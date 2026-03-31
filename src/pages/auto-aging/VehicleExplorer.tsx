@@ -27,8 +27,8 @@ export default function VehicleExplorer() {
     if (paymentFilter !== 'all' && v.paymentMethod !== paymentFilter) return false;
     return true;
   }).sort((a, b) => {
-    const aVal = (a as Record<string, unknown>)[sortField] as number ?? 0;
-    const bVal = (b as Record<string, unknown>)[sortField] as number ?? 0;
+    const aVal = (a as unknown as Record<string, unknown>)[sortField] as number ?? 0;
+    const bVal = (b as unknown as Record<string, unknown>)[sortField] as number ?? 0;
     return sortDir === 'desc' ? bVal - aVal : aVal - bVal;
   });
 
