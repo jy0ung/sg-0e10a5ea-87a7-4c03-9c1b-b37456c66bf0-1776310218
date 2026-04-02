@@ -7,6 +7,9 @@ import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Download, Filter } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { AgingTrendChart } from '@/components/charts/AgingTrendChart';
+import { OutlierScatterChart } from '@/components/charts/OutlierScatterChart';
+import { PaymentPieChart } from '@/components/charts/PaymentPieChart';
 
 export default function AutoAgingDashboard() {
   const { kpiSummaries, vehicles, qualityIssues, lastRefresh, refreshKpis } = useData();
