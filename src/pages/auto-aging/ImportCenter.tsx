@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
@@ -10,6 +11,7 @@ import { ImportBatch, VehicleRaw } from '@/types';
 type Step = 'upload' | 'validating' | 'review' | 'publishing' | 'done';
 
 export default function ImportCenter() {
+  const navigate = useNavigate();
   const { addImportBatch, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, vehicles } = useData();
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');
@@ -43,18 +45,18 @@ export default function ImportCenter() {
     setStep('review');
   }, [addImportBatch]);
 
-  const handlePublish = useCallback(() => {
+  const handlePublish = useCallback(async () => {
     setStep('publishing');
     updateImportBatch(batchId, { status: 'publish_in_progress' });
 
-    setTimeout(() => {
-      const { canonical, issues } = publishCanonical(rawRows);
-      setVehicles([...canonical, ...vehicles.filter(v => !canonical.find(c => c.chassis_no === v.chassis_no))]);
-      addQualityIssues(issues);
-      updateImportBatch(batchId, { status: 'published', publishedAt: new Date().toISOString() });
-      refreshKpis();
-      setStep('done');
-    }, 1500);
+    const { canonical, issues } = publishCanonical(rawRows);
+    // Merge with existing: new records override duplicates by chassis_no
+    const existingNonDup = vehicles.filter(v => !canonical.find(c => c.chassis_no === v.chassis_no));
+    await setVehicles([...canonical, ...existingNonDup]);
+    addQualityIssues(issues);
+    updateImportBatch(batchId, { status: 'published', publishedAt: new Date().toISOString() });
+    refreshKpis();
+    setStep('done');
   }, [batchId, rawRows, vehicles, updateImportBatch, setVehicles, addQualityIssues, refreshKpis]);
 
   const reset = () => { setStep('upload'); setRawRows([]); setValidationIssues([]); setMissingCols([]); };
@@ -174,7 +176,7 @@ export default function ImportCenter() {
           <p className="text-sm text-muted-foreground mb-6">Dashboard snapshots have been refreshed with the latest data.</p>
           <div className="flex gap-2 justify-center">
             <Button onClick={reset}>Import Another</Button>
-            <Button variant="outline" onClick={() => window.location.href = '/auto-aging'}>View Dashboard</Button>
+            <Button variant="outline" onClick={() => navigate('/auto-aging')}>View Dashboard</Button>
           </div>
         </div>
       )}
