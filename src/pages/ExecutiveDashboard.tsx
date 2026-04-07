@@ -50,7 +50,8 @@ export default function ExecutiveDashboard() {
   }, [user?.id]);
 
   const savePreferences = useCallback(async (kpis: string[], advanced: boolean) => {
-    const userId = user?.id || 'default';
+    if (!user?.id) return;
+    const userId = user.id;
     await supabase
       .from('dashboard_preferences')
       .upsert({
