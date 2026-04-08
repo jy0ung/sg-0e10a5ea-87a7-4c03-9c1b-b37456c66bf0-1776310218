@@ -347,6 +347,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      can_read_profile: {
+        Args: { target_company_id: string; target_id: string }
+        Returns: boolean
+      }
       get_my_access_scope: {
         Args: never
         Returns: {
