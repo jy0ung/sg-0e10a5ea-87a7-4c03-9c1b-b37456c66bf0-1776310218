@@ -51,7 +51,7 @@ export async function logVehicleEdit(
 export async function getAuditLog(
   vehicleId: string,
   limit: number = 100
-): Promise<{ data: AuditLogWithProfile[] | null; error: any }> {
+): Promise<{ data: AuditLogWithProfile[] | null; error: Error | null }> {
   const { data, error } = await supabase
     .from('audit_logs')
     .select('*, profiles(full_name, email, role)')
@@ -60,7 +60,7 @@ export async function getAuditLog(
     .order('created_at', { ascending: false })
     .limit(limit);
 
-  return { data, error };
+  return { data, error: error || null };
 }
 
 /**
