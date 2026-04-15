@@ -5,17 +5,23 @@ import { KpiCard } from '@/components/shared/KpiCard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Download, Filter, Upload } from 'lucide-react';
+import { RefreshCw, Download, Filter, Upload, X } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AgingTrendChart } from '@/components/charts/AgingTrendChart';
 import { OutlierScatterChart } from '@/components/charts/OutlierScatterChart';
 import { PaymentPieChart } from '@/components/charts/PaymentPieChart';
+import { KpiTrendChart } from '@/components/charts/KpiTrendChart';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 
 export default function AutoAgingDashboard() {
   const { kpiSummaries, vehicles, qualityIssues, lastRefresh, refreshKpis } = useData();
   const navigate = useNavigate();
   const [branchFilter, setBranchFilter] = useState<string>('all');
   const [modelFilter, setModelFilter] = useState<string>('all');
+  const [selectedKpiId, setSelectedKpiId] = useState<string>('bg_to_delivery');
+  const [vehicleDetailsOpen, setVehicleDetailsOpen] = useState(false);
+  const [detailKpiId, setDetailKpiId] = useState<string | null>(null);
 
   const branches = [...new Set(vehicles.map(v => v.branch_code))].sort();
   const models = [...new Set(vehicles.map(v => v.model))].sort();
@@ -26,6 +32,28 @@ export default function AutoAgingDashboard() {
     return true;
   });
 
+  // Get vehicles for a specific KPI
+  const getKpiVehicles = (kpiId: string) => {
+    const kpiDef = KPI_DEFINITIONS.find(k => k.id === kpiId);
+    if (!kpiDef) return [];
+    const kpiSummary = kpiSummaries.find(k => k.kpiId === kpiId);
+    if (!kpiSummary) return [];
+    
+    return filtered.filter(v => {
+      const val = v[kpiDef.computedField as keyof typeof v] as number | null | undefined;
+      return val !== null && val !== undefined && val >= 0;
+    }).sort((a, b) => {
+      const valA = a[kpiDef.computedField as keyof typeof a] as number;
+      const valB = b[kpiDef.computedField as keyof typeof b] as number;
+      return valB - valA; // Sort descending
+    });
+  };
+
+  const handleKpiCardClick = (kpiId: string) => {
+    setDetailKpiId(kpiId);
+    setVehicleDetailsOpen(true);
+  };
+
   const processStages = [
     { label: 'BG Date', short: 'BG' },
     { label: 'Shipment ETD', short: 'ETD' },
@@ -35,7 +63,6 @@ export default function AutoAgingDashboard() {
     { label: 'Disbursement', short: 'DISB' },
   ];
 
-  // Map process flow KPIs (the segment KPIs between stages)
   const segmentKpiIds = ['bg_to_shipment_etd', 'etd_to_outlet', 'outlet_to_reg', 'reg_to_delivery', 'delivery_to_disb'];
 
   const branchHeatmap = React.useMemo(() => {
@@ -119,10 +146,13 @@ export default function AutoAgingDashboard() {
             status={kpi.overdueCount > 10 ? 'critical' : kpi.overdueCount > 0 ? 'warning' : 'normal'}
             validCount={kpi.validCount}
             overdueCount={kpi.overdueCount}
-            onClick={() => navigate('/auto-aging/vehicles')}
+            onClick={() => handleKpiCardClick(kpi.kpiId)}
           />
         ))}
       </div>
+
+      {/* Trend Chart */}
+      <KpiTrendChart vehicles={filtered} selectedKpiId={selectedKpiId} />
 
       {/* Branch Heatmap + Quality */}
       <div className="grid md:grid-cols-3 gap-4">
@@ -211,6 +241,83 @@ export default function AutoAgingDashboard() {
           </table>
         </div>
       </div>
+
+      {/* Vehicle Details Modal */}
+      <Dialog open={vehicleDetailsOpen} onOpenChange={setVehicleDetailsOpen}>
+        <DialogContent className="max-w-5xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle>
+                {detailKpiId && KPI_DEFINITIONS.find(k => k.id === detailKpiId)?.label} — Vehicle Details
+              </DialogTitle>
+              <Button variant="ghost" size="icon" onClick={() => setVehicleDetailsOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="overflow-y-auto max-h-[65vh]">
+            {detailKpiId ? (
+              <>
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-card z-10">
+                    <tr className="border-b border-border">
+                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Chassis No</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Model</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Branch</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Customer</th>
+                      <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground">Days</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getKpiVehicles(detailKpiId).slice(0, 50).map(v => {
+                      const kpiDef = KPI_DEFINITIONS.find(k => k.id === detailKpiId);
+                      const kpiField = kpiDef?.computedField;
+                      const value = kpiField ? (v[kpiField as keyof typeof v] as number) : 0;
+                      const kpiSummary = kpiSummaries.find(k => k.kpiId === detailKpiId);
+                      const isOverdue = kpiSummary ? value > kpiSummary.slaDays : false;
+                      
+                      return (
+                        <tr 
+                          key={v.id} 
+                          className="border-b border-border/50 hover:bg-secondary/30 cursor-pointer"
+                          onClick={() => navigate(`/auto-aging/vehicles/${v.chassis_no}`)}
+                        >
+                          <td className="px-3 py-2 font-medium">{v.chassis_no}</td>
+                          <td className="px-3 py-2">{v.model}</td>
+                          <td className="px-3 py-2">{v.branch_code}</td>
+                          <td className="px-3 py-2">{v.customer_name}</td>
+                          <td className="px-3 py-2 text-right">
+                            <span className={`font-semibold ${isOverdue ? 'text-destructive' : 'text-success'}`}>
+                              {value}d
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">
+                            <StatusBadge status={isOverdue ? 'warning' : 'active'} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {getKpiVehicles(detailKpiId).length > 50 && (
+                  <div className="text-center py-4 text-sm text-muted-foreground">
+                    Showing 50 of {getKpiVehicles(detailKpiId).length} vehicles. 
+                    <button 
+                      onClick={() => navigate('/auto-aging/vehicles')}
+                      className="text-primary hover:underline ml-2"
+                    >
+                      View all →
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">No KPI selected</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

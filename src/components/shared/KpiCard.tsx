@@ -10,6 +10,7 @@ interface KpiCardProps {
   validCount?: number;
   overdueCount?: number;
   onClick?: () => void;
+  onVehicleDetails?: () => void;
 }
 
 export function KpiCard({ 
@@ -19,7 +20,8 @@ export function KpiCard({
   status = 'normal', 
   validCount, 
   overdueCount,
-  onClick 
+  onClick,
+  onVehicleDetails
 }: KpiCardProps) {
   const statusColors = {
     normal: 'bg-success/10 border-success/20',
@@ -36,11 +38,11 @@ export function KpiCard({
   return (
     <Card 
       className={cn(
-        'glass-panel p-4 cursor-pointer transition-all hover:shadow-md',
-        onClick && 'hover:border-primary/40',
+        'glass-panel p-4 transition-all hover:shadow-md',
+        (onClick || onVehicleDetails) && 'hover:border-primary/40 cursor-pointer',
         statusColors[status]
       )}
-      onClick={onClick}
+      onClick={onClick || onVehicleDetails}
     >
       <div className="space-y-2">
         {/* KPI Name - Prominent */}
