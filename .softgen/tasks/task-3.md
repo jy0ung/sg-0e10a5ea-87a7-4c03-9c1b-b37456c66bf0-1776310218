@@ -203,14 +203,14 @@ const validators = {
 - [x] Create auditService.ts with logging functions
 - [x] Update vehicleService.ts to include audit logging
 - [x] Create ExcelTable generic component
+- [x] Create VehicleDetailPanel component
+- [x] Create PermissionEditor admin component (connected to Supabase)
+- [ ] Create AuditLogViewer component
 - [ ] Refactor VehicleExplorer to use ExcelTable
 - [ ] Define all Excel columns matching uploaded layout
 - [ ] Remove KPI columns from Vehicle Explorer
 - [ ] Implement inline edit with auto-save
 - [ ] Add cell validation for each column type
-- [ ] Create VehicleDetailPanel component
-- [ ] Create PermissionEditor admin component
-- [ ] Create AuditLogViewer component
 - [ ] Add bulk edit functionality
 - [ ] Add export functionality
 - [ ] Implement permission-based column visibility
