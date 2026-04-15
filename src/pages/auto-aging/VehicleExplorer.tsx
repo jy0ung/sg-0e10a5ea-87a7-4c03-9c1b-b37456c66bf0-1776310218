@@ -1,120 +1,442 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { ExcelTable, TableColumn } from '@/components/shared/ExcelTable';
+import { VehicleDetailPanel } from '@/components/vehicles/VehicleDetailPanel';
+import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { Download, Search, ChevronLeft, ChevronRight } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Download, Search, Filter } from 'lucide-react';
+import { updateVehicleWithAudit } from '@/services/vehicleService';
+import { getUserPermissions } from '@/services/permissionService';
+import type { VehicleCanonical } from '@/types';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250];
 
 export default function VehicleExplorer() {
-  const { vehicles, reloadFromDb } = useData();
+  const { user } = useAuth();
+  const { vehicles } = useData();
   const navigate = useNavigate();
+  const { chassis_no: chassisParam } = useParams();
+
+  // State
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState('all');
   const [modelFilter, setModelFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
-  const [sortField, setSortField] = useState<string>('bg_to_delivery');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [sortField, setSortField] = useState<string>('chassis_no');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
-  
+  const [selectedVehicle, setSelectedVehicle] = useState<VehicleCanonical | null>(null);
+  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+  const [userPermissions, setUserPermissions] = useState<ReturnType<typeof getUserPermissions extends Promise<infer T> ? T : never>>(null);
 
+  // Get user permissions
+  useEffect(() => {
+    if (user?.id) {
+      getUserPermissions(user.id).then(permissions => {
+        setUserPermissions(permissions);
+      });
+    }
+  }, [user?.id]);
+
+  // Open detail panel if chassis_no is in URL
+  useEffect(() => {
+    if (chassisParam) {
+      const vehicle = vehicles.find(v => v.chassis_no === chassisParam);
+      if (vehicle) {
+        setSelectedVehicle(vehicle);
+        setDetailPanelOpen(true);
+      }
+    }
+  }, [chassisParam, vehicles]);
+
+  // Get filter options
   const branches = [...new Set(vehicles.map(v => v.branch_code))].sort();
   const models = [...new Set(vehicles.map(v => v.model))].sort();
   const payments = [...new Set(vehicles.map(v => v.payment_method))].sort();
 
+  // Filter vehicles
   const filtered = vehicles.filter(v => {
-    if (search && !v.chassis_no.toLowerCase().includes(search.toLowerCase()) && !v.customer_name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !v.chassis_no.toLowerCase().includes(search.toLowerCase()) && 
+        !v.customer_name.toLowerCase().includes(search.toLowerCase()) &&
+        !v.invoice_no?.toLowerCase().includes(search.toLowerCase())) return false;
     if (branchFilter !== 'all' && v.branch_code !== branchFilter) return false;
     if (modelFilter !== 'all' && v.model !== modelFilter) return false;
     if (paymentFilter !== 'all' && v.payment_method !== paymentFilter) return false;
     return true;
-  }).sort((a, b) => {
-    const aVal = (a as unknown as Record<string, unknown>)[sortField] as number ?? 0;
-    const bVal = (b as unknown as Record<string, unknown>)[sortField] as number ?? 0;
-    return sortDir === 'desc' ? bVal - aVal : aVal - bVal;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  // Sort vehicles
+  const sorted = [...filtered].sort((a, b) => {
+    const aVal = (a as Record<string, unknown>)[sortField];
+    const bVal = (b as Record<string, unknown>)[sortField];
+    
+    // Handle null/undefined
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+    
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      return sortDir === 'desc' 
+        ? bVal.localeCompare(aVal) 
+        : aVal.localeCompare(bVal);
+    }
+    
+    return sortDir === 'desc' 
+      ? (bVal as number) - (aVal as number) 
+      : (aVal as number) - (bVal as number);
+  });
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const startIdx = (currentPage - 1) * pageSize;
-  const pageData = filtered.slice(startIdx, startIdx + pageSize);
+  const pageData = sorted.slice(startIdx, startIdx + pageSize);
 
   // Reset page when filters change
-  React.useEffect(() => { setPage(1); }, [search, branchFilter, modelFilter, paymentFilter, pageSize]);
+  useEffect(() => { 
+    setPage(1); 
+  }, [search, branchFilter, modelFilter, paymentFilter, pageSize]);
 
-  const toggleSort = (field: string) => {
-    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortField(field); setSortDir('desc'); }
-  };
+  // Define columns matching Excel layout
+  const columns: TableColumn<VehicleCanonical>[] = [
+    {
+      key: 'row_no',
+      label: 'Row No',
+      width: 80,
+      sortable: false,
+      format: (_value, index) => String(startIdx + index + 1),
+    },
+    {
+      key: 'chassis_no',
+      label: 'Chassis No',
+      width: 120,
+      sortable: true,
+      type: 'text',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'branch_code',
+      label: 'Branch',
+      width: 100,
+      sortable: true,
+      type: 'select',
+      options: branches,
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'model',
+      label: 'Model',
+      width: 120,
+      sortable: true,
+      type: 'select',
+      options: models,
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'variant',
+      label: 'Variant',
+      width: 120,
+      sortable: true,
+      type: 'text',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'customer_name',
+      label: 'Customer',
+      width: 180,
+      sortable: true,
+      type: 'text',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'salesman_name',
+      label: 'Salesman',
+      width: 150,
+      sortable: true,
+      type: 'text',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'bg_date',
+      label: 'BG Date',
+      width: 120,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'etd_pkg',
+      label: 'ETD (PKG)',
+      width: 120,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'eta_kk',
+      label: 'ETA (KK)',
+      width: 120,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'eta_twu',
+      label: 'ETA (TWU)',
+      width: 120,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'eta_sdk',
+      label: 'ETA (SDK)',
+      width: 120,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'outlet_recv_date',
+      label: 'Outlet Recv',
+      width: 120,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'reg_date',
+      label: 'Reg Date',
+      width: 120,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'delivery_date',
+      label: 'Delivery Date',
+      width: 130,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'disb_date',
+      label: 'Disb Date',
+      width: 120,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'payment_method',
+      label: 'Payment Method',
+      width: 130,
+      sortable: true,
+      type: 'select',
+      options: payments,
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'lou_amount',
+      label: 'LOU',
+      width: 100,
+      sortable: true,
+      type: 'number',
+      format: (value) => value ? `${value}` : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'contra_sola',
+      label: 'Contra/Sola',
+      width: 110,
+      sortable: true,
+      type: 'text',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'full_payment_date',
+      label: 'Full Payment Date',
+      width: 150,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'vaa_date',
+      label: 'VAA Date',
+      width: 110,
+      sortable: true,
+      type: 'date',
+      format: (value) => value ? String(value).split('T')[0] : '',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'reg_no',
+      label: 'Reg No',
+      width: 120,
+      sortable: true,
+      type: 'text',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'invoice_no',
+      label: 'Invoice No',
+      width: 140,
+      sortable: true,
+      type: 'text',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'obr',
+      label: 'OBR',
+      width: 100,
+      sortable: true,
+      type: 'text',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'dealer_transfer_price',
+      label: 'Dealer Transfer Price',
+      width: 160,
+      sortable: true,
+      type: 'number',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'full_payment_type',
+      label: 'Full Payment Type',
+      width: 160,
+      sortable: true,
+      type: 'text',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'shipment_name',
+      label: 'Shipment Name',
+      width: 150,
+      sortable: true,
+      type: 'text',
+      editable: userPermissions?.canEdit || false,
+    },
+    {
+      key: 'd2d',
+      label: 'D2D',
+      width: 80,
+      sortable: true,
+      editable: false,
+      format: (value) => value ? 'Yes' : 'No',
+    },
+    {
+      key: 'remark',
+      label: 'Remark',
+      width: 200,
+      sortable: true,
+      type: 'textarea',
+      editable: userPermissions?.canEdit || false,
+    },
+  ];
 
-  const SortHeader = ({ field, label }: { field: string; label: string }) => (
-    <th className="px-3 py-2 text-xs text-muted-foreground font-medium cursor-pointer hover:text-foreground" onClick={() => toggleSort(field)}>
-      {label} {sortField === field && (sortDir === 'desc' ? '↓' : '↑')}
-    </th>
-  );
+  // Handle cell edit
+  const handleCellEdit = async (rowId: string, column: string, value: unknown) => {
+    if (!user?.id) return;
 
-  const kpiColumns = [
-    { field: 'bg_to_delivery', label: 'BG→Del' },
-    { field: 'bg_to_shipment_etd', label: 'BG→ETD' },
-    { field: 'etd_to_outlet', label: 'ETD→Out' },
-    { field: 'outlet_to_reg', label: 'Out→Reg' },
-    { field: 'reg_to_delivery', label: 'Reg→Del' },
-    { field: 'bg_to_disb', label: 'BG→Disb' },
-    { field: 'delivery_to_disb', label: 'Del→Disb' },
-  ] as const;
+    const updates: Partial<VehicleCanonical> = {
+      [column]: value,
+    };
 
-  const getPageNumbers = () => {
-    const pages: (number | 'ellipsis')[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    const result = await updateVehicleWithAudit(rowId, updates, user.id);
+    if (result.error) {
+      console.error('Failed to update vehicle:', result.error);
     } else {
-      pages.push(1);
-      if (currentPage > 3) pages.push('ellipsis');
-      for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-        pages.push(i);
-      }
-      if (currentPage < totalPages - 2) pages.push('ellipsis');
-      pages.push(totalPages);
+      // Refresh data to show updated values
+      window.location.reload();
     }
-    return pages;
   };
+
+  // Handle row click to open detail panel
+  const handleRowClick = (row: VehicleCanonical) => {
+    setSelectedVehicle(row);
+    setDetailPanelOpen(true);
+    navigate(`/auto-aging/vehicles/${row.chassis_no}`);
+  };
+
+  // Get permissions for columns
+  const permissions = userPermissions?.columns 
+    ? Object.fromEntries(Array.from(userPermissions.columns.entries()).map(([col, level]) => [col, level]))
+    : {};
 
   return (
     <div className="space-y-4 animate-fade-in">
       <PageHeader
         title="Vehicle Explorer"
         description={`${filtered.length} of ${vehicles.length} vehicles`}
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Vehicle Explorer' }]}
-        actions={<Button variant="outline" size="sm"><Download className="h-3.5 w-3.5 mr-1" />Export CSV</Button>}
+        breadcrumbs={[
+          { label: 'FLC BI' }, 
+          { label: 'Auto Aging' }, 
+          { label: 'Vehicle Explorer' }
+        ]}
+        actions={
+          <Button variant="outline" size="sm">
+            <Download className="h-3.5 w-3.5 mr-1" />Export CSV
+          </Button>
+        }
       />
 
+      {/* Filters */}
       <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
+        <Filter className="h-4 w-4 text-muted-foreground" />
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search chassis or customer..." className="h-8 w-56 rounded-md bg-secondary border border-border pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+          <input 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+            placeholder="Search chassis, customer, invoice..." 
+            className="h-8 w-64 rounded-md bg-secondary border border-border pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" 
+          />
         </div>
-        <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)} className="h-8 rounded-md bg-secondary border border-border px-3 text-xs text-foreground">
-          <option value="all">All Branches</option>
-          {branches.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
-        <select value={modelFilter} onChange={e => setModelFilter(e.target.value)} className="h-8 rounded-md bg-secondary border border-border px-3 text-xs text-foreground">
-          <option value="all">All Models</option>
-          {models.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-        <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)} className="h-8 rounded-md bg-secondary border border-border px-3 text-xs text-foreground">
-          <option value="all">All Payments</option>
-          {payments.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+        <Select value={branchFilter} onValueChange={setBranchFilter}>
+          <SelectTrigger className="h-8 w-40 text-xs">
+            <SelectValue placeholder="All Branches" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Branches</SelectItem>
+            {branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={modelFilter} onValueChange={setModelFilter}>
+          <SelectTrigger className="h-8 w-40 text-xs">
+            <SelectValue placeholder="All Models" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Models</SelectItem>
+            {models.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+          <SelectTrigger className="h-8 w-40 text-xs">
+            <SelectValue placeholder="All Payments" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Payments</SelectItem>
+            {payments.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Rows per page:</span>
           <Select value={String(pageSize)} onValueChange={v => setPageSize(Number(v))}>
@@ -130,84 +452,52 @@ export default function VehicleExplorer() {
         </div>
       </div>
 
-      <div className="glass-panel overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-secondary/30 text-left">
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Chassis No.</th>
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Branch</th>
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Model</th>
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Customer</th>
-                {kpiColumns.map(c => <SortHeader key={c.field} field={c.field} label={c.label} />)}
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">D2D</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageData.map(v => (
-                <tr key={v.id} className="data-table-row cursor-pointer" onClick={() => navigate(`/auto-aging/vehicles/${v.chassis_no}`)}>
-                  <td className="px-3 py-2 font-mono text-xs text-primary">{v.chassis_no}</td>
-                  <td className="px-3 py-2 text-foreground">{v.branch_code}</td>
-                  <td className="px-3 py-2 text-foreground">{v.model}</td>
-                  <td className="px-3 py-2 text-foreground truncate max-w-[120px]">{v.customer_name}</td>
-                  {kpiColumns.map(c => {
-                    const val = v[c.field as keyof typeof v] as number | null | undefined;
-                    return (
-                      <td key={c.field} className="px-3 py-2 tabular-nums">
-                        {val != null ? <span className={val < 0 ? 'text-destructive' : val > 45 ? 'text-warning' : 'text-foreground'}>{val}</span> : <span className="text-muted-foreground">—</span>}
-                      </td>
-                    );
-                  })}
-                  <td className="px-3 py-2">{v.is_d2d ? <StatusBadge status="warning" className="text-[10px]" /> : ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Excel Table */}
+      <ExcelTable<VehicleCanonical>
+        data={pageData}
+        columns={columns}
+        sort={{ key: sortField, direction: sortDir }}
+        onSort={(key) => {
+          if (sortField === key) {
+            setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+          } else {
+            setSortField(key);
+            setSortDir('desc');
+          }
+        }}
+        pagination={{
+          page: currentPage,
+          pageSize,
+          totalPages,
+          total: filtered.length,
+          onPageChange: setPage,
+          onPageSizeChange: setPageSize,
+        }}
+        onEdit={userPermissions?.canEdit ? handleCellEdit : undefined}
+        onRowClick={handleRowClick}
+        permissions={permissions}
+      />
 
-        {/* Pagination controls */}
-        <div className="flex items-center justify-between border-t border-border px-4 py-3">
-          <p className="text-xs text-muted-foreground">
-            Showing {filtered.length === 0 ? 0 : startIdx + 1}–{Math.min(startIdx + pageSize, filtered.length)} of {filtered.length} results
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              disabled={currentPage <= 1}
-              onClick={() => setPage(p => p - 1)}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
-            {getPageNumbers().map((p, i) =>
-              p === 'ellipsis' ? (
-                <span key={`e-${i}`} className="px-1 text-xs text-muted-foreground">…</span>
-              ) : (
-                <Button
-                  key={p}
-                  variant={p === currentPage ? 'default' : 'outline'}
-                  size="icon"
-                  className="h-7 w-7 text-xs"
-                  onClick={() => setPage(p)}
-                >
-                  {p}
-                </Button>
-              )
-            )}
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              disabled={currentPage >= totalPages}
-              onClick={() => setPage(p => p + 1)}
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
+      {/* Vehicle Detail Panel */}
+      <VehicleDetailPanel
+        vehicle={selectedVehicle}
+        open={detailPanelOpen}
+        onClose={() => {
+          setDetailPanelOpen(false);
+          setSelectedVehicle(null);
+          navigate('/auto-aging/vehicles');
+        }}
+        canEdit={userPermissions?.canEdit || false}
+        onEdit={userPermissions?.canEdit ? async (id, updates) => {
+          if (!user?.id) return;
+          const result = await updateVehicleWithAudit(id, updates, user.id);
+          if (result.error) {
+            console.error('Failed to update vehicle:', result.error);
+          } else {
+            window.location.reload();
+          }
+        } : undefined}
+      />
     </div>
   );
 }
