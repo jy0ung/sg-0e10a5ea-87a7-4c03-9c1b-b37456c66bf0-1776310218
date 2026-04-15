@@ -1,9 +1,9 @@
-import { supabase } from '@/integrations/supabase/client';
-import type { Tables } from '@/integrations/supabase/types';
-import { performanceService } from './performanceService';
-import { loggingService } from './loggingService';
+import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
+import { performanceService } from "./performanceService";
+import { loggingService } from "./loggingService";
 
-export type AuditLog = Tables<'audit_logs'>;
+export type AuditLog = Tables<"audit_logs">;
 
 export interface AuditChange<T = unknown> {
   before: T;
@@ -18,9 +18,6 @@ export interface AuditLogWithProfile extends AuditLog {
   };
 }
 
-/**
- * Log a vehicle edit to audit trail
- */
 export async function logVehicleEdit(
   userId: string,
   vehicleId: string,
@@ -33,13 +30,13 @@ export async function logVehicleEdit(
   const queryId = `audit-log-${vehicleId}-${Date.now()}`;
   performanceService.startQueryTimer(queryId);
 
-  const { error } = await supabase.from('audit_logs').insert({
+  const { error } = await supabase.from("audit_logs").insert({
     user_id: userId,
-    action: 'update',
-    entity_type: 'vehicle',
+    action: "update",
+    entity_type: "vehicle",
     entity_id: vehicleId,
     changes: changes as Record<string, unknown>,
-    table_name: 'vehicles',
+    table_name: "vehicles",
     ...metadata,
   });
 
@@ -52,9 +49,6 @@ export async function logVehicleEdit(
   return { error: error || null };
 }
 
-/**
- * Get audit log for a specific vehicle
- */
 export async function getAuditLog(
   vehicleId: string,
   limit: number = 100
@@ -63,11 +57,11 @@ export async function getAuditLog(
   performanceService.startQueryTimer(queryId);
 
   const { data, error } = await supabase
-    .from('audit_logs')
-    .select('*, profiles(full_name, email, role)')
-    .eq('entity_id', vehicleId)
-    .eq('entity_type', 'vehicle')
-    .order('created_at', { ascending: false })
+    .from("audit_logs")
+    .select("*, profiles(full_name, email, role)")
+    .eq("entity_id", vehicleId)
+    .eq("entity_type", "vehicle")
+    .order("created_at", { ascending: false })
     .limit(limit);
 
   performanceService.endQueryTimer(queryId, "get_audit_log_vehicle");
@@ -79,9 +73,6 @@ export async function getAuditLog(
   return { data, error: error || null };
 }
 
-/**
- * Get audit logs for a specific user
- */
 export async function getUserAuditLogs(
   userId: string,
   limit: number = 100,
@@ -91,10 +82,10 @@ export async function getUserAuditLogs(
   performanceService.startQueryTimer(queryId);
 
   const { data, error } = await supabase
-    .from('audit_logs')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+    .from("audit_logs")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
   performanceService.endQueryTimer(queryId, "get_user_audit_logs");
@@ -106,9 +97,6 @@ export async function getUserAuditLogs(
   return { data, error: error || null };
 }
 
-/**
- * Get all audit logs (admin only)
- */
 export async function getAllAuditLogs(
   limit: number = 100,
   offset: number = 0,
@@ -127,25 +115,25 @@ export async function getAllAuditLogs(
   performanceService.startQueryTimer(queryId);
 
   let query = supabase
-    .from('audit_logs')
-    .select('*, profiles(full_name, email, role)', { count: 'exact' })
-    .order('created_at', { ascending: false })
+    .from("audit_logs")
+    .select("*, profiles(full_name, email, role)", { count: "exact" })
+    .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (filters?.entityType) {
-    query = query.eq('entity_type', filters.entityType);
+    query = query.eq("entity_type", filters.entityType);
   }
 
   if (filters?.userId) {
-    query = query.eq('user_id', filters.userId);
+    query = query.eq("user_id", filters.userId);
   }
 
   if (filters?.fromDate) {
-    query = query.gte('created_at', filters.fromDate.toISOString());
+    query = query.gte("created_at", filters.fromDate.toISOString());
   }
 
   if (filters?.toDate) {
-    query = query.lte('created_at', filters.toDate.toISOString());
+    query = query.lte("created_at", filters.toDate.toISOString());
   }
 
   const { data, error, count } = await query;
@@ -159,9 +147,6 @@ export async function getAllAuditLogs(
   return { data, error: error || null, count };
 }
 
-/**
- * Log a permission change
- */
 export async function logPermissionChange(
   userId: string,
   targetUserId: string,
@@ -174,13 +159,13 @@ export async function logPermissionChange(
   const queryId = `audit-perm-${targetUserId}-${Date.now()}`;
   performanceService.startQueryTimer(queryId);
 
-  const { error } = await supabase.from('audit_logs').insert({
+  const { error } = await supabase.from("audit_logs").insert({
     user_id: userId,
-    action: 'permission_change',
-    entity_type: 'user',
+    action: "permission_change",
+    entity_type: "user",
     entity_id: targetUserId,
     changes: changes,
-    table_name: 'profiles',
+    table_name: "profiles",
     ...metadata,
   });
 
