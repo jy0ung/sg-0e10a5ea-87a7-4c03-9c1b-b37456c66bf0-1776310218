@@ -22,3 +22,23 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Softgen - prevent committing dependencies and build artifacts
+.next/
+build/
+.cache/
+.vercel/
+.turbo/
+out/
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.jwt
+service-account*.json
+firebase-service-account.json
+credentials.json
+.git-credentials
+.secrets
+secrets/
