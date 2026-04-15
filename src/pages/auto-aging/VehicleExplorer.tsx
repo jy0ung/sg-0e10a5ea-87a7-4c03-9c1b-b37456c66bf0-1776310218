@@ -16,13 +16,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250];
 
+type VehicleRow = VehicleCanonical & {
+  row_no?: number;
+  etd_pkg?: string | null;
+  eta_kk?: string | null;
+  eta_twu?: string | null;
+  eta_sdk?: string | null;
+  outlet_recv_date?: string | null;
+};
+
 export default function VehicleExplorer() {
   const { user } = useAuth();
   const { vehicles } = useData();
   const navigate = useNavigate();
   const { chassis_no: chassisParam } = useParams();
 
-  // State
   const [search, setSearch] = useState('');
   const [branchFilter, setBranchFilter] = useState('all');
   const [modelFilter, setModelFilter] = useState('all');
@@ -34,8 +42,8 @@ export default function VehicleExplorer() {
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleCanonical | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [userPermissions, setUserPermissions] = useState<ReturnType<typeof getUserPermissions extends Promise<infer T> ? T : never>>(null);
+  const [exportLoading, setExportLoading] = useState(false);
 
-  // Get user permissions
   useEffect(() => {
     if (user?.id) {
       getUserPermissions(user.id).then(permissions => {
@@ -44,7 +52,6 @@ export default function VehicleExplorer() {
     }
   }, [user?.id]);
 
-  // Open detail panel if chassis_no is in URL
   useEffect(() => {
     if (chassisParam) {
       const vehicle = vehicles.find(v => v.chassis_no === chassisParam);
@@ -55,12 +62,10 @@ export default function VehicleExplorer() {
     }
   }, [chassisParam, vehicles]);
 
-  // Get filter options
   const branches = [...new Set(vehicles.map(v => v.branch_code))].sort();
   const models = [...new Set(vehicles.map(v => v.model))].sort();
   const payments = [...new Set(vehicles.map(v => v.payment_method))].sort();
 
-  // Filter vehicles
   const filtered = vehicles.filter(v => {
     if (search && !v.chassis_no.toLowerCase().includes(search.toLowerCase()) && 
         !v.customer_name.toLowerCase().includes(search.toLowerCase()) &&
@@ -71,12 +76,43 @@ export default function VehicleExplorer() {
     return true;
   });
 
-  // Sort vehicles
   const sorted = [...filtered].sort((a, b) => {
-    const aVal = (a as Record<string, unknown>)[sortField];
-    const bVal = (b as Record<string, unknown>)[sortField];
+    let aVal: unknown;
+    let bVal: unknown;
+
+    const rowA = a as VehicleRow;
+    const rowB = b as VehicleRow;
+
+    switch (sortField) {
+      case 'row_no':
+        aVal = (filtered.indexOf(a) + 1);
+        bVal = (filtered.indexOf(b) + 1);
+        break;
+      case 'etd_pkg':
+        aVal = rowA.shipment_etd_pkg;
+        bVal = rowB.shipment_etd_pkg;
+        break;
+      case 'eta_kk':
+        aVal = rowA.shipment_eta_kk_twu_sdk;
+        bVal = rowB.shipment_eta_kk_twu_sdk;
+        break;
+      case 'eta_twu':
+        aVal = rowA.shipment_eta_kk_twu_sdk;
+        bVal = rowB.shipment_eta_kk_twu_sdk;
+        break;
+      case 'eta_sdk':
+        aVal = rowA.shipment_eta_kk_twu_sdk;
+        bVal = rowB.shipment_eta_kk_twu_sdk;
+        break;
+      case 'outlet_recv_date':
+        aVal = rowA.date_received_by_outlet;
+        bVal = rowB.date_received_by_outlet;
+        break;
+      default:
+        aVal = (a as Record<string, unknown>)[sortField];
+        bVal = (b as Record<string, unknown>)[sortField];
+    }
     
-    // Handle null/undefined
     if (aVal == null) return 1;
     if (bVal == null) return -1;
     
@@ -91,19 +127,25 @@ export default function VehicleExplorer() {
       : (aVal as number) - (bVal as number);
   });
 
-  // Pagination
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const startIdx = (currentPage - 1) * pageSize;
   const pageData = sorted.slice(startIdx, startIdx + pageSize);
 
-  // Reset page when filters change
   useEffect(() => { 
     setPage(1); 
   }, [search, branchFilter, modelFilter, paymentFilter, pageSize]);
 
-  // Define columns matching Excel layout
-  const columns: TableColumn<VehicleCanonical>[] = [
+  const formatDate = (value: unknown): string => {
+    if (!value) return '';
+    const strValue = String(value);
+    if (strValue.includes('T')) {
+      return strValue.split('T')[0];
+    }
+    return strValue;
+  };
+
+  const columns: TableColumn<VehicleRow>[] = [
     {
       key: 'row_no',
       label: 'Row No',
@@ -167,7 +209,7 @@ export default function VehicleExplorer() {
       width: 120,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: formatDate,
       editable: userPermissions?.canEdit || false,
     },
     {
@@ -176,8 +218,9 @@ export default function VehicleExplorer() {
       width: 120,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: (v) => formatDate((v as VehicleRow).shipment_etd_pkg),
       editable: userPermissions?.canEdit || false,
+      onSave: (rowId, value) => ({ shipment_etd_pkg: value }),
     },
     {
       key: 'eta_kk',
@@ -185,8 +228,9 @@ export default function VehicleExplorer() {
       width: 120,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: (v) => formatDate((v as VehicleRow).shipment_eta_kk_twu_sdk),
       editable: userPermissions?.canEdit || false,
+      onSave: (rowId, value) => ({ shipment_eta_kk_twu_sdk: value }),
     },
     {
       key: 'eta_twu',
@@ -194,8 +238,9 @@ export default function VehicleExplorer() {
       width: 120,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: (v) => formatDate((v as VehicleRow).shipment_eta_kk_twu_sdk),
       editable: userPermissions?.canEdit || false,
+      onSave: (rowId, value) => ({ shipment_eta_kk_twu_sdk: value }),
     },
     {
       key: 'eta_sdk',
@@ -203,8 +248,9 @@ export default function VehicleExplorer() {
       width: 120,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: (v) => formatDate((v as VehicleRow).shipment_eta_kk_twu_sdk),
       editable: userPermissions?.canEdit || false,
+      onSave: (rowId, value) => ({ shipment_eta_kk_twu_sdk: value }),
     },
     {
       key: 'outlet_recv_date',
@@ -212,8 +258,9 @@ export default function VehicleExplorer() {
       width: 120,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: (v) => formatDate((v as VehicleRow).date_received_by_outlet),
       editable: userPermissions?.canEdit || false,
+      onSave: (rowId, value) => ({ date_received_by_outlet: value }),
     },
     {
       key: 'reg_date',
@@ -221,7 +268,7 @@ export default function VehicleExplorer() {
       width: 120,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: formatDate,
       editable: userPermissions?.canEdit || false,
     },
     {
@@ -230,7 +277,7 @@ export default function VehicleExplorer() {
       width: 130,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: formatDate,
       editable: userPermissions?.canEdit || false,
     },
     {
@@ -239,7 +286,7 @@ export default function VehicleExplorer() {
       width: 120,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: formatDate,
       editable: userPermissions?.canEdit || false,
     },
     {
@@ -252,12 +299,12 @@ export default function VehicleExplorer() {
       editable: userPermissions?.canEdit || false,
     },
     {
-      key: 'lou_amount',
+      key: 'lou',
       label: 'LOU',
       width: 100,
       sortable: true,
-      type: 'number',
-      format: (value) => value ? `${value}` : '',
+      type: 'text',
+      format: (v) => (v as VehicleRow).lou || '',
       editable: userPermissions?.canEdit || false,
     },
     {
@@ -274,7 +321,7 @@ export default function VehicleExplorer() {
       width: 150,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: formatDate,
       editable: userPermissions?.canEdit || false,
     },
     {
@@ -283,7 +330,7 @@ export default function VehicleExplorer() {
       width: 110,
       sortable: true,
       type: 'date',
-      format: (value) => value ? String(value).split('T')[0] : '',
+      format: formatDate,
       editable: userPermissions?.canEdit || false,
     },
     {
@@ -315,7 +362,7 @@ export default function VehicleExplorer() {
       label: 'Dealer Transfer Price',
       width: 160,
       sortable: true,
-      type: 'number',
+      type: 'text',
       editable: userPermissions?.canEdit || false,
     },
     {
@@ -340,7 +387,7 @@ export default function VehicleExplorer() {
       width: 80,
       sortable: true,
       editable: false,
-      format: (value) => value ? 'Yes' : 'No',
+      format: (value) => (value as VehicleRow).is_d2d ? 'Yes' : 'No',
     },
     {
       key: 'remark',
@@ -352,34 +399,76 @@ export default function VehicleExplorer() {
     },
   ];
 
-  // Handle cell edit
-  const handleCellEdit = async (rowId: string, column: string, value: unknown) => {
+  const handleCellEdit = async (rowId: string, column: TableColumn<VehicleRow>, value: unknown) => {
     if (!user?.id) return;
 
-    const updates: Partial<VehicleCanonical> = {
-      [column]: value,
-    };
+    let updates: Partial<VehicleCanonical> = {};
+
+    if (column.onSave) {
+      updates = column.onSave(rowId, value);
+    } else {
+      updates = { [column.key]: value };
+    }
 
     const result = await updateVehicleWithAudit(rowId, updates, user.id);
     if (result.error) {
       console.error('Failed to update vehicle:', result.error);
     } else {
-      // Refresh data to show updated values
-      window.location.reload();
+      await useData.reloadFromDb?.();
     }
   };
 
-  // Handle row click to open detail panel
-  const handleRowClick = (row: VehicleCanonical) => {
+  const handleExportCSV = () => {
+    if (!userPermissions?.canEdit && !userPermissions?.canView) {
+      console.error('No permission to export');
+      return;
+    }
+
+    setExportLoading(true);
+
+    try {
+      const headers = columns.map(c => c.label).join(',');
+      const rows = sorted.map(vehicle => {
+        const rowA = vehicle as VehicleRow;
+        return columns.map(col => {
+          const value = col.format 
+            ? col.format((vehicle as Record<string, unknown>)[col.key], sorted.indexOf(vehicle))
+            : (vehicle as Record<string, unknown>)[col.key] || '';
+          return `"${String(value).replace(/"/g, '""')}"`;
+        }).join(',');
+      }).join('\n');
+
+      const csv = `${headers}\n${rows}`;
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vehicles_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleRowClick = (row: VehicleRow) => {
     setSelectedVehicle(row);
     setDetailPanelOpen(true);
     navigate(`/auto-aging/vehicles/${row.chassis_no}`);
   };
 
-  // Get permissions for columns
   const permissions = userPermissions?.columns 
     ? Object.fromEntries(Array.from(userPermissions.columns.entries()).map(([col, level]) => [col, level]))
     : {};
+
+  const filteredColumns = columns.filter(col => {
+    const perm = permissions[col.key];
+    return perm === 'edit' || perm === 'view' || (!permissions || userPermissions?.role === 'super_admin');
+  });
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -392,13 +481,18 @@ export default function VehicleExplorer() {
           { label: 'Vehicle Explorer' }
         ]}
         actions={
-          <Button variant="outline" size="sm">
-            <Download className="h-3.5 w-3.5 mr-1" />Export CSV
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleExportCSV}
+            disabled={exportLoading}
+          >
+            <Download className="h-3.5 w-3.5 mr-1" />
+            {exportLoading ? 'Exporting...' : 'Export CSV'}
           </Button>
         }
       />
 
-      {/* Filters */}
       <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
         <Filter className="h-4 w-4 text-muted-foreground" />
         <div className="relative">
@@ -452,10 +546,9 @@ export default function VehicleExplorer() {
         </div>
       </div>
 
-      {/* Excel Table */}
-      <ExcelTable<VehicleCanonical>
-        data={pageData}
-        columns={columns}
+      <ExcelTable<VehicleRow>
+        data={pageData as VehicleRow[]}
+        columns={filteredColumns}
         sort={{ key: sortField, direction: sortDir }}
         onSort={(key) => {
           if (sortField === key) {
@@ -478,7 +571,6 @@ export default function VehicleExplorer() {
         permissions={permissions}
       />
 
-      {/* Vehicle Detail Panel */}
       <VehicleDetailPanel
         vehicle={selectedVehicle}
         open={detailPanelOpen}
@@ -494,7 +586,7 @@ export default function VehicleExplorer() {
           if (result.error) {
             console.error('Failed to update vehicle:', result.error);
           } else {
-            window.location.reload();
+            await useData.reloadFromDb?.();
           }
         } : undefined}
       />
