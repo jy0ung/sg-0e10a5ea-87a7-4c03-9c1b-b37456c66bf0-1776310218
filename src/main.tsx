@@ -23,6 +23,7 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { DataProvider } from "./contexts/DataContext";
 import { ProtectedRoute } from "./contexts/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const router = createBrowserRouter([
   {

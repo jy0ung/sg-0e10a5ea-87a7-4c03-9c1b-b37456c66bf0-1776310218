@@ -1,12 +1,16 @@
 ---
 title: Refactor Vehicle Explorer to Excel-like table
-status: todo
+status: in_progress
 priority: high
 type: refactor
-tags: [refactor, excel-like, table, ui]
+tags:
+- refactor
+- excel-like
+- table
+- ui
 created_by: agent
-created_at: 2026-04-15T03:18:00Z
-position: 6
+created_at: 2026-04-15 03:18:00+00:00
+position: 0
 ---
 
 ## Notes
