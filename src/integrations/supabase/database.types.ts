@@ -15,6 +15,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      application_logs: {
+        Row: {
+          component: string | null
+          context: Json | null
+          created_at: string | null
+          id: string
+          level: string
+          message: string
+          user_id: string | null
+        }
+        Insert: {
+          component?: string | null
+          context?: Json | null
+          created_at?: string | null
+          id?: string
+          level: string
+          message: string
+          user_id?: string | null
+        }
+        Update: {
+          component?: string | null
+          context?: Json | null
+          created_at?: string | null
+          id?: string
+          level?: string
+          message?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
