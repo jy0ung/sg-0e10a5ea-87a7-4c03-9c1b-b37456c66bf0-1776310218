@@ -1,6 +1,6 @@
 ---
 title: Refactor Vehicle Explorer to Excel-like table with flexible permissions
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags: [feature, refactor, permissions, audit, excel-like]
@@ -68,16 +68,6 @@ CREATE TABLE column_permissions (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, table_name, column_name)
 );
-
-ALTER TABLE column_permissions ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "admin_full_access" ON column_permissions FOR ALL 
-  USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin'));
-
-CREATE POLICY "user_own_permissions" ON column_permissions FOR SELECT
-  USING (auth.uid() = user_id OR EXISTS (
-    SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('company_admin', 'director', 'general_manager')
-  ));
 ```
 
 **New Table: audit_logs** (if not exists)
@@ -88,27 +78,13 @@ CREATE TABLE audit_logs (
   action TEXT NOT NULL,
   entity_type TEXT NOT NULL,
   entity_id UUID NOT NULL,
-  changes JSONB NOT NULL, -- {before: {...}, after: {...}}
+  changes JSONB NOT NULL,
   ip_address TEXT,
   user_agent TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  table_name TEXT, -- 'vehicles', 'column_permissions', etc.
-  column_name TEXT -- specific column edited
+  table_name TEXT,
+  column_name TEXT
 );
-
-CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
-CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
-CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
-
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "view_own_logs" ON audit_logs FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "admin_view_all_logs" ON audit_logs FOR SELECT
-  USING (EXISTS (
-    SELECT 1 FROM profiles WHERE id = auth.uuid() AND role IN ('super_admin', 'company_admin', 'director', 'general_manager')
-  ));
 ```
 
 **Update profiles table** (add permission flags if needed):
@@ -147,165 +123,50 @@ const DEFAULT_PERMISSIONS = {
 };
 ```
 
-**Permission Check Function:**
-```typescript
-function canEditColumn(userId: string, columnName: string): Promise<boolean> {
-  const { user } = await supabase.auth.getUser();
-  if (!user) return false;
-  
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profile?.role === 'super_admin' || profile?.role === 'company_admin') return true;
-  
-  const { data: perm } = await supabase
-    .from('column_permissions')
-    .select('permission_level')
-    .eq('user_id', user.id)
-    .eq('column_name', columnName)
-    .single();
-  
-  return perm?.permission_level === 'edit';
-}
-```
-
 ## API/Backend Changes
 
-**New Service: permissionService.ts**
-```typescript
-export async function getUserColumnPermissions(userId: string, tableName: string = 'vehicles') {
-  const { data, error } = await supabase
-    .from('column_permissions')
-    .select('column_name, permission_level')
-    .eq('user_id', userId)
-    .eq('table_name', tableName);
-  return data || [];
-}
+**New Service: permissionService.ts** ✅
+- getUserColumnPermissions()
+- setUserColumnPermissions()
+- canEditColumn()
+- getUserPermissions()
+- canViewColumn()
+- getDefaultPermissionsForRole()
 
-export async function setUserColumnPermissions(userId: string, permissions: ColumnPermission[]) {
-  return supabase.from('column_permissions').upsert(
-    permissions.map(p => ({ user_id: userId, table_name: 'vehicles', ...p }))
-  );
-}
+**New Service: auditService.ts** ✅
+- logVehicleEdit()
+- getAuditLog()
+- getUserAuditLogs()
+- getAllAuditLogs()
+- logPermissionChange()
 
-export async function checkEditPermission(userId: string, columnName: string): Promise<boolean> {
-  // Check role first, then column_permissions
-}
-```
-
-**New Service: auditService.ts**
-```typescript
-export async function logVehicleEdit(
-  userId: string,
-  vehicleId: string,
-  changes: Record<string, { before: any; after: any }>,
-  metadata?: { ipAddress?: string; userAgent?: string }
-) {
-  const { error } = await supabase.from('audit_logs').insert({
-    user_id: userId,
-    action: 'update',
-    entity_type: 'vehicle',
-    entity_id: vehicleId,
-    changes: changes,
-    table_name: 'vehicles',
-    ...metadata
-  });
-}
-
-export async function getAuditLog(vehicleId: string) {
-  return supabase.from('audit_logs')
-    .select('*, profiles(name, email, role)')
-    .eq('entity_id', vehicleId)
-    .order('created_at', { ascending: false });
-}
-```
-
-**Update vehicleService.ts:**
-```typescript
-export async function updateVehicleWithAudit(
-  vehicleId: string,
-  updates: Partial<VehicleCanonical>,
-  userId: string
-) {
-  // 1. Fetch current values
-  const { data: current } = await supabase
-    .from('vehicles')
-    .select('*')
-    .eq('id', vehicleId)
-    .single();
-  
-  // 2. Prepare changes object for audit
-  const changes: Record<string, { before: any; after: any }> = {};
-  Object.keys(updates).forEach(key => {
-    if (current[key] !== updates[key]) {
-      changes[key] = { before: current[key], after: updates[key] };
-    }
-  });
-  
-  // 3. Update vehicle
-  const { data, error } = await supabase
-    .from('vehicles')
-    .update(updates)
-    .eq('id', vehicleId)
-    .select()
-    .single();
-  
-  // 4. Log audit if changes exist
-  if (Object.keys(changes).length > 0) {
-    await logVehicleEdit(userId, vehicleId, changes);
-  }
-  
-  return { data, error };
-}
-```
+**Update vehicleService.ts:** ✅
+- updateVehicleWithAudit()
+- batchUpdateVehicles()
+- deleteVehicleWithAudit()
+- getVehicles()
 
 ## Frontend Changes
 
-**Component: ExcelTable.tsx** (New generic component)
-```typescript
-interface ExcelTableProps<T> {
-  data: T[];
-  columns: TableColumn<T>[];
-  editableColumns?: string[];
-  onEdit?: (rowId: string, column: string, value: any) => Promise<void>;
-  permissions?: Record<string, 'view' | 'edit'>;
-  loading?: boolean;
-  pagination?: PaginationConfig;
-  sort?: SortConfig;
-}
+**Component: ExcelTable.tsx** ✅
+- Generic table component with inline edit support
+- Sortable columns
+- Pagination
+- Permission-aware rendering
 
-interface TableColumn<T> {
-  key: keyof T;
-  label: string;
-  width?: number;
-  sortable?: boolean;
-  editable?: boolean;
-  type?: 'text' | 'date' | 'number' | 'select' | 'textarea';
-  options?: string[]; // for select type
-  format?: (value: any) => string;
-  validate?: (value: any) => string | null; // return error message or null
-}
-```
-
-**Component: VehicleExplorerTable.tsx** (Refactored)
-- Replace existing table with ExcelTable
-- Define all Excel columns matching layout
-- Integrate permission checks per column
-- Add inline edit handling with auto-save
-- Add cell validation
-- Add audit trail view
-
-**Component: VehicleDetailPanel.tsx** (New)
+**Component: VehicleDetailPanel.tsx** (Next)
 - Side panel showing complete vehicle record
 - Edit mode toggle
 - Permission-aware field rendering
 - Audit history tab
 
-**Component: PermissionEditor.tsx** (New admin component)
+**Component: PermissionEditor.tsx** (Next)
 - User list with expandable permission details
 - Checkbox grid for column permissions
 - Permission templates
 - Preview mode
 
-**Component: AuditLogViewer.tsx** (New)
+**Component: AuditLogViewer.tsx** (Next)
 - Timeline view of changes
 - Filter by user, action, date range
 - Diff viewer showing before/after values
@@ -326,52 +187,22 @@ const validators = {
 
 **Edge Cases to Handle:**
 
-1. **Concurrent Edits:**
-   - Optimistic locking with version field
-   - Conflict resolution dialog
-
-2. **Permission Changes:**
-   - Live permission updates
-   - Re-render table on permission change
-   - Handle revoked edit mid-edit
-
-3. **Validation Errors:**
-   - Inline error display
-   - Prevent save on invalid data
-   - Bulk edit validation
-
-4. **Audit Log Performance:**
-   - Paginate audit log
-   - Index audit_logs table
-   - Limit to recent 1000 changes by default
-
-5. **Data Consistency:**
-   - Transaction for multi-field edits
-   - Rollback on validation failure
-   - FK constraint handling
-
-6. **Mobile Responsiveness:**
-   - Horizontal scroll for table
-   - Stacked view for detail panel
-   - Touch-friendly edit controls
-
-7. **Bulk Operations:**
-   - Batch updates with audit logging
-   - Progress indicator
-   - Error handling for partial failures
-
-8. **Export Functionality:**
-   - Export visible data respecting permissions
-   - Include audit log option
-   - Format: Excel, CSV, PDF
+1. **Concurrent Edits:** Optimistic locking with version field, conflict resolution dialog
+2. **Permission Changes:** Live permission updates, re-render table on permission change
+3. **Validation Errors:** Inline error display, prevent save on invalid data, bulk edit validation
+4. **Audit Log Performance:** Paginate audit log, index audit_logs table, limit to recent 1000 changes
+5. **Data Consistency:** Transaction for multi-field edits, rollback on validation failure, FK constraint handling
+6. **Mobile Responsiveness:** Horizontal scroll for table, stacked view for detail panel, touch-friendly edit controls
+7. **Bulk Operations:** Batch updates with audit logging, progress indicator, error handling for partial failures
+8. **Export Functionality:** Export visible data respecting permissions, include audit log option, format: Excel, CSV, PDF
 
 ## Checklist
-- [ ] Create database migrations for column_permissions and audit_logs tables
-- [ ] Update profiles table with permission flags
-- [ ] Create permissionService.ts with permission checking functions
-- [ ] Create auditService.ts with logging functions
-- [ ] Update vehicleService.ts to include audit logging
-- [ ] Create ExcelTable generic component
+- [x] Create database migrations for column_permissions and audit_logs tables
+- [x] Update profiles table with permission flags
+- [x] Create permissionService.ts with permission checking functions
+- [x] Create auditService.ts with logging functions
+- [x] Update vehicleService.ts to include audit logging
+- [x] Create ExcelTable generic component
 - [ ] Refactor VehicleExplorer to use ExcelTable
 - [ ] Define all Excel columns matching uploaded layout
 - [ ] Remove KPI columns from Vehicle Explorer
