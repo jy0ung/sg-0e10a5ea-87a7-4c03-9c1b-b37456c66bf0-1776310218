@@ -69,6 +69,7 @@ export function AppSidebar({ collapsed, setCollapsed }: AppSidebarProps) {
           const items = navItems.filter(n => n.section === section);
           const visibleItems = items.filter(item => {
             if (!item.roles) return true;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return hasRole(item.roles as any);
           });
           if (visibleItems.length === 0) return null;

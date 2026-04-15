@@ -59,6 +59,7 @@ export default function ExecutiveDashboard() {
         selected_kpis: kpis,
         show_advanced_kpis: advanced,
         updated_at: new Date().toISOString(),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any, { onConflict: 'user_id' });
   }, [user?.id]);
 

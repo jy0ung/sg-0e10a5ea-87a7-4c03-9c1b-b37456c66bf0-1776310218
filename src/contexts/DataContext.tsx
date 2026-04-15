@@ -188,6 +188,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const chunk = dbRows.slice(i, i + 500);
       const { error } = await supabase
         .from('vehicles')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .upsert(chunk as any, { onConflict: 'chassis_no' });
       if (error) console.error('Vehicle upsert error:', error);
     }
@@ -206,6 +207,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       error_rows: b.errorRows,
       duplicate_rows: b.duplicateRows,
       company_id: companyId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
     if (error) console.error('Import batch insert error:', error);
     setImportBatches(prev => [b, ...prev]);
@@ -219,6 +221,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (updates.validRows !== undefined) dbUpdates.valid_rows = updates.validRows;
     if (updates.errorRows !== undefined) dbUpdates.error_rows = updates.errorRows;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await supabase.from('import_batches').update(dbUpdates as any).eq('id', id);
     setImportBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
   }, []);
@@ -237,12 +240,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
     for (let idx = 0; idx < dbIssues.length; idx += 500) {
       const chunk = dbIssues.slice(idx, idx + 500);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await supabase.from('quality_issues').insert(chunk as any);
     }
     setQualityIssues(prev => [...issues, ...prev]);
   }, [companyId]);
 
   const updateSla = useCallback(async (id: string, slaDays: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await supabase.from('sla_policies').update({ sla_days: slaDays } as any).eq('id', id);
     setSlas(prev => {
       const updated = prev.map(s => s.id === id ? { ...s, slaDays } : s);
