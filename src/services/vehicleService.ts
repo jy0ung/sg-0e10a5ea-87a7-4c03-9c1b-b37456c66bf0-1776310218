@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { VehicleCanonical } from '@/types';
 import { logVehicleEdit } from './auditService';
+import { performanceService } from './performanceService';
+import { loggingService } from './loggingService';
 
 /**
  * Get a single vehicle by ID
@@ -9,11 +11,20 @@ export async function getVehicleById(id: string): Promise<{
   data: VehicleCanonical | null;
   error: Error | null;
 }> {
+  const queryId = `vehicle-get-${id}`;
+  performanceService.startQueryTimer(queryId);
+
   const { data, error } = await supabase
     .from('vehicles')
     .select('*')
     .eq('id', id)
     .single();
+
+  performanceService.endQueryTimer(queryId, "get_vehicle_by_id");
+
+  if (error) {
+    loggingService.error("Failed to get vehicle", { id, error }, "VehicleService");
+  }
 
   return { data, error: error || null };
 }
@@ -25,11 +36,20 @@ export async function getVehicleByChassis(chassisNo: string): Promise<{
   data: VehicleCanonical | null;
   error: Error | null;
 }> {
+  const queryId = `vehicle-chassis-${chassisNo}`;
+  performanceService.startQueryTimer(queryId);
+
   const { data, error } = await supabase
     .from('vehicles')
     .select('*')
     .eq('chassis_no', chassisNo)
     .maybeSingle();
+
+  performanceService.endQueryTimer(queryId, "get_vehicle_by_chassis");
+
+  if (error) {
+    loggingService.error("Failed to get vehicle by chassis", { chassisNo, error }, "VehicleService");
+  }
 
   return { data, error: error || null };
 }
@@ -146,6 +166,9 @@ export async function getVehicles(filters?: {
   error: Error | null; 
   count?: number 
 }> {
+  const queryId = `vehicles-list-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
   let query = supabase
     .from('vehicles')
     .select('*', { count: 'exact' });
@@ -171,6 +194,12 @@ export async function getVehicles(filters?: {
   }
 
   const { data, error, count } = await query;
+
+  performanceService.endQueryTimer(queryId, "get_vehicles_filtered");
+
+  if (error) {
+    loggingService.error("Failed to get vehicles", { filters, error }, "VehicleService");
+  }
 
   return { data, error: error || null, count };
 }

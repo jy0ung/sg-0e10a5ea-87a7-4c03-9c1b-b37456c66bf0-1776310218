@@ -24,6 +24,10 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { DataProvider } from "./contexts/DataContext";
 import { ProtectedRoute } from "./contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { errorTrackingService } from "@/services/errorTrackingService";
+
+// Initialize error tracking
+errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
 
 export const router = createBrowserRouter([
   {

@@ -1,5 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { performanceService } from './performanceService';
+import { loggingService } from './loggingService';
 
 export type AuditLog = Tables<'audit_logs'>;
 
@@ -28,6 +30,9 @@ export async function logVehicleEdit(
     userAgent?: string;
   }
 ): Promise<{ error: Error | null }> {
+  const queryId = `audit-log-${vehicleId}-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
   const { error } = await supabase.from('audit_logs').insert({
     user_id: userId,
     action: 'update',
@@ -38,8 +43,10 @@ export async function logVehicleEdit(
     ...metadata,
   });
 
+  performanceService.endQueryTimer(queryId, "log_vehicle_edit");
+
   if (error) {
-    console.error('Error logging vehicle edit:', error);
+    loggingService.error("Failed to log vehicle edit", { userId, vehicleId, error }, "AuditService");
   }
 
   return { error: error || null };
@@ -52,6 +59,9 @@ export async function getAuditLog(
   vehicleId: string,
   limit: number = 100
 ): Promise<{ data: AuditLogWithProfile[] | null; error: Error | null }> {
+  const queryId = `audit-get-vehicle-${vehicleId}`;
+  performanceService.startQueryTimer(queryId);
+
   const { data, error } = await supabase
     .from('audit_logs')
     .select('*, profiles(full_name, email, role)')
@@ -59,6 +69,12 @@ export async function getAuditLog(
     .eq('entity_type', 'vehicle')
     .order('created_at', { ascending: false })
     .limit(limit);
+
+  performanceService.endQueryTimer(queryId, "get_audit_log_vehicle");
+
+  if (error) {
+    loggingService.error("Failed to get audit log", { vehicleId, error }, "AuditService");
+  }
 
   return { data, error: error || null };
 }
@@ -71,12 +87,21 @@ export async function getUserAuditLogs(
   limit: number = 100,
   offset: number = 0
 ): Promise<{ data: AuditLog[] | null; error: Error | null }> {
+  const queryId = `audit-get-user-${userId}`;
+  performanceService.startQueryTimer(queryId);
+
   const { data, error } = await supabase
     .from('audit_logs')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
+
+  performanceService.endQueryTimer(queryId, "get_user_audit_logs");
+
+  if (error) {
+    loggingService.error("Failed to get user audit logs", { userId, error }, "AuditService");
+  }
 
   return { data, error: error || null };
 }
@@ -98,6 +123,9 @@ export async function getAllAuditLogs(
   error: Error | null; 
   count?: number 
 }> {
+  const queryId = `audit-get-all-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
   let query = supabase
     .from('audit_logs')
     .select('*, profiles(full_name, email, role)', { count: 'exact' })
@@ -122,6 +150,12 @@ export async function getAllAuditLogs(
 
   const { data, error, count } = await query;
 
+  performanceService.endQueryTimer(queryId, "get_all_audit_logs");
+
+  if (error) {
+    loggingService.error("Failed to get all audit logs", { filters, error }, "AuditService");
+  }
+
   return { data, error: error || null, count };
 }
 
@@ -137,6 +171,9 @@ export async function logPermissionChange(
     userAgent?: string;
   }
 ): Promise<{ error: Error | null }> {
+  const queryId = `audit-perm-${targetUserId}-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
   const { error } = await supabase.from('audit_logs').insert({
     user_id: userId,
     action: 'permission_change',
@@ -147,8 +184,10 @@ export async function logPermissionChange(
     ...metadata,
   });
 
+  performanceService.endQueryTimer(queryId, "log_permission_change");
+
   if (error) {
-    console.error('Error logging permission change:', error);
+    loggingService.error("Failed to log permission change", { userId, targetUserId, error }, "AuditService");
   }
 
   return { error: error || null };
