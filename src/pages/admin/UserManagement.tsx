@@ -13,6 +13,9 @@ import { toast } from 'sonner';
 import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
 import { demoBranches } from '@/data/demo-data';
 import { PermissionEditor } from '@/components/admin/PermissionEditor';
+import { userUpdateSchema, type UserUpdateFormData } from '@/lib/validations';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 interface ProfileRow {
   id: string;
@@ -60,6 +63,17 @@ export default function UserManagement() {
   const [permissionUserName, setPermissionUserName] = useState<string>('');
   const [permissionUserRole, setPermissionUserRole] = useState<string>('');
 
+  const editForm = useForm<UserUpdateFormData>({
+    resolver: zodResolver(userUpdateSchema),
+    defaultValues: {
+      name: '',
+      role: 'analyst',
+      access_scope: 'company',
+      branch_id: null,
+    },
+    mode: 'onChange',
+  });
+
   const canManage = hasRole(['super_admin', 'company_admin']);
 
   useEffect(() => {
@@ -79,6 +93,12 @@ export default function UserManagement() {
     setEditRole(p.role);
     setEditScope(p.access_scope);
     setEditBranch(p.branch_id || 'none');
+    editForm.reset({
+      name: p.name,
+      role: p.role as UserUpdateFormData['role'],
+      access_scope: p.access_scope as UserUpdateFormData['access_scope'],
+      branch_id: p.branch_id,
+    });
   };
 
   const openPermissions = (p: ProfileRow) => {
@@ -87,21 +107,17 @@ export default function UserManagement() {
     setPermissionUserRole(p.role);
   };
 
-  const handleRoleChange = (newRole: string) => {
-    setEditRole(newRole);
-    const defaultScope = ROLE_DEFAULT_SCOPE[newRole as AppRole] || 'company';
-    setEditScope(defaultScope);
-  };
-
   const handleSave = async () => {
     if (!editUser) return;
+    const data = editForm.getValues();
     setSaving(true);
     const { error } = await supabase
       .from('profiles')
       .update({
-        role: editRole,
-        access_scope: editScope,
-        branch_id: editBranch === 'none' ? null : editBranch,
+        name: data.name,
+        role: data.role,
+        access_scope: data.access_scope,
+        branch_id: data.branch_id,
         updated_at: new Date().toISOString(),
       })
       .eq('id', editUser.id);
@@ -109,7 +125,7 @@ export default function UserManagement() {
       toast.error('Failed to update user: ' + error.message);
     } else {
       toast.success('User updated successfully');
-      setProfiles(prev => prev.map(p => p.id === editUser.id ? { ...p, role: editRole, access_scope: editScope, branch_id: editBranch === 'none' ? null : editBranch } : p));
+      setProfiles(prev => prev.map(p => p.id === editUser.id ? { ...p, role: data.role, access_scope: data.access_scope, branch_id: data.branch_id } : p));
       setEditUser(null);
     }
     setSaving(false);
@@ -180,8 +196,21 @@ export default function UserManagement() {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-2">
+              <Label>Name</Label>
+              <Input {...editForm.register('name')} className={editForm.formState.errors.name ? 'border-destructive' : ''} />
+              {editForm.formState.errors.name && (
+                <p className="text-destructive text-xs">{editForm.formState.errors.name.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label>Role</Label>
-              <Select value={editRole} onValueChange={handleRoleChange}>
+              <Select value={editForm.watch('role')} onValueChange={(v) => {
+                editForm.setValue('role', v as UserUpdateFormData['role']);
+                const defaultScope = ROLE_DEFAULT_SCOPE[v as AppRole] || 'company';
+                setEditScope(defaultScope);
+                editForm.setValue('access_scope', defaultScope as UserUpdateFormData['access_scope']);
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {ROLES.map(r => (
@@ -193,7 +222,10 @@ export default function UserManagement() {
 
             <div className="space-y-2">
               <Label>Access Scope</Label>
-              <Select value={editScope} onValueChange={setEditScope}>
+              <Select value={editForm.watch('access_scope')} onValueChange={(v) => {
+                setEditScope(v);
+                editForm.setValue('access_scope', v as UserUpdateFormData['access_scope']);
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {SCOPES.map(s => (
@@ -202,13 +234,16 @@ export default function UserManagement() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                This user can access: <strong className="text-foreground capitalize">{editScope}</strong>
+                This user can access: <strong className="text-foreground capitalize">{editForm.watch('access_scope')}</strong>
               </p>
             </div>
 
             <div className="space-y-2">
               <Label>Branch Assignment</Label>
-              <Select value={editBranch} onValueChange={setEditBranch}>
+              <Select value={editBranch} onValueChange={(v) => {
+                setEditBranch(v);
+                editForm.setValue('branch_id', v === 'none' ? null : v);
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No branch assigned</SelectItem>
@@ -222,14 +257,14 @@ export default function UserManagement() {
             <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
               <p className="font-medium text-foreground">Access Summary</p>
               <p className="text-muted-foreground">
-                {editScope === 'global' && 'Can see all companies and all data.'}
-                {editScope === 'company' && `Can see all data within company ${editUser?.company_id}.`}
-                {editScope === 'branch' && `Can see all data in branch ${editBranch === 'none' ? '(unassigned)' : editBranch} within company ${editUser?.company_id}.`}
-                {editScope === 'self' && `Can only see records assigned to this user within company ${editUser?.company_id}.`}
+                {editForm.watch('access_scope') === 'global' && 'Can see all companies and all data.'}
+                {editForm.watch('access_scope') === 'company' && `Can see all data within company ${editUser?.company_id}.`}
+                {editForm.watch('access_scope') === 'branch' && `Can see all data in branch ${editBranch === 'none' ? '(unassigned)' : editBranch} within company ${editUser?.company_id}.`}
+                {editForm.watch('access_scope') === 'self' && `Can only see records assigned to this user within company ${editUser?.company_id}.`}
               </p>
             </div>
 
-            <Button onClick={handleSave} disabled={saving} className="w-full">
+            <Button onClick={editForm.handleSubmit(handleSave)} disabled={saving || !editForm.formState.isValid} className="w-full">
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               Save Changes
             </Button>

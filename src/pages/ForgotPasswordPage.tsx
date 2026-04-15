@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowLeft } from 'lucide-react';
+import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/lib/validations';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -12,11 +15,15 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const form = useForm<ForgotPasswordFormData>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email },
+  });
+
+  const handleSubmit = async (data: ForgotPasswordFormData) => {
     setError('');
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setLoading(false);
@@ -24,6 +31,7 @@ export default function ForgotPasswordPage() {
       setError(error.message);
     } else {
       setSent(true);
+      setEmail(data.email);
     }
   };
 
@@ -50,35 +58,29 @@ export default function ForgotPasswordPage() {
             </Link>
           </div>
         ) : (
-          <>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className="bg-secondary border-border"
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
-              {error && <p className="text-destructive text-sm">{error}</p>}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending reset link...</>
-                ) : (
-                  'Send Reset Link'
-                )}
-              </Button>
-            </form>
-            <div className="mt-6 text-center">
-              <Link to="/login" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
-                <ArrowLeft className="h-4 w-4" /> Back to sign in
-              </Link>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-foreground">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                {...form.register('email')}
+                className={form.formState.errors.email ? 'border-destructive' : 'bg-secondary border-border'}
+                placeholder="Enter your email"
+              />
+              {form.formState.errors.email && (
+                <p className="text-destructive text-xs">{form.formState.errors.email.message}</p>
+              )}
             </div>
-          </>
+            {error && <p className="text-destructive text-sm">{error}</p>}
+            <Button type="submit" className="w-full" disabled={loading || !form.formState.isValid}>
+              {loading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending reset link...</>
+              ) : (
+                'Send Reset Link'
+              )}
+            </Button>
+          </form>
         )}
       </div>
     </div>

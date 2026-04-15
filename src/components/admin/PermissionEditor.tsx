@@ -20,6 +20,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { User, Save, Eye, EyeOff, Edit, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { columnPermissionSchema, type ColumnPermissionFormData } from '@/lib/validations';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 interface PermissionEditorProps {
   userId: string;
@@ -80,6 +83,14 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
   const [saving, setSaving] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
 
+  const form = useForm<ColumnPermissionFormData>({
+    resolver: zodResolver(columnPermissionSchema),
+    defaultValues: {
+      column_key: '',
+      permission_level: 'none',
+    },
+  });
+
   // Global permissions
   const [canEdit, setCanEdit] = useState(false);
   const [canBulkEdit, setCanBulkEdit] = useState(false);
@@ -131,15 +142,20 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
     setUnsavedChanges(true);
   };
 
-  const handleColumnPermissionChange = (column: string, level: PermissionLevel) => {
+  const handleUpdatePermission = (columnKey: string, permissionLevel: 'none' | 'view' | 'edit') => {
     setColumnPermissions(prev => ({
       ...prev,
-      [column]: level,
+      [columnKey]: permissionLevel,
     }));
     setUnsavedChanges(true);
+    form.setValue('column_key', columnKey);
+    form.setValue('permission_level', permissionLevel);
   };
 
   const handleSave = async () => {
+    const isValid = form.formState.isValid;
+    if (!isValid) return;
+
     setSaving(true);
     try {
       // Save column permissions
@@ -240,7 +256,7 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
                         <Button
                           size="sm"
                           variant={level === 'edit' ? 'default' : 'outline'}
-                          onClick={() => handleColumnPermissionChange(column.key, 'edit')}
+                          onClick={() => handleUpdatePermission(column.key, 'edit')}
                           className="min-w-[70px]"
                         >
                           <Edit className="h-3 w-3 mr-1" />
@@ -249,7 +265,7 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
                         <Button
                           size="sm"
                           variant={level === 'view' ? 'default' : 'outline'}
-                          onClick={() => handleColumnPermissionChange(column.key, 'view')}
+                          onClick={() => handleUpdatePermission(column.key, 'view')}
                           className="min-w-[70px]"
                         >
                           <Eye className="h-3 w-3 mr-1" />
@@ -258,7 +274,7 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
                         <Button
                           size="sm"
                           variant={level === 'none' ? 'default' : 'outline'}
-                          onClick={() => handleColumnPermissionChange(column.key, 'none')}
+                          onClick={() => handleUpdatePermission(column.key, 'none')}
                           className="min-w-[70px]"
                         >
                           <EyeOff className="h-3 w-3 mr-1" />

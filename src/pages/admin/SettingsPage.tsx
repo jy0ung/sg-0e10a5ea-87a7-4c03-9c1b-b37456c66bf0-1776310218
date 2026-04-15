@@ -10,6 +10,9 @@ import { toast } from 'sonner';
 import { Loader2, Save } from 'lucide-react';
 import { demoBranches } from '@/data/demo-data';
 import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
+import { profileUpdateSchema, type ProfileUpdateFormData } from '@/lib/validations';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 const ROLES: { value: AppRole; label: string }[] = [
   { value: 'super_admin', label: 'Super Admin' },
@@ -24,33 +27,44 @@ const ROLES: { value: AppRole; label: string }[] = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const [name, setName] = useState('');
-  const [role, setRole] = useState<string>('');
   const [branchId, setBranchId] = useState<string>('none');
   const [saving, setSaving] = useState(false);
 
+  const form = useForm<ProfileUpdateFormData>({
+    resolver: zodResolver(profileUpdateSchema),
+    defaultValues: {
+      name: user?.name || '',
+      role: user?.role || 'analyst',
+      branch_id: user?.branch_id || null,
+    },
+    mode: 'onChange',
+  });
+
   useEffect(() => {
     if (user) {
-      setName(user.name || '');
-      setRole(user.role || 'analyst');
+      form.reset({
+        name: user.name || '',
+        role: user.role || 'analyst',
+        branch_id: user.branch_id || null,
+      });
       setBranchId(user.branch_id || 'none');
     }
-  }, [user]);
+  }, [user, form]);
 
   const handleRoleChange = (newRole: string) => {
-    setRole(newRole);
+    form.setValue('role', newRole as ProfileUpdateFormData['role']);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (data: ProfileUpdateFormData) => {
     if (!user) return;
     setSaving(true);
-    const newScope = ROLE_DEFAULT_SCOPE[role as AppRole] || 'company';
+    const newScope = ROLE_DEFAULT_SCOPE[data.role] || 'company';
     const { error } = await supabase
       .from('profiles')
       .update({
-        name,
-        role,
-        branch_id: branchId === 'none' ? null : branchId,
+        name: data.name,
+        role: data.role,
+        branch_id: data.branch_id,
         access_scope: newScope,
         updated_at: new Date().toISOString(),
       })
@@ -73,60 +87,68 @@ export default function SettingsPage() {
         <div className="glass-panel p-6 space-y-5">
           <h3 className="text-sm font-semibold text-foreground">Your Profile</h3>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" value={user?.email || ''} disabled className="bg-muted/50" />
-            </div>
+          <form onSubmit={form.handleSubmit(handleSave)}>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" value={user?.email || ''} disabled className="bg-muted/50" />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="name">Display Name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Display Name</Label>
+                <Input id="name" {...form.register('name')} placeholder="Your name" />
+                {form.formState.errors.name && (
+                  <p className="text-destructive text-xs">{form.formState.errors.name.message}</p>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select value={role} onValueChange={handleRoleChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select value={form.watch('role')} onValueChange={handleRoleChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="branch">Branch Assignment</Label>
-              <Select value={branchId} onValueChange={setBranchId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No branch assigned</SelectItem>
-                  {demoBranches.map((b) => (
-                    <SelectItem key={b.id} value={b.code}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="branch">Branch Assignment</Label>
+                <Select value={branchId} onValueChange={(v) => {
+                  setBranchId(v);
+                  form.setValue('branch_id', v === 'none' ? null : v);
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No branch assigned</SelectItem>
+                    {demoBranches.map((b) => (
+                      <SelectItem key={b.id} value={b.code}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
-              <p className="font-medium text-foreground">Your Access Level</p>
-              <p className="text-muted-foreground">
-                Scope: <strong className="text-foreground capitalize">{ROLE_DEFAULT_SCOPE[role as AppRole] || 'company'}</strong>
-                {' • '}Role: <strong className="text-foreground capitalize">{role.replace(/_/g, ' ')}</strong>
-                {branchId !== 'none' && <> • Branch: <strong className="text-foreground">{branchId}</strong></>}
-              </p>
-            </div>
+              <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
+                <p className="font-medium text-foreground">Your Access Level</p>
+                <p className="text-muted-foreground">
+                  Scope: <strong className="text-foreground capitalize">{ROLE_DEFAULT_SCOPE[form.watch('role')] || 'company'}</strong>
+                  {' • '}Role: <strong className="text-foreground capitalize">{form.watch('role').replace(/_/g, ' ')}</strong>
+                  {branchId !== 'none' && <> • Branch: <strong className="text-foreground">{branchId}</strong></>}
+                </p>
+              </div>
 
-            <Button onClick={handleSave} disabled={saving} className="w-full">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Save Changes
-            </Button>
-          </div>
+              <Button type="submit" disabled={saving || !form.formState.isValid} className="w-full">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                Save Changes
+              </Button>
+            </div>
+          </form>
         </div>
 
         <div className="glass-panel p-6 space-y-5">

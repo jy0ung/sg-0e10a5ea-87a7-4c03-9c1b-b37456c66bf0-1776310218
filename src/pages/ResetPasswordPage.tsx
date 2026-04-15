@@ -5,15 +5,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle } from 'lucide-react';
+import { resetPasswordSchema, type ResetPasswordFormData } from '@/lib/validations';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [isRecovery, setIsRecovery] = useState(false);
+
+  const form = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema),
+    mode: 'onChange',
+  });
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -30,21 +36,10 @@ export default function ResetPasswordPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (data: ResetPasswordFormData) => {
     setError('');
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-    if (password !== confirm) {
-      setError('Passwords do not match');
-      return;
-    }
-
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error } = await supabase.auth.updateUser({ password: data.password });
     setLoading(false);
 
     if (error) {
@@ -88,35 +83,35 @@ export default function ResetPasswordPage() {
             <p className="text-muted-foreground text-xs">Redirecting to dashboard...</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password" className="text-foreground">New Password</Label>
               <Input
                 id="password"
                 type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="bg-secondary border-border"
+                {...form.register('password')}
+                className={form.formState.errors.password ? 'border-destructive' : 'bg-secondary border-border'}
                 placeholder="Enter new password"
-                minLength={6}
-                required
               />
+              {form.formState.errors.password && (
+                <p className="text-destructive text-xs">{form.formState.errors.password.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm" className="text-foreground">Confirm Password</Label>
               <Input
                 id="confirm"
                 type="password"
-                value={confirm}
-                onChange={e => setConfirm(e.target.value)}
-                className="bg-secondary border-border"
+                {...form.register('confirmPassword')}
+                className={form.formState.errors.confirmPassword ? 'border-destructive' : 'bg-secondary border-border'}
                 placeholder="Confirm new password"
-                minLength={6}
-                required
               />
+              {form.formState.errors.confirmPassword && (
+                <p className="text-destructive text-xs">{form.formState.errors.confirmPassword.message}</p>
+              )}
             </div>
             {error && <p className="text-destructive text-sm">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || !form.formState.isValid}>
               {loading ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating password...</>
               ) : (
