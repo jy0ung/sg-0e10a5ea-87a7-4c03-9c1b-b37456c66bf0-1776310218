@@ -1,7 +1,17 @@
-import { createBrowserRouter } from "react-router-dom";
-import App from "./App";
-import Layout from "./components/layout/AppLayout";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, ProtectedRoute } from "@/contexts/AuthContext";
+import { DataProvider } from "@/contexts/DataContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { errorTrackingService } from "@/services/errorTrackingService";
+import { Loader2 } from "lucide-react";
+
 import LoginPage from "./pages/LoginPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import ModuleDirectory from "./pages/ModuleDirectory";
@@ -18,13 +28,9 @@ import ActivityDashboard from "./pages/admin/ActivityDashboard";
 import UserManagement from "./pages/admin/UserManagement";
 import AuditLog from "./pages/admin/AuditLog";
 import SettingsPage from "./pages/admin/SettingsPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import { AuthProvider } from "./contexts/AuthContext";
-import { DataProvider } from "./contexts/DataContext";
-import { ProtectedRoute } from "./contexts/AuthContext";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { errorTrackingService } from "@/services/errorTrackingService";
+import AppLayout from "./components/layout/AppLayout";
+
+const queryClient = new QueryClient();
 
 // Initialize error tracking
 errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
@@ -48,7 +54,7 @@ export const router = createBrowserRouter([
       <ProtectedRoute>
         <AuthProvider>
           <DataProvider>
-            <Layout />
+            <AppLayout />
           </DataProvider>
         </AuthProvider>
       </ProtectedRoute>
@@ -76,3 +82,19 @@ export const router = createBrowserRouter([
     element: <NotFound />,
   },
 ]);
+
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <ErrorBoundary>
+          <RouterProvider router={router} />
+        </ErrorBoundary>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
+
+export default App;
