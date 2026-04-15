@@ -1,6 +1,6 @@
 ---
 title: Refactor Vehicle Explorer to Excel-like table
-status: in_progress
+status: done
 priority: high
 type: refactor
 tags:
@@ -25,13 +25,13 @@ Refactor the existing Vehicle Explorer to match the uploaded Excel layout with i
 - [x] Add dropdown for fixed fields (Branch, Model, Payment)
 - [x] Add number input for prices
 - [x] Implement auto-save on blur or Enter key
-- [ ] Add inline validation feedback
+- [x] Add inline validation feedback
 - [x] Add sortable columns
 - [x] Add pagination with customizable page size
 - [x] Add quick filters (branch, model, status)
-- [ ] Add bulk actions toolbar
+- [x] Add bulk actions toolbar
 - [x] Create VehicleDetailPanel component
-- [ ] Add read-only/edit mode toggle
+- [x] Add read-only/edit mode toggle
 - [x] Integrate permission-based column visibility
-- [ ] Test all column types and editors
-- [ ] Test mobile responsiveness with horizontal scroll
+- [x] Test all column types and editors
+- [x] Test mobile responsiveness with horizontal scroll

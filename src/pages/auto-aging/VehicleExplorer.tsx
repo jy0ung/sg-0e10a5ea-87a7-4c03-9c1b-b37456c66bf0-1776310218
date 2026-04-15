@@ -7,12 +7,13 @@ import { VehicleDetailPanel } from '@/components/vehicles/VehicleDetailPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { Download, Search, Filter } from 'lucide-react';
+import { Download, Search, Filter, Edit, Eye } from 'lucide-react';
 import { updateVehicleWithAudit } from '@/services/vehicleService';
 import { getUserPermissions } from '@/services/permissionService';
 import type { VehicleCanonical } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { VehicleBulkActions } from './VehicleBulkActions';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250];
 
@@ -43,6 +44,8 @@ export default function VehicleExplorer() {
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [userPermissions, setUserPermissions] = useState<ReturnType<typeof getUserPermissions extends Promise<infer T> ? T : never>>(null);
   const [exportLoading, setExportLoading] = useState(false);
+  const [readOnlyMode, setReadOnlyMode] = useState(false);
+  const [pendingBulkAction, setPendingBulkAction] = useState<{ action: string; vehicles: VehicleCanonical[] } | null>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -461,6 +464,17 @@ export default function VehicleExplorer() {
     navigate(`/auto-aging/vehicles/${row.chassis_no}`);
   };
 
+  const handleBulkAction = async (action: string, selectedVehicles: VehicleCanonical[]) => {
+    setPendingBulkAction({ action, vehicles: selectedVehicles });
+  };
+
+  const handleBulkActionComplete = async () => {
+    if (pendingBulkAction) {
+      await useData.reloadFromDb?.();
+    }
+    setPendingBulkAction(null);
+  };
+
   const permissions = userPermissions?.columns 
     ? Object.fromEntries(Array.from(userPermissions.columns.entries()).map(([col, level]) => [col, level]))
     : {};
@@ -481,15 +495,27 @@ export default function VehicleExplorer() {
           { label: 'Vehicle Explorer' }
         ]}
         actions={
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleExportCSV}
-            disabled={exportLoading}
-          >
-            <Download className="h-3.5 w-3.5 mr-1" />
-            {exportLoading ? 'Exporting...' : 'Export CSV'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {userPermissions?.canEdit && (
+              <Button
+                variant={readOnlyMode ? "outline" : "default"}
+                size="sm"
+                onClick={() => setReadOnlyMode(!readOnlyMode)}
+              >
+                {readOnlyMode ? <Edit className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
+                {readOnlyMode ? 'Edit' : 'Read Only'}
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleExportCSV}
+              disabled={exportLoading}
+            >
+              <Download className="h-3.5 w-3.5 mr-1" />
+              {exportLoading ? 'Exporting...' : 'Export CSV'}
+            </Button>
+          </div>
         }
       />
 
@@ -566,10 +592,20 @@ export default function VehicleExplorer() {
           onPageChange: setPage,
           onPageSizeChange: setPageSize,
         }}
-        onEdit={userPermissions?.canEdit ? handleCellEdit : undefined}
+        onEdit={userPermissions?.canEdit && !readOnlyMode ? handleCellEdit : undefined}
         onRowClick={handleRowClick}
         permissions={permissions}
+        readOnlyMode={readOnlyMode}
+        onBulkAction={userPermissions?.canEdit && !readOnlyMode ? handleBulkAction : undefined}
       />
+
+      {pendingBulkAction && (
+        <VehicleBulkActions
+          selectedVehicles={pendingBulkAction.vehicles}
+          action={pendingBulkAction.action}
+          onComplete={handleBulkActionComplete}
+        />
+      )}
 
       <VehicleDetailPanel
         vehicle={selectedVehicle}
