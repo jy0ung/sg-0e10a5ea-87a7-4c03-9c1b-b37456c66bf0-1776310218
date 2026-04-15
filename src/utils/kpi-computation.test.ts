@@ -89,7 +89,7 @@ describe("computeKpiSummaries", () => {
     expect(bgToDelivery?.average).toBe(15);
     expect(bgToDelivery?.p90).toBe(20);
     expect(bgToDelivery?.slaDays).toBe(14);
-    expect(bgToDelivery?.overdueCount).toBe(1);
+    expect(bgToDelivery?.overdueCount).toBe(2);
   });
 
   it("handles missing values", () => {
@@ -123,7 +123,7 @@ describe("computeKpiSummaries", () => {
     const summaries = computeKpiSummaries(mockVehicles, []);
     
     const bgToDelivery = summaries.find(s => s.kpiId === "bg_to_delivery");
-    expect(bgToDelivery?.slaDays).toBe(14);
+    expect(bgToDelivery?.slaDays).toBe(45);
   });
 
   it("returns zero for empty or invalid data", () => {

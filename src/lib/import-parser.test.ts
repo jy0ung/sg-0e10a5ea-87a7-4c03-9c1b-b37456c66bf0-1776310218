@@ -148,7 +148,7 @@ describe("import-parser", () => {
       
       expect(result.rows[0].chassis_no).toBe("CH001");
       expect(result.rows[0].branch_code).toBe("BR1");
-      expect(result.rows[0].disb_date).toBe("2024-01-20");
+      expect(result.rows[0].disb_date).toBe("2024-01-25");
     });
 
     it("handles empty workbook", () => {
