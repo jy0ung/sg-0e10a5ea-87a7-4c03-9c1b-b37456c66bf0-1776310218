@@ -2,9 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { ValidationSummaryModal } from '@/components/shared/ValidationSummaryModal';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCircle } from 'lucide-react';
 import { parseWorkbook, publishCanonical } from '@/lib/import-parser';
 import { validateVehicleImportBatch, validateImportBatch } from '@/services/validationService';
 import { createImportBatch, validateAndInsertVehicles } from '@/services/importService';
@@ -30,6 +31,7 @@ export default function ImportCenter() {
   const [missingCols, setMissingCols] = useState<string[]>([]);
   const [batchId, setBatchId] = useState('');
   const [companyId, setCompanyId] = useState('default-company');
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
   const handleFileDrop = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -131,6 +133,20 @@ export default function ImportCenter() {
       setStep('review');
     }
   }, [batchId, rawRows, vehicles, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, validationIssues, serverErrors, companyId, user]);
+
+  const handleExportErrors = useCallback(() => {
+    const errorsText = serverErrors.map(e => 
+      `Field: ${e.field}\nMessage: ${e.message}\nCode: ${e.code}\nSeverity: ${e.severity}\n---`
+    ).join('\n');
+    
+    const blob = new Blob([errorsText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${fileName}_validation_errors.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [serverErrors, fileName]);
 
   const reset = () => { 
     setStep('upload'); 
@@ -261,9 +277,29 @@ export default function ImportCenter() {
               </Button>
               <Button variant="outline" onClick={reset}>Cancel</Button>
             </div>
+
+            {/* View Detailed Errors Button */}
+            {serverErrors.length > 0 && (
+              <div className="mt-4">
+                <Button variant="outline" className="w-full" onClick={() => setShowErrorModal(true)}>
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  View {serverErrors.length} Validation Errors in Detail
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* Validation Error Summary Modal */}
+      <ValidationSummaryModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        errors={serverErrors}
+        fileName={fileName}
+        totalRows={rawRows.length}
+        onExport={handleExportErrors}
+      />
 
       {step === 'publishing' && (
         <div className="glass-panel p-12 text-center">
