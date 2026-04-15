@@ -1,4 +1,3 @@
-<![CDATA[
 import { supabase } from "@/integrations/supabase/client";
 import { loggingService } from "./loggingService";
 import { performanceService } from "./performanceService";
@@ -12,9 +11,6 @@ export interface SlaPolicy {
   companyId: string;
 }
 
-/**
- * Update an SLA policy with audit logging
- */
 export async function updateSlaPolicy(
   id: string,
   updates: Partial<SlaPolicy>,
@@ -24,7 +20,6 @@ export async function updateSlaPolicy(
   performanceService.startQueryTimer(queryId);
 
   try {
-    // Fetch current values
     const { data: current, error: fetchError } = await supabase
       .from("sla_policies")
       .select("*")
@@ -36,7 +31,6 @@ export async function updateSlaPolicy(
       return { data: null, error: fetchError };
     }
 
-    // Update SLA
     const { data, error } = await supabase
       .from("sla_policies")
       .update(updates)
@@ -51,7 +45,6 @@ export async function updateSlaPolicy(
       return { data: null, error };
     }
 
-    // Log audit if changes exist
     const changes: Record<string, { before: unknown; after: unknown }> = {};
     Object.keys(updates).forEach((key) => {
       const currentVal = current[key as keyof SlaPolicy];
@@ -74,9 +67,6 @@ export async function updateSlaPolicy(
   }
 }
 
-/**
- * Create a new SLA policy with audit logging
- */
 export async function createSlaPolicy(
   policy: Omit<SlaPolicy, "id">,
   userId: string
@@ -112,6 +102,3 @@ export async function createSlaPolicy(
     return { data: null, error: error as Error };
   }
 }
-]]>
-
-[Tool result trimmed: kept first 100 chars and last 100 chars of 4896 chars.]

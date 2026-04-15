@@ -1,4 +1,3 @@
-<![CDATA
 import { loggingService } from "./loggingService";
 
 interface PerformanceMetric {
@@ -32,7 +31,6 @@ class PerformanceService {
 
     loggingService.logPerformance(`Query: ${queryName}`, duration, "ms");
     
-    // Warn if query takes longer than 1 second
     if (duration > 1000) {
       loggingService.warn(`Slow query detected: ${queryName}`, { duration: duration.toFixed(2) }, "Performance");
     }
@@ -50,7 +48,6 @@ class PerformanceService {
 
     loggingService.logPerformance(`Render: ${componentName}`, duration, "ms");
     
-    // Warn if render takes longer than 100ms
     if (duration > 100) {
       loggingService.warn(`Slow render detected: ${componentName}`, { duration: duration.toFixed(2) }, "Performance");
     }
@@ -80,10 +77,8 @@ class PerformanceService {
   }
 
   clearMetrics() {
-    this.metrics.clear();
+    this.metrics = [];
   }
 }
 
 export const performanceService = new PerformanceService();
-</metadata>
-]]>

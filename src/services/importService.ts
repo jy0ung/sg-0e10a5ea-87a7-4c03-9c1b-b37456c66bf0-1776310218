@@ -1,4 +1,3 @@
-<![CDATA[
 import { supabase } from "@/integrations/supabase/client";
 import { loggingService } from "./loggingService";
 import { performanceService } from "./performanceService";
@@ -17,9 +16,6 @@ export interface ImportBatchInsert {
   companyId: string;
 }
 
-/**
- * Create a new import batch with audit logging
- */
 export async function createImportBatch(
   batch: ImportBatchInsert,
   userId: string
@@ -51,7 +47,6 @@ export async function createImportBatch(
       return { data: null, error };
     }
 
-    // Log audit
     await logVehicleEdit(userId, data.id, {
       _create: { before: null, after: data },
     });
@@ -62,7 +57,7 @@ export async function createImportBatch(
       totalRows: batch.totalRows,
     }, "ImportService");
 
-    return { data: error: null };
+    return { data, error: null };
   } catch (error) {
     performanceService.endQueryTimer(queryId, "create_import_batch");
     loggingService.error("Unexpected error creating import batch", { batch, error }, "ImportService");
@@ -70,9 +65,6 @@ export async function createImportBatch(
   }
 }
 
-/**
- * Update import batch status with audit logging
- */
 export async function updateImportBatch(
   id: string,
   updates: Partial<ImportBatch>,
@@ -82,7 +74,6 @@ export async function updateImportBatch(
   performanceService.startQueryTimer(queryId);
 
   try {
-    // Fetch current values
     const { data: current, error: fetchError } = await supabase
       .from("import_batches")
       .select("*")
@@ -115,7 +106,6 @@ export async function updateImportBatch(
       return { data: null, error };
     }
 
-    // Log audit if changes exist
     const changes: Record<string, { before: unknown; after: unknown }> = {};
     Object.keys(dbUpdates).forEach((key) => {
       const currentVal = current[key as keyof ImportBatch];
@@ -138,9 +128,6 @@ export async function updateImportBatch(
   }
 }
 
-/**
- * Log quality issues for import
- */
 export async function logQualityIssues(
   issues: Array<{
     chassisNo: string;
@@ -168,7 +155,6 @@ export async function logQualityIssues(
       company_id: issue.companyId,
     }));
 
-    // Insert in chunks
     for (let idx = 0; idx < dbIssues.length; idx += 500) {
       const chunk = dbIssues.slice(idx, idx + 500);
       const { error } = await supabase.from("quality_issues").insert(chunk);
@@ -188,6 +174,3 @@ export async function logQualityIssues(
     return { error: error as Error };
   }
 }
-]]>
-
-[Tool result trimmed: kept first 100 chars and last 100 chars of 6892 chars.]

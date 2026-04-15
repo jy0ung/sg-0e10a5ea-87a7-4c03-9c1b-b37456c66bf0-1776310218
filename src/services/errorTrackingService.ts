@@ -5,7 +5,7 @@ interface ErrorContext {
   component?: string;
   action?: string;
   userId?: string;
-  additionalData?: Record<string, any>;
+  additionalData?: Record<string, unknown>;
 }
 
 class ErrorTrackingService {
@@ -18,9 +18,8 @@ class ErrorTrackingService {
       Sentry.init({
         dsn,
         environment: import.meta.env.MODE,
-        tracesSampleRate: 0.1, // 10% of transactions for performance monitoring
+        tracesSampleRate: 0.1,
         beforeSend(event, hint) {
-          // Don't send errors in development
           if (import.meta.env.DEV) {
             return null;
           }
@@ -33,13 +32,11 @@ class ErrorTrackingService {
   }
 
   captureException(error: Error, context?: ErrorContext) {
-    // Always log locally
     loggingService.error(error.message, {
       stack: error.stack,
       ...context?.additionalData,
     }, context?.component || "ErrorBoundary");
 
-    // Send to Sentry if initialized and in production
     if (this.isInitialized && !import.meta.env.DEV) {
       Sentry.withScope((scope) => {
         if (context?.component) {

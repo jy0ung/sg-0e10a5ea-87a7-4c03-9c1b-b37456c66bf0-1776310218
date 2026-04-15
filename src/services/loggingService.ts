@@ -6,7 +6,7 @@ export type LogLevel = "info" | "warn" | "error" | "debug";
 export interface LogEntry {
   level: LogLevel;
   message: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   userId?: string;
   timestamp: string;
   component?: string;
@@ -15,11 +15,10 @@ export interface LogEntry {
 class LoggingService {
   private logLevel: LogLevel = "info";
   private logs: LogEntry[] = [];
-  private maxLogs = 100; // Keep last 100 logs in memory
+  private maxLogs = 100;
   private isDevelopment = import.meta.env.DEV;
 
   constructor() {
-    // Set log level based on environment
     if (import.meta.env.PROD) {
       this.logLevel = "info";
     }
@@ -31,7 +30,6 @@ class LoggingService {
   }
 
   private async persistLog(entry: LogEntry) {
-    // In production, persist to database
     if (!this.isDevelopment) {
       try {
         await supabase.from("application_logs").insert({
@@ -43,7 +41,6 @@ class LoggingService {
           created_at: entry.timestamp,
         });
       } catch (error) {
-        // Don't crash if logging fails
         console.error("Failed to persist log:", error);
       }
     }
@@ -52,7 +49,7 @@ class LoggingService {
   private createLogEntry(
     level: LogLevel,
     message: string,
-    context?: Record<string, any>,
+    context?: Record<string, unknown>,
     component?: string
   ): LogEntry {
     const auth = localStorage.getItem("auth");
@@ -80,13 +77,11 @@ class LoggingService {
   private addLog(entry: LogEntry) {
     if (!this.shouldLog(entry.level)) return;
 
-    // Add to memory
     this.logs.push(entry);
     if (this.logs.length > this.maxLogs) {
       this.logs.shift();
     }
 
-    // Console output with appropriate styling
     const styles = {
       info: "color: #3b82f6",
       warn: "color: #f59e0b",
@@ -103,26 +98,25 @@ class LoggingService {
       console.log(`%c${prefix} ${entry.message}`, style);
     }
 
-    // Persist asynchronously
     this.persistLog(entry);
   }
 
-  info(message: string, context?: Record<string, any>, component?: string) {
+  info(message: string, context?: Record<string, unknown>, component?: string) {
     const entry = this.createLogEntry("info", message, context, component);
     this.addLog(entry);
   }
 
-  warn(message: string, context?: Record<string, any>, component?: string) {
+  warn(message: string, context?: Record<string, unknown>, component?: string) {
     const entry = this.createLogEntry("warn", message, context, component);
     this.addLog(entry);
   }
 
-  error(message: string, context?: Record<string, any>, component?: string) {
+  error(message: string, context?: Record<string, unknown>, component?: string) {
     const entry = this.createLogEntry("error", message, context, component);
     this.addLog(entry);
   }
 
-  debug(message: string, context?: Record<string, any>, component?: string) {
+  debug(message: string, context?: Record<string, unknown>, component?: string) {
     const entry = this.createLogEntry("debug", message, context, component);
     this.addLog(entry);
   }
@@ -135,16 +129,15 @@ class LoggingService {
     this.logs = [];
   }
 
-  // Structured logging for specific actions
-  logUserAction(action: string, details?: Record<string, any>) {
+  logUserAction(action: string, details?: Record<string, unknown>) {
     this.info(`User action: ${action}`, details, "UserAction");
   }
 
-  logApiCall(endpoint: string, method: string, duration?: number, error?: any) {
+  logApiCall(endpoint: string, method: string, duration?: number, error?: unknown) {
     if (error) {
       this.error(`API call failed: ${method} ${endpoint}`, {
         duration,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
       }, "API");
     } else {
       this.info(`API call: ${method} ${endpoint}`, { duration }, "API");
@@ -155,7 +148,7 @@ class LoggingService {
     table: string,
     operation: "insert" | "update" | "delete",
     recordId?: string,
-    details?: Record<string, any>
+    details?: Record<string, unknown>
   ) {
     this.info(`Data mutation: ${operation} on ${table}`, {
       recordId,
@@ -169,4 +162,3 @@ class LoggingService {
 }
 
 export const loggingService = new LoggingService();
-</metadata>
