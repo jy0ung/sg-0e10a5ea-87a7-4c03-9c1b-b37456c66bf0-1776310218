@@ -65,7 +65,16 @@ export function VehicleDetailPanel({
 
   if (!vehicle || !open) return null;
 
-  const sections = [
+  const sections: Array<{
+    id: string;
+    title: string;
+    fields: Array<{
+      key: keyof VehicleCanonical;
+      label: string;
+      type: 'text' | 'number' | 'date' | 'textarea';
+      readonly?: boolean;
+    }>;
+  }> = [
     {
       id: 'basic',
       title: 'Basic Information',
@@ -118,8 +127,13 @@ export function VehicleDetailPanel({
     },
   ];
 
-  const renderField = (field: any) => {
-    const value = editData[field.key as keyof VehicleCanonical];
+  const renderField = (field: {
+    key: keyof VehicleCanonical;
+    label: string;
+    type: 'text' | 'number' | 'date' | 'textarea';
+    readonly?: boolean;
+  }) => {
+    const value = editData[field.key];
     const isReadOnly = !isEditing || field.readonly;
 
     if (field.type === 'textarea') {
