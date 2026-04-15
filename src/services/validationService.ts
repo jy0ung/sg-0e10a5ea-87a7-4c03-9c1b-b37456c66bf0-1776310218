@@ -17,8 +17,13 @@ export interface ValidationResult {
 
 // Allowed values for enum fields
 const ALLOWED_STATUSES = ['uploaded', 'validated', 'failed', 'publish_in_progress', 'published'] as const;
+type ImportBatchStatus = typeof ALLOWED_STATUSES[number];
+
 const ALLOWED_SEVERITIES = ['info', 'warning', 'error'] as const;
+type QualityIssueSeverity = typeof ALLOWED_SEVERITIES[number];
+
 const ALLOWED_ISSUE_TYPES = ['missing', 'duplicate', 'negative', 'invalid', 'format'] as const;
+type QualityIssueType = typeof ALLOWED_ISSUE_TYPES[number];
 
 /**
  * Validate a vehicle row against schema and business rules
@@ -238,7 +243,7 @@ export async function validateImportBatch(
     }
   }
 
-  if (batch.status && !ALLOWED_STATUSES.includes(batch.status as any)) {
+  if (batch.status && !ALLOWED_STATUSES.includes(batch.status as ImportBatchStatus)) {
     errors.push({
       field: 'status',
       message: `Invalid status '${batch.status}'. Must be one of: ${ALLOWED_STATUSES.join(', ')}`,
@@ -380,7 +385,7 @@ export function validateQualityIssue(
     });
   }
 
-  if (!issue.issueType || !ALLOWED_ISSUE_TYPES.includes(issue.issueType as any)) {
+  if (!issue.issueType || !ALLOWED_ISSUE_TYPES.includes(issue.issueType as QualityIssueType)) {
     errors.push({
       field: 'issue_type',
       message: `Invalid issue type. Must be one of: ${ALLOWED_ISSUE_TYPES.join(', ')}`,
@@ -398,7 +403,7 @@ export function validateQualityIssue(
     });
   }
 
-  if (!issue.severity || !ALLOWED_SEVERITIES.includes(issue.severity as any)) {
+  if (!issue.severity || !ALLOWED_SEVERITIES.includes(issue.severity as QualityIssueSeverity)) {
     errors.push({
       field: 'severity',
       message: `Invalid severity. Must be one of: ${ALLOWED_SEVERITIES.join(', ')}`,
