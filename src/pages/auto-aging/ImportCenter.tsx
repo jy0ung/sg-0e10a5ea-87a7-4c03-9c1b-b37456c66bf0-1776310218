@@ -6,19 +6,30 @@ import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { parseWorkbook, publishCanonical } from '@/lib/import-parser';
+import { validateVehicleImportBatch, validateImportBatch } from '@/services/validationService';
+import { createImportBatch, validateAndInsertVehicles } from '@/services/importService';
 import { ImportBatch, VehicleRaw } from '@/types';
 
 type Step = 'upload' | 'validating' | 'review' | 'publishing' | 'done';
 
+interface ServerValidationError {
+  field: string;
+  message: string;
+  code: string;
+  severity: 'error' | 'warning';
+}
+
 export default function ImportCenter() {
   const navigate = useNavigate();
-  const { addImportBatch, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, vehicles } = useData();
+  const { addImportBatch, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, vehicles, user } = useData();
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');
   const [rawRows, setRawRows] = useState<VehicleRaw[]>([]);
   const [validationIssues, setValidationIssues] = useState<{ id: string; chassisNo: string; field: string; issueType: string; message: string; severity: string; importBatchId: string }[]>([]);
+  const [serverErrors, setServerErrors] = useState<ServerValidationError[]>([]);
   const [missingCols, setMissingCols] = useState<string[]>([]);
   const [batchId, setBatchId] = useState('');
+  const [companyId, setCompanyId] = useState('default-company');
 
   const handleFileDrop = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -26,40 +37,110 @@ export default function ImportCenter() {
     setFileName(file.name);
     setStep('validating');
 
-    const buffer = await file.arrayBuffer();
-    const { rows, issues, missingColumns } = parseWorkbook(buffer);
+    try {
+      // Parse the workbook
+      const buffer = await file.arrayBuffer();
+      const { rows, issues, missingColumns } = parseWorkbook(buffer);
 
-    const id = `batch-${Date.now()}`;
-    setBatchId(id);
-    setRawRows(rows);
-    setValidationIssues(issues);
-    setMissingCols(missingColumns);
+      setMissingCols(missingColumns);
 
-    const batch: ImportBatch = {
-      id, fileName: file.name, uploadedBy: 'Current User', uploadedAt: new Date().toISOString(),
-      status: missingColumns.length > 0 ? 'failed' : 'validated',
-      totalRows: rows.length, validRows: rows.length - issues.filter(i => i.severity === 'error').length,
-      errorRows: issues.filter(i => i.severity === 'error').length, duplicateRows: issues.filter(i => i.issueType === 'duplicate').length,
-    };
-    addImportBatch(batch);
-    setStep('review');
-  }, [addImportBatch]);
+      // Server-side validation
+      const validationResult = await validateVehicleImportBatch(rows, companyId);
+
+      if (!validationResult.isValid) {
+        setRawRows(rows);
+        setValidationIssues(issues);
+        setServerErrors(validationResult.errors);
+        setBatchId(`batch-${Date.now()}`);
+        setStep('review');
+        return;
+      }
+
+      // Create import batch
+      const batch: ImportBatchInsert = {
+        fileName: file.name,
+        uploadedBy: user?.email || 'Unknown',
+        uploadedAt: new Date().toISOString(),
+        status: 'validated',
+        totalRows: rows.length,
+        validRows: rows.length - validationResult.errors.length,
+        errorRows: validationResult.errors.length,
+        duplicateRows: issues.filter(i => i.issueType === 'duplicate').length,
+        companyId,
+      };
+
+      const { data: batchData, error: batchError } = await createImportBatch(batch, user?.id || 'system-user');
+
+      if (batchError) {
+        throw new Error(`Failed to create import batch: ${batchError.message}`);
+      }
+
+      const id = batchData?.id || `batch-${Date.now()}`;
+      setBatchId(id);
+      setRawRows(rows);
+      setValidationIssues(issues);
+      setServerErrors(validationResult.warnings);
+      addImportBatch({ ...batch, id });
+      setStep('review');
+    } catch (error) {
+      console.error('Import error:', error);
+      alert(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setStep('upload');
+    }
+  }, [addImportBatch, companyId, user]);
 
   const handlePublish = useCallback(async () => {
+    if (serverErrors.length > 0) {
+      alert('Please fix all validation errors before publishing.');
+      return;
+    }
+
     setStep('publishing');
     updateImportBatch(batchId, { status: 'publish_in_progress' });
 
-    const { canonical, issues } = publishCanonical(rawRows);
-    // Merge with existing: new records override duplicates by chassis_no
-    const existingNonDup = vehicles.filter(v => !canonical.find(c => c.chassis_no === v.chassis_no));
-    await setVehicles([...canonical, ...existingNonDup]);
-    addQualityIssues(issues);
-    updateImportBatch(batchId, { status: 'published', publishedAt: new Date().toISOString() });
-    refreshKpis();
-    setStep('done');
-  }, [batchId, rawRows, vehicles, updateImportBatch, setVehicles, addQualityIssues, refreshKpis]);
+    try {
+      // Validate and insert vehicles server-side
+      const result = await validateAndInsertVehicles(
+        rawRows,
+        batchId,
+        companyId,
+        user?.id || 'system-user'
+      );
 
-  const reset = () => { setStep('upload'); setRawRows([]); setValidationIssues([]); setMissingCols([]); };
+      if (result.error) {
+        throw new Error(`Validation or insert failed: ${result.error.message}`);
+      }
+
+      // Publish canonical data to UI
+      const { canonical, issues } = publishCanonical(rawRows);
+      const existingNonDup = vehicles.filter(v => !canonical.find(c => c.chassis_no === v.chassis_no));
+      await setVehicles([...canonical, ...existingNonDup]);
+      addQualityIssues([...validationIssues, ...issues]);
+      updateImportBatch(batchId, { 
+        status: 'published', 
+        publishedAt: new Date().toISOString(),
+        validRows: result.inserted,
+        errorRows: result.errors.length
+      });
+      refreshKpis();
+      setStep('done');
+    } catch (error) {
+      console.error('Publish error:', error);
+      alert(`Publish failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      updateImportBatch(batchId, { status: 'failed' });
+      setStep('review');
+    }
+  }, [batchId, rawRows, vehicles, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, validationIssues, serverErrors, companyId, user]);
+
+  const reset = () => { 
+    setStep('upload'); 
+    setRawRows([]); 
+    setValidationIssues([]); 
+    setServerErrors([]); 
+    setMissingCols([]); 
+  };
+
+  const hasErrors = serverErrors.filter(e => e.severity === 'error').length > 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -100,6 +181,7 @@ export default function ImportCenter() {
         <div className="glass-panel p-12 text-center">
           <Loader2 className="h-10 w-10 text-primary mx-auto mb-4 animate-spin" />
           <p className="text-foreground font-medium">Validating {fileName}...</p>
+          <p className="text-sm text-muted-foreground mt-1">Running server-side schema validation and data integrity checks</p>
         </div>
       )}
 
@@ -120,39 +202,61 @@ export default function ImportCenter() {
               </div>
             )}
 
+            {/* Server-side validation errors */}
+            {serverErrors.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-foreground mb-2">Server-Side Validation Errors</h4>
+                <div className="space-y-1 max-h-48 overflow-y-auto p-3 rounded-md bg-destructive/5 border border-destructive/10">
+                  {serverErrors.map((error, idx) => (
+                    <div key={idx} className="flex items-start gap-2 p-2 rounded bg-secondary/30">
+                      <AlertTriangle className={`h-4 w-4 flex-shrink-0 mt-0.5 ${error.severity === 'error' ? 'text-destructive' : 'text-warning'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-foreground">{error.message}</p>
+                        <p className="text-xs text-muted-foreground">Field: {error.field} | Code: {error.code}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Client-side validation issues */}
+            {validationIssues.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-foreground mb-2">Data Quality Issues</h4>
+                <div className="space-y-1 max-h-48 overflow-y-auto p-3 rounded-md bg-secondary/30">
+                  {validationIssues.map(issue => (
+                    <div key={issue.id} className="flex items-center gap-2 p-2 rounded bg-secondary/50 text-xs">
+                      {issue.severity === 'error' ? <AlertTriangle className="h-3 w-3 text-destructive flex-shrink-0" /> : <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0" />}
+                      <span className="text-foreground truncate">{issue.message}</span>
+                      <StatusBadge status={issue.issueType} className="ml-auto flex-shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-4 gap-3 mb-4">
               <div className="p-3 rounded bg-secondary/50 text-center">
                 <p className="text-2xl font-bold text-foreground">{rawRows.length}</p>
                 <p className="text-xs text-muted-foreground">Total Rows</p>
               </div>
               <div className="p-3 rounded bg-secondary/50 text-center">
-                <p className="text-2xl font-bold text-success">{rawRows.length - validationIssues.filter(i => i.severity === 'error').length}</p>
+                <p className="text-2xl font-bold text-success">{rawRows.length - serverErrors.filter(e => e.severity === 'error').length}</p>
                 <p className="text-xs text-muted-foreground">Valid</p>
               </div>
               <div className="p-3 rounded bg-secondary/50 text-center">
-                <p className="text-2xl font-bold text-destructive">{validationIssues.filter(i => i.severity === 'error').length}</p>
+                <p className="text-2xl font-bold text-destructive">{serverErrors.filter(e => e.severity === 'error').length}</p>
                 <p className="text-xs text-muted-foreground">Errors</p>
               </div>
               <div className="p-3 rounded bg-secondary/50 text-center">
-                <p className="text-2xl font-bold text-warning">{validationIssues.filter(i => i.issueType === 'duplicate').length}</p>
-                <p className="text-xs text-muted-foreground">Duplicates</p>
+                <p className="text-2xl font-bold text-warning">{serverErrors.filter(e => e.severity === 'warning').length + validationIssues.filter(i => i.issueType === 'duplicate').length}</p>
+                <p className="text-xs text-muted-foreground">Warnings</p>
               </div>
             </div>
 
-            {validationIssues.length > 0 && (
-              <div className="space-y-1 max-h-48 overflow-y-auto mb-4">
-                {validationIssues.map(issue => (
-                  <div key={issue.id} className="flex items-center gap-2 p-2 rounded bg-secondary/30 text-xs">
-                    {issue.severity === 'error' ? <AlertTriangle className="h-3 w-3 text-destructive flex-shrink-0" /> : <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0" />}
-                    <span className="text-foreground">{issue.message}</span>
-                    <StatusBadge status={issue.issueType} className="ml-auto" />
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div className="flex gap-2">
-              <Button onClick={handlePublish} disabled={missingCols.length > 0}>
+              <Button onClick={handlePublish} disabled={hasErrors || missingCols.length > 0}>
                 <CheckCircle className="h-4 w-4 mr-1" />Publish Canonical Data
               </Button>
               <Button variant="outline" onClick={reset}>Cancel</Button>
