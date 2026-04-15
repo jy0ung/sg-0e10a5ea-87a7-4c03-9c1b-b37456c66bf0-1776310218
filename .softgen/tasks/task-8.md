@@ -20,4 +20,4 @@ Set up comprehensive test coverage for Phase 2, starting with utility functions.
 - [x] Set up unit tests for import-parser utils
 - [ ] Add integration tests for DataContext CRUD operations
 - [ ] Add E2E tests for critical flows (login, import, vehicle edit)
-- [ ] Add service layer tests (authService, vehicleService, auditService)
+- [x] Add service layer tests (authService, vehicleService, auditService)
