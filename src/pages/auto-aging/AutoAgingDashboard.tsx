@@ -108,33 +108,6 @@ export default function AutoAgingDashboard() {
         <span className="text-xs text-muted-foreground ml-auto">{filtered.length} vehicles</span>
       </div>
 
-      {/* Process Flow */}
-      <div className="glass-panel p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Process Flow</h3>
-        <div className="flex items-center justify-between gap-1 overflow-x-auto pb-2">
-          {processStages.map((stage, i) => (
-            <React.Fragment key={stage.short}>
-              <div className="flex flex-col items-center min-w-[80px]">
-                <div className="w-12 h-12 rounded-full bg-primary/15 border-2 border-primary/40 flex items-center justify-center">
-                  <span className="text-xs font-bold text-primary">{stage.short}</span>
-                </div>
-                <span className="text-[10px] text-muted-foreground mt-1 text-center">{stage.label}</span>
-              </div>
-              {i < processStages.length - 1 && (
-                <div className="flex-1 h-0.5 bg-border min-w-[20px] relative">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] text-primary font-medium whitespace-nowrap">
-                    {(() => {
-                      const segKpi = kpiSummaries.find(k => k.kpiId === segmentKpiIds[i]);
-                      return segKpi ? `${segKpi.median}d` : '—';
-                    })()}
-                  </div>
-                </div>
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         {kpiSummaries.map(kpi => (
