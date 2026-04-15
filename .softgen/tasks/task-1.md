@@ -1,6 +1,6 @@
 ---
 title: Fix Vite Environment Variables
-status: todo
+status: done
 priority: urgent
 type: bug
 tags: [config, reliability]
@@ -15,6 +15,6 @@ The application uses Next.js style `process.env.NEXT_PUBLIC_*` syntax for enviro
 We need to configure Vite to explicitly expose `NEXT_PUBLIC_` variables and update the client code to use Vite's native `import.meta.env` syntax.
 
 ## Checklist
-- [ ] Update `vite.config.ts` to include `envPrefix: ["VITE_", "NEXT_PUBLIC_"]` inside `defineConfig`
-- [ ] Update `src/integrations/supabase/client.ts` to replace `process.env` with `import.meta.env` (handling both `VITE_` and `NEXT_PUBLIC_` prefixes)
-- [ ] Update `src/services/authService.ts` to replace `process?.env` with `import.meta.env` for `VERCEL_URL` and `SITE_URL`
+- [x] Update `vite.config.ts` to include `envPrefix: ["VITE_", "NEXT_PUBLIC_"]` inside `defineConfig`
+- [x] Update `src/integrations/supabase/client.ts` to replace `process.env` with `import.meta.env` (handling both `VITE_` and `NEXT_PUBLIC_` prefixes)
+- [x] Update `src/services/authService.ts` to replace `process?.env` with `import.meta.env` for `VERCEL_URL` and `SITE_URL`
