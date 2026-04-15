@@ -1,3 +1,5 @@
+import React from "react";
+import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -7,7 +9,6 @@ import { AuthProvider, ProtectedRoute } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { errorTrackingService } from "@/services/errorTrackingService";
-import { Loader2 } from "lucide-react";
 
 import LoginPage from "./pages/LoginPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -35,7 +36,7 @@ const queryClient = new QueryClient();
 // Initialize error tracking
 errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
 
-export const router = createBrowserRouter([
+const router = createBrowserRouter([
   {
     path: "/login",
     element: <LoginPage />,
@@ -52,11 +53,9 @@ export const router = createBrowserRouter([
     path: "/",
     element: (
       <ProtectedRoute>
-        <AuthProvider>
-          <DataProvider>
-            <AppLayout />
-          </DataProvider>
-        </AuthProvider>
+        <DataProvider>
+          <AppLayout />
+        </DataProvider>
       </ProtectedRoute>
     ),
     children: [
@@ -90,11 +89,16 @@ const App = () => {
         <Toaster />
         <Sonner />
         <ErrorBoundary>
-          <RouterProvider router={router} />
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
         </ErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>
   );
 };
+
+const root = createRoot(document.getElementById("root")!);
+root.render(<App />);
 
 export default App;
