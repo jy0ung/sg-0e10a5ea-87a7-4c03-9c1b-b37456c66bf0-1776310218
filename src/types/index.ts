@@ -206,3 +206,21 @@ export interface PlatformModule {
   status: 'active' | 'coming_soon' | 'planned';
   path?: string;
 }
+
+// ===== KPI Dashboard Filters =====
+export interface KpiDashboardFilters {
+  dateRange: {
+    from: Date | null;
+    to: Date | null;
+  };
+  branches: string[];
+  models: string[];
+  paymentMethods: string[];
+  overdueOnly: boolean;
+}
+
+export interface KpiSegmentClick {
+  kpiId: string;
+  segmentType: 'compliant' | 'overdue' | 'missing' | 'invalid';
+  value: number;
+}
