@@ -237,6 +237,7 @@ export default function ExecutiveDashboard() {
           </div>
           <KpiDashboard 
             kpiSummaries={visibleKpis} 
+            vehicles={vehicles}
             showAdvanced={showAdvanced}
           />
         </>
