@@ -3,14 +3,16 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Loader2, Save } from 'lucide-react';
+import { Shield, Loader2, Save, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
 import { demoBranches } from '@/data/demo-data';
+import { PermissionEditor } from '@/components/admin/PermissionEditor';
 
 interface ProfileRow {
   id: string;
@@ -54,6 +56,9 @@ export default function UserManagement() {
   const [editScope, setEditScope] = useState<string>('');
   const [editBranch, setEditBranch] = useState<string>('none');
   const [saving, setSaving] = useState(false);
+  const [permissionUserId, setPermissionUserId] = useState<string>('');
+  const [permissionUserName, setPermissionUserName] = useState<string>('');
+  const [permissionUserRole, setPermissionUserRole] = useState<string>('');
 
   const canManage = hasRole(['super_admin', 'company_admin']);
 
@@ -74,6 +79,12 @@ export default function UserManagement() {
     setEditRole(p.role);
     setEditScope(p.access_scope);
     setEditBranch(p.branch_id || 'none');
+  };
+
+  const openPermissions = (p: ProfileRow) => {
+    setPermissionUserId(p.id);
+    setPermissionUserName(p.name);
+    setPermissionUserRole(p.role);
   };
 
   const handleRoleChange = (newRole: string) => {
@@ -148,8 +159,11 @@ export default function UserManagement() {
                 </td>
                 <td className="px-4 py-3 text-foreground">{p.branch_id || '—'}</td>
                 {canManage && (
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 flex items-center gap-2">
                     <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>Edit</Button>
+                    <Button variant="ghost" size="sm" onClick={() => openPermissions(p)}>
+                      <Settings className="h-3.5 w-3.5 mr-1" />Permissions
+                    </Button>
                   </td>
                 )}
               </tr>
@@ -220,6 +234,24 @@ export default function UserManagement() {
               Save Changes
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permission Editor Dialog */}
+      <Dialog open={!!permissionUserId} onOpenChange={(open) => !open && setPermissionUserId('')}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          {permissionUserId && (
+            <PermissionEditor
+              userId={permissionUserId}
+              userName={permissionUserName}
+              userRole={permissionUserRole}
+              onSave={() => {
+                setPermissionUserId('');
+                toast.success('Permissions saved successfully');
+              }}
+              onCancel={() => setPermissionUserId('')}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
