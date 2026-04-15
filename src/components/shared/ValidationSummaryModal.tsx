@@ -164,7 +164,7 @@ export function ValidationSummaryModal({
               className="h-9"
             />
           </div>
-          <Select value={severityFilter} onValueChange={(v: any) => setSeverityFilter(v)}>
+          <Select value={severityFilter} onValueChange={(v: 'all' | 'error' | 'warning') => setSeverityFilter(v)}>
             <SelectTrigger className="w-32 h-9">
               <SelectValue />
             </SelectTrigger>
@@ -215,7 +215,7 @@ export function ValidationSummaryModal({
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 text-sm text-muted-foreground mr-4">
               <span>Sort by:</span>
-              <Select value={sortField} onValueChange={(v: any) => setSortField(v)}>
+              <Select value={sortField} onValueChange={(v: SortField) => setSortField(v)}>
                 <SelectTrigger className="w-28 h-8">
                   <SelectValue />
                 </SelectTrigger>

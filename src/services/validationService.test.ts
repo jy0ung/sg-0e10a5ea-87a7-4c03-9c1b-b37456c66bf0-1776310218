@@ -2,16 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateVehicleRow, validateImportBatch, validateSlaPolicy, validateQualityIssue, validateVehicleImportBatch } from './validationService';
 import { supabase } from '@/integrations/supabase/client';
 
+// Type-safe mock for Supabase
+const createMockQueryBuilder = () => ({
+  select: vi.fn(),
+  eq: vi.fn(),
+  maybeSingle: vi.fn(),
+  single: vi.fn(),
+});
+
+const mockSupabase = {
+  from: vi.fn(() => createMockQueryBuilder()),
+};
+
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle: vi.fn(),
-        })),
-      })),
-    })),
-  },
+  supabase: mockSupabase,
 }));
 
 describe('ValidationService', () => {
@@ -32,13 +36,9 @@ describe('ValidationService', () => {
         shipment_etd_pkg: '2024-02-01',
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.isValid).toBe(true);
@@ -86,13 +86,9 @@ describe('ValidationService', () => {
         payment_method: 'Cash',
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'existing-id' }, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: { id: 'existing-id' }, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.isValid).toBe(false);
@@ -109,13 +105,9 @@ describe('ValidationService', () => {
         payment_method: 'Cash',
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.isValid).toBe(false);
@@ -133,13 +125,9 @@ describe('ValidationService', () => {
         bg_date: 'invalid-date',
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.isValid).toBe(false);
@@ -158,13 +146,9 @@ describe('ValidationService', () => {
         shipment_etd_pkg: '2024-01-01', // Before BG date
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.warnings.some(e => e.code === 'DATE_ORDER_WARNING')).toBe(true);
@@ -181,13 +165,9 @@ describe('ValidationService', () => {
         dealer_transfer_price: 'not-a-number',
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.isValid).toBe(false);
@@ -204,13 +184,9 @@ describe('ValidationService', () => {
         payment_method: 'CRYPTO', // Unusual payment method
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.warnings.some(e => e.code === 'UNUSUAL_PAYMENT_METHOD')).toBe(true);
@@ -235,13 +211,9 @@ describe('ValidationService', () => {
           bg_date: dateStr,
         };
 
-        vi.mocked(supabase.from).mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-          }),
-        } as any);
+        const mockQueryBuilder = createMockQueryBuilder();
+        mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+        mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
         const result = await validateVehicleRow(row, 'company-123', 1);
         expect(result.errors.filter(e => e.field === 'bg_date' && e.code === 'INVALID_DATE_FORMAT')).toHaveLength(0);
@@ -258,13 +230,9 @@ describe('ValidationService', () => {
         status: 'uploaded',
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'company-123' }, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: { id: 'company-123' }, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateImportBatch(batch);
       expect(result.isValid).toBe(true);
@@ -299,13 +267,9 @@ describe('ValidationService', () => {
         companyId: 'invalid-company',
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateImportBatch(batch);
       expect(result.isValid).toBe(false);
@@ -319,13 +283,9 @@ describe('ValidationService', () => {
         status: 'invalid-status',
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'company-123' }, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: { id: 'company-123' }, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateImportBatch(batch);
       expect(result.isValid).toBe(false);
@@ -339,13 +299,9 @@ describe('ValidationService', () => {
         totalRows: -1,
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'company-123' }, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: { id: 'company-123' }, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateImportBatch(batch);
       expect(result.isValid).toBe(false);
@@ -362,13 +318,9 @@ describe('ValidationService', () => {
         label: 'Delivery SLA',
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'company-123' }, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: { id: 'company-123' }, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateSlaPolicy(policy);
       expect(result.isValid).toBe(true);
@@ -408,13 +360,9 @@ describe('ValidationService', () => {
         label: 'Delivery SLA',
       };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'company-123' }, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: { id: 'company-123' }, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateSlaPolicy(policy);
       expect(result.isValid).toBe(false);
@@ -500,13 +448,9 @@ describe('ValidationService', () => {
         },
       ];
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateVehicleImportBatch(rows, 'company-123');
       expect(result.summary.totalRows).toBe(2);
@@ -534,13 +478,9 @@ describe('ValidationService', () => {
         },
       ];
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      } as any);
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
 
       const result = await validateVehicleImportBatch(rows, 'company-123');
       expect(result.summary.totalRows).toBe(2);
