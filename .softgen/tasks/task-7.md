@@ -1,6 +1,6 @@
 ---
 title: 'Phase 1: Stability Foundation'
-status: todo
+status: in_progress
 created_by: human
 created_at: '2026-04-15T05:08:40.294993'
 position: 0
