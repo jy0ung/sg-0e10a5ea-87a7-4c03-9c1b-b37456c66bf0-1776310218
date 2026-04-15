@@ -1,6 +1,6 @@
 ---
 title: Create Missing Profiles Table and Auth Trigger
-status: todo
+status: done
 priority: urgent
 type: bug
 tags: [auth, database, blocker]
@@ -18,8 +18,8 @@ The application's authentication flow is broken because:
 This blocks all authentication features.
 
 ## Checklist
-- [ ] Create `profiles` table with columns: `id` (UUID, FK to auth.users), `email`, `name`, `role`, `company_id`, `branch_id`, `avatar_url`, `access_scope`, timestamps
-- [ ] Create trigger function `handle_new_user()` to auto-insert profile row on user signup
-- [ ] Add RLS policies for profiles (T1 pattern - users can read/update their own profile)
-- [ ] Backfill existing auth.users into profiles table
-- [ ] Test signup flow end-to-end
+- [x] Create `profiles` table with columns: `id` (UUID, FK to auth.users), `email`, `name`, `role`, `company_id`, `branch_id`, `avatar_url`, `access_scope`, timestamps
+- [x] Create trigger function `handle_new_user()` to auto-insert profile row on user signup
+- [x] Add RLS policies for profiles (T1 pattern - users can read/update their own profile)
+- [x] Backfill existing auth.users into profiles table
+- [x] Test signup flow end-to-end
