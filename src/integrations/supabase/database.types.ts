@@ -15,6 +15,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          changes: Json
+          column_name: string | null
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          ip_address: string | null
+          table_name: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          changes: Json
+          column_name?: string | null
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          changes?: Json
+          column_name?: string | null
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           code: string
@@ -46,6 +96,44 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      column_permissions: {
+        Row: {
+          column_name: string
+          created_at: string | null
+          id: string
+          permission_level: string
+          table_name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          column_name: string
+          created_at?: string | null
+          id?: string
+          permission_level: string
+          table_name?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          column_name?: string
+          created_at?: string | null
+          id?: string
+          permission_level?: string
+          table_name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "column_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -135,6 +223,9 @@ export type Database = {
           access_scope: string | null
           avatar_url: string | null
           branch_id: string | null
+          can_bulk_edit_vehicles: boolean | null
+          can_edit_vehicles: boolean | null
+          can_view_vehicle_details: boolean | null
           company_id: string | null
           created_at: string | null
           email: string | null
@@ -147,6 +238,9 @@ export type Database = {
           access_scope?: string | null
           avatar_url?: string | null
           branch_id?: string | null
+          can_bulk_edit_vehicles?: boolean | null
+          can_edit_vehicles?: boolean | null
+          can_view_vehicle_details?: boolean | null
           company_id?: string | null
           created_at?: string | null
           email?: string | null
@@ -159,6 +253,9 @@ export type Database = {
           access_scope?: string | null
           avatar_url?: string | null
           branch_id?: string | null
+          can_bulk_edit_vehicles?: boolean | null
+          can_edit_vehicles?: boolean | null
+          can_view_vehicle_details?: boolean | null
           company_id?: string | null
           created_at?: string | null
           email?: string | null

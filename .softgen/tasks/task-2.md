@@ -1,24 +1,29 @@
 ---
-title: Add filters and interactivity to KPI Dashboard
+title: Fix Excel Import and KPI Logic Relocation
 status: done
 priority: high
-type: feature
-tags: [feature, dashboard, filters, interactivity]
+type: bug
+tags: [bug, fix, refactor]
 created_by: agent
-created_at: 2026-04-15T02:01:00Z
+created_at: 2026-04-15T02:00:29Z
 position: 2
 ---
 
 ## Notes
-Add date range and category filters to the KpiDashboard to filter chart data. Make KPI chart segments clickable to open a modal showing detailed vehicle data.
+Fix the Excel import issue where data is not persisting and relocate the KPI computation logic from demo-data.ts to a proper utility file.
 
 ## Checklist
-- [x] Add filter types to index.ts (KpiDashboardFilters, KpiSegmentClick)
-- [x] Add date range picker filter using shadcn Calendar component
-- [x] Add category filters for branches, models, and payment methods
-- [x] Add filter toggle UI with show/hide functionality
-- [x] Add filtered data summary showing count of filtered vehicles
-- [x] Make KPI table rows clickable to show overdue vehicles
-- [x] Add vehicle details modal with chassis, model, branch, customer, and days data
-- [x] Apply filters to vehicle data before displaying
-- [x] Test filters and modal functionality
+- [x] Check database schema to verify tables and constraints
+- [x] Fix upsert constraint in DataContext to match database unique constraint (chassis_no,company_id)
+- [x] Create utils/kpi-computation.ts with computeKpiSummaries function
+- [x] Update DataContext to import computeKpiSummaries from utils/kpi-computation
+- [x] Remove computeKpiSummaries from demo-data.ts
+- [x] Create KpiDashboard component to visualize computed KPI summaries
+- [x] Update ExecutiveDashboard to use the new KpiDashboard component
+- [x] Fix KpiDashboard missing vehicles prop
+- [x] Remove Process Flow cards from Auto Aging Dashboard
+- [x] Update KPI cards with clearer labels showing "median days"
+- [x] Add trend line chart showing 6-month KPI trends
+- [x] Add vehicle details modal on KPI card click
+- [x] Implement date range and category filters for KPI Dashboard
+- [ ] Test Excel import to verify data persistence
