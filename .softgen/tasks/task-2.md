@@ -1,25 +1,24 @@
 ---
-title: Create Missing Profiles Table and Auth Trigger
+title: Add filters and interactivity to KPI Dashboard
 status: done
-priority: urgent
-type: bug
-tags: [auth, database, blocker]
-created_by: softgen
-created_at: 2026-04-15T01:15:00Z
+priority: high
+type: feature
+tags: [feature, dashboard, filters, interactivity]
+created_by: agent
+created_at: 2026-04-15T02:01:00Z
 position: 2
 ---
 
 ## Notes
-The application's authentication flow is broken because:
-1. `AuthContext.tsx` fetches user profiles from a `profiles` table that doesn't exist in the database
-2. There's no trigger to auto-create profile rows when users sign up via `supabase.auth.signUp()`
-3. Users can complete signup but won't be able to log in because profile fetching fails
-
-This blocks all authentication features.
+Add date range and category filters to the KpiDashboard to filter chart data. Make KPI chart segments clickable to open a modal showing detailed vehicle data.
 
 ## Checklist
-- [x] Create `profiles` table with columns: `id` (UUID, FK to auth.users), `email`, `name`, `role`, `company_id`, `branch_id`, `avatar_url`, `access_scope`, timestamps
-- [x] Create trigger function `handle_new_user()` to auto-insert profile row on user signup
-- [x] Add RLS policies for profiles (T1 pattern - users can read/update their own profile)
-- [x] Backfill existing auth.users into profiles table
-- [x] Test signup flow end-to-end
+- [x] Add filter types to index.ts (KpiDashboardFilters, KpiSegmentClick)
+- [x] Add date range picker filter using shadcn Calendar component
+- [x] Add category filters for branches, models, and payment methods
+- [x] Add filter toggle UI with show/hide functionality
+- [x] Add filtered data summary showing count of filtered vehicles
+- [x] Make KPI table rows clickable to show overdue vehicles
+- [x] Add vehicle details modal with chassis, model, branch, customer, and days data
+- [x] Apply filters to vehicle data before displaying
+- [x] Test filters and modal functionality
