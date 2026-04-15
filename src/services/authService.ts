@@ -4,7 +4,8 @@ import type { User, Session } from "@supabase/supabase-js";
 export interface AuthUser {
   id: string;
   email: string;
-  user_metadata?: Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  user_metadata?: any;
   created_at?: string;
 }
 
@@ -15,10 +16,8 @@ export interface AuthError {
 
 // Dynamic URL Helper
 const getURL = () => {
-  let url = import.meta.env.VITE_VERCEL_URL ?? 
-           import.meta.env.NEXT_PUBLIC_VERCEL_URL ?? 
-           import.meta.env.VITE_SITE_URL ??
-           import.meta.env.NEXT_PUBLIC_SITE_URL ?? 
+  let url = process?.env?.NEXT_PUBLIC_VERCEL_URL ?? 
+           process?.env?.NEXT_PUBLIC_SITE_URL ?? 
            'http://localhost:3000'
   
   // Handle undefined or null url

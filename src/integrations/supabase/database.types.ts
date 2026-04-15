@@ -11,48 +11,408 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      branches: {
+        Row: {
+          code: string
+          company_id: string
+          created_at: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          company_id: string
+          created_at?: string | null
+          id: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      import_batches: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          duplicate_rows: number | null
+          error_rows: number | null
+          file_name: string
+          id: string
+          published_at: string | null
+          status: string
+          total_rows: number | null
+          updated_at: string | null
+          uploaded_at: string | null
+          uploaded_by: string
+          valid_rows: number | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          duplicate_rows?: number | null
+          error_rows?: number | null
+          file_name: string
+          id?: string
+          published_at?: string | null
+          status?: string
+          total_rows?: number | null
+          updated_at?: string | null
+          uploaded_at?: string | null
+          uploaded_by: string
+          valid_rows?: number | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          duplicate_rows?: number | null
+          error_rows?: number | null
+          file_name?: string
+          id?: string
+          published_at?: string | null
+          status?: string
+          total_rows?: number | null
+          updated_at?: string | null
+          uploaded_at?: string | null
+          uploaded_by?: string
+          valid_rows?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
-          access_scope: string
+          access_scope: string | null
           avatar_url: string | null
           branch_id: string | null
-          company_id: string
+          company_id: string | null
           created_at: string | null
           email: string | null
           id: string
           name: string | null
-          role: string
+          role: string | null
           updated_at: string | null
         }
         Insert: {
-          access_scope?: string
+          access_scope?: string | null
           avatar_url?: string | null
           branch_id?: string | null
-          company_id?: string
+          company_id?: string | null
           created_at?: string | null
           email?: string | null
           id: string
           name?: string | null
-          role?: string
+          role?: string | null
           updated_at?: string | null
         }
         Update: {
-          access_scope?: string
+          access_scope?: string | null
           avatar_url?: string | null
           branch_id?: string | null
-          company_id?: string
+          company_id?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           name?: string | null
-          role?: string
+          role?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quality_issues: {
+        Row: {
+          chassis_no: string
+          company_id: string | null
+          created_at: string | null
+          field: string
+          id: string
+          import_batch_id: string | null
+          issue_type: string
+          message: string
+          severity: string
+        }
+        Insert: {
+          chassis_no: string
+          company_id?: string | null
+          created_at?: string | null
+          field: string
+          id?: string
+          import_batch_id?: string | null
+          issue_type: string
+          message: string
+          severity?: string
+        }
+        Update: {
+          chassis_no?: string
+          company_id?: string | null
+          created_at?: string | null
+          field?: string
+          id?: string
+          import_batch_id?: string | null
+          issue_type?: string
+          message?: string
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quality_issues_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quality_issues_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sla_policies: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          id: string
+          kpi_id: string
+          label: string
+          sla_days: number
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          kpi_id: string
+          label: string
+          sla_days?: number
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          kpi_id?: string
+          label?: string
+          sla_days?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sla_policies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicles: {
+        Row: {
+          bg_date: string | null
+          bg_to_delivery: number | null
+          bg_to_disb: number | null
+          bg_to_shipment_etd: number | null
+          branch_code: string
+          chassis_no: string
+          company_id: string | null
+          contra_sola: string | null
+          created_at: string | null
+          customer_name: string
+          date_received_by_outlet: string | null
+          dealer_transfer_price: string | null
+          delivery_date: string | null
+          delivery_to_disb: number | null
+          disb_date: string | null
+          etd_to_outlet: number | null
+          full_payment_date: string | null
+          full_payment_type: string | null
+          id: string
+          import_batch_id: string | null
+          invoice_no: string | null
+          is_d2d: boolean | null
+          lou: string | null
+          model: string
+          obr: string | null
+          outlet_to_reg: number | null
+          payment_method: string
+          reg_date: string | null
+          reg_no: string | null
+          reg_to_delivery: number | null
+          remark: string | null
+          salesman_name: string
+          shipment_eta_kk_twu_sdk: string | null
+          shipment_etd_pkg: string | null
+          shipment_name: string | null
+          source_row_id: string | null
+          updated_at: string | null
+          vaa_date: string | null
+          variant: string | null
+        }
+        Insert: {
+          bg_date?: string | null
+          bg_to_delivery?: number | null
+          bg_to_disb?: number | null
+          bg_to_shipment_etd?: number | null
+          branch_code: string
+          chassis_no: string
+          company_id?: string | null
+          contra_sola?: string | null
+          created_at?: string | null
+          customer_name: string
+          date_received_by_outlet?: string | null
+          dealer_transfer_price?: string | null
+          delivery_date?: string | null
+          delivery_to_disb?: number | null
+          disb_date?: string | null
+          etd_to_outlet?: number | null
+          full_payment_date?: string | null
+          full_payment_type?: string | null
+          id?: string
+          import_batch_id?: string | null
+          invoice_no?: string | null
+          is_d2d?: boolean | null
+          lou?: string | null
+          model: string
+          obr?: string | null
+          outlet_to_reg?: number | null
+          payment_method: string
+          reg_date?: string | null
+          reg_no?: string | null
+          reg_to_delivery?: number | null
+          remark?: string | null
+          salesman_name: string
+          shipment_eta_kk_twu_sdk?: string | null
+          shipment_etd_pkg?: string | null
+          shipment_name?: string | null
+          source_row_id?: string | null
+          updated_at?: string | null
+          vaa_date?: string | null
+          variant?: string | null
+        }
+        Update: {
+          bg_date?: string | null
+          bg_to_delivery?: number | null
+          bg_to_disb?: number | null
+          bg_to_shipment_etd?: number | null
+          branch_code?: string
+          chassis_no?: string
+          company_id?: string | null
+          contra_sola?: string | null
+          created_at?: string | null
+          customer_name?: string
+          date_received_by_outlet?: string | null
+          dealer_transfer_price?: string | null
+          delivery_date?: string | null
+          delivery_to_disb?: number | null
+          disb_date?: string | null
+          etd_to_outlet?: number | null
+          full_payment_date?: string | null
+          full_payment_type?: string | null
+          id?: string
+          import_batch_id?: string | null
+          invoice_no?: string | null
+          is_d2d?: boolean | null
+          lou?: string | null
+          model?: string
+          obr?: string | null
+          outlet_to_reg?: number | null
+          payment_method?: string
+          reg_date?: string | null
+          reg_no?: string | null
+          reg_to_delivery?: number | null
+          remark?: string | null
+          salesman_name?: string
+          shipment_eta_kk_twu_sdk?: string | null
+          shipment_etd_pkg?: string | null
+          shipment_name?: string | null
+          source_row_id?: string | null
+          updated_at?: string | null
+          vaa_date?: string | null
+          variant?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicles_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
