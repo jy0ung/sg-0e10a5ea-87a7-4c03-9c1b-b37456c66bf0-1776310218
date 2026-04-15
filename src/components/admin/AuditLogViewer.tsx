@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { getAllAuditLogs } from '@/services/auditService';
+import { getAllAuditLogs, AuditLogWithProfile } from '@/services/auditService';
 import { History, Search, Filter, Download, ChevronRight, ChevronDown, X } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
@@ -15,7 +15,7 @@ interface AuditLogViewerProps {
 }
 
 export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerProps) {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLogWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState({
