@@ -1,5 +1,6 @@
 import { VehicleCanonical, ImportBatch, DataQualityIssue, Notification, AuditLog, Branch, Company, User, SlaPolicy, PlatformModule } from '@/types';
 import { KPI_DEFINITIONS } from './kpi-definitions';
+import { computeKpiSummaries } from '@/utils/kpi-computation';
 
 export const demoVehicles: VehicleCanonical[] = [];
 
@@ -34,29 +35,3 @@ export const platformModules: PlatformModule[] = [
   { id: 'hr', name: 'HR / People Intelligence', description: 'Workforce analytics and talent management', icon: 'UserCheck', status: 'planned' },
   { id: 'forecasting', name: 'Forecasting & AI Insights', description: 'Predictive analytics and AI recommendations', icon: 'Brain', status: 'planned' },
 ];
-
-export function computeKpiSummaries(vehicles: VehicleCanonical[], slas: SlaPolicy[]): import('@/types').KpiSummary[] {
-  return KPI_DEFINITIONS.map(kpi => {
-    const sla = slas.find(s => s.kpiId === kpi.id);
-    const slaDays = sla?.slaDays ?? kpi.slaDefault;
-    const values: number[] = [];
-    let invalidCount = 0;
-    let missingCount = 0;
-
-    vehicles.forEach(v => {
-      const val = v[kpi.computedField] as number | null | undefined;
-      if (val === null || val === undefined) missingCount++;
-      else if (val < 0) invalidCount++;
-      else values.push(val);
-    });
-
-    values.sort((a, b) => a - b);
-    const validCount = values.length;
-    const median = validCount > 0 ? values[Math.floor(validCount / 2)] : 0;
-    const average = validCount > 0 ? Math.round(values.reduce((s, v) => s + v, 0) / validCount) : 0;
-    const p90 = validCount > 0 ? values[Math.floor(validCount * 0.9)] : 0;
-    const overdueCount = values.filter(v => v > slaDays).length;
-
-    return { kpiId: kpi.id, label: kpi.label, shortLabel: kpi.shortLabel, validCount, invalidCount, missingCount, median, average, p90, overdueCount, slaDays };
-  });
-}

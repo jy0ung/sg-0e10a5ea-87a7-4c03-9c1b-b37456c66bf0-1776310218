@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { VehicleCanonical, ImportBatch, DataQualityIssue, SlaPolicy, KpiSummary } from '@/types';
-import { computeKpiSummaries } from '@/data/demo-data';
+import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -189,7 +189,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase
         .from('vehicles')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .upsert(chunk as any, { onConflict: 'chassis_no' });
+        .upsert(chunk as any, { onConflict: 'chassis_no,company_id' });
       if (error) console.error('Vehicle upsert error:', error);
     }
 
