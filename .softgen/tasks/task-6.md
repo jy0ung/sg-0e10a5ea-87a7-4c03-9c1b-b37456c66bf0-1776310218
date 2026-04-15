@@ -17,21 +17,21 @@ position: 0
 Refactor the existing Vehicle Explorer to match the uploaded Excel layout with inline editing, removing KPI columns and adding full detail view.
 
 ## Checklist
-- [ ] Create ExcelTable generic component with edit support
-- [ ] Define all Excel columns matching uploaded layout (25+ columns)
-- [ ] Remove KPI columns from table
-- [ ] Implement inline edit with double-click or Edit button
-- [ ] Add date picker for date fields
-- [ ] Add dropdown for fixed fields (Branch, Model, Payment)
-- [ ] Add number input for prices
-- [ ] Implement auto-save on blur or Enter key
+- [x] Create ExcelTable generic component with edit support
+- [x] Define all Excel columns matching uploaded layout (25+ columns)
+- [x] Remove KPI columns from table
+- [x] Implement inline edit with double-click or Edit button
+- [x] Add date picker for date fields
+- [x] Add dropdown for fixed fields (Branch, Model, Payment)
+- [x] Add number input for prices
+- [x] Implement auto-save on blur or Enter key
 - [ ] Add inline validation feedback
-- [ ] Add sortable columns
-- [ ] Add pagination with customizable page size
-- [ ] Add quick filters (branch, model, status)
+- [x] Add sortable columns
+- [x] Add pagination with customizable page size
+- [x] Add quick filters (branch, model, status)
 - [ ] Add bulk actions toolbar
-- [ ] Create VehicleDetailPanel component
+- [x] Create VehicleDetailPanel component
 - [ ] Add read-only/edit mode toggle
-- [ ] Integrate permission-based column visibility
+- [x] Integrate permission-based column visibility
 - [ ] Test all column types and editors
 - [ ] Test mobile responsiveness with horizontal scroll
