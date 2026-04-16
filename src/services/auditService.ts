@@ -18,6 +18,74 @@ export interface AuditLogWithProfile extends AuditLog {
   };
 }
 
+export type UserActionType = 
+  | "view" 
+  | "create" 
+  | "update" 
+  | "delete" 
+  | "export" 
+  | "import" 
+  | "login" 
+  | "logout" 
+  | "permission_change"
+  | "search"
+  | "filter"
+  | "sort"
+  | "navigate"
+  | "download"
+  | "share";
+
+export interface UserActionMetadata {
+  page?: string;
+  component?: string;
+  route?: string;
+  referrer?: string;
+  deviceType?: string;
+  browser?: string;
+  os?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  duration?: number;
+  itemCount?: number;
+  searchQuery?: string;
+  filterParams?: Record<string, unknown>;
+}
+
+export async function logUserAction(
+  userId: string,
+  actionType: UserActionType,
+  entityType: string,
+  entityId?: string,
+  metadata?: UserActionMetadata
+): Promise<{ error: Error | null }> {
+  const queryId = `user-action-${actionType}-${entityId || 'none'}-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
+  try {
+    const { error } = await supabase.from("audit_logs").insert({
+      user_id: userId,
+      action: actionType,
+      entity_type: entityType,
+      entity_id: entityId || null,
+      changes: metadata || {},
+      table_name: "user_actions",
+    });
+
+    performanceService.endQueryTimer(queryId, "log_user_action");
+
+    if (error) {
+      loggingService.error("Failed to log user action", { userId, actionType, error }, "AuditService");
+    }
+
+    return { error: error || null };
+  } catch (err) {
+    performanceService.endQueryTimer(queryId, "log_user_action_failed");
+    const error = err instanceof Error ? err : new Error(String(err));
+    loggingService.error("Unexpected error logging user action", { userId, actionType, error }, "AuditService");
+    return { error };
+  }
+}
+
 export async function logVehicleEdit(
   userId: string,
   vehicleId: string,
@@ -97,12 +165,69 @@ export async function getUserAuditLogs(
   return { data, error: error || null };
 }
 
+export async function getUserActionHistory(
+  userId: string,
+  filters?: {
+    actionType?: UserActionType;
+    entityType?: string;
+    fromDate?: Date;
+    toDate?: Date;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<{ data: AuditLog[] | null; error: Error | null; count?: number }> {
+  const queryId = `user-action-history-${userId}-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
+  let query = supabase
+    .from("audit_logs")
+    .select("*", { count: "exact" })
+    .eq("user_id", userId)
+    .eq("table_name", "user_actions")
+    .order("created_at", { ascending: false });
+
+  if (filters?.actionType) {
+    query = query.eq("action", filters.actionType);
+  }
+
+  if (filters?.entityType) {
+    query = query.eq("entity_type", filters.entityType);
+  }
+
+  if (filters?.fromDate) {
+    query = query.gte("created_at", filters.fromDate.toISOString());
+  }
+
+  if (filters?.toDate) {
+    query = query.lte("created_at", filters.toDate.toISOString());
+  }
+
+  if (filters?.limit) {
+    query = query.limit(filters.limit);
+  }
+
+  if (filters?.offset) {
+    query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
+  }
+
+  const { data, error, count } = await query;
+
+  performanceService.endQueryTimer(queryId, "get_user_action_history");
+
+  if (error) {
+    loggingService.error("Failed to get user action history", { userId, filters, error }, "AuditService");
+  }
+
+  return { data, error: error || null, count };
+}
+
 export async function getAllAuditLogs(
   limit: number = 100,
   offset: number = 0,
   filters?: {
     entityType?: string;
     userId?: string;
+    action?: string;
     fromDate?: Date;
     toDate?: Date;
   }
@@ -126,6 +251,10 @@ export async function getAllAuditLogs(
 
   if (filters?.userId) {
     query = query.eq("user_id", filters.userId);
+  }
+
+  if (filters?.action) {
+    query = query.eq("action", filters.action);
   }
 
   if (filters?.fromDate) {
@@ -176,4 +305,69 @@ export async function logPermissionChange(
   }
 
   return { error: error || null };
+}
+
+// Create a React Hook for automatic action logging
+import { useEffect, useRef } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+
+export function useActionLogger(
+  entityType: string,
+  entityId?: string,
+  component?: string
+) {
+  const { user } = useAuth();
+  const mountTimeRef = useRef<number>(Date.now());
+  const previousEntityIdRef = useRef<string | undefined>(entityId);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    // Log view action when component mounts or entity changes
+    if (previousEntityIdRef.current !== entityId) {
+      logUserAction(user.id, "view", entityType, entityId, {
+        page: window.location.pathname,
+        component: component,
+        route: window.location.pathname,
+        referrer: document.referrer,
+      });
+      
+      previousEntityIdRef.current = entityId;
+    }
+  }, [user?.id, entityType, entityId, component]);
+
+  useEffect(() => {
+    // Log navigation/exit action when component unmounts
+    return () => {
+      if (!user?.id) return;
+
+      const duration = Date.now() - mountTimeRef.current;
+      
+      logUserAction(user.id, "navigate", entityType, entityId, {
+        page: window.location.pathname,
+        component: component,
+        route: window.location.pathname,
+        duration,
+      }).catch((err) => {
+        // Silently fail during unmount
+        console.error("Failed to log navigate action:", err);
+      });
+    };
+  }, [user?.id, entityType, entityId, component]);
+
+  const logAction = async (actionType: UserActionType, metadata?: Partial<UserActionMetadata>) => {
+    if (!user?.id) {
+      console.warn("Cannot log action: User not authenticated");
+      return;
+    }
+
+    return logUserAction(user.id, actionType, entityType, entityId, {
+      page: window.location.pathname,
+      component: component,
+      route: window.location.pathname,
+      ...metadata,
+    });
+  };
+
+  return { logAction };
 }
