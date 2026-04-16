@@ -53,6 +53,26 @@ export interface ImportBatch {
   publishedAt?: string;
 }
 
+export interface ImportBatchInsert {
+  fileName: string;
+  uploadedBy: string;
+  uploadedAt: string;
+  status: string;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
+  duplicateRows: number;
+  companyId: string;
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  code: string;
+  severity: 'error' | 'warning';
+  rowNumber?: number;
+}
+
 // ===== Vehicle =====
 export interface VehicleRaw {
   id: string;

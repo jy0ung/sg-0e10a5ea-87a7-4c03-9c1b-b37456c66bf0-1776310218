@@ -5,21 +5,8 @@ import { logVehicleEdit } from "./auditService";
 import {
   validateVehicleImportBatch,
   validateImportBatch,
-  type ValidationError,
 } from "./validationService";
-import type { ImportBatch } from "@/types";
-
-export interface ImportBatchInsert {
-  fileName: string;
-  uploadedBy: string;
-  uploadedAt: string;
-  status: string;
-  totalRows: number;
-  validRows: number;
-  errorRows: number;
-  duplicateRows: number;
-  companyId: string;
-}
+import type { ImportBatch, ImportBatchInsert, ValidationError } from "@/types";
 
 export async function createImportBatch(
   batch: ImportBatchInsert,

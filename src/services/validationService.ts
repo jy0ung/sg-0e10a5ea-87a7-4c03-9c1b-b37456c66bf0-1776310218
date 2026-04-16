@@ -1,19 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { loggingService } from "./loggingService";
-import { performanceService } from "./performanceService";
-
-export interface ValidationError {
-  field: string;
-  message: string;
-  code: string;
-  severity: 'error' | 'warning';
-}
-
-export interface ValidationResult {
-  isValid: boolean;
-  errors: ValidationError[];
-  warnings: ValidationError[];
-}
+import type { ValidationError } from "@/types";
 
 // Allowed values for enum fields
 const ALLOWED_STATUSES = ['uploaded', 'validated', 'failed', 'publish_in_progress', 'published'] as const;
@@ -24,6 +11,13 @@ type QualityIssueSeverity = typeof ALLOWED_SEVERITIES[number];
 
 const ALLOWED_ISSUE_TYPES = ['missing', 'duplicate', 'negative', 'invalid', 'format'] as const;
 type QualityIssueType = typeof ALLOWED_ISSUE_TYPES[number];
+
+// Reference data cache
+const branchesCache: string[] = [];
+const modelsCache: string[] = [];
+const paymentMethodsCache: string[] = [];
+const cacheExpiry = 0;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Validate a vehicle row against schema and business rules

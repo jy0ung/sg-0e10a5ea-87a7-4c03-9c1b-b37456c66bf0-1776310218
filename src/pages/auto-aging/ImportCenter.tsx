@@ -9,16 +9,9 @@ import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCirc
 import { parseWorkbook, publishCanonical } from '@/lib/import-parser';
 import { validateVehicleImportBatch, validateImportBatch } from '@/services/validationService';
 import { createImportBatch, validateAndInsertVehicles } from '@/services/importService';
-import { ImportBatch, VehicleRaw } from '@/types';
+import type { ImportBatchInsert, VehicleRaw, ValidationError } from '@/types';
 
 type Step = 'upload' | 'validating' | 'review' | 'publishing' | 'done';
-
-interface ServerValidationError {
-  field: string;
-  message: string;
-  code: string;
-  severity: 'error' | 'warning';
-}
 
 export default function ImportCenter() {
   const navigate = useNavigate();
@@ -27,7 +20,7 @@ export default function ImportCenter() {
   const [fileName, setFileName] = useState('');
   const [rawRows, setRawRows] = useState<VehicleRaw[]>([]);
   const [validationIssues, setValidationIssues] = useState<{ id: string; chassisNo: string; field: string; issueType: string; message: string; severity: string; importBatchId: string }[]>([]);
-  const [serverErrors, setServerErrors] = useState<ServerValidationError[]>([]);
+  const [serverErrors, setServerErrors] = useState<ValidationError[]>([]);
   const [missingCols, setMissingCols] = useState<string[]>([]);
   const [batchId, setBatchId] = useState('');
   const [companyId, setCompanyId] = useState('default-company');

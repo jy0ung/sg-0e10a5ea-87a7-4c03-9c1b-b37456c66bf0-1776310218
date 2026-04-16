@@ -1,18 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, AlertTriangle, X, Filter, ArrowUpDown, Download } from 'lucide-react';
-
-export interface ValidationError {
-  field: string;
-  message: string;
-  code: string;
-  severity: 'error' | 'warning';
-}
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { AlertTriangle, AlertCircle, Download, Search, SortAsc } from 'lucide-react';
+import type { ValidationError } from '@/types';
 
 interface ValidationSummaryModalProps {
   isOpen: boolean;
