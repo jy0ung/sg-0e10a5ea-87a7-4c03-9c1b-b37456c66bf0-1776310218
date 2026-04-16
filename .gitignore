@@ -28,6 +28,10 @@ dist-ssr
 build/
 .cache/
 .vercel/
+
+# Playwright test artifacts
+test-results/
+playwright-report/
 .turbo/
 out/
 .env
