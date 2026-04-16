@@ -24,6 +24,7 @@ interface AuthContextType {
   signup: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   hasRole: (roles: AppRole[]) => boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -34,13 +35,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    if (data) {
-      setProfile(data as unknown as Profile);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching profile:', error);
+        // Create minimal profile if it doesn't exist
+        if (error.code === 'PGRST116') {
+          setProfile({
+            id: userId,
+            email: '',
+            name: 'User',
+            role: 'user',
+            company_id: 'default',
+            access_scope: 'own_branch',
+          });
+        }
+      } else if (data) {
+        setProfile(data as unknown as Profile);
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching profile:', err);
+      // Set minimal profile to prevent app from breaking
+      setProfile({
+        id: userId,
+        email: '',
+        name: 'User',
+        role: 'user',
+        company_id: 'default',
+        access_scope: 'own_branch',
+      });
     }
   }, []);
 
@@ -51,11 +79,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(newSession);
         if (newSession?.user) {
           // Use setTimeout to avoid Supabase client deadlock
-          setTimeout(() => fetchProfile(newSession.user.id), 0);
+          setTimeout(() => {
+            fetchProfile(newSession.user.id).finally(() => {
+              setLoading(false);
+            });
+          }, 0);
         } else {
           setProfile(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
@@ -63,9 +95,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
       setSession(existingSession);
       if (existingSession?.user) {
-        fetchProfile(existingSession.user.id);
+        fetchProfile(existingSession.user.id).finally(() => {
+          setLoading(false);
+        });
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -91,6 +126,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    if (session?.user) {
+      await fetchProfile(session.user.id);
+    }
+  }, [session?.user, fetchProfile]);
+
   const hasRole = useCallback((roles: AppRole[]): boolean => {
     if (!profile) return false;
     if (profile.role === 'super_admin') return true;
@@ -107,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signup,
       logout,
       hasRole,
+      refreshProfile,
     }}>
       {children}
     </AuthContext.Provider>
