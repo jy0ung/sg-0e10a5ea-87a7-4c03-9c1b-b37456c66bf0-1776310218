@@ -30,18 +30,24 @@ class LoggingService {
   }
 
   private async persistLog(entry: LogEntry) {
+    // Only persist logs in production
     if (!this.isDevelopment) {
       try {
-        await supabase.from("application_logs").insert({
+        const { error } = await supabase.from("application_logs").insert({
           level: entry.level,
           message: entry.message,
-          context: entry.context,
-          user_id: entry.userId,
-          component: entry.component,
+          context: entry.context || null,
+          user_id: entry.userId || null,
+          component: entry.component || null,
           created_at: entry.timestamp,
         });
+        
+        if (error) {
+          // Don't log errors about logging to avoid infinite loops
+          console.warn("Failed to persist log to database:", error);
+        }
       } catch (error) {
-        console.error("Failed to persist log:", error);
+        console.warn("Failed to persist log:", error);
       }
     }
   }
