@@ -11,13 +11,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getUserGroups, upsertUserGroup, deleteUserGroup } from '@/services/masterDataService';
 import { UserGroup } from '@/types';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 
 type FormState = { name: string; status: string };
 const empty: FormState = { name: '', status: 'Active' };
 
 export default function UserGroups() {
-  const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const { hasRole } = useAuth();
+  const companyId = useCompanyId();
+  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
   const { toast } = useToast();
 
   const [groups, setGroups] = useState<UserGroup[]>([]);

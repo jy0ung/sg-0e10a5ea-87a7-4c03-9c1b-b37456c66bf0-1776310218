@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { VehicleCanonical, ImportBatch, DataQualityIssue, SlaPolicy, KpiSummary } from '@/types';
 import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { loggingService } from '@/services/loggingService';
 import { performanceService } from '@/services/performanceService';
 
@@ -106,7 +106,6 @@ function mapDbSla(row: Record<string, unknown>): SlaPolicy {
 }
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
   const [vehicles, setVehiclesState] = useState<VehicleCanonical[]>([]);
   const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
   const [qualityIssues, setQualityIssues] = useState<DataQualityIssue[]>([]);
@@ -115,7 +114,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [lastRefresh, setLastRefresh] = useState(new Date().toISOString());
   const [loading, setLoading] = useState(true);
 
-  const companyId = user?.company_id || 'c1';
+  const companyId = useCompanyId();
 
   const reloadFromDb = useCallback(async () => {
     setLoading(true);

@@ -6,6 +6,7 @@ import { getSalesOrders, moveSalesOrderStage, updateSalesOrder } from '@/service
 import { getInvoices } from '@/services/invoiceService';
 import { getSalesmanTargets } from '@/services/salesTargetService';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompanyId } from '@/hooks/useCompanyId';
 
 interface SalesContextValue {
   customers: Customer[];
@@ -23,7 +24,7 @@ const SalesContext = createContext<SalesContextValue | null>(null);
 
 export function SalesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);

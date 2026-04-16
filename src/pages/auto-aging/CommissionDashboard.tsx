@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { useData } from '@/contexts/DataContext';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -32,7 +33,7 @@ export default function CommissionDashboard() {
   const { user } = useAuth();
   const { vehicles } = useData();
   const { toast } = useToast();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
   const canManage = ['super_admin', 'company_admin', 'director', 'general_manager'].includes(user?.role ?? '');
 
   const [rules, setRules] = useState<CommissionRule[]>([]);

@@ -18,6 +18,7 @@ import { PermissionEditor } from '@/components/admin/PermissionEditor';
 import { userUpdateSchema, type UserUpdateFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 
 interface ProfileRow {
   id: string;
@@ -78,6 +79,7 @@ export default function UserManagement() {
   });
 
   const canManage = hasRole(['super_admin', 'company_admin']);
+  if (!canManage) return <UnauthorizedAccess />;
 
   useEffect(() => {
     async function load() {
@@ -86,7 +88,7 @@ export default function UserManagement() {
           .from('profiles')
           .select('id, email, name, role, company_id, branch_id, access_scope, created_at')
           .order('created_at', { ascending: true }),
-        getBranches(user?.company_id || 'c1'),
+        getBranches(user?.company_id || ''),
       ]);
       setProfiles((profileRes.data || []) as unknown as ProfileRow[]);
       setBranches(branchRes.data);

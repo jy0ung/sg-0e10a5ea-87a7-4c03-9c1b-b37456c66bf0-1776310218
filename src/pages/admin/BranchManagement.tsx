@@ -8,13 +8,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getBranches, upsertBranch, deleteBranch } from '@/services/masterDataService';
 import { BranchRecord } from '@/types';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 
 type FormState = { code: string; name: string; orSeries: string; vdoSeries: string };
 const empty: FormState = { code: '', name: '', orSeries: '', vdoSeries: '' };
 
 export default function BranchManagement() {
-  const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const { hasRole } = useAuth();
+  const companyId = useCompanyId();
+  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
   const { toast } = useToast();
 
   const [branches, setBranches] = useState<BranchRecord[]>([]);

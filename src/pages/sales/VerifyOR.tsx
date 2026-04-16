@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { getOfficialReceipts, upsertOfficialReceipt, deleteOfficialReceipt } from '@/services/masterDataService';
 import { OfficialReceipt } from '@/types';
 import { Plus, Pencil, Trash2, CheckCircle, Clock } from 'lucide-react';
@@ -25,7 +26,7 @@ const STATUS_ICON: Record<string, React.ReactElement> = {
 
 export default function VerifyOR() {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
   const { toast } = useToast();
 
   const [receipts, setReceipts] = useState<OfficialReceipt[]>([]);

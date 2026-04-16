@@ -12,6 +12,10 @@ import { DataProvider } from "@/contexts/DataContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppLayout from "./components/layout/AppLayout";
 import { SalesProvider } from "./contexts/SalesContext";
+import { errorTrackingService } from "@/services/errorTrackingService";
+
+// Initialise error tracking. Reads VITE_SENTRY_DSN if set; otherwise runs in local-only mode.
+errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
 
 // Route-level code splitting — all pages are loaded on demand
 const LoginPage = lazy(() => import("./pages/LoginPage"));
@@ -144,24 +148,6 @@ const router = createBrowserRouter([
   {
     path: "/reset-password",
     element: <S><ResetPasswordPage /></S>,
-  },
-  {
-    path: "/debug",
-    element: (
-      <div className="flex items-center justify-center h-screen bg-background text-foreground">
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-3xl font-bold text-primary">Debug Page</h1>
-          <p className="text-muted-foreground">If you see this, React is mounting correctly.</p>
-          <div className="space-y-2 text-left">
-            <p><strong>Supabase URL:</strong> {import.meta.env.VITE_SUPABASE_URL || "Not configured"}</p>
-            <p><strong>Supabase Key:</strong> {import.meta.env.VITE_SUPABASE_ANON_KEY ? "Configured" : "Not configured"}</p>
-          </div>
-          <a href="/" className="inline-block mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
-            Go to Login
-          </a>
-        </div>
-      </div>
-    ),
   },
   {
     path: "*",

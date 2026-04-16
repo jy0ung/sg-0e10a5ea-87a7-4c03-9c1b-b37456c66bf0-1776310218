@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { useToast } from '@/hooks/use-toast';
 import {
   getBranchMappings, createBranchMapping, updateBranchMapping, deleteBranchMapping,
@@ -145,7 +146,7 @@ function MappingTable<T extends { id: string; rawValue: string; notes?: string }
 export default function MappingAdmin() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
   const canEdit = ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'].includes(user?.role ?? '');
 
   const [branchMappings, setBranchMappings] = useState<BranchMapping[]>([]);

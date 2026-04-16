@@ -19,6 +19,8 @@ import {
 import { getAllAuditLogs, AuditLogWithProfile } from '@/services/auditService';
 import { formatDate, formatTime } from '@/lib/utils';
 import { loggingService } from '@/services/loggingService';
+import { useAuth } from '@/contexts/AuthContext';
+import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import {
   Chart,
   ChartContainer,
@@ -38,6 +40,9 @@ const COLORS = {
 };
 
 export default function ActivityDashboard() {
+  const { hasRole } = useAuth();
+  if (!hasRole(['super_admin', 'company_admin', 'director', 'general_manager'])) return <UnauthorizedAccess />;
+
   const [logs, setLogs] = useState<AuditLogWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('today');

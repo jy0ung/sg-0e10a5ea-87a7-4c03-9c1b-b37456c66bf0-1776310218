@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/contexts/SalesContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { createSalesOrder, createVehicleFromSalesOrder } from '@/services/salesOrderService';
 import { SalesOrder, SalesOrderStatus } from '@/types';
 import { Plus, Search, Link2, ChevronRight } from 'lucide-react';
@@ -25,7 +26,7 @@ const STATUSES: SalesOrderStatus[] = ['enquiry','quoted','confirmed','booked','d
 
 export default function SalesOrders() {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
   const { salesOrders, customers, reloadSales } = useSales();
   const { toast } = useToast();
   const [search, setSearch] = useState('');

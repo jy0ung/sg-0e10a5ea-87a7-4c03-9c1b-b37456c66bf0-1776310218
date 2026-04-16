@@ -17,6 +17,7 @@ class LoggingService {
   private logs: LogEntry[] = [];
   private maxLogs = 100;
   private isDevelopment = import.meta.env.DEV;
+  private currentUserId?: string;
 
   constructor() {
     if (import.meta.env.PROD) {
@@ -52,29 +53,27 @@ class LoggingService {
     }
   }
 
+  /** Called by AuthContext after a successful profile fetch. */
+  setUserId(id: string) {
+    this.currentUserId = id;
+  }
+
+  /** Called by AuthContext on logout. */
+  clearUserId() {
+    this.currentUserId = undefined;
+  }
+
   private createLogEntry(
     level: LogLevel,
     message: string,
     context?: Record<string, unknown>,
     component?: string
   ): LogEntry {
-    const auth = localStorage.getItem("auth");
-    let userId: string | undefined;
-    
-    try {
-      if (auth) {
-        const session = JSON.parse(auth);
-        userId = session.user?.id;
-      }
-    } catch {
-      // Ignore parsing errors
-    }
-
     return {
       level,
       message,
       context,
-      userId,
+      userId: this.currentUserId,
       timestamp: new Date().toISOString(),
       component,
     };

@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
 import { createCustomer, updateCustomer, deleteCustomer } from '@/services/customerService';
 import { Customer } from '@/types';
@@ -16,7 +17,7 @@ const EMPTY: Omit<Customer, 'id' | 'companyId' | 'createdAt' | 'updatedAt'> = { 
 
 export default function Customers() {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
   const { customers, reloadSales } = useSales();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);

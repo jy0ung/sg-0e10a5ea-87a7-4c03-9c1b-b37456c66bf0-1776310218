@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
 import { computeSalesmanActuals, upsertSalesmanTarget, deleteSalesmanTarget } from '@/services/salesTargetService';
 import { SalesmanPerformance, SalesmanTarget } from '@/types';
@@ -13,7 +14,7 @@ import { Target, Plus, Pencil, Trash2 } from 'lucide-react';
 
 export default function SalesmanPerformancePage() {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
   const { salesmanTargets, reloadSales } = useSales();
   const { toast } = useToast();
   const now = new Date();

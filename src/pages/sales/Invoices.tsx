@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
 import { createInvoice, recordPayment } from '@/services/invoiceService';
 import { Invoice, InvoicePaymentStatus, InvoiceType } from '@/types';
@@ -64,7 +65,7 @@ function InvoiceTable({ invoices, onPay }: { invoices: Invoice[]; onPay: (inv: I
 
 export default function Invoices() {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
   const { invoices, customers, salesOrders, reloadSales } = useSales();
   const { toast } = useToast();
   const [addOpen, setAddOpen] = useState(false);

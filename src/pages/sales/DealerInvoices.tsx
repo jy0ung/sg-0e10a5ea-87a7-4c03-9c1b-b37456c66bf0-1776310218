@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { getDealerInvoices, upsertDealerInvoice, deleteDealerInvoice } from '@/services/masterDataService';
 import { DealerInvoice } from '@/types';
 import { Plus, Pencil, Trash2, Eye } from 'lucide-react';
@@ -24,7 +25,7 @@ const STATUS_COLORS: Record<string, 'default' | 'secondary' | 'destructive' | 'o
 
 export default function DealerInvoices() {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
   const { toast } = useToast();
 
   const [invoices, setInvoices] = useState<DealerInvoice[]>([]);

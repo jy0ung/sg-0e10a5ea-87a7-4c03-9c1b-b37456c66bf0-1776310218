@@ -57,7 +57,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
         }
       } else if (data) {
-        setProfile(data as unknown as Profile);
+        const p = data as unknown as Profile;
+        setProfile(p);
+        loggingService.setUserId(p.id);
       }
     } catch (err) {
       loggingService.error('Unexpected error fetching profile', { error: err }, 'AuthContext');
@@ -123,6 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
+    loggingService.clearUserId();
     setProfile(null);
     setSession(null);
   }, []);

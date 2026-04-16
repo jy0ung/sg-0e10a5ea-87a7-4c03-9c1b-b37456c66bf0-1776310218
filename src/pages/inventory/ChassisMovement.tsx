@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { Search, ArrowRight, Plus, Pencil, Trash2 } from 'lucide-react';
 
 interface VehicleRow { id: string; chassisNo: string; model: string; branchCode: string; bgDate: string }
@@ -30,7 +31,7 @@ const ACTION_COLOR: Record<string, string> = {
 
 export default function ChassisMovement() {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
 
   const [query, setQuery] = useState('');
   const [vehicle, setVehicle] = useState<VehicleRow | null>(null);

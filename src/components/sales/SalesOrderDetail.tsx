@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
 import { createVehicleFromSalesOrder } from '@/services/salesOrderService';
 import { SalesOrder, Invoice } from '@/types';
@@ -35,7 +36,7 @@ const PAY_COLORS: Record<string, string> = {
 
 export function SalesOrderDetail({ order, invoices, onClose }: SalesOrderDetailProps) {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
   const { reloadSales } = useSales();
   const { toast } = useToast();
   const [linkOpen, setLinkOpen] = useState(false);

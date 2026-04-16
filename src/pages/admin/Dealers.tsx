@@ -11,6 +11,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getDealers, upsertDealer, deleteDealer } from '@/services/masterDataService';
 import { Dealer } from '@/types';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 
 type FormState = {
   name: string; accCode: string; companyRegNo: string;
@@ -19,8 +21,9 @@ type FormState = {
 const empty: FormState = { name: '', accCode: '', companyRegNo: '', address: '', contactNo: '', email: '', status: 'Active' };
 
 export default function Dealers() {
-  const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const { hasRole } = useAuth();
+  const companyId = useCompanyId();
+  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
   const { toast } = useToast();
 
   const [dealers, setDealers] = useState<Dealer[]>([]);

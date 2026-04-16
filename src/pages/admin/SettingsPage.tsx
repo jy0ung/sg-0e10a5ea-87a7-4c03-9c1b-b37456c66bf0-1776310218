@@ -54,7 +54,7 @@ export default function SettingsPage() {
   }, [user, form]);
 
   useEffect(() => {
-    getBranches(user?.company_id || 'c1').then(res => setBranches(res.data));
+    getBranches(user?.company_id || '').then(res => setBranches(res.data));
   }, [user?.company_id]);
 
   const handleRoleChange = (newRole: string) => {
@@ -162,7 +162,7 @@ export default function SettingsPage() {
           <div className="space-y-3 text-sm">
             <div><p className="text-xs text-muted-foreground">Company</p><p className="text-foreground font-medium">FLC Auto Group</p></div>
             <div><p className="text-xs text-muted-foreground">Company Code</p><p className="text-foreground font-medium">FLC</p></div>
-            <div><p className="text-xs text-muted-foreground">Company ID</p><p className="text-foreground font-medium">{user?.company_id || 'c1'}</p></div>
+            <div><p className="text-xs text-muted-foreground">Company ID</p><p className="text-foreground font-medium">{user?.company_id || ''}</p></div>
             <div><p className="text-xs text-muted-foreground">Platform</p><p className="text-foreground font-medium">FLC BI v1.0</p></div>
           </div>
         </div>

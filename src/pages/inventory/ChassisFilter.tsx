@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { Search, RefreshCw, X } from 'lucide-react';
 
 interface Vehicle {
@@ -25,7 +26,7 @@ const CHIP_CLASS = 'inline-flex items-center gap-1 rounded-full bg-primary/10 te
 
 export default function ChassisFilter() {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
 
   const [filters, setFilters] = useState({
     ownerName: '', vehicleType: '', chassisNo: '', plateNo: '',

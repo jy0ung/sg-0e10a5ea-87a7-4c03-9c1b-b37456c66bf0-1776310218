@@ -26,6 +26,8 @@ import {
   AdditionalItem, PaymentType, BankRecord,
 } from '@/types';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 
 // ── Generic inline-editable table ──────────────────────────────────────────
 
@@ -140,8 +142,9 @@ function ConfirmDelete({ name, onConfirm, onCancel }: { name: string; onConfirm:
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function MasterData() {
-  const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const { hasRole } = useAuth();
+  const companyId = useCompanyId();
+  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
   const { toast } = useToast();
 
   // Finance Companies

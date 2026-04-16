@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { Download, FileText, RefreshCw } from 'lucide-react';
 
 interface ReportRow {
@@ -239,7 +240,7 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
 
 export default function ReportsCenter() {
   const { user } = useAuth();
-  const companyId = user?.company_id ?? 'c1';
+  const companyId = useCompanyId();
 
   return (
     <div className="space-y-6">
