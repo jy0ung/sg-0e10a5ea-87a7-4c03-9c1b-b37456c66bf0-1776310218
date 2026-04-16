@@ -5,19 +5,62 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/contexts/SalesContext';
 import { createInvoice, recordPayment } from '@/services/invoiceService';
-import { Invoice, InvoicePaymentStatus } from '@/types';
+import { Invoice, InvoicePaymentStatus, InvoiceType } from '@/types';
 import { Plus, CreditCard } from 'lucide-react';
 
 const STATUS_BADGE: Record<InvoicePaymentStatus, string> = {
   unpaid: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
   partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
   paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
-  cancelled: 'bg-secondary text-secondary-foreground',
 };
+
+const TYPE_LABELS: Record<InvoiceType, string> = {
+  customer_sales: 'Customer Sales',
+  dealer_sales: 'Dealer Sales',
+  purchase: 'Purchase',
+};
+
+function InvoiceTable({ invoices, onPay }: { invoices: Invoice[]; onPay: (inv: Invoice) => void }) {
+  return (
+    <div className="glass-panel overflow-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+            {['Invoice No','Customer','Issue Date','Due Date','Total','Paid','Status',''].map(h => (
+              <th key={h} className="px-3 py-2 font-medium">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {invoices.map(inv => (
+            <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
+              <td className="px-3 py-2 font-mono text-xs">{inv.invoiceNo}</td>
+              <td className="px-3 py-2">{inv.customerName ?? '—'}</td>
+              <td className="px-3 py-2 text-muted-foreground">{inv.issueDate}</td>
+              <td className="px-3 py-2 text-muted-foreground">{inv.dueDate ?? '—'}</td>
+              <td className="px-3 py-2 font-medium">RM {inv.totalAmount.toLocaleString()}</td>
+              <td className="px-3 py-2 text-muted-foreground">RM {(inv.paidAmount ?? 0).toLocaleString()}</td>
+              <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-[11px] font-medium capitalize ${STATUS_BADGE[inv.paymentStatus]}`}>{inv.paymentStatus}</span></td>
+              <td className="px-3 py-2 text-right">
+                {inv.paymentStatus !== 'paid' && (
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onPay(inv)}>
+                    <CreditCard className="h-3.5 w-3.5 mr-1" />Pay
+                  </Button>
+                )}
+              </td>
+            </tr>
+          ))}
+          {invoices.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground text-xs">No invoices</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function Invoices() {
   const { user } = useAuth();
@@ -29,12 +72,14 @@ export default function Invoices() {
   const [payTarget, setPayTarget] = useState<Invoice | null>(null);
   const [payAmount, setPayAmount] = useState('');
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ invoiceNo: '', salesOrderId: '', customerId: '', issueDate: new Date().toISOString().split('T')[0], dueDate: '', subtotal: '', taxAmount: '', discountAmount: '', notes: '' });
+  const [form, setForm] = useState({ invoiceNo: '', salesOrderId: '', customerId: '', issueDate: new Date().toISOString().split('T')[0], dueDate: '', subtotal: '', taxAmount: '', discountAmount: '', notes: '', invoiceType: 'customer_sales' as InvoiceType });
 
   useEffect(() => { reloadSales(); }, []);
 
   const totalRevenue = invoices.filter(i => i.paymentStatus === 'paid').reduce((s, i) => s + i.totalAmount, 0);
-  const outstanding = invoices.filter(i => i.paymentStatus !== 'paid' && i.paymentStatus !== 'cancelled').reduce((s, i) => s + (i.totalAmount - (i.paidAmount ?? 0)), 0);
+  const outstanding = invoices.filter(i => i.paymentStatus !== 'paid').reduce((s, i) => s + (i.totalAmount - (i.paidAmount ?? 0)), 0);
+
+  const byType = (type: InvoiceType) => invoices.filter(i => (i.invoiceType ?? 'customer_sales') === type);
 
   const handleCreate = async () => {
     if (!form.invoiceNo || !form.salesOrderId || !form.customerId || !form.subtotal) return toast({ title: 'Required fields missing', variant: 'destructive' });
@@ -58,6 +103,7 @@ export default function Invoices() {
       paidAmount: 0,
       paymentStatus: 'unpaid',
       notes: form.notes || undefined,
+      invoiceType: form.invoiceType,
     });
     setSaving(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -76,6 +122,8 @@ export default function Invoices() {
     setPayOpen(false);
     toast({ title: 'Payment recorded' });
   };
+
+  const openPay = (inv: Invoice) => { setPayTarget(inv); setPayAmount(''); setPayOpen(true); };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -99,44 +147,33 @@ export default function Invoices() {
         ))}
       </div>
 
-      <div className="glass-panel overflow-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              {['Invoice No','Customer','Issue Date','Due Date','Total','Paid','Status',''].map(h => (
-                <th key={h} className="px-3 py-2 font-medium">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map(inv => (
-              <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
-                <td className="px-3 py-2 font-mono text-xs">{inv.invoiceNo}</td>
-                <td className="px-3 py-2">{inv.customerName ?? '—'}</td>
-                <td className="px-3 py-2 text-muted-foreground">{inv.issueDate}</td>
-                <td className="px-3 py-2 text-muted-foreground">{inv.dueDate ?? '—'}</td>
-                <td className="px-3 py-2 font-medium">RM {inv.totalAmount.toLocaleString()}</td>
-                <td className="px-3 py-2 text-muted-foreground">RM {(inv.paidAmount ?? 0).toLocaleString()}</td>
-                <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-[11px] font-medium capitalize ${STATUS_BADGE[inv.paymentStatus]}`}>{inv.paymentStatus}</span></td>
-                <td className="px-3 py-2 text-right">
-                  {inv.paymentStatus !== 'paid' && inv.paymentStatus !== 'cancelled' && (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setPayTarget(inv); setPayAmount(''); setPayOpen(true); }}>
-                      <CreditCard className="h-3.5 w-3.5 mr-1" />Pay
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {invoices.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground text-xs">No invoices yet</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <Tabs defaultValue="customer_sales">
+        <TabsList>
+          <TabsTrigger value="customer_sales">Customer Sales ({byType('customer_sales').length})</TabsTrigger>
+          <TabsTrigger value="dealer_sales">Dealer Sales ({byType('dealer_sales').length})</TabsTrigger>
+          <TabsTrigger value="purchase">Purchase ({byType('purchase').length})</TabsTrigger>
+        </TabsList>
+        <TabsContent value="customer_sales" className="mt-4"><InvoiceTable invoices={byType('customer_sales')} onPay={openPay} /></TabsContent>
+        <TabsContent value="dealer_sales" className="mt-4"><InvoiceTable invoices={byType('dealer_sales')} onPay={openPay} /></TabsContent>
+        <TabsContent value="purchase" className="mt-4"><InvoiceTable invoices={byType('purchase')} onPay={openPay} /></TabsContent>
+      </Tabs>
 
       {/* New Invoice Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>New Invoice</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3 py-2">
+            <div className="col-span-2 space-y-1">
+              <label className="text-xs text-muted-foreground">Invoice Type *</label>
+              <Select value={form.invoiceType} onValueChange={v => setForm(f => ({ ...f, invoiceType: v as InvoiceType }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer_sales">Customer Sales</SelectItem>
+                  <SelectItem value="dealer_sales">Dealer Sales</SelectItem>
+                  <SelectItem value="purchase">Purchase</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {[
               { field: 'invoiceNo', label: 'Invoice No *' },
               { field: 'issueDate', label: 'Issue Date *', type: 'date' },
@@ -147,7 +184,7 @@ export default function Invoices() {
             ].map(({ field, label, type }) => (
               <div key={field} className="space-y-1">
                 <label className="text-xs text-muted-foreground">{label}</label>
-                <Input type={type ?? 'text'} className="h-8 text-sm" value={form[field as keyof typeof form]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
+                <Input type={type ?? 'text'} className="h-8 text-sm" value={form[field as keyof typeof form] as string} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
               </div>
             ))}
             <div className="space-y-1">
@@ -194,3 +231,5 @@ export default function Invoices() {
     </div>
   );
 }
+
+

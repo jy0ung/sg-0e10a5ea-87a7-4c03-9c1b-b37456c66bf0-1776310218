@@ -35,7 +35,7 @@ export default function SalesOrders() {
   const [linkOrder, setLinkOrder] = useState<SalesOrder | null>(null);
   const [chassisNo, setChassisNo] = useState('');
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ orderNo: '', customerId: '', branchCode: '', salesmanName: '', model: '', variant: '', colour: '', bookingDate: new Date().toISOString().split('T')[0], bookingAmount: '', totalPrice: '', status: 'enquiry' as SalesOrderStatus });
+  const [form, setForm] = useState({ orderNo: '', customerId: '', branchCode: '', salesmanName: '', model: '', variant: '', colour: '', bookingDate: new Date().toISOString().split('T')[0], bookingAmount: '', totalPrice: '', status: 'enquiry' as SalesOrderStatus, vsoNo: '', depositAmount: '', bankLoanAmount: '', financeCompany: '', insuranceCompany: '', plateNo: '' });
 
   useEffect(() => { reloadSales(); }, []);
 
@@ -61,6 +61,12 @@ export default function SalesOrders() {
       bookingAmount: form.bookingAmount ? parseFloat(form.bookingAmount) : undefined,
       totalPrice: form.totalPrice ? parseFloat(form.totalPrice) : undefined,
       status: form.status,
+      vsoNo: form.vsoNo || undefined,
+      depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : undefined,
+      bankLoanAmount: form.bankLoanAmount ? parseFloat(form.bankLoanAmount) : undefined,
+      financeCompany: form.financeCompany || undefined,
+      insuranceCompany: form.insuranceCompany || undefined,
+      plateNo: form.plateNo || undefined,
     });
     setCreating(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -111,6 +117,7 @@ export default function SalesOrders() {
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="pb-2 pr-4 font-medium">Order No</th>
+                <th className="pb-2 pr-4 font-medium">VSO No</th>
                 <th className="pb-2 pr-4 font-medium">Customer</th>
                 <th className="pb-2 pr-4 font-medium">Model</th>
                 <th className="pb-2 pr-4 font-medium">Branch</th>
@@ -124,6 +131,7 @@ export default function SalesOrders() {
               {filtered.map(o => (
                 <tr key={o.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
                   <td className="py-2 pr-4 font-mono text-xs font-medium">{o.orderNo}</td>
+                  <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{o.vsoNo ?? '—'}</td>
                   <td className="py-2 pr-4">{o.customerName ?? '—'}</td>
                   <td className="py-2 pr-4">{o.model}{o.variant ? ` / ${o.variant}` : ''}</td>
                   <td className="py-2 pr-4">{o.branchCode}</td>
@@ -140,7 +148,7 @@ export default function SalesOrders() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground text-xs">No orders found</td></tr>}
+              {filtered.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-muted-foreground text-xs">No orders found</td></tr>}
             </tbody>
           </table>
         </div>
@@ -161,6 +169,12 @@ export default function SalesOrders() {
               { field: 'bookingDate', label: 'Booking Date', type: 'date' },
               { field: 'bookingAmount', label: 'Booking Amt', type: 'number' },
               { field: 'totalPrice', label: 'Total Price', type: 'number' },
+              { field: 'vsoNo', label: 'VSO No' },
+              { field: 'depositAmount', label: 'Deposit Amt', type: 'number' },
+              { field: 'bankLoanAmount', label: 'Bank Loan', type: 'number' },
+              { field: 'financeCompany', label: 'Finance Co' },
+              { field: 'insuranceCompany', label: 'Insurance Co' },
+              { field: 'plateNo', label: 'Plate No' },
             ].map(({ field, label, type }) => (
               <div key={field} className="space-y-1">
                 <label className="text-xs text-muted-foreground">{label}</label>

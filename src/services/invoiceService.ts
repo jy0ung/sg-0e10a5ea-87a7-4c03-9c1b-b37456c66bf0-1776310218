@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Invoice, InvoicePaymentStatus } from '@/types';
+import { Invoice, InvoicePaymentStatus, InvoiceType } from '@/types';
 import { loggingService } from './loggingService';
 import { performanceService } from './performanceService';
 
@@ -9,7 +9,7 @@ function mapInvoice(row: Record<string, unknown>): Invoice {
     companyId: row.company_id as string,
     invoiceNo: row.invoice_no as string,
     salesOrderId: row.sales_order_id as string,
-    customerId: row.customer_id as string,
+    customerId: row.customer_id as string | undefined,
     customerName: row.customer_name as string | undefined,
     issueDate: row.issue_date as string,
     dueDate: row.due_date as string | undefined,
@@ -22,6 +22,7 @@ function mapInvoice(row: Record<string, unknown>): Invoice {
     notes: row.notes as string | undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+    invoiceType: (row.invoice_type as InvoiceType) ?? 'customer_sales',
   };
 }
 
@@ -55,6 +56,7 @@ export async function createInvoice(companyId: string, fields: Omit<Invoice, 'id
       paid_amount: fields.paidAmount ?? 0,
       payment_status: fields.paymentStatus,
       notes: fields.notes,
+      invoice_type: fields.invoiceType ?? 'customer_sales',
     })
     .select()
     .single();

@@ -6,12 +6,13 @@ import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { KpiDashboard } from '@/components/KpiDashboard';
-import { Timer, TrendingUp, AlertTriangle, CheckCircle, Settings2, BarChart3, Loader2 } from 'lucide-react';
+import { Timer, TrendingUp, AlertTriangle, CheckCircle, Settings2, BarChart3, Loader2, ShoppingCart, Car, UserPlus, CalendarCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { useSales } from '@/contexts/SalesContext';
 
 const ALL_KPI_IDS = KPI_DEFINITIONS.map(k => k.id);
 const BASIC_KPIS = ['bg_to_delivery', 'bg_to_disb'];
@@ -21,6 +22,9 @@ export default function ExecutiveDashboard() {
   const { kpiSummaries, vehicles, qualityIssues, lastRefresh, importBatches, loading } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { salesOrders, customers, reloadSales } = useSales();
+
+  useEffect(() => { reloadSales(); }, []);
 
   const [selectedKpis, setSelectedKpis] = useState<string[]>(ADVANCED_KPIS);
   const [showAdvanced, setShowAdvanced] = useState(true);
@@ -79,6 +83,14 @@ export default function ExecutiveDashboard() {
   };
 
   const visibleKpis = kpiSummaries.filter(k => selectedKpis.includes(k.kpiId));
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayBookings    = salesOrders.filter(o => o.bookingDate === todayStr);
+  const todayBookingAmt  = todayBookings.reduce((s, o) => s + (o.totalPrice ?? 0), 0);
+  const todayCarOut      = vehicles.filter(v => v.delivery_date === todayStr).length;
+  const todayNewCustomers = customers.filter(c => (c as unknown as Record<string, unknown>).created_at?.toString().startsWith(todayStr)).length;
+  const startOfMonth     = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  const mtdBookings      = salesOrders.filter(o => o.bookingDate >= startOfMonth).length;
 
   const totalVehicles = vehicles.length;
   const totalOverdue = kpiSummaries.reduce((s, k) => s + k.overdueCount, 0);
@@ -186,6 +198,42 @@ export default function ExecutiveDashboard() {
           </div>
         }
       />
+
+      {/* Today at a Glance */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Today at a Glance</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="glass-panel p-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500"><ShoppingCart className="h-4 w-4" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Bookings Today</p>
+              <p className="text-xl font-bold text-blue-500">{todayBookings.length}</p>
+              {todayBookingAmt > 0 && <p className="text-[10px] text-muted-foreground">RM {(todayBookingAmt / 1000).toFixed(0)}k</p>}
+            </div>
+          </div>
+          <div className="glass-panel p-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500"><Car className="h-4 w-4" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Cars Out Today</p>
+              <p className="text-xl font-bold text-emerald-500">{todayCarOut}</p>
+            </div>
+          </div>
+          <div className="glass-panel p-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500"><UserPlus className="h-4 w-4" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">New Customers Today</p>
+              <p className="text-xl font-bold text-purple-500">{todayNewCustomers}</p>
+            </div>
+          </div>
+          <div className="glass-panel p-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-orange-500/10 text-orange-500"><CalendarCheck className="h-4 w-4" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">MTD Bookings</p>
+              <p className="text-xl font-bold text-orange-500">{mtdBookings}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Platform KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

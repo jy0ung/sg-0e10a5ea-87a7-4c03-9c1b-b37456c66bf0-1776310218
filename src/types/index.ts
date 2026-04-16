@@ -287,49 +287,64 @@ export interface DealStage {
   companyId: string;
 }
 
-export type SalesOrderStatus = 'active' | 'won' | 'lost';
+export type SalesOrderStatus = 'enquiry' | 'quoted' | 'confirmed' | 'booked' | 'delivered' | 'cancelled';
 
 export interface SalesOrder {
   id: string;
+  companyId: string;
+  orderNo: string;
   customerId?: string;
-  customerName?: string;       // joined from customers table
-  salesmanName: string;
+  customerName?: string;
   branchCode: string;
+  salesmanId?: string;
+  salesmanName?: string;
   model: string;
   variant?: string;
-  color?: string;
-  bookingAmount?: number;
-  discount?: number;
-  sellingPrice?: number;
-  paymentMethod?: string;
-  stageId?: string;
-  stageName?: string;          // joined from deal_stages
-  stageColor?: string;
+  colour?: string;
   bookingDate: string;
-  expectedDeliveryDate?: string;
+  deliveryDate?: string;
+  bookingAmount?: number;
+  totalPrice?: number;
+  status: SalesOrderStatus;
+  dealStageId?: string;
+  chassisNo?: string;
+  vehicleId?: string;
   notes?: string;
-  chassisNo?: string;          // set when linked to a vehicle BG entry
-  companyId: string;
   createdAt: string;
   updatedAt: string;
+  // VSO / financing fields
+  vsoNo?: string;
+  depositAmount?: number;
+  bankLoanAmount?: number;
+  outstandingAmount?: number;
+  financeCompany?: string;
+  insuranceCompany?: string;
+  plateNo?: string;
 }
 
 export type InvoicePaymentStatus = 'unpaid' | 'partial' | 'paid';
+export type InvoiceType = 'customer_sales' | 'dealer_sales' | 'purchase';
 
 export interface Invoice {
   id: string;
-  salesOrderId: string;
-  invoiceNo: string;
-  invoiceDate: string;
-  amount: number;
-  taxAmount: number;
-  totalAmount: number;
-  paymentStatus: InvoicePaymentStatus;
-  paidAmount: number;
-  dueDate?: string;
   companyId: string;
+  invoiceNo: string;
+  salesOrderId: string;
+  customerId?: string;
+  customerName?: string;
+  issueDate: string;
+  dueDate?: string;
+  subtotal: number;
+  taxAmount?: number;
+  discountAmount?: number;
+  totalAmount: number;
+  paidAmount?: number;
+  paymentStatus: InvoicePaymentStatus;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
+  // Phase 1B migration fields
+  invoiceType: InvoiceType;
 }
 
 export interface SalesmanTarget {
@@ -379,4 +394,50 @@ export interface CommissionRecord {
   period: string;
   companyId: string;
   createdAt: string;
+}
+
+// ===== Master Data =====
+export interface FinanceCompany {
+  id: string;
+  code: string;
+  name: string;
+  companyId: string;
+  createdAt: string;
+}
+
+export interface InsuranceCompany {
+  id: string;
+  code: string;
+  name: string;
+  companyId: string;
+  createdAt: string;
+}
+
+export interface VehicleModel {
+  id: string;
+  code: string;
+  name: string;
+  basePrice?: number;
+  companyId: string;
+  createdAt: string;
+}
+
+export interface VehicleColour {
+  id: string;
+  code: string;
+  name: string;
+  hex?: string;
+  companyId: string;
+  createdAt: string;
+}
+
+export interface BranchRecord {
+  id: string;
+  code: string;
+  name: string;
+  orSeries?: string;
+  vdoSeries?: string;
+  companyId: string;
+  createdAt: string;
+  updatedAt: string;
 }

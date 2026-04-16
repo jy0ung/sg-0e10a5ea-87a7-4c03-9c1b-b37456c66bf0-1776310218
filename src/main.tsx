@@ -41,6 +41,15 @@ const SalesOrders = lazy(() => import("./pages/sales/SalesOrders"));
 const Customers = lazy(() => import("./pages/sales/Customers"));
 const Invoices = lazy(() => import("./pages/sales/Invoices"));
 const SalesmanPerformancePage = lazy(() => import("./pages/sales/SalesmanPerformance"));
+const SalesAdvisors = lazy(() => import("./pages/sales/SalesAdvisors"));
+const StockBalance = lazy(() => import("./pages/inventory/StockBalance"));
+const VehicleTransfer = lazy(() => import("./pages/inventory/VehicleTransfer"));
+const ChassisMovement = lazy(() => import("./pages/inventory/ChassisMovement"));
+const PurchaseInvoices = lazy(() => import("./pages/purchasing/PurchaseInvoices"));
+const MarginAnalysis = lazy(() => import("./pages/sales/MarginAnalysis"));
+const OutstandingCollection = lazy(() => import("./pages/sales/OutstandingCollection"));
+const BranchManagement = lazy(() => import("./pages/admin/BranchManagement"));
+const MasterData = lazy(() => import("./pages/admin/MasterData"));
 
 // Lightweight spinner shown while a lazy page chunk loads
 const PageSpinner = () => (
@@ -76,7 +85,7 @@ const router = createBrowserRouter([
       </div>
     ),
     children: [
-      { index: true, element: <S><ExecutiveDashboard /></S> },
+      { index: true, element: <SalesProvider><S><ExecutiveDashboard /></S></SalesProvider> },
       { path: "modules", element: <S><ModuleDirectory /></S> },
       { path: "notifications", element: <S><Notifications /></S> },
       { path: "auto-aging", element: <S><AutoAgingDashboard /></S> },
@@ -95,10 +104,19 @@ const router = createBrowserRouter([
       { path: "sales/customers", element: <SalesProvider><S><Customers /></S></SalesProvider> },
       { path: "sales/invoices", element: <SalesProvider><S><Invoices /></S></SalesProvider> },
       { path: "sales/performance", element: <SalesProvider><S><SalesmanPerformancePage /></S></SalesProvider> },
+      { path: "sales/advisors", element: <SalesProvider><S><SalesAdvisors /></S></SalesProvider> },
+      { path: "sales/margin", element: <SalesProvider><S><MarginAnalysis /></S></SalesProvider> },
+      { path: "sales/outstanding", element: <SalesProvider><S><OutstandingCollection /></S></SalesProvider> },
+      { path: "inventory/stock", element: <S><StockBalance /></S> },
+      { path: "inventory/transfers", element: <S><VehicleTransfer /></S> },
+      { path: "inventory/chassis", element: <S><ChassisMovement /></S> },
+      { path: "purchasing/invoices", element: <S><PurchaseInvoices /></S> },
       { path: "admin/activity", element: <S><ActivityDashboard /></S> },
       { path: "admin/users", element: <S><UserManagement /></S> },
       { path: "admin/audit", element: <S><AuditLog /></S> },
       { path: "admin/settings", element: <S><SettingsPage /></S> },
+      { path: "admin/branches", element: <S><BranchManagement /></S> },
+      { path: "admin/master-data", element: <S><MasterData /></S> },
     ],
   },
   {

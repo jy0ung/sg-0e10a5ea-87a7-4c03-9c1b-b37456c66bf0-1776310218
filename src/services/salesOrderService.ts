@@ -28,6 +28,14 @@ function mapOrder(row: Record<string, unknown>): SalesOrder {
     notes: row.notes as string | undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+    // VSO / financing fields
+    vsoNo: row.vso_no as string | undefined,
+    depositAmount: row.deposit_amount as number | undefined,
+    bankLoanAmount: row.bank_loan_amount as number | undefined,
+    outstandingAmount: row.outstanding_amount as number | undefined,
+    financeCompany: row.finance_company as string | undefined,
+    insuranceCompany: row.insurance_company as string | undefined,
+    plateNo: row.plate_no as string | undefined,
   };
 }
 
@@ -66,6 +74,13 @@ export async function createSalesOrder(companyId: string, fields: Omit<SalesOrde
       chassis_no: fields.chassisNo,
       vehicle_id: fields.vehicleId,
       notes: fields.notes,
+      vso_no: fields.vsoNo,
+      deposit_amount: fields.depositAmount,
+      bank_loan_amount: fields.bankLoanAmount,
+      outstanding_amount: fields.outstandingAmount,
+      finance_company: fields.financeCompany,
+      insurance_company: fields.insuranceCompany,
+      plate_no: fields.plateNo,
     })
     .select()
     .single();
@@ -93,6 +108,13 @@ export async function updateSalesOrder(id: string, fields: Partial<Omit<SalesOrd
   if (fields.chassisNo !== undefined) updates.chassis_no = fields.chassisNo;
   if (fields.vehicleId !== undefined) updates.vehicle_id = fields.vehicleId;
   if (fields.notes !== undefined) updates.notes = fields.notes;
+  if (fields.vsoNo !== undefined) updates.vso_no = fields.vsoNo;
+  if (fields.depositAmount !== undefined) updates.deposit_amount = fields.depositAmount;
+  if (fields.bankLoanAmount !== undefined) updates.bank_loan_amount = fields.bankLoanAmount;
+  if (fields.outstandingAmount !== undefined) updates.outstanding_amount = fields.outstandingAmount;
+  if (fields.financeCompany !== undefined) updates.finance_company = fields.financeCompany;
+  if (fields.insuranceCompany !== undefined) updates.insurance_company = fields.insuranceCompany;
+  if (fields.plateNo !== undefined) updates.plate_no = fields.plateNo;
 
   const { data, error } = await supabase.from('sales_orders').update(updates).eq('id', id).select().single();
   if (error) { loggingService.error('updateSalesOrder failed', { error }); return { data: null, error: new Error(error.message) }; }
