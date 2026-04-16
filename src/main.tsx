@@ -35,18 +35,6 @@ const queryClient = new QueryClient();
 
 const router = createBrowserRouter([
   {
-    path: "/login",
-    element: <LoginPage />,
-  },
-  {
-    path: "/forgot-password",
-    element: <ForgotPasswordPage />,
-  },
-  {
-    path: "/reset-password",
-    element: <ResetPasswordPage />,
-  },
-  {
     path: "/",
     element: (
       <ProtectedRoute>
@@ -54,6 +42,15 @@ const router = createBrowserRouter([
           <AppLayout />
         </DataProvider>
       </ProtectedRoute>
+    ),
+    errorElement: (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold text-foreground">Route Error</h1>
+          <p className="text-muted-foreground">An error occurred while loading this page.</p>
+          <a href="/" className="text-primary hover:underline">Go to Home</a>
+        </div>
+      </div>
     ),
     children: [
       { index: true, element: <ExecutiveDashboard /> },
@@ -72,6 +69,36 @@ const router = createBrowserRouter([
       { path: "admin/audit", element: <AuditLog /> },
       { path: "admin/settings", element: <SettingsPage /> },
     ],
+  },
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPasswordPage />,
+  },
+  {
+    path: "/debug",
+    element: (
+      <div className="flex items-center justify-center h-screen bg-background text-foreground">
+        <div className="text-center space-y-4 p-8">
+          <h1 className="text-3xl font-bold text-primary">Debug Page</h1>
+          <p className="text-muted-foreground">If you see this, React is mounting correctly.</p>
+          <div className="space-y-2 text-left">
+            <p><strong>Supabase URL:</strong> {import.meta.env.VITE_SUPABASE_URL || "Not configured"}</p>
+            <p><strong>Supabase Key:</strong> {import.meta.env.VITE_SUPABASE_ANON_KEY ? "Configured" : "Not configured"}</p>
+          </div>
+          <a href="/" className="inline-block mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90">
+            Go to Login
+          </a>
+        </div>
+      </div>
+    ),
   },
   {
     path: "*",
