@@ -8,7 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, ProtectedRoute } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { errorTrackingService } from "@/services/errorTrackingService";
+import { loggingService } from "@/services/loggingService";
 
 import LoginPage from "./pages/LoginPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
@@ -32,11 +32,6 @@ import SettingsPage from "./pages/admin/SettingsPage";
 import AppLayout from "./components/layout/AppLayout";
 
 const queryClient = new QueryClient();
-
-// Initialize error tracking (Sentry is optional)
-if (import.meta.env.VITE_SENTRY_DSN) {
-  errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
-}
 
 const router = createBrowserRouter([
   {
