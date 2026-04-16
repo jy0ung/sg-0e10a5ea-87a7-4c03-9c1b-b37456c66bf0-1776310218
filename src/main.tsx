@@ -1,6 +1,6 @@
 import "@/index.css";
 
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -10,37 +10,49 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, ProtectedRoute } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { loggingService } from "@/services/loggingService";
-
-import LoginPage from "./pages/LoginPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import NotFound from "./pages/NotFound";
-import ExecutiveDashboard from "./pages/ExecutiveDashboard";
-import ModuleDirectory from "./pages/ModuleDirectory";
-import Notifications from "./pages/Notifications";
-import AutoAgingDashboard from "./pages/auto-aging/AutoAgingDashboard";
-import VehicleExplorer from "./pages/auto-aging/VehicleExplorer";
-import ImportCenter from "./pages/auto-aging/ImportCenter";
-import DataQuality from "./pages/auto-aging/DataQuality";
-import SLAAdmin from "./pages/auto-aging/SLAAdmin";
-import MappingAdmin from "./pages/auto-aging/MappingAdmin";
-import ImportHistory from "./pages/auto-aging/ImportHistory";
-import VehicleDetail from "./pages/auto-aging/VehicleDetail";
-import ActivityDashboard from "./pages/admin/ActivityDashboard";
-import UserManagement from "./pages/admin/UserManagement";
-import AuditLog from "./pages/admin/AuditLog";
-import SettingsPage from "./pages/admin/SettingsPage";
 import AppLayout from "./components/layout/AppLayout";
-import CommissionDashboard from "./pages/auto-aging/CommissionDashboard";
-import ReportCenter from "./pages/auto-aging/ReportCenter";
-import SalesDashboard from "./pages/sales/SalesDashboard";
-import DealPipeline from "./pages/sales/DealPipeline";
-import SalesOrders from "./pages/sales/SalesOrders";
-import Customers from "./pages/sales/Customers";
-import Invoices from "./pages/sales/Invoices";
-import SalesmanPerformancePage from "./pages/sales/SalesmanPerformance";
 import { SalesProvider } from "./contexts/SalesContext";
+
+// Route-level code splitting — all pages are loaded on demand
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
+const ModuleDirectory = lazy(() => import("./pages/ModuleDirectory"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const AutoAgingDashboard = lazy(() => import("./pages/auto-aging/AutoAgingDashboard"));
+const VehicleExplorer = lazy(() => import("./pages/auto-aging/VehicleExplorer"));
+const ImportCenter = lazy(() => import("./pages/auto-aging/ImportCenter"));
+const DataQuality = lazy(() => import("./pages/auto-aging/DataQuality"));
+const SLAAdmin = lazy(() => import("./pages/auto-aging/SLAAdmin"));
+const MappingAdmin = lazy(() => import("./pages/auto-aging/MappingAdmin"));
+const ImportHistory = lazy(() => import("./pages/auto-aging/ImportHistory"));
+const VehicleDetail = lazy(() => import("./pages/auto-aging/VehicleDetail"));
+const CommissionDashboard = lazy(() => import("./pages/auto-aging/CommissionDashboard"));
+const ReportCenter = lazy(() => import("./pages/auto-aging/ReportCenter"));
+const ActivityDashboard = lazy(() => import("./pages/admin/ActivityDashboard"));
+const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
+const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
+const SettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
+const SalesDashboard = lazy(() => import("./pages/sales/SalesDashboard"));
+const DealPipeline = lazy(() => import("./pages/sales/DealPipeline"));
+const SalesOrders = lazy(() => import("./pages/sales/SalesOrders"));
+const Customers = lazy(() => import("./pages/sales/Customers"));
+const Invoices = lazy(() => import("./pages/sales/Invoices"));
+const SalesmanPerformancePage = lazy(() => import("./pages/sales/SalesmanPerformance"));
+
+// Lightweight spinner shown while a lazy page chunk loads
+const PageSpinner = () => (
+  <div className="flex items-center justify-center h-64">
+    <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+  </div>
+);
+
+// Shorthand Suspense wrapper used on every route element
+function S({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageSpinner />}>{children}</Suspense>;
+}
 
 const queryClient = new QueryClient();
 
@@ -64,60 +76,42 @@ const router = createBrowserRouter([
       </div>
     ),
     children: [
-      { index: true, element: <ExecutiveDashboard /> },
-      { path: "modules", element: <ModuleDirectory /> },
-      { path: "notifications", element: <Notifications /> },
-      { path: "auto-aging", element: <AutoAgingDashboard /> },
-      { path: "auto-aging/vehicles", element: <VehicleExplorer /> },
-      { path: "auto-aging/vehicles/:id", element: <VehicleDetail /> },
-      { path: "auto-aging/import", element: <ImportCenter /> },
-      { path: "auto-aging/quality", element: <DataQuality /> },
-      { path: "auto-aging/sla", element: <SLAAdmin /> },
-      { path: "auto-aging/mappings", element: <MappingAdmin /> },
-      { path: "auto-aging/history", element: <ImportHistory /> },
-            { path: "auto-aging/commissions", element: <CommissionDashboard /> },
-            { path: "auto-aging/reports", element: <ReportCenter /> },
-            {
-              path: "sales",
-              element: <SalesProvider><SalesDashboard /></SalesProvider>,
-            },
-            {
-              path: "sales/pipeline",
-              element: <SalesProvider><DealPipeline /></SalesProvider>,
-            },
-            {
-              path: "sales/orders",
-              element: <SalesProvider><SalesOrders /></SalesProvider>,
-            },
-            {
-              path: "sales/customers",
-              element: <SalesProvider><Customers /></SalesProvider>,
-            },
-            {
-              path: "sales/invoices",
-              element: <SalesProvider><Invoices /></SalesProvider>,
-            },
-            {
-              path: "sales/performance",
-              element: <SalesProvider><SalesmanPerformancePage /></SalesProvider>,
-            },
-      { path: "admin/activity", element: <ActivityDashboard /> },
-      { path: "admin/users", element: <UserManagement /> },
-      { path: "admin/audit", element: <AuditLog /> },
-      { path: "admin/settings", element: <SettingsPage /> },
+      { index: true, element: <S><ExecutiveDashboard /></S> },
+      { path: "modules", element: <S><ModuleDirectory /></S> },
+      { path: "notifications", element: <S><Notifications /></S> },
+      { path: "auto-aging", element: <S><AutoAgingDashboard /></S> },
+      { path: "auto-aging/vehicles", element: <S><VehicleExplorer /></S> },
+      { path: "auto-aging/vehicles/:id", element: <S><VehicleDetail /></S> },
+      { path: "auto-aging/import", element: <S><ImportCenter /></S> },
+      { path: "auto-aging/quality", element: <S><DataQuality /></S> },
+      { path: "auto-aging/sla", element: <S><SLAAdmin /></S> },
+      { path: "auto-aging/mappings", element: <S><MappingAdmin /></S> },
+      { path: "auto-aging/history", element: <S><ImportHistory /></S> },
+      { path: "auto-aging/commissions", element: <S><CommissionDashboard /></S> },
+      { path: "auto-aging/reports", element: <S><ReportCenter /></S> },
+      { path: "sales", element: <SalesProvider><S><SalesDashboard /></S></SalesProvider> },
+      { path: "sales/pipeline", element: <SalesProvider><S><DealPipeline /></S></SalesProvider> },
+      { path: "sales/orders", element: <SalesProvider><S><SalesOrders /></S></SalesProvider> },
+      { path: "sales/customers", element: <SalesProvider><S><Customers /></S></SalesProvider> },
+      { path: "sales/invoices", element: <SalesProvider><S><Invoices /></S></SalesProvider> },
+      { path: "sales/performance", element: <SalesProvider><S><SalesmanPerformancePage /></S></SalesProvider> },
+      { path: "admin/activity", element: <S><ActivityDashboard /></S> },
+      { path: "admin/users", element: <S><UserManagement /></S> },
+      { path: "admin/audit", element: <S><AuditLog /></S> },
+      { path: "admin/settings", element: <S><SettingsPage /></S> },
     ],
   },
   {
     path: "/login",
-    element: <LoginPage />,
+    element: <S><LoginPage /></S>,
   },
   {
     path: "/forgot-password",
-    element: <ForgotPasswordPage />,
+    element: <S><ForgotPasswordPage /></S>,
   },
   {
     path: "/reset-password",
-    element: <ResetPasswordPage />,
+    element: <S><ResetPasswordPage /></S>,
   },
   {
     path: "/debug",
@@ -139,7 +133,7 @@ const router = createBrowserRouter([
   },
   {
     path: "*",
-    element: <NotFound />,
+    element: <S><NotFound /></S>,
   },
 ]);
 
