@@ -11,8 +11,20 @@ import {
   getInsuranceCompanies, upsertInsuranceCompany, deleteInsuranceCompany,
   getVehicleModels, upsertVehicleModel, deleteVehicleModel,
   getVehicleColours, upsertVehicleColour, deleteVehicleColour,
+  getTinTypes, upsertTinType, deleteTinType,
+  getRegistrationFees, upsertRegistrationFee, deleteRegistrationFee,
+  getRoadTaxFees, upsertRoadTaxFee, deleteRoadTaxFee,
+  getInspectionFees, upsertInspectionFee, deleteInspectionFee,
+  getHandlingFees, upsertHandlingFee, deleteHandlingFee,
+  getAdditionalItems, upsertAdditionalItem, deleteAdditionalItem,
+  getPaymentTypes, upsertPaymentType, deletePaymentType,
+  getBanks, upsertBank, deleteBank,
 } from '@/services/masterDataService';
-import { FinanceCompany, InsuranceCompany, VehicleModel, VehicleColour } from '@/types';
+import {
+  FinanceCompany, InsuranceCompany, VehicleModel, VehicleColour,
+  TinType, RegistrationFee, RoadTaxFee, InspectionFee, HandlingFee,
+  AdditionalItem, PaymentType, BankRecord,
+} from '@/types';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 
 // ── Generic inline-editable table ──────────────────────────────────────────
@@ -152,19 +164,67 @@ export default function MasterData() {
   const [clDialog, setClDialog] = useState<{ open: boolean; id?: string; values: Record<string, string> }>({ open: false, values: {} });
   const [clDelete, setClDelete] = useState<VehicleColour | null>(null);
 
+  // TIN Types
+  const [tinTypes, setTinTypes] = useState<TinType[]>([]);
+  const [ttDialog, setTtDialog] = useState<{ open: boolean; id?: string; values: Record<string, string> }>({ open: false, values: {} });
+  const [ttDelete, setTtDelete] = useState<TinType | null>(null);
+
+  // Registration Fees
+  const [regFees, setRegFees] = useState<RegistrationFee[]>([]);
+  const [rfDialog, setRfDialog] = useState<{ open: boolean; id?: string; values: Record<string, string> }>({ open: false, values: {} });
+  const [rfDelete, setRfDelete] = useState<RegistrationFee | null>(null);
+
+  // Road Tax Fees
+  const [roadTaxFees, setRoadTaxFees] = useState<RoadTaxFee[]>([]);
+  const [rtDialog, setRtDialog] = useState<{ open: boolean; id?: string; values: Record<string, string> }>({ open: false, values: {} });
+  const [rtDelete, setRtDelete] = useState<RoadTaxFee | null>(null);
+
+  // Inspection Fees
+  const [inspFees, setInspFees] = useState<InspectionFee[]>([]);
+  const [ifDialog, setIfDialog] = useState<{ open: boolean; id?: string; values: Record<string, string> }>({ open: false, values: {} });
+  const [ifDelete, setIfDelete] = useState<InspectionFee | null>(null);
+
+  // Handling Fees
+  const [handFees, setHandFees] = useState<HandlingFee[]>([]);
+  const [hfDialog, setHfDialog] = useState<{ open: boolean; id?: string; values: Record<string, string> }>({ open: false, values: {} });
+  const [hfDelete, setHfDelete] = useState<HandlingFee | null>(null);
+
+  // Additional Items
+  const [addItems, setAddItems] = useState<AdditionalItem[]>([]);
+  const [aiDialog, setAiDialog] = useState<{ open: boolean; id?: string; values: Record<string, string> }>({ open: false, values: {} });
+  const [aiDelete, setAiDelete] = useState<AdditionalItem | null>(null);
+
+  // Payment Types
+  const [payTypes, setPayTypes] = useState<PaymentType[]>([]);
+  const [ptDialog, setPtDialog] = useState<{ open: boolean; id?: string; values: Record<string, string> }>({ open: false, values: {} });
+  const [ptDelete, setPtDelete] = useState<PaymentType | null>(null);
+
+  // Banks
+  const [banks, setBanks] = useState<BankRecord[]>([]);
+  const [bkDialog, setBkDialog] = useState<{ open: boolean; id?: string; values: Record<string, string> }>({ open: false, values: {} });
+  const [bkDelete, setBkDelete] = useState<BankRecord | null>(null);
+
   const [saving, setSaving] = useState(false);
 
   const loadAll = useCallback(async () => {
-    const [fc, ic, md, cl] = await Promise.all([
+    const [fc, ic, md, cl, tt, rf, rt, inf, hf, ai, pt, bk] = await Promise.all([
       getFinanceCompanies(companyId),
       getInsuranceCompanies(companyId),
       getVehicleModels(companyId),
       getVehicleColours(companyId),
+      getTinTypes(companyId),
+      getRegistrationFees(companyId),
+      getRoadTaxFees(companyId),
+      getInspectionFees(companyId),
+      getHandlingFees(companyId),
+      getAdditionalItems(companyId),
+      getPaymentTypes(companyId),
+      getBanks(companyId),
     ]);
-    setFinCos(fc.data);
-    setInsCos(ic.data);
-    setModels(md.data);
-    setColours(cl.data);
+    setFinCos(fc.data); setInsCos(ic.data); setModels(md.data); setColours(cl.data);
+    setTinTypes(tt.data); setRegFees(rf.data); setRoadTaxFees(rt.data);
+    setInspFees(inf.data); setHandFees(hf.data); setAddItems(ai.data);
+    setPayTypes(pt.data); setBanks(bk.data);
   }, [companyId]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
@@ -249,6 +309,102 @@ export default function MasterData() {
     setClDelete(null);
   };
 
+  // ── TIN Types handlers ──
+  const ttSave = async () => {
+    const { code, name, status } = ttDialog.values;
+    if (!code?.trim() || !name?.trim()) return toast({ title: 'Code and Name required', variant: 'destructive' });
+    setSaving(true);
+    const { error } = await upsertTinType(companyId, { id: ttDialog.id, code: code.trim(), name: name.trim(), status: status ?? 'Active' });
+    setSaving(false);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll(); setTtDialog({ open: false, values: {} }); toast({ title: ttDialog.id ? 'Updated' : 'Created' });
+  };
+  const ttDel = async () => { if (!ttDelete) return; await deleteTinType(ttDelete.id); await loadAll(); setTtDelete(null); };
+
+  // ── Registration Fee handlers ──
+  const rfSave = async () => {
+    const { description, price, status } = rfDialog.values;
+    if (!description?.trim()) return toast({ title: 'Description required', variant: 'destructive' });
+    setSaving(true);
+    const { error } = await upsertRegistrationFee(companyId, { id: rfDialog.id, description: description.trim(), price: parseFloat(price) || 0, status: status ?? 'Active' });
+    setSaving(false);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll(); setRfDialog({ open: false, values: {} }); toast({ title: rfDialog.id ? 'Updated' : 'Created' });
+  };
+  const rfDel = async () => { if (!rfDelete) return; await deleteRegistrationFee(rfDelete.id); await loadAll(); setRfDelete(null); };
+
+  // ── Road Tax Fee handlers ──
+  const rtSave = async () => {
+    const { description, price, status } = rtDialog.values;
+    if (!description?.trim()) return toast({ title: 'Description required', variant: 'destructive' });
+    setSaving(true);
+    const { error } = await upsertRoadTaxFee(companyId, { id: rtDialog.id, description: description.trim(), price: parseFloat(price) || 0, status: status ?? 'Active' });
+    setSaving(false);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll(); setRtDialog({ open: false, values: {} }); toast({ title: rtDialog.id ? 'Updated' : 'Created' });
+  };
+  const rtDel = async () => { if (!rtDelete) return; await deleteRoadTaxFee(rtDelete.id); await loadAll(); setRtDelete(null); };
+
+  // ── Inspection Fee handlers ──
+  const ifSave = async () => {
+    const { itemCode, description, price, status } = ifDialog.values;
+    if (!description?.trim()) return toast({ title: 'Description required', variant: 'destructive' });
+    setSaving(true);
+    const { error } = await upsertInspectionFee(companyId, { id: ifDialog.id, itemCode: itemCode?.trim(), description: description.trim(), price: parseFloat(price) || 0, status: status ?? 'Active' });
+    setSaving(false);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll(); setIfDialog({ open: false, values: {} }); toast({ title: ifDialog.id ? 'Updated' : 'Created' });
+  };
+  const ifDel = async () => { if (!ifDelete) return; await deleteInspectionFee(ifDelete.id); await loadAll(); setIfDelete(null); };
+
+  // ── Handling Fee handlers ──
+  const hfSave = async () => {
+    const { itemCode, description, price, billing, status } = hfDialog.values;
+    if (!description?.trim()) return toast({ title: 'Description required', variant: 'destructive' });
+    setSaving(true);
+    const { error } = await upsertHandlingFee(companyId, { id: hfDialog.id, itemCode: itemCode?.trim(), description: description.trim(), price: parseFloat(price) || 0, billing: billing?.trim(), status: status ?? 'Active' });
+    setSaving(false);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll(); setHfDialog({ open: false, values: {} }); toast({ title: hfDialog.id ? 'Updated' : 'Created' });
+  };
+  const hfDel = async () => { if (!hfDelete) return; await deleteHandlingFee(hfDelete.id); await loadAll(); setHfDelete(null); };
+
+  // ── Additional Item handlers ──
+  const aiSave = async () => {
+    const { itemCode, description, unitPrice, status } = aiDialog.values;
+    if (!description?.trim()) return toast({ title: 'Description required', variant: 'destructive' });
+    setSaving(true);
+    const { error } = await upsertAdditionalItem(companyId, { id: aiDialog.id, itemCode: itemCode?.trim(), description: description.trim(), unitPrice: parseFloat(unitPrice) || 0, status: status ?? 'Active' });
+    setSaving(false);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll(); setAiDialog({ open: false, values: {} }); toast({ title: aiDialog.id ? 'Updated' : 'Created' });
+  };
+  const aiDel = async () => { if (!aiDelete) return; await deleteAdditionalItem(aiDelete.id); await loadAll(); setAiDelete(null); };
+
+  // ── Payment Type handlers ──
+  const ptSave = async () => {
+    const { name, billing, status } = ptDialog.values;
+    if (!name?.trim()) return toast({ title: 'Name required', variant: 'destructive' });
+    setSaving(true);
+    const { error } = await upsertPaymentType(companyId, { id: ptDialog.id, name: name.trim(), billing: billing?.trim(), status: status ?? 'Active' });
+    setSaving(false);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll(); setPtDialog({ open: false, values: {} }); toast({ title: ptDialog.id ? 'Updated' : 'Created' });
+  };
+  const ptDel = async () => { if (!ptDelete) return; await deletePaymentType(ptDelete.id); await loadAll(); setPtDelete(null); };
+
+  // ── Bank handlers ──
+  const bkSave = async () => {
+    const { name, accountNo, status } = bkDialog.values;
+    if (!name?.trim()) return toast({ title: 'Name required', variant: 'destructive' });
+    setSaving(true);
+    const { error } = await upsertBank(companyId, { id: bkDialog.id, name: name.trim(), accountNo: accountNo?.trim(), status: status ?? 'Active' });
+    setSaving(false);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll(); setBkDialog({ open: false, values: {} }); toast({ title: bkDialog.id ? 'Updated' : 'Created' });
+  };
+  const bkDel = async () => { if (!bkDelete) return; await deleteBank(bkDelete.id); await loadAll(); setBkDelete(null); };
+
   const codeNameCols = [
     { key: 'code' as const, label: 'Code', className: 'font-mono font-semibold' },
     { key: 'name' as const, label: 'Name' },
@@ -263,11 +419,19 @@ export default function MasterData() {
       />
 
       <Tabs defaultValue="finance">
-        <TabsList>
-          <TabsTrigger value="finance">Finance Companies</TabsTrigger>
+        <TabsList className="flex-wrap h-auto gap-1">
+          <TabsTrigger value="finance">Finance Cos</TabsTrigger>
           <TabsTrigger value="insurance">Insurance</TabsTrigger>
           <TabsTrigger value="models">Models</TabsTrigger>
           <TabsTrigger value="colours">Colours</TabsTrigger>
+          <TabsTrigger value="tin">TIN Types</TabsTrigger>
+          <TabsTrigger value="regfee">Reg. Fee</TabsTrigger>
+          <TabsTrigger value="roadtax">Road Tax</TabsTrigger>
+          <TabsTrigger value="inspfee">Insp. Fee</TabsTrigger>
+          <TabsTrigger value="handfee">Handling Fee</TabsTrigger>
+          <TabsTrigger value="additems">Other Products</TabsTrigger>
+          <TabsTrigger value="paytype">Payment Types</TabsTrigger>
+          <TabsTrigger value="banks">Banks</TabsTrigger>
         </TabsList>
 
         {/* Finance Companies */}
@@ -376,6 +540,86 @@ export default function MasterData() {
             saving={saving}
           />
           {clDelete && <ConfirmDelete name={`${clDelete.code} – ${clDelete.name}`} onConfirm={clDel} onCancel={() => setClDelete(null)} />}
+        </TabsContent>
+
+        {/* TIN Types */}
+        <TabsContent value="tin" className="mt-4">
+          <MasterTable rows={tinTypes} cols={[{ key: 'code' as const, label: 'Code', className: 'font-mono font-semibold' }, { key: 'name' as const, label: 'Name' }, { key: 'status' as const, label: 'Status' }] as ColDef<TinType>[]}
+            onAdd={() => setTtDialog({ open: true, values: { status: 'Active' } })} onEdit={r => setTtDialog({ open: true, id: r.id, values: { code: r.code, name: r.name, status: r.status } })} onDelete={r => setTtDelete(r)} addLabel="Add TIN Type" />
+          <RecordDialog open={ttDialog.open} onClose={() => setTtDialog({ open: false, values: {} })} title={ttDialog.id ? 'Edit TIN Type' : 'Add TIN Type'}
+            fields={[{ key: 'code', label: 'Code *', hint: 'e.g. IND' }, { key: 'name', label: 'Name *', hint: 'e.g. Individual' }, { key: 'status', label: 'Status', hint: 'Active / Inactive' }]}
+            values={ttDialog.values} onChange={(k, v) => setTtDialog(d => ({ ...d, values: { ...d.values, [k]: v } }))} onSave={ttSave} saving={saving} />
+          {ttDelete && <ConfirmDelete name={`${ttDelete.code} – ${ttDelete.name}`} onConfirm={ttDel} onCancel={() => setTtDelete(null)} />}
+        </TabsContent>
+
+        {/* Registration Fees */}
+        <TabsContent value="regfee" className="mt-4">
+          <MasterTable rows={regFees} cols={[{ key: 'description' as const, label: 'Description' }, { key: 'price' as const, label: 'Price (RM)' }, { key: 'status' as const, label: 'Status' }] as ColDef<RegistrationFee>[]}
+            onAdd={() => setRfDialog({ open: true, values: { status: 'Active' } })} onEdit={r => setRfDialog({ open: true, id: r.id, values: { description: r.description, price: String(r.price), status: r.status } })} onDelete={r => setRfDelete(r)} addLabel="Add Fee" />
+          <RecordDialog open={rfDialog.open} onClose={() => setRfDialog({ open: false, values: {} })} title={rfDialog.id ? 'Edit Registration Fee' : 'Add Registration Fee'}
+            fields={[{ key: 'description', label: 'Description *', hint: 'e.g. JPJ Registration' }, { key: 'price', label: 'Price (RM)', type: 'number' }, { key: 'status', label: 'Status', hint: 'Active / Inactive' }]}
+            values={rfDialog.values} onChange={(k, v) => setRfDialog(d => ({ ...d, values: { ...d.values, [k]: v } }))} onSave={rfSave} saving={saving} />
+          {rfDelete && <ConfirmDelete name={rfDelete.description} onConfirm={rfDel} onCancel={() => setRfDelete(null)} />}
+        </TabsContent>
+
+        {/* Road Tax Fees */}
+        <TabsContent value="roadtax" className="mt-4">
+          <MasterTable rows={roadTaxFees} cols={[{ key: 'description' as const, label: 'Description' }, { key: 'price' as const, label: 'Price (RM)' }, { key: 'status' as const, label: 'Status' }] as ColDef<RoadTaxFee>[]}
+            onAdd={() => setRtDialog({ open: true, values: { status: 'Active' } })} onEdit={r => setRtDialog({ open: true, id: r.id, values: { description: r.description, price: String(r.price), status: r.status } })} onDelete={r => setRtDelete(r)} addLabel="Add Fee" />
+          <RecordDialog open={rtDialog.open} onClose={() => setRtDialog({ open: false, values: {} })} title={rtDialog.id ? 'Edit Road Tax Fee' : 'Add Road Tax Fee'}
+            fields={[{ key: 'description', label: 'Description *' }, { key: 'price', label: 'Price (RM)', type: 'number' }, { key: 'status', label: 'Status', hint: 'Active / Inactive' }]}
+            values={rtDialog.values} onChange={(k, v) => setRtDialog(d => ({ ...d, values: { ...d.values, [k]: v } }))} onSave={rtSave} saving={saving} />
+          {rtDelete && <ConfirmDelete name={rtDelete.description} onConfirm={rtDel} onCancel={() => setRtDelete(null)} />}
+        </TabsContent>
+
+        {/* Inspection Fees */}
+        <TabsContent value="inspfee" className="mt-4">
+          <MasterTable rows={inspFees} cols={[{ key: 'itemCode' as const, label: 'Item Code', className: 'font-mono' }, { key: 'description' as const, label: 'Description' }, { key: 'price' as const, label: 'Price (RM)' }, { key: 'status' as const, label: 'Status' }] as ColDef<InspectionFee>[]}
+            onAdd={() => setIfDialog({ open: true, values: { status: 'Active' } })} onEdit={r => setIfDialog({ open: true, id: r.id, values: { itemCode: r.itemCode ?? '', description: r.description, price: String(r.price), status: r.status } })} onDelete={r => setIfDelete(r)} addLabel="Add Fee" />
+          <RecordDialog open={ifDialog.open} onClose={() => setIfDialog({ open: false, values: {} })} title={ifDialog.id ? 'Edit Inspection Fee' : 'Add Inspection Fee'}
+            fields={[{ key: 'itemCode', label: 'Item Code', hint: 'Optional code' }, { key: 'description', label: 'Description *' }, { key: 'price', label: 'Price (RM)', type: 'number' }, { key: 'status', label: 'Status', hint: 'Active / Inactive' }]}
+            values={ifDialog.values} onChange={(k, v) => setIfDialog(d => ({ ...d, values: { ...d.values, [k]: v } }))} onSave={ifSave} saving={saving} />
+          {ifDelete && <ConfirmDelete name={ifDelete.description} onConfirm={ifDel} onCancel={() => setIfDelete(null)} />}
+        </TabsContent>
+
+        {/* Handling Fees */}
+        <TabsContent value="handfee" className="mt-4">
+          <MasterTable rows={handFees} cols={[{ key: 'itemCode' as const, label: 'Item Code', className: 'font-mono' }, { key: 'description' as const, label: 'Description' }, { key: 'price' as const, label: 'Price (RM)' }, { key: 'billing' as const, label: 'Billing' }, { key: 'status' as const, label: 'Status' }] as ColDef<HandlingFee>[]}
+            onAdd={() => setHfDialog({ open: true, values: { status: 'Active' } })} onEdit={r => setHfDialog({ open: true, id: r.id, values: { itemCode: r.itemCode ?? '', description: r.description, price: String(r.price), billing: r.billing ?? '', status: r.status } })} onDelete={r => setHfDelete(r)} addLabel="Add Fee" />
+          <RecordDialog open={hfDialog.open} onClose={() => setHfDialog({ open: false, values: {} })} title={hfDialog.id ? 'Edit Handling Fee' : 'Add Handling Fee'}
+            fields={[{ key: 'itemCode', label: 'Item Code' }, { key: 'description', label: 'Description *' }, { key: 'price', label: 'Price (RM)', type: 'number' }, { key: 'billing', label: 'Billing', hint: 'Yes / No' }, { key: 'status', label: 'Status', hint: 'Active / Inactive' }]}
+            values={hfDialog.values} onChange={(k, v) => setHfDialog(d => ({ ...d, values: { ...d.values, [k]: v } }))} onSave={hfSave} saving={saving} />
+          {hfDelete && <ConfirmDelete name={hfDelete.description} onConfirm={hfDel} onCancel={() => setHfDelete(null)} />}
+        </TabsContent>
+
+        {/* Additional Items */}
+        <TabsContent value="additems" className="mt-4">
+          <MasterTable rows={addItems} cols={[{ key: 'itemCode' as const, label: 'Item Code', className: 'font-mono' }, { key: 'description' as const, label: 'Description' }, { key: 'unitPrice' as const, label: 'Unit Price (RM)' }, { key: 'status' as const, label: 'Status' }] as ColDef<AdditionalItem>[]}
+            onAdd={() => setAiDialog({ open: true, values: { status: 'Active' } })} onEdit={r => setAiDialog({ open: true, id: r.id, values: { itemCode: r.itemCode ?? '', description: r.description, unitPrice: String(r.unitPrice), status: r.status } })} onDelete={r => setAiDelete(r)} addLabel="Add Product" />
+          <RecordDialog open={aiDialog.open} onClose={() => setAiDialog({ open: false, values: {} })} title={aiDialog.id ? 'Edit Other Product' : 'Add Other Product'}
+            fields={[{ key: 'itemCode', label: 'Item Code' }, { key: 'description', label: 'Description *' }, { key: 'unitPrice', label: 'Unit Price (RM)', type: 'number' }, { key: 'status', label: 'Status', hint: 'Active / Inactive' }]}
+            values={aiDialog.values} onChange={(k, v) => setAiDialog(d => ({ ...d, values: { ...d.values, [k]: v } }))} onSave={aiSave} saving={saving} />
+          {aiDelete && <ConfirmDelete name={aiDelete.description} onConfirm={aiDel} onCancel={() => setAiDelete(null)} />}
+        </TabsContent>
+
+        {/* Payment Types */}
+        <TabsContent value="paytype" className="mt-4">
+          <MasterTable rows={payTypes} cols={[{ key: 'name' as const, label: 'Payment Type' }, { key: 'billing' as const, label: 'Billing' }, { key: 'status' as const, label: 'Status' }] as ColDef<PaymentType>[]}
+            onAdd={() => setPtDialog({ open: true, values: { status: 'Active' } })} onEdit={r => setPtDialog({ open: true, id: r.id, values: { name: r.name, billing: r.billing ?? '', status: r.status } })} onDelete={r => setPtDelete(r)} addLabel="Add Type" />
+          <RecordDialog open={ptDialog.open} onClose={() => setPtDialog({ open: false, values: {} })} title={ptDialog.id ? 'Edit Payment Type' : 'Add Payment Type'}
+            fields={[{ key: 'name', label: 'Name *', hint: 'e.g. Cash' }, { key: 'billing', label: 'Billing', hint: 'Yes / No' }, { key: 'status', label: 'Status', hint: 'Active / Inactive' }]}
+            values={ptDialog.values} onChange={(k, v) => setPtDialog(d => ({ ...d, values: { ...d.values, [k]: v } }))} onSave={ptSave} saving={saving} />
+          {ptDelete && <ConfirmDelete name={ptDelete.name} onConfirm={ptDel} onCancel={() => setPtDelete(null)} />}
+        </TabsContent>
+
+        {/* Banks */}
+        <TabsContent value="banks" className="mt-4">
+          <MasterTable rows={banks} cols={[{ key: 'name' as const, label: 'Bank Name' }, { key: 'accountNo' as const, label: 'Account No.' }, { key: 'status' as const, label: 'Status' }] as ColDef<BankRecord>[]}
+            onAdd={() => setBkDialog({ open: true, values: { status: 'Active' } })} onEdit={r => setBkDialog({ open: true, id: r.id, values: { name: r.name, accountNo: r.accountNo ?? '', status: r.status } })} onDelete={r => setBkDelete(r)} addLabel="Add Bank" />
+          <RecordDialog open={bkDialog.open} onClose={() => setBkDialog({ open: false, values: {} })} title={bkDialog.id ? 'Edit Bank' : 'Add Bank'}
+            fields={[{ key: 'name', label: 'Bank Name *', hint: 'e.g. Maybank Berhad' }, { key: 'accountNo', label: 'Account No.', hint: 'e.g. 5621-1234-5678' }, { key: 'status', label: 'Status', hint: 'Active / Inactive' }]}
+            values={bkDialog.values} onChange={(k, v) => setBkDialog(d => ({ ...d, values: { ...d.values, [k]: v } }))} onSave={bkSave} saving={saving} />
+          {bkDelete && <ConfirmDelete name={bkDelete.name} onConfirm={bkDel} onCancel={() => setBkDelete(null)} />}
         </TabsContent>
       </Tabs>
     </div>

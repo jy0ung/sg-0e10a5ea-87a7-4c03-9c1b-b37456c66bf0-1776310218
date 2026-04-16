@@ -31,6 +31,7 @@ const sectionDefs: SectionDef[] = [
   { name: 'Sales', icon: TrendingUp },
   { name: 'Inventory', icon: Package },
   { name: 'Purchasing', icon: Truck },
+  { name: 'Reports', icon: BarChart3 },
   { name: 'Admin', icon: Shield },
 ];
 
@@ -58,18 +59,26 @@ const navItems: NavItem[] = [
   { label: 'Performance', path: '/sales/performance', icon: Target, section: 'Sales' },
   { label: 'Margin Analysis', path: '/sales/margin', icon: TrendingDown, section: 'Sales' },
   { label: 'Outstanding Collection', path: '/sales/outstanding', icon: Landmark, section: 'Sales' },
+  { label: 'Dealer Invoices', path: '/sales/dealer-invoices', icon: FileText, section: 'Sales' },
+  { label: 'Verify OR', path: '/sales/verify-or', icon: Receipt, section: 'Sales' },
 
   { label: 'Stock Balance', path: '/inventory/stock', icon: Package, section: 'Inventory' },
   { label: 'Vehicle Transfer', path: '/inventory/transfers', icon: ArrowLeftRight, section: 'Inventory' },
   { label: 'Chassis Movement', path: '/inventory/chassis', icon: Search, section: 'Inventory' },
+  { label: 'Chassis Filter', path: '/inventory/chassis-filter', icon: KanbanSquare, section: 'Inventory' },
 
   { label: 'Purchase Invoices', path: '/purchasing/invoices', icon: Truck, section: 'Purchasing' },
+
+  { label: 'Reports Centre', path: '/reports', icon: BarChart3, section: 'Reports' },
 
   { label: 'Activity Dashboard', path: '/admin/activity', icon: BarChart3, section: 'Admin', roles: ['super_admin', 'company_admin'] },
   { label: 'Users & Roles', path: '/admin/users', icon: Shield, section: 'Admin', roles: ['super_admin', 'company_admin'] },
   { label: 'Audit Log', path: '/admin/audit', icon: FileText, section: 'Admin', roles: ['super_admin', 'company_admin', 'director'] },
   { label: 'Branch Management', path: '/admin/branches', icon: GitBranch, section: 'Admin', roles: ['super_admin', 'company_admin'] },
   { label: 'Master Data', path: '/admin/master-data', icon: Database, section: 'Admin', roles: ['super_admin', 'company_admin'] },
+  { label: 'Suppliers', path: '/admin/suppliers', icon: Truck, section: 'Admin', roles: ['super_admin', 'company_admin'] },
+  { label: 'Dealers', path: '/admin/dealers', icon: Users, section: 'Admin', roles: ['super_admin', 'company_admin'] },
+  { label: 'User Groups', path: '/admin/user-groups', icon: Shield, section: 'Admin', roles: ['super_admin', 'company_admin'] },
   { label: 'Settings', path: '/admin/settings', icon: Settings, section: 'Admin' },
 ];
 

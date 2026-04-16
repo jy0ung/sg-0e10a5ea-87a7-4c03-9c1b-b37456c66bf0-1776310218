@@ -50,6 +50,13 @@ const MarginAnalysis = lazy(() => import("./pages/sales/MarginAnalysis"));
 const OutstandingCollection = lazy(() => import("./pages/sales/OutstandingCollection"));
 const BranchManagement = lazy(() => import("./pages/admin/BranchManagement"));
 const MasterData = lazy(() => import("./pages/admin/MasterData"));
+const Suppliers = lazy(() => import("./pages/admin/Suppliers"));
+const Dealers = lazy(() => import("./pages/admin/Dealers"));
+const UserGroups = lazy(() => import("./pages/admin/UserGroups"));
+const DealerInvoices = lazy(() => import("./pages/sales/DealerInvoices"));
+const VerifyOR = lazy(() => import("./pages/sales/VerifyOR"));
+const ReportsCenter = lazy(() => import("./pages/reports/ReportsCenter"));
+const ChassisFilter = lazy(() => import("./pages/inventory/ChassisFilter"));
 
 // Lightweight spinner shown while a lazy page chunk loads
 const PageSpinner = () => (
@@ -117,6 +124,13 @@ const router = createBrowserRouter([
       { path: "admin/settings", element: <S><SettingsPage /></S> },
       { path: "admin/branches", element: <S><BranchManagement /></S> },
       { path: "admin/master-data", element: <S><MasterData /></S> },
+      { path: "admin/suppliers", element: <S><Suppliers /></S> },
+      { path: "admin/dealers", element: <S><Dealers /></S> },
+      { path: "admin/user-groups", element: <S><UserGroups /></S> },
+      { path: "sales/dealer-invoices", element: <SalesProvider><S><DealerInvoices /></S></SalesProvider> },
+      { path: "sales/verify-or", element: <SalesProvider><S><VerifyOR /></S></SalesProvider> },
+      { path: "reports", element: <S><ReportsCenter /></S> },
+      { path: "inventory/chassis-filter", element: <S><ChassisFilter /></S> },
     ],
   },
   {
