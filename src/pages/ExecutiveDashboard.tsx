@@ -24,7 +24,7 @@ export default function ExecutiveDashboard() {
   const navigate = useNavigate();
   const { salesOrders, customers, reloadSales } = useSales();
 
-  useEffect(() => { reloadSales(); }, []);
+  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   const [selectedKpis, setSelectedKpis] = useState<string[]>(ADVANCED_KPIS);
   const [showAdvanced, setShowAdvanced] = useState(true);

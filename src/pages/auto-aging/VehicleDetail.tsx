@@ -148,16 +148,6 @@ export default function VehicleDetail() {
           </div>
         </div>
       )}
-      <VehicleEditDialog
-        vehicle={vehicle}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        onSaved={() => reloadFromDb()}
-      />
-    </div>
-  );
-}
-
       {/* Risk badge */}
       <div className="flex items-center gap-2">
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${riskColors[risk]}`}>
@@ -193,3 +183,13 @@ export default function VehicleDetail() {
           </div>
         </div>
       )}
+
+      <VehicleEditDialog
+        vehicle={vehicle}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={() => reloadFromDb()}
+      />
+    </div>
+  );
+}

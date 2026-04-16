@@ -31,7 +31,7 @@ export default function OutstandingCollection() {
 
   const [bucketFilter, setBucketFilter] = useState<'all' | AgingBucket>('all');
 
-  useEffect(() => { reloadSales(); }, []);
+  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   // Only unpaid / partial
   const outstanding: (Invoice & { bucket: AgingBucket; owedAmount: number })[] = useMemo(() => {

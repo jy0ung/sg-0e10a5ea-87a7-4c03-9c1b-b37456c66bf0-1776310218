@@ -10,7 +10,7 @@ export default function DealPipeline() {
   const { salesOrders, dealStages, moveOrderStage, reloadSales } = useSales();
   const [dragging, setDragging] = useState<string | null>(null);
 
-  useEffect(() => { reloadSales(); }, []);
+  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   const ordersByStage = (stageId: string) =>
     salesOrders.filter(o => o.dealStageId === stageId && o.status !== 'cancelled');

@@ -10,9 +10,23 @@
  *   });
  */
 import type { Page } from "@playwright/test";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 
-const SUPABASE_URL = "https://rbmsbppvpgcrmtkdfahy.supabase.co";
-const PROJECT_REF = "rbmsbppvpgcrmtkdfahy";
+// Read VITE_SUPABASE_URL from the project .env file so the mock targets the
+// same Supabase instance the app talks to at runtime.
+function readSupabaseUrl(): string {
+  try {
+    const envPath = resolve(__dirname, "../../.env");
+    const content = readFileSync(envPath, "utf-8");
+    const match = content.match(/VITE_SUPABASE_URL\s*=\s*"?([^"\n]+)"?/);
+    if (match) return match[1];
+  } catch { /* ignore */ }
+  return "http://127.0.0.1:54321";
+}
+
+const SUPABASE_URL = readSupabaseUrl();
+const PROJECT_REF = new URL(SUPABASE_URL).hostname.split(".")[0];
 const LS_KEY = `sb-${PROJECT_REF}-auth-token`;
 
 export const MOCK_USER = {

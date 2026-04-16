@@ -26,7 +26,7 @@ export default function Customers() {
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => { reloadSales(); }, []);
+  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   const filtered = customers.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||

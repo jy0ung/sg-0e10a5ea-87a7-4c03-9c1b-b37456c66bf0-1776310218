@@ -338,10 +338,11 @@ export function useActionLogger(
 
   useEffect(() => {
     // Log navigation/exit action when component unmounts
+    const mountTime = mountTimeRef.current;
     return () => {
       if (!user?.id) return;
 
-      const duration = Date.now() - mountTimeRef.current;
+      const duration = Date.now() - mountTime;
       
       logUserAction(user.id, "navigate", entityType, entityId, {
         page: window.location.pathname,
@@ -350,14 +351,14 @@ export function useActionLogger(
         duration,
       }).catch((err) => {
         // Silently fail during unmount
-        console.error("Failed to log navigate action:", err);
+        loggingService.warn('Failed to log navigate action', { error: err }, 'AuditService');
       });
     };
   }, [user?.id, entityType, entityId, component]);
 
   const logAction = async (actionType: UserActionType, metadata?: Partial<UserActionMetadata>) => {
     if (!user?.id) {
-      console.warn("Cannot log action: User not authenticated");
+      loggingService.warn("Cannot log action: User not authenticated", {}, "AuditService");
       return;
     }
 

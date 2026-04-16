@@ -74,7 +74,7 @@ export default function Invoices() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ invoiceNo: '', salesOrderId: '', customerId: '', issueDate: new Date().toISOString().split('T')[0], dueDate: '', subtotal: '', taxAmount: '', discountAmount: '', notes: '', invoiceType: 'customer_sales' as InvoiceType });
 
-  useEffect(() => { reloadSales(); }, []);
+  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   const totalRevenue = invoices.filter(i => i.paymentStatus === 'paid').reduce((s, i) => s + i.totalAmount, 0);
   const outstanding = invoices.filter(i => i.paymentStatus !== 'paid').reduce((s, i) => s + (i.totalAmount - (i.paidAmount ?? 0)), 0);

@@ -2,25 +2,52 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateVehicleRow, validateImportBatch, validateSlaPolicy, validateQualityIssue, validateVehicleImportBatch } from './validationService';
 import { supabase } from '@/integrations/supabase/client';
 
-// Type-safe mock for Supabase
-const createMockQueryBuilder = () => ({
-  select: vi.fn(),
-  eq: vi.fn(),
-  maybeSingle: vi.fn(),
-  single: vi.fn(),
-});
-
-const mockSupabase = {
-  from: vi.fn(() => createMockQueryBuilder()),
+// Type-safe chainable mock for Supabase
+const createMockQueryBuilder = (resolvedValue: { data: unknown; error: unknown } = { data: null, error: null }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const builder: Record<string, any> = {};
+  builder.select = vi.fn(() => builder);
+  builder.eq = vi.fn(() => builder);
+  builder.maybeSingle = vi.fn().mockResolvedValue(resolvedValue);
+  builder.single = vi.fn().mockResolvedValue(resolvedValue);
+  builder.order = vi.fn(() => Promise.resolve(resolvedValue));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  builder.then = (resolve: any) => Promise.resolve(resolvedValue).then(resolve);
+  return builder;
 };
+
+const { mockSupabase } = vi.hoisted(() => {
+  return {
+    mockSupabase: {
+      from: vi.fn(),
+    },
+  };
+});
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock('./performanceService', () => ({
+  performanceService: {
+    startQueryTimer: vi.fn(),
+    endQueryTimer: vi.fn(),
+  },
+}));
+
+vi.mock('./loggingService', () => ({
+  loggingService: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
 describe('ValidationService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock returns a chainable builder with null data
+    mockSupabase.from.mockReturnValue(createMockQueryBuilder({ data: null, error: null }));
   });
 
   describe('validateVehicleRow', () => {
@@ -36,9 +63,15 @@ describe('ValidationService', () => {
         shipment_etd_pkg: '2024-02-01',
       };
 
-      const mockQueryBuilder = createMockQueryBuilder();
-      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
-      mockSupabase.from.mockReturnValue(mockQueryBuilder);
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'vehicles') {
+          return createMockQueryBuilder({ data: null, error: null }); // No duplicate
+        }
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: { id: 'b1', code: 'B001' }, error: null }); // Branch exists
+        }
+        return createMockQueryBuilder({ data: null, error: null });
+      });
 
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.isValid).toBe(true);
@@ -448,9 +481,12 @@ describe('ValidationService', () => {
         },
       ];
 
-      const mockQueryBuilder = createMockQueryBuilder();
-      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
-      mockSupabase.from.mockReturnValue(mockQueryBuilder);
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: { id: 'b1', code: 'B001' }, error: null });
+        }
+        return createMockQueryBuilder({ data: null, error: null });
+      });
 
       const result = await validateVehicleImportBatch(rows, 'company-123');
       expect(result.summary.totalRows).toBe(2);
@@ -478,9 +514,12 @@ describe('ValidationService', () => {
         },
       ];
 
-      const mockQueryBuilder = createMockQueryBuilder();
-      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
-      mockSupabase.from.mockReturnValue(mockQueryBuilder);
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: { id: 'b1', code: 'B001' }, error: null });
+        }
+        return createMockQueryBuilder({ data: null, error: null });
+      });
 
       const result = await validateVehicleImportBatch(rows, 'company-123');
       expect(result.summary.totalRows).toBe(2);

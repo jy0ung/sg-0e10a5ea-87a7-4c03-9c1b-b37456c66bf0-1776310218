@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { getAllAuditLogs, AuditLogWithProfile } from '@/services/auditService';
 import { formatDate, formatTime } from '@/lib/utils';
+import { loggingService } from '@/services/loggingService';
 import {
   Chart,
   ChartContainer,
@@ -42,11 +43,7 @@ export default function ActivityDashboard() {
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('today');
   const [actionFilter, setActionFilter] = useState<string>('all');
 
-  useEffect(() => {
-    loadLogs();
-  }, [timeRange, actionFilter]);
-
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
       const fromDate = getFromDate(timeRange);
@@ -58,11 +55,15 @@ export default function ActivityDashboard() {
         setLogs(result.data);
       }
     } catch (error) {
-      console.error('Error loading activity logs:', error);
+      loggingService.error('Error loading activity logs', { error }, 'ActivityDashboard');
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange, actionFilter]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [timeRange, actionFilter, loadLogs]);
 
   const getFromDate = (range: 'today' | 'week' | 'month'): Date => {
     const now = new Date();

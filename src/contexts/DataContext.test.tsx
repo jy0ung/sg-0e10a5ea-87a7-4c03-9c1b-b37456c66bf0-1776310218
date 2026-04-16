@@ -1,18 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { DataProvider, useData } from './DataContext';
 import { supabase } from '@/integrations/supabase/client';
 
+const createDefaultBuilder = () => {
+  const builder: any = {};
+  builder.select = vi.fn(() => builder);
+  builder.eq = vi.fn(() => builder);
+  builder.order = vi.fn(() => Promise.resolve({ data: [], error: null }));
+  builder.insert = vi.fn().mockResolvedValue({ error: null });
+  builder.update = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
+  builder.upsert = vi.fn().mockResolvedValue({ error: null });
+  builder.then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
+  return builder;
+};
+
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-    }))
+    from: vi.fn(() => createDefaultBuilder()),
   }
 }));
 
@@ -24,6 +30,8 @@ vi.mock('@/contexts/AuthContext', () => ({
 describe('DataContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Restore default chainable mock after clearAllMocks
+    vi.mocked(supabase.from).mockImplementation(() => createDefaultBuilder());
   });
 
   describe('DataProvider', () => {
@@ -51,17 +59,22 @@ describe('DataContext', () => {
           total_rows: 10, valid_rows: 8, error_rows: 2, duplicate_rows: 0 }
       ];
 
-      const selectMock = vi.fn().mockReturnThis();
-      const orderMock = vi.fn().mockReturnThis();
-      orderMock.mockResolvedValueOnce({ data: mockVehicles, error: null });
-      orderMock.mockResolvedValueOnce({ data: mockBatches, error: null });
-      orderMock.mockResolvedValueOnce({ data: [], error: null });
-      orderMock.mockResolvedValueOnce({ data: [], error: null });
+      const tableData: Record<string, unknown[]> = {
+        vehicles: mockVehicles,
+        import_batches: mockBatches,
+        quality_issues: [],
+        sla_policies: [],
+      };
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: selectMock,
-        order: orderMock
-      } as any);
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        const result = { data: tableData[table] ?? [], error: null };
+        const builder: any = {};
+        builder.select = vi.fn(() => builder);
+        builder.eq = vi.fn(() => builder);
+        builder.order = vi.fn(() => Promise.resolve(result));
+        builder.then = (resolve: any) => Promise.resolve(result).then(resolve);
+        return builder;
+      });
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <DataProvider>{children}</DataProvider>
@@ -104,16 +117,17 @@ describe('DataContext', () => {
 
   describe('CRUD operations', () => {
     it('setVehicles upserts vehicles to database', async () => {
-      const insertMock = vi.fn().mockResolvedValue({ error: null });
-      const selectMock = vi.fn().mockReturnThis();
-      const upsertMock = vi.fn().mockReturnThis();
-      const orderMock = vi.fn().mockResolvedValue({ data: [], error: null });
+      const upsertMock = vi.fn().mockResolvedValue({ error: null });
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: selectMock,
-        upsert: upsertMock.mockResolvedValue({ error: null }),
-        order: orderMock
-      } as any);
+      vi.mocked(supabase.from).mockImplementation(() => {
+        const builder: any = {};
+        builder.select = vi.fn(() => builder);
+        builder.eq = vi.fn(() => builder);
+        builder.order = vi.fn(() => Promise.resolve({ data: [], error: null }));
+        builder.upsert = upsertMock;
+        builder.then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
+        return builder;
+      });
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <DataProvider>{children}</DataProvider>
@@ -121,7 +135,13 @@ describe('DataContext', () => {
       
       const { result } = renderHook(() => useData(), { wrapper });
       
-      await result.current.setVehicles([]);
+      await act(async () => {
+        await result.current.setVehicles([{
+          chassis_no: 'CH001', branch_code: 'BR1', model: 'Model1',
+          payment_method: 'Cash', salesman_name: 'Sales1', customer_name: 'Cust1',
+          is_d2d: false,
+        } as any]);
+      });
 
       expect(upsertMock).toHaveBeenCalled();
     });
@@ -129,15 +149,26 @@ describe('DataContext', () => {
     it('addImportBatch inserts batch to database', async () => {
       const insertMock = vi.fn().mockResolvedValue({ error: null });
       
-      vi.mocked(supabase.from).mockReturnValue({
-        insert: insertMock
-      } as any);
+      vi.mocked(supabase.from).mockImplementation(() => {
+        const builder: any = {};
+        builder.select = vi.fn(() => builder);
+        builder.eq = vi.fn(() => builder);
+        builder.order = vi.fn(() => Promise.resolve({ data: [], error: null }));
+        builder.insert = insertMock;
+        builder.then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
+        return builder;
+      });
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <DataProvider>{children}</DataProvider>
       );
       
       const { result } = renderHook(() => useData(), { wrapper });
+
+      // Wait for mount-time reloadFromDb to finish
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
       
       const batch = {
         id: 'b1',
@@ -151,21 +182,24 @@ describe('DataContext', () => {
         duplicateRows: 0
       };
 
-      await result.current.addImportBatch(batch);
+      await act(async () => {
+        await result.current.addImportBatch(batch);
+      });
 
       expect(insertMock).toHaveBeenCalled();
       expect(result.current.importBatches).toHaveLength(1);
     });
 
     it('updateImportBatch updates batch in database', async () => {
-      const updateMock = vi.fn().mockResolvedValue({ error: null });
-      const eqMock = vi.fn().mockReturnThis();
+      const updateMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
       
-      vi.mocked(supabase.from).mockReturnValue({
-        update: updateMock.mockReturnValue({
-          eq: eqMock
-        })
-      } as any);
+      vi.mocked(supabase.from).mockImplementation(() => {
+        const builder: any = createDefaultBuilder();
+        builder.update = updateMock;
+        return builder;
+      });
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <DataProvider>{children}</DataProvider>
@@ -181,36 +215,50 @@ describe('DataContext', () => {
     it('addQualityIssues inserts issues to database', async () => {
       const insertMock = vi.fn().mockResolvedValue({ error: null });
       
-      vi.mocked(supabase.from).mockReturnValue({
-        insert: insertMock
-      } as any);
+      vi.mocked(supabase.from).mockImplementation(() => {
+        const builder: any = {};
+        builder.select = vi.fn(() => builder);
+        builder.eq = vi.fn(() => builder);
+        builder.order = vi.fn(() => Promise.resolve({ data: [], error: null }));
+        builder.insert = insertMock;
+        builder.then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
+        return builder;
+      });
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <DataProvider>{children}</DataProvider>
       );
       
       const { result } = renderHook(() => useData(), { wrapper });
+
+      // Wait for mount-time reloadFromDb to finish
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
       
       const issues = [
         { id: 'iss1', chassisNo: 'CH001', field: 'bg_date', issueType: 'missing' as const,
           message: 'Missing BG date', severity: 'error' as const, importBatchId: 'b1' }
       ];
 
-      await result.current.addQualityIssues(issues);
+      await act(async () => {
+        await result.current.addQualityIssues(issues);
+      });
 
       expect(insertMock).toHaveBeenCalled();
       expect(result.current.qualityIssues).toHaveLength(1);
     });
 
     it('updateSla updates SLA in database and refreshes KPIs', async () => {
-      const updateMock = vi.fn().mockResolvedValue({ error: null });
-      const eqMock = vi.fn().mockReturnThis();
+      const updateMock = vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      });
       
-      vi.mocked(supabase.from).mockReturnValue({
-        update: updateMock.mockReturnValue({
-          eq: eqMock
-        })
-      } as any);
+      vi.mocked(supabase.from).mockImplementation(() => {
+        const builder: any = createDefaultBuilder();
+        builder.update = updateMock;
+        return builder;
+      });
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <DataProvider>{children}</DataProvider>
@@ -223,7 +271,7 @@ describe('DataContext', () => {
       expect(updateMock).toHaveBeenCalled();
     });
 
-    it('refreshKpis recalculates KPI summaries', () => {
+    it('refreshKpis recalculates KPI summaries', async () => {
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <DataProvider>{children}</DataProvider>
       );
@@ -231,20 +279,28 @@ describe('DataContext', () => {
       const { result } = renderHook(() => useData(), { wrapper });
       
       const lastRefreshBefore = result.current.lastRefresh;
-      
+
+      // Wait a tick so the timestamp differs
+      await new Promise(resolve => setTimeout(resolve, 5));
+
       result.current.refreshKpis();
 
-      expect(result.current.lastRefresh).not.toBe(lastRefreshBefore);
+      await waitFor(() => {
+        expect(result.current.lastRefresh).not.toBe(lastRefreshBefore);
+      });
     });
 
     it('reloadFromDb fetches fresh data from database', async () => {
-      const selectMock = vi.fn().mockReturnThis();
-      const orderMock = vi.fn().mockResolvedValue({ data: [], error: null });
+      const orderMock = vi.fn(() => Promise.resolve({ data: [], error: null }));
 
-      vi.mocked(supabase.from).mockReturnValue({
-        select: selectMock,
-        order: orderMock
-      } as any);
+      vi.mocked(supabase.from).mockImplementation(() => {
+        const builder: any = {};
+        builder.select = vi.fn(() => builder);
+        builder.eq = vi.fn(() => builder);
+        builder.order = orderMock;
+        builder.then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
+        return builder;
+      });
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
         <DataProvider>{children}</DataProvider>

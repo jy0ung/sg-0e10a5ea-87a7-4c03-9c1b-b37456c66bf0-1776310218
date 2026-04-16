@@ -12,6 +12,7 @@ import { updateVehicleWithAudit } from '@/services/vehicleService';
 import { getUserPermissions } from '@/services/permissionService';
 import type { VehicleCanonical } from '@/types';
 import { Input } from '@/components/ui/input';
+import { loggingService } from '@/services/loggingService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { VehicleBulkActions } from './VehicleBulkActions';
 
@@ -415,7 +416,7 @@ export default function VehicleExplorer() {
 
     const result = await updateVehicleWithAudit(rowId, updates, user.id);
     if (result.error) {
-      console.error('Failed to update vehicle:', result.error);
+      loggingService.error('Failed to update vehicle', { error: result.error }, 'VehicleExplorer');
     } else {
       await useData.reloadFromDb?.();
     }
@@ -423,7 +424,7 @@ export default function VehicleExplorer() {
 
   const handleExportCSV = () => {
     if (!userPermissions?.canEdit && !userPermissions?.canView) {
-      console.error('No permission to export');
+      loggingService.warn('No permission to export', {}, 'VehicleExplorer');
       return;
     }
 
@@ -452,7 +453,7 @@ export default function VehicleExplorer() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Export failed:', error);
+      loggingService.error('Export failed', { error }, 'VehicleExplorer');
     } finally {
       setExportLoading(false);
     }
@@ -620,7 +621,7 @@ export default function VehicleExplorer() {
           if (!user?.id) return;
           const result = await updateVehicleWithAudit(id, updates, user.id);
           if (result.error) {
-            console.error('Failed to update vehicle:', result.error);
+            loggingService.error('Failed to update vehicle', { error: result.error }, 'VehicleExplorer');
           } else {
             await useData.reloadFromDb?.();
           }

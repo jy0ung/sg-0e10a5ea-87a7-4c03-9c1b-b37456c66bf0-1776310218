@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,14 +25,14 @@ export default function SalesmanPerformancePage() {
   const [editTarget, setEditTarget] = useState<SalesmanTarget | null>(null);
   const [form, setForm] = useState({ salesmanId: '', salesmanName: '', branchCode: '', targetUnits: '', targetRevenue: '' });
 
-  useEffect(() => { reloadSales(); loadPerformance(); }, [year, month]);
-
-  const loadPerformance = async () => {
+  const loadPerformance = useCallback(async () => {
     setLoading(true);
     const { data } = await computeSalesmanActuals(companyId, year, month);
     setPerformance(data);
     setLoading(false);
-  };
+  }, [companyId, year, month]);
+
+  useEffect(() => { reloadSales(); loadPerformance(); }, [year, month, reloadSales, loadPerformance]);
 
   const handleSaveTarget = async () => {
     if (!form.salesmanId || !form.targetUnits) return toast({ title: 'Salesman ID and Target Units required', variant: 'destructive' });

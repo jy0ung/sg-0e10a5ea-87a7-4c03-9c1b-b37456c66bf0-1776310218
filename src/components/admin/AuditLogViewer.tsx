@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { getAllAuditLogs, AuditLogWithProfile } from '@/services/auditService';
 import { History, Search, Filter, Download, ChevronRight, ChevronDown, X } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { loggingService } from '@/services/loggingService';
 
 interface AuditLogViewerProps {
   entityId?: string;
@@ -25,11 +26,7 @@ export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerP
     dateTo: '',
   });
 
-  useEffect(() => {
-    loadLogs();
-  }, [entityId, entityType]);
-
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getAllAuditLogs(
@@ -41,11 +38,15 @@ export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerP
         setLogs(result.data);
       }
     } catch (error) {
-      console.error('Error loading audit logs:', error);
+      loggingService.error('Error loading audit logs', { error }, 'AuditLogViewer');
     } finally {
       setLoading(false);
     }
-  };
+  }, [entityId, entityType]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [entityId, entityType, loadLogs]);
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {

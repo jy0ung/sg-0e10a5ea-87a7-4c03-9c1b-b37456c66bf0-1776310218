@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { loggingService } from './loggingService';
 
 export type PermissionLevel = 'none' | 'view' | 'edit';
 export type ColumnPermission = Tables<'column_permissions'>;
@@ -25,7 +26,7 @@ export async function getUserColumnPermissions(
     .eq('table_name', tableName);
 
   if (error) {
-    console.error('Error fetching column permissions:', error);
+    loggingService.error('Error fetching column permissions', { error }, 'PermissionService');
     return [];
   }
 
@@ -48,7 +49,7 @@ export async function setUserColumnPermissions(
     .eq('table_name', tableName);
 
   if (deleteError) {
-    console.error('Error deleting old permissions:', deleteError);
+    loggingService.error('Error deleting old permissions', { error: deleteError }, 'PermissionService');
     return { error: deleteError };
   }
 
@@ -66,7 +67,7 @@ export async function setUserColumnPermissions(
       );
 
     if (insertError) {
-      console.error('Error inserting new permissions:', insertError);
+      loggingService.error('Error inserting new permissions', { error: insertError }, 'PermissionService');
       return { error: insertError };
     }
   }

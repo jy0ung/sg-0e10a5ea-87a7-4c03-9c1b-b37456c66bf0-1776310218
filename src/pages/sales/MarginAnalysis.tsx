@@ -28,7 +28,7 @@ export default function MarginAnalysis() {
   const [branchFilter, setBranchFilter] = useState('all');
   const [periodFilter, setPeriodFilter] = useState('all');
 
-  useEffect(() => { reloadSales(); }, []);
+  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   // Unique branches
   const branches = useMemo(() => {

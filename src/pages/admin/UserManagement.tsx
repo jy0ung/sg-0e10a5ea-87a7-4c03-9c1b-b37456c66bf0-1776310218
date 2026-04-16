@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
-import { demoBranches } from '@/data/demo-data';
+import { getBranches } from '@/services/masterDataService';
+import type { BranchRecord } from '@/types';
 import { PermissionEditor } from '@/components/admin/PermissionEditor';
 import { userUpdateSchema, type UserUpdateFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
@@ -60,6 +61,7 @@ export default function UserManagement() {
   const [editScope, setEditScope] = useState<string>('');
   const [editBranch, setEditBranch] = useState<string>('none');
   const [saving, setSaving] = useState(false);
+  const [branches, setBranches] = useState<BranchRecord[]>([]);
   const [permissionUserId, setPermissionUserId] = useState<string>('');
   const [permissionUserName, setPermissionUserName] = useState<string>('');
   const [permissionUserRole, setPermissionUserRole] = useState<string>('');
@@ -79,15 +81,19 @@ export default function UserManagement() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, email, name, role, company_id, branch_id, access_scope, created_at')
-        .order('created_at', { ascending: true });
-      setProfiles((data || []) as unknown as ProfileRow[]);
+      const [profileRes, branchRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, email, name, role, company_id, branch_id, access_scope, created_at')
+          .order('created_at', { ascending: true }),
+        getBranches(user?.company_id || 'c1'),
+      ]);
+      setProfiles((profileRes.data || []) as unknown as ProfileRow[]);
+      setBranches(branchRes.data);
       setLoading(false);
     }
     load();
-  }, []);
+  }, [user?.company_id]);
 
   const openEdit = (p: ProfileRow) => {
     setEditUser(p);
@@ -248,7 +254,7 @@ export default function UserManagement() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No branch assigned</SelectItem>
-                  {demoBranches.map(b => (
+                  {branches.map(b => (
                     <SelectItem key={b.id} value={b.code}>{b.name}</SelectItem>
                   ))}
                 </SelectContent>

@@ -4,6 +4,7 @@ import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, AlertCircle, CheckCircle2, Filter, Calendar, ChevronDown, X } from 'lucide-react';
+import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -96,11 +97,16 @@ export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true }: Kp
 
   // Compute filtered KPI summaries
   const filteredKpiSummaries = useMemo(() => {
-    // This would need the computeKpiSummaries function
-    // For now, we'll use the original summaries but note that they're not re-computed
-    // In a real implementation, you'd recompute KPIs based on filteredVehicles
-    return kpiSummaries;
-  }, [kpiSummaries, filteredVehicles.length]);
+    const hasActiveFilters = filters.branches.length > 0 || filters.models.length > 0 ||
+      filters.paymentMethods.length > 0 || filters.dateRange.from || filters.dateRange.to;
+    if (!hasActiveFilters) return kpiSummaries;
+
+    // Reconstruct SLA policies from existing summaries and recompute against filtered vehicles
+    const slas = kpiSummaries.map(k => ({
+      id: k.kpiId, kpiId: k.kpiId, label: k.label, slaDays: k.slaDays, companyId: '',
+    }));
+    return computeKpiSummaries(filteredVehicles, slas);
+  }, [kpiSummaries, filteredVehicles, filters]);
 
   const toggleFilter = (type: keyof KpiDashboardFilters, value: string) => {
     setFilters(prev => {

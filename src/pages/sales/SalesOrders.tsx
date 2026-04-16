@@ -37,7 +37,7 @@ export default function SalesOrders() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ orderNo: '', customerId: '', branchCode: '', salesmanName: '', model: '', variant: '', colour: '', bookingDate: new Date().toISOString().split('T')[0], bookingAmount: '', totalPrice: '', status: 'enquiry' as SalesOrderStatus, vsoNo: '', depositAmount: '', bankLoanAmount: '', financeCompany: '', insuranceCompany: '', plateNo: '' });
 
-  useEffect(() => { reloadSales(); }, []);
+  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   const filtered = salesOrders.filter(o =>
     (statusFilter === 'all' || o.status === statusFilter) &&

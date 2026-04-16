@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,14 +36,14 @@ export default function DealerInvoices() {
   const [deleteTarget, setDeleteTarget] = useState<DealerInvoice | null>(null);
   const [search, setSearch] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const { data } = await getDealerInvoices(companyId);
     setInvoices(data);
     setLoading(false);
-  };
+  }, [companyId]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
   const openEdit = (inv: DealerInvoice) => {

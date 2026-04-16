@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { loggingService } from "./loggingService";
+import { performanceService } from "./performanceService";
 import type { ValidationError } from "@/types";
 
 // Allowed values for enum fields

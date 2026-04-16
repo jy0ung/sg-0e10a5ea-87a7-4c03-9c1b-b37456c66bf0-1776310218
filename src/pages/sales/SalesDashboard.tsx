@@ -8,7 +8,7 @@ export default function SalesDashboard() {
   const { salesOrders, invoices, reloadSales } = useSales();
   const { vehicles } = useData();
 
-  useEffect(() => { reloadSales(); }, []);
+  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];

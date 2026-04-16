@@ -1,11 +1,15 @@
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { errorTrackingService } from "@/services/errorTrackingService";
 
 export function useErrorHandler() {
   const { toast } = useToast();
 
   const handleError = useCallback((error: unknown, title?: string) => {
-    console.error("Error caught:", error);
+    errorTrackingService.captureException(
+      error instanceof Error ? error : new Error(String(error)),
+      { component: 'useErrorHandler' }
+    );
     
     const errorMessage = error instanceof Error 
       ? error.message 

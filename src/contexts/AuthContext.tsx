@@ -3,6 +3,7 @@ import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AppRole, AccessScope } from '@/types';
 import { useLocation, Navigate } from 'react-router-dom';
+import { loggingService } from '@/services/loggingService';
 
 interface Profile {
   id: string;
@@ -43,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
       
       if (error) {
-        console.error('Error fetching profile:', error);
+        loggingService.error('Error fetching profile', { error }, 'AuthContext');
         // Create minimal profile if it doesn't exist
         if (error.code === 'PGRST116') {
           setProfile({
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(data as unknown as Profile);
       }
     } catch (err) {
-      console.error('Unexpected error fetching profile:', err);
+      loggingService.error('Unexpected error fetching profile', { error: err }, 'AuthContext');
       // Set minimal profile to prevent app from breaking
       setProfile({
         id: userId,

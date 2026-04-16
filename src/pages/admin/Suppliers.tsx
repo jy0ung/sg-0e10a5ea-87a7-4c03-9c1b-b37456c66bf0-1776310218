@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,14 +31,14 @@ export default function Suppliers() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const { data } = await getSuppliers(companyId);
     setSuppliers(data);
     setLoading(false);
-  };
+  }, [companyId]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
   const openEdit = (s: Supplier) => {

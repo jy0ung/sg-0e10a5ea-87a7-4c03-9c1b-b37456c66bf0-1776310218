@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Card, CardContent, CardDescription, CardHeader, CardTitle 
 } from '@/components/ui/card';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { loggingService } from '@/services/loggingService';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   getUserPermissions, 
@@ -102,33 +103,31 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
   // Load existing permissions
   useEffect(() => {
     loadPermissions();
-  }, [userId]);
+  }, [userId, loadPermissions]);
 
-  const loadPermissions = async () => {
+  const loadPermissions = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getUserPermissions(userId);
-      if (result.data) {
-        setCanEdit(result.data.can_edit);
-        setCanBulkEdit(result.data.can_bulk_edit);
-        setCanViewDetails(result.data.can_view_details);
-      }
+      setCanEdit(result.canEdit);
+      setCanBulkEdit(result.canBulkEdit);
+      setCanViewDetails(result.canViewDetails);
 
-      const columnResult = await getUserColumnPermissions(userId);
-      if (columnResult.data) {
+      const columnPerms = await getUserColumnPermissions(userId);
+      if (columnPerms.length > 0) {
         const perms: Record<string, PermissionLevel> = {};
-        columnResult.data.forEach(p => {
+        columnPerms.forEach(p => {
           perms[p.column_name] = p.permission_level as PermissionLevel;
         });
         setColumnPermissions(perms);
       }
     } catch (error) {
-      console.error('Error loading permissions:', error);
+      loggingService.error('Error loading permissions', { error }, 'PermissionEditor');
       toast.error('Failed to load permissions');
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   const applyTemplate = (template: keyof typeof PERMISSION_TEMPLATES) => {
     const newPerms: Record<string, PermissionLevel> = {};
@@ -178,7 +177,7 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
       setUnsavedChanges(false);
       onSave?.();
     } catch (error) {
-      console.error('Error saving permissions:', error);
+      loggingService.error('Error saving permissions', { error }, 'PermissionEditor');
       toast.error('Failed to save permissions');
     } finally {
       setSaving(false);

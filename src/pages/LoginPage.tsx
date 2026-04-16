@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,11 +10,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 export default function LoginPage() {
-  const { login, signup } = useAuth();
+  const { login, signup, isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -25,23 +27,33 @@ export default function LoginPage() {
     mode: 'onChange',
   });
 
+  // Redirect if already authenticated
+  if (!loading && isAuthenticated) {
+    navigate('/', { replace: true });
+    return null;
+  }
+
   const handleLoginSubmit = async (data: LoginFormData) => {
     setError('');
     setSuccess('');
-    setLoading(true);
+    setSubmitting(true);
     const { error: err } = await login(data.email, data.password);
-    setLoading(false);
+    setSubmitting(false);
     if (err) setError(err);
+    else navigate('/', { replace: true });
   };
 
   const handleSignupSubmit = async (data: SignupFormData) => {
     setError('');
     setSuccess('');
-    setLoading(true);
+    setSubmitting(true);
     const { error: err } = await signup(data.email, data.password, data.name);
-    setLoading(false);
+    setSubmitting(false);
     if (err) setError(err);
-    else setSuccess('Account created successfully! You are now signed in.');
+    else {
+      setSuccess('Account created successfully! You are now signed in.');
+      navigate('/', { replace: true });
+    }
   };
 
   return (
@@ -101,8 +113,8 @@ export default function LoginPage() {
             {error && <p className="text-destructive text-sm">{error}</p>}
             {success && <p className="text-primary text-sm">{success}</p>}
 
-            <Button type="submit" className="w-full" disabled={loading || !signupForm.formState.isValid}>
-              {loading ? (
+            <Button type="submit" className="w-full" disabled={submitting || !signupForm.formState.isValid}>
+              {submitting ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating account...</>
               ) : (
                 'Create Account'
@@ -140,8 +152,8 @@ export default function LoginPage() {
 
             {error && <p className="text-destructive text-sm">{error}</p>}
 
-            <Button type="submit" className="w-full" disabled={loading || !loginForm.formState.isValid}>
-              {loading ? (
+            <Button type="submit" className="w-full" disabled={submitting || !loginForm.formState.isValid}>
+              {submitting ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Signing in...</>
               ) : (
                 'Sign In'

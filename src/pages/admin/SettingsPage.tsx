@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Loader2, Save } from 'lucide-react';
-import { demoBranches } from '@/data/demo-data';
+import { getBranches } from '@/services/masterDataService';
+import type { BranchRecord } from '@/types';
 import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
 import { profileUpdateSchema, type ProfileUpdateFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
@@ -29,6 +30,7 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const [branchId, setBranchId] = useState<string>('none');
   const [saving, setSaving] = useState(false);
+  const [branches, setBranches] = useState<BranchRecord[]>([]);
 
   const form = useForm<ProfileUpdateFormData>({
     resolver: zodResolver(profileUpdateSchema),
@@ -50,6 +52,10 @@ export default function SettingsPage() {
       setBranchId(user.branch_id || 'none');
     }
   }, [user, form]);
+
+  useEffect(() => {
+    getBranches(user?.company_id || 'c1').then(res => setBranches(res.data));
+  }, [user?.company_id]);
 
   const handleRoleChange = (newRole: string) => {
     form.setValue('role', newRole as ProfileUpdateFormData['role']);
@@ -127,7 +133,7 @@ export default function SettingsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No branch assigned</SelectItem>
-                    {demoBranches.map((b) => (
+                    {branches.map((b) => (
                       <SelectItem key={b.id} value={b.code}>{b.name}</SelectItem>
                     ))}
                   </SelectContent>

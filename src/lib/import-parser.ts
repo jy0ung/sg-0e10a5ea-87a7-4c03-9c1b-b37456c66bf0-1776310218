@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { VehicleRaw, DataQualityIssue, VehicleCanonical } from '@/types';
+import { loggingService } from '@/services/loggingService';
 
 function normalizeHeader(raw: unknown): string {
   return String(raw ?? '')
@@ -218,7 +219,7 @@ export function parseWorkbook(file: ArrayBuffer): { rows: VehicleRaw[]; issues: 
 
     return { rows, issues, missingColumns };
   } catch (error) {
-    console.error('Error parsing workbook:', error);
+    loggingService.error('Error parsing workbook', { error }, 'ImportParser');
     return { 
       rows: [], 
       issues: [], 
@@ -325,7 +326,7 @@ export function publishCanonical(
 
     return { canonical, issues };
   } catch (error) {
-    console.error('Error publishing canonical:', error);
+    loggingService.error('Error publishing canonical', { error }, 'ImportParser');
     return { canonical: [], issues: [] };
   }
 }

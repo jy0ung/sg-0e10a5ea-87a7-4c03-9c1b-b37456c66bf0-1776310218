@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,14 +38,14 @@ export default function VerifyOR() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const { data } = await getOfficialReceipts(companyId);
     setReceipts(data);
     setLoading(false);
-  };
+  }, [companyId]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
   const openEdit = (r: OfficialReceipt) => {

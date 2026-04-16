@@ -165,7 +165,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       performanceService.endQueryTimer(queryId, 'data_reload');
       loggingService.error('Failed to load data from database', { error: err }, 'DataContext');
-      console.error('Failed to load data from database:', err);
     } finally {
       setLoading(false);
     }
@@ -224,7 +223,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           .upsert(chunk, { onConflict: 'chassis_no,company_id' });
         if (error) {
           loggingService.error('Vehicle upsert error', { error, chunkIndex: i }, 'DataContext');
-          console.error('Vehicle upsert error:', error);
         }
       }
 
@@ -233,7 +231,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       performanceService.endQueryTimer(queryId, 'vehicles_upsert');
       loggingService.error('Unexpected error upserting vehicles', { error: err }, 'DataContext');
-      console.error('Unexpected error upserting vehicles:', err);
     }
   }, [reloadFromDb, companyId]);
 
@@ -253,14 +250,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       
       if (error) {
         loggingService.error('Import batch insert error', { error, batch: b }, 'DataContext');
-        console.error('Import batch insert error:', error);
       } else {
         setImportBatches(prev => [b, ...prev]);
         loggingService.info('Import batch added', { batchId: b.id }, 'DataContext');
       }
     } catch (err) {
       loggingService.error('Unexpected error adding import batch', { error: err }, 'DataContext');
-      console.error('Unexpected error adding import batch:', err);
     }
   }, [companyId]);
 
@@ -277,14 +272,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       
       if (error) {
         loggingService.error('Import batch update error', { error, id, updates }, 'DataContext');
-        console.error('Import batch update error:', error);
       } else {
         setImportBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
         loggingService.info('Import batch updated', { batchId: id }, 'DataContext');
       }
     } catch (err) {
       loggingService.error('Unexpected error updating import batch', { error: err }, 'DataContext');
-      console.error('Unexpected error updating import batch:', err);
     }
   }, []);
 
@@ -307,7 +300,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.from('quality_issues').insert(chunk);
         if (error) {
           loggingService.error('Quality issues insert error', { error, chunkIndex: idx }, 'DataContext');
-          console.error('Quality issues insert error:', error);
         }
       }
 
@@ -315,7 +307,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       loggingService.info('Quality issues added', { count: issues.length }, 'DataContext');
     } catch (err) {
       loggingService.error('Unexpected error adding quality issues', { error: err }, 'DataContext');
-      console.error('Unexpected error adding quality issues:', err);
     }
   }, [companyId]);
 
@@ -325,7 +316,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       
       if (error) {
         loggingService.error('SLA update error', { error, id, slaDays }, 'DataContext');
-        console.error('SLA update error:', error);
       } else {
         setSlas(prev => {
           const updated = prev.map(s => s.id === id ? { ...s, slaDays } : s);
@@ -336,7 +326,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       loggingService.error('Unexpected error updating SLA', { error: err }, 'DataContext');
-      console.error('Unexpected error updating SLA:', err);
     }
   }, [vehicles]);
 

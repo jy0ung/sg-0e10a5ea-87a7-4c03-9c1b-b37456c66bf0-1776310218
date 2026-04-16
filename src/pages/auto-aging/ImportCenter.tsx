@@ -11,6 +11,7 @@ import { loadBranchMappingLookup, loadPaymentMappingLookup } from '@/services/ma
 import { validateVehicleImportBatch, validateImportBatch } from '@/services/validationService';
 import { createImportBatch, validateAndInsertVehicles } from '@/services/importService';
 import type { ImportBatchInsert, VehicleRaw, ValidationError } from '@/types';
+import { loggingService } from '@/services/loggingService';
 
 type Step = 'upload' | 'validating' | 'review' | 'publishing' | 'done';
 
@@ -79,7 +80,7 @@ export default function ImportCenter() {
       addImportBatch({ ...batch, id });
       setStep('review');
     } catch (error) {
-      console.error('Import error:', error);
+      loggingService.error('Import error', { error }, 'ImportCenter');
       alert(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setStep('upload');
     }
@@ -125,7 +126,7 @@ export default function ImportCenter() {
       refreshKpis();
       setStep('done');
     } catch (error) {
-      console.error('Publish error:', error);
+      loggingService.error('Publish error', { error }, 'ImportCenter');
       alert(`Publish failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       updateImportBatch(batchId, { status: 'failed' });
       setStep('review');
