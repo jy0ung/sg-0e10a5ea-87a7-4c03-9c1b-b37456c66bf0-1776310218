@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { AppSidebar } from './AppSidebar';
 import { Bell, Search } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
 
@@ -41,7 +41,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="flex-1 overflow-auto p-6">
-          {children}
+          <Outlet />
         </main>
       </div>
     </div>
