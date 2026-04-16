@@ -3,6 +3,8 @@ import { VehicleCanonical, ImportBatch, DataQualityIssue, SlaPolicy, KpiSummary 
 import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { loggingService } from '@/services/loggingService';
+import { performanceService } from '@/services/performanceService';
 
 interface DataContextType {
   vehicles: VehicleCanonical[];
@@ -25,8 +27,8 @@ const DataContext = createContext<DataContextType | null>(null);
 
 function mapDbVehicle(row: Record<string, unknown>): VehicleCanonical {
   return {
-    id: String(row.id),
-    chassis_no: String(row.chassis_no),
+    id: String(row.id || ''),
+    chassis_no: String(row.chassis_no || ''),
     bg_date: row.bg_date ? String(row.bg_date) : undefined,
     shipment_etd_pkg: row.shipment_etd_pkg ? String(row.shipment_etd_pkg) : undefined,
     shipment_eta_kk_twu_sdk: row.shipment_eta_kk_twu_sdk ? String(row.shipment_eta_kk_twu_sdk) : undefined,
@@ -34,17 +36,17 @@ function mapDbVehicle(row: Record<string, unknown>): VehicleCanonical {
     reg_date: row.reg_date ? String(row.reg_date) : undefined,
     delivery_date: row.delivery_date ? String(row.delivery_date) : undefined,
     disb_date: row.disb_date ? String(row.disb_date) : undefined,
-    branch_code: String(row.branch_code ?? 'Unknown'),
-    model: String(row.model ?? 'Unknown'),
-    payment_method: String(row.payment_method ?? 'Unknown'),
-    salesman_name: String(row.salesman_name ?? 'Unknown'),
-    customer_name: String(row.customer_name ?? 'Unknown'),
+    branch_code: String(row.branch_code || 'Unknown'),
+    model: String(row.model || 'Unknown'),
+    payment_method: String(row.payment_method || 'Unknown'),
+    salesman_name: String(row.salesman_name || 'Unknown'),
+    customer_name: String(row.customer_name || 'Unknown'),
     remark: row.remark ? String(row.remark) : undefined,
     vaa_date: row.vaa_date ? String(row.vaa_date) : undefined,
     full_payment_date: row.full_payment_date ? String(row.full_payment_date) : undefined,
     is_d2d: Boolean(row.is_d2d),
-    import_batch_id: String(row.import_batch_id ?? ''),
-    source_row_id: String(row.source_row_id ?? ''),
+    import_batch_id: String(row.import_batch_id || ''),
+    source_row_id: String(row.source_row_id || ''),
     variant: row.variant ? String(row.variant) : undefined,
     dealer_transfer_price: row.dealer_transfer_price ? String(row.dealer_transfer_price) : undefined,
     full_payment_type: row.full_payment_type ? String(row.full_payment_type) : undefined,
@@ -54,50 +56,50 @@ function mapDbVehicle(row: Record<string, unknown>): VehicleCanonical {
     reg_no: row.reg_no ? String(row.reg_no) : undefined,
     invoice_no: row.invoice_no ? String(row.invoice_no) : undefined,
     obr: row.obr ? String(row.obr) : undefined,
-    bg_to_delivery: row.bg_to_delivery as number | null,
-    bg_to_shipment_etd: row.bg_to_shipment_etd as number | null,
-    etd_to_outlet: row.etd_to_outlet as number | null,
-    outlet_to_reg: row.outlet_to_reg as number | null,
-    reg_to_delivery: row.reg_to_delivery as number | null,
-    bg_to_disb: row.bg_to_disb as number | null,
-    delivery_to_disb: row.delivery_to_disb as number | null,
+    bg_to_delivery: typeof row.bg_to_delivery === 'number' ? row.bg_to_delivery : null,
+    bg_to_shipment_etd: typeof row.bg_to_shipment_etd === 'number' ? row.bg_to_shipment_etd : null,
+    etd_to_outlet: typeof row.etd_to_outlet === 'number' ? row.etd_to_outlet : null,
+    outlet_to_reg: typeof row.outlet_to_reg === 'number' ? row.outlet_to_reg : null,
+    reg_to_delivery: typeof row.reg_to_delivery === 'number' ? row.reg_to_delivery : null,
+    bg_to_disb: typeof row.bg_to_disb === 'number' ? row.bg_to_disb : null,
+    delivery_to_disb: typeof row.delivery_to_disb === 'number' ? row.delivery_to_disb : null,
   };
 }
 
 function mapDbBatch(row: Record<string, unknown>): ImportBatch {
   return {
-    id: String(row.id),
-    fileName: String(row.file_name),
-    uploadedBy: String(row.uploaded_by),
-    uploadedAt: String(row.uploaded_at),
-    status: String(row.status) as ImportBatch['status'],
-    totalRows: Number(row.total_rows),
-    validRows: Number(row.valid_rows),
-    errorRows: Number(row.error_rows),
-    duplicateRows: Number(row.duplicate_rows),
+    id: String(row.id || ''),
+    fileName: String(row.file_name || 'Unknown'),
+    uploadedBy: String(row.uploaded_by || 'Unknown'),
+    uploadedAt: String(row.uploaded_at || new Date().toISOString()),
+    status: String(row.status || 'uploaded') as ImportBatch['status'],
+    totalRows: Number(row.total_rows || 0),
+    validRows: Number(row.valid_rows || 0),
+    errorRows: Number(row.error_rows || 0),
+    duplicateRows: Number(row.duplicate_rows || 0),
     publishedAt: row.published_at ? String(row.published_at) : undefined,
   };
 }
 
 function mapDbIssue(row: Record<string, unknown>): DataQualityIssue {
   return {
-    id: String(row.id),
-    chassisNo: String(row.chassis_no),
-    field: String(row.field),
-    issueType: String(row.issue_type) as DataQualityIssue['issueType'],
-    message: String(row.message),
-    severity: String(row.severity) as DataQualityIssue['severity'],
-    importBatchId: String(row.import_batch_id),
+    id: String(row.id || ''),
+    chassisNo: String(row.chassis_no || ''),
+    field: String(row.field || ''),
+    issueType: String(row.issue_type || 'invalid') as DataQualityIssue['issueType'],
+    message: String(row.message || ''),
+    severity: String(row.severity || 'warning') as DataQualityIssue['severity'],
+    importBatchId: String(row.import_batch_id || ''),
   };
 }
 
 function mapDbSla(row: Record<string, unknown>): SlaPolicy {
   return {
-    id: String(row.id),
-    kpiId: String(row.kpi_id),
-    label: String(row.label),
-    slaDays: Number(row.sla_days),
-    companyId: String(row.company_id),
+    id: String(row.id || ''),
+    kpiId: String(row.kpi_id || ''),
+    label: String(row.label || ''),
+    slaDays: Number(row.sla_days || 0),
+    companyId: String(row.company_id || ''),
   };
 }
 
@@ -115,14 +117,29 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const reloadFromDb = useCallback(async () => {
     setLoading(true);
+    const queryId = `data-reload-${Date.now()}`;
+    performanceService.startQueryTimer(queryId);
+
     try {
-      // RLS handles scope filtering — just fetch all accessible data
       const [vehiclesRes, batchesRes, issuesRes, slasRes] = await Promise.all([
         supabase.from('vehicles').select('*').order('created_at', { ascending: false }),
         supabase.from('import_batches').select('*').order('created_at', { ascending: false }),
         supabase.from('quality_issues').select('*').order('created_at', { ascending: false }),
         supabase.from('sla_policies').select('*'),
       ]);
+
+      if (vehiclesRes.error) {
+        loggingService.error('Failed to load vehicles', { error: vehiclesRes.error }, 'DataContext');
+      }
+      if (batchesRes.error) {
+        loggingService.error('Failed to load import batches', { error: batchesRes.error }, 'DataContext');
+      }
+      if (issuesRes.error) {
+        loggingService.error('Failed to load quality issues', { error: issuesRes.error }, 'DataContext');
+      }
+      if (slasRes.error) {
+        loggingService.error('Failed to load SLA policies', { error: slasRes.error }, 'DataContext');
+      }
 
       const dbVehicles = (vehiclesRes.data || []).map(r => mapDbVehicle(r as unknown as Record<string, unknown>));
       const dbBatches = (batchesRes.data || []).map(r => mapDbBatch(r as unknown as Record<string, unknown>));
@@ -135,7 +152,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setSlas(dbSlas);
       setKpiSummaries(computeKpiSummaries(dbVehicles, dbSlas));
       setLastRefresh(new Date().toISOString());
+
+      performanceService.endQueryTimer(queryId, 'data_reload');
+      loggingService.info('Data reloaded successfully', {
+        vehicles: dbVehicles.length,
+        batches: dbBatches.length,
+        issues: dbIssues.length,
+        slas: dbSlas.length,
+      }, 'DataContext');
     } catch (err) {
+      performanceService.endQueryTimer(queryId, 'data_reload');
+      loggingService.error('Failed to load data from database', { error: err }, 'DataContext');
       console.error('Failed to load data from database:', err);
     } finally {
       setLoading(false);
@@ -145,120 +172,176 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { reloadFromDb(); }, [reloadFromDb]);
 
   const setVehicles = useCallback(async (v: VehicleCanonical[]) => {
-    const dbRows = v.map(vehicle => ({
-      chassis_no: vehicle.chassis_no,
-      bg_date: vehicle.bg_date || null,
-      shipment_etd_pkg: vehicle.shipment_etd_pkg || null,
-      shipment_eta_kk_twu_sdk: vehicle.shipment_eta_kk_twu_sdk || null,
-      date_received_by_outlet: vehicle.date_received_by_outlet || null,
-      reg_date: vehicle.reg_date || null,
-      delivery_date: vehicle.delivery_date || null,
-      disb_date: vehicle.disb_date || null,
-      branch_code: vehicle.branch_code,
-      model: vehicle.model,
-      payment_method: vehicle.payment_method,
-      salesman_name: vehicle.salesman_name,
-      customer_name: vehicle.customer_name,
-      remark: vehicle.remark || null,
-      vaa_date: vehicle.vaa_date || null,
-      full_payment_date: vehicle.full_payment_date || null,
-      is_d2d: vehicle.is_d2d,
-      import_batch_id: null,
-      source_row_id: vehicle.source_row_id,
-      variant: vehicle.variant || null,
-      dealer_transfer_price: vehicle.dealer_transfer_price || null,
-      full_payment_type: vehicle.full_payment_type || null,
-      shipment_name: vehicle.shipment_name || null,
-      lou: vehicle.lou || null,
-      contra_sola: vehicle.contra_sola || null,
-      reg_no: vehicle.reg_no || null,
-      invoice_no: vehicle.invoice_no || null,
-      obr: vehicle.obr || null,
-      bg_to_delivery: vehicle.bg_to_delivery ?? null,
-      bg_to_shipment_etd: vehicle.bg_to_shipment_etd ?? null,
-      etd_to_outlet: vehicle.etd_to_outlet ?? null,
-      outlet_to_reg: vehicle.outlet_to_reg ?? null,
-      reg_to_delivery: vehicle.reg_to_delivery ?? null,
-      bg_to_disb: vehicle.bg_to_disb ?? null,
-      delivery_to_disb: vehicle.delivery_to_disb ?? null,
-      company_id: companyId,
-    }));
+    const queryId = `vehicles-upsert-${Date.now()}`;
+    performanceService.startQueryTimer(queryId);
 
-    for (let i = 0; i < dbRows.length; i += 500) {
-      const chunk = dbRows.slice(i, i + 500);
-      const { error } = await supabase
-        .from('vehicles')
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .upsert(chunk as any, { onConflict: 'chassis_no,company_id' });
-      if (error) console.error('Vehicle upsert error:', error);
+    try {
+      const dbRows = v.map(vehicle => ({
+        chassis_no: vehicle.chassis_no,
+        bg_date: vehicle.bg_date || null,
+        shipment_etd_pkg: vehicle.shipment_etd_pkg || null,
+        shipment_eta_kk_twu_sdk: vehicle.shipment_eta_kk_twu_sdk || null,
+        date_received_by_outlet: vehicle.date_received_by_outlet || null,
+        reg_date: vehicle.reg_date || null,
+        delivery_date: vehicle.delivery_date || null,
+        disb_date: vehicle.disb_date || null,
+        branch_code: vehicle.branch_code,
+        model: vehicle.model,
+        payment_method: vehicle.payment_method,
+        salesman_name: vehicle.salesman_name,
+        customer_name: vehicle.customer_name,
+        remark: vehicle.remark || null,
+        vaa_date: vehicle.vaa_date || null,
+        full_payment_date: vehicle.full_payment_date || null,
+        is_d2d: vehicle.is_d2d,
+        import_batch_id: null,
+        source_row_id: vehicle.source_row_id,
+        variant: vehicle.variant || null,
+        dealer_transfer_price: vehicle.dealer_transfer_price || null,
+        full_payment_type: vehicle.full_payment_type || null,
+        shipment_name: vehicle.shipment_name || null,
+        lou: vehicle.lou || null,
+        contra_sola: vehicle.contra_sola || null,
+        reg_no: vehicle.reg_no || null,
+        invoice_no: vehicle.invoice_no || null,
+        obr: vehicle.obr || null,
+        bg_to_delivery: vehicle.bg_to_delivery ?? null,
+        bg_to_shipment_etd: vehicle.bg_to_shipment_etd ?? null,
+        etd_to_outlet: vehicle.etd_to_outlet ?? null,
+        outlet_to_reg: vehicle.outlet_to_reg ?? null,
+        reg_to_delivery: vehicle.reg_to_delivery ?? null,
+        bg_to_disb: vehicle.bg_to_disb ?? null,
+        delivery_to_disb: vehicle.delivery_to_disb ?? null,
+        company_id: companyId,
+      }));
+
+      for (let i = 0; i < dbRows.length; i += 500) {
+        const chunk = dbRows.slice(i, i + 500);
+        const { error } = await supabase
+          .from('vehicles')
+          .upsert(chunk, { onConflict: 'chassis_no,company_id' });
+        if (error) {
+          loggingService.error('Vehicle upsert error', { error, chunkIndex: i }, 'DataContext');
+          console.error('Vehicle upsert error:', error);
+        }
+      }
+
+      performanceService.endQueryTimer(queryId, 'vehicles_upsert');
+      await reloadFromDb();
+    } catch (err) {
+      performanceService.endQueryTimer(queryId, 'vehicles_upsert');
+      loggingService.error('Unexpected error upserting vehicles', { error: err }, 'DataContext');
+      console.error('Unexpected error upserting vehicles:', err);
     }
-
-    await reloadFromDb();
   }, [reloadFromDb, companyId]);
 
   const addImportBatch = useCallback(async (b: ImportBatch) => {
-    const { error } = await supabase.from('import_batches').insert({
-      file_name: b.fileName,
-      uploaded_by: b.uploadedBy,
-      uploaded_at: b.uploadedAt,
-      status: b.status,
-      total_rows: b.totalRows,
-      valid_rows: b.validRows,
-      error_rows: b.errorRows,
-      duplicate_rows: b.duplicateRows,
-      company_id: companyId,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
-    if (error) console.error('Import batch insert error:', error);
-    setImportBatches(prev => [b, ...prev]);
+    try {
+      const { error } = await supabase.from('import_batches').insert({
+        file_name: b.fileName,
+        uploaded_by: b.uploadedBy,
+        uploaded_at: b.uploadedAt,
+        status: b.status,
+        total_rows: b.totalRows,
+        valid_rows: b.validRows,
+        error_rows: b.errorRows,
+        duplicate_rows: b.duplicateRows,
+        company_id: companyId,
+      });
+      
+      if (error) {
+        loggingService.error('Import batch insert error', { error, batch: b }, 'DataContext');
+        console.error('Import batch insert error:', error);
+      } else {
+        setImportBatches(prev => [b, ...prev]);
+        loggingService.info('Import batch added', { batchId: b.id }, 'DataContext');
+      }
+    } catch (err) {
+      loggingService.error('Unexpected error adding import batch', { error: err }, 'DataContext');
+      console.error('Unexpected error adding import batch:', err);
+    }
   }, [companyId]);
 
   const updateImportBatch = useCallback(async (id: string, updates: Partial<ImportBatch>) => {
-    const dbUpdates: Record<string, unknown> = {};
-    if (updates.status) dbUpdates.status = updates.status;
-    if (updates.publishedAt) dbUpdates.published_at = updates.publishedAt;
-    if (updates.totalRows !== undefined) dbUpdates.total_rows = updates.totalRows;
-    if (updates.validRows !== undefined) dbUpdates.valid_rows = updates.validRows;
-    if (updates.errorRows !== undefined) dbUpdates.error_rows = updates.errorRows;
+    try {
+      const dbUpdates: Record<string, unknown> = {};
+      if (updates.status) dbUpdates.status = updates.status;
+      if (updates.publishedAt) dbUpdates.published_at = updates.publishedAt;
+      if (updates.totalRows !== undefined) dbUpdates.total_rows = updates.totalRows;
+      if (updates.validRows !== undefined) dbUpdates.valid_rows = updates.validRows;
+      if (updates.errorRows !== undefined) dbUpdates.error_rows = updates.errorRows;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('import_batches').update(dbUpdates as any).eq('id', id);
-    setImportBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+      const { error } = await supabase.from('import_batches').update(dbUpdates).eq('id', id);
+      
+      if (error) {
+        loggingService.error('Import batch update error', { error, id, updates }, 'DataContext');
+        console.error('Import batch update error:', error);
+      } else {
+        setImportBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+        loggingService.info('Import batch updated', { batchId: id }, 'DataContext');
+      }
+    } catch (err) {
+      loggingService.error('Unexpected error updating import batch', { error: err }, 'DataContext');
+      console.error('Unexpected error updating import batch:', err);
+    }
   }, []);
 
   const addQualityIssues = useCallback(async (issues: DataQualityIssue[]) => {
     if (issues.length === 0) return;
-    const dbIssues = issues.map(i => ({
-      chassis_no: i.chassisNo,
-      field: i.field,
-      issue_type: i.issueType,
-      message: i.message,
-      severity: i.severity,
-      import_batch_id: null,
-      company_id: companyId,
-    }));
 
-    for (let idx = 0; idx < dbIssues.length; idx += 500) {
-      const chunk = dbIssues.slice(idx, idx + 500);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await supabase.from('quality_issues').insert(chunk as any);
+    try {
+      const dbIssues = issues.map(i => ({
+        chassis_no: i.chassisNo,
+        field: i.field,
+        issue_type: i.issueType,
+        message: i.message,
+        severity: i.severity,
+        import_batch_id: null,
+        company_id: companyId,
+      }));
+
+      for (let idx = 0; idx < dbIssues.length; idx += 500) {
+        const chunk = dbIssues.slice(idx, idx + 500);
+        const { error } = await supabase.from('quality_issues').insert(chunk);
+        if (error) {
+          loggingService.error('Quality issues insert error', { error, chunkIndex: idx }, 'DataContext');
+          console.error('Quality issues insert error:', error);
+        }
+      }
+
+      setQualityIssues(prev => [...issues, ...prev]);
+      loggingService.info('Quality issues added', { count: issues.length }, 'DataContext');
+    } catch (err) {
+      loggingService.error('Unexpected error adding quality issues', { error: err }, 'DataContext');
+      console.error('Unexpected error adding quality issues:', err);
     }
-    setQualityIssues(prev => [...issues, ...prev]);
   }, [companyId]);
 
   const updateSla = useCallback(async (id: string, slaDays: number) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await supabase.from('sla_policies').update({ sla_days: slaDays } as any).eq('id', id);
-    setSlas(prev => {
-      const updated = prev.map(s => s.id === id ? { ...s, slaDays } : s);
-      setKpiSummaries(computeKpiSummaries(vehicles, updated));
-      return updated;
-    });
+    try {
+      const { error } = await supabase.from('sla_policies').update({ sla_days: slaDays }).eq('id', id);
+      
+      if (error) {
+        loggingService.error('SLA update error', { error, id, slaDays }, 'DataContext');
+        console.error('SLA update error:', error);
+      } else {
+        setSlas(prev => {
+          const updated = prev.map(s => s.id === id ? { ...s, slaDays } : s);
+          setKpiSummaries(computeKpiSummaries(vehicles, updated));
+          return updated;
+        });
+        loggingService.info('SLA updated', { slaId: id, slaDays }, 'DataContext');
+      }
+    } catch (err) {
+      loggingService.error('Unexpected error updating SLA', { error: err }, 'DataContext');
+      console.error('Unexpected error updating SLA:', err);
+    }
   }, [vehicles]);
 
   const refreshKpis = useCallback(() => {
     setKpiSummaries(computeKpiSummaries(vehicles, slas));
     setLastRefresh(new Date().toISOString());
+    loggingService.info('KPIs refreshed', { vehicleCount: vehicles.length }, 'DataContext');
   }, [vehicles, slas]);
 
   return (
