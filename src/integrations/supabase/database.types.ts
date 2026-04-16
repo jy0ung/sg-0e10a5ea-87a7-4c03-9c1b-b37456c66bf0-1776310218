@@ -295,11 +295,17 @@ export type Database = {
           can_edit_vehicles: boolean | null
           can_view_vehicle_details: boolean | null
           company_id: string | null
+          contact_no: string | null
           created_at: string | null
           email: string | null
+          ic_no: string | null
           id: string
+          join_date: string | null
           name: string | null
+          resign_date: string | null
           role: string | null
+          staff_code: string | null
+          status: string
           updated_at: string | null
         }
         Insert: {
@@ -310,11 +316,17 @@ export type Database = {
           can_edit_vehicles?: boolean | null
           can_view_vehicle_details?: boolean | null
           company_id?: string | null
+          contact_no?: string | null
           created_at?: string | null
           email?: string | null
+          ic_no?: string | null
           id: string
+          join_date?: string | null
           name?: string | null
+          resign_date?: string | null
           role?: string | null
+          staff_code?: string | null
+          status?: string
           updated_at?: string | null
         }
         Update: {
@@ -325,11 +337,17 @@ export type Database = {
           can_edit_vehicles?: boolean | null
           can_view_vehicle_details?: boolean | null
           company_id?: string | null
+          contact_no?: string | null
           created_at?: string | null
           email?: string | null
+          ic_no?: string | null
           id?: string
+          join_date?: string | null
           name?: string | null
+          resign_date?: string | null
           role?: string | null
+          staff_code?: string | null
+          status?: string
           updated_at?: string | null
         }
         Relationships: [

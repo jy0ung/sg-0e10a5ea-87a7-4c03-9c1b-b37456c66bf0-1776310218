@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Search, Plus, UserCheck } from 'lucide-react';
 
 type SAStatus = 'active' | 'resigned' | 'inactive';
@@ -33,32 +34,29 @@ const STATUS_BADGE: Record<SAStatus, string> = {
 
 const EMPTY_FORM = { code: '', name: '', ic: '', email: '', contact: '', branch: '', joinDate: new Date().toISOString().split('T')[0] };
 
+// Map a profiles row to the SalesAdvisor view model
+function rowToAdvisor(row: Record<string, unknown>): SalesAdvisor {
+  return {
+    id:         String(row.id ?? ''),
+    code:       String(row.staff_code ?? '—'),
+    name:       String(row.name ?? '—'),
+    ic:         String(row.ic_no ?? '—'),
+    email:      String(row.email ?? '—'),
+    contact:    String(row.contact_no ?? '—'),
+    branch:     String(row.branch_id ?? '—'),
+    joinDate:   row.join_date ? String(row.join_date) : '—',
+    resignDate: row.resign_date ? String(row.resign_date) : undefined,
+    status:     (row.status as SAStatus) ?? 'active',
+  };
+}
+
 export default function SalesAdvisors() {
   const { user } = useAuth();
   const { vehicles } = useData();
   const { toast } = useToast();
 
-  const [advisors, setAdvisors]   = useState<SalesAdvisor[]>(() => {
-    // Pre-populate from salesman names found in vehicle data
-    const seen = new Set<string>();
-    const initial: SalesAdvisor[] = [];
-    vehicles.forEach(v => {
-      if (!v.salesman_name || seen.has(v.salesman_name)) return;
-      seen.add(v.salesman_name);
-      initial.push({
-        id: `sa-${seen.size}`,
-        code: `SA${String(seen.size).padStart(3, '0')}`,
-        name: v.salesman_name,
-        ic: '—',
-        email: '—',
-        contact: '—',
-        branch: v.branch_code ?? '—',
-        joinDate: '—',
-        status: 'active',
-      });
-    });
-    return initial;
-  });
+  const [advisors, setAdvisors]   = useState<SalesAdvisor[]>([]);
+  const [loading, setLoading]     = useState(true);
 
   const [search, setSearch]         = useState('');
   const [statusFilter, setStatus]   = useState<string>('all');
@@ -69,6 +67,26 @@ export default function SalesAdvisors() {
 
   const branches = [...new Set(vehicles.map(v => v.branch_code).filter(Boolean))].sort() as string[];
 
+  // Load sales advisors from profiles table
+  const loadAdvisors = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date')
+      .eq('company_id', user.company_id)
+      .eq('role', 'sales')
+      .order('name');
+    if (error) {
+      toast({ title: 'Failed to load sales advisors', variant: 'destructive' });
+    } else {
+      setAdvisors((data ?? []).map(row => rowToAdvisor(row as Record<string, unknown>)));
+    }
+    setLoading(false);
+  }, [user, toast]);
+
+  useEffect(() => { loadAdvisors(); }, [loadAdvisors]);
+
   const filtered = advisors.filter(a => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
     if (branchFilter !== 'all' && a.branch !== branchFilter) return false;
@@ -76,37 +94,71 @@ export default function SalesAdvisors() {
     return !q || [a.code, a.name, a.email, a.branch].join(' ').toLowerCase().includes(q);
   });
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!form.code || !form.name || !form.branch) {
       return toast({ title: 'Code, Name, and Branch are required', variant: 'destructive' });
     }
-    if (advisors.some(a => a.code === form.code)) {
+    if (advisors.some(a => a.code === form.code.toUpperCase())) {
       return toast({ title: 'SA Code already exists', variant: 'destructive' });
     }
+    if (!user) return;
     setSaving(true);
-    const sa: SalesAdvisor = {
-      id: `sa-${Date.now()}`,
-      code: form.code.toUpperCase(),
-      name: form.name,
-      ic: form.ic || '—',
-      email: form.email || '—',
-      contact: form.contact || '—',
-      branch: form.branch,
-      joinDate: form.joinDate,
-      status: 'active',
-    };
-    setAdvisors(prev => [sa, ...prev]);
+    const { error } = await supabase
+      .from('profiles')
+      .insert({
+        id:          crypto.randomUUID(),
+        email:       form.email || `${form.code.toLowerCase()}@flc.local`,
+        name:        form.name,
+        role:        'sales',
+        company_id:  user.company_id,
+        branch_id:   form.branch,
+        access_scope:'self',
+        status:      'active',
+        staff_code:  form.code.toUpperCase(),
+        ic_no:       form.ic || null,
+        contact_no:  form.contact || null,
+        join_date:   form.joinDate || null,
+      });
+    setSaving(false);
+    if (error) {
+      toast({ title: 'Failed to create advisor', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Sales Advisor created', description: `${form.code.toUpperCase()} — ${form.name}` });
     setForm(EMPTY_FORM);
     setAddOpen(false);
-    setSaving(false);
-    toast({ title: 'Sales Advisor created', description: `${sa.code} — ${sa.name}` });
+    loadAdvisors();
   };
 
-  const toggleStatus = (id: string) => {
-    setAdvisors(prev => prev.map(a =>
-      a.id !== id ? a : { ...a, status: a.status === 'active' ? 'inactive' : 'active' }
-    ));
+  const toggleStatus = async (id: string) => {
+    const advisor = advisors.find(a => a.id === id);
+    if (!advisor) return;
+    const newStatus: SAStatus = advisor.status === 'active' ? 'inactive' : 'active';
+    // Optimistic update
+    setAdvisors(prev => prev.map(a => a.id !== id ? a : { ...a, status: newStatus }));
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status: newStatus })
+      .eq('id', id);
+    if (error) {
+      // Revert on failure
+      setAdvisors(prev => prev.map(a => a.id !== id ? a : { ...a, status: advisor.status }));
+      toast({ title: 'Failed to update status', description: error.message, variant: 'destructive' });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader
+          title="Sales Advisors"
+          description="Sales advisor profiles and branch assignments"
+          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Sales Advisors' }]}
+        />
+        <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading advisors…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
