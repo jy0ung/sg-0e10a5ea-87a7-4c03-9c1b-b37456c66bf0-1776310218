@@ -33,8 +33,10 @@ import AppLayout from "./components/layout/AppLayout";
 
 const queryClient = new QueryClient();
 
-// Initialize error tracking
-errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
+// Initialize error tracking (Sentry is optional)
+if (import.meta.env.VITE_SENTRY_DSN) {
+  errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
+}
 
 const router = createBrowserRouter([
   {
