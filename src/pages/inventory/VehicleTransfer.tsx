@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Search, Plus, ArrowRight } from 'lucide-react';
 
 type TransferStatus = 'pending' | 'in_transit' | 'arrived' | 'cancelled';
@@ -35,13 +36,29 @@ const STATUS_BADGE: Record<TransferStatus, string> = {
 
 const EMPTY_FORM = { fromBranch: '', toBranch: '', chassisNo: '', model: '', colour: '', remark: '' };
 
+function rowToTransfer(row: Record<string, unknown>): Transfer {
+  return {
+    id:         String(row.id ?? ''),
+    runningNo:  String(row.running_no ?? ''),
+    fromBranch: String(row.from_branch ?? ''),
+    toBranch:   String(row.to_branch ?? ''),
+    chassisNo:  String(row.chassis_no ?? ''),
+    model:      String(row.model ?? ''),
+    colour:     row.colour ? String(row.colour) : undefined,
+    status:     (row.status as TransferStatus) ?? 'pending',
+    createdAt:  row.created_at ? String(row.created_at).split('T')[0] : '',
+    arrivedAt:  row.arrived_at ? String(row.arrived_at) : undefined,
+    remark:     row.remark ? String(row.remark) : undefined,
+  };
+}
+
 export default function VehicleTransfer() {
   const { user } = useAuth();
   const { vehicles } = useData();
   const { toast } = useToast();
 
-  // Local state — transfers are stored client-side until DB table is added
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatus] = useState<string>('all');
   const [addOpen, setAddOpen]     = useState(false);
@@ -50,44 +67,92 @@ export default function VehicleTransfer() {
 
   const branches = [...new Set(vehicles.map(v => v.branch_code).filter(Boolean))].sort() as string[];
 
+  const loadTransfers = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('vehicle_transfers')
+      .select('*')
+      .eq('company_id', user.company_id)
+      .order('created_at', { ascending: false });
+    if (error) {
+      toast({ title: 'Failed to load transfers', variant: 'destructive' });
+    } else {
+      setTransfers((data ?? []).map(row => rowToTransfer(row as Record<string, unknown>)));
+    }
+    setLoading(false);
+  }, [user, toast]);
+
+  useEffect(() => { loadTransfers(); }, [loadTransfers]);
+
   const filtered = transfers.filter(t => {
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
     const q = search.toLowerCase();
     return !q || [t.chassisNo, t.model, t.fromBranch, t.toBranch, t.runningNo].join(' ').toLowerCase().includes(q);
   });
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!form.fromBranch || !form.toBranch || !form.chassisNo || !form.model) {
       return toast({ title: 'From Branch, To Branch, Chassis No, and Model are required', variant: 'destructive' });
     }
     if (form.fromBranch === form.toBranch) {
       return toast({ title: 'From and To branches must differ', variant: 'destructive' });
     }
+    if (!user) return;
     setSaving(true);
-    const newTransfer: Transfer = {
-      id: `tr-${Date.now()}`,
-      runningNo: `TRF-${String(transfers.length + 1).padStart(4, '0')}`,
-      fromBranch: form.fromBranch,
-      toBranch: form.toBranch,
-      chassisNo: form.chassisNo.toUpperCase(),
-      model: form.model,
-      colour: form.colour || undefined,
-      status: 'pending',
-      createdAt: new Date().toISOString().split('T')[0],
-      remark: form.remark || undefined,
-    };
-    setTransfers(prev => [newTransfer, ...prev]);
+    const runningNo = `TRF-${String(transfers.length + 1).padStart(4, '0')}`;
+    const { error } = await supabase
+      .from('vehicle_transfers')
+      .insert({
+        company_id:  user.company_id,
+        running_no:  runningNo,
+        from_branch: form.fromBranch,
+        to_branch:   form.toBranch,
+        chassis_no:  form.chassisNo.toUpperCase(),
+        model:       form.model,
+        colour:      form.colour || null,
+        status:      'pending',
+        remark:      form.remark || null,
+      });
+    setSaving(false);
+    if (error) {
+      toast({ title: 'Failed to create transfer', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Transfer record created', description: runningNo });
     setForm(EMPTY_FORM);
     setAddOpen(false);
-    setSaving(false);
-    toast({ title: 'Transfer record created', description: newTransfer.runningNo });
+    loadTransfers();
   };
 
-  const updateStatus = (id: string, status: TransferStatus) => {
-    setTransfers(prev => prev.map(t =>
-      t.id === id ? { ...t, status, arrivedAt: status === 'arrived' ? new Date().toISOString().split('T')[0] : t.arrivedAt } : t
+  const updateStatus = async (id: string, status: TransferStatus) => {
+    const prev = transfers.find(t => t.id === id);
+    if (!prev) return;
+    const arrivedAt = status === 'arrived' ? new Date().toISOString().split('T')[0] : prev.arrivedAt;
+    // Optimistic update
+    setTransfers(ts => ts.map(t =>
+      t.id === id ? { ...t, status, arrivedAt } : t
     ));
+    const { error } = await supabase
+      .from('vehicle_transfers')
+      .update({ status, arrived_at: arrivedAt ?? null })
+      .eq('id', id);
+    if (error) {
+      // Revert
+      setTransfers(ts => ts.map(t => t.id === id ? prev : t));
+      toast({ title: 'Failed to update status', description: error.message, variant: 'destructive' });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader title="Vehicle Transfer" description="Inter-branch chassis movement tracking"
+          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Inventory' }, { label: 'Vehicle Transfer' }]} />
+        <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading transfers…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">

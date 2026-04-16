@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Search, Plus, Truck } from 'lucide-react';
 
 type PIStatus = 'pending' | 'received' | 'cancelled';
@@ -35,15 +37,50 @@ function fmt(n: number) {
   return `RM ${n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function rowToInvoice(row: Record<string, unknown>): PurchaseInvoice {
+  return {
+    id:           String(row.id ?? ''),
+    invoiceNo:    String(row.invoice_no ?? ''),
+    supplier:     String(row.supplier ?? ''),
+    chassisNo:    String(row.chassis_no ?? ''),
+    model:        String(row.model ?? ''),
+    invoiceDate:  String(row.invoice_date ?? ''),
+    amount:       Number(row.amount ?? 0),
+    status:       (row.status as PIStatus) ?? 'pending',
+    receivedDate: row.received_date ? String(row.received_date) : undefined,
+    remark:       row.remark ? String(row.remark) : undefined,
+  };
+}
+
 export default function PurchaseInvoices() {
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const [invoices, setInvoices]   = useState<PurchaseInvoice[]>([]);
+  const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatus] = useState<string>('all');
   const [addOpen, setAddOpen]     = useState(false);
   const [form, setForm]           = useState(EMPTY_FORM);
   const [saving, setSaving]       = useState(false);
+
+  const loadInvoices = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('purchase_invoices')
+      .select('*')
+      .eq('company_id', user.company_id)
+      .order('created_at', { ascending: false });
+    if (error) {
+      toast({ title: 'Failed to load purchase invoices', variant: 'destructive' });
+    } else {
+      setInvoices((data ?? []).map(row => rowToInvoice(row as Record<string, unknown>)));
+    }
+    setLoading(false);
+  }, [user, toast]);
+
+  useEffect(() => { loadInvoices(); }, [loadInvoices]);
 
   const filtered = invoices.filter(i => {
     if (statusFilter !== 'all' && i.status !== statusFilter) return false;
@@ -54,7 +91,7 @@ export default function PurchaseInvoices() {
   const totalAmount = invoices.reduce((s, i) => s + i.amount, 0);
   const pendingAmount = invoices.filter(i => i.status === 'pending').reduce((s, i) => s + i.amount, 0);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!form.invoiceNo || !form.supplier || !form.chassisNo || !form.model || !form.amount) {
       return toast({ title: 'Invoice No, Supplier, Chassis, Model, and Amount are required', variant: 'destructive' });
     }
@@ -62,30 +99,59 @@ export default function PurchaseInvoices() {
     if (isNaN(parsed) || parsed <= 0) {
       return toast({ title: 'Amount must be a positive number', variant: 'destructive' });
     }
+    if (!user) return;
     setSaving(true);
-    const pi: PurchaseInvoice = {
-      id: `pi-${Date.now()}`,
-      invoiceNo: form.invoiceNo,
-      supplier: form.supplier,
-      chassisNo: form.chassisNo.toUpperCase(),
-      model: form.model,
-      invoiceDate: form.invoiceDate,
-      amount: parsed,
-      status: 'pending',
-      remark: form.remark || undefined,
-    };
-    setInvoices(prev => [pi, ...prev]);
+    const { error } = await supabase
+      .from('purchase_invoices')
+      .insert({
+        company_id:   user.company_id,
+        invoice_no:   form.invoiceNo,
+        supplier:     form.supplier,
+        chassis_no:   form.chassisNo.toUpperCase(),
+        model:        form.model,
+        invoice_date: form.invoiceDate,
+        amount:       parsed,
+        status:       'pending',
+        remark:       form.remark || null,
+      });
+    setSaving(false);
+    if (error) {
+      toast({ title: 'Failed to create invoice', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Purchase invoice created', description: form.invoiceNo });
     setForm(EMPTY_FORM);
     setAddOpen(false);
-    setSaving(false);
-    toast({ title: 'Purchase invoice created', description: pi.invoiceNo });
+    loadInvoices();
   };
 
-  const markReceived = (id: string) => {
-    setInvoices(prev => prev.map(i =>
-      i.id === id ? { ...i, status: 'received' as PIStatus, receivedDate: new Date().toISOString().split('T')[0] } : i
+  const markReceived = async (id: string) => {
+    const prev = invoices.find(i => i.id === id);
+    if (!prev) return;
+    const receivedDate = new Date().toISOString().split('T')[0];
+    // Optimistic update
+    setInvoices(is => is.map(i =>
+      i.id === id ? { ...i, status: 'received' as PIStatus, receivedDate } : i
     ));
+    const { error } = await supabase
+      .from('purchase_invoices')
+      .update({ status: 'received', received_date: receivedDate })
+      .eq('id', id);
+    if (error) {
+      setInvoices(is => is.map(i => i.id === id ? prev : i));
+      toast({ title: 'Failed to mark received', description: error.message, variant: 'destructive' });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader title="Purchase Invoices" description="CBU vehicle procurement invoices from suppliers"
+          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Purchasing' }, { label: 'Purchase Invoices' }]} />
+        <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading invoices…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">

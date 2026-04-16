@@ -367,6 +367,112 @@ export type Database = {
           },
         ]
       }
+      purchase_invoices: {
+        Row: {
+          id: string
+          company_id: string
+          invoice_no: string
+          supplier: string
+          chassis_no: string
+          model: string
+          invoice_date: string
+          amount: number
+          status: string
+          received_date: string | null
+          remark: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          invoice_no: string
+          supplier: string
+          chassis_no: string
+          model: string
+          invoice_date: string
+          amount: number
+          status?: string
+          received_date?: string | null
+          remark?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          invoice_no?: string
+          supplier?: string
+          chassis_no?: string
+          model?: string
+          invoice_date?: string
+          amount?: number
+          status?: string
+          received_date?: string | null
+          remark?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_invoices_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_transfers: {
+        Row: {
+          id: string
+          company_id: string
+          running_no: string
+          from_branch: string
+          to_branch: string
+          chassis_no: string
+          model: string
+          colour: string | null
+          status: string
+          remark: string | null
+          arrived_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          running_no: string
+          from_branch: string
+          to_branch: string
+          chassis_no: string
+          model: string
+          colour?: string | null
+          status?: string
+          remark?: string | null
+          arrived_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          running_no?: string
+          from_branch?: string
+          to_branch?: string
+          chassis_no?: string
+          model?: string
+          colour?: string | null
+          status?: string
+          remark?: string | null
+          arrived_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_transfers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quality_issues: {
         Row: {
           chassis_no: string
