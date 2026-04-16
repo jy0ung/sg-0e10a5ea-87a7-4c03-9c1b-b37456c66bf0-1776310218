@@ -227,7 +227,11 @@ export function parseWorkbook(file: ArrayBuffer): { rows: VehicleRaw[]; issues: 
   }
 }
 
-export function publishCanonical(rows: VehicleRaw[]): { canonical: VehicleCanonical[]; issues: DataQualityIssue[] } {
+export function publishCanonical(
+  rows: VehicleRaw[],
+  branchMap?: Map<string, string>,
+  paymentMap?: Map<string, string>,
+): { canonical: VehicleCanonical[]; issues: DataQualityIssue[] } {
   try {
     const grouped = new Map<string, VehicleRaw[]>();
     rows.filter(r => r.chassis_no).forEach(r => {
@@ -265,9 +269,9 @@ export function publishCanonical(rows: VehicleRaw[]): { canonical: VehicleCanoni
         reg_date: best.reg_date,
         delivery_date: best.delivery_date,
         disb_date: best.disb_date,
-        branch_code: best.branch_code || 'Unknown',
+        branch_code: (branchMap && best.branch_code ? (branchMap.get(best.branch_code.toUpperCase()) ?? best.branch_code) : best.branch_code) || 'Unknown',
         model: best.model || 'Unknown',
-        payment_method: best.payment_method || 'Unknown',
+        payment_method: (paymentMap && best.payment_method ? (paymentMap.get(best.payment_method.toUpperCase()) ?? best.payment_method) : best.payment_method) || 'Unknown',
         salesman_name: best.salesman_name || 'Unknown',
         customer_name: best.customer_name || 'Unknown',
         remark: best.remark,

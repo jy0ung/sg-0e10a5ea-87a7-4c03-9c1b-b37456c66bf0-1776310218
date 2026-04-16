@@ -7,10 +7,13 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Pencil } from 'lucide-react';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { VehicleEditDialog } from '@/components/vehicles/VehicleEditDialog';
+import { forecastVehicleMilestones, getVehicleRisk } from '@/utils/forecasting';
+import { Badge } from '@/components/ui/badge';
+import { TrendingUp } from 'lucide-react';
 
 export default function VehicleDetail() {
   const { chassisNo } = useParams<{ chassisNo: string }>();
-  const { vehicles, qualityIssues, reloadFromDb } = useData();
+  const { vehicles, qualityIssues, kpiSummaries, reloadFromDb } = useData();
   const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
 
@@ -40,6 +43,15 @@ export default function VehicleDetail() {
     value: vehicle[k.computedField] as number | null,
     sla: k.slaDefault,
   }));
+
+  const forecasts = forecastVehicleMilestones(vehicle, kpiSummaries);
+  const risk = getVehicleRisk(vehicle, kpiSummaries);
+  const riskColors = {
+    on_track: 'bg-success/15 text-success border-success/30',
+    at_risk: 'bg-warning/15 text-warning border-warning/30',
+    overdue: 'bg-destructive/15 text-destructive border-destructive/30',
+  };
+  const riskLabels = { on_track: 'On Track', at_risk: 'At Risk', overdue: 'Overdue' };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -145,3 +157,39 @@ export default function VehicleDetail() {
     </div>
   );
 }
+
+      {/* Risk badge */}
+      <div className="flex items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${riskColors[risk]}`}>
+          <TrendingUp className="h-3 w-3" />
+          {riskLabels[risk]}
+        </span>
+      </div>
+
+      {/* Predicted Timeline */}
+      {forecasts.length > 0 && (
+        <div className="glass-panel p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" /> Predicted Timeline
+            <Badge variant="outline" className="text-[10px] ml-1">Statistical estimate — based on historical medians</Badge>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {forecasts.map(f => (
+              <div key={f.kpiId} className="p-3 rounded-lg border border-border bg-secondary/30">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{f.label}</p>
+                <p className="text-sm font-semibold text-foreground">{f.predictedDate}</p>
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[10px] text-muted-foreground">Median: {f.medianDays}d from {f.fromDate}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    f.confidence === 'high' ? 'bg-success/15 text-success' :
+                    f.confidence === 'medium' ? 'bg-warning/15 text-warning' :
+                    'bg-muted text-muted-foreground'
+                  }`}>
+                    {f.confidence}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}

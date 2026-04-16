@@ -7,6 +7,7 @@ import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCircle } from 'lucide-react';
 import { parseWorkbook, publishCanonical } from '@/lib/import-parser';
+import { loadBranchMappingLookup, loadPaymentMappingLookup } from '@/services/mappingService';
 import { validateVehicleImportBatch, validateImportBatch } from '@/services/validationService';
 import { createImportBatch, validateAndInsertVehicles } from '@/services/importService';
 import type { ImportBatchInsert, VehicleRaw, ValidationError } from '@/types';
@@ -106,8 +107,12 @@ export default function ImportCenter() {
         throw new Error(`Validation or insert failed: ${result.error.message}`);
       }
 
-      // Publish canonical data to UI
-      const { canonical, issues } = publishCanonical(rawRows);
+      // Publish canonical data to UI (with dynamic DB-backed value mappings)
+      const [branchMap, paymentMap] = await Promise.all([
+        loadBranchMappingLookup(companyId),
+        loadPaymentMappingLookup(companyId),
+      ]);
+      const { canonical, issues } = publishCanonical(rawRows, branchMap, paymentMap);
       const existingNonDup = vehicles.filter(v => !canonical.find(c => c.chassis_no === v.chassis_no));
       await setVehicles([...canonical, ...existingNonDup]);
       addQualityIssues([...validationIssues, ...issues]);

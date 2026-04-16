@@ -30,6 +30,8 @@ function mapDbVehicle(row: Record<string, unknown>): VehicleCanonical {
     id: String(row.id || ''),
     chassis_no: String(row.chassis_no || ''),
     bg_date: row.bg_date ? String(row.bg_date) : undefined,
+      is_deleted: Boolean(row.is_deleted),
+      deleted_at: row.deleted_at ? String(row.deleted_at) : undefined,
     shipment_etd_pkg: row.shipment_etd_pkg ? String(row.shipment_etd_pkg) : undefined,
     shipment_eta_kk_twu_sdk: row.shipment_eta_kk_twu_sdk ? String(row.shipment_eta_kk_twu_sdk) : undefined,
     date_received_by_outlet: row.date_received_by_outlet ? String(row.date_received_by_outlet) : undefined,
@@ -122,7 +124,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const [vehiclesRes, batchesRes, issuesRes, slasRes] = await Promise.all([
-        supabase.from('vehicles').select('*').order('created_at', { ascending: false }),
+        supabase.from('vehicles').select('*').eq('is_deleted', false).order('created_at', { ascending: false }),
         supabase.from('import_batches').select('*').order('created_at', { ascending: false }),
         supabase.from('quality_issues').select('*').order('created_at', { ascending: false }),
         supabase.from('sla_policies').select('*'),

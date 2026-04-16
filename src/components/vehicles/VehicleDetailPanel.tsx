@@ -12,6 +12,7 @@ import { formatDate } from '@/lib/utils';
 import { Edit2, Eye, Save, X, Clock, History } from 'lucide-react';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { getAuditLog, type AuditLogWithProfile } from '@/services/auditService';
+import { AuditDiffTable } from '@/components/shared/AuditDiffTable';
 
 interface VehicleDetailPanelProps {
   vehicle: VehicleCanonical | null;
@@ -288,30 +289,7 @@ export function VehicleDetailPanel({
                             </Badge>
                           </div>
                           {log.changes && Object.keys(log.changes).length > 0 && (
-                            <div className="space-y-2">
-                              {Object.entries(log.changes).map(([key, change]) => {
-                                const typedChange = change as { before: unknown; after: unknown };
-                                return (
-                                  <div key={key} className="bg-secondary/30 rounded p-3 space-y-1">
-                                    <p className="text-xs font-medium text-muted-foreground uppercase">{key}</p>
-                                    <div className="flex gap-4 text-xs">
-                                      <div className="flex-1">
-                                        <span className="text-destructive">Before:</span>{' '}
-                                        <span className="text-muted-foreground">
-                                          {String(typedChange.before || '—')}
-                                        </span>
-                                      </div>
-                                      <div className="flex-1">
-                                        <span className="text-success">After:</span>{' '}
-                                        <span className="text-foreground">
-                                          {String(typedChange.after || '—')}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            <AuditDiffTable changes={log.changes as Record<string, { before: unknown; after: unknown }>} className="mt-2" />
                           )}
                         </CardContent>
                       </Card>

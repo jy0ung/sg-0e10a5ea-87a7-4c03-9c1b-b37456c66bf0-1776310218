@@ -32,6 +32,15 @@ import UserManagement from "./pages/admin/UserManagement";
 import AuditLog from "./pages/admin/AuditLog";
 import SettingsPage from "./pages/admin/SettingsPage";
 import AppLayout from "./components/layout/AppLayout";
+import CommissionDashboard from "./pages/auto-aging/CommissionDashboard";
+import ReportCenter from "./pages/auto-aging/ReportCenter";
+import SalesDashboard from "./pages/sales/SalesDashboard";
+import DealPipeline from "./pages/sales/DealPipeline";
+import SalesOrders from "./pages/sales/SalesOrders";
+import Customers from "./pages/sales/Customers";
+import Invoices from "./pages/sales/Invoices";
+import SalesmanPerformancePage from "./pages/sales/SalesmanPerformance";
+import { SalesProvider } from "./contexts/SalesContext";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +75,32 @@ const router = createBrowserRouter([
       { path: "auto-aging/sla", element: <SLAAdmin /> },
       { path: "auto-aging/mappings", element: <MappingAdmin /> },
       { path: "auto-aging/history", element: <ImportHistory /> },
+            { path: "auto-aging/commissions", element: <CommissionDashboard /> },
+            { path: "auto-aging/reports", element: <ReportCenter /> },
+            {
+              path: "sales",
+              element: <SalesProvider><SalesDashboard /></SalesProvider>,
+            },
+            {
+              path: "sales/pipeline",
+              element: <SalesProvider><DealPipeline /></SalesProvider>,
+            },
+            {
+              path: "sales/orders",
+              element: <SalesProvider><SalesOrders /></SalesProvider>,
+            },
+            {
+              path: "sales/customers",
+              element: <SalesProvider><Customers /></SalesProvider>,
+            },
+            {
+              path: "sales/invoices",
+              element: <SalesProvider><Invoices /></SalesProvider>,
+            },
+            {
+              path: "sales/performance",
+              element: <SalesProvider><SalesmanPerformancePage /></SalesProvider>,
+            },
       { path: "admin/activity", element: <ActivityDashboard /> },
       { path: "admin/users", element: <UserManagement /> },
       { path: "admin/audit", element: <AuditLog /> },

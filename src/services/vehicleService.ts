@@ -3,7 +3,6 @@ import type { VehicleCanonical } from "@/types";
 import { logVehicleEdit } from "./auditService";
 import { performanceService } from "./performanceService";
 import { loggingService } from "./loggingService";
-import { toast } from "sonner";
 
 export async function getVehicleById(id: string): Promise<{
   data: VehicleCanonical | null;
@@ -99,72 +98,17 @@ export async function getVehicles(filters?: {
 }
 
 export async function updateVehicleWithAudit(
+  id: string,
+  updates: Partial<Record<string, unknown>>,
   userId: string,
-  vehicleId: string,
-  changes: Record<string, { before: unknown; after: unknown }>,
-  metadata?: {
-    ipAddress?: string;
-    userAgent?: string;
-  }
 ): Promise<{ data: VehicleCanonical | null; error: Error | null }> {
-  const queryId = `vehicle-update-${vehicleId}-${Date.now()}`;
-  performanceService.startQueryTimer(queryId);
-
-  try {
-    // Get current vehicle data for audit trail
-    const { data: currentVehicle, error: fetchError } = await getVehicleById(vehicleId);
-    
-    if (fetchError) {
-      throw fetchError;
-    }
-
-    if (!currentVehicle) {
-      throw new Error(`Vehicle with ID ${vehicleId} not found`);
-    }
-
-    // Apply changes to the vehicle data
-    const updatedData = { ...currentVehicle };
-    Object.keys(changes).forEach(key => {
-      updatedData[key as keyof VehicleCanonical] = changes[key].after;
-    });
-
-    // Update the vehicle in the database
-    const { data: updatedVehicle, error: updateError } = await supabase
-      .from("vehicles")
-      .update(updatedData)
-      .eq("id", vehicleId)
-      .select()
-      .single();
-
-    if (updateError) {
-      throw updateError;
-    }
-
-    // Log the audit trail
-    const { error: auditError } = await logVehicleEdit(
-      userId,
-      vehicleId,
-      changes,
-      metadata
-    );
-
-    if (auditError) {
-      loggingService.error("Failed to log vehicle edit audit trail", { userId, vehicleId, auditError }, "VehicleService");
-    }
-
-    performanceService.endQueryTimer(queryId, "update_vehicle_with_audit");
-    
-    toast.success("Vehicle updated successfully");
-    
-    return { data: updatedVehicle as VehicleCanonical, error: null };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    
-    performanceService.endQueryTimer(queryId, "update_vehicle_with_audit_failed");
-    
-    loggingService.error("Failed to update vehicle", { userId, vehicleId, error }, "VehicleService");
-    toast.error(`Failed to update vehicle: ${errorMessage}`);
-    
-    return { data: null, error: error instanceof Error ? error : new Error(errorMessage) };
+  const { data: before } = await getVehicleById(id);
+  const { data, error } = await supabase.from('vehicles').update(updates).eq('id', id).select().single();
+  if (error) return { data: null, error: new Error(error.message) };
+  const changes: Record<string, unknown> = {};
+  for (const key of Object.keys(updates)) {
+    changes[key] = { before: (before as Record<string, unknown> | null)?.[key], after: updates[key] };
   }
+  await logVehicleEdit(userId, id, changes);
+  return { data: data as VehicleCanonical, error: null };
 }

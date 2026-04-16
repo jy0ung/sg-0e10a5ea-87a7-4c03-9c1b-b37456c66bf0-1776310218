@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   Timer, LayoutDashboard, Bell, Search, Settings, Shield, FileText,
   LogOut, ChevronLeft, ChevronRight, Upload, Car, AlertTriangle, Gauge,
-  Map, History, Grid3X3, UserCircle, BarChart3
+  Map, History, Grid3X3, UserCircle, BarChart3, DollarSign, FileSpreadsheet,
+  ShoppingCart, Users, KanbanSquare, Receipt, Target, TrendingUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,7 +29,15 @@ const navItems: NavItem[] = [
   { label: 'SLA Policies', path: '/auto-aging/sla', icon: Gauge, section: 'Auto Aging' },
   { label: 'Mappings', path: '/auto-aging/mappings', icon: Map, section: 'Auto Aging' },
   { label: 'Import History', path: '/auto-aging/history', icon: History, section: 'Auto Aging' },
+  { label: 'Commissions', path: '/auto-aging/commissions', icon: DollarSign, section: 'Auto Aging' },
+  { label: 'Reports', path: '/auto-aging/reports', icon: FileSpreadsheet, section: 'Auto Aging' },
 
+  { label: 'Sales Dashboard', path: '/sales', icon: TrendingUp, section: 'Sales' },
+  { label: 'Deal Pipeline', path: '/sales/pipeline', icon: KanbanSquare, section: 'Sales' },
+  { label: 'Sales Orders', path: '/sales/orders', icon: ShoppingCart, section: 'Sales' },
+  { label: 'Customers', path: '/sales/customers', icon: Users, section: 'Sales' },
+  { label: 'Invoices', path: '/sales/invoices', icon: Receipt, section: 'Sales' },
+  { label: 'Performance', path: '/sales/performance', icon: Target, section: 'Sales' },
   { label: 'Activity Dashboard', path: '/admin/activity', icon: BarChart3, section: 'Admin', roles: ['super_admin', 'company_admin'] },
   { label: 'Users & Roles', path: '/admin/users', icon: Shield, section: 'Admin', roles: ['super_admin', 'company_admin'] },
   { label: 'Audit Log', path: '/admin/audit', icon: FileText, section: 'Admin', roles: ['super_admin', 'company_admin', 'director'] },

@@ -111,6 +111,8 @@ export interface VehicleRaw {
 export interface VehicleCanonical {
   id: string;
   chassis_no: string;
+  is_deleted?: boolean;
+  deleted_at?: string;
   bg_date?: string;
   shipment_etd_pkg?: string;
   shipment_eta_kk_twu_sdk?: string;
@@ -243,4 +245,138 @@ export interface KpiSegmentClick {
   kpiId: string;
   segmentType: 'compliant' | 'overdue' | 'missing' | 'invalid';
   value: number;
+
+}
+
+// ===== Mapping Admin =====
+export interface BranchMapping {
+  id: string;
+  rawValue: string;
+  canonicalCode: string;
+  notes?: string;
+  companyId: string;
+}
+
+export interface PaymentMethodMapping {
+  id: string;
+  rawValue: string;
+  canonicalValue: string;
+  notes?: string;
+  companyId: string;
+}
+
+// ===== Sales Module =====
+export interface Customer {
+  id: string;
+  name: string;
+  icNo?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  companyId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DealStage {
+  id: string;
+  name: string;
+  stageOrder: number;
+  color: string;
+  companyId: string;
+}
+
+export type SalesOrderStatus = 'active' | 'won' | 'lost';
+
+export interface SalesOrder {
+  id: string;
+  customerId?: string;
+  customerName?: string;       // joined from customers table
+  salesmanName: string;
+  branchCode: string;
+  model: string;
+  variant?: string;
+  color?: string;
+  bookingAmount?: number;
+  discount?: number;
+  sellingPrice?: number;
+  paymentMethod?: string;
+  stageId?: string;
+  stageName?: string;          // joined from deal_stages
+  stageColor?: string;
+  bookingDate: string;
+  expectedDeliveryDate?: string;
+  notes?: string;
+  chassisNo?: string;          // set when linked to a vehicle BG entry
+  companyId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type InvoicePaymentStatus = 'unpaid' | 'partial' | 'paid';
+
+export interface Invoice {
+  id: string;
+  salesOrderId: string;
+  invoiceNo: string;
+  invoiceDate: string;
+  amount: number;
+  taxAmount: number;
+  totalAmount: number;
+  paymentStatus: InvoicePaymentStatus;
+  paidAmount: number;
+  dueDate?: string;
+  companyId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SalesmanTarget {
+  id: string;
+  salesmanName: string;
+  branchCode: string;
+  periodYear: number;
+  periodMonth: number;
+  targetUnits: number;
+  targetRevenue: number;
+  companyId: string;
+}
+
+export interface SalesmanPerformance {
+  salesmanName: string;
+  branchCode: string;
+  totalDeals: number;
+  closedDeals: number;
+  totalRevenue: number;
+  avgDealValue: number;
+  conversionRate: number;
+  commissionEarned: number;
+  targetUnits?: number;
+  targetRevenue?: number;
+  targetAchievement?: number;
+}
+
+export interface CommissionRule {
+  id: string;
+  salesmanName?: string;
+  branchCode?: string;
+  ruleName: string;
+  thresholdDays?: number;
+  amount: number;
+  companyId: string;
+}
+
+export interface CommissionRecord {
+  id: string;
+  vehicleId?: string;
+  chassisNo: string;
+  salesmanName: string;
+  ruleId?: string;
+  ruleName?: string;
+  status: 'pending' | 'approved' | 'paid';
+  amount: number;
+  period: string;
+  companyId: string;
+  createdAt: string;
 }
