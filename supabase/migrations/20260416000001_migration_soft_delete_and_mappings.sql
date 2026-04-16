@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS branch_mappings (
   raw_value   text NOT NULL,
   canonical_code text NOT NULL,
   notes       text,
-  company_id  uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id  text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
   UNIQUE (raw_value, company_id)
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS payment_method_mappings (
   raw_value       text NOT NULL,
   canonical_value text NOT NULL,
   notes           text,
-  company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id      text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (raw_value, company_id)

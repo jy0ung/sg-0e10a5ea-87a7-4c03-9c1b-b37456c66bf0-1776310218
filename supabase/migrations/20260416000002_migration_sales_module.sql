@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS customers (
   email       text,
   address     text,
   notes       text,
-  company_id  uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id  text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS deal_stages (
   name        text NOT NULL,
   stage_order integer NOT NULL DEFAULT 0,
   color       text NOT NULL DEFAULT '#6b7280',
-  company_id  uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id  text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   created_at  timestamptz NOT NULL DEFAULT now(),
   UNIQUE (name, company_id)
 );
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS sales_orders (
   expected_delivery_date  date,
   notes                   text,
   chassis_no              text,                                -- linked to vehicles.chassis_no after BG entry created
-  company_id              uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id              text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   created_at              timestamptz NOT NULL DEFAULT now(),
   updated_at              timestamptz NOT NULL DEFAULT now()
 );
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   payment_status  text NOT NULL DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid','partial','paid')),
   paid_amount     numeric(12,2) NOT NULL DEFAULT 0,
   due_date        date,
-  company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id      text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (invoice_no, company_id)
@@ -168,7 +168,7 @@ CREATE TABLE IF NOT EXISTS salesman_targets (
   period_month    integer NOT NULL CHECK (period_month BETWEEN 1 AND 12),
   target_units    integer NOT NULL DEFAULT 0,
   target_revenue  numeric(14,2) NOT NULL DEFAULT 0,
-  company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id      text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (salesman_name, branch_code, period_year, period_month, company_id)
@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS commission_rules (
   rule_name       text NOT NULL,
   threshold_days  integer,                  -- for aging-based commission: deliver within N days
   amount          numeric(10,2) NOT NULL DEFAULT 0,
-  company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id      text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
@@ -243,7 +243,7 @@ CREATE TABLE IF NOT EXISTS commission_records (
   status          text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','paid')),
   amount          numeric(10,2) NOT NULL DEFAULT 0,
   period          text NOT NULL,             -- e.g. '2026-04'
-  company_id      uuid NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  company_id      text NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now()
 );

@@ -36,6 +36,9 @@ CREATE POLICY "Admins can manage branches"
 CREATE INDEX IF NOT EXISTS idx_branches_company_id ON public.branches (company_id);
 CREATE INDEX IF NOT EXISTS idx_branches_code       ON public.branches (code);
 
+-- Ensure id column has a default (original table has id TEXT PRIMARY KEY without default)
+ALTER TABLE public.branches ALTER COLUMN id SET DEFAULT gen_random_uuid()::text;
+
 -- Seed default branches from existing vehicle data
 INSERT INTO public.branches (code, name, company_id) VALUES
   ('KK',  'Kota Kinabalu',  'c1'),
