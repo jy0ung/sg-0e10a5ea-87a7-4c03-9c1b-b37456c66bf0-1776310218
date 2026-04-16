@@ -26,7 +26,7 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from '@/components/ui/chart';
-import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 const COLORS = {
   create: '#22c55e',
@@ -262,7 +262,7 @@ export default function ActivityDashboard() {
             <CardDescription>Breakdown of action types</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
+            <ChartContainer config={{}} className="h-[200px]">
               <PieChart>
                 <Pie
                   data={actionDistribution}
@@ -279,7 +279,7 @@ export default function ActivityDashboard() {
                 </Pie>
                 <ChartTooltip content={<ChartTooltipContent />} />
               </PieChart>
-            </ResponsiveContainer>
+            </ChartContainer>
             <div className="mt-4 grid grid-cols-2 gap-2">
               {actionDistribution.map((item) => (
                 <div key={item.name} className="flex items-center gap-2 text-sm">
@@ -302,7 +302,7 @@ export default function ActivityDashboard() {
             <CardDescription>Actions by hour of day</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
+            <ChartContainer config={{}} className="h-[200px]">
               <LineChart data={hourlyActivity}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis 
@@ -326,7 +326,7 @@ export default function ActivityDashboard() {
                   dot={{ r: 3 }}
                 />
               </LineChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </CardContent>
         </Card>
       </div>

@@ -1,17 +1,17 @@
 import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
-  testDir: "./e2e",
-  fullyParallel: false,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  testDir: ".",
+  testMatch: "**/*.spec.ts",
+  timeout: 30_000,
+  retries: 1,
   workers: 1,
-  reporter: "list",
-  timeout: 30000,
+  reporter: [["list"], ["html", { open: "never", outputFolder: "../playwright-report" }]],
   use: {
     baseURL: "http://localhost:3001",
-    trace: "on-first-retry",
+    headless: true,
     screenshot: "only-on-failure",
+    video: "retain-on-failure",
   },
   projects: [
     {
@@ -19,5 +19,4 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  // Dev server is already running — no need to start it here
 });
