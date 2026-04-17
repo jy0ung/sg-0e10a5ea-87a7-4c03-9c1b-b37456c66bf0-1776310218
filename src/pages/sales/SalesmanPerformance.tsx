@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { useSales, salesQueryKey } from '@/contexts/SalesContext';
+import { useSales } from '@/contexts/SalesContext';
 import { computeSalesmanActuals, upsertSalesmanTarget, deleteSalesmanTarget } from '@/services/salesTargetService';
 import { SalesmanPerformance, SalesmanTarget } from '@/types';
 import { Target, Plus, Pencil, Trash2 } from 'lucide-react';
@@ -50,7 +50,7 @@ export default function SalesmanPerformancePage() {
       targetRevenue: form.targetRevenue ? parseFloat(form.targetRevenue) : undefined,
     });
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    await queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId) });
+    await queryClient.invalidateQueries({ queryKey: ['sales', companyId] });
     await invalidatePerf();
     setTargetOpen(false);
     toast({ title: 'Target saved' });
@@ -58,7 +58,7 @@ export default function SalesmanPerformancePage() {
 
   const handleDeleteTarget = async (id: string) => {
     await deleteSalesmanTarget(id);
-    await queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId) });
+    await queryClient.invalidateQueries({ queryKey: ['sales', companyId] });
     await invalidatePerf();
     toast({ title: 'Target removed' });
   };

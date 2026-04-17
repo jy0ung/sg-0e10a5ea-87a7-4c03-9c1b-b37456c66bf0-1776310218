@@ -39,14 +39,15 @@ function mapOrder(row: Record<string, unknown>): SalesOrder {
   };
 }
 
-export async function getSalesOrders(companyId: string): Promise<{ data: SalesOrder[]; error: Error | null }> {
+export async function getSalesOrders(companyId: string, branchCode?: string | null): Promise<{ data: SalesOrder[]; error: Error | null }> {
   const timerId = performanceService.startQueryTimer('getSalesOrders');
-  const { data, error } = await supabase
+  let q = supabase
     .from('sales_orders')
     .select('*')
     .eq('company_id', companyId)
-    .eq('is_deleted', false)
-    .order('booking_date', { ascending: false });
+    .eq('is_deleted', false);
+  if (branchCode) q = q.eq('branch_code', branchCode);
+  const { data, error } = await q.order('booking_date', { ascending: false });
   performanceService.endQueryTimer(timerId);
   if (error) { loggingService.error('getSalesOrders failed', { error }); return { data: [], error: new Error(error.message) }; }
   return { data: (data ?? []).map(r => mapOrder(r as Record<string, unknown>)), error: null };

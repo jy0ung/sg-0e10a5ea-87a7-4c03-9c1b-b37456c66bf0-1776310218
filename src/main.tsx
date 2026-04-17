@@ -10,6 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, ProtectedRoute } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { RequireRole } from "@/components/shared/RequireRole";
 import AppLayout from "./components/layout/AppLayout";
 import { SalesProvider } from "./contexts/SalesContext";
 import { errorTrackingService } from "@/services/errorTrackingService";
@@ -139,15 +140,15 @@ const router = createBrowserRouter([
       { path: "inventory/transfers", element: <S><VehicleTransfer /></S> },
       { path: "inventory/chassis", element: <S><ChassisMovement /></S> },
       { path: "purchasing/invoices", element: <S><PurchaseInvoices /></S> },
-      { path: "admin/activity", element: <S><ActivityDashboard /></S> },
-      { path: "admin/users", element: <S><UserManagement /></S> },
-      { path: "admin/audit", element: <S><AuditLog /></S> },
+      { path: "admin/activity", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager']}><S><ActivityDashboard /></S></RequireRole> },
+      { path: "admin/users", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserManagement /></S></RequireRole> },
+      { path: "admin/audit", element: <RequireRole roles={['super_admin', 'company_admin', 'director']}><S><AuditLog /></S></RequireRole> },
       { path: "admin/settings", element: <S><SettingsPage /></S> },
-      { path: "admin/branches", element: <S><BranchManagement /></S> },
-      { path: "admin/master-data", element: <S><MasterData /></S> },
-      { path: "admin/suppliers", element: <S><Suppliers /></S> },
-      { path: "admin/dealers", element: <S><Dealers /></S> },
-      { path: "admin/user-groups", element: <S><UserGroups /></S> },
+      { path: "admin/branches", element: <RequireRole roles={['super_admin', 'company_admin']}><S><BranchManagement /></S></RequireRole> },
+      { path: "admin/master-data", element: <RequireRole roles={['super_admin', 'company_admin']}><S><MasterData /></S></RequireRole> },
+      { path: "admin/suppliers", element: <RequireRole roles={['super_admin', 'company_admin']}><S><Suppliers /></S></RequireRole> },
+      { path: "admin/dealers", element: <RequireRole roles={['super_admin', 'company_admin']}><S><Dealers /></S></RequireRole> },
+      { path: "admin/user-groups", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserGroups /></S></RequireRole> },
       { path: "sales/dealer-invoices", element: <SalesProvider><S><DealerInvoices /></S></SalesProvider> },
       { path: "sales/verify-or", element: <SalesProvider><S><VerifyOR /></S></SalesProvider> },
       { path: "reports", element: <S><ReportsCenter /></S> },
@@ -156,7 +157,7 @@ const router = createBrowserRouter([
       { path: "hrms/leave", element: <S><LeaveManagement /></S> },
       { path: "hrms/leave-calendar", element: <S><LeaveCalendar /></S> },
       { path: "hrms/attendance", element: <S><AttendanceLog /></S> },
-      { path: "hrms/payroll", element: <S><PayrollSummary /></S> },
+      { path: "hrms/payroll", element: <RequireRole roles={['super_admin', 'company_admin', 'general_manager']}><S><PayrollSummary /></S></RequireRole> },
       { path: "hrms/appraisals", element: <S><PerformanceAppraisals /></S> },
       { path: "hrms/announcements", element: <S><HrmsAnnouncements /></S> },
     ],

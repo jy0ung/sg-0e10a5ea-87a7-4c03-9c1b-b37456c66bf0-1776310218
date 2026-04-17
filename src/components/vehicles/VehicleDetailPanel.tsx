@@ -13,6 +13,7 @@ import { Edit2, Eye, Save, X, Clock, History } from 'lucide-react';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { getAuditLog, type AuditLogWithProfile } from '@/services/auditService';
 import { AuditDiffTable } from '@/components/shared/AuditDiffTable';
+import { useColumnPermissions, canViewField, canEditField } from '@/hooks/useColumnPermissions';
 
 interface VehicleDetailPanelProps {
   vehicle: VehicleCanonical | null;
@@ -34,6 +35,7 @@ export function VehicleDetailPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLogWithProfile[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const { permissions } = useColumnPermissions();
 
   useEffect(() => {
     if (vehicle && open) {
@@ -135,7 +137,8 @@ export function VehicleDetailPanel({
     readonly?: boolean;
   }) => {
     const value = editData[field.key];
-    const isReadOnly = !isEditing || field.readonly;
+    const fieldEditable = canEditField(permissions, field.key as string);
+    const isReadOnly = !isEditing || field.readonly || !fieldEditable;
 
     if (field.type === 'textarea') {
       return (
@@ -194,7 +197,7 @@ export function VehicleDetailPanel({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {canEdit && !isEditing && (
+              {canEdit && permissions.canEdit && !isEditing && (
                 <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
                   <Edit2 className="h-4 w-4 mr-2" />Edit
                 </Button>
@@ -232,14 +235,17 @@ export function VehicleDetailPanel({
             <TabsContent value="details" className="flex-1 overflow-hidden">
               <ScrollArea className="h-full pr-4">
                 <div className="space-y-6 pb-4">
-                  {sections.map((section) => (
+                  {sections.map((section) => {
+                    const visibleFields = section.fields.filter(f => canViewField(permissions, f.key as string));
+                    if (visibleFields.length === 0) return null;
+                    return (
                     <Card key={section.id} className="border border-border/50">
                       <CardHeader>
                         <CardTitle className="text-sm font-semibold">{section.title}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-2 gap-4">
-                          {section.fields.map((field) => (
+                          {visibleFields.map((field) => (
                             <div key={field.key} className="space-y-2">
                               <Label className="text-xs text-muted-foreground">{field.label}</Label>
                               {renderField(field)}
@@ -248,7 +254,8 @@ export function VehicleDetailPanel({
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </TabsContent>

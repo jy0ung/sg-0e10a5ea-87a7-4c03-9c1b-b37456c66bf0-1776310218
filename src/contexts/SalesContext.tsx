@@ -7,9 +7,12 @@ import { getInvoices } from '@/services/invoiceService';
 import { getSalesmanTargets } from '@/services/salesTargetService';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompanyId } from '@/hooks/useCompanyId';
+import { useAuth } from '@/contexts/AuthContext';
+import { resolveBranchCode } from '@/services/branchService';
 
 /** Stable query key factory — import in tests to reuse. */
-export const salesQueryKey = (companyId: string) => ['sales', companyId] as const;
+export const salesQueryKey = (companyId: string, branchId?: string | null) =>
+  ['sales', companyId, branchId ?? 'all'] as const;
 
 interface SalesData {
   customers: Customer[];
@@ -19,10 +22,10 @@ interface SalesData {
   salesmanTargets: SalesmanTarget[];
 }
 
-async function fetchSalesData(companyId: string): Promise<SalesData> {
+async function fetchSalesData(companyId: string, branchCode?: string | null): Promise<SalesData> {
   const [customersRes, ordersRes, stagesRes, invoicesRes, targetsRes] = await Promise.all([
     getCustomers(companyId),
-    getSalesOrders(companyId),
+    getSalesOrders(companyId, branchCode),
     supabase.from('deal_stages').select('*').eq('company_id', companyId).order('sort_order'),
     getInvoices(companyId),
     getSalesmanTargets(companyId),
@@ -62,19 +65,29 @@ const SalesContext = createContext<SalesContextValue | null>(null);
 
 export function SalesProvider({ children }: { children: ReactNode }) {
   const companyId = useCompanyId();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Branch-scoped users only see their branch's sales orders.
+  const branchId = user?.access_scope === 'branch' ? (user.branch_id ?? null) : null;
+
   const { data, isLoading } = useQuery({
-    queryKey: salesQueryKey(companyId),
-    queryFn: () => fetchSalesData(companyId),
+    queryKey: salesQueryKey(companyId, branchId),
+    queryFn: async () => {
+      let branchCode: string | null = null;
+      if (branchId) {
+        branchCode = await resolveBranchCode(branchId);
+      }
+      return fetchSalesData(companyId, branchCode);
+    },
     enabled: !!companyId,
     staleTime: 30_000,
   });
 
   /** Invalidates the cache and awaits the next successful fetch. */
   const reloadSales = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId) });
-  }, [queryClient, companyId]);
+    await queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId, branchId) });
+  }, [queryClient, companyId, branchId]);
 
   // Realtime: invalidate the sales cache whenever a sales_order row changes.
   useEffect(() => {
@@ -84,27 +97,27 @@ export function SalesProvider({ children }: { children: ReactNode }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'sales_orders', filter: `company_id=eq.${companyId}` },
-        () => { queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId) }); }
+        () => { queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId, branchId) }); }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [companyId, queryClient]);
+  }, [companyId, branchId, queryClient]);
 
   /** Optimistically update deal-stage in cache then persist to DB. */
   const moveOrderStage = useCallback(async (orderId: string, stageId: string) => {
     await moveSalesOrderStage(orderId, stageId);
-    queryClient.setQueryData<SalesData>(salesQueryKey(companyId), prev =>
+    queryClient.setQueryData<SalesData>(salesQueryKey(companyId, branchId), prev =>
       prev ? { ...prev, salesOrders: prev.salesOrders.map(o => o.id === orderId ? { ...o, dealStageId: stageId } : o) } : prev
     );
-  }, [queryClient, companyId]);
+  }, [queryClient, companyId, branchId]);
 
   /** Optimistically update order fields in cache then persist to DB. */
   const updateOrder = useCallback(async (id: string, fields: Partial<SalesOrder>) => {
     await updateSalesOrder(id, fields);
-    queryClient.setQueryData<SalesData>(salesQueryKey(companyId), prev =>
+    queryClient.setQueryData<SalesData>(salesQueryKey(companyId, branchId), prev =>
       prev ? { ...prev, salesOrders: prev.salesOrders.map(o => o.id === id ? { ...o, ...fields } : o) } : prev
     );
-  }, [queryClient, companyId]);
+  }, [queryClient, companyId, branchId]);
 
   return (
     <SalesContext.Provider value={{

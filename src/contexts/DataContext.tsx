@@ -4,8 +4,10 @@ import { VehicleCanonical, ImportBatch, DataQualityIssue, SlaPolicy, KpiSummary 
 import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompanyId } from '@/hooks/useCompanyId';
+import { useAuth } from '@/contexts/AuthContext';
 import { loggingService } from '@/services/loggingService';
 import { performanceService } from '@/services/performanceService';
+import { resolveBranchCode } from '@/services/branchService';
 
 interface DataContextType {
   vehicles: VehicleCanonical[];
@@ -106,20 +108,23 @@ function mapDbSla(row: Record<string, unknown>): SlaPolicy {
   };
 }
 
-export const dataQueryKey = (companyId: string) => ['data', companyId] as const;
+export const dataQueryKey = (companyId: string, branchId?: string | null) =>
+  ['data', companyId, branchId ?? 'all'] as const;
 
 /** Fetch all vehicles in chunks of VEHICLE_PAGE_SIZE to avoid unbounded queries. */
 const VEHICLE_PAGE_SIZE = 1_000;
 
-async function fetchAllVehicles(companyId: string): Promise<VehicleCanonical[]> {
+async function fetchAllVehicles(companyId: string, branchCode?: string | null): Promise<VehicleCanonical[]> {
   const results: VehicleCanonical[] = [];
   let from = 0;
   while (true) {
-    const { data, error } = await supabase
+    let q = supabase
       .from('vehicles')
       .select('*')
       .eq('is_deleted', false)
-      .eq('company_id', companyId)
+      .eq('company_id', companyId);
+    if (branchCode) q = q.eq('branch_code', branchCode);
+    const { data, error } = await q
       .order('created_at', { ascending: false })
       .range(from, from + VEHICLE_PAGE_SIZE - 1);
     if (error) { loggingService.error('Failed to load vehicles page', { error, from }, 'DataContext'); break; }
@@ -131,12 +136,12 @@ async function fetchAllVehicles(companyId: string): Promise<VehicleCanonical[]> 
   return results;
 }
 
-async function fetchDataFromDb(companyId: string) {
+async function fetchDataFromDb(companyId: string, branchCode?: string | null) {
   const queryId = `data-reload-${Date.now()}`;
   performanceService.startQueryTimer(queryId);
 
   const [vehiclesRes, batchesRes, issuesRes, slasRes] = await Promise.all([
-    fetchAllVehicles(companyId).then(v => ({ data: v, error: null })),
+    fetchAllVehicles(companyId, branchCode).then(v => ({ data: v, error: null })),
     supabase.from('import_batches').select('*').eq('company_id', companyId).order('created_at', { ascending: false }),
     supabase.from('quality_issues').select('*').order('created_at', { ascending: false }),
     supabase.from('sla_policies').select('*').eq('company_id', companyId),
@@ -170,18 +175,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [lastRefresh, setLastRefresh] = useState(new Date().toISOString());
 
   const companyId = useCompanyId();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Branch-scoped users only see their branch's vehicles.
+  const branchId = user?.access_scope === 'branch' ? (user.branch_id ?? null) : null;
 
   // React Query manages initial fetch and re-fetches after invalidation.
   const { isLoading } = useQuery({
-    queryKey: dataQueryKey(companyId),
-    queryFn: () => fetchDataFromDb(companyId),
+    queryKey: dataQueryKey(companyId, branchId),
+    queryFn: async () => {
+      let branchCode: string | null = null;
+      if (branchId) {
+        branchCode = await resolveBranchCode(branchId);
+      }
+      return fetchDataFromDb(companyId, branchCode);
+    },
     enabled: !!companyId,
     staleTime: 60_000,
   });
 
   // Sync server data to local state whenever the query cache updates.
-  const queryData = queryClient.getQueryData<Awaited<ReturnType<typeof fetchDataFromDb>>>(dataQueryKey(companyId));
+  const queryData = queryClient.getQueryData<Awaited<ReturnType<typeof fetchDataFromDb>>>(dataQueryKey(companyId, branchId));
   useEffect(() => {
     if (queryData) {
       setVehiclesState(queryData.vehicles);
@@ -194,8 +209,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [queryData]);
 
   const reloadFromDb = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId) });
-  }, [queryClient, companyId]);
+    await queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId, branchId) });
+  }, [queryClient, companyId, branchId]);
 
   // Realtime: invalidate whenever a vehicle row changes in this company.
   useEffect(() => {
@@ -205,11 +220,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'vehicles', filter: `company_id=eq.${companyId}` },
-        () => { queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId) }); }
+        () => { queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId, branchId) }); }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [companyId, queryClient]);
+  }, [companyId, branchId, queryClient]);
 
   const setVehicles = useCallback(async (v: VehicleCanonical[]) => {
     const queryId = `vehicles-upsert-${Date.now()}`;
