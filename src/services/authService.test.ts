@@ -23,6 +23,16 @@ describe('authService', () => {
     vi.clearAllMocks();
   });
 
+  describe('signUp', () => {
+    it('returns a disabled message for self-service signup', async () => {
+      const result = await authService.signUp('test@test.com', 'password123');
+
+      expect(result.user).toBeNull();
+      expect(result.error?.message).toMatch(/self-service signup is disabled/i);
+      expect(supabase.auth.signUp).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getCurrentUser', () => {
     it('returns user when authenticated', async () => {
       const mockUser = { id: '123', email: 'test@test.com' };
@@ -79,6 +89,19 @@ describe('authService', () => {
 
       const result = await authService.signOut();
       expect(result.error).toBeNull();
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('uses the canonical reset-password route', async () => {
+      vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({ data: {}, error: null } as any);
+
+      const result = await authService.resetPassword('test@test.com');
+
+      expect(result.error).toBeNull();
+      expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith('test@test.com', {
+        redirectTo: 'http://localhost:3000/reset-password',
+      });
     });
   });
 });

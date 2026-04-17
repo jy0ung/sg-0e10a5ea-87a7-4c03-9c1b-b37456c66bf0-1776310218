@@ -25,7 +25,7 @@ function readSupabaseUrl(): string {
   return "http://127.0.0.1:54321";
 }
 
-const SUPABASE_URL = readSupabaseUrl();
+export const SUPABASE_URL = readSupabaseUrl();
 const PROJECT_REF = new URL(SUPABASE_URL).hostname.split(".")[0];
 const LS_KEY = `sb-${PROJECT_REF}-auth-token`;
 
@@ -84,6 +84,41 @@ const FAKE_SESSION = {
   refresh_token: "fake-refresh-token",
   user: MOCK_USER,
 };
+
+/**
+ * Inject only a fake session into localStorage so the Supabase SDK will
+ * attempt `updateUser` calls (which require an active session). Does NOT
+ * set up full table mocks — callers can add their own route interceptors.
+ */
+export async function setupSessionForUpdateUser(page: Page) {
+  await page.addInitScript(
+    ({ key, value, userKey, userValue }) => {
+      localStorage.setItem(key, JSON.stringify(value));
+      localStorage.setItem(userKey, JSON.stringify(userValue));
+    },
+    {
+      key: LS_KEY,
+      value: FAKE_SESSION,
+      userKey: LS_KEY + "-user",
+      userValue: { user: MOCK_USER },
+    }
+  );
+
+  // SDK validates the session via GET /auth/v1/user on some code paths
+  await page.route(`${SUPABASE_URL}/auth/v1/user`, (route) => {
+    if (route.request().method() === "GET") {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_USER),
+      });
+    } else {
+      route.continue();
+    }
+  });
+
+  await page.route(`${SUPABASE_URL}/realtime/**`, (route) => route.abort());
+}
 
 export async function setupAuthMocks(page: Page) {
   // ------------------------------------------------------------------

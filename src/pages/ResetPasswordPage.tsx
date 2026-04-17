@@ -11,6 +11,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
+  const [initializing, setInitializing] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -22,18 +23,68 @@ export default function ResetPasswordPage() {
   });
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes('type=recovery')) {
-      setIsRecovery(true);
-    }
+    let isMounted = true;
+
+    const getCallbackParams = () => {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const searchParams = new URLSearchParams(window.location.search);
+
+      return {
+        type: hashParams.get('type') || searchParams.get('type'),
+        accessToken: hashParams.get('access_token') || searchParams.get('access_token'),
+        refreshToken: hashParams.get('refresh_token') || searchParams.get('refresh_token'),
+        tokenHash: hashParams.get('token_hash') || searchParams.get('token_hash'),
+        code: hashParams.get('code') || searchParams.get('code'),
+      };
+    };
+
+    const initializeRecovery = async () => {
+      const { type, accessToken, refreshToken, tokenHash, code } = getCallbackParams();
+      const hasRecoveryCallback = type === 'recovery' && !!(accessToken || tokenHash || code);
+
+      if (!hasRecoveryCallback) {
+        if (isMounted) {
+          setError('Invalid or expired reset link. Request a new password reset email and try again.');
+          setInitializing(false);
+        }
+        return;
+      }
+
+      if (accessToken && refreshToken) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (sessionError) {
+          if (isMounted) {
+            setError('Invalid or expired reset link. Request a new password reset email and try again.');
+            setInitializing(false);
+          }
+          return;
+        }
+      }
+
+      if (isMounted) {
+        setIsRecovery(true);
+        setInitializing(false);
+      }
+    };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+      if (event === 'PASSWORD_RECOVERY' && isMounted) {
         setIsRecovery(true);
+        setError('');
+        setInitializing(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    void initializeRecovery();
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (data: ResetPasswordFormData) => {
@@ -46,15 +97,26 @@ export default function ResetPasswordPage() {
       setError(error.message);
     } else {
       setSuccess(true);
-      setTimeout(() => navigate('/'), 2000);
+      setTimeout(() => navigate('/login', { replace: true }), 2000);
     }
   };
+
+  if (initializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center executive-gradient">
+        <div className="w-full max-w-md p-8 glass-panel gold-glow animate-fade-in text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Validating reset link...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isRecovery) {
     return (
       <div className="min-h-screen flex items-center justify-center executive-gradient">
         <div className="w-full max-w-md p-8 glass-panel gold-glow animate-fade-in text-center">
-          <p className="text-muted-foreground">Invalid or expired reset link.</p>
+          <p className="text-muted-foreground">{error || 'Invalid or expired reset link.'}</p>
           <Button className="mt-4" onClick={() => navigate('/login')}>
             Back to Sign In
           </Button>
@@ -80,7 +142,7 @@ export default function ResetPasswordPage() {
           <div className="text-center space-y-3">
             <CheckCircle className="h-12 w-12 text-primary mx-auto" />
             <p className="text-primary text-sm font-medium">Password updated successfully!</p>
-            <p className="text-muted-foreground text-xs">Redirecting to dashboard...</p>
+            <p className="text-muted-foreground text-xs">Redirecting to sign in...</p>
           </div>
         ) : (
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">

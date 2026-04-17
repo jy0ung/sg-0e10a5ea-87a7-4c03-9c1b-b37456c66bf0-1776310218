@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AppRole, AccessScope } from '@/types';
 import { useLocation, Navigate } from 'react-router-dom';
@@ -22,7 +22,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
-  signup: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   hasRole: (roles: AppRole[]) => boolean;
   refreshProfile: () => Promise<void>;
@@ -114,15 +113,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message || null };
   }, []);
 
-  const signup = useCallback(async (email: string, password: string, name: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
-    });
-    return { error: error?.message || null };
-  }, []);
-
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
     loggingService.clearUserId();
@@ -149,7 +139,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: !!session && !!profile,
       loading,
       login,
-      signup,
       logout,
       hasRole,
       refreshProfile,

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { SUPABASE_URL, setupSessionForUpdateUser } from "./helpers/auth-mock";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH FLOWS  (unauthenticated — no mocking needed)
@@ -10,6 +11,15 @@ test.describe("Login page", () => {
     await expect(page.locator("#email")).toBeVisible();
     await expect(page.locator("#password")).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
+  });
+
+  test("shows admin-managed onboarding guidance", async ({ page }) => {
+    await page.goto("/login");
+    await expect(
+      page.locator("text=/staff accounts are created by an administrator/i")
+    ).toBeVisible();
+    await expect(page.locator("#name")).toHaveCount(0);
+    await expect(page.locator("text=/sign.?up|create.?account/i")).toHaveCount(0);
   });
 
   test("submit button is disabled until form is valid", async ({ page }) => {
@@ -32,12 +42,6 @@ test.describe("Login page", () => {
     await expect(page.locator("text=/invalid|credentials|email|password/i").first()).toBeVisible({
       timeout: 10000,
     });
-  });
-
-  test("toggle to Sign Up shows name field", async ({ page }) => {
-    await page.goto("/login");
-    await page.click("text=/sign.?up|create.?account/i");
-    await expect(page.locator("#name")).toBeVisible({ timeout: 3000 });
   });
 
   test("forgot password link navigates to /forgot-password", async ({ page }) => {
@@ -65,6 +69,84 @@ test.describe("Forgot Password page", () => {
   });
 });
 
+test.describe("Reset Password page", () => {
+  test("shows invalid-link state without recovery callback params", async ({ page }) => {
+    await page.goto("/reset-password");
+    await expect(page.locator("text=/invalid or expired reset link/i")).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(page.locator("#password")).toHaveCount(0);
+  });
+
+  test("shows the reset form for a valid recovery callback", async ({ page }) => {
+    await page.goto("/reset-password#type=recovery&token_hash=fake-recovery-token");
+
+    await expect(page.locator("text=/set your new password/i")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("#password")).toBeVisible();
+    await expect(page.locator("#confirm")).toBeVisible();
+    await expect(page.locator('button[type="submit"]')).toBeDisabled();
+  });
+
+  test("shows success state after a successful password update", async ({ page }) => {
+    await setupSessionForUpdateUser(page);
+
+    // Override only the PUT (updateUser) to return success
+    await page.route(`${SUPABASE_URL}/auth/v1/user`, (route) => {
+      if (route.request().method() === "PUT") {
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ id: "fake-user-id", email: "staff@flc.test" }),
+        });
+      } else {
+        route.continue();
+      }
+    });
+
+    await page.goto("/reset-password#type=recovery&token_hash=fake-recovery-token");
+    await expect(page.locator("#password")).toBeVisible({ timeout: 5000 });
+
+    await page.fill("#password", "NewPassword123!");
+    await page.fill("#confirm", "NewPassword123!");
+    await page.click('button[type="submit"]');
+
+    await expect(page.locator("text=/password updated successfully/i")).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(page.locator("text=/redirecting to sign in/i")).toBeVisible();
+  });
+
+  test("shows error message after a failed password update", async ({ page }) => {
+    await setupSessionForUpdateUser(page);
+
+    // Override only the PUT (updateUser) to return an auth error
+    await page.route(`${SUPABASE_URL}/auth/v1/user`, (route) => {
+      if (route.request().method() === "PUT") {
+        route.fulfill({
+          status: 401,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "invalid_token", message: "Token expired or invalid" }),
+        });
+      } else {
+        route.continue();
+      }
+    });
+
+    await page.goto("/reset-password#type=recovery&token_hash=fake-recovery-token");
+    await expect(page.locator("#password")).toBeVisible({ timeout: 5000 });
+
+    await page.fill("#password", "NewPassword123!");
+    await page.fill("#confirm", "NewPassword123!");
+    await page.click('button[type="submit"]');
+
+    await expect(
+      page.locator("text=/token expired or invalid|invalid_token|error/i").first()
+    ).toBeVisible({ timeout: 5000 });
+    // Form remains visible so the user can retry
+    await expect(page.locator("#password")).toBeVisible();
+  });
+});
+
 test.describe("Protected-route redirect", () => {
   test("/ redirects to /login when not authenticated", async ({ page }) => {
     await page.goto("/");
@@ -78,11 +160,6 @@ test.describe("Protected-route redirect", () => {
 });
 
 test.describe("404 / Not Found", () => {
-  test("/debug route renders debug info", async ({ page }) => {
-    await page.goto("/debug");
-    await expect(page.locator("text=Debug Page")).toBeVisible({ timeout: 5000 });
-  });
-
   test("unknown route renders Not Found page", async ({ page }) => {
     await page.goto("/this-page-does-not-exist");
     await expect(page.locator("text=/not found|404/i").first()).toBeVisible({

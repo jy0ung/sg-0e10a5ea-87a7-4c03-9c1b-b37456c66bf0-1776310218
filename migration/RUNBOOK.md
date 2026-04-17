@@ -33,7 +33,7 @@ supabase status        # must show API and DB URLs as active
 ```
 
 No credentials to configure — the scripts already contain:
-- fookloi.net login: `staffName=JAMRI` / `staffpwd=flit@dmin`
+- fookloi.net login: `staffName=<CHANGE>` / `staffpwd=<CHANGE>`
 - Supabase local service-role key (default local dev key, already in `.env`)
 
 ---
@@ -133,15 +133,21 @@ npx tsx scripts/seed-from-extract.ts --only customers sales-orders
 The seed script creates `profiles` rows for all staff imported from fookloi.net
 but does **not** create Supabase Auth accounts — no passwords are set yet.
 
-Each staff member must:
+Before any staff member can use **Forgot Password**, an admin must create or invite
+the corresponding Supabase Auth user for that work email.
 
-1. Go to the FLC BI UBS login page
-2. Click **Forgot Password** and enter their work email
-3. Follow the reset link sent to their inbox
-4. Set a new password and log in
+Recommended sequence:
 
-Alternatively, an admin can bulk-invite via:  
-**Supabase Dashboard → Authentication → Users → Invite user**
+1. Admin creates or bulk-invites staff under:
+   **Supabase Dashboard → Authentication → Users**
+2. Confirm each invited user email matches the imported `profiles.email` value
+3. Staff member goes to the FLC BI UBS login page
+4. Staff member clicks **Forgot Password** and enters that same work email
+5. Staff member follows the reset link sent to their inbox
+6. Staff member sets a new password and logs in
+
+If an admin uses **Invite user**, the invite email itself may be enough for first access,
+but the supported in-app recovery path remains **Forgot Password** after the auth user exists.
 
 ---
 
