@@ -26,17 +26,19 @@ interface NavItem {
 interface SectionDef {
   name: string;
   icon: React.ElementType;
+  /** Entry path — navigated to when the section header is clicked in non-focused mode */
+  path?: string;
 }
 
 const sectionDefs: SectionDef[] = [
-  { name: 'Platform', icon: LayoutDashboard },
-  { name: 'Auto Aging', icon: Timer },
-  { name: 'Sales', icon: TrendingUp },
-  { name: 'Inventory', icon: Package },
-  { name: 'Purchasing', icon: Truck },
-  { name: 'Reports', icon: BarChart3 },
-  { name: 'HRMS', icon: Briefcase },
-  { name: 'Admin', icon: Shield },
+  { name: 'Platform', icon: LayoutDashboard },                            // no path — always shown
+  { name: 'Auto Aging', icon: Timer,      path: '/auto-aging' },
+  { name: 'Sales',      icon: TrendingUp, path: '/sales' },
+  { name: 'Inventory',  icon: Package,    path: '/inventory/stock' },
+  { name: 'Purchasing', icon: Truck,      path: '/purchasing/invoices' },
+  { name: 'Reports',    icon: BarChart3,  path: '/reports' },
+  { name: 'HRMS',       icon: Briefcase,  path: '/hrms/employees' },
+  { name: 'Admin',      icon: Shield,     path: '/admin/settings' },
 ];
 
 const navItems: NavItem[] = [
@@ -251,7 +253,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
             )
           )}
 
-          {visibleSections.map(({ name, icon: SectionIcon }, index) => {
+          {visibleSections.map(({ name, icon: SectionIcon, path: sectionPath }, index) => {
             const items = navItems.filter(n => n.section === name);
             const visibleItems = items.filter(item => {
               if (!item.roles) return true;
@@ -261,45 +263,71 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
             if (visibleItems.length === 0) return null;
 
             const hasActive = visibleItems.some(item => isItemActive(item.path, pathname));
+
+            // Platform has no entry path — its items are always shown.
+            // All other sections: non-focused = clickable header only; focused = header label + sub-items.
+            const isPlatform = !sectionPath;
+            const showItems = isPlatform || (isFocused && focusedSection === name);
+
             const grouped = groupItems(visibleItems);
             const showGroupLabels = !collapsed && grouped.length > 1;
 
             return (
               <div key={name}>
-                {/* Section header — flat, non-collapsible */}
+                {/* Section header */}
                 {collapsed ? (
-                  index > 0 && <div className="h-px bg-sidebar-border/50 my-2 mx-1" />
-                ) : (
-                  <div
-                    className={cn(
-                      "flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-widest mb-0.5",
-                      hasActive ? "text-primary" : "text-muted-foreground"
-                    )}
-                  >
+                  // Collapsed: divider between sections; icon handled by items below
+                  index > 0 && !isPlatform && <div className="h-px bg-sidebar-border/50 my-2 mx-1" />
+                ) : isPlatform ? (
+                  // Platform: non-clickable label (items always shown below)
+                  <div className={cn(
+                    "flex items-center gap-2 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-widest mb-0.5",
+                    hasActive ? "text-primary" : "text-muted-foreground"
+                  )}>
                     <SectionIcon className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>{name}</span>
                   </div>
+                ) : (
+                  // Other sections: clickable link header; shows active state when focused here
+                  <Link
+                    to={sectionPath!}
+                    onClick={onNavigate}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-widest mb-0.5 transition-colors",
+                      hasActive
+                        ? "text-primary bg-primary/5"
+                        : "text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <SectionIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="flex-1">{name}</span>
+                    {!isFocused && (
+                      <ChevronRight className="h-3 w-3 opacity-40" />
+                    )}
+                  </Link>
                 )}
 
-                {/* Section items — always visible */}
-                <div className="space-y-0.5">
-                  {showGroupLabels ? (
-                    grouped.map((g, gi) => (
-                      <div key={g.group} className={cn("space-y-0.5", gi > 0 && "mt-2")}>
-                        <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          {g.group}
-                        </p>
-                        {g.items.map(item => (
-                          <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
-                        ))}
-                      </div>
-                    ))
-                  ) : (
-                    visibleItems.map(item => (
-                      <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
-                    ))
-                  )}
-                </div>
+                {/* Sub-items: shown only for Platform (always) or when focused on this section */}
+                {showItems && (
+                  <div className="space-y-0.5">
+                    {showGroupLabels ? (
+                      grouped.map((g, gi) => (
+                        <div key={g.group} className={cn("space-y-0.5", gi > 0 && "mt-2")}>
+                          <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {g.group}
+                          </p>
+                          {g.items.map(item => (
+                            <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
+                          ))}
+                        </div>
+                      ))
+                    ) : (
+                      visibleItems.map(item => (
+                        <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
