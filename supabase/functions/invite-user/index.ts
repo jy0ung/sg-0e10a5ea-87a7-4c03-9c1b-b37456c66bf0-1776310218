@@ -42,8 +42,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Check caller has admin role
-    const { data: callerProfile } = await callerClient
+    // Create admin client with service role key (bypasses RLS)
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Check caller has admin role — use service role to bypass RLS
+    const { data: callerProfile } = await adminClient
       .from('profiles')
       .select('role')
       .eq('id', caller.id)
@@ -66,11 +71,6 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
-
-    // Create admin client with service role key
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
 
     // Determine the signup redirect URL
     // Use the site URL from env or the request origin
