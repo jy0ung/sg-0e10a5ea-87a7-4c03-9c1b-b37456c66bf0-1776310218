@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Plus, ArrowRight } from 'lucide-react';
+import { TableSkeleton } from '@/components/shared/TableSkeleton';
 
 type TransferStatus = 'pending' | 'in_transit' | 'arrived' | 'cancelled';
 
@@ -159,7 +160,7 @@ export default function VehicleTransfer() {
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Vehicle Transfer" description="Inter-branch chassis movement tracking"
           breadcrumbs={[{ label: 'FLC BI' }, { label: 'Inventory' }, { label: 'Vehicle Transfer' }]} />
-        <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading transfers…</div>
+        <TableSkeleton rows={8} cols={7} colWidths={['w-20','w-20','w-20','w-28','w-20','w-24','w-16']} />
       </div>
     );
   }

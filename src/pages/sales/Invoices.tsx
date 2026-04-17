@@ -13,6 +13,7 @@ import { useSales } from '@/contexts/SalesContext';
 import { createInvoice, recordPayment } from '@/services/invoiceService';
 import { Invoice, InvoicePaymentStatus, InvoiceType } from '@/types';
 import { Plus, CreditCard } from 'lucide-react';
+import { TableSkeleton } from '@/components/shared/TableSkeleton';
 
 const STATUS_BADGE: Record<InvoicePaymentStatus, string> = {
   unpaid: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
@@ -66,7 +67,7 @@ function InvoiceTable({ invoices, onPay }: { invoices: Invoice[]; onPay: (inv: I
 export default function Invoices() {
   const { user } = useAuth();
   const companyId = useCompanyId();
-  const { invoices, customers, salesOrders, reloadSales } = useSales();
+  const { invoices, customers, salesOrders, reloadSales, loading } = useSales();
   const { toast } = useToast();
   const [addOpen, setAddOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -135,6 +136,9 @@ export default function Invoices() {
         actions={<Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" />New Invoice</Button>}
       />
 
+      {loading ? (
+        <TableSkeleton rows={8} cols={7} colWidths={['w-28','w-32','w-20','w-20','w-24','w-20','w-16']} />
+      ) : (<>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {[
           { label: 'Total Collected', value: `RM ${totalRevenue.toLocaleString()}`, color: 'text-emerald-500' },
@@ -158,6 +162,7 @@ export default function Invoices() {
         <TabsContent value="dealer_sales" className="mt-4"><InvoiceTable invoices={byType('dealer_sales')} onPay={openPay} /></TabsContent>
         <TabsContent value="purchase" className="mt-4"><InvoiceTable invoices={byType('purchase')} onPay={openPay} /></TabsContent>
       </Tabs>
+      </>)}
 
       {/* New Invoice Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -214,7 +219,7 @@ export default function Invoices() {
         </DialogContent>
       </Dialog>
 
-      {/* Payment Dialog */}
+      {/* Payment Dialog */}}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>

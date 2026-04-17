@@ -12,13 +12,15 @@ import { useSales } from '@/contexts/SalesContext';
 import { createCustomer, updateCustomer, deleteCustomer } from '@/services/customerService';
 import { Customer } from '@/types';
 import { Plus, Search, Pencil, Trash2, User } from 'lucide-react';
+import { TableSkeleton } from '@/components/shared/TableSkeleton';
+import { customerSchema } from '@/lib/validations';
 
 const EMPTY: Omit<Customer, 'id' | 'companyId' | 'createdAt' | 'updatedAt'> = { name: '', email: '', phone: '', address: '', nric: '' };
 
 export default function Customers() {
   const { user } = useAuth();
   const companyId = useCompanyId();
-  const { customers, reloadSales } = useSales();
+  const { customers, reloadSales, loading } = useSales();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
@@ -39,7 +41,11 @@ export default function Customers() {
   const openEdit = (c: Customer) => { setEditing(c); setForm({ name: c.name, email: c.email ?? '', phone: c.phone ?? '', address: c.address ?? '', nric: c.nric ?? '' }); setDialogOpen(true); };
 
   const handleSave = async () => {
-    if (!form.name.trim()) return toast({ title: 'Name is required', variant: 'destructive' });
+    const result = customerSchema.safeParse(form);
+    if (!result.success) {
+      const first = result.error.errors[0];
+      return toast({ title: first.message, variant: 'destructive' });
+    }
     setSaving(true);
     const { error } = editing
       ? await updateCustomer(editing.id, form)
@@ -69,6 +75,9 @@ export default function Customers() {
         actions={<Button size="sm" onClick={openAdd}><Plus className="h-4 w-4 mr-1" />Add Customer</Button>}
       />
 
+      {loading ? (
+        <TableSkeleton rows={8} cols={5} colWidths={['w-32','w-28','w-24','w-36','w-16']} />
+      ) : (
       <div className="glass-panel p-4">
         <div className="flex items-center gap-2 mb-4">
           <div className="relative flex-1 max-w-xs">
@@ -107,6 +116,7 @@ export default function Customers() {
           </table>
         </div>
       </div>
+      )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

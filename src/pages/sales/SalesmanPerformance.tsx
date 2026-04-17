@@ -11,6 +11,7 @@ import { useSales } from '@/contexts/SalesContext';
 import { computeSalesmanActuals, upsertSalesmanTarget, deleteSalesmanTarget } from '@/services/salesTargetService';
 import { SalesmanPerformance, SalesmanTarget } from '@/types';
 import { Target, Plus, Pencil, Trash2 } from 'lucide-react';
+import { TableSkeleton } from '@/components/shared/TableSkeleton';
 
 export default function SalesmanPerformancePage() {
   const { user } = useAuth();
@@ -112,7 +113,11 @@ export default function SalesmanPerformancePage() {
               );
             })}
             {performance.length === 0 && !loading && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground text-xs">No data for this period</td></tr>}
-            {loading && <tr><td colSpan={8} className="py-4 text-center text-xs text-muted-foreground">Loading…</td></tr>}
+            {loading && Array.from({ length: 4 }).map((_, i) => (
+              <tr key={i} className="border-b border-border last:border-0">
+                {Array.from({ length: 8 }).map((_, c) => <td key={c} className="px-3 py-2.5"><div className="h-3 w-full animate-pulse rounded bg-muted" /></td>)}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

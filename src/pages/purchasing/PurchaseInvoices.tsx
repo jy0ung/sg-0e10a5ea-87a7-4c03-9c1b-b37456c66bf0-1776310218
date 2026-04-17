@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Plus, Truck } from 'lucide-react';
+import { TableSkeleton } from '@/components/shared/TableSkeleton';
 
 type PIStatus = 'pending' | 'received' | 'cancelled';
 
@@ -177,7 +178,7 @@ export default function PurchaseInvoices() {
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Purchase Invoices" description="CBU vehicle procurement invoices from suppliers"
           breadcrumbs={[{ label: 'FLC BI' }, { label: 'Purchasing' }, { label: 'Purchase Invoices' }]} />
-        <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading invoices…</div>
+        <TableSkeleton rows={8} cols={6} colWidths={['w-24','w-32','w-28','w-24','w-20','w-16']} />
       </div>
     );
   }

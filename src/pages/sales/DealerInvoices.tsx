@@ -12,6 +12,8 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { getDealerInvoices, upsertDealerInvoice, deleteDealerInvoice } from '@/services/masterDataService';
 import { DealerInvoice } from '@/types';
 import { Plus, Pencil, Trash2, Eye } from 'lucide-react';
+import { TableSkeleton } from '@/components/shared/TableSkeleton';
+import { dealerInvoiceSchema } from '@/lib/validations';
 
 type FormState = {
   invoiceNo: string; branchId: string; dealerName: string; carModel: string;
@@ -59,7 +61,21 @@ export default function DealerInvoices() {
   };
 
   const handleSave = async () => {
-    if (!form.invoiceNo.trim() || !form.dealerName.trim()) return toast({ title: 'Invoice No and Dealer Name required', variant: 'destructive' });
+    const parsed = dealerInvoiceSchema.safeParse({
+      invoiceNo:   form.invoiceNo,
+      dealerName:  form.dealerName,
+      carModel:    form.carModel || undefined,
+      colour:      form.colour || undefined,
+      chassisNo:   form.chassisNo || undefined,
+      salesPrice:  form.salesPrice ? parseFloat(form.salesPrice) : undefined,
+      invoiceDate: form.invoiceDate || undefined,
+      branchId:    form.branchId || undefined,
+      status:      form.status,
+    });
+    if (!parsed.success) {
+      const first = parsed.error.errors[0];
+      return toast({ title: first.message, variant: 'destructive' });
+    }
     setSaving(true);
     const { error } = await upsertDealerInvoice(companyId, {
       id: editId ?? undefined,
@@ -103,7 +119,7 @@ export default function DealerInvoices() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center h-32 items-center text-muted-foreground">Loading…</div>
+        <TableSkeleton rows={8} cols={6} colWidths={['w-24','w-32','w-28','w-20','w-24','w-16']} />
       ) : (
         <div className="rounded-md border overflow-x-auto">
           <table className="w-full text-sm">

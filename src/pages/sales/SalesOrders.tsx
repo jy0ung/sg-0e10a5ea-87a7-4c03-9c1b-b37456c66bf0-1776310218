@@ -12,6 +12,8 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { createSalesOrder, createVehicleFromSalesOrder } from '@/services/salesOrderService';
 import { SalesOrder, SalesOrderStatus } from '@/types';
 import { Plus, Search, Link2, ChevronRight } from 'lucide-react';
+import { TableSkeleton } from '@/components/shared/TableSkeleton';
+import { salesOrderSchema } from '@/lib/validations';
 
 const STATUS_COLORS: Record<SalesOrderStatus, string> = {
   enquiry: 'bg-secondary text-secondary-foreground',
@@ -27,7 +29,7 @@ const STATUSES: SalesOrderStatus[] = ['enquiry','quoted','confirmed','booked','d
 export default function SalesOrders() {
   const { user } = useAuth();
   const companyId = useCompanyId();
-  const { salesOrders, customers, reloadSales } = useSales();
+  const { salesOrders, customers, reloadSales, loading } = useSales();
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -46,7 +48,29 @@ export default function SalesOrders() {
   );
 
   const handleCreate = async () => {
-    if (!form.orderNo || !form.customerId || !form.model) return toast({ title: 'Order No, Customer, and Model are required', variant: 'destructive' });
+    const result = salesOrderSchema.safeParse({
+      orderNo:      form.orderNo,
+      customerId:   form.customerId,
+      model:        form.model,
+      branchCode:   form.branchCode || undefined,
+      salesmanName: form.salesmanName || undefined,
+      variant:      form.variant || undefined,
+      colour:       form.colour || undefined,
+      bookingDate:  form.bookingDate,
+      bookingAmount: form.bookingAmount ? parseFloat(form.bookingAmount) : undefined,
+      totalPrice:   form.totalPrice ? parseFloat(form.totalPrice) : undefined,
+      status:       form.status,
+      vsoNo:        form.vsoNo || undefined,
+      depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : undefined,
+      bankLoanAmount: form.bankLoanAmount ? parseFloat(form.bankLoanAmount) : undefined,
+      financeCompany: form.financeCompany || undefined,
+      insuranceCompany: form.insuranceCompany || undefined,
+      plateNo:      form.plateNo || undefined,
+    });
+    if (!result.success) {
+      const first = result.error.errors[0];
+      return toast({ title: first.message, variant: 'destructive' });
+    }
     setCreating(true);
     const customer = customers.find(c => c.id === form.customerId);
     const { error } = await createSalesOrder(companyId, {
@@ -97,6 +121,9 @@ export default function SalesOrders() {
         actions={<Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" />New Order</Button>}
       />
 
+      {loading ? (
+        <TableSkeleton rows={8} cols={9} colWidths={['w-24','w-24','w-28','w-24','w-20','w-24','w-20','w-20','w-16']} />
+      ) : (
       <div className="glass-panel p-4">
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <div className="relative flex-1 min-w-40 max-w-xs">
@@ -154,6 +181,7 @@ export default function SalesOrders() {
           </table>
         </div>
       </div>
+      )}
 
       {/* New Order Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

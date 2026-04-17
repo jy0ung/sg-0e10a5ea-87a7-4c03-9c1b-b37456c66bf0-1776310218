@@ -111,3 +111,59 @@ export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
 export type SlaUpdateFormData = z.infer<typeof slaUpdateSchema>;
 export type ColumnPermissionFormData = z.infer<typeof columnPermissionSchema>;
 export type ImportBatchFormData = z.infer<typeof importBatchSchema>;
+
+// ─── CRUD form schemas ────────────────────────────────────────────────────────
+
+export const customerSchema = z.object({
+  name:    z.string().min(1, 'Name is required'),
+  phone:   z.string().optional(),
+  email:   z.string().email('Invalid email').optional().or(z.literal('')),
+  address: z.string().optional(),
+  nric:    z.string().optional(),
+});
+export type CustomerFormData = z.infer<typeof customerSchema>;
+
+export const salesOrderSchema = z.object({
+  orderNo:       z.string().min(1, 'Order No is required'),
+  customerId:    z.string().min(1, 'Customer is required'),
+  model:         z.string().min(1, 'Model is required'),
+  branchCode:    z.string().optional(),
+  salesmanName:  z.string().optional(),
+  variant:       z.string().optional(),
+  colour:        z.string().optional(),
+  bookingDate:   z.string().min(1, 'Booking date is required'),
+  bookingAmount: z.number({ invalid_type_error: 'Must be a number' }).positive('Must be positive').optional(),
+  totalPrice:    z.number({ invalid_type_error: 'Must be a number' }).positive('Must be positive').optional(),
+  status:        z.enum(['enquiry','quoted','confirmed','booked','delivered','cancelled']),
+  vsoNo:             z.string().optional(),
+  depositAmount:     z.number().nonnegative().optional(),
+  bankLoanAmount:    z.number().nonnegative().optional(),
+  financeCompany:    z.string().optional(),
+  insuranceCompany:  z.string().optional(),
+  plateNo:           z.string().optional(),
+});
+export type SalesOrderFormData = z.infer<typeof salesOrderSchema>;
+
+export const purchaseInvoiceSchema = z.object({
+  invoiceNo:   z.string().min(1, 'Invoice No is required'),
+  supplier:    z.string().min(1, 'Supplier is required'),
+  chassisNo:   z.string().min(1, 'Chassis No is required'),
+  model:       z.string().min(1, 'Model is required'),
+  invoiceDate: z.string().min(1, 'Invoice date is required'),
+  amount:      z.number({ invalid_type_error: 'Must be a number' }).positive('Amount must be positive'),
+  remark:      z.string().optional(),
+});
+export type PurchaseInvoiceFormData = z.infer<typeof purchaseInvoiceSchema>;
+
+export const dealerInvoiceSchema = z.object({
+  invoiceNo:  z.string().min(1, 'Invoice No is required'),
+  dealerName: z.string().min(1, 'Dealer Name is required'),
+  carModel:   z.string().optional(),
+  colour:     z.string().optional(),
+  chassisNo:  z.string().optional(),
+  salesPrice: z.number().positive().optional(),
+  invoiceDate: z.string().optional(),
+  branchId:   z.string().optional(),
+  status:     z.string().min(1, 'Status is required'),
+});
+export type DealerInvoiceFormData = z.infer<typeof dealerInvoiceSchema>;

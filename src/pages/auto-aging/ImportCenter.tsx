@@ -467,7 +467,7 @@ export default function ImportCenter() {
             </div>
 
             <div className="flex gap-2 flex-wrap">
-              <Button onClick={handlePublish} disabled={hasHardErrors}>
+              <Button onClick={handlePublish} disabled={hasHardErrors || step === 'publishing'}>
                 <CheckCircle className="h-4 w-4 mr-1" />{publishLabel}
               </Button>
               <Button variant="outline" onClick={reset}>Cancel</Button>
