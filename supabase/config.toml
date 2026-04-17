@@ -1,1 +1,14 @@
 project_id = "rbmsbppvpgcrmtkdfahy"
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/signup", "http://localhost:3000/reset-password"]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+# Override the invite email template so the link points to /signup
+[auth.email.template.invite]
+subject = "You've been invited to FLC BI"
+content_path = "supabase/templates/invite.html"

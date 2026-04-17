@@ -1,0 +1,31 @@
+<html>
+  <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f9fafb; padding: 40px 0;">
+    <div style="max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
+      <div style="background: #1a1a2e; padding: 24px; text-align: center;">
+        <div style="display: inline-block; width: 40px; height: 40px; background: #c8a951; border-radius: 8px; line-height: 40px; color: #1a1a2e; font-weight: bold; font-size: 18px;">F</div>
+        <h1 style="color: #ffffff; font-size: 20px; margin: 8px 0 0;">FLC BI</h1>
+      </div>
+      <div style="padding: 32px 24px;">
+        <h2 style="color: #1a1a2e; font-size: 18px; margin: 0 0 12px;">You've been invited!</h2>
+        <p style="color: #4b5563; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
+          An administrator has invited you to join FLC BI. Click the button below to set up your account and password.
+        </p>
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="{{ .SiteURL }}/signup#type=invite&access_token={{ .Token }}&token_hash={{ .TokenHash }}" 
+             style="display: inline-block; background: #c8a951; color: #1a1a2e; font-weight: 600; font-size: 14px; padding: 12px 32px; border-radius: 8px; text-decoration: none;">
+            Complete Sign Up
+          </a>
+        </div>
+        <p style="color: #9ca3af; font-size: 12px; line-height: 1.5; margin: 16px 0 0;">
+          If the button doesn't work, copy and paste this link into your browser:<br>
+          <a href="{{ .SiteURL }}/signup#type=invite&access_token={{ .Token }}&token_hash={{ .TokenHash }}" style="color: #c8a951; word-break: break-all;">
+            {{ .SiteURL }}/signup#type=invite&access_token={{ .Token }}&token_hash={{ .TokenHash }}
+          </a>
+        </p>
+        <p style="color: #9ca3af; font-size: 12px; margin: 16px 0 0;">
+          This link expires in 24 hours. If it has expired, ask your administrator to resend the invitation.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

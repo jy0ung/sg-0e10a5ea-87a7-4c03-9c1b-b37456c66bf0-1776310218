@@ -227,7 +227,28 @@ const App = () => {
   );
 };
 
-const root = createRoot(document.getElementById("root")!);
-root.render(<App />);
+// Detect invite/signup callback tokens landing on the wrong page and redirect
+// to /signup BEFORE React or Supabase JS processes (and consumes) the tokens.
+function shouldRedirectInviteToSignup(): boolean {
+  const { pathname, hash, search } = window.location;
+  // Already on signup or reset-password — nothing to do
+  if (pathname === '/signup' || pathname === '/reset-password') return false;
+
+  const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+  const searchParams = new URLSearchParams(search);
+  const type = hashParams.get('type') || searchParams.get('type');
+
+  if (type === 'invite' || type === 'signup' || type === 'magiclink') {
+    // Hard redirect preserving both search and hash so tokens survive
+    window.location.replace(`/signup${search}${hash}`);
+    return true;
+  }
+  return false;
+}
+
+if (!shouldRedirectInviteToSignup()) {
+  const root = createRoot(document.getElementById("root")!);
+  root.render(<App />);
+}
 
 export default App;

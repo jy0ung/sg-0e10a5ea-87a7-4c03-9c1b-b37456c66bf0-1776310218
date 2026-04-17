@@ -47,6 +47,24 @@ export default function SignUpPage() {
         !!(accessToken || tokenHash || code);
 
       if (!isInviteCallback) {
+        // No tokens in URL — check if Supabase already auto-processed them
+        // and established a session (the client consumes hash tokens on load)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          // Session exists — the user was invited and tokens were auto-consumed.
+          // They still need to set their password.
+          if (isMounted) {
+            setEmail(session.user.email || '');
+            const metaName = session.user.user_metadata?.name || '';
+            if (metaName) {
+              form.setValue('name', metaName, { shouldValidate: true });
+            }
+            setIsInvite(true);
+            setInitializing(false);
+          }
+          return;
+        }
+
         if (isMounted) {
           setError('Invalid or expired invitation link. Please ask your administrator to resend the invitation.');
           setInitializing(false);
