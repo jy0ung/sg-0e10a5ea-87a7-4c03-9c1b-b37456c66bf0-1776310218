@@ -3,14 +3,20 @@ import { AppSidebar } from './AppSidebar';
 import { Bell, Search } from 'lucide-react';
 import { Link, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFocusedMode } from '@/hooks/useFocusedMode';
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
+  const { isFocused } = useFocusedMode();
 
   return (
     <div className="h-screen flex w-full bg-background overflow-hidden">
-      <AppSidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+      <AppSidebar
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+        isFocused={isFocused}
+      />
       <div className="flex-1 flex flex-col min-w-0 h-screen">
         {/* Top bar */}
         <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-card/50 backdrop-blur-sm flex-shrink-0 z-10">

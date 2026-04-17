@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 export default function LoginPage() {
   const { login, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from: string = (location.state as { from?: Location })?.from
+    ? `${(location.state as { from: Location }).from.pathname}${(location.state as { from: Location }).from.search}`
+    : '/';
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -20,9 +24,9 @@ export default function LoginPage() {
     mode: 'onChange',
   });
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated — honour the intended destination
   if (!loading && isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={from} replace />;
   }
 
   const handleLoginSubmit = async (data: LoginFormData) => {
@@ -31,7 +35,7 @@ export default function LoginPage() {
     const { error: err } = await login(data.email, data.password);
     setSubmitting(false);
     if (err) setError(err);
-    else navigate('/', { replace: true });
+    else navigate(from, { replace: true });
   };
 
   return (

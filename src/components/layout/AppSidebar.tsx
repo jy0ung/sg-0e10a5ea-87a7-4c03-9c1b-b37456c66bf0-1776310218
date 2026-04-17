@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Timer, LayoutDashboard, Bell, Settings, Shield, FileText,
-  LogOut, ChevronLeft, ChevronRight, ChevronDown, Upload, Car, AlertTriangle, Gauge,
+  LogOut, ChevronLeft, ChevronRight, ChevronDown, Upload, Car, AlertTriangle, Gauge, ArrowLeft,
   Map, History, Grid3X3, BarChart3, DollarSign, FileSpreadsheet,
   ShoppingCart, Users, KanbanSquare, Receipt, Target, TrendingUp,
   Package, ArrowLeftRight, Truck, UserCheck, GitBranch, Database,
@@ -82,6 +82,23 @@ const navItems: NavItem[] = [
   { label: 'Settings', path: '/admin/settings', icon: Settings, section: 'Admin' },
 ];
 
+/** Maps a URL path prefix to the sidebar section name it belongs to. */
+const PATH_TO_SECTION: Record<string, string> = {
+  '/auto-aging': 'Auto Aging',
+  '/sales': 'Sales',
+  '/inventory': 'Inventory',
+  '/purchasing': 'Purchasing',
+  '/reports': 'Reports',
+  '/admin': 'Admin',
+};
+
+function getFocusedSection(pathname: string): string | null {
+  for (const [prefix, section] of Object.entries(PATH_TO_SECTION)) {
+    if (pathname.startsWith(prefix)) return section;
+  }
+  return null;
+}
+
 function getInitials(name?: string): string {
   if (!name) return '?';
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -129,16 +146,31 @@ const NavItemLink = React.memo(function NavItemLink({ item, collapsed, pathname 
 interface AppSidebarProps {
   collapsed: boolean;
   setCollapsed: (v: boolean) => void;
+  isFocused?: boolean;
 }
 
-export function AppSidebar({ collapsed, setCollapsed }: AppSidebarProps) {
+export function AppSidebar({ collapsed, setCollapsed, isFocused }: AppSidebarProps) {
   const { user, logout, hasRole } = useAuth();
   const location = useLocation();
   const pathname = location.pathname;
 
+  // In focused mode, only render the section that matches the current URL.
+  // Falls back to all sections when on a path with no matching module (e.g. "/").
+  const focusedSection = isFocused ? getFocusedSection(pathname) : null;
+  const visibleSections = focusedSection
+    ? sectionDefs.filter(s => s.name === focusedSection)
+    : sectionDefs;
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     const activeItem = navItems.find(item => isItemActive(item.path, pathname));
-    return Object.fromEntries(sectionDefs.map(s => [s.name, s.name === activeItem?.section]));
+    return Object.fromEntries(
+      sectionDefs.map(s => [
+        s.name,
+        // In focused mode the single visible section is always open.
+        // In full mode open only the section containing the current page.
+        isFocused ? s.name === focusedSection : s.name === activeItem?.section,
+      ])
+    );
   });
 
   const toggleSection = (name: string) => {
@@ -171,7 +203,31 @@ export function AppSidebar({ collapsed, setCollapsed }: AppSidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-1">
-          {sectionDefs.map(({ name, icon: SectionIcon }, index) => {
+          {/* Focused mode: back link to Module Directory */}
+          {isFocused && focusedSection && (
+            collapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    to="/modules"
+                    className="w-full flex justify-center py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors mb-1"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">All modules</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Link
+                to="/modules"
+                className="flex items-center gap-2 px-2 py-1.5 mb-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
+              >
+                <ArrowLeft className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>All modules</span>
+              </Link>
+            )
+          )}
+          {visibleSections.map(({ name, icon: SectionIcon }, index) => {
             const items = navItems.filter(n => n.section === name);
             const visibleItems = items.filter(item => {
               if (!item.roles) return true;
