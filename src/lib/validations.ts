@@ -24,6 +24,24 @@ export const resetPasswordSchema = z.object({
   path: ['confirmPassword'],
 });
 
+export const inviteSignupSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string().min(1, 'Please confirm your password'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
+});
+
+export const inviteUserSchema = z.object({
+  email: z.string().min(1, 'Email is required').email('Invalid email address'),
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst']),
+});
+
+export type InviteSignupFormData = z.infer<typeof inviteSignupSchema>;
+export type InviteUserFormData = z.infer<typeof inviteUserSchema>;
+
 // Vehicle schemas
 export const vehicleSchema = z.object({
   chassis_no: z.string().min(1, 'Chassis number is required'),

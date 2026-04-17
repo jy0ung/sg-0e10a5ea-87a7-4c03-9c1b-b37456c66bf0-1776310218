@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Shield, Loader2, Save, Settings } from 'lucide-react';
+import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,7 +15,7 @@ import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import type { BranchRecord } from '@/types';
 import { PermissionEditor } from '@/components/admin/PermissionEditor';
-import { userUpdateSchema, type UserUpdateFormData } from '@/lib/validations';
+import { userUpdateSchema, inviteUserSchema, type UserUpdateFormData, type InviteUserFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
@@ -64,6 +64,10 @@ export default function UserManagement() {
   const [permissionUserId, setPermissionUserId] = useState<string>('');
   const [permissionUserName, setPermissionUserName] = useState<string>('');
   const [permissionUserRole, setPermissionUserRole] = useState<string>('');
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [signupUrl, setSignupUrl] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const editForm = useForm<UserUpdateFormData>({
     resolver: zodResolver(userUpdateSchema),
@@ -77,6 +81,16 @@ export default function UserManagement() {
   });
 
   const canManage = hasRole(['super_admin', 'company_admin']);
+
+  const inviteForm = useForm<InviteUserFormData>({
+    resolver: zodResolver(inviteUserSchema),
+    defaultValues: {
+      email: '',
+      name: '',
+      role: 'analyst',
+    },
+    mode: 'onChange',
+  });
 
   useEffect(() => {
     async function load() {
@@ -140,6 +154,61 @@ export default function UserManagement() {
     setSaving(false);
   };
 
+  const getSignupUrl = () => {
+    const origin = window.location.origin;
+    return `${origin}/signup`;
+  };
+
+  const handleCopySignupLink = async () => {
+    const url = getSignupUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      toast.success('Sign-up link copied to clipboard');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy link');
+    }
+  };
+
+  const handleInvite = async (data: InviteUserFormData) => {
+    setInviting(true);
+
+    const { data: result, error } = await supabase.functions.invoke('invite-user', {
+      body: {
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        company_id: user?.company_id || '',
+      },
+    });
+
+    setInviting(false);
+
+    if (error) {
+      toast.error('Failed to send invitation: ' + error.message);
+      return;
+    }
+
+    if (result?.error) {
+      toast.error('Failed to send invitation: ' + result.error);
+      return;
+    }
+
+    toast.success(`Invitation sent to ${data.email}`);
+    setSignupUrl(getSignupUrl());
+    inviteForm.reset();
+
+    // Reload profiles to show the new user
+    const { data: refreshed } = await supabase
+      .from('profiles')
+      .select('id, email, name, role, company_id, branch_id, access_scope, created_at')
+      .order('created_at', { ascending: true });
+    if (refreshed) {
+      setProfiles(refreshed as unknown as ProfileRow[]);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -150,7 +219,21 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Users & Roles" description="Manage platform users, roles, and access scope" breadcrumbs={[{ label: 'FLC BI' }, { label: 'Admin' }, { label: 'Users & Roles' }]} />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <PageHeader title="Users & Roles" description="Manage platform users, roles, and access scope" breadcrumbs={[{ label: 'FLC BI' }, { label: 'Admin' }, { label: 'Users & Roles' }]} />
+        {canManage && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleCopySignupLink}>
+              {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
+              {copied ? 'Copied' : 'Copy Sign-Up Link'}
+            </Button>
+            <Button size="sm" onClick={() => { setInviteOpen(true); setSignupUrl(''); }}>
+              <UserPlus className="h-4 w-4 mr-1" />
+              Invite User
+            </Button>
+          </div>
+        )}
+      </div>
       <div className="glass-panel overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -301,6 +384,98 @@ export default function UserManagement() {
               onCancel={() => setPermissionUserId('')}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Invite User Dialog */}
+      <Dialog open={inviteOpen} onOpenChange={(open) => { if (!open) { setInviteOpen(false); setSignupUrl(''); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invite New User</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            {signupUrl ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20 text-center space-y-2">
+                  <CheckCircle className="h-8 w-8 text-primary mx-auto" />
+                  <p className="text-sm font-medium text-foreground">Invitation sent!</p>
+                  <p className="text-xs text-muted-foreground">
+                    The user will receive an email with a link to set up their account.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Sign-Up Page Link</Label>
+                  <p className="text-xs text-muted-foreground">
+                    You can also share this link directly with the user:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input readOnly value={signupUrl} className="bg-secondary text-xs" />
+                    <Button variant="outline" size="sm" onClick={handleCopySignupLink}>
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <Button className="w-full" variant="outline" onClick={() => { setInviteOpen(false); setSignupUrl(''); }}>
+                  Done
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={inviteForm.handleSubmit(handleInvite)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Email Address</Label>
+                  <Input
+                    type="email"
+                    {...inviteForm.register('email')}
+                    className={inviteForm.formState.errors.email ? 'border-destructive' : ''}
+                    placeholder="user@company.com"
+                  />
+                  {inviteForm.formState.errors.email && (
+                    <p className="text-destructive text-xs">{inviteForm.formState.errors.email.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input
+                    type="text"
+                    {...inviteForm.register('name')}
+                    className={inviteForm.formState.errors.name ? 'border-destructive' : ''}
+                    placeholder="John Doe"
+                  />
+                  {inviteForm.formState.errors.name && (
+                    <p className="text-destructive text-xs">{inviteForm.formState.errors.name.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select value={inviteForm.watch('role')} onValueChange={(v) => inviteForm.setValue('role', v as InviteUserFormData['role'])}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ROLES.map(r => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
+                  <p className="font-medium text-foreground">What happens next?</p>
+                  <p className="text-muted-foreground">
+                    An invitation email will be sent to the user with a link to set up their account and password on the sign-up page.
+                  </p>
+                </div>
+
+                <Button type="submit" className="w-full" disabled={inviting || !inviteForm.formState.isValid}>
+                  {inviting ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending invitation...</>
+                  ) : (
+                    <><UserPlus className="h-4 w-4 mr-2" />Send Invitation</>
+                  )}
+                </Button>
+              </form>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

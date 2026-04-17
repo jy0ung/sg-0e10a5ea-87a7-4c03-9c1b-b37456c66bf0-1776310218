@@ -27,6 +27,7 @@ const NewTicket = lazy(() => import("./pages/tickets/NewTicket"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const SignUpPage = lazy(() => import("./pages/SignUpPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const ModuleDirectory = lazy(() => import("./pages/ModuleDirectory"));
@@ -199,6 +200,10 @@ const router = createBrowserRouter([
   {
     path: "/reset-password",
     element: <S><ResetPasswordPage /></S>,
+  },
+  {
+    path: "/signup",
+    element: <S><SignUpPage /></S>,
   },
   {
     path: "*",

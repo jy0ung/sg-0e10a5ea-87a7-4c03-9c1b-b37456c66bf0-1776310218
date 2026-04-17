@@ -96,7 +96,8 @@ export default function LoginPage() {
             Forgot your password?
           </Link>
           <p className="text-sm text-muted-foreground">
-            Staff accounts are created by an administrator. If you have been invited already, use password reset to set or recover your password.
+            Received an invitation?{' '}
+            <Link to="/signup" className="text-primary hover:underline">Complete your sign up</Link>
           </p>
         </div>
       </div>
