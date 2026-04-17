@@ -16,9 +16,9 @@ import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 
 type FormState = {
   name: string; accCode: string; companyRegNo: string;
-  address: string; contactNo: string; email: string; status: string;
+  companyAddress: string; contactNo: string; email: string; status: string;
 };
-const empty: FormState = { name: '', accCode: '', companyRegNo: '', address: '', contactNo: '', email: '', status: 'Active' };
+const empty: FormState = { name: '', accCode: '', companyRegNo: '', companyAddress: '', contactNo: '', email: '', status: 'Active' };
 
 export default function Dealers() {
   const { hasRole } = useAuth();
@@ -46,7 +46,7 @@ export default function Dealers() {
   const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
   const openEdit = (d: Dealer) => {
     setEditId(d.id);
-    setForm({ name: d.name, accCode: d.accCode ?? '', companyRegNo: d.companyRegNo ?? '', address: d.address ?? '', contactNo: d.contactNo ?? '', email: d.email ?? '', status: d.status });
+    setForm({ name: d.name, accCode: d.accCode ?? '', companyRegNo: d.companyRegNo ?? '', companyAddress: d.companyAddress ?? '', contactNo: d.contactNo ?? '', email: d.email ?? '', status: d.status });
     setDialogOpen(true);
   };
 
@@ -58,7 +58,7 @@ export default function Dealers() {
       name: form.name.trim(),
       accCode: form.accCode.trim() || undefined,
       companyRegNo: form.companyRegNo.trim() || undefined,
-      address: form.address.trim() || undefined,
+      companyAddress: form.companyAddress.trim() || undefined,
       contactNo: form.contactNo.trim() || undefined,
       email: form.email.trim() || undefined,
       status: form.status,
@@ -72,7 +72,8 @@ export default function Dealers() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await deleteDealer(deleteTarget.id);
+    const { error } = await deleteDealer(deleteTarget.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await load();
     setDeleteTarget(null);
     toast({ title: 'Dealer deleted' });
@@ -133,7 +134,7 @@ export default function Dealers() {
               ['name', 'Name *', 'e.g. Best Motors Sdn Bhd'],
               ['accCode', 'Acc. Code', 'e.g. BM001'],
               ['companyRegNo', 'Company Reg No', 'e.g. 123456-A'],
-              ['address', 'Address', ''],
+              ['companyAddress', 'Address', ''],
               ['contactNo', 'Contact No', 'e.g. 03-12345678'],
               ['email', 'Email', 'e.g. dealer@example.com'],
               ['status', 'Status', 'Active / Inactive'],

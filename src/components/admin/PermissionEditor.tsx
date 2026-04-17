@@ -100,11 +100,6 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
   // Column permissions
   const [columnPermissions, setColumnPermissions] = useState<Record<string, PermissionLevel>>({});
 
-  // Load existing permissions
-  useEffect(() => {
-    loadPermissions();
-  }, [userId, loadPermissions]);
-
   const loadPermissions = useCallback(async () => {
     setLoading(true);
     try {
@@ -128,6 +123,11 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
       setLoading(false);
     }
   }, [userId]);
+
+  // Load existing permissions
+  useEffect(() => {
+    loadPermissions();
+  }, [userId, loadPermissions]);
 
   const applyTemplate = (template: keyof typeof PERMISSION_TEMPLATES) => {
     const newPerms: Record<string, PermissionLevel> = {};

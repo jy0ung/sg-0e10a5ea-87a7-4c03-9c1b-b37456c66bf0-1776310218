@@ -69,6 +69,15 @@ export const profileUpdateSchema = z.object({
   branch_id: z.string().nullable().optional(),
 });
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+  confirmPassword: z.string().min(1, 'Please confirm your new password'),
+}).refine((d) => d.newPassword === d.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
+});
+
 // SLA schemas
 export const slaUpdateSchema = z.object({
   sla_days: z.coerce.number().min(1, 'SLA days must be at least 1').max(365, 'SLA days cannot exceed 365'),
@@ -98,6 +107,7 @@ export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 export type VehicleFormData = z.infer<typeof vehicleSchema>;
 export type UserUpdateFormData = z.infer<typeof userUpdateSchema>;
 export type ProfileUpdateFormData = z.infer<typeof profileUpdateSchema>;
+export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
 export type SlaUpdateFormData = z.infer<typeof slaUpdateSchema>;
 export type ColumnPermissionFormData = z.infer<typeof columnPermissionSchema>;
 export type ImportBatchFormData = z.infer<typeof importBatchSchema>;

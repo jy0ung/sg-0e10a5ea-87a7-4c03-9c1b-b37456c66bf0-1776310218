@@ -16,9 +16,9 @@ import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 
 type FormState = {
   name: string; code: string; companyRegNo: string;
-  address: string; contactNo: string; email: string; status: string;
+  companyAddress: string; contactNo: string; email: string; status: string;
 };
-const empty: FormState = { name: '', code: '', companyRegNo: '', address: '', contactNo: '', email: '', status: 'Active' };
+const empty: FormState = { name: '', code: '', companyRegNo: '', companyAddress: '', contactNo: '', email: '', status: 'Active' };
 
 export default function Suppliers() {
   const { hasRole } = useAuth();
@@ -46,7 +46,7 @@ export default function Suppliers() {
   const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
   const openEdit = (s: Supplier) => {
     setEditId(s.id);
-    setForm({ name: s.name, code: s.code ?? '', companyRegNo: s.companyRegNo ?? '', address: s.address ?? '', contactNo: s.contactNo ?? '', email: s.email ?? '', status: s.status });
+    setForm({ name: s.name, code: s.code ?? '', companyRegNo: s.companyRegNo ?? '', companyAddress: s.companyAddress ?? '', contactNo: s.contactNo ?? '', email: s.email ?? '', status: s.status });
     setDialogOpen(true);
   };
 
@@ -58,7 +58,7 @@ export default function Suppliers() {
       name: form.name.trim(),
       code: form.code.trim() || undefined,
       companyRegNo: form.companyRegNo.trim() || undefined,
-      address: form.address.trim() || undefined,
+      companyAddress: form.companyAddress.trim() || undefined,
       contactNo: form.contactNo.trim() || undefined,
       email: form.email.trim() || undefined,
       status: form.status,
@@ -72,7 +72,8 @@ export default function Suppliers() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await deleteSupplier(deleteTarget.id);
+    const { error } = await deleteSupplier(deleteTarget.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await load();
     setDeleteTarget(null);
     toast({ title: 'Supplier deleted' });
@@ -133,7 +134,7 @@ export default function Suppliers() {
               ['name', 'Name *', 'e.g. Proton Edar Sdn Bhd'],
               ['code', 'Code', 'e.g. PE'],
               ['companyRegNo', 'Company Reg No', 'e.g. 123456-A'],
-              ['address', 'Address', ''],
+              ['companyAddress', 'Address', ''],
               ['contactNo', 'Contact No', 'e.g. 03-12345678'],
               ['email', 'Email', 'e.g. supplier@example.com'],
               ['status', 'Status', 'Active / Inactive'],

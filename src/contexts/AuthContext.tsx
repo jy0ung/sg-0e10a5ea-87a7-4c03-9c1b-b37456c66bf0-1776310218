@@ -50,9 +50,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: userId,
             email: '',
             name: 'User',
-            role: 'user',
+            role: 'analyst',
             company_id: 'default',
-            access_scope: 'own_branch',
+            access_scope: 'self',
           });
         }
       } else if (data) {
@@ -67,9 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: userId,
         email: '',
         name: 'User',
-        role: 'user',
+        role: 'analyst',
         company_id: 'default',
-        access_scope: 'own_branch',
+        access_scope: 'self',
       });
     }
   }, []);

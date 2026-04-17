@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -60,7 +61,8 @@ export default function UserGroups() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await deleteUserGroup(deleteTarget.id);
+    const { error } = await deleteUserGroup(deleteTarget.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await load();
     setDeleteTarget(null);
     toast({ title: 'User group deleted' });
@@ -117,7 +119,15 @@ export default function UserGroups() {
             </div>
             <div className="grid grid-cols-3 items-center gap-4">
               <Label className="text-right">Status</Label>
-              <Input className="col-span-2" placeholder="Active / Inactive" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} />
+              <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+                <SelectTrigger className="col-span-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

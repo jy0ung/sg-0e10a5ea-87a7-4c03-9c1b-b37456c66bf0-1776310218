@@ -322,7 +322,13 @@ export default function MasterData() {
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll(); setTtDialog({ open: false, values: {} }); toast({ title: ttDialog.id ? 'Updated' : 'Created' });
   };
-  const ttDel = async () => { if (!ttDelete) return; await deleteTinType(ttDelete.id); await loadAll(); setTtDelete(null); };
+  const ttDel = async () => {
+    if (!ttDelete) return;
+    const { error } = await deleteTinType(ttDelete.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll();
+    setTtDelete(null);
+  };
 
   // ── Registration Fee handlers ──
   const rfSave = async () => {
@@ -334,7 +340,13 @@ export default function MasterData() {
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll(); setRfDialog({ open: false, values: {} }); toast({ title: rfDialog.id ? 'Updated' : 'Created' });
   };
-  const rfDel = async () => { if (!rfDelete) return; await deleteRegistrationFee(rfDelete.id); await loadAll(); setRfDelete(null); };
+  const rfDel = async () => {
+    if (!rfDelete) return;
+    const { error } = await deleteRegistrationFee(rfDelete.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll();
+    setRfDelete(null);
+  };
 
   // ── Road Tax Fee handlers ──
   const rtSave = async () => {
@@ -346,7 +358,13 @@ export default function MasterData() {
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll(); setRtDialog({ open: false, values: {} }); toast({ title: rtDialog.id ? 'Updated' : 'Created' });
   };
-  const rtDel = async () => { if (!rtDelete) return; await deleteRoadTaxFee(rtDelete.id); await loadAll(); setRtDelete(null); };
+  const rtDel = async () => {
+    if (!rtDelete) return;
+    const { error } = await deleteRoadTaxFee(rtDelete.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll();
+    setRtDelete(null);
+  };
 
   // ── Inspection Fee handlers ──
   const ifSave = async () => {
@@ -358,7 +376,13 @@ export default function MasterData() {
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll(); setIfDialog({ open: false, values: {} }); toast({ title: ifDialog.id ? 'Updated' : 'Created' });
   };
-  const ifDel = async () => { if (!ifDelete) return; await deleteInspectionFee(ifDelete.id); await loadAll(); setIfDelete(null); };
+  const ifDel = async () => {
+    if (!ifDelete) return;
+    const { error } = await deleteInspectionFee(ifDelete.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll();
+    setIfDelete(null);
+  };
 
   // ── Handling Fee handlers ──
   const hfSave = async () => {
@@ -370,7 +394,13 @@ export default function MasterData() {
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll(); setHfDialog({ open: false, values: {} }); toast({ title: hfDialog.id ? 'Updated' : 'Created' });
   };
-  const hfDel = async () => { if (!hfDelete) return; await deleteHandlingFee(hfDelete.id); await loadAll(); setHfDelete(null); };
+  const hfDel = async () => {
+    if (!hfDelete) return;
+    const { error } = await deleteHandlingFee(hfDelete.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll();
+    setHfDelete(null);
+  };
 
   // ── Additional Item handlers ──
   const aiSave = async () => {
@@ -382,7 +412,13 @@ export default function MasterData() {
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll(); setAiDialog({ open: false, values: {} }); toast({ title: aiDialog.id ? 'Updated' : 'Created' });
   };
-  const aiDel = async () => { if (!aiDelete) return; await deleteAdditionalItem(aiDelete.id); await loadAll(); setAiDelete(null); };
+  const aiDel = async () => {
+    if (!aiDelete) return;
+    const { error } = await deleteAdditionalItem(aiDelete.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll();
+    setAiDelete(null);
+  };
 
   // ── Payment Type handlers ──
   const ptSave = async () => {
@@ -394,7 +430,13 @@ export default function MasterData() {
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll(); setPtDialog({ open: false, values: {} }); toast({ title: ptDialog.id ? 'Updated' : 'Created' });
   };
-  const ptDel = async () => { if (!ptDelete) return; await deletePaymentType(ptDelete.id); await loadAll(); setPtDelete(null); };
+  const ptDel = async () => {
+    if (!ptDelete) return;
+    const { error } = await deletePaymentType(ptDelete.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll();
+    setPtDelete(null);
+  };
 
   // ── Bank handlers ──
   const bkSave = async () => {
@@ -406,7 +448,13 @@ export default function MasterData() {
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll(); setBkDialog({ open: false, values: {} }); toast({ title: bkDialog.id ? 'Updated' : 'Created' });
   };
-  const bkDel = async () => { if (!bkDelete) return; await deleteBank(bkDelete.id); await loadAll(); setBkDelete(null); };
+  const bkDel = async () => {
+    if (!bkDelete) return;
+    const { error } = await deleteBank(bkDelete.id);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await loadAll();
+    setBkDelete(null);
+  };
 
   const codeNameCols = [
     { key: 'code' as const, label: 'Code', className: 'font-mono font-semibold' },

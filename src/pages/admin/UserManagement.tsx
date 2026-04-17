@@ -58,8 +58,6 @@ export default function UserManagement() {
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [editUser, setEditUser] = useState<ProfileRow | null>(null);
-  const [editRole, setEditRole] = useState<string>('');
-  const [editScope, setEditScope] = useState<string>('');
   const [editBranch, setEditBranch] = useState<string>('none');
   const [saving, setSaving] = useState(false);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
@@ -90,6 +88,9 @@ export default function UserManagement() {
           .order('created_at', { ascending: true }),
         getBranches(user?.company_id || ''),
       ]);
+      if (profileRes.error) {
+        toast.error('Failed to load users: ' + profileRes.error.message);
+      }
       setProfiles((profileRes.data || []) as unknown as ProfileRow[]);
       setBranches(branchRes.data);
       setLoading(false);
@@ -99,8 +100,6 @@ export default function UserManagement() {
 
   const openEdit = (p: ProfileRow) => {
     setEditUser(p);
-    setEditRole(p.role);
-    setEditScope(p.access_scope);
     setEditBranch(p.branch_id || 'none');
     editForm.reset({
       name: p.name,
@@ -164,6 +163,13 @@ export default function UserManagement() {
             </tr>
           </thead>
           <tbody>
+            {profiles.length === 0 && (
+              <tr>
+                <td colSpan={canManage ? 6 : 5} className="px-4 py-10 text-center text-muted-foreground">
+                  No users found.
+                </td>
+              </tr>
+            )}
             {profiles.map(p => (
               <tr key={p.id} className="data-table-row">
                 <td className="px-4 py-3 text-foreground font-medium flex items-center gap-2">
@@ -217,7 +223,6 @@ export default function UserManagement() {
               <Select value={editForm.watch('role')} onValueChange={(v) => {
                 editForm.setValue('role', v as UserUpdateFormData['role']);
                 const defaultScope = ROLE_DEFAULT_SCOPE[v as AppRole] || 'company';
-                setEditScope(defaultScope);
                 editForm.setValue('access_scope', defaultScope as UserUpdateFormData['access_scope']);
               }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -232,7 +237,6 @@ export default function UserManagement() {
             <div className="space-y-2">
               <Label>Access Scope</Label>
               <Select value={editForm.watch('access_scope')} onValueChange={(v) => {
-                setEditScope(v);
                 editForm.setValue('access_scope', v as UserUpdateFormData['access_scope']);
               }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -257,7 +261,7 @@ export default function UserManagement() {
                 <SelectContent>
                   <SelectItem value="none">No branch assigned</SelectItem>
                   {branches.map(b => (
-                    <SelectItem key={b.id} value={b.code}>{b.name}</SelectItem>
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

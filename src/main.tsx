@@ -2,7 +2,7 @@ import "@/index.css";
 
 import React, { lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -18,6 +18,9 @@ import { errorTrackingService } from "@/services/errorTrackingService";
 errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
 
 // Route-level code splitting — all pages are loaded on demand
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const CustomerServiceLayout = lazy(() => import("./components/layout/CustomerServiceLayout"));
+const NewTicket = lazy(() => import("./pages/tickets/NewTicket"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
@@ -97,6 +100,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <SalesProvider><S><ExecutiveDashboard /></S></SalesProvider> },
+      { path: "profile", element: <Navigate to="/admin/settings" replace /> },
       { path: "modules", element: <S><ModuleDirectory /></S> },
       { path: "notifications", element: <S><Notifications /></S> },
       { path: "auto-aging", element: <S><AutoAgingDashboard /></S> },
@@ -135,6 +139,23 @@ const router = createBrowserRouter([
       { path: "sales/verify-or", element: <SalesProvider><S><VerifyOR /></S></SalesProvider> },
       { path: "reports", element: <S><ReportsCenter /></S> },
       { path: "inventory/chassis-filter", element: <S><ChassisFilter /></S> },
+    ],
+  },
+  {
+    path: "/welcome",
+    element: <S><LandingPage /></S>,
+  },
+  {
+    path: "/portal",
+    element: (
+      <ProtectedRoute>
+        <Suspense fallback={<PageSpinner />}>
+          <CustomerServiceLayout />
+        </Suspense>
+      </ProtectedRoute>
+    ),
+    children: [
+      { path: "tickets/new", element: <S><NewTicket /></S> },
     ],
   },
   {

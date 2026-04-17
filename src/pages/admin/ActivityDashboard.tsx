@@ -9,12 +9,9 @@ import {
   Car, 
   TrendingUp, 
   RefreshCw, 
-  Download, 
-  Calendar,
-  Filter,
+  Download,
   ChevronRight,
-  ArrowUp,
-  ArrowDown
+  Trash2
 } from 'lucide-react';
 import { getAllAuditLogs, AuditLogWithProfile } from '@/services/auditService';
 import { formatDate, formatTime } from '@/lib/utils';
@@ -22,12 +19,9 @@ import { loggingService } from '@/services/loggingService';
 import { useAuth } from '@/contexts/AuthContext';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import {
-  Chart,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
 } from '@/components/ui/chart';
 import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, XAxis, YAxis, CartesianGrid } from 'recharts';
 
@@ -158,7 +152,7 @@ export default function ActivityDashboard() {
       case 'update':
         return <RefreshCw className="h-4 w-4 text-warning" />;
       case 'delete':
-        return <TrendingUp className="h-4 w-4 text-destructive" />;
+        return <Trash2 className="h-4 w-4 text-destructive" />;
       case 'permission_change':
         return <Users className="h-4 w-4 text-primary" />;
       default:
