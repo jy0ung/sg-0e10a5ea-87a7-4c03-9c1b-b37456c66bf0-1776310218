@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Customer, DealStage, SalesOrder, Invoice, SalesmanTarget } from '@/types';
 import { getCustomers } from '@/services/customerService';
@@ -75,6 +75,20 @@ export function SalesProvider({ children }: { children: ReactNode }) {
   const reloadSales = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId) });
   }, [queryClient, companyId]);
+
+  // Realtime: invalidate the sales cache whenever a sales_order row changes.
+  useEffect(() => {
+    if (!companyId) return;
+    const channel = supabase
+      .channel(`realtime:sales_orders:${companyId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sales_orders', filter: `company_id=eq.${companyId}` },
+        () => { queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId) }); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [companyId, queryClient]);
 
   /** Optimistically update deal-stage in cache then persist to DB. */
   const moveOrderStage = useCallback(async (orderId: string, stageId: string) => {

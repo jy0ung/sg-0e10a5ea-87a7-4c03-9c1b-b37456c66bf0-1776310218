@@ -1,47 +1,80 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { getNotifications, markAsRead, markAllAsRead, NotificationRow } from '@/services/notificationService';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCheck, Bell } from 'lucide-react';
+import { CheckCheck, Bell } from 'lucide-react';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/shared/TableSkeleton';
 
 export default function Notifications() {
   const { user } = useAuth();
-  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const notifKey = ['notifications', user?.id ?? ''] as const;
 
-  const load = useCallback(async () => {
+  const { data: notifications = [], isLoading } = useQuery({
+    queryKey: notifKey,
+    queryFn: () => getNotifications(user!.id).then(r => r.data),
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+
+  // Realtime: prepend new notifications live without a full refetch.
+  useEffect(() => {
     if (!user) return;
-    setLoading(true);
-    const { data } = await getNotifications(user.id);
-    setNotifications(data);
-    setLoading(false);
-  }, [user]);
-
-  useEffect(() => { load(); }, [load]);
+    const channel = supabase
+      .channel(`realtime:notifications:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          queryClient.setQueryData<NotificationRow[]>(notifKey, prev =>
+            [payload.new as NotificationRow, ...(prev ?? [])]
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          queryClient.setQueryData<NotificationRow[]>(notifKey, prev =>
+            (prev ?? []).map(n => n.id === (payload.new as NotificationRow).id ? payload.new as NotificationRow : n)
+          );
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleMarkRead = async (id: string) => {
     const { error } = await markAsRead(id);
     if (error) { toast.error('Failed to mark as read'); return; }
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    queryClient.setQueryData<NotificationRow[]>(notifKey, prev =>
+      (prev ?? []).map(n => n.id === id ? { ...n, read: true } : n)
+    );
   };
 
   const handleMarkAllRead = async () => {
     if (!user) return;
     const { error } = await markAllAsRead(user.id);
     if (error) { toast.error('Failed to mark all as read'); return; }
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    queryClient.setQueryData<NotificationRow[]>(notifKey, prev =>
+      (prev ?? []).map(n => ({ ...n, read: true }))
+    );
     toast.success('All notifications marked as read');
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader title="Notifications" description="System alerts and updates" />
+        <TableSkeleton rows={6} cols={1} />
       </div>
     );
   }

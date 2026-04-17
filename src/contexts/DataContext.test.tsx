@@ -17,11 +17,19 @@ const createDefaultBuilder = () => {
   return builder;
 };
 
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(() => createDefaultBuilder()),
-  }
-}));
+vi.mock('@/integrations/supabase/client', () => {
+  const channelStub = {
+    on: vi.fn().mockReturnThis(),
+    subscribe: vi.fn().mockReturnThis(),
+  };
+  return {
+    supabase: {
+      from: vi.fn(() => createDefaultBuilder()),
+      channel: vi.fn(() => channelStub),
+      removeChannel: vi.fn(),
+    }
+  };
+});
 
 vi.mock('@/contexts/AuthContext', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => children,

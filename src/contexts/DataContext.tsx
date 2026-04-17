@@ -173,6 +173,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     await queryClient.invalidateQueries({ queryKey: DATA_QUERY_KEY });
   }, [queryClient]);
 
+  // Realtime: invalidate whenever a vehicle row changes in this company.
+  useEffect(() => {
+    if (!companyId) return;
+    const channel = supabase
+      .channel(`realtime:vehicles:${companyId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vehicles', filter: `company_id=eq.${companyId}` },
+        () => { queryClient.invalidateQueries({ queryKey: DATA_QUERY_KEY }); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [companyId, queryClient]);
+
   const setVehicles = useCallback(async (v: VehicleCanonical[]) => {
     const queryId = `vehicles-upsert-${Date.now()}`;
     performanceService.startQueryTimer(queryId);
