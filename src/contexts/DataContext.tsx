@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { VehicleCanonical, ImportBatch, DataQualityIssue, SlaPolicy, KpiSummary } from '@/types';
 import { computeKpiSummaries } from '@/utils/kpi-computation';
@@ -174,14 +174,10 @@ async function fetchDataFromDb(companyId: string, branchCode?: string | null) {
   return { vehicles: dbVehicles, batches: dbBatches, issues: dbIssues, slas: dbSlas, errors };
 }
 
-export function DataProvider({ children }: { children: React.ReactNode }) {
-  const [vehicles, setVehiclesState] = useState<VehicleCanonical[]>([]);
-  const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
-  const [qualityIssues, setQualityIssues] = useState<DataQualityIssue[]>([]);
-  const [slas, setSlas] = useState<SlaPolicy[]>([]);
-  const [kpiSummaries, setKpiSummaries] = useState<KpiSummary[]>([]);
-  const [lastRefresh, setLastRefresh] = useState(new Date().toISOString());
+type DataQueryResult = Awaited<ReturnType<typeof fetchDataFromDb>>;
+const emptyData: DataQueryResult = { vehicles: [], batches: [], issues: [], slas: [], errors: [] };
 
+export function DataProvider({ children }: { children: React.ReactNode }) {
   const companyId = useCompanyId();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -190,8 +186,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // Branch-scoped users only see their branch's vehicles.
   const branchId = user?.access_scope === 'branch' ? (user.branch_id ?? null) : null;
 
-  // React Query manages initial fetch and re-fetches after invalidation.
-  const { isLoading } = useQuery({
+  // React Query is the single source of truth — no local useState mirrors.
+  const { data, isLoading, dataUpdatedAt } = useQuery({
     queryKey: dataQueryKey(companyId, branchId),
     queryFn: async () => {
       let branchCode: string | null = null;
@@ -204,21 +200,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     staleTime: 60_000,
   });
 
-  // Sync server data to local state whenever the query cache updates.
-  const queryData = queryClient.getQueryData<Awaited<ReturnType<typeof fetchDataFromDb>>>(dataQueryKey(companyId, branchId));
+  // Derive all context values directly from query data.
+  const vehicles = data?.vehicles ?? [];
+  const importBatches = data?.batches ?? [];
+  const qualityIssues = data?.issues ?? [];
+  const slas = data?.slas ?? [];
+  const kpiSummaries = useMemo(() => computeKpiSummaries(vehicles, slas), [vehicles, slas]);
+  const lastRefresh = dataUpdatedAt ? new Date(dataUpdatedAt).toISOString() : new Date().toISOString();
+
+  // Surface fetch errors to users via toast (only once per fetch).
+  const lastErrorRef = useRef<string | null>(null);
   useEffect(() => {
-    if (queryData) {
-      setVehiclesState(queryData.vehicles);
-      setImportBatches(queryData.batches);
-      setQualityIssues(queryData.issues);
-      setSlas(queryData.slas);
-      setKpiSummaries(computeKpiSummaries(queryData.vehicles, queryData.slas));
-      setLastRefresh(new Date().toISOString());
-      if (queryData.errors.length > 0) {
-        toast({ title: `Failed to load: ${queryData.errors.join(', ')}`, variant: 'destructive' });
+    const errors = data?.errors ?? [];
+    if (errors.length > 0) {
+      const key = errors.join(',');
+      if (lastErrorRef.current !== key) {
+        lastErrorRef.current = key;
+        toast({ title: `Failed to load: ${errors.join(', ')}`, variant: 'destructive' });
       }
+    } else {
+      lastErrorRef.current = null;
     }
-  }, [queryData]);
+  }, [data?.errors, toast]);
 
   const reloadFromDb = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId, branchId) });
@@ -317,13 +320,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         loggingService.error('Import batch insert error', { error, batch: b }, 'DataContext');
       } else {
-        setImportBatches(prev => [b, ...prev]);
+        queryClient.setQueryData<DataQueryResult>(dataQueryKey(companyId, branchId), prev => {
+          const base = prev ?? emptyData;
+          return { ...base, batches: [b, ...base.batches] };
+        });
         loggingService.info('Import batch added', { batchId: b.id }, 'DataContext');
       }
     } catch (err) {
       loggingService.error('Unexpected error adding import batch', { error: err }, 'DataContext');
     }
-  }, [companyId]);
+  }, [companyId, queryClient, branchId]);
 
   const updateImportBatch = useCallback(async (id: string, updates: Partial<ImportBatch>) => {
     try {
@@ -339,13 +345,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         loggingService.error('Import batch update error', { error, id, updates }, 'DataContext');
       } else {
-        setImportBatches(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+        queryClient.setQueryData<DataQueryResult>(dataQueryKey(companyId, branchId), prev => {
+          const base = prev ?? emptyData;
+          return { ...base, batches: base.batches.map(b => b.id === id ? { ...b, ...updates } : b) };
+        });
         loggingService.info('Import batch updated', { batchId: id }, 'DataContext');
       }
     } catch (err) {
       loggingService.error('Unexpected error updating import batch', { error: err }, 'DataContext');
     }
-  }, []);
+  }, [queryClient, companyId, branchId]);
 
   const addQualityIssues = useCallback(async (issues: DataQualityIssue[]) => {
     if (issues.length === 0) return;
@@ -369,12 +378,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      setQualityIssues(prev => [...issues, ...prev]);
+      queryClient.setQueryData<DataQueryResult>(dataQueryKey(companyId, branchId), prev => {
+        const base = prev ?? emptyData;
+        return { ...base, issues: [...issues, ...base.issues] };
+      });
       loggingService.info('Quality issues added', { count: issues.length }, 'DataContext');
     } catch (err) {
       loggingService.error('Unexpected error adding quality issues', { error: err }, 'DataContext');
     }
-  }, [companyId]);
+  }, [companyId, queryClient, branchId]);
 
   const updateSla = useCallback(async (id: string, slaDays: number) => {
     try {
@@ -383,23 +395,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         loggingService.error('SLA update error', { error, id, slaDays }, 'DataContext');
       } else {
-        setSlas(prev => {
-          const updated = prev.map(s => s.id === id ? { ...s, slaDays } : s);
-          setKpiSummaries(computeKpiSummaries(vehicles, updated));
-          return updated;
+        queryClient.setQueryData<DataQueryResult>(dataQueryKey(companyId, branchId), prev => {
+          const base = prev ?? emptyData;
+          return { ...base, slas: base.slas.map(s => s.id === id ? { ...s, slaDays } : s) };
         });
         loggingService.info('SLA updated', { slaId: id, slaDays }, 'DataContext');
       }
     } catch (err) {
       loggingService.error('Unexpected error updating SLA', { error: err }, 'DataContext');
     }
-  }, [vehicles]);
+  }, [queryClient, companyId, branchId]);
 
   const refreshKpis = useCallback(() => {
-    setKpiSummaries(computeKpiSummaries(vehicles, slas));
-    setLastRefresh(new Date().toISOString());
-    loggingService.info('KPIs refreshed', { vehicleCount: vehicles.length }, 'DataContext');
-  }, [vehicles, slas]);
+    // KPIs are auto-derived via useMemo; this function triggers a cache touch
+    // to notify consumers. In practice, reloadFromDb is preferred.
+    queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId, branchId) });
+    loggingService.info('KPIs refresh requested', { vehicleCount: vehicles.length }, 'DataContext');
+  }, [queryClient, companyId, branchId, vehicles.length]);
 
   return (
     <DataContext.Provider value={{ vehicles, importBatches, qualityIssues, slas, kpiSummaries, lastRefresh, loading: isLoading, setVehicles, addImportBatch, updateImportBatch, addQualityIssues, updateSla, refreshKpis, reloadFromDb }}>

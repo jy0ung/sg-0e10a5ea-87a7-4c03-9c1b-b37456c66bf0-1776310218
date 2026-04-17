@@ -42,7 +42,7 @@ export default defineConfig(({ mode }) => ({
             "@radix-ui/react-tabs", "@radix-ui/react-toast",
             "@radix-ui/react-toggle", "@radix-ui/react-toggle-group",
             "@radix-ui/react-tooltip",
-            "lucide-react", "framer-motion", "sonner", "vaul", "cmdk",
+            "lucide-react", "sonner", "vaul", "cmdk",
             "input-otp", "embla-carousel-react", "react-day-picker",
             "react-resizable-panels", "next-themes",
           ],

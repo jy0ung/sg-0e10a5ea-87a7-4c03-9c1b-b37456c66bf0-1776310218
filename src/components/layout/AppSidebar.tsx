@@ -127,6 +127,7 @@ interface NavItemLinkProps {
   item: NavItem;
   collapsed: boolean;
   pathname: string;
+  onNavigate?: () => void;
 }
 
 function groupItems(items: NavItem[]): Array<{ group: string; items: NavItem[] }> {
@@ -145,11 +146,12 @@ function groupItems(items: NavItem[]): Array<{ group: string; items: NavItem[] }
   }));
 }
 
-const NavItemLink = React.memo(function NavItemLink({ item, collapsed, pathname }: NavItemLinkProps) {
+const NavItemLink = React.memo(function NavItemLink({ item, collapsed, pathname, onNavigate }: NavItemLinkProps) {
   const active = isItemActive(item.path, pathname);
   const link = (
     <Link
       to={item.path}
+      onClick={onNavigate}
       className={cn(
         "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150",
         collapsed && "justify-center px-2 py-2.5",
@@ -177,9 +179,10 @@ interface AppSidebarProps {
   collapsed: boolean;
   setCollapsed: (v: boolean) => void;
   isFocused?: boolean;
+  onNavigate?: () => void;
 }
 
-export function AppSidebar({ collapsed, setCollapsed, isFocused }: AppSidebarProps) {
+export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: AppSidebarProps) {
   const { user, logout, hasRole } = useAuth();
   const location = useLocation();
   const pathname = location.pathname;
@@ -328,14 +331,14 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused }: AppSidebarPro
                             {g.group}
                           </p>
                           {g.items.map(item => (
-                            <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} />
+                            <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
                           ))}
                         </div>
                       ))
                     ) : (
                       <div className="space-y-0.5">
                         {visibleItems.map(item => (
-                          <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} />
+                          <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
                         ))}
                       </div>
                     )}

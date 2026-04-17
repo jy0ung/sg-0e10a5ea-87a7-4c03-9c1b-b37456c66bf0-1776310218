@@ -26,7 +26,7 @@ async function fetchSalesData(companyId: string, branchCode?: string | null): Pr
   const [customersRes, ordersRes, stagesRes, invoicesRes, targetsRes] = await Promise.all([
     getCustomers(companyId),
     getSalesOrders(companyId, branchCode),
-    supabase.from('deal_stages').select('*').eq('company_id', companyId).order('sort_order'),
+    supabase.from('deal_stages').select('*').eq('company_id', companyId).order('stage_order'),
     getInvoices(companyId),
     getSalesmanTargets(companyId),
   ]);
@@ -35,9 +35,8 @@ async function fetchSalesData(companyId: string, branchCode?: string | null): Pr
     id: r.id as string,
     companyId: r.company_id as string,
     name: r.name as string,
-    sortOrder: r.sort_order as number,
-    isTerminal: r.is_terminal as boolean,
-    colour: r.colour as string | undefined,
+    stageOrder: r.stage_order as number,
+    color: r.color as string,
   }));
 
   return {

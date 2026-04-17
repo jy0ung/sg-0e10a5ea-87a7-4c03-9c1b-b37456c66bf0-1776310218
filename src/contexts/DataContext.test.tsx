@@ -199,7 +199,9 @@ describe('DataContext', () => {
       });
 
       expect(insertMock).toHaveBeenCalled();
-      expect(result.current.importBatches).toHaveLength(1);
+      await waitFor(() => {
+        expect(result.current.importBatches).toHaveLength(1);
+      });
     });
 
     it('updateImportBatch updates batch in database', async () => {
@@ -254,7 +256,9 @@ describe('DataContext', () => {
       });
 
       expect(insertMock).toHaveBeenCalled();
-      expect(result.current.qualityIssues).toHaveLength(1);
+      await waitFor(() => {
+        expect(result.current.qualityIssues).toHaveLength(1);
+      });
     });
 
     it('updateSla updates SLA in database and refreshes KPIs', async () => {

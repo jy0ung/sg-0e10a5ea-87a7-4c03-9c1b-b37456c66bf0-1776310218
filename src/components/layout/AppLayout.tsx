@@ -1,34 +1,57 @@
 import React, { useState } from 'react';
 import { AppSidebar } from './AppSidebar';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 import { Link, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFocusedMode } from '@/hooks/useFocusedMode';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { user } = useAuth();
   const { isFocused } = useFocusedMode();
+  const isMobile = useIsMobile();
+
+  const sidebar = (
+    <AppSidebar
+      collapsed={isMobile ? false : collapsed}
+      setCollapsed={setCollapsed}
+      isFocused={isFocused}
+      onNavigate={isMobile ? () => setMobileOpen(false) : undefined}
+    />
+  );
 
   return (
     <div className="h-screen flex w-full bg-background overflow-hidden">
-      <AppSidebar
-        collapsed={collapsed}
-        setCollapsed={setCollapsed}
-        isFocused={isFocused}
-      />
+      {/* Desktop sidebar */}
+      {!isMobile && sidebar}
+
+      {/* Mobile sidebar sheet */}
+      {isMobile && (
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetContent side="left" className="p-0 w-72">
+            <VisuallyHidden><SheetTitle>Navigation</SheetTitle></VisuallyHidden>
+            {sidebar}
+          </SheetContent>
+        </Sheet>
+      )}
+
       <div className="flex-1 flex flex-col min-w-0 h-screen">
         {/* Top bar */}
-        <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-card/50 backdrop-blur-sm flex-shrink-0 z-10">
+        <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 bg-card/50 backdrop-blur-sm flex-shrink-0 z-10">
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search vehicles, batches..."
-                className="h-9 w-64 rounded-md bg-secondary border border-border pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
+            {isMobile && (
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                aria-label="Open navigation menu"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <Link to="/notifications" className="relative text-muted-foreground hover:text-foreground transition-colors">
@@ -46,7 +69,7 @@ export default function AppLayout() {
             </div>
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-4 md:p-6">
           <Outlet />
         </main>
       </div>

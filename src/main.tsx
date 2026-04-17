@@ -12,6 +12,7 @@ import { DataProvider } from "@/contexts/DataContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RequireRole } from "@/components/shared/RequireRole";
 import AppLayout from "./components/layout/AppLayout";
+import SalesLayout from "./components/layout/SalesLayout";
 import { SalesProvider } from "./contexts/SalesContext";
 import { errorTrackingService } from "@/services/errorTrackingService";
 
@@ -127,15 +128,23 @@ const router = createBrowserRouter([
       { path: "auto-aging/history", element: <S><ImportHistory /></S> },
       { path: "auto-aging/commissions", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><CommissionDashboard /></S></RequireRole> },
       { path: "auto-aging/reports", element: <S><ReportCenter /></S> },
-      { path: "sales", element: <SalesProvider><S><SalesDashboard /></S></SalesProvider> },
-      { path: "sales/pipeline", element: <SalesProvider><S><DealPipeline /></S></SalesProvider> },
-      { path: "sales/orders", element: <SalesProvider><S><SalesOrders /></S></SalesProvider> },
-      { path: "sales/customers", element: <SalesProvider><S><Customers /></S></SalesProvider> },
-      { path: "sales/invoices", element: <SalesProvider><S><Invoices /></S></SalesProvider> },
-      { path: "sales/performance", element: <SalesProvider><S><SalesmanPerformancePage /></S></SalesProvider> },
-      { path: "sales/advisors", element: <SalesProvider><S><SalesAdvisors /></S></SalesProvider> },
-      { path: "sales/margin", element: <SalesProvider><S><MarginAnalysis /></S></SalesProvider> },
-      { path: "sales/outstanding", element: <SalesProvider><S><OutstandingCollection /></S></SalesProvider> },
+      {
+        path: "sales",
+        element: <SalesLayout />,
+        children: [
+          { index: true, element: <S><SalesDashboard /></S> },
+          { path: "pipeline", element: <S><DealPipeline /></S> },
+          { path: "orders", element: <S><SalesOrders /></S> },
+          { path: "customers", element: <S><Customers /></S> },
+          { path: "invoices", element: <S><Invoices /></S> },
+          { path: "performance", element: <S><SalesmanPerformancePage /></S> },
+          { path: "advisors", element: <S><SalesAdvisors /></S> },
+          { path: "margin", element: <S><MarginAnalysis /></S> },
+          { path: "outstanding", element: <S><OutstandingCollection /></S> },
+          { path: "dealer-invoices", element: <S><DealerInvoices /></S> },
+          { path: "verify-or", element: <S><VerifyOR /></S> },
+        ],
+      },
       { path: "inventory/stock", element: <S><StockBalance /></S> },
       { path: "inventory/transfers", element: <S><VehicleTransfer /></S> },
       { path: "inventory/chassis", element: <S><ChassisMovement /></S> },
@@ -149,8 +158,6 @@ const router = createBrowserRouter([
       { path: "admin/suppliers", element: <RequireRole roles={['super_admin', 'company_admin']}><S><Suppliers /></S></RequireRole> },
       { path: "admin/dealers", element: <RequireRole roles={['super_admin', 'company_admin']}><S><Dealers /></S></RequireRole> },
       { path: "admin/user-groups", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserGroups /></S></RequireRole> },
-      { path: "sales/dealer-invoices", element: <SalesProvider><S><DealerInvoices /></S></SalesProvider> },
-      { path: "sales/verify-or", element: <SalesProvider><S><VerifyOR /></S></SalesProvider> },
       { path: "reports", element: <S><ReportsCenter /></S> },
       { path: "inventory/chassis-filter", element: <S><ChassisFilter /></S> },
       { path: "hrms/employees", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><EmployeeDirectory /></S></RequireRole> },
