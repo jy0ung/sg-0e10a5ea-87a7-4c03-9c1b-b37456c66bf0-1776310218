@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Timer, LayoutDashboard, Bell, Settings, Shield, FileText,
-  LogOut, ChevronLeft, ChevronRight, ChevronDown, Upload, Car, AlertTriangle, Gauge, ArrowLeft,
+  LogOut, ChevronLeft, ChevronRight, Upload, Car, AlertTriangle, Gauge, ArrowLeft,
   Map as MapIcon, History, Grid3X3, BarChart3, DollarSign, FileSpreadsheet,
   ShoppingCart, Users, KanbanSquare, Receipt, Target, TrendingUp,
   Package, ArrowLeftRight, Truck, UserCheck, GitBranch, Database,
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { loadRolePermissions } from '@/config/rolePermissions';
 
 interface NavItem {
   label: string;
@@ -25,18 +26,17 @@ interface NavItem {
 interface SectionDef {
   name: string;
   icon: React.ElementType;
-  path?: string;
 }
 
 const sectionDefs: SectionDef[] = [
   { name: 'Platform', icon: LayoutDashboard },
-  { name: 'Auto Aging', icon: Timer, path: '/auto-aging' },
-  { name: 'Sales', icon: TrendingUp, path: '/sales' },
-  { name: 'Inventory', icon: Package, path: '/inventory/stock' },
-  { name: 'Purchasing', icon: Truck, path: '/purchasing/invoices' },
-  { name: 'Reports', icon: BarChart3, path: '/reports' },
-  { name: 'HRMS', icon: Briefcase, path: '/hrms/employees' },
-  { name: 'Admin', icon: Shield, path: '/admin/settings' },
+  { name: 'Auto Aging', icon: Timer },
+  { name: 'Sales', icon: TrendingUp },
+  { name: 'Inventory', icon: Package },
+  { name: 'Purchasing', icon: Truck },
+  { name: 'Reports', icon: BarChart3 },
+  { name: 'HRMS', icon: Briefcase },
+  { name: 'Admin', icon: Shield },
 ];
 
 const navItems: NavItem[] = [
@@ -47,12 +47,12 @@ const navItems: NavItem[] = [
 
   { label: 'Auto Aging Overview', path: '/auto-aging', icon: Timer, section: 'Auto Aging', group: 'Overview' },
   { label: 'Vehicle Explorer', path: '/auto-aging/vehicles', icon: Car, section: 'Auto Aging', group: 'Overview' },
-  { label: 'Import Center', path: '/auto-aging/import', icon: Upload, section: 'Auto Aging', group: 'Data Pipeline' },
+  { label: 'Import Center', path: '/auto-aging/import', icon: Upload, section: 'Auto Aging', group: 'Data Pipeline', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'creator_updater'] },
   { label: 'Import History', path: '/auto-aging/history', icon: History, section: 'Auto Aging', group: 'Data Pipeline' },
   { label: 'Data Quality', path: '/auto-aging/quality', icon: AlertTriangle, section: 'Auto Aging', group: 'Controls' },
-  { label: 'SLA Policies', path: '/auto-aging/sla', icon: Gauge, section: 'Auto Aging', group: 'Controls' },
-  { label: 'Mappings', path: '/auto-aging/mappings', icon: MapIcon, section: 'Auto Aging', group: 'Controls' },
-  { label: 'Commissions', path: '/auto-aging/commissions', icon: DollarSign, section: 'Auto Aging', group: 'Insights' },
+  { label: 'SLA Policies', path: '/auto-aging/sla', icon: Gauge, section: 'Auto Aging', group: 'Controls', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
+  { label: 'Mappings', path: '/auto-aging/mappings', icon: MapIcon, section: 'Auto Aging', group: 'Controls', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
+  { label: 'Commissions', path: '/auto-aging/commissions', icon: DollarSign, section: 'Auto Aging', group: 'Insights', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'Aging Reports', path: '/auto-aging/reports', icon: FileSpreadsheet, section: 'Auto Aging', group: 'Insights' },
 
   { label: 'Sales Overview', path: '/sales', icon: TrendingUp, section: 'Sales', group: 'Overview' },
@@ -76,18 +76,19 @@ const navItems: NavItem[] = [
 
   { label: 'Business Reports', path: '/reports', icon: BarChart3, section: 'Reports', group: 'Workspace' },
 
-  { label: 'Employee Directory', path: '/hrms/employees', icon: Users, section: 'HRMS', group: 'Staff' },
+  { label: 'Employee Directory', path: '/hrms/employees', icon: Users, section: 'HRMS', group: 'Staff', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'Leave Management', path: '/hrms/leave', icon: Calendar, section: 'HRMS', group: 'Leave' },
   { label: 'Leave Calendar', path: '/hrms/leave-calendar', icon: Calendar, section: 'HRMS', group: 'Leave' },
-  { label: 'Attendance Log', path: '/hrms/attendance', icon: Clock, section: 'HRMS', group: 'Attendance' },
+  { label: 'Attendance Log', path: '/hrms/attendance', icon: Clock, section: 'HRMS', group: 'Attendance', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'Payroll Summary', path: '/hrms/payroll', icon: CreditCard, section: 'HRMS', group: 'Payroll', roles: ['super_admin', 'company_admin', 'general_manager'] },
-  { label: 'Performance Appraisals', path: '/hrms/appraisals', icon: Star, section: 'HRMS', group: 'Performance' },
-  { label: 'Announcements', path: '/hrms/announcements', icon: Megaphone, section: 'HRMS', group: 'Communications' },
+  { label: 'Performance Appraisals', path: '/hrms/appraisals', icon: Star, section: 'HRMS', group: 'Performance', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { label: 'Announcements', path: '/hrms/announcements', icon: Megaphone, section: 'HRMS', group: 'Communications', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
 
   { label: 'Activity Overview', path: '/admin/activity', icon: BarChart3, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin'] },
   { label: 'Audit Log', path: '/admin/audit', icon: FileText, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
   { label: 'Users & Roles', path: '/admin/users', icon: Shield, section: 'Admin', group: 'Access', roles: ['super_admin', 'company_admin'] },
   { label: 'User Groups', path: '/admin/user-groups', icon: Shield, section: 'Admin', group: 'Access', roles: ['super_admin', 'company_admin'] },
+  { label: 'Role Permissions', path: '/admin/role-permissions', icon: Shield, section: 'Admin', group: 'Access', roles: ['super_admin', 'company_admin'] },
   { label: 'Branch Management', path: '/admin/branches', icon: GitBranch, section: 'Admin', group: 'Master Data', roles: ['super_admin', 'company_admin'] },
   { label: 'Master Data', path: '/admin/master-data', icon: Database, section: 'Admin', group: 'Master Data', roles: ['super_admin', 'company_admin'] },
   { label: 'Suppliers', path: '/admin/suppliers', icon: Truck, section: 'Admin', group: 'Master Data', roles: ['super_admin', 'company_admin'] },
@@ -186,35 +187,18 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
   const { user, logout, hasRole } = useAuth();
   const location = useLocation();
   const pathname = location.pathname;
-  const navigate = useNavigate();
+
+  // Role-based section filtering from permission matrix (persisted to localStorage)
+  const rolePermissions = loadRolePermissions();
+  const allowedSections: string[] = user?.role
+    ? (rolePermissions[user.role] ?? sectionDefs.map(s => s.name))
+    : sectionDefs.map(s => s.name);
 
   // In focused mode, only render the section that matches the current URL.
-  // Falls back to all sections when on a path with no matching module (e.g. "/").
   const focusedSection = isFocused ? getFocusedSection(pathname) : null;
   const visibleSections = focusedSection
     ? sectionDefs.filter(s => s.name === focusedSection)
-    : sectionDefs;
-
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
-    const activeItem = navItems.find(item => isItemActive(item.path, pathname));
-    return Object.fromEntries(
-      sectionDefs.map(s => [
-        s.name,
-        isFocused ? s.name === focusedSection : s.name === activeItem?.section,
-      ])
-    );
-  });
-
-  // Auto-open the focused section when navigating into a module
-  useEffect(() => {
-    if (focusedSection) {
-      setOpenSections(prev => prev[focusedSection] ? prev : { ...prev, [focusedSection]: true });
-    }
-  }, [focusedSection]);
-
-  const toggleSection = (name: string) => {
-    setOpenSections(prev => ({ ...prev, [name]: !prev[name] }));
-  };
+    : sectionDefs.filter(s => allowedSections.includes(s.name));
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -267,7 +251,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
             )
           )}
 
-          {visibleSections.map(({ name, icon: SectionIcon, path: sectionPath }, index) => {
+          {visibleSections.map(({ name, icon: SectionIcon }, index) => {
             const items = navItems.filter(n => n.section === name);
             const visibleItems = items.filter(item => {
               if (!item.roles) return true;
@@ -276,73 +260,45 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
             });
             if (visibleItems.length === 0) return null;
 
-            const isOpen = openSections[name] ?? false;
             const hasActive = visibleItems.some(item => isItemActive(item.path, pathname));
-            const showItems = collapsed || isOpen;
-
             const grouped = groupItems(visibleItems);
             const showGroupLabels = !collapsed && grouped.length > 1;
 
             return (
               <div key={name}>
-                {/* Section header */}
+                {/* Section header — flat, non-collapsible */}
                 {collapsed ? (
                   index > 0 && <div className="h-px bg-sidebar-border/50 my-2 mx-1" />
                 ) : (
-                  <button
-                    onClick={() => {
-                      if (sectionPath && !isFocused) {
-                        navigate(sectionPath);
-                      } else {
-                        toggleSection(name);
-                      }
-                    }}
+                  <div
                     className={cn(
-                      "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-widest mb-0.5 transition-colors",
-                      hasActive
-                        ? "text-primary"
-                        : "text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50"
+                      "flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-widest mb-0.5",
+                      hasActive ? "text-primary" : "text-muted-foreground"
                     )}
                   >
                     <SectionIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="flex-1 text-left">{name}</span>
-                    <ChevronDown
-                      className={cn(
-                        "h-3.5 w-3.5 transition-transform duration-200",
-                        isOpen && "rotate-180"
-                      )}
-                    />
-                  </button>
+                    <span>{name}</span>
+                  </div>
                 )}
 
-                {/* Section items — CSS grid trick for smooth height animation */}
-                <div
-                  aria-hidden={!showItems}
-                  className={cn(
-                    "grid transition-all duration-200 ease-in-out",
-                    showItems ? "grid-rows-[1fr]" : "grid-rows-[0fr] invisible"
-                  )}
-                >
-                  <div className="overflow-hidden min-h-0">
-                    {showGroupLabels ? (
-                      grouped.map((g, gi) => (
-                        <div key={g.group} className={cn("space-y-0.5", gi > 0 && "mt-2")}>
-                          <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                            {g.group}
-                          </p>
-                          {g.items.map(item => (
-                            <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
-                          ))}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="space-y-0.5">
-                        {visibleItems.map(item => (
+                {/* Section items — always visible */}
+                <div className="space-y-0.5">
+                  {showGroupLabels ? (
+                    grouped.map((g, gi) => (
+                      <div key={g.group} className={cn("space-y-0.5", gi > 0 && "mt-2")}>
+                        <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          {g.group}
+                        </p>
+                        {g.items.map(item => (
                           <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
                         ))}
                       </div>
-                    )}
-                  </div>
+                    ))
+                  ) : (
+                    visibleItems.map(item => (
+                      <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
+                    ))
+                  )}
                 </div>
               </div>
             );

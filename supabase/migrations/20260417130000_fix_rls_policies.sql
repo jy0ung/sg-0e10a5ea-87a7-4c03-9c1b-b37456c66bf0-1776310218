@@ -177,10 +177,26 @@ CREATE POLICY "tickets_update_admin" ON public.tickets
 
 -- ─── 4. Profiles: scope SELECT to same company ──────────────────────────────
 
+CREATE OR REPLACE FUNCTION public.can_read_profile(target_company_id text, target_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+      FROM public.profiles p
+     WHERE p.id = auth.uid()
+       AND (
+         p.id = target_id
+         OR p.access_scope = 'global'
+         OR p.company_id = target_company_id
+       )
+  );
+$$;
+
 DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
 CREATE POLICY "profiles_select_own" ON public.profiles
   FOR SELECT TO authenticated
-  USING (
-    company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
-    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND access_scope = 'global')
-  );
+  USING (public.can_read_profile(company_id, id));

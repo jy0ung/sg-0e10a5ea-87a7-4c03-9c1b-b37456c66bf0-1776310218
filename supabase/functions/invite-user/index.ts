@@ -113,16 +113,24 @@ Deno.serve(async (req: Request) => {
 
       const finalScope = access_scope || roleDefaultScopes[role] || 'company';
 
-      await adminClient
+      const { error: profileError } = await adminClient
         .from('profiles')
-        .update({
+        .upsert({
+          id: inviteData.user.id,
+          email,
           name,
           role,
           company_id,
           access_scope: finalScope,
           updated_at: new Date().toISOString(),
-        })
-        .eq('id', inviteData.user.id);
+        }, { onConflict: 'id' });
+
+      if (profileError) {
+        return new Response(
+          JSON.stringify({ error: `Invitation created, but profile setup failed: ${profileError.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
     }
 
     return new Response(

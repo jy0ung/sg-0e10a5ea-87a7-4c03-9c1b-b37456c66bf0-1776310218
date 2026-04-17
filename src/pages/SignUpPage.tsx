@@ -146,11 +146,23 @@ export default function SignUpPage() {
 
     // Update the profile name
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase
+    if (!user) {
+      setError('Your password was saved, but we could not verify your session to finish account setup. Please sign in and contact an administrator if your profile name is still incorrect.');
+      setLoading(false);
+      return;
+    }
+
+    const { error: profileError } = await supabase
         .from('profiles')
         .update({ name: data.name, updated_at: new Date().toISOString() })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select('id')
+        .single();
+
+    if (profileError) {
+      setError(`Your password was saved, but we could not update your profile name: ${profileError.message}`);
+      setLoading(false);
+      return;
     }
 
     // Sign out so they log in fresh

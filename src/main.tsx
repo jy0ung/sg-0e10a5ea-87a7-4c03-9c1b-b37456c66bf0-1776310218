@@ -74,8 +74,7 @@ const LeaveCalendar = lazy(() => import("./pages/hrms/LeaveCalendar"));
 const AttendanceLog = lazy(() => import("./pages/hrms/AttendanceLog"));
 const PayrollSummary = lazy(() => import("./pages/hrms/PayrollSummary"));
 const PerformanceAppraisals = lazy(() => import("./pages/hrms/PerformanceAppraisals"));
-const HrmsAnnouncements = lazy(() => import("./pages/hrms/Announcements"));
-
+const HrmsAnnouncements = lazy(() => import("./pages/hrms/Announcements"));const RolePermissionsPage = lazy(() => import('./pages/admin/RolePermissions'));
 // Lightweight spinner shown while a lazy page chunk loads
 const PageSpinner = () => (
   <div className="flex items-center justify-center h-64">
@@ -158,8 +157,7 @@ const router = createBrowserRouter([
       { path: "admin/master-data", element: <RequireRole roles={['super_admin', 'company_admin']}><S><MasterData /></S></RequireRole> },
       { path: "admin/suppliers", element: <RequireRole roles={['super_admin', 'company_admin']}><S><Suppliers /></S></RequireRole> },
       { path: "admin/dealers", element: <RequireRole roles={['super_admin', 'company_admin']}><S><Dealers /></S></RequireRole> },
-      { path: "admin/user-groups", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserGroups /></S></RequireRole> },
-      { path: "reports", element: <S><ReportsCenter /></S> },
+      { path: "admin/user-groups", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserGroups /></S></RequireRole> },      { path: 'admin/role-permissions', element: <RequireRole roles={['super_admin', 'company_admin']}><S><RolePermissionsPage /></S></RequireRole> },      { path: "reports", element: <S><ReportsCenter /></S> },
       { path: "inventory/chassis-filter", element: <S><ChassisFilter /></S> },
       { path: "hrms/employees", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><EmployeeDirectory /></S></RequireRole> },
       { path: "hrms/leave", element: <S><LeaveManagement /></S> },

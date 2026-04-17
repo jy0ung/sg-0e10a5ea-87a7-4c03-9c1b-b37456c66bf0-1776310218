@@ -36,7 +36,7 @@ export const inviteSignupSchema = z.object({
 export const inviteUserSchema = z.object({
   email: z.string().min(1, 'Email is required').email('Invalid email address'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst']),
+  role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater']),
 });
 
 export type InviteSignupFormData = z.infer<typeof inviteSignupSchema>;
@@ -75,7 +75,7 @@ export const vehicleSchema = z.object({
 // User management schemas
 export const userUpdateSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst']),
+  role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater']),
   access_scope: z.enum(['self', 'branch', 'company', 'global']),
   branch_id: z.string().nullable().optional(),
 });
@@ -83,7 +83,7 @@ export const userUpdateSchema = z.object({
 // Settings schemas
 export const profileUpdateSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst']),
+  role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater']),
   branch_id: z.string().nullable().optional(),
 });
 

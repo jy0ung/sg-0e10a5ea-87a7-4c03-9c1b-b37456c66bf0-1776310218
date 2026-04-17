@@ -1,5 +1,5 @@
 // ===== User & Auth =====
-export type AppRole = 'super_admin' | 'company_admin' | 'director' | 'general_manager' | 'manager' | 'sales' | 'accounts' | 'analyst';
+export type AppRole = 'super_admin' | 'company_admin' | 'director' | 'general_manager' | 'manager' | 'sales' | 'accounts' | 'analyst' | 'creator_updater';
 export type AccessScope = 'self' | 'branch' | 'company' | 'global';
 
 export const ROLE_DEFAULT_SCOPE: Record<AppRole, AccessScope> = {
@@ -11,6 +11,7 @@ export const ROLE_DEFAULT_SCOPE: Record<AppRole, AccessScope> = {
   sales: 'self',
   accounts: 'company',
   analyst: 'company',
+  creator_updater: 'branch',
 };
 
 export interface User {
