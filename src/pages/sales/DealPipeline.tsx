@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,10 +7,8 @@ import { SalesOrder, DealStage } from '@/types';
 import { GripVertical } from 'lucide-react';
 
 export default function DealPipeline() {
-  const { salesOrders, dealStages, moveOrderStage, reloadSales } = useSales();
+  const { salesOrders, dealStages, moveOrderStage } = useSales();
   const [dragging, setDragging] = useState<string | null>(null);
-
-  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   const ordersByStage = (stageId: string) =>
     salesOrders.filter(o => o.dealStageId === stageId && o.status !== 'cancelled');

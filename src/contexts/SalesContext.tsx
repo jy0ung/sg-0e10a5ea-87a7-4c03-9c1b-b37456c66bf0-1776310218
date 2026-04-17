@@ -1,12 +1,50 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, ReactNode } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Customer, DealStage, SalesOrder, Invoice, SalesmanTarget } from '@/types';
-import { useAuth } from '@/contexts/AuthContext';
 import { getCustomers } from '@/services/customerService';
 import { getSalesOrders, moveSalesOrderStage, updateSalesOrder } from '@/services/salesOrderService';
 import { getInvoices } from '@/services/invoiceService';
 import { getSalesmanTargets } from '@/services/salesTargetService';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompanyId } from '@/hooks/useCompanyId';
+
+/** Stable query key factory — import in tests to reuse. */
+export const salesQueryKey = (companyId: string) => ['sales', companyId] as const;
+
+interface SalesData {
+  customers: Customer[];
+  salesOrders: SalesOrder[];
+  dealStages: DealStage[];
+  invoices: Invoice[];
+  salesmanTargets: SalesmanTarget[];
+}
+
+async function fetchSalesData(companyId: string): Promise<SalesData> {
+  const [customersRes, ordersRes, stagesRes, invoicesRes, targetsRes] = await Promise.all([
+    getCustomers(companyId),
+    getSalesOrders(companyId),
+    supabase.from('deal_stages').select('*').eq('company_id', companyId).order('sort_order'),
+    getInvoices(companyId),
+    getSalesmanTargets(companyId),
+  ]);
+
+  const dealStages = (stagesRes.data ?? []).map((r: Record<string, unknown>) => ({
+    id: r.id as string,
+    companyId: r.company_id as string,
+    name: r.name as string,
+    sortOrder: r.sort_order as number,
+    isTerminal: r.is_terminal as boolean,
+    colour: r.colour as string | undefined,
+  }));
+
+  return {
+    customers: customersRes.data,
+    salesOrders: ordersRes.data,
+    dealStages,
+    invoices: invoicesRes.data,
+    salesmanTargets: targetsRes.data,
+  };
+}
 
 interface SalesContextValue {
   customers: Customer[];
@@ -23,56 +61,49 @@ interface SalesContextValue {
 const SalesContext = createContext<SalesContextValue | null>(null);
 
 export function SalesProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
   const companyId = useCompanyId();
+  const queryClient = useQueryClient();
 
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
-  const [dealStages, setDealStages] = useState<DealStage[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [salesmanTargets, setSalesmanTargets] = useState<SalesmanTarget[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data, isLoading } = useQuery({
+    queryKey: salesQueryKey(companyId),
+    queryFn: () => fetchSalesData(companyId),
+    enabled: !!companyId,
+    staleTime: 30_000,
+  });
 
+  /** Invalidates the cache and awaits the next successful fetch. */
   const reloadSales = useCallback(async () => {
-    setLoading(true);
-    const [customersRes, ordersRes, stagesRes, invoicesRes, targetsRes] = await Promise.all([
-      getCustomers(companyId),
-      getSalesOrders(companyId),
-      supabase.from('deal_stages').select('*').eq('company_id', companyId).order('sort_order'),
-      getInvoices(companyId),
-      getSalesmanTargets(companyId),
-    ]);
-    setCustomers(customersRes.data);
-    setSalesOrders(ordersRes.data);
-    if (!stagesRes.error) {
-      setDealStages(
-        (stagesRes.data ?? []).map((r: Record<string, unknown>) => ({
-          id: r.id as string,
-          companyId: r.company_id as string,
-          name: r.name as string,
-          sortOrder: r.sort_order as number,
-          isTerminal: r.is_terminal as boolean,
-          colour: r.colour as string | undefined,
-        }))
-      );
-    }
-    setInvoices(invoicesRes.data);
-    setSalesmanTargets(targetsRes.data);
-    setLoading(false);
-  }, [companyId]);
+    await queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId) });
+  }, [queryClient, companyId]);
 
+  /** Optimistically update deal-stage in cache then persist to DB. */
   const moveOrderStage = useCallback(async (orderId: string, stageId: string) => {
     await moveSalesOrderStage(orderId, stageId);
-    setSalesOrders(prev => prev.map(o => o.id === orderId ? { ...o, dealStageId: stageId } : o));
-  }, []);
+    queryClient.setQueryData<SalesData>(salesQueryKey(companyId), prev =>
+      prev ? { ...prev, salesOrders: prev.salesOrders.map(o => o.id === orderId ? { ...o, dealStageId: stageId } : o) } : prev
+    );
+  }, [queryClient, companyId]);
 
+  /** Optimistically update order fields in cache then persist to DB. */
   const updateOrder = useCallback(async (id: string, fields: Partial<SalesOrder>) => {
     await updateSalesOrder(id, fields);
-    setSalesOrders(prev => prev.map(o => o.id === id ? { ...o, ...fields } : o));
-  }, []);
+    queryClient.setQueryData<SalesData>(salesQueryKey(companyId), prev =>
+      prev ? { ...prev, salesOrders: prev.salesOrders.map(o => o.id === id ? { ...o, ...fields } : o) } : prev
+    );
+  }, [queryClient, companyId]);
 
   return (
-    <SalesContext.Provider value={{ customers, salesOrders, dealStages, invoices, salesmanTargets, loading, reloadSales, moveOrderStage, updateOrder }}>
+    <SalesContext.Provider value={{
+      customers: data?.customers ?? [],
+      salesOrders: data?.salesOrders ?? [],
+      dealStages: data?.dealStages ?? [],
+      invoices: data?.invoices ?? [],
+      salesmanTargets: data?.salesmanTargets ?? [],
+      loading: isLoading,
+      reloadSales,
+      moveOrderStage,
+      updateOrder,
+    }}>
       {children}
     </SalesContext.Provider>
   );

@@ -1,14 +1,12 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSales } from '@/contexts/SalesContext';
 import { useData } from '@/contexts/DataContext';
 import { ShoppingCart, DollarSign, TrendingUp, CheckCircle } from 'lucide-react';
 
 export default function SalesDashboard() {
-  const { salesOrders, invoices, reloadSales } = useSales();
+  const { salesOrders, invoices } = useSales();
   const { vehicles } = useData();
-
-  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];

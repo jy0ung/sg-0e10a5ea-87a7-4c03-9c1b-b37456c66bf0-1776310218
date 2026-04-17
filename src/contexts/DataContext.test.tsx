@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DataProvider, useData } from './DataContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -27,6 +28,17 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { company_id: 'c1' } })
 }));
 
+vi.mock('@/hooks/useCompanyId', () => ({
+  useCompanyId: () => 'c1'
+}));
+
+const makeWrapper = () => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={qc}><DataProvider>{children}</DataProvider></QueryClientProvider>
+  );
+};
+
 describe('DataContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,9 +48,7 @@ describe('DataContext', () => {
 
   describe('DataProvider', () => {
     it('provides data context', () => {
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataProvider>{children}</DataProvider>
-      );
+      const wrapper = makeWrapper();
       
       const { result } = renderHook(() => useData(), { wrapper });
       
@@ -76,9 +86,7 @@ describe('DataContext', () => {
         return builder;
       });
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataProvider>{children}</DataProvider>
-      );
+      const wrapper = makeWrapper();
       
       const { result } = renderHook(() => useData(), { wrapper });
 
@@ -99,9 +107,7 @@ describe('DataContext', () => {
     });
 
     it('provides all data context methods', () => {
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataProvider>{children}</DataProvider>
-      );
+      const wrapper = makeWrapper();
       
       const { result } = renderHook(() => useData(), { wrapper });
       
@@ -129,9 +135,7 @@ describe('DataContext', () => {
         return builder;
       });
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataProvider>{children}</DataProvider>
-      );
+      const wrapper = makeWrapper();
       
       const { result } = renderHook(() => useData(), { wrapper });
       
@@ -159,9 +163,7 @@ describe('DataContext', () => {
         return builder;
       });
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataProvider>{children}</DataProvider>
-      );
+      const wrapper = makeWrapper();
       
       const { result } = renderHook(() => useData(), { wrapper });
 
@@ -201,9 +203,7 @@ describe('DataContext', () => {
         return builder;
       });
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataProvider>{children}</DataProvider>
-      );
+      const wrapper = makeWrapper();
       
       const { result } = renderHook(() => useData(), { wrapper });
       
@@ -225,9 +225,7 @@ describe('DataContext', () => {
         return builder;
       });
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataProvider>{children}</DataProvider>
-      );
+      const wrapper = makeWrapper();
       
       const { result } = renderHook(() => useData(), { wrapper });
 
@@ -260,9 +258,7 @@ describe('DataContext', () => {
         return builder;
       });
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataProvider>{children}</DataProvider>
-      );
+      const wrapper = makeWrapper();
       
       const { result } = renderHook(() => useData(), { wrapper });
       
@@ -272,9 +268,7 @@ describe('DataContext', () => {
     });
 
     it('refreshKpis recalculates KPI summaries', async () => {
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataProvider>{children}</DataProvider>
-      );
+      const wrapper = makeWrapper();
       
       const { result } = renderHook(() => useData(), { wrapper });
       
@@ -302,9 +296,7 @@ describe('DataContext', () => {
         return builder;
       });
 
-      const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <DataProvider>{children}</DataProvider>
-      );
+      const wrapper = makeWrapper();
       
       const { result } = renderHook(() => useData(), { wrapper });
       

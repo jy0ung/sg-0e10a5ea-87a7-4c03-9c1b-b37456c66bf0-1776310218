@@ -22,9 +22,7 @@ export default function ExecutiveDashboard() {
   const { kpiSummaries, vehicles, qualityIssues, lastRefresh, importBatches, loading } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { salesOrders, customers, reloadSales } = useSales();
-
-  useEffect(() => { reloadSales(); }, [reloadSales]);
+  const { salesOrders, customers } = useSales();
 
   const [selectedKpis, setSelectedKpis] = useState<string[]>(ADVANCED_KPIS);
   const [showAdvanced, setShowAdvanced] = useState(true);

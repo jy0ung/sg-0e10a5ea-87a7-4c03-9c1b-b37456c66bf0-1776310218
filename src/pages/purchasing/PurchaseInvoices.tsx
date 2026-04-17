@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Plus, Truck } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
@@ -55,34 +57,33 @@ function rowToInvoice(row: Record<string, unknown>): PurchaseInvoice {
 
 export default function PurchaseInvoices() {
   const { user } = useAuth();
+  const companyId = useCompanyId();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const [invoices, setInvoices]   = useState<PurchaseInvoice[]>([]);
-  const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatus] = useState<string>('all');
   const [addOpen, setAddOpen]     = useState(false);
   const [form, setForm]           = useState(EMPTY_FORM);
   const [saving, setSaving]       = useState(false);
 
-  const loadInvoices = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('purchase_invoices')
-      .select('*')
-      .eq('company_id', user.company_id)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
-    if (error) {
-      toast({ title: 'Failed to load purchase invoices', variant: 'destructive' });
-    } else {
-      setInvoices((data ?? []).map(row => rowToInvoice(row as Record<string, unknown>)));
-    }
-    setLoading(false);
-  }, [user, toast]);
+  const { data: invoices = [], isLoading } = useQuery({
+    queryKey: ['purchase-invoices', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('purchase_invoices')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map(row => rowToInvoice(row as Record<string, unknown>));
+    },
+    enabled: !!companyId,
+    staleTime: 30_000,
+  });
 
-  useEffect(() => { loadInvoices(); }, [loadInvoices]);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['purchase-invoices', companyId] });
 
   const filtered = invoices.filter(i => {
     if (statusFilter !== 'all' && i.status !== statusFilter) return false;
@@ -124,23 +125,18 @@ export default function PurchaseInvoices() {
     toast({ title: 'Purchase invoice created', description: form.invoiceNo });
     setForm(EMPTY_FORM);
     setAddOpen(false);
-    loadInvoices();
+    invalidate();
   };
 
   const markReceived = async (id: string) => {
     const prev = invoices.find(i => i.id === id);
     if (!prev) return;
     const receivedDate = new Date().toISOString().split('T')[0];
-    // Optimistic update
-    setInvoices(is => is.map(i =>
-      i.id === id ? { ...i, status: 'received' as PIStatus, receivedDate } : i
-    ));
     const { error } = await supabase
       .from('purchase_invoices')
       .update({ status: 'received', received_date: receivedDate })
       .eq('id', id);
     if (error) {
-      setInvoices(is => is.map(i => i.id === id ? prev : i));
       toast({ title: 'Failed to mark received', description: error.message, variant: 'destructive' });
       return;
     }
@@ -171,9 +167,10 @@ export default function PurchaseInvoices() {
         });
       }
     }
+    invalidate();
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Purchase Invoices" description="CBU vehicle procurement invoices from suppliers"

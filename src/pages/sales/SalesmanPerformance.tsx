@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { useSales } from '@/contexts/SalesContext';
+import { useSales, salesQueryKey } from '@/contexts/SalesContext';
 import { computeSalesmanActuals, upsertSalesmanTarget, deleteSalesmanTarget } from '@/services/salesTargetService';
 import { SalesmanPerformance, SalesmanTarget } from '@/types';
 import { Target, Plus, Pencil, Trash2 } from 'lucide-react';
@@ -15,25 +16,27 @@ import { Target, Plus, Pencil, Trash2 } from 'lucide-react';
 export default function SalesmanPerformancePage() {
   const { user } = useAuth();
   const companyId = useCompanyId();
-  const { salesmanTargets, reloadSales } = useSales();
+  const { salesmanTargets } = useSales();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [performance, setPerformance] = useState<SalesmanPerformance[]>([]);
-  const [loading, setLoading] = useState(false);
   const [targetOpen, setTargetOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<SalesmanTarget | null>(null);
   const [form, setForm] = useState({ salesmanId: '', salesmanName: '', branchCode: '', targetUnits: '', targetRevenue: '' });
 
-  const loadPerformance = useCallback(async () => {
-    setLoading(true);
-    const { data } = await computeSalesmanActuals(companyId, year, month);
-    setPerformance(data);
-    setLoading(false);
-  }, [companyId, year, month]);
+  const { data: performance = [], isFetching: loading } = useQuery({
+    queryKey: ['salesman-performance', companyId, year, month],
+    queryFn: async () => {
+      const { data } = await computeSalesmanActuals(companyId, year, month);
+      return data;
+    },
+    enabled: !!companyId,
+    staleTime: 60_000,
+  });
 
-  useEffect(() => { reloadSales(); loadPerformance(); }, [year, month, reloadSales, loadPerformance]);
+  const invalidatePerf = () => queryClient.invalidateQueries({ queryKey: ['salesman-performance', companyId, year, month] });
 
   const handleSaveTarget = async () => {
     if (!form.salesmanId || !form.targetUnits) return toast({ title: 'Salesman ID and Target Units required', variant: 'destructive' });
@@ -47,14 +50,16 @@ export default function SalesmanPerformancePage() {
       targetRevenue: form.targetRevenue ? parseFloat(form.targetRevenue) : undefined,
     });
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    await reloadSales();
+    await queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId) });
+    await invalidatePerf();
     setTargetOpen(false);
     toast({ title: 'Target saved' });
   };
 
   const handleDeleteTarget = async (id: string) => {
     await deleteSalesmanTarget(id);
-    await reloadSales();
+    await queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId) });
+    await invalidatePerf();
     toast({ title: 'Target removed' });
   };
 
@@ -81,7 +86,7 @@ export default function SalesmanPerformancePage() {
           <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>{months.map(m => <SelectItem key={m.val} value={String(m.val)}>{m.label}</SelectItem>)}</SelectContent>
         </Select>
-        <Button variant="outline" size="sm" className="h-8" onClick={loadPerformance}>Refresh</Button>
+        <Button variant="outline" size="sm" className="h-8" onClick={invalidatePerf}>Refresh</Button>
       </div>
 
       {/* Performance Table */}

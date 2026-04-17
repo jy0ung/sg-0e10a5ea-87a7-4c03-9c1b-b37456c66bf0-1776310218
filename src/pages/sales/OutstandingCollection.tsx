@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -27,11 +27,9 @@ const BUCKET_STYLE: Record<AgingBucket, string> = {
 
 export default function OutstandingCollection() {
   const { user } = useAuth();
-  const { invoices, reloadSales } = useSales();
+  const { invoices } = useSales();
 
   const [bucketFilter, setBucketFilter] = useState<'all' | AgingBucket>('all');
-
-  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   // Only unpaid / partial
   const outstanding: (Invoice & { bucket: AgingBucket; owedAmount: number })[] = useMemo(() => {

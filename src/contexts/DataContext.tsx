@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { VehicleCanonical, ImportBatch, DataQualityIssue, SlaPolicy, KpiSummary } from '@/types';
 import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { supabase } from '@/integrations/supabase/client';
@@ -105,6 +106,38 @@ function mapDbSla(row: Record<string, unknown>): SlaPolicy {
   };
 }
 
+export const DATA_QUERY_KEY = ['data'] as const;
+
+async function fetchDataFromDb() {
+  const queryId = `data-reload-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
+  const [vehiclesRes, batchesRes, issuesRes, slasRes] = await Promise.all([
+    supabase.from('vehicles').select('*').eq('is_deleted', false).order('created_at', { ascending: false }),
+    supabase.from('import_batches').select('*').order('created_at', { ascending: false }),
+    supabase.from('quality_issues').select('*').order('created_at', { ascending: false }),
+    supabase.from('sla_policies').select('*'),
+  ]);
+
+  if (vehiclesRes.error) loggingService.error('Failed to load vehicles', { error: vehiclesRes.error }, 'DataContext');
+  if (batchesRes.error) loggingService.error('Failed to load import batches', { error: batchesRes.error }, 'DataContext');
+  if (issuesRes.error) loggingService.error('Failed to load quality issues', { error: issuesRes.error }, 'DataContext');
+  if (slasRes.error) loggingService.error('Failed to load SLA policies', { error: slasRes.error }, 'DataContext');
+
+  const dbVehicles = (vehiclesRes.data || []).map(r => mapDbVehicle(r as unknown as Record<string, unknown>));
+  const dbBatches  = (batchesRes.data  || []).map(r => mapDbBatch(r  as unknown as Record<string, unknown>));
+  const dbIssues   = (issuesRes.data   || []).map(r => mapDbIssue(r  as unknown as Record<string, unknown>));
+  const dbSlas     = (slasRes.data     || []).map(r => mapDbSla(r    as unknown as Record<string, unknown>));
+
+  performanceService.endQueryTimer(queryId, 'data_reload');
+  loggingService.info('Data reloaded successfully',
+    { vehicles: dbVehicles.length, batches: dbBatches.length, issues: dbIssues.length, slas: dbSlas.length },
+    'DataContext'
+  );
+
+  return { vehicles: dbVehicles, batches: dbBatches, issues: dbIssues, slas: dbSlas };
+}
+
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [vehicles, setVehiclesState] = useState<VehicleCanonical[]>([]);
   const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
@@ -112,64 +145,33 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [slas, setSlas] = useState<SlaPolicy[]>([]);
   const [kpiSummaries, setKpiSummaries] = useState<KpiSummary[]>([]);
   const [lastRefresh, setLastRefresh] = useState(new Date().toISOString());
-  const [loading, setLoading] = useState(true);
 
   const companyId = useCompanyId();
+  const queryClient = useQueryClient();
+
+  // React Query manages initial fetch and re-fetches after invalidation.
+  const { isLoading } = useQuery({
+    queryKey: DATA_QUERY_KEY,
+    queryFn: fetchDataFromDb,
+    staleTime: 60_000,
+  });
+
+  // Sync server data to local state whenever the query cache updates.
+  const queryData = queryClient.getQueryData<Awaited<ReturnType<typeof fetchDataFromDb>>>(DATA_QUERY_KEY);
+  useEffect(() => {
+    if (queryData) {
+      setVehiclesState(queryData.vehicles);
+      setImportBatches(queryData.batches);
+      setQualityIssues(queryData.issues);
+      setSlas(queryData.slas);
+      setKpiSummaries(computeKpiSummaries(queryData.vehicles, queryData.slas));
+      setLastRefresh(new Date().toISOString());
+    }
+  }, [queryData]);
 
   const reloadFromDb = useCallback(async () => {
-    setLoading(true);
-    const queryId = `data-reload-${Date.now()}`;
-    performanceService.startQueryTimer(queryId);
-
-    try {
-      const [vehiclesRes, batchesRes, issuesRes, slasRes] = await Promise.all([
-        supabase.from('vehicles').select('*').eq('is_deleted', false).order('created_at', { ascending: false }),
-        supabase.from('import_batches').select('*').order('created_at', { ascending: false }),
-        supabase.from('quality_issues').select('*').order('created_at', { ascending: false }),
-        supabase.from('sla_policies').select('*'),
-      ]);
-
-      if (vehiclesRes.error) {
-        loggingService.error('Failed to load vehicles', { error: vehiclesRes.error }, 'DataContext');
-      }
-      if (batchesRes.error) {
-        loggingService.error('Failed to load import batches', { error: batchesRes.error }, 'DataContext');
-      }
-      if (issuesRes.error) {
-        loggingService.error('Failed to load quality issues', { error: issuesRes.error }, 'DataContext');
-      }
-      if (slasRes.error) {
-        loggingService.error('Failed to load SLA policies', { error: slasRes.error }, 'DataContext');
-      }
-
-      const dbVehicles = (vehiclesRes.data || []).map(r => mapDbVehicle(r as unknown as Record<string, unknown>));
-      const dbBatches = (batchesRes.data || []).map(r => mapDbBatch(r as unknown as Record<string, unknown>));
-      const dbIssues = (issuesRes.data || []).map(r => mapDbIssue(r as unknown as Record<string, unknown>));
-      const dbSlas = (slasRes.data || []).map(r => mapDbSla(r as unknown as Record<string, unknown>));
-
-      setVehiclesState(dbVehicles);
-      setImportBatches(dbBatches);
-      setQualityIssues(dbIssues);
-      setSlas(dbSlas);
-      setKpiSummaries(computeKpiSummaries(dbVehicles, dbSlas));
-      setLastRefresh(new Date().toISOString());
-
-      performanceService.endQueryTimer(queryId, 'data_reload');
-      loggingService.info('Data reloaded successfully', {
-        vehicles: dbVehicles.length,
-        batches: dbBatches.length,
-        issues: dbIssues.length,
-        slas: dbSlas.length,
-      }, 'DataContext');
-    } catch (err) {
-      performanceService.endQueryTimer(queryId, 'data_reload');
-      loggingService.error('Failed to load data from database', { error: err }, 'DataContext');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { reloadFromDb(); }, [reloadFromDb]);
+    await queryClient.invalidateQueries({ queryKey: DATA_QUERY_KEY });
+  }, [queryClient]);
 
   const setVehicles = useCallback(async (v: VehicleCanonical[]) => {
     const queryId = `vehicles-upsert-${Date.now()}`;
@@ -335,7 +337,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [vehicles, slas]);
 
   return (
-    <DataContext.Provider value={{ vehicles, importBatches, qualityIssues, slas, kpiSummaries, lastRefresh, loading, setVehicles, addImportBatch, updateImportBatch, addQualityIssues, updateSla, refreshKpis, reloadFromDb }}>
+    <DataContext.Provider value={{ vehicles, importBatches, qualityIssues, slas, kpiSummaries, lastRefresh, loading: isLoading, setVehicles, addImportBatch, updateImportBatch, addQualityIssues, updateSla, refreshKpis, reloadFromDb }}>
       {children}
     </DataContext.Provider>
   );

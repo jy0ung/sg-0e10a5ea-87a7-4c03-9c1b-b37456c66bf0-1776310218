@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,9 +30,8 @@ export default function DealerInvoices() {
   const { user } = useAuth();
   const companyId = useCompanyId();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const [invoices, setInvoices] = useState<DealerInvoice[]>([]);
-  const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(empty);
@@ -39,14 +39,14 @@ export default function DealerInvoices() {
   const [deleteTarget, setDeleteTarget] = useState<DealerInvoice | null>(null);
   const [search, setSearch] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data } = await getDealerInvoices(companyId);
-    setInvoices(data);
-    setLoading(false);
-  }, [companyId]);
+  const { data: invoices = [], isLoading } = useQuery({
+    queryKey: ['dealer-invoices', companyId],
+    queryFn: () => getDealerInvoices(companyId).then(r => r.data),
+    enabled: !!companyId,
+    staleTime: 30_000,
+  });
 
-  useEffect(() => { load(); }, [load]);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['dealer-invoices', companyId] });
 
   const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
   const openEdit = (inv: DealerInvoice) => {
@@ -91,7 +91,7 @@ export default function DealerInvoices() {
     });
     setSaving(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    await load();
+    await invalidate();
     setDialogOpen(false);
     toast({ title: editId ? 'Invoice updated' : 'Invoice created' });
   };
@@ -99,7 +99,7 @@ export default function DealerInvoices() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     await deleteDealerInvoice(deleteTarget.id);
-    await load();
+    await invalidate();
     setDeleteTarget(null);
     toast({ title: 'Invoice deleted' });
   };
@@ -118,7 +118,7 @@ export default function DealerInvoices() {
         <Button onClick={openAdd}><Plus className="h-4 w-4 mr-2" />New Invoice</Button>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <TableSkeleton rows={8} cols={6} colWidths={['w-24','w-32','w-28','w-20','w-24','w-16']} />
       ) : (
         <div className="rounded-md border overflow-x-auto">

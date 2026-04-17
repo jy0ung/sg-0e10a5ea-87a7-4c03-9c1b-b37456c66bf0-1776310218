@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/contexts/SalesContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 
@@ -22,34 +23,30 @@ interface ModelRow {
 const COLORS = ['#6366f1','#8b5cf6','#a78bfa','#c4b5fd','#e879f9','#f472b6','#fb7185','#fbbf24','#34d399','#22d3ee'];
 
 export default function MarginAnalysis() {
-  const { user } = useAuth();
-  const { salesOrders, reloadSales } = useSales();
+  const companyId = useCompanyId();
+  const { salesOrders } = useSales();
 
   const [branchFilter, setBranchFilter] = useState('all');
   const [periodFilter, setPeriodFilter] = useState('all');
-  // Map<chassisNo, invoiceCost>
-  const [costMap, setCostMap] = useState<Map<string, number>>(new Map());
 
-  useEffect(() => { reloadSales(); }, [reloadSales]);
-
-  // Fetch purchase invoice costs once per company
-  const loadCosts = useCallback(async () => {
-    if (!user?.company_id) return;
-    const { data } = await supabase
-      .from('purchase_invoices')
-      .select('chassis_no, amount')
-      .eq('company_id', user.company_id)
-      .eq('status', 'received');
-    if (data) {
+  // Fetch purchase invoice costs via React Query
+  const { data: costMap = new Map<string, number>() } = useQuery({
+    queryKey: ['margin-costs', companyId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('purchase_invoices')
+        .select('chassis_no, amount')
+        .eq('company_id', companyId)
+        .eq('status', 'received');
       const map = new Map<string, number>();
-      for (const row of data) {
+      for (const row of (data ?? [])) {
         if (row.chassis_no) map.set(row.chassis_no as string, Number(row.amount ?? 0));
       }
-      setCostMap(map);
-    }
-  }, [user?.company_id]);
-
-  useEffect(() => { loadCosts(); }, [loadCosts]);
+      return map;
+    },
+    enabled: !!companyId,
+    staleTime: 60_000,
+  });
 
   // Unique branches
   const branches = useMemo(() => {

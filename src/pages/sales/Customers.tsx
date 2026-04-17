@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,8 +28,6 @@ export default function Customers() {
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => { reloadSales(); }, [reloadSales]);
 
   const filtered = customers.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||

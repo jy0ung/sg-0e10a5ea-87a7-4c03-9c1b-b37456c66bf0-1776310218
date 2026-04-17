@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { useData } from '@/contexts/DataContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Plus, ArrowRight } from 'lucide-react';
@@ -55,11 +57,11 @@ function rowToTransfer(row: Record<string, unknown>): Transfer {
 
 export default function VehicleTransfer() {
   const { user } = useAuth();
+  const companyId = useCompanyId();
   const { vehicles } = useData();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatus] = useState<string>('all');
   const [addOpen, setAddOpen]     = useState(false);
@@ -68,23 +70,22 @@ export default function VehicleTransfer() {
 
   const branches = [...new Set(vehicles.map(v => v.branch_code).filter(Boolean))].sort() as string[];
 
-  const loadTransfers = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('vehicle_transfers')
-      .select('*')
-      .eq('company_id', user.company_id)
-      .order('created_at', { ascending: false });
-    if (error) {
-      toast({ title: 'Failed to load transfers', variant: 'destructive' });
-    } else {
-      setTransfers((data ?? []).map(row => rowToTransfer(row as Record<string, unknown>)));
-    }
-    setLoading(false);
-  }, [user, toast]);
+  const { data: transfers = [], isLoading } = useQuery({
+    queryKey: ['vehicle-transfers', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vehicle_transfers')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map(row => rowToTransfer(row as Record<string, unknown>));
+    },
+    enabled: !!companyId,
+    staleTime: 30_000,
+  });
 
-  useEffect(() => { loadTransfers(); }, [loadTransfers]);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['vehicle-transfers', companyId] });
 
   const filtered = transfers.filter(t => {
     if (statusFilter !== 'all' && t.status !== statusFilter) return false;
@@ -123,24 +124,19 @@ export default function VehicleTransfer() {
     toast({ title: 'Transfer record created', description: runningNo });
     setForm(EMPTY_FORM);
     setAddOpen(false);
-    loadTransfers();
+    invalidate();
   };
 
   const updateStatus = async (id: string, status: TransferStatus) => {
     const prev = transfers.find(t => t.id === id);
     if (!prev) return;
     const arrivedAt = status === 'arrived' ? new Date().toISOString().split('T')[0] : prev.arrivedAt;
-    // Optimistic update
-    setTransfers(ts => ts.map(t =>
-      t.id === id ? { ...t, status, arrivedAt } : t
-    ));
     const { error } = await supabase
       .from('vehicle_transfers')
       .update({ status, arrived_at: arrivedAt ?? null })
       .eq('id', id);
     if (error) {
       // Revert
-      setTransfers(ts => ts.map(t => t.id === id ? prev : t));
       toast({ title: 'Failed to update status', description: error.message, variant: 'destructive' });
       return;
     }
@@ -153,9 +149,10 @@ export default function VehicleTransfer() {
         .eq('company_id', user.company_id)
         .eq('is_deleted', false);
     }
+    invalidate();
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Vehicle Transfer" description="Inter-branch chassis movement tracking"
