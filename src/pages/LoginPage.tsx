@@ -4,10 +4,25 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { loginSchema, type LoginFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+
+function friendlyAuthError(raw: string): string {
+  const msg = raw.toLowerCase();
+  if (msg.includes('invalid login credentials') || msg.includes('invalid credentials'))
+    return 'Incorrect email or password. Please check your details and try again.';
+  if (msg.includes('email not confirmed'))
+    return 'Your email address has not been verified. Please check your inbox for a confirmation link.';
+  if (msg.includes('too many requests') || msg.includes('rate limit'))
+    return 'Too many login attempts. Please wait a few minutes before trying again.';
+  if (msg.includes('user not found'))
+    return 'No account found with that email address.';
+  if (msg.includes('network') || msg.includes('fetch'))
+    return 'Unable to connect. Please check your internet connection and try again.';
+  return raw;
+}
 
 export default function LoginPage() {
   const { login, isAuthenticated, loading } = useAuth();
@@ -35,7 +50,7 @@ export default function LoginPage() {
     setSubmitting(true);
     const { error: err } = await login(data.email, data.password);
     setSubmitting(false);
-    if (err) setError(err);
+    if (err) setError(friendlyAuthError(err));
     else navigate(from, { replace: true });
   };
 
@@ -80,7 +95,12 @@ export default function LoginPage() {
             )}
           </div>
 
-          {error && <p className="text-destructive text-sm">{error}</p>}
+          {error && (
+            <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
           <Button type="submit" className="w-full" disabled={submitting || !loginForm.formState.isValid}>
             {submitting ? (
