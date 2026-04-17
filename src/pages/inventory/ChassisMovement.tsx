@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { Search, ArrowRight, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Search, ArrowRight, Plus, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const AUDIT_PAGE_SIZE = 50;
 
 interface VehicleRow { id: string; chassisNo: string; model: string; branchCode: string; bgDate: string }
 interface AuditEvent {
@@ -36,9 +38,40 @@ export default function ChassisMovement() {
   const [query, setQuery] = useState('');
   const [vehicle, setVehicle] = useState<VehicleRow | null>(null);
   const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [totalEvents, setTotalEvents] = useState(0);
+  const [auditPage, setAuditPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentVehicleId, setCurrentVehicleId] = useState<string | null>(null);
+
+  const totalAuditPages = Math.ceil(totalEvents / AUDIT_PAGE_SIZE) || 1;
+
+  const loadAuditPage = async (vehicleId: string, p: number) => {
+    const { data: logData, error: logErr, count } = await supabase
+      .from('audit_logs')
+      .select('id, action, entity_type, changes, created_at, profiles(full_name, email)', { count: 'exact' })
+      .eq('entity_id', vehicleId)
+      .order('created_at', { ascending: true })
+      .range(p * AUDIT_PAGE_SIZE, (p + 1) * AUDIT_PAGE_SIZE - 1);
+
+    if (logErr) { setError(logErr.message); return; }
+    setTotalEvents(count ?? 0);
+    setAuditPage(p);
+    setEvents(
+      ((logData ?? []) as Record<string, unknown>[]).map(r => {
+        const profile = r.profiles as Record<string, unknown> | null;
+        return {
+          id: r.id as string,
+          action: r.action as string,
+          entityType: r.entity_type as string,
+          changes: r.changes as Record<string, unknown>,
+          createdAt: r.created_at as string,
+          userName: (profile?.full_name ?? profile?.email ?? 'System') as string,
+        };
+      })
+    );
+  };
 
   const handleSearch = async () => {
     const chassis = query.trim().toUpperCase();
@@ -62,31 +95,12 @@ export default function ChassisMovement() {
     if (!vData) { setLoading(false); return; }
 
     const v = vData as Record<string, unknown>;
-    setVehicle({ id: v.id as string, chassisNo: v.chassis_no as string, model: v.model as string, branchCode: v.branch_code as string, bgDate: v.bg_date as string });
+    const vid = v.id as string;
+    setVehicle({ id: vid, chassisNo: v.chassis_no as string, model: v.model as string, branchCode: v.branch_code as string, bgDate: v.bg_date as string });
+    setCurrentVehicleId(vid);
 
-    // Fetch audit logs for this vehicle
-    const { data: logData, error: logErr } = await supabase
-      .from('audit_logs')
-      .select('id, action, entity_type, changes, created_at, profiles(full_name, email)')
-      .eq('entity_id', v.id as string)
-      .order('created_at', { ascending: true })
-      .limit(200);
-
-    if (logErr) { setError(logErr.message); setLoading(false); return; }
-
-    setEvents(
-      ((logData ?? []) as Record<string, unknown>[]).map(r => {
-        const profile = r.profiles as Record<string, unknown> | null;
-        return {
-          id: r.id as string,
-          action: r.action as string,
-          entityType: r.entity_type as string,
-          changes: r.changes as Record<string, unknown>,
-          createdAt: r.created_at as string,
-          userName: (profile?.full_name ?? profile?.email ?? 'System') as string,
-        };
-      })
-    );
+    // Fetch audit logs — page 0
+    await loadAuditPage(vid, 0);
     setLoading(false);
   };
 
@@ -159,7 +173,22 @@ export default function ChassisMovement() {
       {/* Timeline */}
       {events.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">{events.length} audit event{events.length !== 1 ? 's' : ''}</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              {totalEvents.toLocaleString()} audit event{totalEvents !== 1 ? 's' : ''}
+            </h3>
+            {totalAuditPages > 1 && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Button variant="outline" size="icon" className="h-7 w-7" disabled={auditPage === 0 || loading} onClick={() => currentVehicleId && loadAuditPage(currentVehicleId, auditPage - 1)}>
+                  <ChevronLeft className="h-3 w-3" />
+                </Button>
+                <span className="px-2">Page {auditPage + 1} of {totalAuditPages}</span>
+                <Button variant="outline" size="icon" className="h-7 w-7" disabled={auditPage >= totalAuditPages - 1 || loading} onClick={() => currentVehicleId && loadAuditPage(currentVehicleId, auditPage + 1)}>
+                  <ChevronRight className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
           <div className="relative pl-6 space-y-4">
             {/* Vertical line */}
             <div className="absolute left-2 top-2 bottom-2 w-px bg-border" />

@@ -9,7 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { Download, FileText, RefreshCw } from 'lucide-react';
+import { Download, FileText, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const REPORT_PAGE_SIZE = 100;
 
 interface ReportRow {
   [key: string]: string | number | null | undefined;
@@ -20,15 +22,50 @@ interface ReportConfig {
   label: string;
   description: string;
   columns: { key: string; label: string; numeric?: boolean }[];
-  query: (companyId: string, from: string, to: string) => Promise<ReportRow[]>;
+  /** Returns one page of data plus exact total count. */
+  query: (companyId: string, from: string, to: string, page: number) => Promise<{ data: ReportRow[]; count: number }>;
+  /** Fetch ALL rows for CSV export (loops pages). */
+  fetchAll: (companyId: string, from: string, to: string) => Promise<ReportRow[]>;
 }
 
-async function queryTable(table: string, companyId: string, from: string, to: string, dateCol: string, select = '*'): Promise<ReportRow[]> {
-  let q = supabase.from(table as 'vehicles').select(select).eq('company_id', companyId);
+async function queryTable(
+  table: string,
+  companyId: string,
+  from: string,
+  to: string,
+  dateCol: string,
+  select: string,
+  page: number,
+): Promise<{ data: ReportRow[]; count: number }> {
+  let q = supabase
+    .from(table as 'vehicles')
+    .select(select, { count: 'exact' })
+    .eq('company_id', companyId);
   if (from) q = q.gte(dateCol, from);
   if (to) q = q.lte(dateCol, to);
-  const { data } = await q.order(dateCol, { ascending: false }).limit(500);
-  return (data ?? []) as ReportRow[];
+  const { data, count } = await q
+    .order(dateCol, { ascending: false })
+    .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
+  return { data: (data ?? []) as ReportRow[], count: count ?? 0 };
+}
+
+async function fetchAllPages(
+  table: string,
+  companyId: string,
+  from: string,
+  to: string,
+  dateCol: string,
+  select: string,
+): Promise<ReportRow[]> {
+  const results: ReportRow[] = [];
+  let page = 0;
+  while (true) {
+    const { data } = await queryTable(table, companyId, from, to, dateCol, select, page);
+    results.push(...data);
+    if (data.length < REPORT_PAGE_SIZE) break;
+    page++;
+  }
+  return results;
 }
 
 const REPORTS: ReportConfig[] = [
@@ -44,9 +81,30 @@ const REPORTS: ReportConfig[] = [
       { key: 'status', label: 'Status' },
       { key: 'created_at', label: 'Date In' },
     ],
-    query: async (companyId) => {
-      const { data } = await supabase.from('vehicles').select('chassis_no,model,colour,branch_id,status,created_at').eq('company_id', companyId).order('created_at', { ascending: false }).limit(500);
-      return (data ?? []) as ReportRow[];
+    query: async (companyId, _from, _to, page) => {
+      const { data, count } = await supabase
+        .from('vehicles')
+        .select('chassis_no,model,colour,branch_id,status,created_at', { count: 'exact' })
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false })
+        .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
+      return { data: (data ?? []) as ReportRow[], count: count ?? 0 };
+    },
+    fetchAll: async (companyId) => {
+      const results: ReportRow[] = [];
+      let page = 0;
+      while (true) {
+        const { data } = await supabase
+          .from('vehicles')
+          .select('chassis_no,model,colour,branch_id,status,created_at')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
+        results.push(...((data ?? []) as ReportRow[]));
+        if ((data ?? []).length < REPORT_PAGE_SIZE) break;
+        page++;
+      }
+      return results;
     },
   },
   {
@@ -61,9 +119,30 @@ const REPORTS: ReportConfig[] = [
       { key: 'colour', label: 'Colour' },
       { key: 'status', label: 'Status' },
     ],
-    query: async (companyId) => {
-      const { data } = await supabase.from('vehicles').select('chassis_no,plate_no,model,engine_no,colour,status').eq('company_id', companyId).order('chassis_no').limit(500);
-      return (data ?? []) as ReportRow[];
+    query: async (companyId, _from, _to, page) => {
+      const { data, count } = await supabase
+        .from('vehicles')
+        .select('chassis_no,plate_no,model,engine_no,colour,status', { count: 'exact' })
+        .eq('company_id', companyId)
+        .order('chassis_no')
+        .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
+      return { data: (data ?? []) as ReportRow[], count: count ?? 0 };
+    },
+    fetchAll: async (companyId) => {
+      const results: ReportRow[] = [];
+      let page = 0;
+      while (true) {
+        const { data } = await supabase
+          .from('vehicles')
+          .select('chassis_no,plate_no,model,engine_no,colour,status')
+          .eq('company_id', companyId)
+          .order('chassis_no')
+          .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
+        results.push(...((data ?? []) as ReportRow[]));
+        if ((data ?? []).length < REPORT_PAGE_SIZE) break;
+        page++;
+      }
+      return results;
     },
   },
   {
@@ -78,7 +157,8 @@ const REPORTS: ReportConfig[] = [
       { key: 'created_at', label: 'Booking Date' },
       { key: 'total_price', label: 'Price (RM)', numeric: true },
     ],
-    query: (companyId, from, to) => queryTable('sales_orders', companyId, from, to, 'created_at', 'order_no,customer_name,model,status,created_at,total_price'),
+    query: (companyId, from, to, page) => queryTable('sales_orders', companyId, from, to, 'created_at', 'order_no,customer_name,model,status,created_at,total_price', page),
+    fetchAll: (companyId, from, to) => fetchAllPages('sales_orders', companyId, from, to, 'created_at', 'order_no,customer_name,model,status,created_at,total_price'),
   },
   {
     id: 'disbursement',
@@ -92,7 +172,8 @@ const REPORTS: ReportConfig[] = [
       { key: 'disbursement_date', label: 'Disbursement Date' },
       { key: 'status', label: 'Status' },
     ],
-    query: (companyId, from, to) => queryTable('sales_orders', companyId, from, to, 'created_at', 'order_no,customer_name,finance_company,loan_amount,disbursement_date,status'),
+    query: (companyId, from, to, page) => queryTable('sales_orders', companyId, from, to, 'created_at', 'order_no,customer_name,finance_company,loan_amount,disbursement_date,status', page),
+    fetchAll: (companyId, from, to) => fetchAllPages('sales_orders', companyId, from, to, 'created_at', 'order_no,customer_name,finance_company,loan_amount,disbursement_date,status'),
   },
   {
     id: 'purchase',
@@ -106,7 +187,8 @@ const REPORTS: ReportConfig[] = [
       { key: 'purchase_price', label: 'Price (RM)', numeric: true },
       { key: 'invoice_date', label: 'Invoice Date' },
     ],
-    query: (companyId, from, to) => queryTable('purchase_invoices', companyId, from, to, 'invoice_date', 'invoice_no,supplier_name,model,chassis_no,purchase_price,invoice_date'),
+    query: (companyId, from, to, page) => queryTable('purchase_invoices', companyId, from, to, 'invoice_date', 'invoice_no,supplier_name,model,chassis_no,purchase_price,invoice_date', page),
+    fetchAll: (companyId, from, to) => fetchAllPages('purchase_invoices', companyId, from, to, 'invoice_date', 'invoice_no,supplier_name,model,chassis_no,purchase_price,invoice_date'),
   },
   {
     id: 'transfer',
@@ -120,7 +202,8 @@ const REPORTS: ReportConfig[] = [
       { key: 'transferred_by', label: 'Transferred By' },
       { key: 'status', label: 'Status' },
     ],
-    query: (companyId, from, to) => queryTable('vehicle_transfers', companyId, from, to, 'transfer_date', 'chassis_no,from_branch,to_branch,transfer_date,transferred_by,status'),
+    query: (companyId, from, to, page) => queryTable('vehicle_transfers', companyId, from, to, 'transfer_date', 'chassis_no,from_branch,to_branch,transfer_date,transferred_by,status', page),
+    fetchAll: (companyId, from, to) => fetchAllPages('vehicle_transfers', companyId, from, to, 'transfer_date', 'chassis_no,from_branch,to_branch,transfer_date,transferred_by,status'),
   },
   {
     id: 'invoice',
@@ -134,7 +217,8 @@ const REPORTS: ReportConfig[] = [
       { key: 'invoice_amount', label: 'Amount (RM)', numeric: true },
       { key: 'invoice_date', label: 'Invoice Date' },
     ],
-    query: (companyId, from, to) => queryTable('sales_invoices', companyId, from, to, 'invoice_date', 'invoice_no,customer_name,model,chassis_no,invoice_amount,invoice_date'),
+    query: (companyId, from, to, page) => queryTable('sales_invoices', companyId, from, to, 'invoice_date', 'invoice_no,customer_name,model,chassis_no,invoice_amount,invoice_date', page),
+    fetchAll: (companyId, from, to) => fetchAllPages('sales_invoices', companyId, from, to, 'invoice_date', 'invoice_no,customer_name,model,chassis_no,invoice_amount,invoice_date'),
   },
 ];
 
@@ -144,30 +228,45 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
   const [from, setFrom] = useState(firstOfMonth);
   const [to, setTo] = useState(today);
   const [rows, setRows] = useState<ReportRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [generated, setGenerated] = useState(false);
 
-  const generate = async () => {
+  const totalPages = Math.ceil(totalCount / REPORT_PAGE_SIZE) || 1;
+
+  const loadPage = async (p: number) => {
     setLoading(true);
     try {
-      const data = await config.query(companyId, from, to);
+      const { data, count } = await config.query(companyId, from, to, p);
       setRows(data);
+      setTotalCount(count);
+      setPage(p);
       setGenerated(true);
     } finally {
       setLoading(false);
     }
   };
 
-  const exportCSV = () => {
-    const header = config.columns.map(c => c.label).join(',');
-    const body = rows.map(r => config.columns.map(c => {
-      const v = r[c.key];
-      return v == null ? '' : String(v).includes(',') ? `"${v}"` : v;
-    }).join(',')).join('\n');
-    const blob = new Blob([header + '\n' + body], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${config.id}-report.csv`; a.click();
-    URL.revokeObjectURL(url);
+  const generate = () => loadPage(0);
+
+  const exportCSV = async () => {
+    setExporting(true);
+    try {
+      const all = await config.fetchAll(companyId, from, to);
+      const header = config.columns.map(c => c.label).join(',');
+      const body = all.map(r => config.columns.map(c => {
+        const v = r[c.key];
+        return v == null ? '' : String(v).includes(',') ? `"${v}"` : v;
+      }).join(',')).join('\n');
+      const blob = new Blob([header + '\n' + body], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `${config.id}-report.csv`; a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -190,9 +289,10 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               {loading ? 'Generating…' : 'Generate'}
             </Button>
-            {generated && rows.length > 0 && (
-              <Button variant="outline" onClick={exportCSV}>
-                <Download className="h-4 w-4 mr-2" />Export CSV
+            {generated && totalCount > 0 && (
+              <Button variant="outline" onClick={exportCSV} disabled={exporting}>
+                <Download className="h-4 w-4 mr-2" />
+                {exporting ? 'Exporting…' : `Export CSV (${totalCount.toLocaleString()})`}
               </Button>
             )}
           </div>
@@ -200,39 +300,50 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
       </Card>
 
       {generated && (
-        <div className="rounded-md border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted text-muted-foreground">
-              <tr>
-                {config.columns.map(c => (
-                  <th key={c.key} className={`px-4 py-3 font-medium whitespace-nowrap ${c.numeric ? 'text-right' : 'text-left'}`}>{c.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr><td colSpan={config.columns.length} className="px-4 py-8 text-center text-muted-foreground">No records found for the selected period.</td></tr>
-              ) : rows.map((row, i) => (
-                <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
+        <>
+          <div className="rounded-md border overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted text-muted-foreground">
+                <tr>
                   {config.columns.map(c => (
-                    <td key={c.key} className={`px-4 py-3 ${c.numeric ? 'text-right tabular-nums' : ''}`}>
-                      {row[c.key] == null ? '—' : c.numeric ? Number(row[c.key]).toLocaleString('en-MY', { minimumFractionDigits: 2 }) : String(row[c.key])}
-                    </td>
+                    <th key={c.key} className={`px-4 py-3 font-medium whitespace-nowrap ${c.numeric ? 'text-right' : 'text-left'}`}>{c.label}</th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-            {rows.length > 0 && (
-              <tfoot className="bg-muted/50">
-                <tr>
-                  <td className="px-4 py-2 text-xs text-muted-foreground" colSpan={config.columns.length}>
-                    {rows.length} record{rows.length !== 1 ? 's' : ''} found
-                  </td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr><td colSpan={config.columns.length} className="px-4 py-8 text-center text-muted-foreground">No records found for the selected period.</td></tr>
+                ) : rows.map((row, i) => (
+                  <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
+                    {config.columns.map(c => (
+                      <td key={c.key} className={`px-4 py-3 ${c.numeric ? 'text-right tabular-nums' : ''}`}>
+                        {row[c.key] == null ? '—' : c.numeric ? Number(row[c.key]).toLocaleString('en-MY', { minimumFractionDigits: 2 }) : String(row[c.key])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination bar */}
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              {totalCount === 0
+                ? 'No records'
+                : `${page * REPORT_PAGE_SIZE + 1}–${Math.min((page + 1) * REPORT_PAGE_SIZE, totalCount)} of ${totalCount.toLocaleString()} records`}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 0 || loading} onClick={() => loadPage(page - 1)}>
+                <ChevronLeft className="h-3 w-3" />
+              </Button>
+              <span className="px-2">Page {page + 1} of {totalPages}</span>
+              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1 || loading} onClick={() => loadPage(page + 1)}>
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

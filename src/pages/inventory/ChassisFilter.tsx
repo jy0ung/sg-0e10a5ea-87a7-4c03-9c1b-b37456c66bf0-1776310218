@@ -8,7 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { Search, RefreshCw, X } from 'lucide-react';
+import { Search, RefreshCw, X, ChevronLeft, ChevronRight } from 'lucide-react';
+
+const FILTER_PAGE_SIZE = 100;
 
 interface Vehicle {
   id: string;
@@ -33,17 +35,20 @@ export default function ChassisFilter() {
     model: '', engineNo: '', colour: '',
   });
   const [results, setResults] = useState<Vehicle[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
   const activeFilters = Object.entries(filters).filter(([, v]) => v.trim());
+  const totalPages = Math.ceil(totalCount / FILTER_PAGE_SIZE) || 1;
 
-  const handleSearch = async () => {
+  const runSearch = async (p: number) => {
     setLoading(true);
     try {
       let q = supabase
         .from('vehicles')
-        .select('id,chassis_no,plate_no,model,engine_no,colour,status,branch_id,owner_name')
+        .select('id,chassis_no,plate_no,model,engine_no,colour,status,branch_id,owner_name', { count: 'exact' })
         .eq('company_id', companyId);
 
       if (filters.chassisNo.trim()) q = q.ilike('chassis_no', `%${filters.chassisNo.trim()}%`);
@@ -53,16 +58,22 @@ export default function ChassisFilter() {
       if (filters.colour.trim()) q = q.ilike('colour', `%${filters.colour.trim()}%`);
       if (filters.ownerName.trim()) q = q.ilike('owner_name', `%${filters.ownerName.trim()}%`);
 
-      const { data } = await q.order('chassis_no').limit(200);
+      const { data, count } = await q
+        .order('chassis_no')
+        .range(p * FILTER_PAGE_SIZE, (p + 1) * FILTER_PAGE_SIZE - 1);
       setResults((data ?? []) as Vehicle[]);
+      setTotalCount(count ?? 0);
+      setPage(p);
       setSearched(true);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSearch = () => runSearch(0);
+
   const clearFilter = (key: string) => setFilters(f => ({ ...f, [key]: '' }));
-  const clearAll = () => { setFilters({ ownerName: '', vehicleType: '', chassisNo: '', plateNo: '', model: '', engineNo: '', colour: '' }); setResults([]); setSearched(false); };
+  const clearAll = () => { setFilters({ ownerName: '', vehicleType: '', chassisNo: '', plateNo: '', model: '', engineNo: '', colour: '' }); setResults([]); setSearched(false); setTotalCount(0); setPage(0); };
 
   const set = (k: keyof typeof filters) => (e: React.ChangeEvent<HTMLInputElement>) => setFilters(f => ({ ...f, [k]: e.target.value }));
 
@@ -121,48 +132,59 @@ export default function ChassisFilter() {
       </Card>
 
       {searched && (
-        <div className="rounded-md border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted text-muted-foreground">
-              <tr>
-                {['Chassis No', 'Plate No', 'Model', 'Engine No', 'Colour', 'Status', 'Branch', 'Owner Name'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">{h}</th>
+        <>
+          <div className="rounded-md border overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted text-muted-foreground">
+                <tr>
+                  {['Chassis No', 'Plate No', 'Model', 'Engine No', 'Colour', 'Status', 'Branch', 'Owner Name'].map(h => (
+                    <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {results.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
+                      No vehicles matched your filters.
+                    </td>
+                  </tr>
+                ) : results.map(v => (
+                  <tr key={v.id} className="border-t hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs font-semibold">{v.chassis_no ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{v.plate_no ?? '—'}</td>
+                    <td className="px-4 py-3">{v.model ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{v.engine_no ?? '—'}</td>
+                    <td className="px-4 py-3">{v.colour ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      {v.status ? <Badge variant={v.status === 'Available' ? 'default' : 'secondary'}>{v.status}</Badge> : '—'}
+                    </td>
+                    <td className="px-4 py-3">{v.branch_id ?? '—'}</td>
+                    <td className="px-4 py-3">{v.owner_name ?? '—'}</td>
+                  </tr>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {results.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
-                    No vehicles matched your filters.
-                  </td>
-                </tr>
-              ) : results.map(v => (
-                <tr key={v.id} className="border-t hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs font-semibold">{v.chassis_no ?? '—'}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{v.plate_no ?? '—'}</td>
-                  <td className="px-4 py-3">{v.model ?? '—'}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{v.engine_no ?? '—'}</td>
-                  <td className="px-4 py-3">{v.colour ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    {v.status ? <Badge variant={v.status === 'Available' ? 'default' : 'secondary'}>{v.status}</Badge> : '—'}
-                  </td>
-                  <td className="px-4 py-3">{v.branch_id ?? '—'}</td>
-                  <td className="px-4 py-3">{v.owner_name ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-            {results.length > 0 && (
-              <tfoot className="bg-muted/50">
-                <tr>
-                  <td className="px-4 py-2 text-xs text-muted-foreground" colSpan={8}>
-                    {results.length} vehicle{results.length !== 1 ? 's' : ''} found
-                  </td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination bar */}
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              {totalCount === 0
+                ? 'No vehicles found'
+                : `${page * FILTER_PAGE_SIZE + 1}–${Math.min((page + 1) * FILTER_PAGE_SIZE, totalCount)} of ${totalCount.toLocaleString()} vehicles`}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 0 || loading} onClick={() => runSearch(page - 1)}>
+                <ChevronLeft className="h-3 w-3" />
+              </Button>
+              <span className="px-2">Page {page + 1} of {totalPages}</span>
+              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1 || loading} onClick={() => runSearch(page + 1)}>
+                <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

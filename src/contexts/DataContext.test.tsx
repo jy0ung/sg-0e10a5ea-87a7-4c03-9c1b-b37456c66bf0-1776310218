@@ -9,7 +9,8 @@ const createDefaultBuilder = () => {
   const builder: any = {};
   builder.select = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
-  builder.order = vi.fn(() => Promise.resolve({ data: [], error: null }));
+  builder.order = vi.fn(() => builder);
+  builder.range = vi.fn(() => Promise.resolve({ data: [], error: null }));
   builder.insert = vi.fn().mockResolvedValue({ error: null });
   builder.update = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
   builder.upsert = vi.fn().mockResolvedValue({ error: null });
@@ -89,7 +90,8 @@ describe('DataContext', () => {
         const builder: any = {};
         builder.select = vi.fn(() => builder);
         builder.eq = vi.fn(() => builder);
-        builder.order = vi.fn(() => Promise.resolve(result));
+        builder.order = vi.fn(() => builder);
+        builder.range = vi.fn(() => Promise.resolve(result));
         builder.then = (resolve: any) => Promise.resolve(result).then(resolve);
         return builder;
       });

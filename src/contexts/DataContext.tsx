@@ -108,12 +108,35 @@ function mapDbSla(row: Record<string, unknown>): SlaPolicy {
 
 export const dataQueryKey = (companyId: string) => ['data', companyId] as const;
 
+/** Fetch all vehicles in chunks of VEHICLE_PAGE_SIZE to avoid unbounded queries. */
+const VEHICLE_PAGE_SIZE = 1_000;
+
+async function fetchAllVehicles(companyId: string): Promise<VehicleCanonical[]> {
+  const results: VehicleCanonical[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('vehicles')
+      .select('*')
+      .eq('is_deleted', false)
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false })
+      .range(from, from + VEHICLE_PAGE_SIZE - 1);
+    if (error) { loggingService.error('Failed to load vehicles page', { error, from }, 'DataContext'); break; }
+    const rows = (data ?? []).map(r => mapDbVehicle(r as unknown as Record<string, unknown>));
+    results.push(...rows);
+    if (rows.length < VEHICLE_PAGE_SIZE) break;
+    from += VEHICLE_PAGE_SIZE;
+  }
+  return results;
+}
+
 async function fetchDataFromDb(companyId: string) {
   const queryId = `data-reload-${Date.now()}`;
   performanceService.startQueryTimer(queryId);
 
   const [vehiclesRes, batchesRes, issuesRes, slasRes] = await Promise.all([
-    supabase.from('vehicles').select('*').eq('is_deleted', false).eq('company_id', companyId).order('created_at', { ascending: false }),
+    fetchAllVehicles(companyId).then(v => ({ data: v, error: null })),
     supabase.from('import_batches').select('*').eq('company_id', companyId).order('created_at', { ascending: false }),
     supabase.from('quality_issues').select('*').order('created_at', { ascending: false }),
     supabase.from('sla_policies').select('*').eq('company_id', companyId),
@@ -124,7 +147,7 @@ async function fetchDataFromDb(companyId: string) {
   if (issuesRes.error) loggingService.error('Failed to load quality issues', { error: issuesRes.error }, 'DataContext');
   if (slasRes.error) loggingService.error('Failed to load SLA policies', { error: slasRes.error }, 'DataContext');
 
-  const dbVehicles = (vehiclesRes.data || []).map(r => mapDbVehicle(r as unknown as Record<string, unknown>));
+  const dbVehicles = vehiclesRes.data ?? [];
   const dbBatches  = (batchesRes.data  || []).map(r => mapDbBatch(r  as unknown as Record<string, unknown>));
   const dbIssues   = (issuesRes.data   || []).map(r => mapDbIssue(r  as unknown as Record<string, unknown>));
   const dbSlas     = (slasRes.data     || []).map(r => mapDbSla(r    as unknown as Record<string, unknown>));
