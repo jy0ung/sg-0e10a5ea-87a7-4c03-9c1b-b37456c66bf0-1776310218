@@ -106,17 +106,17 @@ function mapDbSla(row: Record<string, unknown>): SlaPolicy {
   };
 }
 
-export const DATA_QUERY_KEY = ['data'] as const;
+export const dataQueryKey = (companyId: string) => ['data', companyId] as const;
 
-async function fetchDataFromDb() {
+async function fetchDataFromDb(companyId: string) {
   const queryId = `data-reload-${Date.now()}`;
   performanceService.startQueryTimer(queryId);
 
   const [vehiclesRes, batchesRes, issuesRes, slasRes] = await Promise.all([
-    supabase.from('vehicles').select('*').eq('is_deleted', false).order('created_at', { ascending: false }),
-    supabase.from('import_batches').select('*').order('created_at', { ascending: false }),
+    supabase.from('vehicles').select('*').eq('is_deleted', false).eq('company_id', companyId).order('created_at', { ascending: false }),
+    supabase.from('import_batches').select('*').eq('company_id', companyId).order('created_at', { ascending: false }),
     supabase.from('quality_issues').select('*').order('created_at', { ascending: false }),
-    supabase.from('sla_policies').select('*'),
+    supabase.from('sla_policies').select('*').eq('company_id', companyId),
   ]);
 
   if (vehiclesRes.error) loggingService.error('Failed to load vehicles', { error: vehiclesRes.error }, 'DataContext');
@@ -151,13 +151,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   // React Query manages initial fetch and re-fetches after invalidation.
   const { isLoading } = useQuery({
-    queryKey: DATA_QUERY_KEY,
-    queryFn: fetchDataFromDb,
+    queryKey: dataQueryKey(companyId),
+    queryFn: () => fetchDataFromDb(companyId),
+    enabled: !!companyId,
     staleTime: 60_000,
   });
 
   // Sync server data to local state whenever the query cache updates.
-  const queryData = queryClient.getQueryData<Awaited<ReturnType<typeof fetchDataFromDb>>>(DATA_QUERY_KEY);
+  const queryData = queryClient.getQueryData<Awaited<ReturnType<typeof fetchDataFromDb>>>(dataQueryKey(companyId));
   useEffect(() => {
     if (queryData) {
       setVehiclesState(queryData.vehicles);
@@ -170,8 +171,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [queryData]);
 
   const reloadFromDb = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: DATA_QUERY_KEY });
-  }, [queryClient]);
+    await queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId) });
+  }, [queryClient, companyId]);
 
   // Realtime: invalidate whenever a vehicle row changes in this company.
   useEffect(() => {
@@ -181,7 +182,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'vehicles', filter: `company_id=eq.${companyId}` },
-        () => { queryClient.invalidateQueries({ queryKey: DATA_QUERY_KEY }); }
+        () => { queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId) }); }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
