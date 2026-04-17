@@ -80,6 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, newSession) => {
         setSession(newSession);
         if (newSession?.user) {
+          // Keep loading true while the profile is being fetched so that
+          // ProtectedRoute does not redirect before the profile arrives.
+          setLoading(true);
           // Use setTimeout to avoid Supabase client deadlock
           setTimeout(() => {
             fetchProfile(newSession.user.id).finally(() => {
