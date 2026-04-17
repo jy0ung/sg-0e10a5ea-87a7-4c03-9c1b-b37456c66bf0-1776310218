@@ -20,6 +20,7 @@ errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
 // Route-level code splitting — all pages are loaded on demand
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const CustomerServiceLayout = lazy(() => import("./components/layout/CustomerServiceLayout"));
+const MyTickets = lazy(() => import("./pages/tickets/MyTickets"));
 const NewTicket = lazy(() => import("./pages/tickets/NewTicket"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
@@ -64,6 +65,13 @@ const DealerInvoices = lazy(() => import("./pages/sales/DealerInvoices"));
 const VerifyOR = lazy(() => import("./pages/sales/VerifyOR"));
 const ReportsCenter = lazy(() => import("./pages/reports/ReportsCenter"));
 const ChassisFilter = lazy(() => import("./pages/inventory/ChassisFilter"));
+const EmployeeDirectory = lazy(() => import("./pages/hrms/EmployeeDirectory"));
+const LeaveManagement = lazy(() => import("./pages/hrms/LeaveManagement"));
+const LeaveCalendar = lazy(() => import("./pages/hrms/LeaveCalendar"));
+const AttendanceLog = lazy(() => import("./pages/hrms/AttendanceLog"));
+const PayrollSummary = lazy(() => import("./pages/hrms/PayrollSummary"));
+const PerformanceAppraisals = lazy(() => import("./pages/hrms/PerformanceAppraisals"));
+const HrmsAnnouncements = lazy(() => import("./pages/hrms/Announcements"));
 
 // Lightweight spinner shown while a lazy page chunk loads
 const PageSpinner = () => (
@@ -77,18 +85,23 @@ function S({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageSpinner />}>{children}</Suspense>;
 }
 
+function ProtectedAppShell({ redirectTo = "/login" }: { redirectTo?: string | ((pathname: string) => string) }) {
+  return (
+    <ProtectedRoute redirectTo={redirectTo}>
+      <DataProvider>
+        <AppLayout />
+      </DataProvider>
+    </ProtectedRoute>
+  );
+}
+
 const queryClient = new QueryClient();
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: (
-      <ProtectedRoute>
-        <DataProvider>
-          <AppLayout />
-        </DataProvider>
-      </ProtectedRoute>
-    ),
+    // Unauthenticated root (/) → /welcome, any other protected path → /login
+    element: <ProtectedAppShell redirectTo={(p) => (p === "/" ? "/welcome" : "/login")} />,
     errorElement: (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center space-y-4">
@@ -139,6 +152,13 @@ const router = createBrowserRouter([
       { path: "sales/verify-or", element: <SalesProvider><S><VerifyOR /></S></SalesProvider> },
       { path: "reports", element: <S><ReportsCenter /></S> },
       { path: "inventory/chassis-filter", element: <S><ChassisFilter /></S> },
+      { path: "hrms/employees", element: <S><EmployeeDirectory /></S> },
+      { path: "hrms/leave", element: <S><LeaveManagement /></S> },
+      { path: "hrms/leave-calendar", element: <S><LeaveCalendar /></S> },
+      { path: "hrms/attendance", element: <S><AttendanceLog /></S> },
+      { path: "hrms/payroll", element: <S><PayrollSummary /></S> },
+      { path: "hrms/appraisals", element: <S><PerformanceAppraisals /></S> },
+      { path: "hrms/announcements", element: <S><HrmsAnnouncements /></S> },
     ],
   },
   {
@@ -155,6 +175,8 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
+      { index: true, element: <Navigate to="tickets/new" replace /> },
+      { path: "tickets", element: <S><MyTickets /></S> },
       { path: "tickets/new", element: <S><NewTicket /></S> },
     ],
   },

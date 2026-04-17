@@ -10,6 +10,7 @@ export function computeKpiSummaries(vehicles: VehicleCanonical[], slas: SlaPolic
     let missingCount = 0;
 
     vehicles.forEach(v => {
+      if (v.is_incomplete) { missingCount++; return; }
       const val = v[kpi.computedField] as number | null | undefined;
       if (val === null || val === undefined) missingCount++;
       else if (val < 0) invalidCount++;

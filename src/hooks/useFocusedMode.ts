@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 /**
  * Paths whose first segment belongs to a standalone module.
  * Any route under these prefixes renders in focused (module-only) mode.
- * Platform paths (/. /modules, /notifications, /admin/*) are excluded.
+ * Platform paths (`/`, `/modules`, `/notifications`, `/admin/*`) are excluded.
  */
 const MODULE_PREFIXES = [
   '/auto-aging',
@@ -11,6 +11,7 @@ const MODULE_PREFIXES = [
   '/inventory',
   '/purchasing',
   '/reports',
+  '/hrms',
 ];
 
 export function useFocusedMode(): { isFocused: boolean } {

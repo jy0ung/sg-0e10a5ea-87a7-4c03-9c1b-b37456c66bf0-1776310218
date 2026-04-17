@@ -87,9 +87,9 @@ export default function AutoAgingDashboard() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader
-          title="Auto Aging Dashboard"
+          title="Auto Aging Overview"
           description="Vehicle aging analysis across operational milestones"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Dashboard' }]}
+          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Overview' }]}
         />
         <div className="glass-panel p-12 text-center">
           <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -106,9 +106,9 @@ export default function AutoAgingDashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="Auto Aging Dashboard"
+        title="Auto Aging Overview"
         description="Vehicle aging analysis across operational milestones"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Dashboard' }]}
+        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Overview' }]}
         actions={
           <div className="flex items-center gap-2">
             <div className="text-right mr-2">

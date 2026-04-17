@@ -71,6 +71,7 @@ export default function PurchaseInvoices() {
       .from('purchase_invoices')
       .select('*')
       .eq('company_id', user.company_id)
+      .eq('is_deleted', false)
       .order('created_at', { ascending: false });
     if (error) {
       toast({ title: 'Failed to load purchase invoices', variant: 'destructive' });
@@ -140,6 +141,34 @@ export default function PurchaseInvoices() {
     if (error) {
       setInvoices(is => is.map(i => i.id === id ? prev : i));
       toast({ title: 'Failed to mark received', description: error.message, variant: 'destructive' });
+      return;
+    }
+    // Upsert vehicle row so the vehicle appears in inventory when stock arrives.
+    // If a vehicle with this chassis already exists, update date_received_by_outlet only
+    // when it has not been set yet. Otherwise insert a minimal stub record.
+    if (user?.company_id && prev.chassisNo) {
+      const { data: existing } = await supabase
+        .from('vehicles')
+        .select('id, date_received_by_outlet')
+        .eq('chassis_no', prev.chassisNo)
+        .eq('company_id', user.company_id)
+        .maybeSingle();
+
+      if (existing) {
+        if (!existing.date_received_by_outlet) {
+          await supabase
+            .from('vehicles')
+            .update({ date_received_by_outlet: receivedDate })
+            .eq('id', existing.id);
+        }
+      } else {
+        await supabase.from('vehicles').insert({
+          chassis_no: prev.chassisNo,
+          model: prev.model,
+          company_id: user.company_id,
+          date_received_by_outlet: receivedDate,
+        });
+      }
     }
   };
 

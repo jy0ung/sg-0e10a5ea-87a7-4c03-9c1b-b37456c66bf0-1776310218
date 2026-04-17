@@ -37,6 +37,208 @@ export interface Branch {
   companyId: string;
 }
 
+// ===== HRMS =====
+export type EmployeeStatus = 'active' | 'inactive' | 'resigned';
+
+export interface Employee {
+  id: string;
+  email: string;
+  name: string;
+  role: AppRole;
+  companyId: string;
+  branchId?: string;
+  staffCode?: string;
+  icNo?: string;
+  contactNo?: string;
+  joinDate?: string;
+  resignDate?: string;
+  status: EmployeeStatus;
+  avatarUrl?: string;
+}
+
+// ===== HRMS — Leave =====
+export interface LeaveType {
+  id: string;
+  companyId: string;
+  name: string;
+  code: string;
+  daysPerYear: number;
+  isPaid: boolean;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeaveBalance {
+  id: string;
+  employeeId: string;
+  leaveTypeId: string;
+  year: number;
+  entitledDays: number;
+  usedDays: number;
+  remainingDays: number; // computed: entitledDays - usedDays
+}
+
+export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface LeaveRequest {
+  id: string;
+  companyId: string;
+  employeeId: string;
+  employeeName?: string;
+  leaveTypeId: string;
+  leaveTypeName?: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason?: string;
+  status: LeaveStatus;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewerNote?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLeaveRequestInput {
+  leaveTypeId: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason?: string;
+}
+
+// ===== HRMS — Attendance =====
+export type AttendanceStatus = 'present' | 'absent' | 'half_day' | 'on_leave' | 'public_holiday';
+
+export interface AttendanceRecord {
+  id: string;
+  companyId: string;
+  employeeId: string;
+  employeeName?: string;
+  date: string;
+  clockIn?: string;
+  clockOut?: string;
+  hoursWorked?: number;
+  status: AttendanceStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertAttendanceInput {
+  employeeId: string;
+  date: string;
+  clockIn?: string;
+  clockOut?: string;
+  hoursWorked?: number;
+  status: AttendanceStatus;
+  notes?: string;
+}
+
+// ===== HRMS — Payroll =====
+export type PayrollRunStatus = 'draft' | 'finalised' | 'paid';
+
+export interface PayrollRun {
+  id: string;
+  companyId: string;
+  periodYear: number;
+  periodMonth: number;
+  status: PayrollRunStatus;
+  totalHeadcount: number;
+  totalGross: number;
+  totalNet: number;
+  notes?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PayrollItem {
+  id: string;
+  payrollRunId: string;
+  employeeId: string;
+  employeeName?: string;
+  basicSalary: number;
+  allowances: number;
+  overtime: number;
+  grossPay: number;
+  epfEmployee: number;
+  socsoEmployee: number;
+  incomeTax: number;
+  otherDeductions: number;
+  totalDeductions: number;
+  netPay: number;
+  epfEmployer: number;
+  socsoEmployer: number;
+  notes?: string;
+}
+
+// ===== HRMS — Appraisals =====
+export type AppraisalCycle = 'annual' | 'mid_year' | 'quarterly' | 'probation';
+export type AppraisalStatus = 'open' | 'in_progress' | 'completed' | 'archived';
+export type AppraisalItemStatus = 'pending' | 'self_reviewed' | 'reviewed' | 'acknowledged';
+
+export interface Appraisal {
+  id: string;
+  companyId: string;
+  title: string;
+  cycle: AppraisalCycle;
+  periodStart: string;
+  periodEnd: string;
+  status: AppraisalStatus;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppraisalItem {
+  id: string;
+  appraisalId: string;
+  employeeId: string;
+  employeeName?: string;
+  reviewerId?: string;
+  reviewerName?: string;
+  rating?: number;
+  goals?: string;
+  achievements?: string;
+  areasToImprove?: string;
+  reviewerComments?: string;
+  employeeComments?: string;
+  status: AppraisalItemStatus;
+  reviewedAt?: string;
+}
+
+// ===== HRMS — Announcements =====
+export type AnnouncementCategory = 'general' | 'policy' | 'event' | 'emergency' | 'holiday';
+export type AnnouncementPriority = 'low' | 'normal' | 'high' | 'urgent';
+
+export interface Announcement {
+  id: string;
+  companyId: string;
+  title: string;
+  body: string;
+  category: AnnouncementCategory;
+  priority: AnnouncementPriority;
+  pinned: boolean;
+  publishedAt?: string;
+  expiresAt?: string;
+  authorId?: string;
+  authorName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAnnouncementInput {
+  title: string;
+  body: string;
+  category: AnnouncementCategory;
+  priority: AnnouncementPriority;
+  pinned?: boolean;
+  publishedAt?: string;
+  expiresAt?: string;
+}
+
 // ===== Import Pipeline =====
 export type ImportStatus = 'uploaded' | 'validating' | 'validated' | 'normalization_in_progress' | 'normalization_complete' | 'publish_in_progress' | 'published' | 'failed';
 
@@ -149,6 +351,11 @@ export interface VehicleCanonical {
   reg_to_delivery?: number | null;
   bg_to_disb?: number | null;
   delivery_to_disb?: number | null;
+  // Incomplete-record flags — set when vehicle was imported with missing reference/person data
+  is_incomplete?: boolean;
+  pending_fields?: string[];
+  // HRMS link — resolved profile UUID of the salesman
+  salesman_id?: string | null;
 }
 
 // ===== KPI =====

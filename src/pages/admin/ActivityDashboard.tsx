@@ -18,6 +18,7 @@ import { formatDate, formatTime } from '@/lib/utils';
 import { loggingService } from '@/services/loggingService';
 import { useAuth } from '@/contexts/AuthContext';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
+import { PageHeader } from '@/components/shared/PageHeader';
 import {
   ChartContainer,
   ChartTooltip,
@@ -176,13 +177,12 @@ export default function ActivityDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Activity Dashboard</h1>
-          <p className="text-muted-foreground">Track user actions and inventory changes</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        title="Activity Overview"
+        description="Track user actions, inventory changes, and platform activity trends."
+        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Admin' }, { label: 'Activity Overview' }]}
+        actions={
+          <div className="flex items-center gap-2">
           <div className="flex items-center border rounded-md">
             {(['today', 'week', 'month'] as const).map((range) => (
               <Button
@@ -202,8 +202,9 @@ export default function ActivityDashboard() {
           <Button variant="outline" size="sm">
             <Download className="h-4 w-4 mr-2" />Export
           </Button>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

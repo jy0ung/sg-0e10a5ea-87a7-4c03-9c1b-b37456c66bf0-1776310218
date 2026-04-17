@@ -42,9 +42,9 @@ export default function SalesDashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="Sales Dashboard"
-        description="Month-to-date sales performance overview"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Dashboard' }]}
+        title="Sales Overview"
+        description="Month-to-date sales performance, branch activity, and sales-to-vehicle linkage at a glance."
+        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Overview' }]}
       />
 
       {/* KPI Cards */}

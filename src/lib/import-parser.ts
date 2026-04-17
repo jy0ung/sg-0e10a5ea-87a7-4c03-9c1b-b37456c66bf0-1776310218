@@ -232,6 +232,7 @@ export function publishCanonical(
   rows: VehicleRaw[],
   branchMap?: Map<string, string>,
   paymentMap?: Map<string, string>,
+  nameToIdMap?: Map<string, string>,
 ): { canonical: VehicleCanonical[]; issues: DataQualityIssue[] } {
   try {
     const grouped = new Map<string, VehicleRaw[]>();
@@ -260,6 +261,16 @@ export function publishCanonical(
         }
       };
 
+      const resolvedBranchCode = (branchMap && best.branch_code ? (branchMap.get(best.branch_code.toUpperCase()) ?? best.branch_code) : best.branch_code) || undefined;
+
+      // Detect fields that are genuinely missing (need real-world data to complete)
+      const pendingFields: string[] = [];
+      if (!best.salesman_name) pendingFields.push('salesman_name');
+      if (!best.customer_name) pendingFields.push('customer_name');
+      if (!best.model) pendingFields.push('model');
+      if (!best.payment_method) pendingFields.push('payment_method');
+      if (!resolvedBranchCode) pendingFields.push('branch_code');
+
       const v: VehicleCanonical = {
         id: `canon-${chassis}`,
         chassis_no: chassis,
@@ -270,11 +281,11 @@ export function publishCanonical(
         reg_date: best.reg_date,
         delivery_date: best.delivery_date,
         disb_date: best.disb_date,
-        branch_code: (branchMap && best.branch_code ? (branchMap.get(best.branch_code.toUpperCase()) ?? best.branch_code) : best.branch_code) || 'Unknown',
+        branch_code: resolvedBranchCode || 'Unknown',
         model: best.model || 'Unknown',
         payment_method: (paymentMap && best.payment_method ? (paymentMap.get(best.payment_method.toUpperCase()) ?? best.payment_method) : best.payment_method) || 'Unknown',
-        salesman_name: best.salesman_name || 'Unknown',
-        customer_name: best.customer_name || 'Unknown',
+        salesman_name: best.salesman_name || 'Pending',
+        customer_name: best.customer_name || 'Pending',
         remark: best.remark,
         vaa_date: best.vaa_date,
         full_payment_date: best.full_payment_date,
@@ -298,6 +309,11 @@ export function publishCanonical(
         reg_to_delivery: diffDays(best.reg_date, best.delivery_date),
         bg_to_disb: diffDays(best.bg_date, best.disb_date),
         delivery_to_disb: diffDays(best.delivery_date, best.disb_date),
+        is_incomplete: pendingFields.length > 0,
+        pending_fields: pendingFields.length > 0 ? pendingFields : undefined,
+        salesman_id: (nameToIdMap && best.salesman_name)
+          ? (nameToIdMap.get(best.salesman_name) ?? null)
+          : null,
       };
 
       const kpiFields = [

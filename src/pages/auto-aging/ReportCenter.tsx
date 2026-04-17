@@ -82,9 +82,9 @@ export default function ReportCenter() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="Report Center"
-        description="Generate and export structured reports from vehicle data"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Reports' }]}
+        title="Auto Aging Reports"
+        description="Generate and export vehicle-aging analytics, SLA compliance, and filtered KPI report sets."
+        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Aging Reports' }]}
       />
 
       <div className="glass-panel p-5 space-y-5">

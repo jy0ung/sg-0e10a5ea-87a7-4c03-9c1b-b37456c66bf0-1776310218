@@ -128,6 +128,7 @@ export default function ExecutiveDashboard() {
     'hsl(350, 80%, 55%)',
     'hsl(175, 70%, 40%)',
   ];
+  const firstName = user?.name?.split(' ')[0] ?? 'there';
 
   if (loading) {
     return (
@@ -140,8 +141,9 @@ export default function ExecutiveDashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title={`Welcome back, ${user?.name?.split(' ')[0]}`}
-        description="FLC Business Intelligence — Executive Overview"
+        title="Company Overview"
+        description={`Welcome back, ${firstName}. Executive visibility across sales, vehicles, SLA performance, and data quality.`}
+        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Company Overview' }]}
         actions={
           <div className="flex items-center gap-3">
             <div className="text-right">

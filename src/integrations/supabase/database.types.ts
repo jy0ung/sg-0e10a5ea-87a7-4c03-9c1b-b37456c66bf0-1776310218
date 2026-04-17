@@ -230,6 +230,427 @@ export type Database = {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          author_id: string | null
+          body: string
+          category: string
+          company_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          pinned: boolean
+          priority: string
+          published_at: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          category?: string
+          company_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          pinned?: boolean
+          priority?: string
+          published_at?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          category?: string
+          company_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          pinned?: boolean
+          priority?: string
+          published_at?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "announcements_author_id_fkey"; columns: ["author_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
+        ]
+      }
+      appraisal_items: {
+        Row: {
+          appraisal_id: string
+          areas_to_improve: string | null
+          created_at: string
+          employee_comments: string | null
+          employee_id: string
+          goals: string | null
+          id: string
+          achievements: string | null
+          rating: number | null
+          reviewed_at: string | null
+          reviewer_comments: string | null
+          reviewer_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          appraisal_id: string
+          areas_to_improve?: string | null
+          created_at?: string
+          employee_comments?: string | null
+          employee_id: string
+          goals?: string | null
+          id?: string
+          achievements?: string | null
+          rating?: number | null
+          reviewed_at?: string | null
+          reviewer_comments?: string | null
+          reviewer_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          appraisal_id?: string
+          areas_to_improve?: string | null
+          created_at?: string
+          employee_comments?: string | null
+          employee_id?: string
+          goals?: string | null
+          id?: string
+          achievements?: string | null
+          rating?: number | null
+          reviewed_at?: string | null
+          reviewer_comments?: string | null
+          reviewer_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "appraisal_items_appraisal_id_fkey"; columns: ["appraisal_id"]; referencedRelation: "appraisals"; referencedColumns: ["id"] },
+          { foreignKeyName: "appraisal_items_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "appraisal_items_reviewer_id_fkey"; columns: ["reviewer_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
+        ]
+      }
+      appraisals: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          cycle: string
+          id: string
+          period_end: string
+          period_start: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          cycle?: string
+          id?: string
+          period_end: string
+          period_start: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          cycle?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "appraisals_created_by_fkey"; columns: ["created_by"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
+        ]
+      }
+      attendance_records: {
+        Row: {
+          clock_in: string | null
+          clock_out: string | null
+          company_id: string
+          created_at: string
+          date: string
+          employee_id: string
+          hours_worked: number | null
+          id: string
+          notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          clock_in?: string | null
+          clock_out?: string | null
+          company_id: string
+          created_at?: string
+          date: string
+          employee_id: string
+          hours_worked?: number | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          clock_in?: string | null
+          clock_out?: string | null
+          company_id?: string
+          created_at?: string
+          date?: string
+          employee_id?: string
+          hours_worked?: number | null
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "attendance_records_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
+        ]
+      }
+      leave_balances: {
+        Row: {
+          created_at: string
+          employee_id: string
+          entitled_days: number
+          id: string
+          leave_type_id: string
+          updated_at: string
+          used_days: number
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          employee_id: string
+          entitled_days?: number
+          id?: string
+          leave_type_id: string
+          updated_at?: string
+          used_days?: number
+          year: number
+        }
+        Update: {
+          created_at?: string
+          employee_id?: string
+          entitled_days?: number
+          id?: string
+          leave_type_id?: string
+          updated_at?: string
+          used_days?: number
+          year?: number
+        }
+        Relationships: [
+          { foreignKeyName: "leave_balances_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "leave_balances_leave_type_id_fkey"; columns: ["leave_type_id"]; referencedRelation: "leave_types"; referencedColumns: ["id"] }
+        ]
+      }
+      leave_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          days: number
+          employee_id: string
+          end_date: string
+          id: string
+          leave_type_id: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_note: string | null
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          days: number
+          employee_id: string
+          end_date: string
+          id?: string
+          leave_type_id: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          days?: number
+          employee_id?: string
+          end_date?: string
+          id?: string
+          leave_type_id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_note?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "leave_requests_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "leave_requests_leave_type_id_fkey"; columns: ["leave_type_id"]; referencedRelation: "leave_types"; referencedColumns: ["id"] },
+          { foreignKeyName: "leave_requests_reviewed_by_fkey"; columns: ["reviewed_by"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
+        ]
+      }
+      leave_types: {
+        Row: {
+          active: boolean
+          code: string
+          company_id: string
+          created_at: string
+          days_per_year: number
+          id: string
+          is_paid: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          company_id: string
+          created_at?: string
+          days_per_year?: number
+          id?: string
+          is_paid?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          company_id?: string
+          created_at?: string
+          days_per_year?: number
+          id?: string
+          is_paid?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payroll_items: {
+        Row: {
+          allowances: number
+          basic_salary: number
+          created_at: string
+          employee_id: string
+          epf_employee: number
+          epf_employer: number
+          gross_pay: number
+          id: string
+          income_tax: number
+          net_pay: number
+          notes: string | null
+          other_deductions: number
+          overtime: number
+          payroll_run_id: string
+          socso_employee: number
+          socso_employer: number
+          total_deductions: number
+          updated_at: string
+        }
+        Insert: {
+          allowances?: number
+          basic_salary?: number
+          created_at?: string
+          employee_id: string
+          epf_employee?: number
+          epf_employer?: number
+          id?: string
+          income_tax?: number
+          notes?: string | null
+          other_deductions?: number
+          overtime?: number
+          payroll_run_id: string
+          socso_employee?: number
+          socso_employer?: number
+          updated_at?: string
+        }
+        Update: {
+          allowances?: number
+          basic_salary?: number
+          created_at?: string
+          employee_id?: string
+          epf_employee?: number
+          epf_employer?: number
+          id?: string
+          income_tax?: number
+          notes?: string | null
+          other_deductions?: number
+          overtime?: number
+          payroll_run_id?: string
+          socso_employee?: number
+          socso_employer?: number
+          updated_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "payroll_items_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "payroll_items_payroll_run_id_fkey"; columns: ["payroll_run_id"]; referencedRelation: "payroll_runs"; referencedColumns: ["id"] }
+        ]
+      }
+      payroll_runs: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          period_month: number
+          period_year: number
+          status: string
+          total_gross: number
+          total_headcount: number
+          total_net: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_month: number
+          period_year: number
+          status?: string
+          total_gross?: number
+          total_headcount?: number
+          total_net?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_month?: number
+          period_year?: number
+          status?: string
+          total_gross?: number
+          total_headcount?: number
+          total_net?: number
+          updated_at?: string
+        }
+        Relationships: [
+          { foreignKeyName: "payroll_runs_created_by_fkey"; columns: ["created_by"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
+        ]
+      }
       import_batches: {
         Row: {
           company_id: string | null
@@ -595,6 +1016,7 @@ export type Database = {
           reg_no: string | null
           reg_to_delivery: number | null
           remark: string | null
+          salesman_id: string | null
           salesman_name: string
           shipment_eta_kk_twu_sdk: string | null
           shipment_etd_pkg: string | null
@@ -636,6 +1058,7 @@ export type Database = {
           reg_no?: string | null
           reg_to_delivery?: number | null
           remark?: string | null
+          salesman_id?: string | null
           salesman_name: string
           shipment_eta_kk_twu_sdk?: string | null
           shipment_etd_pkg?: string | null
@@ -677,6 +1100,7 @@ export type Database = {
           reg_no?: string | null
           reg_to_delivery?: number | null
           remark?: string | null
+          salesman_id?: string | null
           salesman_name?: string
           shipment_eta_kk_twu_sdk?: string | null
           shipment_etd_pkg?: string | null
@@ -687,6 +1111,13 @@ export type Database = {
           variant?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "vehicles_salesman_id_fkey"
+            columns: ["salesman_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "vehicles_company_id_fkey"
             columns: ["company_id"]

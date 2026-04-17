@@ -5,11 +5,14 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ValidationSummaryModal } from '@/components/shared/ValidationSummaryModal';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCircle, Info, PlusCircle } from 'lucide-react';
 import { parseWorkbook, publishCanonical } from '@/lib/import-parser';
-import { loadBranchMappingLookup, loadPaymentMappingLookup } from '@/services/mappingService';
-import { validateVehicleImportBatch, validateImportBatch } from '@/services/validationService';
+import { loadBranchMappingLookup, loadPaymentMappingLookup, createBranchMapping } from '@/services/mappingService';
+import { validateVehicleImportBatch } from '@/services/validationService';
 import { createImportBatch, validateAndInsertVehicles } from '@/services/importService';
+import { resolveNamesToIds } from '@/services/hrmsService';
 import type { ImportBatchInsert, VehicleRaw, ValidationError } from '@/types';
 import { loggingService } from '@/services/loggingService';
 
@@ -18,6 +21,7 @@ type Step = 'upload' | 'validating' | 'review' | 'publishing' | 'done';
 export default function ImportCenter() {
   const navigate = useNavigate();
   const { addImportBatch, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, vehicles, user } = useData();
+  const { toast } = useToast();
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');
   const [rawRows, setRawRows] = useState<VehicleRaw[]>([]);
@@ -27,11 +31,73 @@ export default function ImportCenter() {
   const [batchId, setBatchId] = useState('');
   const [companyId, setCompanyId] = useState('default-company');
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [validationProgress, setValidationProgress] = useState({ processed: 0, total: 0 });
+
+  // Branch-mapping proposal: rawCode → user-entered canonical value
+  const [branchMappingInputs, setBranchMappingInputs] = useState<Record<string, string>>({});
+  const [savedBranchMappings, setSavedBranchMappings] = useState<Set<string>>(new Set());
+  const [savingBranch, setSavingBranch] = useState<string | null>(null);
+
+  // ─── Error classification helpers ────────────────────────────────────────────
+  // Hard blockers: rows that genuinely cannot be published
+  const HARD_BLOCKER_CODES = ['DUPLICATE_CHASSIS', 'CHASSIS_TOO_SHORT'];
+  const HARD_BLOCKER_FIELDS = ['chassis_no']; // for REQUIRED_FIELD_MISSING
+
+  const hardBlockers = serverErrors.filter(
+    e => e.severity === 'error' && (
+      HARD_BLOCKER_CODES.includes(e.code) ||
+      (e.code === 'REQUIRED_FIELD_MISSING' && HARD_BLOCKER_FIELDS.includes(e.field))
+    )
+  );
+
+  // Reference data errors: branch doesn't exist in system → propose to add
+  const referenceErrors = serverErrors.filter(e => e.code === 'INVALID_BRANCH_CODE');
+  // Extract unique unknown branch codes from error messages
+  const unknownBranchCodes = [...new Set(
+    referenceErrors.map(e => {
+      const match = e.message.match(/Branch code '([^']+)'/);
+      return match ? match[1] : e.field;
+    })
+  )];
+
+  // Real/external-data errors: salesman, customer, dates, numbers — mark as incomplete
+  const incompleteErrors = serverErrors.filter(
+    e => e.severity === 'error' &&
+      !HARD_BLOCKER_CODES.includes(e.code) &&
+      !(e.code === 'REQUIRED_FIELD_MISSING' && HARD_BLOCKER_FIELDS.includes(e.field)) &&
+      e.code !== 'INVALID_BRANCH_CODE'
+  );
+
+  // Count rows affected by incomplete data (deduplicate by row number)
+  const incompleteRowNums = [...new Set(incompleteErrors.map(e => e.rowNumber).filter(Boolean))];
+
+  const hasHardErrors = hardBlockers.length > 0 || missingCols.length > 0;
+
+  // Save a proposed branch mapping to the DB
+  const handleSaveBranchMapping = useCallback(async (rawCode: string) => {
+    const canonical = branchMappingInputs[rawCode]?.trim();
+    if (!canonical) return;
+    setSavingBranch(rawCode);
+    try {
+      const { error } = await createBranchMapping({ rawValue: rawCode, canonicalCode: canonical, companyId });
+      if (!error) {
+        setSavedBranchMappings(prev => new Set([...prev, rawCode]));
+        toast({ title: 'Branch mapping saved', description: `"${rawCode}" → "${canonical}" added. It will be applied when you publish.` });
+      } else {
+        toast({ title: 'Failed to save mapping', description: error.message, variant: 'destructive' });
+      }
+    } catch (err) {
+      toast({ title: 'Failed to save mapping', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setSavingBranch(null);
+    }
+  }, [branchMappingInputs, companyId, toast]);
 
   const handleFileDrop = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
+    setValidationProgress({ processed: 0, total: 0 });
     setStep('validating');
 
     try {
@@ -42,23 +108,18 @@ export default function ImportCenter() {
       setMissingCols(missingColumns);
 
       // Server-side validation
-      const validationResult = await validateVehicleImportBatch(rows, companyId);
+      const validationResult = await validateVehicleImportBatch(
+        rows,
+        companyId,
+        (processed, total) => setValidationProgress({ processed, total })
+      );
 
-      if (!validationResult.isValid) {
-        setRawRows(rows);
-        setValidationIssues(issues);
-        setServerErrors(validationResult.errors);
-        setBatchId(`batch-${Date.now()}`);
-        setStep('review');
-        return;
-      }
-
-      // Create import batch
+      // Always create the batch record in DB first so we get a real UUID
       const batch: ImportBatchInsert = {
         fileName: file.name,
         uploadedBy: user?.email || 'Unknown',
         uploadedAt: new Date().toISOString(),
-        status: 'validated',
+        status: validationResult.isValid ? 'validated' : 'failed',
         totalRows: rows.length,
         validRows: rows.length - validationResult.errors.length,
         errorRows: validationResult.errors.length,
@@ -72,11 +133,11 @@ export default function ImportCenter() {
         throw new Error(`Failed to create import batch: ${batchError.message}`);
       }
 
-      const id = batchData?.id || `batch-${Date.now()}`;
+      const id = batchData?.id!;
       setBatchId(id);
       setRawRows(rows);
       setValidationIssues(issues);
-      setServerErrors(validationResult.warnings);
+      setServerErrors(validationResult.isValid ? validationResult.warnings : validationResult.errors);
       addImportBatch({ ...batch, id });
       setStep('review');
     } catch (error) {
@@ -87,11 +148,9 @@ export default function ImportCenter() {
   }, [addImportBatch, companyId, user]);
 
   const handlePublish = useCallback(async () => {
-    if (serverErrors.length > 0) {
-      alert('Please fix all validation errors before publishing.');
-      return;
+    if (hasHardErrors) {
+      return; // button is disabled, but guard anyway
     }
-
     setStep('publishing');
     updateImportBatch(batchId, { status: 'publish_in_progress' });
 
@@ -109,11 +168,13 @@ export default function ImportCenter() {
       }
 
       // Publish canonical data to UI (with dynamic DB-backed value mappings)
-      const [branchMap, paymentMap] = await Promise.all([
+      const allNames = [...new Set(rawRows.map(r => r.salesman_name).filter((n): n is string => Boolean(n)))];
+      const [branchMap, paymentMap, nameToIdMap] = await Promise.all([
         loadBranchMappingLookup(companyId),
         loadPaymentMappingLookup(companyId),
+        resolveNamesToIds(companyId, allNames),
       ]);
-      const { canonical, issues } = publishCanonical(rawRows, branchMap, paymentMap);
+      const { canonical, issues } = publishCanonical(rawRows, branchMap, paymentMap, nameToIdMap);
       const existingNonDup = vehicles.filter(v => !canonical.find(c => c.chassis_no === v.chassis_no));
       await setVehicles([...canonical, ...existingNonDup]);
       addQualityIssues([...validationIssues, ...issues]);
@@ -131,7 +192,7 @@ export default function ImportCenter() {
       updateImportBatch(batchId, { status: 'failed' });
       setStep('review');
     }
-  }, [batchId, rawRows, vehicles, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, validationIssues, serverErrors, companyId, user]);
+  }, [batchId, rawRows, vehicles, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, validationIssues, hasHardErrors, companyId, user]);
 
   const handleExportErrors = useCallback(() => {
     const errorsText = serverErrors.map(e => 
@@ -153,9 +214,16 @@ export default function ImportCenter() {
     setValidationIssues([]); 
     setServerErrors([]); 
     setMissingCols([]); 
+    setBranchMappingInputs({});
+    setSavedBranchMappings(new Set());
   };
 
-  const hasErrors = serverErrors.filter(e => e.severity === 'error').length > 0;
+  const publishLabel = incompleteErrors.length > 0 || referenceErrors.filter(e => {
+    const match = e.message.match(/Branch code '([^']+)'/);
+    return match ? !savedBranchMappings.has(match[1]) : true;
+  }).length > 0
+    ? `Publish (${incompleteRowNums.length} record${incompleteRowNums.length !== 1 ? 's' : ''} will be marked incomplete)`
+    : 'Publish Canonical Data';
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -193,10 +261,44 @@ export default function ImportCenter() {
       )}
 
       {step === 'validating' && (
-        <div className="glass-panel p-12 text-center">
+        <div className="glass-panel p-10 text-center">
           <Loader2 className="h-10 w-10 text-primary mx-auto mb-4 animate-spin" />
-          <p className="text-foreground font-medium">Validating {fileName}...</p>
-          <p className="text-sm text-muted-foreground mt-1">Running server-side schema validation and data integrity checks</p>
+          <p className="text-foreground font-medium mb-1">Validating {fileName}…</p>
+
+          {validationProgress.total > 0 ? (
+            <div className="mt-4 max-w-sm mx-auto">
+              <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+                <span>Row {validationProgress.processed} of {validationProgress.total}</span>
+                <span>{Math.round((validationProgress.processed / validationProgress.total) * 100)}%</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-150 rounded-full"
+                  style={{ width: `${(validationProgress.processed / validationProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Parsing workbook…</p>
+          )}
+
+          <div className="mt-6 inline-block text-left space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Each row is checked for:</p>
+            {[
+              'Required fields — chassis no, branch, model, customer, salesman, payment method',
+              'Chassis number format (min 5 chars) & duplicate check against existing vehicles',
+              'Branch code — must exist in your company\'s branch records',
+              'Date fields — valid format across 9 date columns',
+              'Date order — e.g. shipment ETD must not precede BG date',
+              'Transfer price — must be a valid number',
+              'Payment method — flags unusual values as warnings',
+            ].map((check, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/40 flex-shrink-0 mt-1" />
+                {check}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -211,38 +313,114 @@ export default function ImportCenter() {
               </div>
             </div>
 
+            {/* ── Missing required columns (always blocks) ── */}
             {missingCols.length > 0 && (
               <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 mb-4">
-                <p className="text-sm text-destructive font-medium">Missing required columns: {missingCols.join(', ')}</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  <p className="text-sm text-destructive font-semibold">Missing required columns — cannot proceed</p>
+                </div>
+                <p className="text-sm text-destructive">{missingCols.join(', ')}</p>
               </div>
             )}
 
-            {/* Server-side validation errors */}
-            {serverErrors.length > 0 && (
-              <div className="mb-4">
-                <h4 className="text-sm font-semibold text-foreground mb-2">Server-Side Validation Errors</h4>
-                <div className="space-y-1 max-h-48 overflow-y-auto p-3 rounded-md bg-destructive/5 border border-destructive/10">
-                  {serverErrors.map((error, idx) => (
-                    <div key={idx} className="flex items-start gap-2 p-2 rounded bg-secondary/30">
-                      <AlertTriangle className={`h-4 w-4 flex-shrink-0 mt-0.5 ${error.severity === 'error' ? 'text-destructive' : 'text-warning'}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-foreground">{error.message}</p>
-                        <p className="text-xs text-muted-foreground">Field: {error.field} | Code: {error.code}</p>
-                      </div>
+            {/* ── Hard blockers (duplicate chassis, chassis too short, missing chassis) ── */}
+            {hardBlockers.length > 0 && (
+              <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  <h4 className="text-sm font-semibold text-destructive">{hardBlockers.length} blocking error{hardBlockers.length !== 1 ? 's' : ''} — these rows cannot be published</h4>
+                </div>
+                <div className="space-y-1 max-h-36 overflow-y-auto">
+                  {hardBlockers.map((error, idx) => (
+                    <div key={idx} className="flex items-start gap-2 p-2 rounded bg-destructive/5 text-xs">
+                      <AlertTriangle className="h-3 w-3 text-destructive flex-shrink-0 mt-0.5" />
+                      <span className="text-foreground">{error.message}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Client-side validation issues */}
+            {/* ── Missing reference data (branch not in system) → propose to add ── */}
+            {unknownBranchCodes.length > 0 && (
+              <div className="mb-4 p-3 rounded-md bg-amber-500/10 border border-amber-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <PlusCircle className="h-4 w-4 text-amber-600" />
+                  <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                    Unknown branch codes — add mappings or publish as incomplete
+                  </h4>
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  These branch codes were not found in the system. You can add a canonical mapping now, or skip and the affected records will be published as <span className="font-medium">incomplete</span> and excluded from statistics until updated.
+                </p>
+                <div className="space-y-2">
+                  {unknownBranchCodes.map(rawCode => (
+                    <div key={rawCode} className="flex items-center gap-2">
+                      <span className="text-xs font-mono bg-secondary px-2 py-1 rounded text-foreground min-w-[80px]">{rawCode}</span>
+                      {savedBranchMappings.has(rawCode) ? (
+                        <div className="flex items-center gap-1 text-xs text-success">
+                          <CheckCircle className="h-3.5 w-3.5" />
+                          Mapping saved — will be applied on publish
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-xs text-muted-foreground">→</span>
+                          <Input
+                            className="h-7 text-xs flex-1 max-w-[200px]"
+                            placeholder="Canonical branch code…"
+                            value={branchMappingInputs[rawCode] ?? ''}
+                            onChange={e => setBranchMappingInputs(prev => ({ ...prev, [rawCode]: e.target.value }))}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            disabled={!branchMappingInputs[rawCode]?.trim() || savingBranch === rawCode}
+                            onClick={() => handleSaveBranchMapping(rawCode)}
+                          >
+                            {savingBranch === rawCode ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add Mapping'}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Missing real-world data (salesman, customer, etc.) → mark incomplete ── */}
+            {incompleteErrors.length > 0 && (
+              <div className="mb-4 p-3 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="h-4 w-4 text-yellow-600" />
+                  <h4 className="text-sm font-semibold text-yellow-700 dark:text-yellow-400">
+                    {incompleteRowNums.length} record{incompleteRowNums.length !== 1 ? 's' : ''} missing data — will be published as incomplete
+                  </h4>
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  The fields below require real-world data (e.g. salesman name, customer name) that cannot be added automatically. These records will be published with a <span className="font-medium">"Pending"</span> placeholder and will <span className="font-medium">not count towards statistical analysis</span> until the missing fields are updated.
+                </p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {incompleteErrors.map((error, idx) => (
+                    <div key={idx} className="flex items-start gap-2 p-1.5 rounded bg-yellow-500/5 text-xs">
+                      <AlertTriangle className="h-3 w-3 text-yellow-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-foreground">{error.message}</span>
+                      <span className="ml-auto text-muted-foreground font-mono text-[10px] whitespace-nowrap">needs update</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Client-side data quality issues (duplicates, etc.) ── */}
             {validationIssues.length > 0 && (
               <div className="mb-4">
                 <h4 className="text-sm font-semibold text-foreground mb-2">Data Quality Issues</h4>
-                <div className="space-y-1 max-h-48 overflow-y-auto p-3 rounded-md bg-secondary/30">
+                <div className="space-y-1 max-h-36 overflow-y-auto p-3 rounded-md bg-secondary/30">
                   {validationIssues.map(issue => (
                     <div key={issue.id} className="flex items-center gap-2 p-2 rounded bg-secondary/50 text-xs">
-                      {issue.severity === 'error' ? <AlertTriangle className="h-3 w-3 text-destructive flex-shrink-0" /> : <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0" />}
+                      <AlertTriangle className={`h-3 w-3 flex-shrink-0 ${issue.severity === 'error' ? 'text-destructive' : 'text-warning'}`} />
                       <span className="text-foreground truncate">{issue.message}</span>
                       <StatusBadge status={issue.issueType} className="ml-auto flex-shrink-0" />
                     </div>
@@ -251,38 +429,56 @@ export default function ImportCenter() {
               </div>
             )}
 
+            {/* ── Warnings (date order, unusual payment, etc.) ── */}
+            {serverErrors.filter(e => e.severity === 'warning').length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-semibold text-foreground mb-2">Warnings</h4>
+                <div className="space-y-1 max-h-32 overflow-y-auto p-3 rounded-md bg-secondary/30">
+                  {serverErrors.filter(e => e.severity === 'warning').map((error, idx) => (
+                    <div key={idx} className="flex items-start gap-2 p-2 rounded bg-secondary/50 text-xs">
+                      <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0 mt-0.5" />
+                      <span className="text-foreground">{error.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Summary stats ── */}
             <div className="grid grid-cols-4 gap-3 mb-4">
               <div className="p-3 rounded bg-secondary/50 text-center">
                 <p className="text-2xl font-bold text-foreground">{rawRows.length}</p>
                 <p className="text-xs text-muted-foreground">Total Rows</p>
               </div>
               <div className="p-3 rounded bg-secondary/50 text-center">
-                <p className="text-2xl font-bold text-success">{rawRows.length - serverErrors.filter(e => e.severity === 'error').length}</p>
-                <p className="text-xs text-muted-foreground">Valid</p>
+                <p className="text-2xl font-bold text-success">
+                  {rawRows.length - hardBlockers.length - incompleteRowNums.length}
+                </p>
+                <p className="text-xs text-muted-foreground">Clean</p>
               </div>
               <div className="p-3 rounded bg-secondary/50 text-center">
-                <p className="text-2xl font-bold text-destructive">{serverErrors.filter(e => e.severity === 'error').length}</p>
-                <p className="text-xs text-muted-foreground">Errors</p>
+                <p className="text-2xl font-bold text-amber-500">{incompleteRowNums.length}</p>
+                <p className="text-xs text-muted-foreground">Incomplete</p>
               </div>
               <div className="p-3 rounded bg-secondary/50 text-center">
-                <p className="text-2xl font-bold text-warning">{serverErrors.filter(e => e.severity === 'warning').length + validationIssues.filter(i => i.issueType === 'duplicate').length}</p>
-                <p className="text-xs text-muted-foreground">Warnings</p>
+                <p className="text-2xl font-bold text-destructive">{hardBlockers.length}</p>
+                <p className="text-xs text-muted-foreground">Blocked</p>
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Button onClick={handlePublish} disabled={hasErrors || missingCols.length > 0}>
-                <CheckCircle className="h-4 w-4 mr-1" />Publish Canonical Data
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={handlePublish} disabled={hasHardErrors}>
+                <CheckCircle className="h-4 w-4 mr-1" />{publishLabel}
               </Button>
               <Button variant="outline" onClick={reset}>Cancel</Button>
             </div>
 
-            {/* View Detailed Errors Button */}
+            {/* View all errors in detail */}
             {serverErrors.length > 0 && (
               <div className="mt-4">
                 <Button variant="outline" className="w-full" onClick={() => setShowErrorModal(true)}>
                   <AlertCircle className="h-4 w-4 mr-2" />
-                  View {serverErrors.length} Validation Errors in Detail
+                  View {serverErrors.length} validation issue{serverErrors.length !== 1 ? 's' : ''} in detail
                 </Button>
               </div>
             )}
@@ -313,6 +509,12 @@ export default function ImportCenter() {
           <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
           <p className="text-foreground font-semibold text-lg mb-1">Import Published Successfully</p>
           <p className="text-sm text-muted-foreground mb-6">Dashboard snapshots have been refreshed with the latest data.</p>
+          {incompleteRowNums.length > 0 && (
+            <div className="mb-6 p-3 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-sm text-yellow-700 dark:text-yellow-400 max-w-md mx-auto">
+              <Info className="h-4 w-4 inline mr-1" />
+              {incompleteRowNums.length} record{incompleteRowNums.length !== 1 ? 's were' : ' was'} published as incomplete and excluded from statistics. Update the missing fields in the Vehicle Explorer to include them.
+            </div>
+          )}
           <div className="flex gap-2 justify-center">
             <Button onClick={reset}>Import Another</Button>
             <Button variant="outline" onClick={() => navigate('/auto-aging')}>View Dashboard</Button>

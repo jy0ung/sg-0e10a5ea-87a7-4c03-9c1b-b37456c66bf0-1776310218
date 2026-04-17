@@ -51,6 +51,21 @@ test.describe("Platform", () => {
   });
 });
 
+test.describe("Customer portal", () => {
+  test("Portal default route (/portal) resolves to raise-a-ticket", async ({ page }) => {
+    await page.goto("/portal");
+    await expect(page).toHaveURL(/\/portal\/tickets\/new$/, { timeout: 8000 });
+    await expect(page.locator("text=/raise a ticket/i").first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test("My Tickets (/portal/tickets)", async ({ page }) => {
+    await page.goto("/portal/tickets");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    await expect(page.locator("text=Route Error")).toHaveCount(0);
+    await expect(page.locator("text=/my tickets/i").first()).toBeVisible({ timeout: 8000 });
+  });
+});
+
 // ── Auto-Aging routes ─────────────────────────────────────────────────────────
 
 test.describe("Auto Aging module", () => {

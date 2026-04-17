@@ -28,7 +28,7 @@ const navLinks: Array<{ label: string | RegExp; expectedPath: RegExp }> = [
   { label: /sales.?dashboard/i, expectedPath: /\/sales$/ },
   { label: /deal.?pipeline/i, expectedPath: /\/sales\/pipeline$/ },
   { label: /sales.?order/i, expectedPath: /\/sales\/orders$/ },
-  { label: /customer/i, expectedPath: /\/sales\/customers$/ },
+  { label: /^customers?$/i, expectedPath: /\/sales\/customers$/ },
   { label: /invoice/i, expectedPath: /\/sales\/invoices$/ },
   { label: /performance/i, expectedPath: /\/sales\/performance$/ },
   { label: /activity.?dashboard/i, expectedPath: /\/admin\/activity$/ },
@@ -39,15 +39,14 @@ const navLinks: Array<{ label: string | RegExp; expectedPath: RegExp }> = [
 
 for (const { label, expectedPath } of navLinks) {
   test(`Sidebar link "${label}" navigates correctly`, async ({ page }) => {
-    // Some sidebar links may be inside collapsed sections; scroll into view first.
+    // Check visibility first — don't wait for missing elements.
     const link = page.locator(`a`).filter({ hasText: label }).first();
-    await link.scrollIntoViewIfNeeded().catch(() => {});
-
     const visible = await link.isVisible().catch(() => false);
     if (!visible) {
       test.skip(true, `Sidebar link "${label}" not visible (possibly hidden by role filter)`);
       return;
     }
+    await link.scrollIntoViewIfNeeded().catch(() => {});
 
     await link.click();
     await expect(page).toHaveURL(expectedPath, { timeout: 8000 });
@@ -57,13 +56,12 @@ for (const { label, expectedPath } of navLinks) {
 test("Logout button clears session and redirects to /login", async ({ page }) => {
   // Mock the supabase signOut endpoint (already done in setupAuthMocks)
   const logoutBtn = page.locator("button, a").filter({ hasText: /log.?out|sign.?out/i }).first();
-  await logoutBtn.scrollIntoViewIfNeeded().catch(() => {});
-
   const visible = await logoutBtn.isVisible().catch(() => false);
   if (!visible) {
     test.skip(true, "Logout button not found in sidebar");
     return;
   }
+  await logoutBtn.scrollIntoViewIfNeeded().catch(() => {});
 
   await logoutBtn.click();
   await expect(page).toHaveURL(/login/, { timeout: 8000 });

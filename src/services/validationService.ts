@@ -20,36 +20,42 @@ const paymentMethodsCache: string[] = [];
 const cacheExpiry = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+interface ValidationResult {
+  isValid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationError[];
+}
+
+const DATE_FIELD_NAMES = [
+  'bg_date', 'shipment_etd_pkg', 'shipment_eta_kk_twu_sdk',
+  'date_received_by_outlet', 'reg_date', 'delivery_date',
+  'disb_date', 'vaa_date', 'full_payment_date',
+];
+
+const REQUIRED_FIELDS = [
+  'chassis_no', 'branch_code', 'model', 'customer_name', 'salesman_name', 'payment_method',
+];
+
+const VALID_PAYMENT_METHODS = ['cash', 'loan', 'hire purchase', 'hp', 'bank loan', 'leasing'];
+
 /**
- * Validate a vehicle row against schema and business rules
+ * Synchronous per-row validation — no DB calls.
+ * Requires pre-fetched reference sets from validateVehicleImportBatch.
  */
-export async function validateVehicleRow(
+export function validateVehicleRowSync(
   row: Record<string, unknown>,
-  companyId: string,
-  rowNumber: number
-): Promise<ValidationResult> {
+  rowNumber: number,
+  existingChassisSet: Set<string>,
+  knownBranchSet: Set<string>,
+): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationError[] = [];
 
   // Required fields
-  const requiredFields = [
-    'chassis_no',
-    'branch_code',
-    'model',
-    'customer_name',
-    'salesman_name',
-    'payment_method',
-  ];
-
-  requiredFields.forEach(field => {
+  REQUIRED_FIELDS.forEach(field => {
     const value = row[field];
     if (!value || (typeof value === 'string' && value.trim() === '')) {
-      errors.push({
-        field,
-        message: `Row ${rowNumber}: ${field} is required`,
-        code: 'REQUIRED_FIELD_MISSING',
-        severity: 'error',
-      });
+      errors.push({ field, message: `Row ${rowNumber}: ${field} is required`, code: 'REQUIRED_FIELD_MISSING', severity: 'error', rowNumber });
     }
   });
 
@@ -57,132 +63,83 @@ export async function validateVehicleRow(
   if (row.chassis_no) {
     const chassis = String(row.chassis_no).trim();
     if (chassis.length < 5) {
-      errors.push({
-        field: 'chassis_no',
-        message: `Row ${rowNumber}: Chassis number is too short (min 5 characters)`,
-        code: 'CHASSIS_TOO_SHORT',
-        severity: 'error',
-      });
-    }
-    
-    // Check for duplicate chassis in database
-    const { data: existingVehicle } = await supabase
-      .from('vehicles')
-      .select('id')
-      .eq('chassis_no', chassis)
-      .eq('company_id', companyId)
-      .maybeSingle();
-
-    if (existingVehicle) {
-      errors.push({
-        field: 'chassis_no',
-        message: `Row ${rowNumber}: Chassis ${chassis} already exists in database`,
-        code: 'DUPLICATE_CHASSIS',
-        severity: 'error',
-      });
+      errors.push({ field: 'chassis_no', message: `Row ${rowNumber}: Chassis number is too short (min 5 characters)`, code: 'CHASSIS_TOO_SHORT', severity: 'error', rowNumber });
+    } else if (existingChassisSet.has(chassis)) {
+      errors.push({ field: 'chassis_no', message: `Row ${rowNumber}: Chassis ${chassis} already exists in database`, code: 'DUPLICATE_CHASSIS', severity: 'error', rowNumber });
     }
   }
 
-  // Branch code validation (reference data check)
+  // Branch code validation against pre-fetched set
   if (row.branch_code) {
-    const queryId = `validate-branch-${row.branch_code}`;
-    performanceService.startQueryTimer(queryId);
-    
-    const { data: branch } = await supabase
-      .from('branches')
-      .select('id, code')
-      .eq('code', String(row.branch_code))
-      .eq('company_id', companyId)
-      .maybeSingle();
-
-    performanceService.endQueryTimer(queryId, "validate_branch_code");
-
-    if (!branch) {
-      errors.push({
-        field: 'branch_code',
-        message: `Row ${rowNumber}: Branch code '${row.branch_code}' does not exist`,
-        code: 'INVALID_BRANCH_CODE',
-        severity: 'error',
-      });
+    const code = String(row.branch_code).toUpperCase();
+    if (!knownBranchSet.has(code)) {
+      errors.push({ field: 'branch_code', message: `Row ${rowNumber}: Branch code '${row.branch_code}' does not exist`, code: 'INVALID_BRANCH_CODE', severity: 'error', rowNumber });
     }
   }
 
   // Date field validation
-  const dateFields = [
-    'bg_date',
-    'shipment_etd_pkg',
-    'shipment_eta_kk_twu_sdk',
-    'date_received_by_outlet',
-    'reg_date',
-    'delivery_date',
-    'disb_date',
-    'vaa_date',
-    'full_payment_date',
-  ];
-
   const parsedDates: Record<string, Date | null> = {};
-
-  dateFields.forEach(field => {
+  DATE_FIELD_NAMES.forEach(field => {
     const value = row[field];
     if (value && typeof value === 'string' && value.trim() !== '') {
       const date = parseDate(value);
       if (!date) {
-        errors.push({
-          field,
-          message: `Row ${rowNumber}: ${field} has invalid date format`,
-          code: 'INVALID_DATE_FORMAT',
-          severity: 'error',
-        });
+        errors.push({ field, message: `Row ${rowNumber}: ${field} has invalid date format`, code: 'INVALID_DATE_FORMAT', severity: 'error', rowNumber });
       } else {
         parsedDates[field] = date;
       }
     }
   });
 
-  // Business logic: dates should be in logical order
-  if (parsedDates.bg_date && parsedDates.shipment_etd_pkg) {
-    if (parsedDates.shipment_etd_pkg < parsedDates.bg_date) {
-      warnings.push({
-        field: 'shipment_etd_pkg',
-        message: `Row ${rowNumber}: Shipment ETD is before BG date (likely incorrect)`,
-        code: 'DATE_ORDER_WARNING',
-        severity: 'warning',
-      });
-    }
+  // Date order
+  if (parsedDates.bg_date && parsedDates.shipment_etd_pkg && parsedDates.shipment_etd_pkg < parsedDates.bg_date) {
+    warnings.push({ field: 'shipment_etd_pkg', message: `Row ${rowNumber}: Shipment ETD is before BG date (likely incorrect)`, code: 'DATE_ORDER_WARNING', severity: 'warning', rowNumber });
   }
 
-  // Numeric field validation
+  // Numeric field
   if (row.dealer_transfer_price) {
     const price = parseFloat(String(row.dealer_transfer_price));
     if (isNaN(price)) {
-      errors.push({
-        field: 'dealer_transfer_price',
-        message: `Row ${rowNumber}: Dealer transfer price must be a valid number`,
-        code: 'INVALID_NUMBER',
-        severity: 'error',
-      });
+      errors.push({ field: 'dealer_transfer_price', message: `Row ${rowNumber}: Dealer transfer price must be a valid number`, code: 'INVALID_NUMBER', severity: 'error', rowNumber });
     }
   }
 
-  // Payment method validation (common values)
+  // Payment method
   if (row.payment_method) {
     const paymentMethod = String(row.payment_method).trim().toLowerCase();
-    const validMethods = ['cash', 'loan', 'hire purchase', 'hp', 'bank loan', 'leasing'];
-    if (!validMethods.some(vm => paymentMethod.includes(vm))) {
-      warnings.push({
-        field: 'payment_method',
-        message: `Row ${rowNumber}: Unusual payment method '${row.payment_method}'`,
-        code: 'UNUSUAL_PAYMENT_METHOD',
-        severity: 'warning',
-      });
+    if (!VALID_PAYMENT_METHODS.some(vm => paymentMethod.includes(vm))) {
+      warnings.push({ field: 'payment_method', message: `Row ${rowNumber}: Unusual payment method '${row.payment_method}'`, code: 'UNUSUAL_PAYMENT_METHOD', severity: 'warning', rowNumber });
     }
   }
 
-  return {
-    isValid: errors.length === 0,
-    errors,
-    warnings,
-  };
+  return { isValid: errors.length === 0, errors, warnings };
+}
+
+/**
+ * Validate a single vehicle row against schema and business rules.
+ * Fetches reference data itself — use validateVehicleImportBatch for bulk imports.
+ */
+export async function validateVehicleRow(
+  row: Record<string, unknown>,
+  companyId: string,
+  rowNumber: number
+): Promise<ValidationResult> {
+  const chassis = row.chassis_no ? String(row.chassis_no).trim() : '';
+  const branchCode = row.branch_code ? String(row.branch_code).toUpperCase() : '';
+
+  const [chassisResult, branchesResult] = await Promise.all([
+    chassis.length >= 5
+      ? supabase.from('vehicles').select('chassis_no').eq('chassis_no', chassis).eq('company_id', companyId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    branchCode
+      ? supabase.from('branches').select('code').eq('company_id', companyId)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const existingChassisSet = new Set<string>(chassisResult.data ? [chassis] : []);
+  const knownBranchSet = new Set<string>((branchesResult.data ?? []).map((b: { code: string }) => b.code.toUpperCase()));
+
+  return validateVehicleRowSync(row, rowNumber, existingChassisSet, knownBranchSet);
 }
 
 /**
@@ -458,11 +415,14 @@ function parseDate(value: string): Date | null {
 }
 
 /**
- * Validate an entire import batch of vehicles
+ * Validate an entire import batch of vehicles.
+ * Pre-fetches all reference data in 2 parallel queries, then validates every
+ * row synchronously — O(2) DB round-trips regardless of batch size.
  */
 export async function validateVehicleImportBatch(
   rows: Record<string, unknown>[],
-  companyId: string
+  companyId: string,
+  onProgress?: (processed: number, total: number) => void
 ): Promise<{
   isValid: boolean;
   errors: ValidationError[];
@@ -474,14 +434,36 @@ export async function validateVehicleImportBatch(
     warningRows: number;
   };
 }> {
+  const qid = `batch-validate-${Date.now()}`;
+  performanceService.startQueryTimer(qid);
+
+  // Collect unique chassis numbers that are long enough to be real
+  const uniqueChassis = [...new Set(
+    rows.map(r => String(r.chassis_no ?? '').trim()).filter(c => c.length >= 5)
+  )];
+
+  // 2 parallel queries: existing chassis + all company branch codes
+  const [chassisResult, branchesResult] = await Promise.all([
+    uniqueChassis.length > 0
+      ? supabase.from('vehicles').select('chassis_no').eq('company_id', companyId).in('chassis_no', uniqueChassis)
+      : Promise.resolve({ data: [] as { chassis_no: string }[], error: null }),
+    supabase.from('branches').select('code').eq('company_id', companyId),
+  ]);
+
+  const existingChassisSet = new Set<string>((chassisResult.data ?? []).map(v => v.chassis_no));
+  const knownBranchSet = new Set<string>((branchesResult.data ?? []).map((b: { code: string }) => b.code.toUpperCase()));
+
+  performanceService.endQueryTimer(qid, 'batch_validate_prefetch');
+
   const allErrors: ValidationError[] = [];
   const allWarnings: ValidationError[] = [];
 
+  onProgress?.(0, rows.length);
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const result = await validateVehicleRow(row, companyId, i + 1);
+    const result = validateVehicleRowSync(rows[i], i + 1, existingChassisSet, knownBranchSet);
     allErrors.push(...result.errors);
     allWarnings.push(...result.warnings);
+    if ((i + 1) % 50 === 0 || i === rows.length - 1) onProgress?.(i + 1, rows.length);
   }
 
   const summary = {

@@ -141,6 +141,16 @@ export default function VehicleTransfer() {
       // Revert
       setTransfers(ts => ts.map(t => t.id === id ? prev : t));
       toast({ title: 'Failed to update status', description: error.message, variant: 'destructive' });
+      return;
+    }
+    // When a transfer arrives, update the vehicle's branch to the destination branch.
+    if (status === 'arrived' && user?.company_id && prev.chassisNo) {
+      await supabase
+        .from('vehicles')
+        .update({ branch_code: prev.toBranch })
+        .eq('chassis_no', prev.chassisNo)
+        .eq('company_id', user.company_id)
+        .eq('is_deleted', false);
     }
   };
 

@@ -2,10 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { loggingService } from "./loggingService";
 import { performanceService } from "./performanceService";
 import { logVehicleEdit } from "./auditService";
-import {
-  validateVehicleImportBatch,
-  validateImportBatch,
-} from "./validationService";
+import { validateImportBatch } from "./validationService";
 import type { ImportBatch, ImportBatchInsert, ValidationError } from "@/types";
 
 export async function createImportBatch(
@@ -198,42 +195,15 @@ export async function validateAndInsertVehicles(
   errors: ValidationError[];
   error: Error | null;
 }> {
-  const queryId = `import-validate-insert-${Date.now()}`;
+  const queryId = `import-insert-${Date.now()}`;
   performanceService.startQueryTimer(queryId);
 
   try {
-    // Validate all vehicles
-    const validationResult = await validateVehicleImportBatch(vehicles, companyId);
-
-    if (!validationResult.isValid) {
-      loggingService.error("Vehicle validation failed before insert", {
-        errorCount: validationResult.errors.length,
-        batchId,
-      }, "ImportService");
-      return {
-        inserted: 0,
-        errors: validationResult.errors,
-        error: new Error(
-          `Validation failed: ${validationResult.errors.slice(0, 5).map(e => e.message).join(', ')}...`
-        ),
-      };
+    if (vehicles.length === 0) {
+      return { inserted: 0, errors: [], error: null };
     }
 
-    // Insert only valid vehicles
-    const validVehicles = vehicles.filter((_, idx) => {
-      const vehicleErrors = validationResult.errors.filter(e => e.field.includes(`Row ${idx + 1}`));
-      return vehicleErrors.length === 0;
-    });
-
-    if (validVehicles.length === 0) {
-      return {
-        inserted: 0,
-        errors: validationResult.errors,
-        error: null,
-      };
-    }
-
-    const dbVehicles = validVehicles.map((v, idx) => ({
+    const dbVehicles = vehicles.map((v) => ({
       chassis_no: v.chassis_no,
       bg_date: v.bg_date,
       shipment_etd_pkg: v.shipment_etd_pkg,
@@ -265,38 +235,24 @@ export async function validateAndInsertVehicles(
       company_id: companyId,
     }));
 
-    for (let idx = 0; idx < dbVehicles.length; idx += 100) {
-      const chunk = dbVehicles.slice(idx, idx + 100);
+    const CHUNK_SIZE = 500;
+    for (let idx = 0; idx < dbVehicles.length; idx += CHUNK_SIZE) {
+      const chunk = dbVehicles.slice(idx, idx + CHUNK_SIZE);
       const { error } = await supabase.from("vehicles").insert(chunk);
       if (error) {
         loggingService.error("Failed to insert vehicle chunk", { chunk: chunk.length, error }, "ImportService");
-        return {
-          inserted: idx,
-          errors: validationResult.errors,
-          error,
-        };
+        return { inserted: idx, errors: [], error };
       }
     }
 
-    performanceService.endQueryTimer(queryId, "validate_and_insert_vehicles");
+    performanceService.endQueryTimer(queryId, "insert_vehicles");
 
-    loggingService.info("Vehicles validated and inserted", {
-      inserted: dbVehicles.length,
-      batchId,
-    }, "ImportService");
+    loggingService.info("Vehicles inserted", { inserted: dbVehicles.length, batchId }, "ImportService");
 
-    return {
-      inserted: dbVehicles.length,
-      errors: validationResult.errors,
-      error: null,
-    };
+    return { inserted: dbVehicles.length, errors: [], error: null };
   } catch (error) {
-    performanceService.endQueryTimer(queryId, "validate_and_insert_vehicles");
-    loggingService.error("Unexpected error validating and inserting vehicles", { error }, "ImportService");
-    return {
-      inserted: 0,
-      errors: [],
-      error: error as Error,
-    };
+    performanceService.endQueryTimer(queryId, "insert_vehicles");
+    loggingService.error("Unexpected error inserting vehicles", { error }, "ImportService");
+    return { inserted: 0, errors: [], error: error as Error };
   }
 }

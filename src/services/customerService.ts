@@ -23,6 +23,7 @@ export async function getCustomers(companyId: string): Promise<{ data: Customer[
     .from('customers')
     .select('*')
     .eq('company_id', companyId)
+    .eq('is_deleted', false)
     .order('name');
   performanceService.endQueryTimer(timerId);
   if (error) { loggingService.error('getCustomers failed', { error }); return { data: [], error: new Error(error.message) }; }
@@ -57,7 +58,10 @@ export async function updateCustomer(id: string, fields: Partial<Omit<Customer, 
 }
 
 export async function deleteCustomer(id: string): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('customers').delete().eq('id', id);
+  const { error } = await supabase
+    .from('customers')
+    .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+    .eq('id', id);
   if (error) return { error: new Error(error.message) };
   return { error: null };
 }

@@ -154,7 +154,19 @@ export function useAuth() {
   return ctx;
 }
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+type RedirectTarget = string | ((pathname: string) => string);
+
+function resolveRedirect(redirectTo: RedirectTarget, pathname: string): string {
+  return typeof redirectTo === 'function' ? redirectTo(pathname) : redirectTo;
+}
+
+export function ProtectedRoute({
+  children,
+  redirectTo = '/login',
+}: {
+  children: React.ReactNode;
+  redirectTo?: RedirectTarget;
+}) {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
   
@@ -167,7 +179,8 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    const target = resolveRedirect(redirectTo, location.pathname);
+    return <Navigate to={target} state={{ from: location }} replace />;
   }
   
   return <>{children}</>;

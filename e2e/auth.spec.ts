@@ -148,9 +148,9 @@ test.describe("Reset Password page", () => {
 });
 
 test.describe("Protected-route redirect", () => {
-  test("/ redirects to /login when not authenticated", async ({ page }) => {
+  test("/ redirects to /welcome when not authenticated", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveURL(/login/, { timeout: 8000 });
+    await expect(page).toHaveURL(/welcome/, { timeout: 8000 });
   });
 
   test("/auto-aging redirects to /login when not authenticated", async ({ page }) => {

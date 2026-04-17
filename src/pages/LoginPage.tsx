@@ -13,8 +13,9 @@ export default function LoginPage() {
   const { login, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from: string = (location.state as { from?: Location })?.from
-    ? `${(location.state as { from: Location }).from.pathname}${(location.state as { from: Location }).from.search}`
+  const destination = (location.state as { from?: Pick<Location, 'pathname' | 'search'> })?.from;
+  const from = destination
+    ? `${destination.pathname}${destination.search ?? ''}`
     : '/';
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);

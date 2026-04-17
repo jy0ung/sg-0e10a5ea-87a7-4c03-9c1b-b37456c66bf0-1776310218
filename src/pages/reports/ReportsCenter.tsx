@@ -245,8 +245,9 @@ export default function ReportsCenter() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Reports Centre"
-        description="Generate and export operational reports"
+        title="Business Reports"
+        description="Generate and export cross-module operational reports for inventory, sales, purchasing, and transfers."
+        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Business Reports' }]}
         icon={<FileText className="h-6 w-6" />}
       />
       <Tabs defaultValue="stock">

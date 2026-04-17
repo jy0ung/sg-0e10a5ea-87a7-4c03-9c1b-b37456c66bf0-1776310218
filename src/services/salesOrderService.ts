@@ -45,6 +45,7 @@ export async function getSalesOrders(companyId: string): Promise<{ data: SalesOr
     .from('sales_orders')
     .select('*')
     .eq('company_id', companyId)
+    .eq('is_deleted', false)
     .order('booking_date', { ascending: false });
   performanceService.endQueryTimer(timerId);
   if (error) { loggingService.error('getSalesOrders failed', { error }); return { data: [], error: new Error(error.message) }; }

@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS public.vehicle_transfers (
 
 ALTER TABLE public.vehicle_transfers ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "vehicle_transfers_company_members" ON public.vehicle_transfers;
+
 CREATE POLICY "vehicle_transfers_company_members" ON public.vehicle_transfers
   FOR ALL USING (
     company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
@@ -44,6 +46,8 @@ CREATE TABLE IF NOT EXISTS public.purchase_invoices (
 );
 
 ALTER TABLE public.purchase_invoices ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "purchase_invoices_company_members" ON public.purchase_invoices;
 
 CREATE POLICY "purchase_invoices_company_members" ON public.purchase_invoices
   FOR ALL USING (
