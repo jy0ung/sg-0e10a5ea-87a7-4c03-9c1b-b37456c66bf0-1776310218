@@ -11,7 +11,6 @@ import { useSales } from '@/contexts/SalesContext';
 import { computeSalesmanActuals, upsertSalesmanTarget, deleteSalesmanTarget } from '@/services/salesTargetService';
 import { SalesmanPerformance, SalesmanTarget } from '@/types';
 import { Target, Plus, Pencil, Trash2 } from 'lucide-react';
-import { TableSkeleton } from '@/components/shared/TableSkeleton';
 
 export default function SalesmanPerformancePage() {
   const { user } = useAuth();

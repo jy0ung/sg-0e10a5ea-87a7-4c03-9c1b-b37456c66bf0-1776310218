@@ -8,6 +8,8 @@ const createMockQueryBuilder = (resolvedValue: { data: unknown; error: unknown }
   const builder: Record<string, any> = {};
   builder.select = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
+  builder.in = vi.fn(() => builder);
+  builder.limit = vi.fn(() => builder);
   builder.maybeSingle = vi.fn().mockResolvedValue(resolvedValue);
   builder.single = vi.fn().mockResolvedValue(resolvedValue);
   builder.order = vi.fn(() => Promise.resolve(resolvedValue));
@@ -68,7 +70,7 @@ describe('ValidationService', () => {
           return createMockQueryBuilder({ data: null, error: null }); // No duplicate
         }
         if (table === 'branches') {
-          return createMockQueryBuilder({ data: { id: 'b1', code: 'B001' }, error: null }); // Branch exists
+          return createMockQueryBuilder({ data: [{ id: 'b1', code: 'B001' }], error: null }); // Branch exists
         }
         return createMockQueryBuilder({ data: null, error: null });
       });
@@ -483,9 +485,9 @@ describe('ValidationService', () => {
 
       mockSupabase.from.mockImplementation((table: string) => {
         if (table === 'branches') {
-          return createMockQueryBuilder({ data: { id: 'b1', code: 'B001' }, error: null });
+          return createMockQueryBuilder({ data: [{ id: 'b1', code: 'B001' }], error: null });
         }
-        return createMockQueryBuilder({ data: null, error: null });
+        return createMockQueryBuilder({ data: [], error: null });
       });
 
       const result = await validateVehicleImportBatch(rows, 'company-123');
@@ -516,9 +518,9 @@ describe('ValidationService', () => {
 
       mockSupabase.from.mockImplementation((table: string) => {
         if (table === 'branches') {
-          return createMockQueryBuilder({ data: { id: 'b1', code: 'B001' }, error: null });
+          return createMockQueryBuilder({ data: [{ id: 'b1', code: 'B001' }], error: null });
         }
-        return createMockQueryBuilder({ data: null, error: null });
+        return createMockQueryBuilder({ data: [], error: null });
       });
 
       const result = await validateVehicleImportBatch(rows, 'company-123');
