@@ -17,7 +17,6 @@ const empty: FormState = { code: '', name: '', orSeries: '', vdoSeries: '' };
 export default function BranchManagement() {
   const { hasRole } = useAuth();
   const companyId = useCompanyId();
-  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
   const { toast } = useToast();
 
   const [branches, setBranches] = useState<BranchRecord[]>([]);
@@ -36,6 +35,8 @@ export default function BranchManagement() {
   }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
+
+  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
 
   const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
   const openEdit = (b: BranchRecord) => {

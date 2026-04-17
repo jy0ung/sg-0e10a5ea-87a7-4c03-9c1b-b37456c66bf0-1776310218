@@ -217,7 +217,7 @@ export default function Invoices() {
         </DialogContent>
       </Dialog>
 
-      {/* Payment Dialog */}}
+      {/* Payment Dialog */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>

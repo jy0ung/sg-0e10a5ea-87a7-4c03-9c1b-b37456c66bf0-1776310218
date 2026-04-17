@@ -5,7 +5,7 @@ import { KpiCard } from '@/components/shared/KpiCard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Download, Filter, Upload, X } from 'lucide-react';
+import { RefreshCw, Download, Filter, Upload, X, Loader2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AgingTrendChart } from '@/components/charts/AgingTrendChart';
 import { OutlierScatterChart } from '@/components/charts/OutlierScatterChart';
@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 
 export default function AutoAgingDashboard() {
-  const { kpiSummaries, vehicles, qualityIssues, lastRefresh, refreshKpis } = useData();
+  const { kpiSummaries, vehicles, qualityIssues, lastRefresh, refreshKpis, loading } = useData();
   const navigate = useNavigate();
   const [branchFilter, setBranchFilter] = useState<string>('all');
   const [modelFilter, setModelFilter] = useState<string>('all');
@@ -82,6 +82,14 @@ export default function AutoAgingDashboard() {
       regToDelivery: g.regToDelivery.length ? Math.round(g.regToDelivery.reduce((s, v) => s + v, 0) / g.regToDelivery.length) : 0,
     })).sort((a, b) => b.bgToDelivery - a.bgToDelivery);
   }, [filtered]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
 
   if (vehicles.length === 0) {
     return (

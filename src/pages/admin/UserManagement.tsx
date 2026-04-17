@@ -77,7 +77,6 @@ export default function UserManagement() {
   });
 
   const canManage = hasRole(['super_admin', 'company_admin']);
-  if (!canManage) return <UnauthorizedAccess />;
 
   useEffect(() => {
     async function load() {
@@ -97,6 +96,8 @@ export default function UserManagement() {
     }
     load();
   }, [user?.company_id]);
+
+  if (!canManage) return <UnauthorizedAccess />;
 
   const openEdit = (p: ProfileRow) => {
     setEditUser(p);

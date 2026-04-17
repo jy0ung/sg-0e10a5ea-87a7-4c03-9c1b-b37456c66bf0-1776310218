@@ -144,7 +144,6 @@ function ConfirmDelete({ name, onConfirm, onCancel }: { name: string; onConfirm:
 export default function MasterData() {
   const { hasRole } = useAuth();
   const companyId = useCompanyId();
-  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
   const { toast } = useToast();
 
   // Finance Companies
@@ -231,6 +230,8 @@ export default function MasterData() {
   }, [companyId]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
+
+  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
 
   // ── Finance Companies handlers ──
   const fcSave = async () => {

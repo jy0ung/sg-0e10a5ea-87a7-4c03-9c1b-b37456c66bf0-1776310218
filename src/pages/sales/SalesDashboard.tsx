@@ -2,11 +2,19 @@ import React, { useMemo } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSales } from '@/contexts/SalesContext';
 import { useData } from '@/contexts/DataContext';
-import { ShoppingCart, DollarSign, TrendingUp, CheckCircle } from 'lucide-react';
+import { ShoppingCart, DollarSign, TrendingUp, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function SalesDashboard() {
-  const { salesOrders, invoices } = useSales();
-  const { vehicles } = useData();
+  const { salesOrders, invoices, loading: salesLoading } = useSales();
+  const { vehicles, loading: dataLoading } = useData();
+
+  if (salesLoading || dataLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];

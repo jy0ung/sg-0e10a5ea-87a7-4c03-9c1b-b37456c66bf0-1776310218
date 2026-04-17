@@ -53,6 +53,7 @@ export default function MyTickets() {
 
       try {
         // The generated database types have not been refreshed for the tickets table yet.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error: fetchError } = await (supabase as any)
           .from('tickets')
           .select('id, subject, category, priority, status, description, created_at')

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,9 +92,9 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 text-center space-y-2">
-          <a href="/forgot-password" className="block text-sm text-muted-foreground hover:text-primary hover:underline">
+          <Link to="/forgot-password" className="block text-sm text-muted-foreground hover:text-primary hover:underline">
             Forgot your password?
-          </a>
+          </Link>
           <p className="text-sm text-muted-foreground">
             Staff accounts are created by an administrator. If you have been invited already, use password reset to set or recover your password.
           </p>

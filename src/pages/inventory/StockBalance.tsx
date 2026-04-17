@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useData } from '@/contexts/DataContext';
-import { Search, Package } from 'lucide-react';
+import { Search, Package, Loader2 } from 'lucide-react';
 
 const STATUS_BADGE: Record<string, string> = {
   in_stock:    'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
@@ -22,10 +22,18 @@ function deriveStatus(v: { delivery_date?: string; reg_date?: string; date_recei
 }
 
 export default function StockBalance() {
-  const { vehicles } = useData();
+  const { vehicles, loading } = useData();
   const [search, setSearch]         = useState('');
   const [statusFilter, setStatus]   = useState('all');
   const [branchFilter, setBranch]   = useState('all');
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
 
   const branches = [...new Set(vehicles.map(v => v.branch_code).filter(Boolean))].sort();
 

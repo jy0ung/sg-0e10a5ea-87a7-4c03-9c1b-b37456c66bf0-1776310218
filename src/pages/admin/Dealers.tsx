@@ -23,7 +23,6 @@ const empty: FormState = { name: '', accCode: '', companyRegNo: '', companyAddre
 export default function Dealers() {
   const { hasRole } = useAuth();
   const companyId = useCompanyId();
-  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
   const { toast } = useToast();
 
   const [dealers, setDealers] = useState<Dealer[]>([]);
@@ -42,6 +41,8 @@ export default function Dealers() {
   }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
+
+  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
 
   const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
   const openEdit = (d: Dealer) => {

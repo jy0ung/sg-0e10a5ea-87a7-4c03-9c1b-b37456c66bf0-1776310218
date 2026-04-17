@@ -19,6 +19,7 @@ import { loggingService } from '@/services/loggingService';
 import { useAuth } from '@/contexts/AuthContext';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { useToast } from '@/hooks/use-toast';
 import {
   ChartContainer,
   ChartTooltip,
@@ -36,7 +37,7 @@ const COLORS = {
 
 export default function ActivityDashboard() {
   const { hasRole } = useAuth();
-  if (!hasRole(['super_admin', 'company_admin', 'director', 'general_manager'])) return <UnauthorizedAccess />;
+  const { toast } = useToast();
 
   const [logs, setLogs] = useState<AuditLogWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +57,7 @@ export default function ActivityDashboard() {
       }
     } catch (error) {
       loggingService.error('Error loading activity logs', { error }, 'ActivityDashboard');
+      toast({ title: 'Failed to load activity logs', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -64,6 +66,8 @@ export default function ActivityDashboard() {
   useEffect(() => {
     loadLogs();
   }, [timeRange, actionFilter, loadLogs]);
+
+  if (!hasRole(['super_admin', 'company_admin', 'director', 'general_manager'])) return <UnauthorizedAccess />;
 
   const getFromDate = (range: 'today' | 'week' | 'month'): Date => {
     const now = new Date();

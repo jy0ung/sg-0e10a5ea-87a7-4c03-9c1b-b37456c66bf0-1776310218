@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { loggingService } from '@/services/loggingService';
 import { performanceService } from '@/services/performanceService';
 import { resolveBranchCode } from '@/services/branchService';
+import { useToast } from '@/hooks/use-toast';
 
 interface DataContextType {
   vehicles: VehicleCanonical[];
@@ -152,6 +153,13 @@ async function fetchDataFromDb(companyId: string, branchCode?: string | null) {
   if (issuesRes.error) loggingService.error('Failed to load quality issues', { error: issuesRes.error }, 'DataContext');
   if (slasRes.error) loggingService.error('Failed to load SLA policies', { error: slasRes.error }, 'DataContext');
 
+  const errors = [
+    vehiclesRes.error && 'vehicles',
+    batchesRes.error && 'import batches',
+    issuesRes.error && 'quality issues',
+    slasRes.error && 'SLA policies',
+  ].filter(Boolean);
+
   const dbVehicles = vehiclesRes.data ?? [];
   const dbBatches  = (batchesRes.data  || []).map(r => mapDbBatch(r  as unknown as Record<string, unknown>));
   const dbIssues   = (issuesRes.data   || []).map(r => mapDbIssue(r  as unknown as Record<string, unknown>));
@@ -163,7 +171,7 @@ async function fetchDataFromDb(companyId: string, branchCode?: string | null) {
     'DataContext'
   );
 
-  return { vehicles: dbVehicles, batches: dbBatches, issues: dbIssues, slas: dbSlas };
+  return { vehicles: dbVehicles, batches: dbBatches, issues: dbIssues, slas: dbSlas, errors };
 }
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
@@ -177,6 +185,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const companyId = useCompanyId();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // Branch-scoped users only see their branch's vehicles.
   const branchId = user?.access_scope === 'branch' ? (user.branch_id ?? null) : null;
@@ -205,6 +214,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setSlas(queryData.slas);
       setKpiSummaries(computeKpiSummaries(queryData.vehicles, queryData.slas));
       setLastRefresh(new Date().toISOString());
+      if (queryData.errors.length > 0) {
+        toast({ title: `Failed to load: ${queryData.errors.join(', ')}`, variant: 'destructive' });
+      }
     }
   }, [queryData]);
 

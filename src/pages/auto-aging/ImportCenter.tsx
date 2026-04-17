@@ -133,7 +133,8 @@ export default function ImportCenter() {
         throw new Error(`Failed to create import batch: ${batchError.message}`);
       }
 
-      const id = batchData?.id!;
+      const id = batchData?.id ?? '';
+      if (!id) throw new Error('Import batch created but no ID returned');
       setBatchId(id);
       setRawRows(rows);
       setValidationIssues(issues);

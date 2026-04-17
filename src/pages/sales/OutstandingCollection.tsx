@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/contexts/SalesContext';
 import { Invoice } from '@/types';
-import { AlertTriangle, Clock, DollarSign } from 'lucide-react';
+import { AlertTriangle, Clock, DollarSign, Loader2 } from 'lucide-react';
 
 type AgingBucket = '0-30' | '31-60' | '61-90' | '90+';
 
@@ -27,7 +27,7 @@ const BUCKET_STYLE: Record<AgingBucket, string> = {
 
 export default function OutstandingCollection() {
   const { user } = useAuth();
-  const { invoices } = useSales();
+  const { invoices, loading } = useSales();
 
   const [bucketFilter, setBucketFilter] = useState<'all' | AgingBucket>('all');
 
@@ -49,6 +49,14 @@ export default function OutstandingCollection() {
     const sum = (b: AgingBucket) => all.filter(i => agingBucket(i.dueDate) === b).reduce((s, i) => s + i.totalAmount - (i.paidAmount ?? 0), 0);
     return { '0-30': sum('0-30'), '31-60': sum('31-60'), '61-90': sum('61-90'), '90+': sum('90+') };
   }, [invoices]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
 
   const totalOutstanding = Object.values(bucketTotals).reduce((s, v) => s + v, 0);
 

@@ -4,11 +4,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useSales } from '@/contexts/SalesContext';
 import { SalesOrder, DealStage } from '@/types';
-import { GripVertical } from 'lucide-react';
+import { GripVertical, Loader2 } from 'lucide-react';
 
 export default function DealPipeline() {
-  const { salesOrders, dealStages, moveOrderStage } = useSales();
+  const { salesOrders, dealStages, moveOrderStage, loading } = useSales();
   const [dragging, setDragging] = useState<string | null>(null);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
 
   const ordersByStage = (stageId: string) =>
     salesOrders.filter(o => o.dealStageId === stageId && o.status !== 'cancelled');

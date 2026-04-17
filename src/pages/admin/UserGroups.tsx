@@ -21,7 +21,6 @@ const empty: FormState = { name: '', status: 'Active' };
 export default function UserGroups() {
   const { hasRole } = useAuth();
   const companyId = useCompanyId();
-  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
   const { toast } = useToast();
 
   const [groups, setGroups] = useState<UserGroup[]>([]);
@@ -40,6 +39,8 @@ export default function UserGroups() {
   }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
+
+  if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
 
   const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
   const openEdit = (g: UserGroup) => {
