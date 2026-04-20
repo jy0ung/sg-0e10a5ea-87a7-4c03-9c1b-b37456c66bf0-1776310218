@@ -22,7 +22,7 @@ type ApprovalStepRecord = {
   allowSelfApproval: boolean;
 };
 
-const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, manager_id, department:departments(name), job_title:job_titles(name), manager:profiles!manager_id(name)';
+const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, manager_id, department:departments(name), job_title:job_titles(name), manager:profiles!profiles_manager_id_fkey(name)';
 
 type ApprovalInstanceRecord = {
   id: string;
@@ -667,7 +667,7 @@ export async function listLeaveRequests(
 ): Promise<{ data: LeaveRequest[]; error: string | null }> {
   let q = supabase
     .from('leave_requests')
-    .select('*, leave_types(name)')
+    .select('*, employee:profiles!leave_requests_employee_id_fkey(name), leave_types(name)')
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
   if (opts?.employeeId) q = q.eq('employee_id', opts.employeeId);
@@ -714,8 +714,8 @@ export async function listLeaveRequests(
   const mapped: LeaveRequest[] = (data ?? []).map((r: Record<string, unknown>) => ({
     id:            String(r.id),
     companyId:     String(r.company_id),
-    employeeId:    String(r.employee_id ?? ''),
-    employeeName:  identityMap.data.get(String(r.employee_id ?? ''))?.name,
+    employeeId:    String(r.employee_id),
+    employeeName:  (r.employee as Record<string, unknown> | null)?.name ? String((r.employee as Record<string, unknown>).name) : undefined,
     leaveTypeId:   String(r.leave_type_id),
     leaveTypeName: (r.leave_types as Record<string, unknown> | null)?.name ? String((r.leave_types as Record<string, unknown>).name) : undefined,
     startDate:     String(r.start_date),
