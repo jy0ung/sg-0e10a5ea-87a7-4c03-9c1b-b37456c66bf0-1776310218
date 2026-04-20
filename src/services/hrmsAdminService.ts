@@ -191,7 +191,7 @@ function rowToJobTitle(r: Record<string, unknown>): JobTitle {
 export async function listJobTitles(companyId: string): Promise<{ data: JobTitle[]; error: string | null }> {
   const { data, error } = await supabase
     .from('job_titles')
-    .select('*, department:departments(name)')
+    .select('*, department:departments!profiles_department_id_fkey(name)')
     .eq('company_id', companyId)
     .order('name');
   if (error) return { data: [], error: error.message };
@@ -213,7 +213,7 @@ export async function createJobTitle(
       description:   input.description ?? null,
       is_active:     input.isActive,
     })
-    .select('*, department:departments(name)')
+    .select('*, department:departments!job_titles_department_id_fkey(name)')
     .single();
   if (error) return { data: null, error: error.message };
   void logUserAction(actorId, 'create', 'job_title', String(data.id), { name: input.name });

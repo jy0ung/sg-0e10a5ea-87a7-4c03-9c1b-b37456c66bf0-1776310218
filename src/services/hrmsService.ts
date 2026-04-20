@@ -22,7 +22,7 @@ type ApprovalStepRecord = {
   allowSelfApproval: boolean;
 };
 
-const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, manager_id, department:departments(name), job_title:job_titles(name), manager:profiles!profiles_manager_id_fkey(name)';
+const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, manager_id, department:departments!profiles_department_id_fkey(name), job_title:job_titles(name), manager:profiles!profiles_manager_id_fkey(name)';
 
 type ApprovalInstanceRecord = {
   id: string;
