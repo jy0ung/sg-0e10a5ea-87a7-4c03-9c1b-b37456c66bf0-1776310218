@@ -8,7 +8,7 @@ import {
   ShoppingCart, Users, KanbanSquare, Receipt, Target, TrendingUp,
   Package, ArrowLeftRight, Truck, UserCheck, GitBranch, Database,
   TrendingDown, Landmark, Search, HeadphonesIcon, Briefcase,
-  Calendar, Clock, CreditCard, Star, Megaphone
+  Calendar, Clock, CreditCard, Star, Megaphone, Settings2, GitMerge
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -85,6 +85,8 @@ const navItems: NavItem[] = [
   { label: 'Payroll Summary', path: '/hrms/payroll', icon: CreditCard, section: 'HRMS', group: 'Payroll', roles: ['super_admin', 'company_admin', 'general_manager'] },
   { label: 'Performance Appraisals', path: '/hrms/appraisals', icon: Star, section: 'HRMS', group: 'Performance', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'Announcements', path: '/hrms/announcements', icon: Megaphone, section: 'HRMS', group: 'Communications', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { label: 'HRMS Settings', path: '/hrms/admin', icon: Settings2, section: 'HRMS', group: 'Administration', roles: ['super_admin', 'company_admin', 'general_manager', 'manager'] },
+  { label: 'Approval Flows', path: '/hrms/approval-flows', icon: GitMerge, section: 'HRMS', group: 'Administration', roles: ['super_admin', 'company_admin', 'general_manager', 'manager'] },
 
   { label: 'Activity Overview', path: '/admin/activity', icon: BarChart3, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin'] },
   { label: 'Audit Log', path: '/admin/audit', icon: FileText, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },

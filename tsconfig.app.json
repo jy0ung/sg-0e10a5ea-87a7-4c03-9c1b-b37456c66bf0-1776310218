@@ -19,7 +19,10 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ]
+      ],
+      "@flc/types": ["./packages/types/src/index.ts"],
+      "@flc/supabase": ["./packages/supabase/src/index.ts"],
+      "@flc/hrms-schemas": ["./packages/hrms-schemas/src/index.ts"]
     },
     "skipLibCheck": true,
     "strict": false,
@@ -30,6 +33,7 @@
     "useDefineForClassFields": true
   },
   "include": [
-    "src"
+    "src",
+    "packages/*/src"
   ]
 }

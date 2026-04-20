@@ -173,6 +173,47 @@ export const purchaseInvoiceSchema = z.object({
 });
 export type PurchaseInvoiceFormData = z.infer<typeof purchaseInvoiceSchema>;
 
+// ─── HRMS schemas ─────────────────────────────────────────────────────────────
+
+export const createEmployeeSchema = z.object({
+  staffCode: z.string().min(1, 'Staff code is required').max(20, 'Staff code too long'),
+  name:      z.string().min(2, 'Name must be at least 2 characters').max(100),
+  email:     z.string().email('Invalid email address').optional().or(z.literal('')),
+  role:      z.enum(['super_admin','company_admin','director','general_manager','manager','sales','accounts','analyst','creator_updater'], {
+    errorMap: () => ({ message: 'Select a valid role' }),
+  }),
+  branch:    z.string().optional(),
+  ic:        z.string().regex(/^\d{6}-\d{2}-\d{4}$/, 'IC must be in format XXXXXX-XX-XXXX').optional().or(z.literal('')),
+  contact:   z.string().regex(/^[0-9+\-\s()]{7,20}$/, 'Invalid contact number').optional().or(z.literal('')),
+  joinDate:  z.string().min(1, 'Join date is required'),
+});
+export type CreateEmployeeFormData = z.infer<typeof createEmployeeSchema>;
+
+export const createLeaveRequestSchema = z.object({
+  leaveTypeId: z.string().min(1, 'Select a leave type'),
+  startDate:   z.string().min(1, 'Start date is required'),
+  endDate:     z.string().min(1, 'End date is required'),
+  reason:      z.string().max(500, 'Reason too long').optional(),
+}).refine(d => !d.startDate || !d.endDate || d.endDate >= d.startDate, {
+  message: 'End date must be on or after start date',
+  path: ['endDate'],
+});
+export type CreateLeaveRequestFormData = z.infer<typeof createLeaveRequestSchema>;
+
+export const upsertAttendanceSchema = z.object({
+  employeeId:  z.string().min(1, 'Select an employee'),
+  date:        z.string().min(1, 'Date is required'),
+  status:      z.enum(['present','absent','half_day','on_leave','public_holiday'], {
+    errorMap: () => ({ message: 'Select a valid status' }),
+  }),
+  clockIn:     z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.literal('')),
+  clockOut:    z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM format').optional().or(z.literal('')),
+  hoursWorked: z.number().min(0, 'Cannot be negative').max(24, 'Cannot exceed 24').optional(),
+  notes:       z.string().max(500, 'Notes too long').optional(),
+});
+export type UpsertAttendanceFormData = z.infer<typeof upsertAttendanceSchema>;
+
+
 export const dealerInvoiceSchema = z.object({
   invoiceNo:  z.string().min(1, 'Invoice No is required'),
   dealerName: z.string().min(1, 'Dealer Name is required'),
@@ -185,3 +226,68 @@ export const dealerInvoiceSchema = z.object({
   status:     z.string().min(1, 'Status is required'),
 });
 export type DealerInvoiceFormData = z.infer<typeof dealerInvoiceSchema>;
+
+// ─── HRMS Admin schemas ───────────────────────────────────────────────────────
+
+export const departmentSchema = z.object({
+  name:            z.string().min(2, 'Name must be at least 2 characters').max(80),
+  description:     z.string().max(300).optional(),
+  headEmployeeId:  z.string().optional(),
+  costCentre:      z.string().max(30).optional(),
+  isActive:        z.boolean().default(true),
+});
+export type DepartmentFormData = z.infer<typeof departmentSchema>;
+
+export const jobTitleSchema = z.object({
+  name:         z.string().min(2, 'Name must be at least 2 characters').max(80),
+  departmentId: z.string().optional(),
+  level:        z.enum(['junior','mid','senior','lead','executive']).optional(),
+  description:  z.string().max(300).optional(),
+  isActive:     z.boolean().default(true),
+});
+export type JobTitleFormData = z.infer<typeof jobTitleSchema>;
+
+export const leaveTypeAdminSchema = z.object({
+  name:        z.string().min(2, 'Name must be at least 2 characters').max(60),
+  code:        z.string().min(1).max(10).regex(/^[A-Z_]+$/, 'Uppercase letters and underscores only'),
+  daysPerYear: z.number().min(0, 'Cannot be negative').max(365),
+  isPaid:      z.boolean(),
+  active:      z.boolean().default(true),
+});
+export type LeaveTypeAdminFormData = z.infer<typeof leaveTypeAdminSchema>;
+
+export const holidaySchema = z.object({
+  name:        z.string().min(2, 'Name must be at least 2 characters').max(100),
+  date:        z.string().min(1, 'Date is required'),
+  holidayType: z.enum(['public','company']),
+  isRecurring: z.boolean().default(false),
+});
+export type HolidayFormData = z.infer<typeof holidaySchema>;
+
+// ─── Approval Flow schemas ────────────────────────────────────────────────────
+
+export const approvalStepSchema = z.object({
+  name:             z.string().min(1, 'Step name is required').max(80),
+  approverType:     z.enum(['role','specific_user','direct_manager']),
+  approverRole:     z.string().nullable().optional(),
+  approverUserId:   z.string().nullable().optional(),
+  allowSelfApproval: z.boolean().default(false),
+}).refine(d => d.approverType !== 'role' || !!d.approverRole, {
+  message: 'Select a role for this step',
+  path: ['approverRole'],
+}).refine(d => d.approverType !== 'specific_user' || !!d.approverUserId, {
+  message: 'Select an approver for this step',
+  path: ['approverUserId'],
+});
+
+export const approvalFlowSchema = z.object({
+  name:        z.string().min(2, 'Name must be at least 2 characters').max(80),
+  description: z.string().max(300).optional(),
+  entityType:  z.enum(['leave_request','payroll_run','appraisal','general']),
+  isActive:    z.boolean().default(true),
+});
+
+export const approvalFlowWithStepsSchema = approvalFlowSchema.extend({
+  steps: z.array(approvalStepSchema).min(1, 'Add at least one approval step'),
+});
+export type ApprovalFlowFormData = z.infer<typeof approvalFlowWithStepsSchema>;

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logUserAction } from '@/services/auditService';
 import {
   Employee, EmployeeStatus, AppRole,
   LeaveType, LeaveBalance, LeaveRequest, CreateLeaveRequestInput, LeaveStatus,
@@ -8,23 +9,27 @@ import {
   Announcement, CreateAnnouncementInput,
 } from '@/types';
 
-const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url';
+const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, department:departments(name), job_title:job_titles(name)';
 
 function rowToEmployee(row: Record<string, unknown>): Employee {
   return {
-    id:          String(row.id ?? ''),
-    email:       String(row.email ?? ''),
-    name:        String(row.name ?? ''),
-    role:        (row.role as AppRole) ?? 'analyst',
-    companyId:   String(row.company_id ?? ''),
-    branchId:    row.branch_id ? String(row.branch_id) : undefined,
-    staffCode:   row.staff_code ? String(row.staff_code) : undefined,
-    icNo:        row.ic_no ? String(row.ic_no) : undefined,
-    contactNo:   row.contact_no ? String(row.contact_no) : undefined,
-    joinDate:    row.join_date ? String(row.join_date) : undefined,
-    resignDate:  row.resign_date ? String(row.resign_date) : undefined,
-    status:      (row.status as EmployeeStatus) ?? 'active',
-    avatarUrl:   row.avatar_url ? String(row.avatar_url) : undefined,
+    id:             String(row.id ?? ''),
+    email:          String(row.email ?? ''),
+    name:           String(row.name ?? ''),
+    role:           (row.role as AppRole) ?? 'analyst',
+    companyId:      String(row.company_id ?? ''),
+    branchId:       row.branch_id ? String(row.branch_id) : undefined,
+    staffCode:      row.staff_code ? String(row.staff_code) : undefined,
+    icNo:           row.ic_no ? String(row.ic_no) : undefined,
+    contactNo:      row.contact_no ? String(row.contact_no) : undefined,
+    joinDate:       row.join_date ? String(row.join_date) : undefined,
+    resignDate:     row.resign_date ? String(row.resign_date) : undefined,
+    status:         (row.status as EmployeeStatus) ?? 'active',
+    avatarUrl:      row.avatar_url ? String(row.avatar_url) : undefined,
+    departmentId:   row.department_id ? String(row.department_id) : undefined,
+    departmentName: row.department ? String((row.department as Record<string, unknown>)?.name ?? '') : undefined,
+    jobTitleId:     row.job_title_id ? String(row.job_title_id) : undefined,
+    jobTitleName:   row.job_title ? String((row.job_title as Record<string, unknown>)?.name ?? '') : undefined,
   };
 }
 
@@ -67,7 +72,7 @@ export interface CreateEmployeeInput {
   joinDate?: string;
 }
 
-export async function createEmployee(input: CreateEmployeeInput): Promise<{ error: string | null }> {
+export async function createEmployee(input: CreateEmployeeInput, actorId: string): Promise<{ error: string | null }> {
   const { error } = await supabase.from('profiles').insert({
     id:          input.id,
     email:       input.email,
@@ -82,6 +87,10 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<{ erro
     contact_no:  input.contactNo ?? null,
     join_date:   input.joinDate ?? null,
   });
+  if (!error) {
+    void logUserAction(actorId, 'create', 'employee', input.id,
+      { name: input.name, role: input.role, staffCode: input.staffCode });
+  }
   return { error: error?.message ?? null };
 }
 
@@ -95,22 +104,29 @@ export interface UpdateEmployeeInput {
   joinDate?: string;
   resignDate?: string | null;
   status?: EmployeeStatus;
+  departmentId?: string | null;
+  jobTitleId?: string | null;
 }
 
-export async function updateEmployee(id: string, input: UpdateEmployeeInput): Promise<{ error: string | null }> {
+export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string): Promise<{ error: string | null }> {
   // Build the update payload, only including defined fields
   const payload: Record<string, unknown> = {};
-  if (input.name       !== undefined) payload.name        = input.name;
-  if (input.role       !== undefined) payload.role        = input.role;
-  if (input.branchId   !== undefined) payload.branch_id   = input.branchId;
-  if (input.staffCode  !== undefined) payload.staff_code  = input.staffCode?.toUpperCase();
-  if (input.icNo       !== undefined) payload.ic_no       = input.icNo;
-  if (input.contactNo  !== undefined) payload.contact_no  = input.contactNo;
-  if (input.joinDate   !== undefined) payload.join_date   = input.joinDate;
-  if (input.resignDate !== undefined) payload.resign_date = input.resignDate;
-  if (input.status     !== undefined) payload.status      = input.status;
+  if (input.name         !== undefined) payload.name          = input.name;
+  if (input.role         !== undefined) payload.role          = input.role;
+  if (input.branchId     !== undefined) payload.branch_id     = input.branchId;
+  if (input.staffCode    !== undefined) payload.staff_code    = input.staffCode?.toUpperCase();
+  if (input.icNo         !== undefined) payload.ic_no         = input.icNo;
+  if (input.contactNo    !== undefined) payload.contact_no    = input.contactNo;
+  if (input.joinDate     !== undefined) payload.join_date     = input.joinDate;
+  if (input.resignDate   !== undefined) payload.resign_date   = input.resignDate;
+  if (input.status       !== undefined) payload.status        = input.status;
+  if (input.departmentId !== undefined) payload.department_id = input.departmentId;
+  if (input.jobTitleId   !== undefined) payload.job_title_id  = input.jobTitleId;
 
   const { error } = await supabase.from('profiles').update(payload).eq('id', id);
+  if (!error && actorId) {
+    void logUserAction(actorId, 'update', 'employee', id, { changes: payload });
+  }
   return { error: error?.message ?? null };
 }
 
@@ -243,10 +259,25 @@ export async function reviewLeaveRequest(
   status: 'approved' | 'rejected',
   note?: string,
 ): Promise<{ error: string | null }> {
+  // Self-approval guard: fetch the request to confirm reviewer !== employee
+  const { data: req } = await supabase
+    .from('leave_requests')
+    .select('employee_id')
+    .eq('id', requestId)
+    .single();
+
+  if (req?.employee_id === reviewerId) {
+    return { error: 'You cannot approve or reject your own leave request.' };
+  }
+
   const { error } = await supabase
     .from('leave_requests')
     .update({ status, reviewed_by: reviewerId, reviewed_at: new Date().toISOString(), reviewer_note: note ?? null })
     .eq('id', requestId);
+  if (!error) {
+    void logUserAction(reviewerId, 'update', 'leave_request', requestId,
+      { status, reviewerNote: note ?? null });
+  }
   return { error: error?.message ?? null };
 }
 
@@ -355,11 +386,33 @@ export async function createPayrollRun(
   };
 }
 
+const VALID_PAYROLL_TRANSITIONS: Record<PayrollRunStatus, PayrollRunStatus[]> = {
+  draft:     ['finalised'],
+  finalised: ['paid'],
+  paid:      [],
+};
+
 export async function updatePayrollRunStatus(
   runId: string,
   status: PayrollRunStatus,
+  actorId?: string,
 ): Promise<{ error: string | null }> {
+  const { data: current } = await supabase
+    .from('payroll_runs')
+    .select('status')
+    .eq('id', runId)
+    .single();
+
+  const currentStatus = current?.status as PayrollRunStatus | undefined;
+  if (currentStatus && !VALID_PAYROLL_TRANSITIONS[currentStatus]?.includes(status)) {
+    return { error: `Cannot transition payroll from '${currentStatus}' to '${status}'.` };
+  }
+
   const { error } = await supabase.from('payroll_runs').update({ status }).eq('id', runId);
+  if (!error && actorId) {
+    void logUserAction(actorId, 'update', 'payroll_run', runId,
+      { status, previousStatus: currentStatus });
+  }
   return { error: error?.message ?? null };
 }
 
@@ -510,10 +563,17 @@ export async function createAnnouncement(
     published_at: input.publishedAt ?? new Date().toISOString(),
     expires_at:   input.expiresAt ?? null,
   });
+  if (!error) {
+    void logUserAction(authorId, 'create', 'announcement', undefined,
+      { title: input.title, category: input.category, priority: input.priority });
+  }
   return { error: error?.message ?? null };
 }
 
-export async function deleteAnnouncement(id: string): Promise<{ error: string | null }> {
+export async function deleteAnnouncement(id: string, actorId?: string): Promise<{ error: string | null }> {
   const { error } = await supabase.from('announcements').delete().eq('id', id);
+  if (!error && actorId) {
+    void logUserAction(actorId, 'delete', 'announcement', id);
+  }
   return { error: error?.message ?? null };
 }

@@ -22,8 +22,11 @@ import {
 } from '@/services/hrmsService';
 import type { LeaveRequest, LeaveType, LeaveStatus, CreateLeaveRequestInput } from '@/types';
 import { CheckCircle2, XCircle, Clock, Plus } from 'lucide-react';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { HRMS_LEAVE_APPROVER_ROLES } from '@/config/hrmsConfig';
+import { createLeaveRequestSchema } from '@/lib/validations';
 
-const MANAGER_ROLES = ['super_admin', 'company_admin', 'general_manager', 'manager'] as const;
+const MANAGER_ROLES = HRMS_LEAVE_APPROVER_ROLES;
 const STATUS_COLORS: Record<LeaveStatus, string> = {
   pending:   'bg-yellow-100 text-yellow-700 border-yellow-200',
   approved:  'bg-green-100 text-green-700 border-green-200',
@@ -73,10 +76,16 @@ export default function LeaveManagement() {
 
   async function handleApply(e: React.FormEvent) {
     e.preventDefault();
-    if (!user?.companyId || !applyForm.leaveTypeId || !applyForm.startDate || !applyForm.endDate) return;
-    const start = new Date(applyForm.startDate);
-    const end   = new Date(applyForm.endDate);
-    const days  = Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1;
+    if (!user?.companyId) return;
+    const result = createLeaveRequestSchema.safeParse(applyForm);
+    if (!result.success) {
+      toast({ title: 'Validation error', description: result.error.errors[0].message, variant: 'destructive' });
+      return;
+    }
+    const days = differenceInCalendarDays(
+      parseISO(applyForm.endDate!),
+      parseISO(applyForm.startDate!),
+    ) + 1;
     const { error } = await createLeaveRequest(user.id, user.companyId, {
       ...applyForm as CreateLeaveRequestInput,
       days,

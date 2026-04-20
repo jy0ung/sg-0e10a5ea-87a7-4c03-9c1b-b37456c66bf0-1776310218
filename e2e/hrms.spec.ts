@@ -322,3 +322,372 @@ test.describe("Sidebar – HRMS navigation", () => {
     ).toBeVisible({ timeout: 8000 });
   });
 });
+
+// ─── Leave Management ─────────────────────────────────────────────────────────
+
+const MOCK_LEAVE_TYPES = [
+  { id: "lt-001", company_id: MOCK_PROFILE.company_id, name: "Annual Leave", default_days: 14, carry_forward: true, created_at: "2024-01-01", updated_at: "2024-01-01" },
+  { id: "lt-002", company_id: MOCK_PROFILE.company_id, name: "Sick Leave", default_days: 7, carry_forward: false, created_at: "2024-01-01", updated_at: "2024-01-01" },
+];
+
+const MOCK_LEAVE_REQUESTS = [
+  {
+    id: "lr-001", company_id: MOCK_PROFILE.company_id, employee_id: "emp-001",
+    leave_type_id: "lt-001", start_date: "2024-06-10", end_date: "2024-06-12",
+    days: 3, reason: "Vacation", status: "approved",
+    reviewed_by: null, reviewed_at: null, reviewer_note: null,
+    created_at: "2024-06-01T00:00:00Z", updated_at: "2024-06-01T00:00:00Z",
+    profiles: { name: "Ahmad Ibrahim" }, leave_types: { name: "Annual Leave" },
+  },
+  {
+    id: "lr-002", company_id: MOCK_PROFILE.company_id, employee_id: "emp-002",
+    leave_type_id: "lt-002", start_date: "2024-06-20", end_date: "2024-06-20",
+    days: 1, reason: "Unwell", status: "pending",
+    reviewed_by: null, reviewed_at: null, reviewer_note: null,
+    created_at: "2024-06-15T00:00:00Z", updated_at: "2024-06-15T00:00:00Z",
+    profiles: { name: "Siti Rahimah" }, leave_types: { name: "Sick Leave" },
+  },
+];
+
+const MOCK_LEAVE_BALANCES = [
+  { id: "lb-001", employee_id: MOCK_PROFILE.id, leave_type_id: "lt-001", year: 2024, entitled_days: 14, used_days: 3 },
+];
+
+async function setupLeaveMocks(page: import("@playwright/test").Page) {
+  await setupHrmsMocks(page);
+
+  await page.route(`${SUPABASE_URL}/rest/v1/leave_types*`, route => {
+    if (route.request().method() === "GET") {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_LEAVE_TYPES) });
+    } else { route.continue(); }
+  });
+
+  await page.route(`${SUPABASE_URL}/rest/v1/leave_requests*`, route => {
+    if (route.request().method() === "GET") {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_LEAVE_REQUESTS) });
+    } else { route.continue(); }
+  });
+
+  await page.route(`${SUPABASE_URL}/rest/v1/leave_balances*`, route => {
+    if (route.request().method() === "GET") {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_LEAVE_BALANCES) });
+    } else { route.continue(); }
+  });
+}
+
+test.describe("HRMS – Leave Management", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupLeaveMocks(page);
+  });
+
+  test("renders Leave Management page without crashing", async ({ page }) => {
+    await page.goto("/hrms/leave");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=/leave.?management/i").first()).toBeVisible({ timeout: 8000 });
+    expect(page.url()).not.toMatch(/\/login/);
+  });
+
+  test("displays leave requests from mock data", async ({ page }) => {
+    await page.goto("/hrms/leave");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=Ahmad Ibrahim")).toBeVisible({ timeout: 8000 });
+    await expect(page.locator("text=Siti Rahimah")).toBeVisible({ timeout: 8000 });
+  });
+
+  test("Apply for Leave button opens dialog", async ({ page }) => {
+    await page.goto("/hrms/leave");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await page.locator("button").filter({ hasText: /apply.*leave|new.*leave/i }).first().click();
+    await expect(page.locator("[role='dialog']")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("pending requests are shown with Approve/Reject actions for managers", async ({ page }) => {
+    await page.goto("/hrms/leave");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    // MOCK_PROFILE is super_admin — should see action buttons for pending requests
+    await expect(page.locator("text=Siti Rahimah")).toBeVisible({ timeout: 8000 });
+    const pendingSection = page.locator("tr, [data-testid]").filter({ hasText: "Siti Rahimah" }).first();
+    await expect(pendingSection.locator("button").filter({ hasText: /approve/i })).toBeVisible({ timeout: 3000 });
+  });
+});
+
+// ─── Attendance Log ───────────────────────────────────────────────────────────
+
+const MOCK_ATTENDANCE = [
+  {
+    id: "att-001", company_id: MOCK_PROFILE.company_id, employee_id: "emp-001",
+    date: "2024-06-10", status: "present", clock_in: "09:00", clock_out: "18:00",
+    hours_worked: 9, notes: null,
+    created_at: "2024-06-10T09:00:00Z", updated_at: "2024-06-10T18:00:00Z",
+    profiles: { name: "Ahmad Ibrahim" },
+  },
+  {
+    id: "att-002", company_id: MOCK_PROFILE.company_id, employee_id: "emp-002",
+    date: "2024-06-10", status: "absent", clock_in: null, clock_out: null,
+    hours_worked: null, notes: "Medical",
+    created_at: "2024-06-10T00:00:00Z", updated_at: "2024-06-10T00:00:00Z",
+    profiles: { name: "Siti Rahimah" },
+  },
+];
+
+async function setupAttendanceMocks(page: import("@playwright/test").Page) {
+  await setupHrmsMocks(page);
+
+  await page.route(`${SUPABASE_URL}/rest/v1/attendance_records*`, route => {
+    if (route.request().method() === "GET") {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_ATTENDANCE) });
+    } else { route.continue(); }
+  });
+}
+
+test.describe("HRMS – Attendance Log", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAttendanceMocks(page);
+  });
+
+  test("renders Attendance Log page without crashing", async ({ page }) => {
+    await page.goto("/hrms/attendance");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=/attendance.?log/i").first()).toBeVisible({ timeout: 8000 });
+    expect(page.url()).not.toMatch(/\/login/);
+  });
+
+  test("shows attendance records from mock data", async ({ page }) => {
+    await page.goto("/hrms/attendance");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=Ahmad Ibrahim")).toBeVisible({ timeout: 8000 });
+    await expect(page.locator("text=Siti Rahimah")).toBeVisible({ timeout: 8000 });
+  });
+
+  test("shows attendance status counts in summary", async ({ page }) => {
+    await page.goto("/hrms/attendance");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=/present/i").first()).toBeVisible({ timeout: 8000 });
+    await expect(page.locator("text=/absent/i").first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test("Log Attendance button opens form for managers", async ({ page }) => {
+    await page.goto("/hrms/attendance");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await page.locator("button").filter({ hasText: /log.?attendance|add.?attendance/i }).first().click();
+    await expect(page.locator("[role='dialog']")).toBeVisible({ timeout: 5000 });
+  });
+});
+
+// ─── Payroll Summary ──────────────────────────────────────────────────────────
+
+const MOCK_PAYROLL_RUNS = [
+  {
+    id: "pr-001", company_id: MOCK_PROFILE.company_id,
+    period_year: 2024, period_month: 6, status: "draft",
+    total_headcount: 3, total_gross: 30000, total_net: 27000,
+    created_by: MOCK_PROFILE.id,
+    created_at: "2024-06-01T00:00:00Z", updated_at: "2024-06-01T00:00:00Z",
+  },
+];
+
+async function setupPayrollMocks(page: import("@playwright/test").Page) {
+  await setupHrmsMocks(page);
+
+  await page.route(`${SUPABASE_URL}/rest/v1/payroll_runs*`, route => {
+    if (route.request().method() === "GET") {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_PAYROLL_RUNS) });
+    } else { route.continue(); }
+  });
+
+  await page.route(`${SUPABASE_URL}/rest/v1/payroll_items*`, route => {
+    if (route.request().method() === "GET") {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
+    } else { route.continue(); }
+  });
+}
+
+test.describe("HRMS – Payroll Summary", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupPayrollMocks(page);
+  });
+
+  test("renders Payroll Summary page without crashing", async ({ page }) => {
+    await page.goto("/hrms/payroll");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=/payroll.?summary/i").first()).toBeVisible({ timeout: 8000 });
+    expect(page.url()).not.toMatch(/\/login/);
+  });
+
+  test("shows payroll run from mock data", async ({ page }) => {
+    await page.goto("/hrms/payroll");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    // Run period should be visible (June 2024)
+    await expect(page.locator("text=/jun|june/i").first()).toBeVisible({ timeout: 8000 });
+    // Draft badge
+    await expect(page.locator("text=/draft/i").first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test("New Payroll Run button is visible for admin users", async ({ page }) => {
+    await page.goto("/hrms/payroll");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("button").filter({ hasText: /new payroll run/i })).toBeVisible({ timeout: 8000 });
+  });
+});
+
+// ─── Performance Appraisals ───────────────────────────────────────────────────
+
+const MOCK_APPRAISALS = [
+  {
+    id: "ap-001", company_id: MOCK_PROFILE.company_id, employee_id: "emp-001",
+    reviewer_id: MOCK_PROFILE.id, cycle_id: null,
+    period_label: "H1 2024", status: "draft",
+    overall_score: null, comments: null,
+    created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z",
+    profiles: { name: "Ahmad Ibrahim" },
+  },
+];
+
+async function setupAppraisalMocks(page: import("@playwright/test").Page) {
+  await setupHrmsMocks(page);
+
+  await page.route(`${SUPABASE_URL}/rest/v1/appraisals*`, route => {
+    if (route.request().method() === "GET") {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_APPRAISALS) });
+    } else { route.continue(); }
+  });
+
+  await page.route(`${SUPABASE_URL}/rest/v1/appraisal_items*`, route => {
+    if (route.request().method() === "GET") {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
+    } else { route.continue(); }
+  });
+
+  await page.route(`${SUPABASE_URL}/rest/v1/appraisal_cycles*`, route => {
+    if (route.request().method() === "GET") {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
+    } else { route.continue(); }
+  });
+}
+
+test.describe("HRMS – Performance Appraisals", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAppraisalMocks(page);
+  });
+
+  test("renders Performance Appraisals page without crashing", async ({ page }) => {
+    await page.goto("/hrms/appraisals");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=/appraisal/i").first()).toBeVisible({ timeout: 8000 });
+    expect(page.url()).not.toMatch(/\/login/);
+  });
+
+  test("shows appraisal entry from mock data", async ({ page }) => {
+    await page.goto("/hrms/appraisals");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=Ahmad Ibrahim")).toBeVisible({ timeout: 8000 });
+    await expect(page.locator("text=H1 2024")).toBeVisible({ timeout: 8000 });
+  });
+});
+
+// ─── Announcements ────────────────────────────────────────────────────────────
+
+const MOCK_ANNOUNCEMENTS = [
+  {
+    id: "ann-001", company_id: MOCK_PROFILE.company_id,
+    author_id: MOCK_PROFILE.id,
+    title: "System Maintenance Notice", body: "There will be scheduled downtime on Sunday.",
+    category: "general", priority: "normal", pinned: false,
+    published_at: "2024-06-01T08:00:00Z", expires_at: null,
+    created_at: "2024-06-01T00:00:00Z", updated_at: "2024-06-01T00:00:00Z",
+    profiles: { name: "Super Admin" },
+  },
+  {
+    id: "ann-002", company_id: MOCK_PROFILE.company_id,
+    author_id: MOCK_PROFILE.id,
+    title: "Public Holiday Reminder", body: "Office closed on Hari Raya.",
+    category: "hr", priority: "high", pinned: true,
+    published_at: "2024-06-05T08:00:00Z", expires_at: null,
+    created_at: "2024-06-05T00:00:00Z", updated_at: "2024-06-05T00:00:00Z",
+    profiles: { name: "Super Admin" },
+  },
+];
+
+async function setupAnnouncementMocks(page: import("@playwright/test").Page) {
+  await setupHrmsMocks(page);
+
+  await page.route(`${SUPABASE_URL}/rest/v1/announcements*`, route => {
+    if (route.request().method() === "GET") {
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(MOCK_ANNOUNCEMENTS) });
+    } else { route.continue(); }
+  });
+}
+
+test.describe("HRMS – Announcements", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupAnnouncementMocks(page);
+  });
+
+  test("renders Announcements page without crashing", async ({ page }) => {
+    await page.goto("/hrms/announcements");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=/announcement/i").first()).toBeVisible({ timeout: 8000 });
+    expect(page.url()).not.toMatch(/\/login/);
+  });
+
+  test("shows announcement titles from mock data", async ({ page }) => {
+    await page.goto("/hrms/announcements");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=System Maintenance Notice")).toBeVisible({ timeout: 8000 });
+    await expect(page.locator("text=Public Holiday Reminder")).toBeVisible({ timeout: 8000 });
+  });
+
+  test("pinned announcement is visually distinguished", async ({ page }) => {
+    await page.goto("/hrms/announcements");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    // "Public Holiday Reminder" is pinned — expect a pin indicator
+    await expect(page.locator("text=Public Holiday Reminder")).toBeVisible({ timeout: 8000 });
+    await expect(page.locator("[data-pinned='true'], .pinned, [aria-label*='pinned']").first()
+      .or(page.locator("text=/pinned/i").first())).toBeVisible({ timeout: 3000 });
+  });
+
+  test("category filter shows only HR announcements", async ({ page }) => {
+    await page.goto("/hrms/announcements");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("text=System Maintenance Notice")).toBeVisible({ timeout: 8000 });
+
+    // Click HR category filter
+    await page.locator("button, [role='tab']").filter({ hasText: /^hr$/i }).first().click();
+
+    await expect(page.locator("text=Public Holiday Reminder")).toBeVisible({ timeout: 3000 });
+    await expect(page.locator("text=System Maintenance Notice")).not.toBeVisible({ timeout: 3000 });
+  });
+
+  test("Post Announcement button is visible for admin users", async ({ page }) => {
+    await page.goto("/hrms/announcements");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await expect(page.locator("button").filter({ hasText: /post.?announcement|new.?announcement/i })).toBeVisible({ timeout: 8000 });
+  });
+
+  test("Post Announcement dialog opens and shows form fields", async ({ page }) => {
+    await page.goto("/hrms/announcements");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    await page.locator("button").filter({ hasText: /post.?announcement|new.?announcement/i }).first().click();
+    await expect(page.locator("[role='dialog']")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("input[placeholder*='Title']").or(page.locator("label").filter({ hasText: /title/i }))).toBeVisible({ timeout: 3000 });
+  });
+});

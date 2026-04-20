@@ -17,8 +17,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { listAnnouncements, createAnnouncement, deleteAnnouncement } from '@/services/hrmsService';
 import type { Announcement, CreateAnnouncementInput, AnnouncementCategory, AnnouncementPriority } from '@/types';
 import { Pin, Plus, Trash2, Megaphone } from 'lucide-react';
+import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
 
-const MANAGER_ROLES = ['super_admin', 'company_admin', 'general_manager', 'manager'] as const;
+const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 
 const PRIORITY_COLORS: Record<AnnouncementPriority, string> = {
   low:    'bg-gray-100 text-gray-500 border-gray-200',
@@ -85,7 +86,7 @@ export default function Announcements() {
   }
 
   async function handleDelete(id: string) {
-    const { error } = await deleteAnnouncement(id);
+    const { error } = await deleteAnnouncement(id, user?.id);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: 'Announcement deleted' });
     setDeleting(null);

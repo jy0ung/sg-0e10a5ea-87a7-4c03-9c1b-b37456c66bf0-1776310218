@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Search, Plus, Users, UserCheck, UserMinus, Pencil } from 'lucide-react';
-import { AppRole, Employee, EmployeeStatus } from '@/types';
+import { AppRole, Employee, EmployeeStatus, Department, JobTitle } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import type { BranchRecord } from '@/types';
+import { listDepartments, listJobTitles } from '@/services/hrmsAdminService';
 import {
   listEmployees,
   createEmployee,
@@ -18,6 +19,8 @@ import {
   type CreateEmployeeInput,
   type UpdateEmployeeInput,
 } from '@/services/hrmsService';
+import { HRMS_MANAGER_ROLES, PII_VIEW_ROLES } from '@/config/hrmsConfig';
+import { createEmployeeSchema } from '@/lib/validations';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -54,8 +57,8 @@ const STATUS_BADGE: Record<EmployeeStatus, string> = {
   resigned: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 };
 
-// Roles that can manage employees (add/edit/deactivate)
-const MANAGER_ROLES: AppRole[] = ['super_admin', 'company_admin', 'general_manager'];
+// Roles that can manage employees (add/edit/deactivate) — sourced from hrmsConfig
+const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 
 // ─── Form state ───────────────────────────────────────────────────────────────
 
@@ -75,6 +78,8 @@ type EditForm = {
   joinDate: string;
   resignDate: string;
   status: EmployeeStatus;
+  departmentId: string;
+  jobTitleId: string;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -83,9 +88,11 @@ export default function EmployeeDirectory() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [branches, setBranches]   = useState<BranchRecord[]>([]);
+  const [employees, setEmployees]   = useState<Employee[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [branches, setBranches]     = useState<BranchRecord[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [jobTitles, setJobTitles]   = useState<JobTitle[]>([]);
 
   // Filters
   const [search, setSearch]           = useState('');
@@ -104,18 +111,36 @@ export default function EmployeeDirectory() {
   const [editSaving, setEditSaving] = useState(false);
 
   const canManage = user && MANAGER_ROLES.includes(user.role);
+  const canViewPii = user && PII_VIEW_ROLES.includes(user.role);
+
+  /** Mask IC: show only last 4 digits — e.g. "900101-12-1234" → "••••••-••-1234" */
+  function maskIc(ic: string | undefined): string {
+    if (!ic) return '—';
+    return ic.replace(/^(\d{6}-\d{2}-)(\d{4})$/, '••••••-••-$2');
+  }
+
+  /** Mask contact: show only last 4 digits — e.g. "012-3456789" → "•••-•••6789" */
+  function maskContact(contact: string | undefined): string {
+    if (!contact) return '—';
+    if (contact.length <= 4) return '••••';
+    return contact.slice(0, -4).replace(/[0-9]/g, '•') + contact.slice(-4);
+  }
 
   // ── Load ──
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const [empResult, branchResult] = await Promise.all([
+    const [empResult, branchResult, deptResult, jtResult] = await Promise.all([
       listEmployees(user.companyId),
       getBranches(user.companyId),
+      listDepartments(user.companyId),
+      listJobTitles(user.companyId),
     ]);
     if (empResult.error) toast({ title: 'Failed to load employees', description: empResult.error, variant: 'destructive' });
     else setEmployees(empResult.data);
     if (!branchResult.error) setBranches(branchResult.data);
+    if (!deptResult.error) setDepartments(deptResult.data);
+    if (!jtResult.error) setJobTitles(jtResult.data);
     setLoading(false);
   }, [user, toast]);
 
@@ -136,8 +161,9 @@ export default function EmployeeDirectory() {
 
   // ── Create ──
   const handleCreate = async () => {
-    if (!form.staffCode || !form.name) {
-      return toast({ title: 'Staff Code and Name are required', variant: 'destructive' });
+    const result = createEmployeeSchema.safeParse(form);
+    if (!result.success) {
+      return toast({ title: 'Validation error', description: result.error.errors[0].message, variant: 'destructive' });
     }
     if (!user) return;
     setSaving(true);
@@ -153,7 +179,7 @@ export default function EmployeeDirectory() {
       contactNo: form.contact || undefined,
       joinDate:  form.joinDate || undefined,
     };
-    const { error } = await createEmployee(input);
+    const { error } = await createEmployee(input, user.id);
     setSaving(false);
     if (error) {
       toast({ title: 'Failed to create employee', description: error, variant: 'destructive' });
@@ -169,16 +195,18 @@ export default function EmployeeDirectory() {
   const openEdit = (emp: Employee) => {
     setEditTarget(emp);
     setEditForm({
-      name:       emp.name,
-      role:       emp.role,
-      branch:     emp.branchId ?? '',
-      staffCode:  emp.staffCode ?? '',
-      ic:         emp.icNo ?? '',
-      contact:    emp.contactNo ?? '',
-      email:      emp.email,
-      joinDate:   emp.joinDate ?? '',
-      resignDate: emp.resignDate ?? '',
-      status:     emp.status,
+      name:         emp.name,
+      role:         emp.role,
+      branch:       emp.branchId ?? '',
+      staffCode:    emp.staffCode ?? '',
+      ic:           emp.icNo ?? '',
+      contact:      emp.contactNo ?? '',
+      email:        emp.email,
+      joinDate:     emp.joinDate ?? '',
+      resignDate:   emp.resignDate ?? '',
+      status:       emp.status,
+      departmentId: emp.departmentId ?? '',
+      jobTitleId:   emp.jobTitleId ?? '',
     });
   };
 
@@ -187,17 +215,19 @@ export default function EmployeeDirectory() {
     if (!editTarget || !editForm) return;
     setEditSaving(true);
     const input: UpdateEmployeeInput = {
-      name:       editForm.name,
-      role:       editForm.role,
-      branchId:   editForm.branch || null,
-      staffCode:  editForm.staffCode,
-      icNo:       editForm.ic,
-      contactNo:  editForm.contact,
-      joinDate:   editForm.joinDate || undefined,
-      resignDate: editForm.resignDate || null,
-      status:     editForm.status,
+      name:         editForm.name,
+      role:         editForm.role,
+      branchId:     editForm.branch || null,
+      staffCode:    editForm.staffCode,
+      icNo:         editForm.ic,
+      contactNo:    editForm.contact,
+      joinDate:     editForm.joinDate || undefined,
+      resignDate:   editForm.resignDate || null,
+      status:       editForm.status,
+      departmentId: editForm.departmentId || null,
+      jobTitleId:   editForm.jobTitleId || null,
     };
-    const { error } = await updateEmployee(editTarget.id, input);
+    const { error } = await updateEmployee(editTarget.id, input, user?.id);
     setEditSaving(false);
     if (error) {
       toast({ title: 'Failed to update employee', description: error, variant: 'destructive' });
@@ -214,7 +244,7 @@ export default function EmployeeDirectory() {
     const next: EmployeeStatus = emp.status === 'active' ? 'inactive' : 'active';
     // Optimistic update
     setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, status: next } : e));
-    const { error } = await updateEmployee(emp.id, { status: next });
+    const { error } = await updateEmployee(emp.id, { status: next }, user?.id);
     if (error) {
       setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, status: emp.status } : e));
       toast({ title: 'Failed to update status', description: error, variant: 'destructive' });
@@ -333,6 +363,8 @@ export default function EmployeeDirectory() {
                 <th className="pb-2 pr-4 font-medium">IC</th>
                 <th className="pb-2 pr-4 font-medium">Contact</th>
                 <th className="pb-2 pr-4 font-medium">Email</th>
+                <th className="pb-2 pr-4 font-medium">Department</th>
+                <th className="pb-2 pr-4 font-medium">Job Title</th>
                 <th className="pb-2 pr-4 font-medium">Branch</th>
                 <th className="pb-2 pr-4 font-medium">Join Date</th>
                 <th className="pb-2 pr-4 font-medium">Status</th>
@@ -342,7 +374,7 @@ export default function EmployeeDirectory() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 10 : 9} className="py-8 text-center text-muted-foreground text-sm">
+                  <td colSpan={canManage ? 12 : 11} className="py-8 text-center text-muted-foreground text-sm">
                     No employees found
                   </td>
                 </tr>
@@ -358,9 +390,11 @@ export default function EmployeeDirectory() {
                           {ROLE_LABEL[emp.role]}
                         </Badge>
                       </td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.icNo ?? '—'}</td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.contactNo ?? '—'}</td>
+                      <td className="py-2 pr-4 text-xs text-muted-foreground">{canViewPii ? (emp.icNo ?? '—') : maskIc(emp.icNo)}</td>
+                      <td className="py-2 pr-4 text-xs text-muted-foreground">{canViewPii ? (emp.contactNo ?? '—') : maskContact(emp.contactNo)}</td>
                       <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.email}</td>
+                      <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.departmentName ?? '—'}</td>
+                      <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.jobTitleName ?? '—'}</td>
                       <td className="py-2 pr-4 text-xs">{branchCode}</td>
                       <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.joinDate ?? '—'}</td>
                       <td className="py-2 pr-4">
@@ -539,6 +573,41 @@ export default function EmployeeDirectory() {
                   value={editForm.name}
                   onChange={e => setEditForm(f => f ? { ...f, name: e.target.value } : f)}
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Department</label>
+                  <Select
+                    value={editForm.departmentId}
+                    onValueChange={v => setEditForm(f => f ? { ...f, departmentId: v, jobTitleId: '' } : f)}
+                  >
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {departments.filter(d => d.isActive).map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Job Title</label>
+                  <Select
+                    value={editForm.jobTitleId}
+                    onValueChange={v => setEditForm(f => f ? { ...f, jobTitleId: v } : f)}
+                  >
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {jobTitles
+                        .filter(jt => jt.isActive && (!editForm.departmentId || jt.departmentId === editForm.departmentId || !jt.departmentId))
+                        .map(jt => (
+                          <SelectItem key={jt.id} value={jt.id}>{jt.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

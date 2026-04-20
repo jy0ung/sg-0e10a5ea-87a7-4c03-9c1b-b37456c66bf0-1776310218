@@ -22,8 +22,9 @@ import {
 } from '@/services/hrmsService';
 import type { PayrollRun, PayrollItem, PayrollRunStatus } from '@/types';
 import { Plus, Eye, CheckCircle2, CreditCard } from 'lucide-react';
+import { HRMS_PAYROLL_ROLES } from '@/config/hrmsConfig';
 
-const MANAGER_ROLES = ['super_admin', 'company_admin', 'general_manager'] as const;
+const MANAGER_ROLES = HRMS_PAYROLL_ROLES;
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const STATUS_COLORS: Record<PayrollRunStatus, string> = {
@@ -71,7 +72,7 @@ export default function PayrollSummary() {
   }
 
   async function handleStatusChange(runId: string, status: PayrollRunStatus) {
-    const { error } = await updatePayrollRunStatus(runId, status);
+    const { error } = await updatePayrollRunStatus(runId, status, user?.id);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: `Status updated to ${status}` });
     load();

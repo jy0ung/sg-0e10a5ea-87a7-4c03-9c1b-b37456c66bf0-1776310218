@@ -19,8 +19,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { listAttendanceRecords, upsertAttendance, listEmployees } from '@/services/hrmsService';
 import type { AttendanceRecord, UpsertAttendanceInput, AttendanceStatus, Employee } from '@/types';
 import { Plus, Download } from 'lucide-react';
+import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
+import { upsertAttendanceSchema } from '@/lib/validations';
 
-const MANAGER_ROLES = ['super_admin', 'company_admin', 'general_manager', 'manager'] as const;
+const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 
 const STATUS_COLORS: Record<AttendanceStatus, string> = {
   present:        'bg-green-100 text-green-700 border-green-200',
@@ -74,7 +76,12 @@ export default function AttendanceLog() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!user?.companyId || !form.employeeId || !form.date || !form.status) return;
+    if (!user?.companyId) return;
+    const result = upsertAttendanceSchema.safeParse(form);
+    if (!result.success) {
+      toast({ title: 'Validation error', description: result.error.errors[0].message, variant: 'destructive' });
+      return;
+    }
     const { error } = await upsertAttendance(user.companyId, form as UpsertAttendanceInput);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: 'Attendance saved' });

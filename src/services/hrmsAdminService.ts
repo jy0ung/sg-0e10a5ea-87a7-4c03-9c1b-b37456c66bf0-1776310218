@@ -1,0 +1,342 @@
+import { supabase } from '@/integrations/supabase/client';
+import { logUserAction } from '@/services/auditService';
+import type {
+  Department, CreateDepartmentInput, UpdateDepartmentInput,
+  JobTitle, CreateJobTitleInput, UpdateJobTitleInput,
+  LeaveType, CreateLeaveTypeInput, UpdateLeaveTypeInput,
+  PublicHoliday, CreateHolidayInput, UpdateHolidayInput,
+} from '@/types';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEPARTMENTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function rowToDepartment(r: Record<string, unknown>): Department {
+  return {
+    id:               String(r.id ?? ''),
+    companyId:        String(r.company_id ?? ''),
+    name:             String(r.name ?? ''),
+    description:      r.description ? String(r.description) : undefined,
+    headEmployeeId:   r.head_employee_id ? String(r.head_employee_id) : undefined,
+    headEmployeeName: r.head_employee ? String((r.head_employee as Record<string, unknown>)?.name ?? '') : undefined,
+    costCentre:       r.cost_centre ? String(r.cost_centre) : undefined,
+    isActive:         Boolean(r.is_active),
+    createdAt:        String(r.created_at ?? ''),
+    updatedAt:        String(r.updated_at ?? ''),
+  };
+}
+
+export async function listDepartments(companyId: string): Promise<{ data: Department[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('departments')
+    .select('*, head_employee:profiles!departments_head_employee_id_fkey(name)')
+    .eq('company_id', companyId)
+    .order('name');
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []).map(r => rowToDepartment(r as Record<string, unknown>)), error: null };
+}
+
+export async function createDepartment(
+  companyId: string,
+  actorId: string,
+  input: CreateDepartmentInput,
+): Promise<{ data: Department | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('departments')
+    .insert({
+      company_id:       companyId,
+      name:             input.name,
+      description:      input.description ?? null,
+      head_employee_id: input.headEmployeeId ?? null,
+      cost_centre:      input.costCentre ?? null,
+      is_active:        input.isActive,
+    })
+    .select('*, head_employee:profiles!departments_head_employee_id_fkey(name)')
+    .single();
+  if (error) return { data: null, error: error.message };
+  void logUserAction(actorId, 'create', 'department', String(data.id), { name: input.name });
+  return { data: rowToDepartment(data as Record<string, unknown>), error: null };
+}
+
+export async function updateDepartment(
+  id: string,
+  actorId: string,
+  input: UpdateDepartmentInput,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('departments')
+    .update({
+      name:             input.name,
+      description:      input.description ?? null,
+      head_employee_id: input.headEmployeeId ?? null,
+      cost_centre:      input.costCentre ?? null,
+      is_active:        input.isActive,
+      updated_at:       new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (!error) void logUserAction(actorId, 'update', 'department', id, { name: input.name });
+  return { error: error?.message ?? null };
+}
+
+export async function deleteDepartment(id: string, actorId: string): Promise<{ error: string | null }> {
+  // Check if any employees are assigned to this department
+  const { count } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('department_id', id);
+  if ((count ?? 0) > 0) {
+    return { error: `Cannot delete: ${count} employee(s) are assigned to this department. Reassign them first.` };
+  }
+  const { error } = await supabase.from('departments').delete().eq('id', id);
+  if (!error) void logUserAction(actorId, 'delete', 'department', id, {});
+  return { error: error?.message ?? null };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JOB TITLES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function rowToJobTitle(r: Record<string, unknown>): JobTitle {
+  return {
+    id:             String(r.id ?? ''),
+    companyId:      String(r.company_id ?? ''),
+    name:           String(r.name ?? ''),
+    departmentId:   r.department_id ? String(r.department_id) : undefined,
+    departmentName: r.department ? String((r.department as Record<string, unknown>)?.name ?? '') : undefined,
+    level:          r.level ? (r.level as JobTitle['level']) : undefined,
+    description:    r.description ? String(r.description) : undefined,
+    isActive:       Boolean(r.is_active),
+    createdAt:      String(r.created_at ?? ''),
+    updatedAt:      String(r.updated_at ?? ''),
+  };
+}
+
+export async function listJobTitles(companyId: string): Promise<{ data: JobTitle[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('job_titles')
+    .select('*, department:departments(name)')
+    .eq('company_id', companyId)
+    .order('name');
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []).map(r => rowToJobTitle(r as Record<string, unknown>)), error: null };
+}
+
+export async function createJobTitle(
+  companyId: string,
+  actorId: string,
+  input: CreateJobTitleInput,
+): Promise<{ data: JobTitle | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('job_titles')
+    .insert({
+      company_id:    companyId,
+      name:          input.name,
+      department_id: input.departmentId ?? null,
+      level:         input.level || null,
+      description:   input.description ?? null,
+      is_active:     input.isActive,
+    })
+    .select('*, department:departments(name)')
+    .single();
+  if (error) return { data: null, error: error.message };
+  void logUserAction(actorId, 'create', 'job_title', String(data.id), { name: input.name });
+  return { data: rowToJobTitle(data as Record<string, unknown>), error: null };
+}
+
+export async function updateJobTitle(
+  id: string,
+  actorId: string,
+  input: UpdateJobTitleInput,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('job_titles')
+    .update({
+      name:          input.name,
+      department_id: input.departmentId ?? null,
+      level:         input.level || null,
+      description:   input.description ?? null,
+      is_active:     input.isActive,
+      updated_at:    new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (!error) void logUserAction(actorId, 'update', 'job_title', id, { name: input.name });
+  return { error: error?.message ?? null };
+}
+
+export async function deleteJobTitle(id: string, actorId: string): Promise<{ error: string | null }> {
+  // Check if any employees have this job title
+  const { count } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('job_title_id', id);
+  if ((count ?? 0) > 0) {
+    return { error: `Cannot delete: ${count} employee(s) have this job title. Reassign them first.` };
+  }
+  const { error } = await supabase.from('job_titles').delete().eq('id', id);
+  if (!error) void logUserAction(actorId, 'delete', 'job_title', id, {});
+  return { error: error?.message ?? null };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LEAVE TYPES (admin CRUD — listLeaveTypes is in hrmsService.ts)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function rowToLeaveType(r: Record<string, unknown>): LeaveType {
+  return {
+    id:          String(r.id ?? ''),
+    companyId:   String(r.company_id ?? ''),
+    name:        String(r.name ?? ''),
+    code:        String(r.code ?? ''),
+    daysPerYear: Number(r.days_per_year),
+    isPaid:      Boolean(r.is_paid),
+    active:      Boolean(r.active),
+    createdAt:   String(r.created_at ?? ''),
+    updatedAt:   String(r.updated_at ?? ''),
+  };
+}
+
+/** List ALL leave types (including inactive) for admin use. */
+export async function listAllLeaveTypes(companyId: string): Promise<{ data: LeaveType[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('leave_types')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('name');
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []).map(r => rowToLeaveType(r as Record<string, unknown>)), error: null };
+}
+
+export async function createLeaveType(
+  companyId: string,
+  actorId: string,
+  input: CreateLeaveTypeInput,
+): Promise<{ data: LeaveType | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('leave_types')
+    .insert({
+      company_id:    companyId,
+      name:          input.name,
+      code:          input.code.toUpperCase(),
+      days_per_year: input.daysPerYear,
+      is_paid:       input.isPaid,
+      active:        input.active,
+    })
+    .select('*')
+    .single();
+  if (error) return { data: null, error: error.message };
+  void logUserAction(actorId, 'create', 'leave_type', String(data.id), { name: input.name, code: input.code });
+  return { data: rowToLeaveType(data as Record<string, unknown>), error: null };
+}
+
+export async function updateLeaveType(
+  id: string,
+  actorId: string,
+  input: UpdateLeaveTypeInput,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('leave_types')
+    .update({
+      name:          input.name,
+      code:          input.code.toUpperCase(),
+      days_per_year: input.daysPerYear,
+      is_paid:       input.isPaid,
+      active:        input.active,
+      updated_at:    new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (!error) void logUserAction(actorId, 'update', 'leave_type', id, { name: input.name });
+  return { error: error?.message ?? null };
+}
+
+/** Soft delete: deactivates the leave type. Hard delete only if no balances reference it. */
+export async function deleteLeaveType(id: string, actorId: string): Promise<{ error: string | null }> {
+  const { count } = await supabase
+    .from('leave_balances')
+    .select('id', { count: 'exact', head: true })
+    .eq('leave_type_id', id);
+  if ((count ?? 0) > 0) {
+    // Soft delete: just deactivate
+    const { error } = await supabase
+      .from('leave_types')
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (!error) void logUserAction(actorId, 'update', 'leave_type', id, { action: 'deactivated' });
+    return { error: error ? `Could not deactivate: ${error.message}` : null };
+  }
+  const { error } = await supabase.from('leave_types').delete().eq('id', id);
+  if (!error) void logUserAction(actorId, 'delete', 'leave_type', id, {});
+  return { error: error?.message ?? null };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PUBLIC / COMPANY HOLIDAYS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function rowToHoliday(r: Record<string, unknown>): PublicHoliday {
+  return {
+    id:          String(r.id ?? ''),
+    companyId:   String(r.company_id ?? ''),
+    name:        String(r.name ?? ''),
+    date:        String(r.date ?? ''),
+    holidayType: (r.holiday_type as PublicHoliday['holidayType']) ?? 'public',
+    isRecurring: Boolean(r.is_recurring),
+    createdAt:   String(r.created_at ?? ''),
+    updatedAt:   String(r.updated_at ?? ''),
+  };
+}
+
+export async function listHolidays(companyId: string): Promise<{ data: PublicHoliday[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('public_holidays')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('date');
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []).map(r => rowToHoliday(r as Record<string, unknown>)), error: null };
+}
+
+export async function createHoliday(
+  companyId: string,
+  actorId: string,
+  input: CreateHolidayInput,
+): Promise<{ data: PublicHoliday | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('public_holidays')
+    .insert({
+      company_id:   companyId,
+      name:         input.name,
+      date:         input.date,
+      holiday_type: input.holidayType,
+      is_recurring: input.isRecurring,
+    })
+    .select('*')
+    .single();
+  if (error) return { data: null, error: error.message };
+  void logUserAction(actorId, 'create', 'holiday', String(data.id), { name: input.name, date: input.date });
+  return { data: rowToHoliday(data as Record<string, unknown>), error: null };
+}
+
+export async function updateHoliday(
+  id: string,
+  actorId: string,
+  input: UpdateHolidayInput,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('public_holidays')
+    .update({
+      name:         input.name,
+      date:         input.date,
+      holiday_type: input.holidayType,
+      is_recurring: input.isRecurring,
+      updated_at:   new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (!error) void logUserAction(actorId, 'update', 'holiday', id, { name: input.name });
+  return { error: error?.message ?? null };
+}
+
+export async function deleteHoliday(id: string, actorId: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('public_holidays').delete().eq('id', id);
+  if (!error) void logUserAction(actorId, 'delete', 'holiday', id, {});
+  return { error: error?.message ?? null };
+}

@@ -19,8 +19,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { listAppraisals, createAppraisal, listAppraisalItems } from '@/services/hrmsService';
 import type { Appraisal, AppraisalItem, AppraisalCycle, AppraisalStatus } from '@/types';
 import { Plus, Eye, Star } from 'lucide-react';
+import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
 
-const MANAGER_ROLES = ['super_admin', 'company_admin', 'general_manager', 'manager'] as const;
+const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 
 const STATUS_COLORS: Record<AppraisalStatus, string> = {
   open:        'bg-blue-100 text-blue-700 border-blue-200',

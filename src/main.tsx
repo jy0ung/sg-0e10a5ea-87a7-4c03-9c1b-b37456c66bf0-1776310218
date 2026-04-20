@@ -74,7 +74,10 @@ const LeaveCalendar = lazy(() => import("./pages/hrms/LeaveCalendar"));
 const AttendanceLog = lazy(() => import("./pages/hrms/AttendanceLog"));
 const PayrollSummary = lazy(() => import("./pages/hrms/PayrollSummary"));
 const PerformanceAppraisals = lazy(() => import("./pages/hrms/PerformanceAppraisals"));
-const HrmsAnnouncements = lazy(() => import("./pages/hrms/Announcements"));const RolePermissionsPage = lazy(() => import('./pages/admin/RolePermissions'));
+const HrmsAnnouncements = lazy(() => import("./pages/hrms/Announcements"));
+const HrmsAdmin = lazy(() => import('./pages/hrms/HrmsAdmin'));
+const ApprovalFlows = lazy(() => import('./pages/hrms/ApprovalFlows'));
+const RolePermissionsPage = lazy(() => import('./pages/admin/RolePermissions'));
 // Lightweight spinner shown while a lazy page chunk loads
 const PageSpinner = () => (
   <div className="flex items-center justify-center h-64">
@@ -160,12 +163,14 @@ const router = createBrowserRouter([
       { path: "admin/user-groups", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserGroups /></S></RequireRole> },      { path: 'admin/role-permissions', element: <RequireRole roles={['super_admin', 'company_admin']}><S><RolePermissionsPage /></S></RequireRole> },      { path: "reports", element: <S><ReportsCenter /></S> },
       { path: "inventory/chassis-filter", element: <S><ChassisFilter /></S> },
       { path: "hrms/employees", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><EmployeeDirectory /></S></RequireRole> },
-      { path: "hrms/leave", element: <S><LeaveManagement /></S> },
-      { path: "hrms/leave-calendar", element: <S><LeaveCalendar /></S> },
+      { path: "hrms/leave", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'accounts']}><S><LeaveManagement /></S></RequireRole> },
+      { path: "hrms/leave-calendar", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><LeaveCalendar /></S></RequireRole> },
       { path: "hrms/attendance", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><AttendanceLog /></S></RequireRole> },
       { path: "hrms/payroll", element: <RequireRole roles={['super_admin', 'company_admin', 'general_manager']}><S><PayrollSummary /></S></RequireRole> },
       { path: "hrms/appraisals", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><PerformanceAppraisals /></S></RequireRole> },
       { path: "hrms/announcements", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><HrmsAnnouncements /></S></RequireRole> },
+      { path: "hrms/admin", element: <RequireRole roles={['super_admin', 'company_admin', 'general_manager', 'manager']}><S><HrmsAdmin /></S></RequireRole> },
+      { path: "hrms/approval-flows", element: <RequireRole roles={['super_admin', 'company_admin', 'general_manager', 'manager']}><S><ApprovalFlows /></S></RequireRole> },
     ],
   },
   {
