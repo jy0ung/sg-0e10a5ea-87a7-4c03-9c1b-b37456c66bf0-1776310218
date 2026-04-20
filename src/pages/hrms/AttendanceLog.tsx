@@ -59,19 +59,23 @@ export default function AttendanceLog() {
   const load = useCallback(async () => {
     if (!user?.companyId || (!isManager && !selfServiceEmployeeId)) return;
     setLoading(true);
-    const [attRes, empRes] = await Promise.all([
-      listAttendanceRecords(user.companyId, {
-        employeeId: !isManager ? selfServiceEmployeeId : (empFilter === 'all' ? undefined : empFilter),
-        dateFrom,
-        dateTo,
-      }),
-      isManager ? listEmployeeDirectory(user.companyId) : Promise.resolve({ data: [], error: null }),
-    ]);
+    const attRes = await listAttendanceRecords(user.companyId, {
+      employeeId: !isManager ? selfServiceEmployeeId : (empFilter === 'all' ? undefined : empFilter),
+      dateFrom,
+      dateTo,
+    });
     setRecords(attRes.data);
-    if (isManager) setEmployees(empRes.data);
     setLoading(false);
     if (attRes.error) toast({ title: 'Error', description: attRes.error, variant: 'destructive' });
   }, [user, isManager, selfServiceEmployeeId, empFilter, dateFrom, dateTo, toast]);
+
+  // Load employee list once on mount (employees rarely change; don't re-fetch on filter changes)
+  useEffect(() => {
+    if (!user?.companyId || !isManager) return;
+    listEmployees(user.companyId).then(res => {
+      if (!res.error) setEmployees(res.data);
+    });
+  }, [user?.companyId, isManager]);
 
   useEffect(() => { load(); }, [load]);
 

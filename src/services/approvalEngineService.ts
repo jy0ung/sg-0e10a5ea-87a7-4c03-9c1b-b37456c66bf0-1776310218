@@ -203,20 +203,26 @@ export async function submitApprovalDecision(
   void logUserAction(approverId, 'update', 'approval_request', approvalRequestId, { decision, step: request.current_step_order });
 
   if (decision === 'rejected') {
-    // Reject the whole flow + the underlying entity
+    // Reject the flow record itself
     const { error: e1 } = await supabase
       .from('approval_requests')
       .update({ status: 'rejected' })
       .eq('id', approvalRequestId);
-    const { error: e2 } = await supabase
-      .from(request.entity_type === 'leave_request' ? 'leave_requests' : 'approval_requests')
-      .update({
-        status:       'rejected',
-        reviewed_by:  approverId,
-        reviewed_at:  new Date().toISOString(),
-        reviewer_note: note ?? null,
-      })
-      .eq('id', String(request.entity_id));
+
+    // Update the underlying entity if it supports a status field
+    let e2: { message: string } | undefined;
+    if (request.entity_type === 'leave_request') {
+      const { error } = await supabase
+        .from('leave_requests')
+        .update({
+          status:        'rejected',
+          reviewed_by:   approverId,
+          reviewed_at:   new Date().toISOString(),
+          reviewer_note: note ?? null,
+        })
+        .eq('id', String(request.entity_id));
+      e2 = error ?? undefined;
+    }
     return { error: e1?.message ?? e2?.message ?? null };
   }
 
@@ -263,66 +269,97 @@ export async function submitApprovalDecision(
 /**
  * Fetch all pending approval requests where the given user is the current eligible approver.
  * Enriched with leave request context when entity_type = 'leave_request'.
+ *
+ * Optimised: uses 5 batch queries instead of N*3 sequential queries (N+1 elimination).
  */
 export async function getPendingApprovalsForUser(
   companyId: string,
   approverId: string,
 ): Promise<{ data: PendingApproval[]; error: string | null }> {
-  // Fetch the approver's role to enable role-based step matching
+  // 1. Fetch approver's role (one query)
   const { data: approverProfile } = await supabase
     .from('profiles')
-    .select('role, manager_id')
+    .select('role')
     .eq('id', approverId)
     .single();
-
   const approverRole = approverProfile?.role ?? null;
 
-  // Get all pending approval_requests for the company
+  // 2. Fetch all pending approval_requests for the company with requester data (one query)
   const { data: requests, error } = await supabase
     .from('approval_requests')
-    .select('*, requester:profiles!requester_id(name, manager_id)')
+    .select('*, requester:profiles!approval_requests_requester_id_fkey(name, manager_id)')
     .eq('company_id', companyId)
     .eq('status', 'pending');
 
   if (error) return { data: [], error: error.message };
+  if (!requests?.length) return { data: [], error: null };
 
-  // For each request, fetch the current step and check eligibility
-  const relevant: PendingApproval[] = [];
+  const allRequests = requests as Array<Record<string, unknown>>;
+  const uniqueFlowIds = [...new Set(allRequests.map(r => String(r.flow_id)))];
 
-  for (const req of (requests ?? [])) {
-    const { data: step } = await supabase
-      .from('approval_steps')
-      .select('id, name, approver_type, approver_role, approver_user_id, allow_self_approval')
-      .eq('flow_id', String(req.flow_id))
-      .eq('step_order', req.current_step_order)
-      .single();
+  // 3. Batch-fetch all steps for all relevant flows (one query)
+  const { data: allSteps } = await supabase
+    .from('approval_steps')
+    .select('id, flow_id, step_order, name, approver_type, approver_role, approver_user_id, allow_self_approval')
+    .in('flow_id', uniqueFlowIds);
 
+  // Build lookup: "flowId:stepOrder" → step
+  const stepKey = (flowId: unknown, stepOrder: unknown) => `${flowId}:${stepOrder}`;
+  const stepsByKey = new Map<string, Record<string, unknown>>();
+  for (const s of allSteps ?? []) {
+    stepsByKey.set(stepKey(s.flow_id, s.step_order), s as Record<string, unknown>);
+  }
+
+  // 4. Batch-fetch flow names (one query)
+  const { data: allFlows } = await supabase
+    .from('approval_flows')
+    .select('id, name')
+    .in('id', uniqueFlowIds);
+  const flowNameById = new Map((allFlows ?? []).map(f => [String(f.id), String(f.name)]));
+
+  // Determine eligibility in-memory (no extra DB calls)
+  const eligible: Array<{ req: Record<string, unknown>; step: Record<string, unknown> }> = [];
+  for (const req of allRequests) {
+    const step = stepsByKey.get(stepKey(req.flow_id, req.current_step_order));
     if (!step) continue;
 
-    // Check if approverId is eligible
-    let eligible = false;
     const requesterId = String(req.requester_id);
-    const selfApprovalOk = Boolean(step.allow_self_approval);
+    if (!step.allow_self_approval && approverId === requesterId) continue;
 
-    if (!selfApprovalOk && approverId === requesterId) continue;
-
+    let isEligible = false;
     if (step.approver_type === 'specific_user' && step.approver_user_id === approverId) {
-      eligible = true;
+      isEligible = true;
     } else if (step.approver_type === 'role' && approverRole === step.approver_role) {
-      eligible = true;
+      isEligible = true;
     } else if (step.approver_type === 'direct_manager') {
       const requesterRow = req.requester as Record<string, unknown> | null;
-      if (requesterRow?.manager_id === approverId) eligible = true;
+      if (requesterRow?.manager_id === approverId) isEligible = true;
     }
+    if (isEligible) eligible.push({ req, step });
+  }
 
-    if (!eligible) continue;
+  if (!eligible.length) return { data: [], error: null };
 
-    // Fetch flow name
-    const { data: flow } = await supabase
-      .from('approval_flows')
-      .select('name')
-      .eq('id', String(req.flow_id))
-      .single();
+  // 5. Batch-fetch leave request details for all eligible leave_requests (one query)
+  const leaveEntityIds = eligible
+    .filter(({ req }) => req.entity_type === 'leave_request')
+    .map(({ req }) => String(req.entity_id));
+
+  const leaveById = new Map<string, Record<string, unknown>>();
+  if (leaveEntityIds.length > 0) {
+    const { data: leaveRows } = await supabase
+      .from('leave_requests')
+      .select('id, start_date, end_date, days, reason, leave_types(name)')
+      .in('id', leaveEntityIds);
+    for (const lr of leaveRows ?? []) {
+      leaveById.set(String(lr.id), lr as Record<string, unknown>);
+    }
+  }
+
+  // Assemble results
+  const result: PendingApproval[] = eligible.map(({ req, step }) => {
+    const requesterId = String(req.requester_id);
+    const requesterRow = req.requester as Record<string, unknown> | null;
 
     const pending: PendingApproval = {
       id:               String(req.id),
@@ -330,25 +367,17 @@ export async function getPendingApprovalsForUser(
       entityId:         String(req.entity_id),
       companyId:        String(req.company_id),
       flowId:           String(req.flow_id),
-      flowName:         flow?.name ? String(flow.name) : '',
+      flowName:         flowNameById.get(String(req.flow_id)) ?? '',
       currentStepOrder: Number(req.current_step_order),
       currentStepName:  String(step.name),
       requesterId,
-      requesterName:    (req.requester as Record<string, unknown> | null)?.name
-        ? String((req.requester as Record<string, unknown>).name)
-        : undefined,
-      status:    req.status as PendingApproval['status'],
-      createdAt: String(req.created_at),
+      requesterName:    requesterRow?.name ? String(requesterRow.name) : undefined,
+      status:           req.status as PendingApproval['status'],
+      createdAt:        String(req.created_at),
     };
 
-    // Enrich leave_request context
     if (req.entity_type === 'leave_request') {
-      const { data: lr } = await supabase
-        .from('leave_requests')
-        .select('start_date, end_date, days, reason, leave_types(name)')
-        .eq('id', String(req.entity_id))
-        .single();
-
+      const lr = leaveById.get(String(req.entity_id));
       if (lr) {
         pending.leaveRequest = {
           startDate:     String(lr.start_date),
@@ -357,15 +386,15 @@ export async function getPendingApprovalsForUser(
           leaveTypeName: (lr.leave_types as Record<string, unknown> | null)?.name
             ? String((lr.leave_types as Record<string, unknown>).name)
             : undefined,
-          reason: lr.reason ?? undefined,
+          reason: lr.reason ? String(lr.reason) : undefined,
         };
       }
     }
 
-    relevant.push(pending);
-  }
+    return pending;
+  });
 
-  return { data: relevant, error: null };
+  return { data: result, error: null };
 }
 
 /**
