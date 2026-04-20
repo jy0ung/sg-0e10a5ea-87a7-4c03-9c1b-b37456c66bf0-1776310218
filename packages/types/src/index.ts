@@ -61,6 +61,8 @@ export interface Employee {
   departmentName?: string;
   jobTitleId?: string;
   jobTitleName?: string;
+  managerId?: string;
+  managerName?: string;
 }
 
 // ===== HRMS — Leave =====
@@ -70,6 +72,8 @@ export interface LeaveType {
   name: string;
   code: string;
   daysPerYear: number;
+  defaultDays: number;
+  carryForward: boolean;
   isPaid: boolean;
   active: boolean;
   createdAt: string;
@@ -272,6 +276,8 @@ export interface CreateLeaveTypeInput {
   name: string;
   code: string;
   daysPerYear: number;
+  defaultDays?: number;
+  carryForward?: boolean;
   isPaid: boolean;
   active: boolean;
 }
@@ -340,6 +346,56 @@ export interface CreateHolidayInput {
   isRecurring: boolean;
 }
 export type UpdateHolidayInput = CreateHolidayInput;
+
+// ===== HRMS — Appraisal item update =====
+export interface UpdateAppraisalItemInput {
+  rating?: number;
+  goals?: string;
+  achievements?: string;
+  areasToImprove?: string;
+  reviewerComments?: string;
+  employeeComments?: string;
+  status?: AppraisalItemStatus;
+  reviewedAt?: string;
+  reviewerId?: string;
+}
+
+// ===== HRMS — Approval Execution Engine =====
+export type ApprovalRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface PendingApproval {
+  id: string;              // approval_requests.id
+  entityType: FlowEntityType;
+  entityId: string;
+  companyId: string;
+  flowId: string;
+  flowName: string;
+  currentStepOrder: number;
+  currentStepName: string;
+  requesterId: string;
+  requesterName?: string;
+  status: ApprovalRequestStatus;
+  // Populated for leave_request context
+  leaveRequest?: {
+    startDate: string;
+    endDate: string;
+    days: number;
+    leaveTypeName?: string;
+    reason?: string;
+  };
+  createdAt: string;
+}
+
+export interface ApprovalDecision {
+  id: string;
+  approvalRequestId: string;
+  stepId: string;
+  approverId: string;
+  approverName?: string;
+  decision: 'approved' | 'rejected';
+  note?: string;
+  decidedAt: string;
+}
 
 // ===== HRMS — Approval Flows =====
 export type ApproverType = 'role' | 'specific_user' | 'direct_manager';

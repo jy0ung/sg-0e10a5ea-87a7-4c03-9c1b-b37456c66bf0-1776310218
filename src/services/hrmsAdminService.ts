@@ -263,15 +263,17 @@ export async function deleteJobTitle(companyId: string, id: string, actorId: str
 
 function rowToLeaveType(r: Record<string, unknown>): LeaveType {
   return {
-    id:          String(r.id ?? ''),
-    companyId:   String(r.company_id ?? ''),
-    name:        String(r.name ?? ''),
-    code:        String(r.code ?? ''),
-    daysPerYear: Number(r.days_per_year),
-    isPaid:      Boolean(r.is_paid),
-    active:      Boolean(r.active),
-    createdAt:   String(r.created_at ?? ''),
-    updatedAt:   String(r.updated_at ?? ''),
+    id:           String(r.id ?? ''),
+    companyId:    String(r.company_id ?? ''),
+    name:         String(r.name ?? ''),
+    code:         String(r.code ?? ''),
+    daysPerYear:  Number(r.days_per_year),
+    defaultDays:  Number(r.default_days ?? r.days_per_year),
+    carryForward: Boolean(r.carry_forward ?? true),
+    isPaid:       Boolean(r.is_paid),
+    active:       Boolean(r.active),
+    createdAt:    String(r.created_at ?? ''),
+    updatedAt:    String(r.updated_at ?? ''),
   };
 }
 
@@ -298,6 +300,8 @@ export async function createLeaveType(
       name:          input.name,
       code:          input.code.toUpperCase(),
       days_per_year: input.daysPerYear,
+      default_days:  input.defaultDays ?? input.daysPerYear,
+      carry_forward: input.carryForward ?? true,
       is_paid:       input.isPaid,
       active:        input.active,
     })
@@ -320,6 +324,8 @@ export async function updateLeaveType(
       name:          input.name,
       code:          input.code.toUpperCase(),
       days_per_year: input.daysPerYear,
+      default_days:  input.defaultDays ?? input.daysPerYear,
+      carry_forward: input.carryForward ?? true,
       is_paid:       input.isPaid,
       active:        input.active,
       updated_at:    new Date().toISOString(),

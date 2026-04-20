@@ -26,6 +26,12 @@ import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { HRMS_LEAVE_APPROVER_ROLES } from '@/config/hrmsConfig';
 import { createLeaveRequestSchema } from '@/lib/validations';
 import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
+import {
+  getPendingApprovalsForUser,
+  submitApprovalDecision,
+  initiateApprovalRequest,
+} from '@/services/approvalEngineService';
+import type { PendingApproval } from '@/types';
 
 const MANAGER_ROLES = HRMS_LEAVE_APPROVER_ROLES;
 const STATUS_COLORS: Record<LeaveStatus, string> = {
@@ -90,20 +96,28 @@ export default function LeaveManagement() {
   const [reviewNote, setReviewNote] = useState('');
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
 
+  // Approval engine queue
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
+  const [approvalsExpanded, setApprovalsExpanded] = useState(true);
+  // When a pending approval is being acted on, track the approval_request id
+  const [reviewingApprovalId, setReviewingApprovalId] = useState<string | null>(null);
+
   // Apply form
   const [applyForm, setApplyForm] = useState<Partial<CreateLeaveRequestInput>>({});
 
   const load = useCallback(async () => {
     if (!user?.companyId || (!isManager && !selfServiceEmployeeId)) return;
     setLoading(true);
-    const [reqRes, typeRes] = await Promise.all([
+    const [reqRes, typeRes, approvalsRes] = await Promise.all([
       listLeaveRequests(user.companyId, isManager
         ? { includeApprovalHistory: true }
         : { employeeId: selfServiceEmployeeId, includeApprovalHistory: true }),
       listLeaveTypes(user.companyId),
+      isManager ? getPendingApprovalsForUser(user.companyId, user.id) : Promise.resolve({ data: [], error: null }),
     ]);
     setRequests(reqRes.data);
     setLeaveTypes(typeRes.data);
+    setPendingApprovals(approvalsRes.data);
     setLoading(false);
     if (reqRes.error) toast({ title: 'Error', description: reqRes.error, variant: 'destructive' });
   }, [user, isManager, selfServiceEmployeeId, toast]);
@@ -155,12 +169,20 @@ export default function LeaveManagement() {
   }
 
   async function handleReview() {
-    if (!reviewingId || !user?.id) return;
-    const { error } = await reviewLeaveRequest(reviewingId, user.id, reviewAction, reviewNote);
+    if (!user?.id) return;
+    let error: string | null = null;
+    if (reviewingApprovalId) {
+      // Route through approval engine
+      ({ error } = await submitApprovalDecision(reviewingApprovalId, user.id, reviewAction, reviewNote));
+    } else if (reviewingId) {
+      // Direct review (no workflow configured)
+      ({ error } = await reviewLeaveRequest(reviewingId, user.id, reviewAction, reviewNote));
+    }
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: `Request ${reviewAction}` });
     notifyApprovalInboxChanged();
     setReviewingId(null);
+    setReviewingApprovalId(null);
     setReviewNote('');
     load();
   }
@@ -177,6 +199,65 @@ export default function LeaveManagement() {
           </Button>
         }
       />
+
+      {/* Pending approvals queue (managers only) */}
+      {isManager && pendingApprovals.length > 0 && (
+        <Card className="border-amber-200 dark:border-amber-800">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                <Clock className="h-4 w-4" />
+                Awaiting My Approval ({pendingApprovals.length})
+              </CardTitle>
+              <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setApprovalsExpanded(v => !v)}>
+                {approvalsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </div>
+          </CardHeader>
+          {approvalsExpanded && (
+            <CardContent className="pt-0 space-y-3">
+              {pendingApprovals.map(pa => (
+                <div key={pa.id} className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+                  <div className="text-sm space-y-0.5">
+                    <p className="font-medium">{pa.requesterName ?? pa.requesterId}</p>
+                    {pa.leaveRequest && (
+                      <p className="text-muted-foreground">
+                        {pa.leaveRequest.leaveTypeName} · {pa.leaveRequest.days}d
+                        &nbsp;({pa.leaveRequest.startDate} – {pa.leaveRequest.endDate})
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Step: {pa.currentStepName} · Flow: {pa.flowName}</p>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      size="sm" variant="outline"
+                      className="text-green-700 border-green-300 hover:bg-green-50 h-7 px-2"
+                      onClick={() => {
+                        setReviewingApprovalId(pa.id);
+                        setReviewingId(pa.entityId);
+                        setReviewAction('approved');
+                      }}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                    </Button>
+                    <Button
+                      size="sm" variant="outline"
+                      className="text-red-700 border-red-300 hover:bg-red-50 h-7 px-2"
+                      onClick={() => {
+                        setReviewingApprovalId(pa.id);
+                        setReviewingId(pa.entityId);
+                        setReviewAction('rejected');
+                      }}
+                    >
+                      <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">

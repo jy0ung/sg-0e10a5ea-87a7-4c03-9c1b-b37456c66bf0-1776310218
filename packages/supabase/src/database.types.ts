@@ -15,6 +15,75 @@ export type Database = {
   }
   public: {
     Tables: {
+      approval_decisions: {
+        Row: {
+          id: string
+          approval_request_id: string
+          step_id: string
+          approver_id: string
+          decision: 'approved' | 'rejected'
+          note: string | null
+          decided_at: string
+        }
+        Insert: {
+          id?: string
+          approval_request_id: string
+          step_id: string
+          approver_id: string
+          decision: 'approved' | 'rejected'
+          note?: string | null
+          decided_at?: string
+        }
+        Update: {
+          id?: string
+          approval_request_id?: string
+          step_id?: string
+          approver_id?: string
+          decision?: 'approved' | 'rejected'
+          note?: string | null
+          decided_at?: string
+        }
+        Relationships: []
+      }
+      approval_requests: {
+        Row: {
+          id: string
+          company_id: string
+          entity_type: 'leave_request' | 'payroll_run' | 'appraisal' | 'general'
+          entity_id: string
+          flow_id: string
+          requester_id: string
+          current_step_order: number
+          status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          entity_type: 'leave_request' | 'payroll_run' | 'appraisal' | 'general'
+          entity_id: string
+          flow_id: string
+          requester_id: string
+          current_step_order?: number
+          status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          entity_type?: 'leave_request' | 'payroll_run' | 'appraisal' | 'general'
+          entity_id?: string
+          flow_id?: string
+          requester_id?: string
+          current_step_order?: number
+          status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       application_logs: {
         Row: {
           component: string | null
@@ -577,10 +646,12 @@ export type Database = {
       leave_types: {
         Row: {
           active: boolean
+          carry_forward: boolean
           code: string
           company_id: string
           created_at: string
           days_per_year: number
+          default_days: number
           id: string
           is_paid: boolean
           name: string
@@ -588,10 +659,12 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          carry_forward?: boolean
           code: string
           company_id: string
           created_at?: string
           days_per_year?: number
+          default_days?: number
           id?: string
           is_paid?: boolean
           name: string
@@ -599,10 +672,12 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          carry_forward?: boolean
           code?: string
           company_id?: string
           created_at?: string
           days_per_year?: number
+          default_days?: number
           id?: string
           is_paid?: boolean
           name?: string
@@ -928,11 +1003,14 @@ export type Database = {
           company_id: string | null
           contact_no: string | null
           created_at: string | null
+          department_id: string | null
           employee_id: string | null
           email: string | null
           ic_no: string | null
           id: string
+          job_title_id: string | null
           join_date: string | null
+          manager_id: string | null
           name: string | null
           resign_date: string | null
           role: string | null
@@ -950,11 +1028,14 @@ export type Database = {
           company_id?: string | null
           contact_no?: string | null
           created_at?: string | null
+          department_id?: string | null
           employee_id?: string | null
           email?: string | null
           ic_no?: string | null
           id: string
+          job_title_id?: string | null
           join_date?: string | null
+          manager_id?: string | null
           name?: string | null
           resign_date?: string | null
           role?: string | null
@@ -972,11 +1053,14 @@ export type Database = {
           company_id?: string | null
           contact_no?: string | null
           created_at?: string | null
+          department_id?: string | null
           employee_id?: string | null
           email?: string | null
           ic_no?: string | null
           id?: string
+          job_title_id?: string | null
           join_date?: string | null
+          manager_id?: string | null
           name?: string | null
           resign_date?: string | null
           role?: string | null

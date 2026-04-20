@@ -6,7 +6,7 @@ import {
   LeaveType, LeaveBalance, LeaveRequest, CreateLeaveRequestInput, LeaveStatus, ApprovalDecision, FlowEntityType,
   AttendanceRecord, UpsertAttendanceInput,
   PayrollRun, PayrollItem, PayrollRunStatus,
-  Appraisal, AppraisalItem, AppraisalStatus, AppraisalCycle,
+  Appraisal, AppraisalItem, AppraisalStatus, AppraisalCycle, UpdateAppraisalItemInput,
   Announcement, CreateAnnouncementInput,
 } from '@/types';
 import { HRMS_LEAVE_APPROVER_ROLES, HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
@@ -21,6 +21,8 @@ type ApprovalStepRecord = {
   approverUserId?: string;
   allowSelfApproval: boolean;
 };
+
+const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, manager_id, department:departments(name), job_title:job_titles(name), manager:profiles!manager_id(name)';
 
 type ApprovalInstanceRecord = {
   id: string;
@@ -343,6 +345,8 @@ function rowToDirectoryEmployee(row: Record<string, unknown>): Employee {
     departmentName: row.department ? String((row.department as Record<string, unknown>)?.name ?? '') : undefined,
     jobTitleId:     row.job_title_id ? String(row.job_title_id) : undefined,
     jobTitleName:   row.job_title ? String((row.job_title as Record<string, unknown>)?.name ?? '') : undefined,
+    managerId:      row.manager_id ? String(row.manager_id) : undefined,
+    managerName:    row.manager ? String((row.manager as Record<string, unknown>)?.name ?? '') : undefined,
   };
 }
 
@@ -539,6 +543,7 @@ export interface UpdateEmployeeInput {
   status?: EmployeeStatus;
   departmentId?: string | null;
   jobTitleId?: string | null;
+  managerId?: string | null;
 }
 
 export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string, companyId?: string): Promise<{ error: string | null }> {
@@ -626,6 +631,8 @@ export async function listLeaveTypes(companyId: string): Promise<{ data: LeaveTy
     name:         String(r.name),
     code:         String(r.code),
     daysPerYear:  Number(r.days_per_year),
+    defaultDays:  Number(r.default_days ?? r.days_per_year),
+    carryForward: Boolean((r as Record<string, unknown>).carry_forward ?? true),
     isPaid:       Boolean(r.is_paid),
     active:       Boolean(r.active),
     createdAt:    String(r.created_at),
@@ -1989,6 +1996,50 @@ export async function acknowledgeAppraisalItem(
     appraisalId: item.appraisalId,
   });
   return { error: null };
+export async function createAppraisalItem(
+  appraisalId: string,
+  companyId: string,
+  input: { employeeId: string; reviewerId?: string; goals?: string; rating?: number },
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('appraisal_items').insert({
+    appraisal_id: appraisalId,
+    company_id:   companyId,
+    employee_id:  input.employeeId,
+    reviewer_id:  input.reviewerId ?? null,
+    goals:        input.goals ?? null,
+    rating:       input.rating ?? null,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function updateAppraisalItem(
+  id: string,
+  input: UpdateAppraisalItemInput,
+  actorId?: string,
+): Promise<{ error: string | null }> {
+  const payload: Record<string, unknown> = {};
+  if (input.rating           !== undefined) payload.rating            = input.rating;
+  if (input.goals            !== undefined) payload.goals             = input.goals;
+  if (input.achievements     !== undefined) payload.achievements      = input.achievements;
+  if (input.areasToImprove   !== undefined) payload.areas_to_improve  = input.areasToImprove;
+  if (input.reviewerComments !== undefined) payload.reviewer_comments = input.reviewerComments;
+  if (input.employeeComments !== undefined) payload.employee_comments = input.employeeComments;
+  if (input.reviewerId       !== undefined) payload.reviewer_id       = input.reviewerId;
+  if (input.status           !== undefined) payload.status            = input.status;
+  if (input.reviewedAt       !== undefined) payload.reviewed_at       = input.reviewedAt;
+  const { error } = await supabase.from('appraisal_items').update(payload).eq('id', id);
+  if (!error && actorId) {
+    void logUserAction(actorId, 'update', 'appraisal_item', id, { changes: payload });
+  }
+  return { error: error?.message ?? null };
+}
+
+export async function deleteAppraisalItem(id: string, actorId?: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('appraisal_items').delete().eq('id', id);
+  if (!error && actorId) {
+    void logUserAction(actorId, 'delete', 'appraisal_item', id);
+  }
+  return { error: error?.message ?? null };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

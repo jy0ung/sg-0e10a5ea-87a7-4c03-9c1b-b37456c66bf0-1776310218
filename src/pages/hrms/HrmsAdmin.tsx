@@ -22,7 +22,7 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { HRMS_ADMIN_ROLES } from '@/config/hrmsConfig';
 import {
-  Building2, Briefcase, Calendar, CalendarDays,
+  Building2, Briefcase, Calendar, CalendarDays, RefreshCw,
   Plus, Pencil, Trash2,
 } from 'lucide-react';
 import {
@@ -44,7 +44,7 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Category = 'departments' | 'job-titles' | 'leave-types' | 'holidays';
+type Category = 'departments' | 'job-titles' | 'leave-types' | 'holidays' | 'rollover';
 
 interface CategoryDef {
   id: Category;
@@ -57,8 +57,9 @@ interface CategoryDef {
 const CATEGORIES: CategoryDef[] = [
   { id: 'departments',  label: 'Departments',     icon: Building2,    description: 'Organise employees into departments and assign department heads.', summary: 'Teams and cost centres' },
   { id: 'job-titles',   label: 'Job Titles',       icon: Briefcase,    description: 'Define job titles and optionally link them to departments.', summary: 'Roles and seniority' },
-  { id: 'leave-types',  label: 'Leave Types',      icon: Calendar,     description: 'Configure leave types, entitlements, and paid/unpaid status.', summary: 'Entitlements and rules' },
+  { id: 'leave-types',  label: 'Leave Types',      icon: Calendar,     description: 'Configure leave types, entitlements, carry-forward rules, and paid/unpaid status.', summary: 'Entitlements and rules' },
   { id: 'holidays',     label: 'Holiday Calendar', icon: CalendarDays, description: 'Manage public and company holidays.', summary: 'Company calendar' },
+  { id: 'rollover',     label: 'Leave Rollover',   icon: RefreshCw,    description: 'Roll over employee leave balances from one year to the next.', summary: 'Year-end rollover' },
 ];
 
 const JOB_LEVELS: { value: JobTitleLevel; label: string }[] = [
@@ -559,7 +560,7 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
   const [deleteTarget, setDeleteTarget] = useState<LeaveType | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<CreateLeaveTypeInput>({
-    name: '', code: '', daysPerYear: 14, isPaid: true, active: true,
+    name: '', code: '', daysPerYear: 14, defaultDays: 14, carryForward: true, isPaid: true, active: true,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -574,14 +575,14 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
 
   function openCreate() {
     setEditTarget(null);
-    setForm({ name: '', code: '', daysPerYear: 14, isPaid: true, active: true });
+    setForm({ name: '', code: '', daysPerYear: 14, defaultDays: 14, carryForward: true, isPaid: true, active: true });
     setErrors({});
     setDialogOpen(true);
   }
 
   function openEdit(lt: LeaveType) {
     setEditTarget(lt);
-    setForm({ name: lt.name, code: lt.code, daysPerYear: lt.daysPerYear, isPaid: lt.isPaid, active: lt.active });
+    setForm({ name: lt.name, code: lt.code, daysPerYear: lt.daysPerYear, defaultDays: lt.defaultDays, carryForward: lt.carryForward, isPaid: lt.isPaid, active: lt.active });
     setErrors({});
     setDialogOpen(true);
   }
@@ -598,6 +599,8 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
     const input: CreateLeaveTypeInput = {
       name: parsed.data.name, code: parsed.data.code,
       daysPerYear: parsed.data.daysPerYear, isPaid: parsed.data.isPaid, active: parsed.data.active,
+      defaultDays: form.defaultDays ?? parsed.data.daysPerYear,
+      carryForward: form.carryForward ?? true,
     };
     const { error } = editTarget
       ? await updateLeaveType(companyId, editTarget.id, actorId, input)
@@ -641,6 +644,7 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
                 <th className="px-3 py-2 font-medium">Name</th>
                 <th className="px-3 py-2 font-medium">Code</th>
                 <th className="px-3 py-2 font-medium">Days/Year</th>
+                <th className="px-3 py-2 font-medium">Rollover</th>
                 <th className="px-3 py-2 font-medium">Paid</th>
                 <th className="px-3 py-2 font-medium">Active</th>
                 {canWrite && <th className="px-3 py-2 font-medium w-20">Actions</th>}
@@ -656,6 +660,13 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
                   <td className="px-3 py-2 font-medium">{lt.name}</td>
                   <td className="px-3 py-2"><Badge variant="outline">{lt.code}</Badge></td>
                   <td className="px-3 py-2">{lt.daysPerYear}</td>
+                  <td className="px-3 py-2">
+                    <Badge className={lt.carryForward
+                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                      : 'bg-secondary text-secondary-foreground'}>
+                      {lt.carryForward ? `≤${lt.defaultDays}d` : 'None'}
+                    </Badge>
+                  </td>
                   <td className="px-3 py-2">
                     <Badge className={lt.isPaid
                       ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
@@ -716,7 +727,18 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
                 <Switch checked={form.active} onCheckedChange={v => setForm(f => ({ ...f, active: v }))} />
                 <Label className="text-sm">Active</Label>
               </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={form.carryForward ?? true} onCheckedChange={v => setForm(f => ({ ...f, carryForward: v }))} />
+                <Label className="text-sm">Carry-forward</Label>
+              </div>
             </div>
+            {(form.carryForward ?? true) && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Default days per year (used for rollover)</Label>
+                <Input className="h-8 text-sm" type="number" min={0} max={365} value={form.defaultDays ?? form.daysPerYear}
+                  onChange={e => setForm(f => ({ ...f, defaultDays: Number(e.target.value) }))} />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button>
@@ -952,6 +974,73 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ROLLOVER PANEL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface RolloverPanelProps { companyId: string; actorId: string; canWrite: boolean }
+
+function RolloverPanel({ companyId, canWrite }: RolloverPanelProps) {
+  const { toast } = useToast();
+  const thisYear = new Date().getFullYear();
+  const [form, setForm] = useState({ fromYear: thisYear - 1, toYear: thisYear, maxCarryDays: 14 });
+  const [running, setRunning] = useState(false);
+
+  async function handleRun() {
+    if (!canWrite) return;
+    setRunning(true);
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const { VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY } = import.meta.env as Record<string, string>;
+      const client = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY);
+      const { error } = await client.functions.invoke('rollover-leave-balances', {
+        body: { company_id: companyId, from_year: form.fromYear, to_year: form.toYear, max_carry_days: form.maxCarryDays },
+      });
+      if (error) throw error;
+      toast({ title: 'Leave rollover completed', description: `Balances rolled from ${form.fromYear} → ${form.toYear}.` });
+    } catch (err) {
+      toast({ title: 'Rollover failed', description: String((err as Error).message), variant: 'destructive' });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-md">
+      <p className="text-sm text-muted-foreground">
+        Running a rollover copies unused leave balances (up to the carry-forward cap per leave type)
+        into the destination year. Only leave types with <em>Carry-forward</em> enabled are included.
+        This operation is safe to re-run — duplicate balance rows are skipped.
+      </p>
+      <div className="glass-panel p-5 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">From year</Label>
+            <Input className="h-8 text-sm" type="number" min={2020} max={2100} value={form.fromYear}
+              onChange={e => setForm(f => ({ ...f, fromYear: Number(e.target.value) }))} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">To year</Label>
+            <Input className="h-8 text-sm" type="number" min={2020} max={2100} value={form.toYear}
+              onChange={e => setForm(f => ({ ...f, toYear: Number(e.target.value) }))} />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Global max carry-over days (overrides per-type cap)</Label>
+          <Input className="h-8 text-sm" type="number" min={0} max={365} value={form.maxCarryDays}
+            onChange={e => setForm(f => ({ ...f, maxCarryDays: Number(e.target.value) }))} />
+        </div>
+        {canWrite && (
+          <Button onClick={handleRun} disabled={running} className="w-full">
+            <RefreshCw className={`h-4 w-4 mr-2 ${running ? 'animate-spin' : ''}`} />
+            {running ? 'Running rollover…' : 'Run Leave Rollover'}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1021,6 +1110,9 @@ export default function HrmsAdmin() {
           )}
           {activeCategory === 'holidays' && (
             <HolidaysPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />
+          )}
+          {activeCategory === 'rollover' && (
+            <RolloverPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />
           )}
         </div>
       </div>

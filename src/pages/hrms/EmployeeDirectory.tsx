@@ -84,6 +84,7 @@ type EditForm = {
   status: EmployeeStatus;
   departmentId: string;
   jobTitleId: string;
+  managerId: string;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -226,6 +227,7 @@ export default function EmployeeDirectory() {
       status:       emp.status,
       departmentId: emp.departmentId ?? '',
       jobTitleId:   emp.jobTitleId ?? '',
+      managerId:    emp.managerId ?? '',
     });
   };
 
@@ -246,6 +248,7 @@ export default function EmployeeDirectory() {
       status:       editForm.status,
       departmentId: editForm.departmentId || null,
       jobTitleId:   editForm.jobTitleId || null,
+      managerId:    editForm.managerId || null,
     };
     const { error } = await updateEmployee(editTarget.id, input, user?.id, user.companyId);
     setEditSaving(false);
@@ -661,6 +664,25 @@ export default function EmployeeDirectory() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Direct Manager</label>
+                <Select
+                  value={editForm.managerId}
+                  onValueChange={v => setEditForm(f => f ? { ...f, managerId: v } : f)}
+                >
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {employees
+                      .filter(e => e.status === 'active' && e.id !== editTarget?.id)
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map(e => (
+                        <SelectItem key={e.id} value={e.id}>{e.name} ({e.role})</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

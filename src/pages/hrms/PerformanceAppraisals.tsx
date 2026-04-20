@@ -26,9 +26,15 @@ import {
   submitAppraisalSelfReview,
   reviewAppraisalItem,
   acknowledgeAppraisalItem,
+  updateAppraisalItem,
+  deleteAppraisalItem,
 } from '@/services/hrmsService';
-import type { Appraisal, AppraisalItem, AppraisalCycle, AppraisalStatus } from '@/types';
-import { Plus, Eye, Star, CheckCircle2, ChevronDown, ChevronUp, Clock, RotateCcw, XCircle } from 'lucide-react';
+import type { Appraisal, AppraisalItem, AppraisalCycle, AppraisalStatus, UpdateAppraisalItemInput } from '@/types';
+import { Plus, Eye, Star, CheckCircle2, ChevronDown, ChevronUp, Clock, RotateCcw, XCircle, Pencil, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
 import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
 
@@ -66,6 +72,18 @@ type AppraisalItemActionState = {
   action: AppraisalItemAction;
 } | null;
 
+function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <button key={i} type="button" onClick={() => onChange(i + 1)} className="focus:outline-none">
+          <Star className={`h-5 w-5 ${i < value ? 'text-amber-400 fill-amber-400' : 'text-gray-300 fill-gray-300'} hover:text-amber-400 hover:fill-amber-400 transition-colors`} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function PerformanceAppraisals() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -93,6 +111,12 @@ export default function PerformanceAppraisals() {
   const [form, setForm] = useState({
     title: '', cycle: 'annual' as AppraisalCycle, periodStart: '', periodEnd: '',
   });
+
+  // Item edit/delete state
+  const [editItem, setEditItem]   = useState<AppraisalItem | null>(null);
+  const [deleteItem, setDeleteItem] = useState<AppraisalItem | null>(null);
+  const [editForm, setEditForm]   = useState<UpdateAppraisalItemInput>({});
+  const [savingItem, setSavingItem] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.companyId) return;
@@ -279,6 +303,39 @@ export default function PerformanceAppraisals() {
     resetItemAction();
     await load();
     if (viewId) await handleView(viewId);
+  }
+
+  function openEditItem(item: AppraisalItem) {
+    setEditItem(item);
+    setEditForm({
+      rating: item.rating,
+      goals: item.goals ?? undefined,
+      achievements: item.achievements ?? undefined,
+      areasToImprove: item.areasToImprove ?? undefined,
+      reviewerComments: item.reviewerComments ?? undefined,
+      employeeComments: item.employeeComments ?? undefined,
+      status: item.status,
+    });
+  }
+
+  async function handleSaveItem() {
+    if (!editItem || !user?.id) return;
+    setSavingItem(true);
+    const { error } = await updateAppraisalItem(editItem.id, editForm, user.id);
+    setSavingItem(false);
+    if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
+    toast({ title: 'Review updated' });
+    setEditItem(null);
+    if (viewId) { const { data } = await listAppraisalItems(viewId); setItems(data); }
+  }
+
+  async function handleDeleteItem() {
+    if (!deleteItem || !user?.id) return;
+    const { error } = await deleteAppraisalItem(deleteItem.id, user.id);
+    if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
+    toast({ title: 'Review removed' });
+    setDeleteItem(null);
+    if (viewId) { const { data } = await listAppraisalItems(viewId); setItems(data); }
   }
 
   const viewingAppraisal = appraisals.find(a => a.id === viewId);
@@ -521,7 +578,17 @@ export default function PerformanceAppraisals() {
                           Acknowledge
                         </Button>
                       )}
-                      {!canSelfReviewItem(item) && !canManagerReviewItem(item) && !canAcknowledgeItem(item) && (
+                      {isManager && (
+                        <>
+                          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEditItem(item)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteItem(item)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      )}
+                      {!canSelfReviewItem(item) && !canManagerReviewItem(item) && !canAcknowledgeItem(item) && !isManager && (
                         <span className="text-xs text-muted-foreground">No action</span>
                       )}
                     </div>
@@ -636,6 +703,69 @@ export default function PerformanceAppraisals() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Edit item dialog */}
+      <Dialog open={!!editItem} onOpenChange={v => !v && setEditItem(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Edit Review</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Rating</Label>
+              <StarPicker value={editForm.rating ?? 0} onChange={v => setEditForm(f => ({ ...f, rating: v }))} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Status</Label>
+              <Select value={editForm.status ?? 'pending'} onValueChange={v => setEditForm(f => ({ ...f, status: v as AppraisalItem['status'] }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(['pending','self_reviewed','reviewed','acknowledged'] as AppraisalItem['status'][]).map(s => (
+                    <SelectItem key={s} value={s} className="capitalize">{s.replace('_', ' ')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Goals</Label>
+              <Textarea rows={2} value={editForm.goals ?? ''} onChange={e => setEditForm(f => ({ ...f, goals: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Achievements</Label>
+              <Textarea rows={2} value={editForm.achievements ?? ''} onChange={e => setEditForm(f => ({ ...f, achievements: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Areas to Improve</Label>
+              <Textarea rows={2} value={editForm.areasToImprove ?? ''} onChange={e => setEditForm(f => ({ ...f, areasToImprove: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Reviewer Comments</Label>
+              <Textarea rows={2} value={editForm.reviewerComments ?? ''} onChange={e => setEditForm(f => ({ ...f, reviewerComments: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Employee Comments</Label>
+              <Textarea rows={2} value={editForm.employeeComments ?? ''} onChange={e => setEditForm(f => ({ ...f, employeeComments: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditItem(null)}>Cancel</Button>
+            <Button onClick={handleSaveItem} disabled={savingItem}>{savingItem ? 'Saving…' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete item confirmation */}
+      <AlertDialog open={!!deleteItem} onOpenChange={v => !v && setDeleteItem(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Review</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove the review for <strong>{deleteItem?.employeeName ?? 'this employee'}</strong>? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteItem} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
