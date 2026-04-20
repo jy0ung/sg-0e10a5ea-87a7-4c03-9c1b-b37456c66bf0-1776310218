@@ -39,20 +39,26 @@ export default function LeaveCalendar() {
   const [loading, setLoading]     = useState(true);
   const [empFilter, setEmpFilter] = useState<string>('all');
 
-  const load = useCallback(async () => {
+  // One-time: load employee list for the filter dropdown
+  useEffect(() => {
+    if (!user?.companyId) return;
+    listEmployees(user.companyId).then(res => { if (!res.error) setEmployees(res.data); });
+  }, [user?.companyId]);
+
+  // Reload leave requests whenever the viewed month changes
+  const loadRequests = useCallback(async () => {
     if (!user?.companyId) return;
     setLoading(true);
-    const [empRes, reqRes] = await Promise.all([
-      listEmployeeDirectory(user.companyId),
-      listLeaveRequests(user.companyId, { status: 'approved' }),
-    ]);
-    setEmployees(empRes.data);
+    // Fetch a window covering the full displayed month (with small ±1 day buffer)
+    const dateFrom = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-01`;
+    const dateTo   = new Date(viewYear, viewMonth + 1, 0).toISOString().slice(0, 10);
+    const reqRes = await listLeaveRequests(user.companyId, { status: 'approved', dateFrom, dateTo });
     setRequests(reqRes.data);
     setLoading(false);
     if (reqRes.error) toast({ title: 'Error', description: reqRes.error, variant: 'destructive' });
-  }, [user, toast]);
+  }, [user?.companyId, viewYear, viewMonth, toast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadRequests(); }, [loadRequests]);
 
   const totalDays = daysInMonth(viewYear, viewMonth);
   const firstDow  = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun

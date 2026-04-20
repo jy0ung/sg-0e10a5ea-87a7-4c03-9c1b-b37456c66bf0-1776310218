@@ -98,8 +98,8 @@ export default function ApprovalFlows() {
 
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
 
-  const isAuthorized =
-    !!user && (HRMS_ADMIN_ROLES as string[]).includes(user.role);
+  // NOTE: auth guard is intentionally placed AFTER all hooks to satisfy React Rules of Hooks
+  const isAuthorized = !!user && (HRMS_ADMIN_ROLES as string[]).includes(user.role);
 
   const load = useCallback(async () => {
     if (!isAuthorized) return;
@@ -247,6 +247,8 @@ export default function ApprovalFlows() {
 
   // ── Stats ───────────────────────────────────────────────────────────────────
   const totalActive = flows.filter(f => f.isActive).length;
+
+  if (!isAuthorized) return <UnauthorizedAccess />;
 
   return (
     <div className="p-6 space-y-6">

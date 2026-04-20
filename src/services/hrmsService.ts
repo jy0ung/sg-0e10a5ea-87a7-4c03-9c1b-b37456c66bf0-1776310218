@@ -665,7 +665,7 @@ export async function listLeaveBalances(employeeId: string, year: number): Promi
 
 export async function listLeaveRequests(
   companyId: string,
-  opts?: { employeeId?: string; status?: LeaveStatus; includeApprovalHistory?: boolean },
+  opts?: { employeeId?: string; status?: LeaveStatus; includeApprovalHistory?: boolean; dateFrom?: string; dateTo?: string },
 ): Promise<{ data: LeaveRequest[]; error: string | null }> {
   let q = supabase
     .from('leave_requests')
@@ -674,6 +674,8 @@ export async function listLeaveRequests(
     .order('created_at', { ascending: false });
   if (opts?.employeeId) q = q.eq('employee_id', opts.employeeId);
   if (opts?.status)     q = q.eq('status', opts.status);
+  if (opts?.dateFrom)   q = q.gte('end_date', opts.dateFrom);   // leave ends on/after window start
+  if (opts?.dateTo)     q = q.lte('start_date', opts.dateTo);   // leave starts on/before window end
   const { data, error } = await q;
   if (error) return { data: [], error: error.message };
 
