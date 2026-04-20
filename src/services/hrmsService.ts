@@ -22,7 +22,9 @@ type ApprovalStepRecord = {
   allowSelfApproval: boolean;
 };
 
-const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, manager_id, department:departments!profiles_department_id_fkey(name), job_title:job_titles(name), manager:profiles!profiles_manager_id_fkey(name)';
+// PostgREST 14.8 does not resolve self-referential FK joins (profiles→profiles).
+// manager_id is included so listEmployees can resolve managerName client-side.
+const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, manager_id, department:departments!profiles_department_id_fkey(name), job_title:job_titles(name)';
 
 type ApprovalInstanceRecord = {
   id: string;
@@ -346,7 +348,7 @@ function rowToDirectoryEmployee(row: Record<string, unknown>): Employee {
     jobTitleId:     row.job_title_id ? String(row.job_title_id) : undefined,
     jobTitleName:   row.job_title ? String((row.job_title as Record<string, unknown>)?.name ?? '') : undefined,
     managerId:      row.manager_id ? String(row.manager_id) : undefined,
-    managerName:    row.manager ? String((row.manager as Record<string, unknown>)?.name ?? '') : undefined,
+    managerName:    row.managerName ? String(row.managerName) : undefined,
   };
 }
 
