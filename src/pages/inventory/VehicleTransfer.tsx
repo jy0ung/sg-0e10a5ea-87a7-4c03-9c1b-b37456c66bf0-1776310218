@@ -10,25 +10,18 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useData } from '@/contexts/DataContext';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  listVehicleTransfers,
+  createVehicleTransfer,
+  updateVehicleTransferStatus,
+  type TransferStatus,
+  type VehicleTransferRecord,
+} from '@/services/inventoryService';
+import { vehicleTransferSchema } from '@/lib/validations';
 import { Search, Plus, ArrowRight } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 
-type TransferStatus = 'pending' | 'in_transit' | 'arrived' | 'cancelled';
-
-interface Transfer {
-  id: string;
-  runningNo: string;
-  fromBranch: string;
-  toBranch: string;
-  chassisNo: string;
-  model: string;
-  colour?: string;
-  status: TransferStatus;
-  createdAt: string;
-  arrivedAt?: string;
-  remark?: string;
-}
+type Transfer = VehicleTransferRecord;
 
 const STATUS_BADGE: Record<TransferStatus, string> = {
   pending:    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -38,22 +31,6 @@ const STATUS_BADGE: Record<TransferStatus, string> = {
 };
 
 const EMPTY_FORM = { fromBranch: '', toBranch: '', chassisNo: '', model: '', colour: '', remark: '' };
-
-function rowToTransfer(row: Record<string, unknown>): Transfer {
-  return {
-    id:         String(row.id ?? ''),
-    runningNo:  String(row.running_no ?? ''),
-    fromBranch: String(row.from_branch ?? ''),
-    toBranch:   String(row.to_branch ?? ''),
-    chassisNo:  String(row.chassis_no ?? ''),
-    model:      String(row.model ?? ''),
-    colour:     row.colour ? String(row.colour) : undefined,
-    status:     (row.status as TransferStatus) ?? 'pending',
-    createdAt:  row.created_at ? String(row.created_at).split('T')[0] : '',
-    arrivedAt:  row.arrived_at ? String(row.arrived_at) : undefined,
-    remark:     row.remark ? String(row.remark) : undefined,
-  };
-}
 
 export default function VehicleTransfer() {
   const { user } = useAuth();
@@ -72,15 +49,7 @@ export default function VehicleTransfer() {
 
   const { data: transfers = [], isLoading } = useQuery({
     queryKey: ['vehicle-transfers', companyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('vehicle_transfers')
-        .select('*')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map(row => rowToTransfer(row as Record<string, unknown>));
-    },
+    queryFn: () => listVehicleTransfers(companyId ?? ''),
     enabled: !!companyId,
     staleTime: 30_000,
   });
@@ -94,28 +63,26 @@ export default function VehicleTransfer() {
   });
 
   const handleCreate = async () => {
-    if (!form.fromBranch || !form.toBranch || !form.chassisNo || !form.model) {
-      return toast({ title: 'From Branch, To Branch, Chassis No, and Model are required', variant: 'destructive' });
-    }
-    if (form.fromBranch === form.toBranch) {
-      return toast({ title: 'From and To branches must differ', variant: 'destructive' });
+    const parsed = vehicleTransferSchema.safeParse(form);
+    if (!parsed.success) {
+      return toast({
+        title: parsed.error.issues[0]?.message ?? 'Invalid input',
+        variant: 'destructive',
+      });
     }
     if (!user) return;
     setSaving(true);
     const runningNo = `TRF-${String(transfers.length + 1).padStart(4, '0')}`;
-    const { error } = await supabase
-      .from('vehicle_transfers')
-      .insert({
-        company_id:  user.company_id,
-        running_no:  runningNo,
-        from_branch: form.fromBranch,
-        to_branch:   form.toBranch,
-        chassis_no:  form.chassisNo.toUpperCase(),
-        model:       form.model,
-        colour:      form.colour || null,
-        status:      'pending',
-        remark:      form.remark || null,
-      });
+    const { error } = await createVehicleTransfer({
+      companyId: user.company_id,
+      runningNo,
+      fromBranch: parsed.data.fromBranch,
+      toBranch: parsed.data.toBranch,
+      chassisNo: parsed.data.chassisNo,
+      model: parsed.data.model,
+      colour: parsed.data.colour ?? null,
+      remark: parsed.data.remark ?? null,
+    });
     setSaving(false);
     if (error) {
       toast({ title: 'Failed to create transfer', description: error.message, variant: 'destructive' });
@@ -130,24 +97,15 @@ export default function VehicleTransfer() {
   const updateStatus = async (id: string, status: TransferStatus) => {
     const prev = transfers.find(t => t.id === id);
     if (!prev) return;
-    const arrivedAt = status === 'arrived' ? new Date().toISOString().split('T')[0] : prev.arrivedAt;
-    const { error } = await supabase
-      .from('vehicle_transfers')
-      .update({ status, arrived_at: arrivedAt ?? null })
-      .eq('id', id);
+    const { error } = await updateVehicleTransferStatus(id, status, {
+      companyId: user?.company_id,
+      chassisNo: prev.chassisNo,
+      toBranch: prev.toBranch,
+      previousArrivedAt: prev.arrivedAt ?? null,
+    });
     if (error) {
-      // Revert
       toast({ title: 'Failed to update status', description: error.message, variant: 'destructive' });
       return;
-    }
-    // When a transfer arrives, update the vehicle's branch to the destination branch.
-    if (status === 'arrived' && user?.company_id && prev.chassisNo) {
-      await supabase
-        .from('vehicles')
-        .update({ branch_code: prev.toBranch })
-        .eq('chassis_no', prev.chassisNo)
-        .eq('company_id', user.company_id)
-        .eq('is_deleted', false);
     }
     invalidate();
   };

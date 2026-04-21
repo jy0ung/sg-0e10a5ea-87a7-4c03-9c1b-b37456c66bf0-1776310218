@@ -70,6 +70,11 @@ function mapDbVehicle(row: Record<string, unknown>): VehicleCanonical {
     reg_to_delivery: typeof row.reg_to_delivery === 'number' ? row.reg_to_delivery : null,
     bg_to_disb: typeof row.bg_to_disb === 'number' ? row.bg_to_disb : null,
     delivery_to_disb: typeof row.delivery_to_disb === 'number' ? row.delivery_to_disb : null,
+    color: row.color ? String(row.color) : undefined,
+    commission_paid: row.commission_paid == null ? undefined : Boolean(row.commission_paid),
+    commission_remark: row.commission_remark ? String(row.commission_remark) : undefined,
+    stage: row.stage ? (String(row.stage) as VehicleCanonical['stage']) : undefined,
+    stage_override: row.stage_override ? (String(row.stage_override) as VehicleCanonical['stage_override']) : undefined,
   };
 }
 
@@ -499,8 +504,45 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     loggingService.info('KPIs refresh requested', { vehicleCount: vehicles.length }, 'DataContext');
   }, [queryClient, companyId, branchId, vehicles.length]);
 
+  const contextValue = useMemo(
+    () => ({
+      vehicles,
+      importBatches,
+      qualityIssues,
+      slas,
+      kpiSummaries,
+      loadErrors,
+      lastRefresh,
+      loading: isLoading,
+      setVehicles,
+      addImportBatch,
+      updateImportBatch,
+      addQualityIssues,
+      updateSla,
+      refreshKpis,
+      reloadFromDb,
+    }),
+    [
+      vehicles,
+      importBatches,
+      qualityIssues,
+      slas,
+      kpiSummaries,
+      loadErrors,
+      lastRefresh,
+      isLoading,
+      setVehicles,
+      addImportBatch,
+      updateImportBatch,
+      addQualityIssues,
+      updateSla,
+      refreshKpis,
+      reloadFromDb,
+    ],
+  );
+
   return (
-    <DataContext.Provider value={{ vehicles, importBatches, qualityIssues, slas, kpiSummaries, loadErrors, lastRefresh, loading: isLoading, setVehicles, addImportBatch, updateImportBatch, addQualityIssues, updateSla, refreshKpis, reloadFromDb }}>
+    <DataContext.Provider value={contextValue}>
       {children}
     </DataContext.Provider>
   );

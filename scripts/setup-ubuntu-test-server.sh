@@ -169,11 +169,15 @@ configure_env_files() {
   elif [[ -f .env ]]; then
     cp .env .env.local
   else
+    # Phase 0 hardening: do not bake in demo/project-specific keys. Operator
+    # must populate .env.local with the real VITE_SUPABASE_URL /
+    # VITE_SUPABASE_ANON_KEY / VITE_SITE_URL before the app will boot.
     cat > .env.local <<'EOF'
-VITE_SUPABASE_URL="http://127.0.0.1:54321"
-VITE_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
-VITE_SUPABASE_PUBLISHABLE_KEY="sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
-VITE_SUPABASE_PROJECT_ID="rbmsbppvpgcrmtkdfahy"
+# Populate these before running `npm run dev`.
+VITE_SUPABASE_URL=""
+VITE_SUPABASE_ANON_KEY=""
+VITE_SUPABASE_PUBLISHABLE_KEY=""
+VITE_SUPABASE_PROJECT_ID=""
 VITE_SITE_URL="http://127.0.0.1:3000"
 EOF
   fi

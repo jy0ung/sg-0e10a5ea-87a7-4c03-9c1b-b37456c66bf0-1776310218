@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSales } from '@/contexts/SalesContext';
-import { supabase } from '@/integrations/supabase/client';
+import { fetchChassisCostMap } from '@/services/purchaseInvoiceService';
 import { useQuery } from '@tanstack/react-query';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -32,18 +32,7 @@ export default function MarginAnalysis() {
   // Fetch purchase invoice costs via React Query
   const { data: costMap = new Map<string, number>() } = useQuery({
     queryKey: ['margin-costs', companyId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('purchase_invoices')
-        .select('chassis_no, amount')
-        .eq('company_id', companyId)
-        .eq('status', 'received');
-      const map = new Map<string, number>();
-      for (const row of (data ?? [])) {
-        if (row.chassis_no) map.set(row.chassis_no as string, Number(row.amount ?? 0));
-      }
-      return map;
-    },
+    queryFn: () => fetchChassisCostMap(companyId ?? ''),
     enabled: !!companyId,
     staleTime: 60_000,
   });

@@ -6,23 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { searchChassisFilter, type ChassisFilterRow } from '@/services/inventoryService';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { Search, RefreshCw, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const FILTER_PAGE_SIZE = 100;
 
-interface Vehicle {
-  id: string;
-  chassis_no: string | null;
-  plate_no: string | null;
-  model: string | null;
-  engine_no: string | null;
-  colour: string | null;
-  status: string | null;
-  branch_id: string | null;
-  owner_name: string | null;
-}
+type Vehicle = ChassisFilterRow;
 
 const CHIP_CLASS = 'inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs px-2 py-0.5 font-medium';
 
@@ -46,23 +36,19 @@ export default function ChassisFilter() {
   const runSearch = async (p: number) => {
     setLoading(true);
     try {
-      let q = supabase
-        .from('vehicles')
-        .select('id,chassis_no,plate_no,model,engine_no,colour,status,branch_id,owner_name', { count: 'exact' })
-        .eq('company_id', companyId);
-
-      if (filters.chassisNo.trim()) q = q.ilike('chassis_no', `%${filters.chassisNo.trim()}%`);
-      if (filters.plateNo.trim()) q = q.ilike('plate_no', `%${filters.plateNo.trim()}%`);
-      if (filters.model.trim()) q = q.ilike('model', `%${filters.model.trim()}%`);
-      if (filters.engineNo.trim()) q = q.ilike('engine_no', `%${filters.engineNo.trim()}%`);
-      if (filters.colour.trim()) q = q.ilike('colour', `%${filters.colour.trim()}%`);
-      if (filters.ownerName.trim()) q = q.ilike('owner_name', `%${filters.ownerName.trim()}%`);
-
-      const { data, count } = await q
-        .order('chassis_no')
-        .range(p * FILTER_PAGE_SIZE, (p + 1) * FILTER_PAGE_SIZE - 1);
-      setResults((data ?? []) as Vehicle[]);
-      setTotalCount(count ?? 0);
+      const { rows, total } = await searchChassisFilter({
+        companyId: companyId ?? '',
+        chassisNo: filters.chassisNo,
+        plateNo: filters.plateNo,
+        model: filters.model,
+        engineNo: filters.engineNo,
+        colour: filters.colour,
+        ownerName: filters.ownerName,
+        page: p,
+        pageSize: FILTER_PAGE_SIZE,
+      });
+      setResults(rows);
+      setTotalCount(total);
       setPage(p);
       setSearched(true);
     } finally {

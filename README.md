@@ -2,6 +2,16 @@
 
 This project is a Vite React application backed by a local Supabase stack for development.
 
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md) — monorepo layout, layering rules, data fetching
+- [Security model](docs/SECURITY.md) — authn/z, edge functions, threat model
+- [Environment contract](docs/ENV.md) — required + optional env vars
+- [RLS matrix](docs/RLS_MATRIX.md) — per-table policy posture
+- [Release flow](docs/RELEASE.md) — branches, CI gates, rollback
+- [Backup & DR](docs/BACKUP_DR.md) — PITR, restore drills, incident response
+- [Launch checklist](docs/LAUNCH_CHECKLIST.md) — one-time production gate
+
 ## Prerequisites
 
 - Node.js 20+ and npm

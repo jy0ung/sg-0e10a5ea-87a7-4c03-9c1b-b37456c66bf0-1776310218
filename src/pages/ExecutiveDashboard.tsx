@@ -1,27 +1,25 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { KpiDashboard } from '@/components/KpiDashboard';
-import { AlertTriangle, ArrowDown, ArrowUp, BarChart3, CalendarCheck, Car, CheckCircle, LayoutGrid, Loader2, Plus, Settings2, ShoppingCart, Sparkles, Timer, Trash2, TrendingUp, type LucideIcon, UserPlus } from 'lucide-react';
+import { AlertTriangle, BarChart3, CalendarCheck, Car, CheckCircle, Loader2, Settings2, ShoppingCart, Sparkles, Timer, TrendingUp, type LucideIcon, UserPlus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  fetchDashboardPreferences,
+  upsertDashboardPreferences,
+} from '@/services/dashboardPreferencesService';
+import { ExecutiveDashboardSettings } from './ExecutiveDashboardSettings';
 import { useSales } from '@/contexts/SalesContext';
 import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { BranchPeriodFilter } from '@/components/shared/BranchPeriodFilter';
 import { getDashboardScopeSummary, loadDashboardFilterState, matchesDashboardPeriod, saveDashboardFilterState } from '@/lib/dashboardFilters';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import {
   CUSTOM_INSIGHT_DEFINITIONS,
-  DASHBOARD_SECTION_LABELS,
   DEFAULT_PERSONAL_DASHBOARD,
+  createCustomFormulaWidget,
   createCustomMetricWidget,
   evaluateCustomInsight,
   isSameDashboardPreferences,
@@ -31,9 +29,12 @@ import {
   sanitizeDashboardPreferences,
   type CustomInsightMetricId,
   type DashboardSystemWidgetId,
+  type PersonalDashboardCustomFormula,
   type PersonalDashboardCustomMetric,
   type PersonalDashboardPreferences,
 } from '@/lib/personalDashboard';
+import { evaluateCustomKpiFormula, type CustomKpiFormula } from '@/lib/customKpiFormula';
+import { CustomKpiCard } from '@/components/CustomKpiCard';
 
 const ALL_KPI_IDS = KPI_DEFINITIONS.map(k => k.id);
 const BASIC_KPIS = ['bg_to_delivery', 'bg_to_disb'];
@@ -49,9 +50,11 @@ interface DashboardCardMetric {
   valueClassName: string;
 }
 
+type DashboardCustomWidget = PersonalDashboardCustomMetric | PersonalDashboardCustomFormula;
+
 type DashboardRenderBlock =
   | { kind: 'section'; widgetId: DashboardSystemWidgetId }
-  | { kind: 'custom-group'; widgets: PersonalDashboardCustomMetric[] };
+  | { kind: 'custom-group'; widgets: DashboardCustomWidget[] };
 
 export default function ExecutiveDashboard() {
   const { kpiSummaries, vehicles, qualityIssues, lastRefresh, importBatches, loading } = useData();
@@ -74,17 +77,12 @@ export default function ExecutiveDashboard() {
       if (!user?.id) { setPrefsLoaded(true); return; }
       const userId = user.id;
       const localDashboard = loadPersonalDashboardState('company-overview');
-      const { data } = await supabase
-        .from('dashboard_preferences')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
+      const { data } = await fetchDashboardPreferences(userId);
+
       if (data) {
-        const row = data as unknown as Record<string, unknown>;
-        setSelectedKpis((row.selected_kpis as string[]) || ADVANCED_KPIS);
-        setShowAdvanced(row.show_advanced_kpis as boolean ?? true);
-        const remoteDashboard = sanitizeDashboardPreferences(row.personal_dashboard);
+        setSelectedKpis(data.selected_kpis ?? ADVANCED_KPIS);
+        setShowAdvanced(data.show_advanced_kpis ?? true);
+        const remoteDashboard = sanitizeDashboardPreferences(data.personal_dashboard);
         setPersonalDashboard(
           isSameDashboardPreferences(remoteDashboard, sanitizeDashboardPreferences(DEFAULT_PERSONAL_DASHBOARD))
             && !isSameDashboardPreferences(localDashboard, sanitizeDashboardPreferences(DEFAULT_PERSONAL_DASHBOARD))
@@ -103,24 +101,48 @@ export default function ExecutiveDashboard() {
     saveDashboardFilterState('company-overview', dashboardFilter);
   }, [dashboardFilter]);
 
-  const savePreferences = useCallback(async (
+  // Debounced DB write: writes collapse to one request per 500ms of idle,
+  // so rapid KPI / widget toggles don't saturate the network. Local
+  // persistence still happens immediately so the UI feels instant.
+  const pendingWriteRef = useRef<number | null>(null);
+  const latestPayloadRef = useRef<{
+    kpis: string[];
+    advanced: boolean;
+    dashboard: PersonalDashboardPreferences;
+  } | null>(null);
+
+  useEffect(() => () => {
+    if (pendingWriteRef.current !== null) {
+      window.clearTimeout(pendingWriteRef.current);
+    }
+  }, []);
+
+  const savePreferences = useCallback((
     kpis: string[],
     advanced: boolean,
     nextDashboard: PersonalDashboardPreferences,
   ) => {
+    // Write to localStorage immediately so a refresh never loses the user's
+    // intent. It's sub-millisecond for small payloads.
     savePersonalDashboardState('company-overview', nextDashboard);
     if (!user?.id) return;
     const userId = user.id;
-    await supabase
-      .from('dashboard_preferences')
-      .upsert({
+    latestPayloadRef.current = { kpis, advanced, dashboard: nextDashboard };
+    if (pendingWriteRef.current !== null) {
+      window.clearTimeout(pendingWriteRef.current);
+    }
+    pendingWriteRef.current = window.setTimeout(() => {
+      pendingWriteRef.current = null;
+      const payload = latestPayloadRef.current;
+      latestPayloadRef.current = null;
+      if (!payload) return;
+      void upsertDashboardPreferences({
         user_id: userId,
-        selected_kpis: kpis,
-        show_advanced_kpis: advanced,
-        personal_dashboard: nextDashboard,
-        updated_at: new Date().toISOString(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any, { onConflict: 'user_id' });
+        selected_kpis: payload.kpis,
+        show_advanced_kpis: payload.advanced,
+        personal_dashboard: payload.dashboard,
+      });
+    }, 500);
   }, [user?.id]);
 
   const updatePersonalDashboard = useCallback((updater: (current: PersonalDashboardPreferences) => PersonalDashboardPreferences) => {
@@ -173,6 +195,12 @@ export default function ExecutiveDashboard() {
     }));
     setNewInsightTitle('');
   }, [newInsightMetricId, newInsightTitle, updatePersonalDashboard]);
+
+  const addCustomFormula = useCallback((title: string, formula: CustomKpiFormula) => {
+    updatePersonalDashboard(current => ({
+      widgets: [...current.widgets, createCustomFormulaWidget(title, formula)],
+    }));
+  }, [updatePersonalDashboard]);
 
   const restoreDefaultDashboard = useCallback(() => {
     const nextDashboard = sanitizeDashboardPreferences(DEFAULT_PERSONAL_DASHBOARD);
@@ -421,13 +449,27 @@ export default function ExecutiveDashboard() {
     );
   }, [filteredCustomers, filteredKpiSummaries, filteredQualityIssues, filteredSalesOrders, filteredVehicles, personalDashboard.widgets]);
 
+  const customFormulaResults = useMemo(() => {
+    const context = {
+      vehicles: filteredVehicles,
+      salesOrders: filteredSalesOrders,
+      customers: filteredCustomers,
+      kpiSummaries: filteredKpiSummaries,
+    };
+    return new Map(
+      personalDashboard.widgets
+        .filter((widget): widget is PersonalDashboardCustomFormula => widget.type === 'custom-formula')
+        .map(widget => [widget.id, evaluateCustomKpiFormula(widget.formula, context)]),
+    );
+  }, [filteredCustomers, filteredKpiSummaries, filteredSalesOrders, filteredVehicles, personalDashboard.widgets]);
+
   const dashboardBlocks = useMemo<DashboardRenderBlock[]>(() => {
     const activeWidgets = personalDashboard.widgets.filter(widget => widget.enabled);
     const blocks: DashboardRenderBlock[] = [];
-    let customGroup: PersonalDashboardCustomMetric[] = [];
+    let customGroup: DashboardCustomWidget[] = [];
 
     activeWidgets.forEach(widget => {
-      if (widget.type === 'custom-metric') {
+      if (widget.type === 'custom-metric' || widget.type === 'custom-formula') {
         customGroup.push(widget);
         return;
       }
@@ -557,7 +599,7 @@ export default function ExecutiveDashboard() {
     }
   };
 
-  const renderCustomInsightGroup = (widgets: PersonalDashboardCustomMetric[]) => (
+  const renderCustomInsightGroup = (widgets: DashboardCustomWidget[]) => (
     <div className="glass-panel p-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-4">
         <div>
@@ -572,6 +614,20 @@ export default function ExecutiveDashboard() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {widgets.map(widget => {
+          if (widget.type === 'custom-formula') {
+            const evaluation = customFormulaResults.get(widget.id);
+            if (!evaluation) return null;
+            return (
+              <CustomKpiCard
+                key={widget.id}
+                title={widget.title}
+                formula={widget.formula}
+                evaluation={evaluation}
+                onRemove={() => removeCustomInsight(widget.id)}
+              />
+            );
+          }
+
           const definition = CUSTOM_INSIGHT_DEFINITIONS.find(item => item.id === widget.metricId);
           const result = customMetricResults.get(widget.id);
 
@@ -608,7 +664,7 @@ export default function ExecutiveDashboard() {
       <PageHeader
         title="My Dashboard"
         description={`Welcome back, ${firstName}. Personalize the company view around the KPIs, widgets, and insights you actually use.`}
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Company Overview' }]}
+        breadcrumbs={[{ label: 'FLC BI' }, { label: 'My Dashboard' }]}
         actions={
           <div className="flex items-center gap-3">
             <BranchPeriodFilter
@@ -630,178 +686,26 @@ export default function ExecutiveDashboard() {
                 <p className="text-[10px] text-success font-medium">Latest: {lastBatch.fileName}</p>
               </div>
             )}
-            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" disabled={!prefsLoaded}>
-                  <Settings2 className="h-3.5 w-3.5 mr-1" />Customize
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Personal Dashboard Settings</DialogTitle>
-                  <DialogDescription>
-                    Reorder your dashboard, decide which core sections stay visible, and add your own insight cards.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 mt-2">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/50">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Advanced View</p>
-                      <p className="text-xs text-muted-foreground">Show all 7 KPI metrics</p>
-                    </div>
-                    <Button
-                      variant={showAdvanced ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={toggleAdvancedView}
-                    >
-                      {showAdvanced ? 'Active' : 'Enable'}
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Select KPIs to Display</p>
-                    {KPI_DEFINITIONS.map(kpi => (
-                      <label key={kpi.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-secondary/30 cursor-pointer">
-                        <Checkbox
-                          checked={selectedKpis.includes(kpi.id)}
-                          onCheckedChange={() => toggleKpi(kpi.id)}
-                        />
-                        <div>
-                          <p className="text-sm text-foreground">{kpi.shortLabel}</p>
-                          <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Dashboard Layout</p>
-                        <p className="text-sm text-muted-foreground">Choose what appears on your dashboard and move widgets into your preferred order.</p>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={restoreDefaultDashboard}>
-                        Restore defaults
-                      </Button>
-                    </div>
-                    <div className="rounded-xl border border-border/60 overflow-hidden">
-                      {personalDashboard.widgets.map((widget, index) => {
-                        const isCustomMetric = widget.type === 'custom-metric';
-                        const definition = isCustomMetric
-                          ? CUSTOM_INSIGHT_DEFINITIONS.find(item => item.id === widget.metricId)
-                          : null;
-                        const title = isCustomMetric ? widget.title : DASHBOARD_SECTION_LABELS[widget.id].title;
-                        const description = isCustomMetric
-                          ? definition?.description ?? 'Custom insight'
-                          : DASHBOARD_SECTION_LABELS[widget.id].description;
-
-                        return (
-                          <div key={widget.id} className="flex items-start gap-3 p-3 border-b border-border/60 last:border-b-0">
-                            <Checkbox
-                              checked={widget.enabled}
-                              onCheckedChange={() => toggleWidgetVisibility(widget.id)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-medium text-foreground">{title}</p>
-                                <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                  {isCustomMetric ? 'Custom Insight' : 'Core Section'}
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">{description}</p>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                disabled={index === 0}
-                                onClick={() => moveDashboardWidget(widget.id, 'up')}
-                              >
-                                <ArrowUp className="h-4 w-4" />
-                                <span className="sr-only">Move up</span>
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                disabled={index === personalDashboard.widgets.length - 1}
-                                onClick={() => moveDashboardWidget(widget.id, 'down')}
-                              >
-                                <ArrowDown className="h-4 w-4" />
-                                <span className="sr-only">Move down</span>
-                              </Button>
-                              {isCustomMetric && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive"
-                                  onClick={() => removeCustomInsight(widget.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  <span className="sr-only">Remove widget</span>
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-3 rounded-xl border border-dashed border-border/70 p-4 bg-secondary/20">
-                    <div className="flex items-center gap-2">
-                      <LayoutGrid className="h-4 w-4 text-primary" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Add Personal Insight</p>
-                        <p className="text-xs text-muted-foreground">Create your own KPI-style card from the dashboard data already in scope.</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="custom-insight-type">Metric template</Label>
-                        <Select value={newInsightMetricId} onValueChange={(value: CustomInsightMetricId) => setNewInsightMetricId(value)}>
-                          <SelectTrigger id="custom-insight-type">
-                            <SelectValue placeholder="Choose a metric template" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CUSTOM_INSIGHT_DEFINITIONS.map(definition => (
-                              <SelectItem key={definition.id} value={definition.id}>
-                                {definition.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="custom-insight-title">Card title</Label>
-                        <Input
-                          id="custom-insight-title"
-                          value={newInsightTitle}
-                          placeholder={CUSTOM_INSIGHT_DEFINITIONS.find(definition => definition.id === newInsightMetricId)?.label ?? 'Custom Insight'}
-                          onChange={(event) => setNewInsightTitle(event.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                      <p className="text-xs text-muted-foreground">
-                        {CUSTOM_INSIGHT_DEFINITIONS.find(definition => definition.id === newInsightMetricId)?.description}
-                      </p>
-                      <Button type="button" onClick={addCustomInsight}>
-                        <Plus className="h-4 w-4 mr-1.5" />Add Insight
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <ExecutiveDashboardSettings
+              open={settingsOpen}
+              onOpenChange={setSettingsOpen}
+              disabled={!prefsLoaded}
+              showAdvanced={showAdvanced}
+              onToggleAdvanced={toggleAdvancedView}
+              selectedKpis={selectedKpis}
+              onToggleKpi={toggleKpi}
+              personalDashboard={personalDashboard}
+              onToggleWidget={toggleWidgetVisibility}
+              onMoveWidget={moveDashboardWidget}
+              onRemoveCustomInsight={removeCustomInsight}
+              onRestoreDefaults={restoreDefaultDashboard}
+              newInsightMetricId={newInsightMetricId}
+              onChangeNewInsightMetricId={setNewInsightMetricId}
+              newInsightTitle={newInsightTitle}
+              onChangeNewInsightTitle={setNewInsightTitle}
+              onAddCustomInsight={addCustomInsight}
+              onAddCustomFormula={addCustomFormula}
+            />
           </div>
         }
       />
@@ -815,15 +719,24 @@ export default function ExecutiveDashboard() {
           </React.Fragment>
         ))
       ) : (
-        <div className="glass-panel p-8 text-center space-y-3">
-          <LayoutGrid className="h-8 w-8 text-primary mx-auto" />
-          <div>
-            <h3 className="text-lg font-semibold text-foreground">Your dashboard is empty</h3>
-            <p className="text-sm text-muted-foreground">Use Customize to turn sections back on or add a personal insight card.</p>
+        <div className="glass-panel p-10 text-center space-y-4">
+          <div className="mx-auto h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Sparkles className="h-7 w-7 text-primary" />
           </div>
-          <Button variant="outline" onClick={() => setSettingsOpen(true)}>
-            <Settings2 className="h-4 w-4 mr-1.5" />Open Customize
-          </Button>
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold text-foreground">Your dashboard is a blank canvas</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Build your own KPI from a formula, pick a template, or turn on a core section. Everything you add stays scoped to the filters above.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <Button onClick={() => setSettingsOpen(true)}>
+              <Sparkles className="h-4 w-4 mr-1.5" />Build my first KPI
+            </Button>
+            <Button variant="outline" onClick={() => setSettingsOpen(true)}>
+              <Settings2 className="h-4 w-4 mr-1.5" />Customize
+            </Button>
+          </div>
         </div>
       )}
     </div>

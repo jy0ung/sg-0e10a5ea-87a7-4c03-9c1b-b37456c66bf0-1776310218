@@ -7,8 +7,8 @@ import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
  * Route-level guard that renders children only when the current user
  * holds one of the required roles.  Falls back to <UnauthorizedAccess />.
  */
-export function RequireRole({ roles, children }: { roles: AppRole[]; children: React.ReactNode }) {
+export function RequireRole({ roles, children }: { roles: readonly AppRole[]; children: React.ReactNode }) {
   const { hasRole } = useAuth();
-  if (!hasRole(roles)) return <UnauthorizedAccess />;
+  if (!hasRole(roles as AppRole[])) return <UnauthorizedAccess />;
   return <>{children}</>;
 }

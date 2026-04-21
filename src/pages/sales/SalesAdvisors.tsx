@@ -8,23 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  listSalesAdvisors,
+  createSalesAdvisor,
+  updateSalesAdvisorStatus,
+  type SalesAdvisorRecord,
+  type SalesAdvisorStatus,
+} from '@/services/salesAdvisorService';
 import { Search, Plus, UserCheck } from 'lucide-react';
 
-type SAStatus = 'active' | 'resigned' | 'inactive';
+type SAStatus = SalesAdvisorStatus;
 
-interface SalesAdvisor {
-  id: string;
-  code: string;
-  name: string;
-  ic: string;
-  email: string;
-  contact: string;
-  branch: string;
-  joinDate: string;
-  resignDate?: string;
-  status: SAStatus;
-}
+type SalesAdvisor = SalesAdvisorRecord;
 
 const STATUS_BADGE: Record<SAStatus, string> = {
   active:   'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
@@ -33,22 +28,6 @@ const STATUS_BADGE: Record<SAStatus, string> = {
 };
 
 const EMPTY_FORM = { code: '', name: '', ic: '', email: '', contact: '', branch: '', joinDate: new Date().toISOString().split('T')[0] };
-
-// Map a profiles row to the SalesAdvisor view model
-function rowToAdvisor(row: Record<string, unknown>): SalesAdvisor {
-  return {
-    id:         String(row.id ?? ''),
-    code:       String(row.staff_code ?? '—'),
-    name:       String(row.name ?? '—'),
-    ic:         String(row.ic_no ?? '—'),
-    email:      String(row.email ?? '—'),
-    contact:    String(row.contact_no ?? '—'),
-    branch:     String(row.branch_id ?? '—'),
-    joinDate:   row.join_date ? String(row.join_date) : '—',
-    resignDate: row.resign_date ? String(row.resign_date) : undefined,
-    status:     (row.status as SAStatus) ?? 'active',
-  };
-}
 
 export default function SalesAdvisors() {
   const { user } = useAuth();
@@ -67,22 +46,18 @@ export default function SalesAdvisors() {
 
   const branches = [...new Set(vehicles.map(v => v.branch_code).filter(Boolean))].sort() as string[];
 
-  // Load sales advisors from profiles table
+  // Load sales advisors via service
   const loadAdvisors = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date')
-      .eq('company_id', user.company_id)
-      .eq('role', 'sales')
-      .order('name');
-    if (error) {
+    try {
+      const list = await listSalesAdvisors(user.company_id);
+      setAdvisors(list);
+    } catch {
       toast({ title: 'Failed to load sales advisors', variant: 'destructive' });
-    } else {
-      setAdvisors((data ?? []).map(row => rowToAdvisor(row as Record<string, unknown>)));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user, toast]);
 
   useEffect(() => { loadAdvisors(); }, [loadAdvisors]);
@@ -103,22 +78,16 @@ export default function SalesAdvisors() {
     }
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase
-      .from('profiles')
-      .insert({
-        id:          crypto.randomUUID(),
-        email:       form.email || `${form.code.toLowerCase()}@flc.local`,
-        name:        form.name,
-        role:        'sales',
-        company_id:  user.company_id,
-        branch_id:   form.branch,
-        access_scope:'self',
-        status:      'active',
-        staff_code:  form.code.toUpperCase(),
-        ic_no:       form.ic || null,
-        contact_no:  form.contact || null,
-        join_date:   form.joinDate || null,
-      });
+    const { error } = await createSalesAdvisor({
+      companyId: user.company_id,
+      code: form.code,
+      name: form.name,
+      email: form.email || null,
+      ic: form.ic || null,
+      contact: form.contact || null,
+      branch: form.branch,
+      joinDate: form.joinDate || null,
+    });
     setSaving(false);
     if (error) {
       toast({ title: 'Failed to create advisor', description: error.message, variant: 'destructive' });
@@ -136,10 +105,7 @@ export default function SalesAdvisors() {
     const newStatus: SAStatus = advisor.status === 'active' ? 'inactive' : 'active';
     // Optimistic update
     setAdvisors(prev => prev.map(a => a.id !== id ? a : { ...a, status: newStatus }));
-    const { error } = await supabase
-      .from('profiles')
-      .update({ status: newStatus })
-      .eq('id', id);
+    const { error } = await updateSalesAdvisorStatus(id, newStatus);
     if (error) {
       // Revert on failure
       setAdvisors(prev => prev.map(a => a.id !== id ? a : { ...a, status: advisor.status }));

@@ -10,7 +10,8 @@ import {
   getPaymentMethodMappings, createPaymentMethodMapping, updatePaymentMethodMapping, deletePaymentMethodMapping,
 } from '@/services/mappingService';
 import type { BranchMapping, PaymentMethodMapping } from '@/types';
-import { Plus, Pencil, Trash2, Check, X, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, Loader2, Copy } from 'lucide-react';
+import { AUTO_AGING_COLUMN_OWNERS } from '@/config/autoAgingColumnOwners';
 
 interface EditingRow {
   id: string | null; // null = new row
@@ -243,8 +244,71 @@ export default function MappingAdmin() {
             onDelete={handleDeletePayment}
             canEdit={canEdit}
           />
+
+          <ColumnOwnersPanel />
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Read-only reference of the Auto-Aging "new format" column owners. Use this
+ * panel as the source of truth when seeding `column_permissions` for the
+ * respective roles. A copy button lets admins paste the column list into the
+ * permissions editor without retyping.
+ */
+function ColumnOwnersPanel() {
+  const { toast } = useToast();
+  const copy = async (cols: string[], label: string) => {
+    try {
+      await navigator.clipboard.writeText(cols.join(', '));
+      toast({ title: 'Copied', description: `${label} columns copied to clipboard.` });
+    } catch {
+      toast({ title: 'Copy failed', description: 'Clipboard unavailable.', variant: 'destructive' });
+    }
+  };
+  return (
+    <div className="glass-panel overflow-hidden">
+      <div className="p-4 border-b border-border">
+        <h3 className="text-sm font-semibold text-foreground">Column Owners (Auto-Aging)</h3>
+        <p className="text-xs text-muted-foreground">
+          Reference grouping for the new Excel template. Use this as the checklist when
+          granting <code className="text-[11px]">edit</code> permissions on
+          <code className="text-[11px]"> column_permissions</code> for each role.
+        </p>
+      </div>
+      <div className="divide-y divide-border">
+        {AUTO_AGING_COLUMN_OWNERS.map(def => (
+          <div key={def.owner} className="p-4 flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-foreground">{def.label}</span>
+                <span className="text-[11px] text-muted-foreground">({def.columns.length} columns)</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">{def.description}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {def.columns.map(col => (
+                  <span
+                    key={col as string}
+                    className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 text-[11px] text-foreground"
+                  >
+                    {col as string}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => copy(def.columns as string[], def.label)}
+              className="shrink-0"
+            >
+              <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+            </Button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

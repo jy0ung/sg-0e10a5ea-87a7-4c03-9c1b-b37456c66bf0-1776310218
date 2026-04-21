@@ -30,7 +30,16 @@ const __dirname  = path.dirname(__filename);
 
 const SUPABASE_URL  = process.env.SUPABASE_URL  ?? "http://127.0.0.1:54321";
 // The service-role key bypasses RLS so we can insert without an authenticated user.
-const SERVICE_KEY   = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hj04zWl196z2-SBc0";
+// Phase 0 hardening: no hardcoded fallback key. Caller MUST set
+// SUPABASE_SERVICE_ROLE_KEY in the environment (see .env.example) — the seed
+// script refuses to run otherwise to avoid leaking data into the wrong project.
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!SERVICE_KEY) {
+  console.error(
+    "seed-from-extract: SUPABASE_SERVICE_ROLE_KEY is not set. Export it in your shell or .env before running.",
+  );
+  process.exit(1);
+}
 const COMPANY_ID    = process.env.SEED_COMPANY_ID ?? "c1";
 const EXTRACT_DIR   = path.resolve(__dirname, "../test-results/extract");
 const CHUNK_SIZE    = 50;

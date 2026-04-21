@@ -12,7 +12,7 @@ import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCirc
 import { parseWorkbook, publishCanonical } from '@/lib/import-parser';
 import { loadBranchMappingLookup, loadPaymentMappingLookup, createBranchMapping } from '@/services/mappingService';
 import { validateVehicleImportBatch } from '@/services/validationService';
-import { createImportBatch, validateAndInsertVehicles } from '@/services/importService';
+import { createImportBatch, commitImportBatch } from '@/services/importService';
 import { resolveNamesToIds } from '@/services/hrmsService';
 import type { ImportBatchInsert, VehicleRaw, ValidationError } from '@/types';
 import { loggingService } from '@/services/loggingService';
@@ -165,34 +165,59 @@ export default function ImportCenter() {
     updateImportBatch(batchId, { status: 'publish_in_progress' });
 
     try {
-      // Validate and insert vehicles server-side
-      const result = await validateAndInsertVehicles(
-        rawRows,
-        batchId,
-        companyId,
-        user?.id || 'system-user'
-      );
-
-      if (result.error) {
-        throw new Error(`Validation or insert failed: ${result.error.message}`);
-      }
-
-      // Publish canonical data to UI (with dynamic DB-backed value mappings)
+      // Resolve canonical rows + per-row quality issues up front; we need both the
+      // shaped vehicles for the RPC and the canonical data for the UI cache.
       const allNames = [...new Set(rawRows.map(r => r.salesman_name).filter((n): n is string => Boolean(n)))];
       const [branchMap, paymentMap, nameToIdMap] = await Promise.all([
         loadBranchMappingLookup(companyId),
         loadPaymentMappingLookup(companyId),
         resolveNamesToIds(companyId, allNames),
       ]);
-      const { canonical, issues } = publishCanonical(rawRows, branchMap, paymentMap, nameToIdMap);
+      const { canonical, issues: canonicalIssues } = publishCanonical(rawRows, branchMap, paymentMap, nameToIdMap);
+
+      // Combine batch-level validation issues with per-row canonical issues
+      // and send them to the transactional commit RPC.
+      const combinedIssues = [
+        ...validationIssues.map(i => ({
+          chassisNo: i.chassisNo,
+          field: i.field,
+          issueType: i.issueType,
+          message: i.message,
+          severity: i.severity,
+        })),
+        ...canonicalIssues.map(i => ({
+          chassisNo: i.chassisNo,
+          field: i.field,
+          issueType: i.issueType,
+          message: i.message,
+          severity: i.severity,
+        })),
+      ];
+
+      // Single transactional call: vehicles upsert + quality_issues insert + batch finalize.
+      // If any step fails the whole batch rolls back — no orphaned rows.
+      const result = await commitImportBatch(
+        rawRows,
+        batchId,
+        companyId,
+        combinedIssues,
+        user?.id || 'system-user',
+      );
+
+      if (result.error) {
+        throw new Error(`Commit failed: ${result.error.message}`);
+      }
+
+      // Refresh local caches with the canonical rows now that the DB is consistent.
       const existingNonDup = vehicles.filter(v => !canonical.find(c => c.chassis_no === v.chassis_no));
       await setVehicles([...canonical, ...existingNonDup]);
-      addQualityIssues([...validationIssues, ...issues]);
-      updateImportBatch(batchId, { 
-        status: 'published', 
+      addQualityIssues([...validationIssues, ...canonicalIssues]);
+      // Reflect the DB-finalized state in the UI cache (the RPC already persisted it).
+      updateImportBatch(batchId, {
+        status: 'published',
         publishedAt: new Date().toISOString(),
         validRows: result.inserted,
-        errorRows: result.errors.length
+        errorRows: combinedIssues.filter(i => i.severity === 'error').length,
       });
       refreshKpis();
       setStep('done');

@@ -174,7 +174,7 @@ export default function ModuleDirectory() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <WorkspaceCard
-            name="Company Overview"
+            name="My Dashboard"
             description="Executive dashboard — KPIs and operating summary"
             onClick={() => navigate('/')}
             Icon={LayoutDashboard}

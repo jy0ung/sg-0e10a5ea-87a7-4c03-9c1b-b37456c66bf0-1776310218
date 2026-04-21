@@ -228,8 +228,8 @@ async function scrapePage(page: import("@playwright/test").Page) {
 // Suite
 // ─────────────────────────────────────────────────────────────────────────────
 
-let siteMap: PageRecord[] = [];
-let visitedUrls = new Set<string>();
+const siteMap: PageRecord[] = [];
+const visitedUrls = new Set<string>();
 
 test.describe("Proton CRM — Read-Only Exploration", () => {
   // ── 1. Login ───────────────────────────────────────────────────────────────

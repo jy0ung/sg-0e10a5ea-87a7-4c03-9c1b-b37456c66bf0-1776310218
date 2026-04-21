@@ -98,23 +98,28 @@ export default function ApprovalFlows() {
 
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
 
-  if (!user || !(HRMS_ADMIN_ROLES as string[]).includes(user.role)) {
-    return <UnauthorizedAccess />;
-  }
+  const isAuthorized =
+    !!user && (HRMS_ADMIN_ROLES as string[]).includes(user.role);
 
   const load = useCallback(async () => {
+    if (!isAuthorized) return;
     setLoading(true);
     const { data, error } = await listApprovalFlows(companyId);
     if (!error) setFlows(data);
     setLoading(false);
-  }, [companyId]);
+  }, [companyId, isAuthorized]);
 
   useEffect(() => { void load(); }, [load]);
 
   // Pre-load employees for specific_user picker
   useEffect(() => {
+    if (!isAuthorized) return;
     listEmployeesForSelect(companyId).then(({ data }) => setEmployees(data));
-  }, [companyId]);
+  }, [companyId, isAuthorized]);
+
+  if (!isAuthorized) {
+    return <UnauthorizedAccess />;
+  }
 
   const filtered = entityFilter === 'all' ? flows : flows.filter(f => f.entityType === entityFilter);
 

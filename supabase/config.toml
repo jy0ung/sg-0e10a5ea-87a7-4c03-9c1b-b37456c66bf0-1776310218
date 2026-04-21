@@ -5,5 +5,10 @@ site_url = "http://192.168.1.241:3000"
 additional_redirect_urls = ["http://192.168.1.241:3000/signup", "http://192.168.1.241:3000/reset-password", "http://localhost:3000/signup", "http://localhost:3000/reset-password"]
 
 [auth.email]
-enable_signup = true
-enable_confirmations = false
+# Phase 0 hotfix: self-signup is disabled platform-wide.
+# New users must be onboarded via the `invite-user` edge function, which
+# requires an authenticated admin caller and provisions `profiles.company_id`
+# server-side. Email confirmations are enabled so invited users verify
+# their address before first login.
+enable_signup = false
+enable_confirmations = true

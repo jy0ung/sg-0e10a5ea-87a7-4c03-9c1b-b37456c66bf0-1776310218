@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { createTicket } from '@/services/ticketService';
 
 const ticketSchema = z.object({
   subject: z.string().min(5, 'Subject must be at least 5 characters'),
@@ -60,33 +60,25 @@ export default function NewTicket() {
   const handleSubmit = async (data: TicketFormData) => {
     if (!user) return;
     setSubmitting(true);
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
-        .from('tickets')
-        .insert({
-          company_id: user.company_id,
-          subject: data.subject,
-          category: data.category,
-          priority: data.priority,
-          description: data.description,
-          status: 'open',
-          submitted_by: user.id,
-        });
-
-      if (error) throw error;
-
+    const { error } = await createTicket({
+      company_id: user.company_id,
+      subject: data.subject,
+      category: data.category,
+      priority: data.priority,
+      description: data.description,
+      submitted_by: user.id,
+    });
+    if (error) {
+      toast.error('Failed to submit ticket', {
+        description: error.message || 'An unexpected error occurred.',
+      });
+    } else {
       toast.success('Ticket submitted successfully', {
         description: 'Your ticket has been raised and will be reviewed shortly.',
       });
       form.reset();
-    } catch (err) {
-      toast.error('Failed to submit ticket', {
-        description: err instanceof Error ? err.message : 'An unexpected error occurred.',
-      });
-    } finally {
-      setSubmitting(false);
     }
+    setSubmitting(false);
   };
 
   return (

@@ -46,3 +46,4 @@ credentials.json
 .git-credentials
 .secrets
 secrets/
+coverage/

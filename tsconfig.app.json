@@ -12,10 +12,10 @@
     "moduleDetection": "force",
     "moduleResolution": "bundler",
     "noEmit": true,
-    "noFallthroughCasesInSwitch": false,
     "noImplicitAny": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
+    "resolveJsonModule": true,
     "paths": {
       "@/*": [
         "./src/*"
@@ -26,6 +26,12 @@
     },
     "skipLibCheck": true,
     "strict": false,
+    // Incremental strictness — safe flags that give real value without
+    // requiring a sweep of every module. Full `strict: true` + the stricter
+    // index/return flags are tracked as Phase 2 debt.
+    "noImplicitOverride": true,
+    "useUnknownInCatchVariables": true,
+    "noFallthroughCasesInSwitch": true,
     "target": "ES2020",
     "types": [
       "vitest/globals"

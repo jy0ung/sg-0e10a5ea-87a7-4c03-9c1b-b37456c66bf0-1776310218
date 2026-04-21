@@ -2,20 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { AlertCircle, Loader2, RefreshCcw, Ticket } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-
-type TicketRecord = {
-  id: string;
-  subject: string;
-  category: string;
-  priority: 'low' | 'medium' | 'high';
-  status: 'open' | 'in_progress' | 'resolved' | 'closed';
-  description: string;
-  created_at: string;
-};
+import { listMyTickets, type TicketRecord } from '@/services/ticketService';
 
 const statusVariant: Record<TicketRecord['status'], 'default' | 'secondary' | 'outline'> = {
   open: 'default',
@@ -51,28 +41,14 @@ export default function MyTickets() {
       setLoading(true);
       setError(null);
 
-      try {
-        // The generated database types have not been refreshed for the tickets table yet.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error: fetchError } = await (supabase as any)
-          .from('tickets')
-          .select('id, subject, category, priority, status, description, created_at')
-          .order('created_at', { ascending: false });
-
-        if (fetchError) throw fetchError;
-
-        if (!cancelled) {
-          setTickets((data ?? []) as TicketRecord[]);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Unable to load tickets.');
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      const { data, error: fetchError } = await listMyTickets();
+      if (cancelled) return;
+      if (fetchError) {
+        setError(fetchError.message || 'Unable to load tickets.');
+      } else {
+        setTickets(data ?? []);
       }
+      setLoading(false);
     };
 
     void loadTickets();

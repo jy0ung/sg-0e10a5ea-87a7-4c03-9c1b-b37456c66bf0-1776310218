@@ -20,7 +20,7 @@ interface KpiDashboardProps {
   showFilters?: boolean;
 }
 
-export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true, showFilters: enableFilters = true }: KpiDashboardProps) {
+function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFilters: enableFilters = true }: KpiDashboardProps) {
   const [filters, setFilters] = useState<KpiDashboardFilters>({
     dateRange: { from: null, to: null },
     branches: [],
@@ -701,3 +701,8 @@ export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true, show
     </div>
   );
 }
+
+// Memoized export: KpiDashboard receives potentially large arrays and renders
+// several recharts visualisations. Skip re-rendering when props are referentially
+// stable (ExecutiveDashboard already memoizes the inputs).
+export const KpiDashboard = React.memo(KpiDashboardImpl);

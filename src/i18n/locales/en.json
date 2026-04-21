@@ -1,0 +1,38 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "empty": "Nothing to show",
+    "search": "Search",
+    "filter": "Filter",
+    "actions": "Actions",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "sales": "Sales",
+    "inventory": "Inventory",
+    "purchasing": "Purchasing",
+    "hrms": "HRMS",
+    "admin": "Admin",
+    "tickets": "Tickets",
+    "reports": "Reports",
+    "notifications": "Notifications",
+    "signOut": "Sign out"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "email": "Email",
+    "password": "Password",
+    "forgot": "Forgot password?",
+    "reset": "Reset password"
+  }
+}

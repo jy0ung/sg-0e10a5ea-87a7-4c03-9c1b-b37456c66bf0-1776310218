@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useMemo, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Customer, DealStage, SalesOrder, Invoice, SalesmanTarget } from '@/types';
 import { getCustomers } from '@/services/customerService';
@@ -118,8 +118,8 @@ export function SalesProvider({ children }: { children: ReactNode }) {
     );
   }, [queryClient, companyId, branchId]);
 
-  return (
-    <SalesContext.Provider value={{
+  const contextValue = useMemo(
+    () => ({
       customers: data?.customers ?? [],
       salesOrders: data?.salesOrders ?? [],
       dealStages: data?.dealStages ?? [],
@@ -129,7 +129,12 @@ export function SalesProvider({ children }: { children: ReactNode }) {
       reloadSales,
       moveOrderStage,
       updateOrder,
-    }}>
+    }),
+    [data, isLoading, reloadSales, moveOrderStage, updateOrder],
+  );
+
+  return (
+    <SalesContext.Provider value={contextValue}>
       {children}
     </SalesContext.Provider>
   );

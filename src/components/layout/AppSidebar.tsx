@@ -44,7 +44,7 @@ const sectionDefs: SectionDef[] = [
 ];
 
 const navItems: NavItem[] = [
-  { label: 'Company Overview', path: '/', icon: LayoutDashboard, section: 'Platform' },
+  { label: 'My Dashboard', path: '/', icon: LayoutDashboard, section: 'Platform' },
   { label: 'Module Directory', path: '/modules', icon: Grid3X3, section: 'Platform' },
   { label: 'Notifications', path: '/notifications', icon: Bell, section: 'Platform' },
   { label: 'Customer Service', path: '/portal/tickets/new', icon: HeadphonesIcon, section: 'Platform' },

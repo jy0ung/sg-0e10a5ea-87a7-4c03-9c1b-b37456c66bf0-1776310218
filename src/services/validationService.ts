@@ -14,12 +14,10 @@ type QualityIssueSeverity = typeof ALLOWED_SEVERITIES[number];
 const ALLOWED_ISSUE_TYPES = ['missing', 'duplicate', 'negative', 'invalid', 'format'] as const;
 type QualityIssueType = typeof ALLOWED_ISSUE_TYPES[number];
 
-// Reference data cache
-const branchesCache: string[] = [];
-const modelsCache: string[] = [];
-const paymentMethodsCache: string[] = [];
-const cacheExpiry = 0;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// Phase 2 #18: the prior reference-data caches (branchesCache, modelsCache,
+// paymentMethodsCache, cacheExpiry, CACHE_TTL) were never populated or read.
+// They were removed to eliminate dead state. Live lookups happen through
+// mappingService (which does its own React Query caching).
 
 interface ValidationResult {
   isValid: boolean;

@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { supabase } from '@/integrations/supabase/client';
 import { logVehicleEdit } from '@/services/auditService';
+import { bulkUpdateVehicles, softDeleteVehicles } from '@/services/vehicleService';
 import type { VehicleCanonical } from '@/types';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -42,10 +42,7 @@ export function VehicleBulkActions({ selectedVehicles, action, onComplete }: Veh
     setLoading(true);
     try {
       const ids = selectedVehicles.map(v => v.id);
-      const { error } = await supabase
-        .from('vehicles')
-        .update({ is_deleted: true, deleted_at: new Date().toISOString() })
-        .in('id', ids);
+      const { error } = await softDeleteVehicles(ids);
       if (error) throw error;
       await Promise.all(
         selectedVehicles.map(v => logVehicleEdit(user.id, v.id, { is_deleted: { before: false, after: true } }))
@@ -64,10 +61,14 @@ export function VehicleBulkActions({ selectedVehicles, action, onComplete }: Veh
     if (!user?.id || selectedVehicles.length === 0) return;
     setLoading(true);
     try {
-      for (const vehicle of selectedVehicles) {
-        await supabase.from('vehicles').update({ remark: 'Completed' }).eq('id', vehicle.id);
-        await logVehicleEdit(user.id, vehicle.id, { remark: { before: vehicle.remark, after: 'Completed' } });
-      }
+      const ids = selectedVehicles.map(v => v.id);
+      const { error } = await bulkUpdateVehicles(ids, { remark: 'Completed' });
+      if (error) throw error;
+      await Promise.all(
+        selectedVehicles.map(v =>
+          logVehicleEdit(user.id, v.id, { remark: { before: v.remark, after: 'Completed' } })
+        )
+      );
       await reloadFromDb();
       toast({ title: `${selectedVehicles.length} vehicle(s) marked complete` });
     } catch (err) {
@@ -83,7 +84,7 @@ export function VehicleBulkActions({ selectedVehicles, action, onComplete }: Veh
     setLoading(true);
     try {
       const ids = selectedVehicles.map(v => v.id);
-      const { error } = await supabase.from('vehicles').update({ branch_code: targetBranch }).in('id', ids);
+      const { error } = await bulkUpdateVehicles(ids, { branch_code: targetBranch });
       if (error) throw error;
       await Promise.all(
         selectedVehicles.map(v =>

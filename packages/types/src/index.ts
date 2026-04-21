@@ -393,6 +393,18 @@ export interface ValidationError {
 }
 
 // ===== Vehicle =====
+
+/**
+ * Pipeline stage for an auto-aging vehicle. Introduced with the new Excel
+ * template which groups rows under three category sections. Values are
+ * derived from milestone dates by default; users can pin a stage via
+ * `VehicleCanonical.stage_override`.
+ */
+export type VehicleStage =
+  | 'pending_register_free_stock'
+  | 'pending_deliver_loan_disburse'
+  | 'complete';
+
 export interface VehicleRaw {
   id: string;
   import_batch_id: string;
@@ -417,6 +429,7 @@ export interface VehicleRaw {
   // Optional fields
   source_row_no?: string;
   variant?: string;
+  color?: string;
   dealer_transfer_price?: string;
   full_payment_type?: string;
   shipment_name?: string;
@@ -425,6 +438,9 @@ export interface VehicleRaw {
   reg_no?: string;
   invoice_no?: string;
   obr?: string;
+  // Commission tracking — parsed from the "COMM PAYOUT..." column on the new template
+  commission_paid?: boolean;
+  commission_remark?: string;
 }
 
 export interface VehicleCanonical {
@@ -452,6 +468,7 @@ export interface VehicleCanonical {
   source_row_id: string;
   // Optional fields
   variant?: string;
+  color?: string;
   dealer_transfer_price?: string;
   full_payment_type?: string;
   shipment_name?: string;
@@ -460,6 +477,15 @@ export interface VehicleCanonical {
   reg_no?: string;
   invoice_no?: string;
   obr?: string;
+  // Commission tracking — from the "COMM PAYOUT..." column on the new template.
+  // `commission_paid=false` with a `commission_remark` (e.g. "Comm not paid") is
+  // the common case; `true` means payout has been processed.
+  commission_paid?: boolean;
+  commission_remark?: string;
+  // Pipeline stage — see VehicleStage. `stage` is auto-derived from date fields
+  // (DB trigger), `stage_override` wins when set so users can pin a card manually.
+  stage?: VehicleStage | null;
+  stage_override?: VehicleStage | null;
   // Computed KPIs — new flow: BG → ETD → Outlet → Reg → Delivery → Disb
   bg_to_delivery?: number | null;
   bg_to_shipment_etd?: number | null;

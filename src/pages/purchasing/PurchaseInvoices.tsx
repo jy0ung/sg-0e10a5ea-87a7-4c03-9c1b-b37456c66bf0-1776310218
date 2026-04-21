@@ -9,24 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  createPurchaseInvoice,
+  listPurchaseInvoices,
+  markPurchaseInvoiceReceived,
+} from '@/services/purchaseInvoiceService';
+import { purchaseInvoiceSchema } from '@/lib/validations';
 import { Search, Plus, Truck } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 
 type PIStatus = 'pending' | 'received' | 'cancelled';
-
-interface PurchaseInvoice {
-  id: string;
-  invoiceNo: string;
-  supplier: string;
-  chassisNo: string;
-  model: string;
-  invoiceDate: string;
-  amount: number;
-  status: PIStatus;
-  receivedDate?: string;
-  remark?: string;
-}
 
 const STATUS_BADGE: Record<PIStatus, string> = {
   pending:   'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -38,21 +30,6 @@ const EMPTY_FORM = { invoiceNo: '', supplier: '', chassisNo: '', model: '', invo
 
 function fmt(n: number) {
   return `RM ${n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function rowToInvoice(row: Record<string, unknown>): PurchaseInvoice {
-  return {
-    id:           String(row.id ?? ''),
-    invoiceNo:    String(row.invoice_no ?? ''),
-    supplier:     String(row.supplier ?? ''),
-    chassisNo:    String(row.chassis_no ?? ''),
-    model:        String(row.model ?? ''),
-    invoiceDate:  String(row.invoice_date ?? ''),
-    amount:       Number(row.amount ?? 0),
-    status:       (row.status as PIStatus) ?? 'pending',
-    receivedDate: row.received_date ? String(row.received_date) : undefined,
-    remark:       row.remark ? String(row.remark) : undefined,
-  };
 }
 
 export default function PurchaseInvoices() {
@@ -69,16 +46,7 @@ export default function PurchaseInvoices() {
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ['purchase-invoices', companyId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('purchase_invoices')
-        .select('*')
-        .eq('company_id', companyId)
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map(row => rowToInvoice(row as Record<string, unknown>));
-    },
+    queryFn: () => listPurchaseInvoices(companyId),
     enabled: !!companyId,
     staleTime: 30_000,
   });
@@ -95,34 +63,35 @@ export default function PurchaseInvoices() {
   const pendingAmount = invoices.filter(i => i.status === 'pending').reduce((s, i) => s + i.amount, 0);
 
   const handleCreate = async () => {
-    if (!form.invoiceNo || !form.supplier || !form.chassisNo || !form.model || !form.amount) {
-      return toast({ title: 'Invoice No, Supplier, Chassis, Model, and Amount are required', variant: 'destructive' });
-    }
-    const parsed = parseFloat(form.amount);
-    if (isNaN(parsed) || parsed <= 0) {
-      return toast({ title: 'Amount must be a positive number', variant: 'destructive' });
+    const amount = parseFloat(form.amount);
+    const parsed = purchaseInvoiceSchema.safeParse({
+      ...form,
+      amount: Number.isFinite(amount) ? amount : undefined,
+    });
+    if (!parsed.success) {
+      return toast({
+        title: parsed.error.issues[0]?.message ?? 'Invalid input',
+        variant: 'destructive',
+      });
     }
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase
-      .from('purchase_invoices')
-      .insert({
-        company_id:   user.company_id,
-        invoice_no:   form.invoiceNo,
-        supplier:     form.supplier,
-        chassis_no:   form.chassisNo.toUpperCase(),
-        model:        form.model,
-        invoice_date: form.invoiceDate,
-        amount:       parsed,
-        status:       'pending',
-        remark:       form.remark || null,
-      });
+    const { error } = await createPurchaseInvoice({
+      companyId: user.company_id,
+      invoiceNo: parsed.data.invoiceNo,
+      supplier: parsed.data.supplier,
+      chassisNo: parsed.data.chassisNo,
+      model: parsed.data.model,
+      invoiceDate: parsed.data.invoiceDate,
+      amount: parsed.data.amount,
+      remark: parsed.data.remark ?? null,
+    });
     setSaving(false);
     if (error) {
       toast({ title: 'Failed to create invoice', description: error.message, variant: 'destructive' });
       return;
     }
-    toast({ title: 'Purchase invoice created', description: form.invoiceNo });
+    toast({ title: 'Purchase invoice created', description: parsed.data.invoiceNo });
     setForm(EMPTY_FORM);
     setAddOpen(false);
     invalidate();
@@ -131,41 +100,15 @@ export default function PurchaseInvoices() {
   const markReceived = async (id: string) => {
     const prev = invoices.find(i => i.id === id);
     if (!prev) return;
-    const receivedDate = new Date().toISOString().split('T')[0];
-    const { error } = await supabase
-      .from('purchase_invoices')
-      .update({ status: 'received', received_date: receivedDate })
-      .eq('id', id);
+    if (!user?.company_id) return;
+    const { error } = await markPurchaseInvoiceReceived(id, {
+      companyId: user.company_id,
+      chassisNo: prev.chassisNo,
+      model: prev.model,
+    });
     if (error) {
       toast({ title: 'Failed to mark received', description: error.message, variant: 'destructive' });
       return;
-    }
-    // Upsert vehicle row so the vehicle appears in inventory when stock arrives.
-    // If a vehicle with this chassis already exists, update date_received_by_outlet only
-    // when it has not been set yet. Otherwise insert a minimal stub record.
-    if (user?.company_id && prev.chassisNo) {
-      const { data: existing } = await supabase
-        .from('vehicles')
-        .select('id, date_received_by_outlet')
-        .eq('chassis_no', prev.chassisNo)
-        .eq('company_id', user.company_id)
-        .maybeSingle();
-
-      if (existing) {
-        if (!existing.date_received_by_outlet) {
-          await supabase
-            .from('vehicles')
-            .update({ date_received_by_outlet: receivedDate })
-            .eq('id', existing.id);
-        }
-      } else {
-        await supabase.from('vehicles').insert({
-          chassis_no: prev.chassisNo,
-          model: prev.model,
-          company_id: user.company_id,
-          date_received_by_outlet: receivedDate,
-        });
-      }
     }
     invalidate();
   };

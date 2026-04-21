@@ -3,21 +3,18 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  findVehicleByChassis,
+  fetchVehicleAuditPage,
+  type AuditEventRecord,
+} from '@/services/inventoryService';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { Search, ArrowRight, Plus, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const AUDIT_PAGE_SIZE = 50;
 
 interface VehicleRow { id: string; chassisNo: string; model: string; branchCode: string; bgDate: string }
-interface AuditEvent {
-  id: string;
-  action: string;
-  entityType: string;
-  changes: Record<string, unknown>;
-  createdAt: string;
-  userName?: string;
-}
+type AuditEvent = AuditEventRecord;
 
 const ACTION_ICON: Record<string, React.FC<{ className?: string }>> = {
   create: Plus,
@@ -48,29 +45,11 @@ export default function ChassisMovement() {
   const totalAuditPages = Math.ceil(totalEvents / AUDIT_PAGE_SIZE) || 1;
 
   const loadAuditPage = async (vehicleId: string, p: number) => {
-    const { data: logData, error: logErr, count } = await supabase
-      .from('audit_logs')
-      .select('id, action, entity_type, changes, created_at, profiles(full_name, email)', { count: 'exact' })
-      .eq('entity_id', vehicleId)
-      .order('created_at', { ascending: true })
-      .range(p * AUDIT_PAGE_SIZE, (p + 1) * AUDIT_PAGE_SIZE - 1);
-
+    const { events: pageEvents, total, error: logErr } = await fetchVehicleAuditPage(vehicleId, p, AUDIT_PAGE_SIZE);
     if (logErr) { setError(logErr.message); return; }
-    setTotalEvents(count ?? 0);
+    setTotalEvents(total);
     setAuditPage(p);
-    setEvents(
-      ((logData ?? []) as Record<string, unknown>[]).map(r => {
-        const profile = r.profiles as Record<string, unknown> | null;
-        return {
-          id: r.id as string,
-          action: r.action as string,
-          entityType: r.entity_type as string,
-          changes: r.changes as Record<string, unknown>,
-          createdAt: r.created_at as string,
-          userName: (profile?.full_name ?? profile?.email ?? 'System') as string,
-        };
-      })
-    );
+    setEvents(pageEvents);
   };
 
   const handleSearch = async () => {
@@ -83,24 +62,16 @@ export default function ChassisMovement() {
     setSearched(true);
 
     // Find vehicle by chassis_no
-    const { data: vData, error: vErr } = await supabase
-      .from('vehicles')
-      .select('id, chassis_no, model, branch_code, bg_date')
-      .ilike('chassis_no', chassis)
-      .eq('company_id', companyId)
-      .limit(1)
-      .maybeSingle();
+    const { data: vData, error: vErr } = await findVehicleByChassis(chassis, companyId ?? '');
 
     if (vErr) { setError(vErr.message); setLoading(false); return; }
     if (!vData) { setLoading(false); return; }
 
-    const v = vData as Record<string, unknown>;
-    const vid = v.id as string;
-    setVehicle({ id: vid, chassisNo: v.chassis_no as string, model: v.model as string, branchCode: v.branch_code as string, bgDate: v.bg_date as string });
-    setCurrentVehicleId(vid);
+    setVehicle(vData);
+    setCurrentVehicleId(vData.id);
 
     // Fetch audit logs — page 0
-    await loadAuditPage(vid, 0);
+    await loadAuditPage(vData.id, 0);
     setLoading(false);
   };
 

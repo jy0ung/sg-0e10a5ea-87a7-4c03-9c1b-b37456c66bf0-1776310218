@@ -180,6 +180,64 @@ describe("import-parser", () => {
       
       expect(result.rows).toHaveLength(0);
     });
+
+    it("parses COLOR column into the vehicle row", () => {
+      const mockData = [
+        {
+          "Chassis No.": "CH001",
+          "BG Date": "2024-01-01",
+          "Shipment ETD PKG": "2024-01-05",
+          "Date Received by Outlet": "2024-01-10",
+          "Reg Date": "2024-01-15",
+          "Delivery Date": "2024-01-20",
+          "Disb. Date": "2024-01-25",
+          "BRCH": "BR1",
+          "Model": "Model1",
+          "Payment Method": "Cash",
+          "Color": "Solid White",
+        },
+      ];
+      const result = parseWorkbook(createMockWorkbook(mockData));
+      expect(result.rows[0].color).toBe("Solid White");
+    });
+
+    it("parses COMM PAYOUT header into commission fields", () => {
+      const mockData = [
+        {
+          "Chassis No.": "CH001",
+          "BG Date": "2024-01-01",
+          "Shipment ETD PKG": "2024-01-05",
+          "Date Received by Outlet": "2024-01-10",
+          "Reg Date": "2024-01-15",
+          "Delivery Date": "2024-01-20",
+          "Disb. Date": "2024-01-25",
+          "BRCH": "BR1",
+          "Model": "Model1",
+          "Payment Method": "Cash",
+          "COMM PAYOUT (on or before 30/04)": "Comm not paid",
+        },
+        {
+          "Chassis No.": "CH002",
+          "BG Date": "2024-01-01",
+          "Shipment ETD PKG": "2024-01-05",
+          "Date Received by Outlet": "2024-01-10",
+          "Reg Date": "2024-01-15",
+          "Delivery Date": "2024-01-20",
+          "Disb. Date": "2024-01-25",
+          "BRCH": "BR1",
+          "Model": "Model1",
+          "Payment Method": "Cash",
+          "COMM PAYOUT (on or before 30/04)": "Paid 15/04",
+        },
+      ];
+      const result = parseWorkbook(createMockWorkbook(mockData));
+      const a = result.rows.find(r => r.chassis_no === "CH001");
+      const b = result.rows.find(r => r.chassis_no === "CH002");
+      expect(a?.commission_paid).toBe(false);
+      expect(a?.commission_remark).toBe("Comm not paid");
+      expect(b?.commission_paid).toBe(true);
+      expect(b?.commission_remark).toBe("Paid 15/04");
+    });
   });
 
   describe("publishCanonical", () => {

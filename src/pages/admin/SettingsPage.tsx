@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { changePassword, updateProfile } from '@/services/profileService';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -76,19 +76,17 @@ export default function SettingsPage() {
     if (!user) return;
     setChangingPassword(true);
     try {
-      // Re-authenticate with current password first
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: data.currentPassword,
-      });
-      if (authError) {
+      const { error, code } = await changePassword(
+        user.email,
+        data.currentPassword,
+        data.newPassword,
+      );
+      if (code === 'wrong_current') {
         passwordForm.setError('currentPassword', { message: 'Current password is incorrect' });
         setChangingPassword(false);
         return;
       }
-      // Update password
-      const { error: updateError } = await supabase.auth.updateUser({ password: data.newPassword });
-      if (updateError) throw updateError;
+      if (error) throw new Error(error);
       toast.success('Password updated successfully');
       passwordForm.reset();
     } catch (err) {
@@ -104,19 +102,16 @@ export default function SettingsPage() {
     if (!user) return;
     setSaving(true);
     const newScope = ROLE_DEFAULT_SCOPE[data.role] || 'company';
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        name: data.name,
-        role: data.role,
-        branch_id: data.branch_id,
-        access_scope: newScope,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id);
+    const { error } = await updateProfile({
+      id: user.id,
+      name: data.name,
+      role: data.role,
+      branch_id: data.branch_id,
+      access_scope: newScope,
+    });
 
     if (error) {
-      toast.error('Failed to update profile: ' + error.message);
+      toast.error('Failed to update profile: ' + error);
     } else {
       toast.success('Profile updated successfully');
       await refreshProfile();

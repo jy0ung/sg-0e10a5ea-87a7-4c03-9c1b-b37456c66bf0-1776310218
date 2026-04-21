@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { SortAsc, SortDesc, ChevronLeft, ChevronRight, MoreVertical, Edit2, Eye, EyeOff, Check, X, AlertCircle } from 'lucide-react';
+import { SortAsc, SortDesc, ChevronLeft, ChevronRight, Check, X, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export type ColumnType = 'text' | 'number' | 'date' | 'select' | 'textarea';
@@ -16,7 +16,7 @@ export interface TableColumn<T = unknown> {
   editable?: boolean;
   type?: ColumnType;
   options?: string[];
-  format?: (value: unknown) => string;
+  format?: (value: unknown, rowIndex: number) => string;
   validate?: (value: unknown) => string | null;
   onSave?: (rowId: string, value: unknown) => Partial<T>;
 }
@@ -67,17 +67,23 @@ export function ExcelTable<T>({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
-  const handleCellClick = useCallback((row: T, column: TableColumn<T>) => {
-    const rowId = (row as Record<string, unknown>).id as string;
-    
-    if (!column.editable || !onEdit || permissions?.[column.key] !== 'edit' || readOnlyMode) {
-      return;
-    }
+  const canEditColumn = useCallback((column: TableColumn<T>): boolean => {
+    // Column must be declared editable by the caller (reflects canEdit + field-level rules),
+    // onEdit handler must exist, and we must not be in read-only mode.
+    if (!column.editable || !onEdit || readOnlyMode) return false;
+    // Permission map semantics: an explicit 'view' entry downgrades to read-only;
+    // missing entries or an empty map imply full access (admin/manager defaults).
+    const entry = permissions?.[column.key];
+    return entry !== 'view';
+  }, [onEdit, permissions, readOnlyMode]);
 
+  const handleCellClick = useCallback((row: T, column: TableColumn<T>) => {
+    if (!canEditColumn(column)) return;
+    const rowId = (row as Record<string, unknown>).id as string;
     setEditingCell({ rowId, column: column.key });
     setEditValue((row as Record<string, unknown>)[column.key]);
     setValidationError(null);
-  }, [onEdit, permissions, readOnlyMode]);
+  }, [canEditColumn]);
 
   const handleCellSave = useCallback(async (rowId: string, column: string, columnDef: TableColumn<T>) => {
     if (columnDef.validate) {
@@ -132,7 +138,7 @@ export function ExcelTable<T>({
     }
   }, [data, selectedRows, onBulkAction]);
 
-  const renderCellContent = (row: T, column: TableColumn<T>) => {
+  const renderCellContent = (row: T, column: TableColumn<T>, rowIndex: number) => {
     const value = (row as Record<string, unknown>)[column.key];
     const rowId = (row as Record<string, unknown>).id as string;
     const isEditing = editingCell?.rowId === rowId && editingCell?.column === column.key;
@@ -161,6 +167,10 @@ export function ExcelTable<T>({
               value={editValue as string}
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={() => handleCellSave(rowId, column.key, column)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCellSave(rowId, column.key, column);
+                if (e.key === 'Escape') handleCellCancel();
+              }}
               className={cn("h-8 px-2 rounded border border-input bg-background text-foreground", validationError && "border-destructive")}
               autoFocus
             />
@@ -171,6 +181,10 @@ export function ExcelTable<T>({
               value={editValue as string}
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={() => handleCellSave(rowId, column.key, column)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCellSave(rowId, column.key, column);
+                if (e.key === 'Escape') handleCellCancel();
+              }}
               className={cn("h-8 px-2 rounded border border-input bg-background text-foreground", validationError && "border-destructive")}
               autoFocus
             >
@@ -207,6 +221,7 @@ export function ExcelTable<T>({
               size="sm"
               variant="ghost"
               className="h-6 w-6 p-0"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleCellSave(rowId, column.key, column)}
             >
               <Check className="h-3.5 w-3.5 text-success" />
@@ -215,6 +230,7 @@ export function ExcelTable<T>({
               size="sm"
               variant="ghost"
               className="h-6 w-6 p-0"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={handleCellCancel}
             >
               <X className="h-3.5 w-3.5 text-destructive" />
@@ -225,7 +241,7 @@ export function ExcelTable<T>({
     }
 
     if (column.format) {
-      return column.format(value);
+      return column.format(value, rowIndex);
     }
 
     if (value === null || value === undefined) {
@@ -254,66 +270,30 @@ export function ExcelTable<T>({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          {onSort && (
-            <Button variant="outline" size="sm" onClick={() => onSort(sort?.key || columns[0].key)}>
-              <SortAsc className="h-3.5 w-3.5 mr-1" />
-              Sort
-            </Button>
-          )}
-          
-          {onBulkAction && selectedRows.size > 0 && (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">{selectedRows.size} selected</Badge>
-              <select
-                onChange={(e) => e.target.value && handleBulkAction(e.target.value)}
-                className="h-8 rounded-md bg-secondary border border-border px-3 text-xs text-foreground"
-                defaultValue=""
-              >
-                <option value="">Bulk Actions</option>
-                <option value="mark_complete">Mark Complete</option>
-                <option value="assign">Assign</option>
-                <option value="delete">Delete</option>
-              </select>
-            </div>
-          )}
+      {onBulkAction && selectedRows.size > 0 && (
+        <div className="glass-panel px-3 py-2 flex items-center gap-2">
+          <Badge variant="secondary">{selectedRows.size} selected</Badge>
+          <select
+            onChange={(e) => e.target.value && handleBulkAction(e.target.value)}
+            className="h-8 rounded-md bg-secondary border border-border px-3 text-xs text-foreground"
+            defaultValue=""
+            aria-label="Bulk actions"
+          >
+            <option value="">Bulk Actions</option>
+            <option value="mark_complete">Mark Complete</option>
+            <option value="assign">Assign</option>
+            <option value="delete">Delete</option>
+          </select>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-xs"
+            onClick={() => setSelectedRows(new Set())}
+          >
+            Clear selection
+          </Button>
         </div>
-        
-        {pagination && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => pagination.onPageChange(pagination.page - 1)}
-              disabled={pagination.page === 1}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
-            <span className="text-sm text-foreground">
-              Page {pagination.page} of {pagination.totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => pagination.onPageChange(pagination.page + 1)}
-              disabled={pagination.page === pagination.totalPages}
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
-            <select
-              value={pagination.pageSize}
-              onChange={(e) => pagination.onPageSizeChange(parseInt(e.target.value))}
-              className="h-8 rounded-md bg-secondary border border-border px-2 text-xs text-foreground"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
-        )}
-      </div>
+      )}
 
       <div className="glass-panel overflow-hidden">
         <div className="overflow-x-auto">
@@ -353,7 +333,7 @@ export function ExcelTable<T>({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((row) => {
+              {data.map((row, rowIndex) => {
                 const rowId = (row as Record<string, unknown>).id as string;
                 const isSelected = selectedRows.has(rowId);
                 
@@ -380,15 +360,16 @@ export function ExcelTable<T>({
                         key={column.key}
                         className={cn(
                           "whitespace-nowrap",
-                          column.editable && onEdit && permissions?.[column.key] === 'edit' && !readOnlyMode && "cursor-text hover:bg-secondary/20"
+                          canEditColumn(column) && "cursor-text hover:bg-secondary/20"
                         )}
+                        title={canEditColumn(column) ? 'Click to edit' : undefined}
                         style={column.width ? { minWidth: `${column.width}px` } : undefined}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCellClick(row, column);
                         }}
                       >
-                        {renderCellContent(row, column)}
+                        {renderCellContent(row, column, rowIndex)}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -400,8 +381,34 @@ export function ExcelTable<T>({
       </div>
 
       {pagination && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>Showing {((pagination.page - 1) * pagination.pageSize) + 1} to {Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} records</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+          <span>
+            Showing {pagination.total === 0 ? 0 : ((pagination.page - 1) * pagination.pageSize) + 1}
+            {' '}to {Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} records
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pagination.onPageChange(pagination.page - 1)}
+              disabled={pagination.page === 1}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </Button>
+            <span className="text-xs text-foreground tabular-nums">
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pagination.onPageChange(pagination.page + 1)}
+              disabled={pagination.page === pagination.totalPages}
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       )}
     </div>

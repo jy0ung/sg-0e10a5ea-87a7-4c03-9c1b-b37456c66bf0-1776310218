@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import { VehicleRaw, DataQualityIssue, VehicleCanonical } from '@/types';
 import { normalizeSupportedDateValue, parseSupportedDateString } from '@/lib/dateParsing';
 import { loggingService } from '@/services/loggingService';
+import { deriveVehicleStage } from '@/utils/vehicleStage';
 
 function normalizeHeader(raw: unknown): string {
   return String(raw ?? '')
@@ -40,6 +41,8 @@ const HEADER_ALIAS_MAP: Record<string, keyof VehicleRaw> = {
   'NO.': 'source_row_no',
   'VAR': 'variant',
   'VARIANT': 'variant',
+  'COLOR': 'color',
+  'COLOUR': 'color',
   'DTP (DEALER TRANSFER PRICE)': 'dealer_transfer_price',
   'FULL PAYMENT TYPE': 'full_payment_type',
   'SHIPMENT NAME': 'shipment_name',
@@ -51,6 +54,40 @@ const HEADER_ALIAS_MAP: Record<string, keyof VehicleRaw> = {
   'INV NO': 'invoice_no',
   'OBR': 'obr',
 };
+
+/**
+ * Headers from the new "auto aging (CHASSIS)" template that carry section
+ * titles or pre-computed aging counters. We deliberately skip them during
+ * import because they are either presentational or recomputed downstream;
+ * listing them keeps the importer quiet about "unknown columns".
+ */
+const IGNORED_HEADERS = new Set<string>([
+  '',
+  'NO',
+  '1. PENDING REGISTER & FREE STOCK',
+  '2. PENDING DELIVER & LOAN DISBURSE',
+  '3. COMPLETE',
+  'STOCK IN',
+  'DEPOSIT PAYMENT',
+  'FULL PAYMENT',
+  'OUTLET ADMIN',
+  'SALES MANAGER',
+  // Pre-computed aging counters — we derive these from dates ourselves.
+  'DAYS SINCE BG',
+  'DAYS SINCE ETD',
+  'DAYS SINCE OUTLET',
+  'DAYS SINCE REG',
+  'DAYS SINCE DELIVERY',
+  'AGING',
+  'AGING DAYS',
+]);
+
+/** Regex that matches the variable "COMM PAYOUT (for disbursement ...)" header. */
+const COMM_PAYOUT_HEADER = /^COMM\s*PAYOUT\b/;
+
+/** Cues that a row is a visual section separator (no chassis) and should be skipped. */
+const SECTION_LABEL_REGEX =
+  /PENDING\s+REGISTER|PENDING\s+DELIVER|LOAN\s+DISBURSE|COMPLETE\b|STOCK\s+IN|DEPOSIT\s+PAYMENT|FULL\s+PAYMENT|OUTLET\s+ADMIN|SALES\s+MANAGER/i;
 
 const REQUIRED_DB_COLUMNS: (keyof VehicleRaw)[] = [
   'chassis_no',
@@ -70,6 +107,35 @@ const DATE_FIELDS = new Set<keyof VehicleRaw>([
   'date_received_by_outlet', 'delivery_date', 'disb_date',
   'vaa_date', 'full_payment_date', 'reg_date',
 ]);
+
+/**
+ * Parse the value under the variable "COMM PAYOUT (for disbursement on or
+ * before ...)" column. Encodes the informal conventions used on the sheet:
+ *   - blank: nothing known
+ *   - "Comm not paid" / "not paid" / "pending": paid=false, remark=raw
+ *   - "Paid", "Paid 12/4", a date cell: paid=true, remark=raw
+ *   - anything else: remark=raw only (don't assume paid state)
+ */
+function parseCommPayout(val: unknown): { paid?: boolean; remark?: string } {
+  if (val === null || val === undefined || val === '') return {};
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return { paid: true, remark: val.toISOString().slice(0, 10) };
+  }
+  if (typeof val === 'number') {
+    // Excel date serials and numeric confirmations both imply "paid".
+    return { paid: true, remark: String(val) };
+  }
+  const text = String(val).trim();
+  if (!text) return {};
+  const lower = text.toLowerCase();
+  if (/\bnot\s*paid\b|\bunpaid\b|\bpending\b/.test(lower)) {
+    return { paid: false, remark: text };
+  }
+  if (/\bpaid\b|\bdone\b|\byes\b/.test(lower)) {
+    return { paid: true, remark: text };
+  }
+  return { remark: text };
+}
 
 function parseExcelDate(val: unknown): string | undefined {
   if (!val) return undefined;
@@ -101,90 +167,148 @@ function parseExcelDate(val: unknown): string | undefined {
 export function parseWorkbook(file: ArrayBuffer): { rows: VehicleRaw[]; issues: DataQualityIssue[]; missingColumns: string[] } {
   try {
     const wb = XLSX.read(file, { type: 'array', cellDates: false });
-    
+
     if (!wb.SheetNames || wb.SheetNames.length === 0) {
       return { rows: [], issues: [], missingColumns: ['No sheets found in workbook'] };
     }
-    
+
     const sheetName = wb.SheetNames.find(s => s.toLowerCase().includes('combine')) || wb.SheetNames[0];
     const ws = wb.Sheets[sheetName];
-    
+
     if (!ws) {
       return { rows: [], issues: [], missingColumns: ['Sheet not found'] };
     }
-    
-    const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
 
-    if (jsonData.length === 0) {
+    // Pull as 2D array so we can locate the real header row; the new template
+    // prefixes the data with section-banner rows ("STOCK IN", "DEPOSIT PAYMENT",
+    // etc.) and the category-label rows ("1. PENDING REGISTER & FREE STOCK").
+    const grid = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' });
+
+    if (grid.length === 0) {
       return { rows: [], issues: [], missingColumns: ['No data found in sheet'] };
     }
 
-    const rawHeaders = Object.keys(jsonData[0]);
-    const columnMapping: Record<string, keyof VehicleRaw> = {};
-
-    rawHeaders.forEach(rawHeader => {
-      const normalized = normalizeHeader(rawHeader);
-      if (HEADER_ALIAS_MAP[normalized]) {
-        columnMapping[rawHeader] = HEADER_ALIAS_MAP[normalized];
+    // Header row = the first row (within the first 10 rows) that matches the
+    // most known aliases. Falls back to row 0 for the legacy template.
+    let headerRowIdx = 0;
+    let bestHits = -1;
+    const scanLimit = Math.min(10, grid.length);
+    for (let i = 0; i < scanLimit; i++) {
+      const row = grid[i] ?? [];
+      let hits = 0;
+      for (const cell of row) {
+        const norm = normalizeHeader(cell);
+        if (HEADER_ALIAS_MAP[norm] || COMM_PAYOUT_HEADER.test(norm)) hits++;
       }
+      if (hits > bestHits) {
+        bestHits = hits;
+        headerRowIdx = i;
+      }
+    }
+
+    const headerCells = (grid[headerRowIdx] ?? []).map(c => normalizeHeader(c));
+    // columnMapping: column index -> VehicleRaw key (regular) or 'COMM_PAYOUT' marker
+    const columnMapping = new Map<number, keyof VehicleRaw | 'COMM_PAYOUT'>();
+    headerCells.forEach((norm, colIdx) => {
+      if (!norm || IGNORED_HEADERS.has(norm)) return;
+      if (COMM_PAYOUT_HEADER.test(norm)) {
+        columnMapping.set(colIdx, 'COMM_PAYOUT');
+        return;
+      }
+      const key = HEADER_ALIAS_MAP[norm];
+      if (key) columnMapping.set(colIdx, key);
     });
 
-    const mappedDbColumns = new Set(Object.values(columnMapping));
+    const mappedDbColumns = new Set(
+      Array.from(columnMapping.values()).filter((v): v is keyof VehicleRaw => v !== 'COMM_PAYOUT'),
+    );
     const missingColumns = REQUIRED_DB_COLUMNS.filter(rc => !mappedDbColumns.has(rc));
 
     const rows: VehicleRaw[] = [];
     const issues: DataQualityIssue[] = [];
     const batchId = `import-${Date.now()}`;
 
-    jsonData.forEach((row, idx) => {
-      const vehicle: Partial<VehicleRaw> = { 
-        id: `raw-${idx}`, 
-        import_batch_id: batchId, 
-        row_number: idx + 1 
+    for (let rIdx = headerRowIdx + 1; rIdx < grid.length; rIdx++) {
+      const row = grid[rIdx] ?? [];
+      const rowNumber = rIdx + 1; // 1-based for user-facing messages
+
+      // Skip completely empty rows.
+      const hasAnyValue = row.some(c => c !== '' && c !== null && c !== undefined);
+      if (!hasAnyValue) continue;
+
+      // Skip section-separator rows (e.g., "1. PENDING REGISTER & FREE STOCK"
+      // or "STOCK IN") interleaved in the sheet. Heuristic: no chassis value
+      // AND any cell looks like a section label.
+      const chassisColIdx = Array.from(columnMapping.entries())
+        .find(([, v]) => v === 'chassis_no')?.[0];
+      const chassisVal = chassisColIdx !== undefined ? row[chassisColIdx] : undefined;
+      const hasChassis = chassisVal !== undefined && String(chassisVal).trim() !== '';
+      if (!hasChassis) {
+        const looksLikeSection = row.some(c => {
+          if (c === '' || c === null || c === undefined) return false;
+          return SECTION_LABEL_REGEX.test(String(c));
+        });
+        if (looksLikeSection) continue;
+      }
+
+      const vehicle: Partial<VehicleRaw> = {
+        id: `raw-${rIdx}`,
+        import_batch_id: batchId,
+        row_number: rowNumber,
       };
 
-      Object.entries(columnMapping).forEach(([excelCol, dbColumn]) => {
-        const val = row[excelCol];
+      columnMapping.forEach((dbColumn, colIdx) => {
+        const val = row[colIdx];
+        if (dbColumn === 'COMM_PAYOUT') {
+          const parsed = parseCommPayout(val);
+          if (parsed.remark !== undefined) vehicle.commission_remark = parsed.remark;
+          if (parsed.paid !== undefined) vehicle.commission_paid = parsed.paid;
+          return;
+        }
         if (DATE_FIELDS.has(dbColumn)) {
           (vehicle as Record<string, unknown>)[dbColumn] = parseExcelDate(val);
         } else {
-          (vehicle as Record<string, unknown>)[dbColumn] = val ? String(val).trim() : undefined;
+          (vehicle as Record<string, unknown>)[dbColumn] = val !== undefined && val !== null && val !== ''
+            ? String(val).trim()
+            : undefined;
         }
       });
 
       if (!vehicle.chassis_no) {
-        issues.push({ 
-          id: `iss-${idx}-chassis`, 
-          chassisNo: '', 
-          field: 'chassis_no', 
-          issueType: 'missing', 
-          message: `Row ${idx + 1}: Missing chassis number`, 
-          severity: 'error', 
-          importBatchId: batchId 
+        issues.push({
+          id: `iss-${rIdx}-chassis`,
+          chassisNo: '',
+          field: 'chassis_no',
+          issueType: 'missing',
+          message: `Row ${rowNumber}: Missing chassis number`,
+          severity: 'error',
+          importBatchId: batchId,
         });
       }
 
-      vehicle.is_d2d = vehicle.remark?.toLowerCase().includes('d2d') || vehicle.remark?.toLowerCase().includes('transfer') || false;
+      vehicle.is_d2d = vehicle.remark?.toLowerCase().includes('d2d')
+        || vehicle.remark?.toLowerCase().includes('transfer')
+        || false;
       rows.push(vehicle as VehicleRaw);
-    });
+    }
 
     const chassisCount = new Map<string, number>();
-    rows.forEach(r => { 
+    rows.forEach(r => {
       if (r.chassis_no) {
         chassisCount.set(r.chassis_no, (chassisCount.get(r.chassis_no) || 0) + 1);
       }
     });
-    
+
     chassisCount.forEach((count, chassis) => {
       if (count > 1) {
-        issues.push({ 
-          id: `iss-dup-${chassis}`, 
-          chassisNo: chassis, 
-          field: 'chassis_no', 
-          issueType: 'duplicate', 
-          message: `Chassis ${chassis} appears ${count} times`, 
-          severity: 'warning', 
-          importBatchId: batchId 
+        issues.push({
+          id: `iss-dup-${chassis}`,
+          chassisNo: chassis,
+          field: 'chassis_no',
+          issueType: 'duplicate',
+          message: `Chassis ${chassis} appears ${count} times`,
+          severity: 'warning',
+          importBatchId: batchId,
         });
       }
     });
@@ -192,10 +316,10 @@ export function parseWorkbook(file: ArrayBuffer): { rows: VehicleRaw[]; issues: 
     return { rows, issues, missingColumns };
   } catch (error) {
     loggingService.error('Error parsing workbook', { error }, 'ImportParser');
-    return { 
-      rows: [], 
-      issues: [], 
-      missingColumns: [`Parse error: ${error instanceof Error ? error.message : 'Unknown error'}`] 
+    return {
+      rows: [],
+      issues: [],
+      missingColumns: [`Parse error: ${error instanceof Error ? error.message : 'Unknown error'}`],
     };
   }
 }
@@ -283,6 +407,7 @@ export function publishCanonical(
         import_batch_id: best.import_batch_id,
         source_row_id: best.id,
         variant: best.variant,
+        color: best.color,
         dealer_transfer_price: best.dealer_transfer_price,
         full_payment_type: best.full_payment_type,
         shipment_name: best.shipment_name,
@@ -291,6 +416,8 @@ export function publishCanonical(
         reg_no: best.reg_no,
         invoice_no: best.invoice_no,
         obr: best.obr,
+        commission_paid: best.commission_paid,
+        commission_remark: best.commission_remark,
         // New flow: BG → ETD → Outlet → Reg → Delivery → Disb
         bg_to_delivery: diffDays(normalizedDates.bg_date, normalizedDates.delivery_date),
         bg_to_shipment_etd: diffDays(normalizedDates.bg_date, normalizedDates.shipment_etd_pkg),
@@ -305,6 +432,10 @@ export function publishCanonical(
           ? (nameToIdMap.get(best.salesman_name) ?? null)
           : null,
       };
+
+      // Derive stage from the canonical date set so the dashboard pipeline
+      // has a value even before the DB trigger fires on insert.
+      v.stage = deriveVehicleStage(v);
 
       const kpiFields = [
         ['bg_to_delivery', 'BG→Delivery'], ['bg_to_shipment_etd', 'BG→ETD'], ['etd_to_outlet', 'ETD→Outlet'],

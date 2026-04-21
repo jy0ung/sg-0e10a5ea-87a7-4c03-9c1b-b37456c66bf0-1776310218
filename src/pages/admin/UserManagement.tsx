@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { listProfiles, updateProfile, inviteUser, type ProfileRow } from '@/services/profileService';
 import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,17 +19,6 @@ import { userUpdateSchema, inviteUserSchema, type UserUpdateFormData, type Invit
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
-
-interface ProfileRow {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  company_id: string;
-  branch_id: string | null;
-  access_scope: string;
-  created_at: string;
-}
 
 const ROLES: { value: AppRole; label: string }[] = [
   { value: 'super_admin', label: 'Super Admin' },
@@ -95,16 +84,13 @@ export default function UserManagement() {
   useEffect(() => {
     async function load() {
       const [profileRes, branchRes] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id, email, name, role, company_id, branch_id, access_scope, created_at')
-          .order('created_at', { ascending: true }),
+        listProfiles(),
         getBranches(user?.company_id || ''),
       ]);
       if (profileRes.error) {
-        toast.error('Failed to load users: ' + profileRes.error.message);
+        toast.error('Failed to load users: ' + profileRes.error);
       }
-      setProfiles((profileRes.data || []) as unknown as ProfileRow[]);
+      setProfiles(profileRes.data);
       setBranches(branchRes.data);
       setLoading(false);
     }
@@ -134,18 +120,15 @@ export default function UserManagement() {
     if (!editUser) return;
     const data = editForm.getValues();
     setSaving(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        name: data.name,
-        role: data.role,
-        access_scope: data.access_scope,
-        branch_id: data.branch_id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', editUser.id);
+    const { error } = await updateProfile({
+      id: editUser.id,
+      name: data.name,
+      role: data.role,
+      access_scope: data.access_scope,
+      branch_id: data.branch_id,
+    });
     if (error) {
-      toast.error('Failed to update user: ' + error.message);
+      toast.error('Failed to update user: ' + error);
     } else {
       toast.success('User updated successfully');
       setProfiles(prev => prev.map(p => p.id === editUser.id ? { ...p, role: data.role, access_scope: data.access_scope, branch_id: data.branch_id } : p));
@@ -173,39 +156,23 @@ export default function UserManagement() {
 
   const handleInvite = async (data: InviteUserFormData) => {
     setInviting(true);
-
-    const { data: result, error } = await supabase.functions.invoke('invite-user', {
-      body: {
-        email: data.email,
-        name: data.name,
-        role: data.role,
-        company_id: user?.company_id || '',
-      },
+    const { error } = await inviteUser({
+      email: data.email,
+      name: data.name,
+      role: data.role,
+      companyId: user?.company_id || '',
     });
-
     setInviting(false);
-
     if (error) {
-      toast.error('Failed to send invitation: ' + error.message);
+      toast.error('Failed to send invitation: ' + error);
       return;
     }
-
-    if (result?.error) {
-      toast.error('Failed to send invitation: ' + result.error);
-      return;
-    }
-
     toast.success(`Invitation sent to ${data.email}`);
     setSignupUrl(getSignupUrl());
     inviteForm.reset();
-
-    // Reload profiles to show the new user
-    const { data: refreshed } = await supabase
-      .from('profiles')
-      .select('id, email, name, role, company_id, branch_id, access_scope, created_at')
-      .order('created_at', { ascending: true });
-    if (refreshed) {
-      setProfiles(refreshed as unknown as ProfileRow[]);
+    const refreshed = await listProfiles();
+    if (!refreshed.error) {
+      setProfiles(refreshed.data);
     }
   };
 

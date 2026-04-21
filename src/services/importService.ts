@@ -288,3 +288,146 @@ export async function validateAndInsertVehicles(
     return { inserted: 0, errors: [], error: error as Error };
   }
 }
+
+/**
+ * Phase 2 #18: transactional import commit.
+ *
+ * Shapes the raw rows into canonical vehicle records, then hands off vehicles +
+ * quality issues + batch finalization to the `commit_import_batch` RPC so the
+ * three writes succeed or fail together. Returns a shape identical to
+ * `validateAndInsertVehicles` so call sites can migrate incrementally.
+ */
+export async function commitImportBatch(
+  rows: VehicleRaw[],
+  batchId: string,
+  companyId: string,
+  qualityIssues: Array<{
+    chassisNo: string;
+    field: string;
+    issueType: string;
+    message: string;
+    severity: string;
+  }>,
+  _userId: string,
+): Promise<{
+  inserted: number;
+  qualityIssuesInserted: number;
+  error: Error | null;
+}> {
+  const queryId = `import-commit-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
+  try {
+    const sanitizeDate = (value: unknown) => normalizeSupportedDateValue(value) ?? null;
+    const [branchLookup, paymentLookup] = await Promise.all([
+      loadBranchMappingLookup(companyId),
+      loadPaymentMappingLookup(companyId),
+    ]);
+    const allNames = [
+      ...new Set(
+        rows
+          .map((vehicle) =>
+            typeof vehicle.salesman_name === "string" ? vehicle.salesman_name.trim() : "",
+          )
+          .filter(Boolean),
+      ),
+    ];
+    const nameToIdMap = await resolveNamesToIds(companyId, allNames);
+    const { canonical } = publishCanonical(rows, branchLookup, paymentLookup, nameToIdMap);
+
+    const dbVehicles = canonical.map((vehicle) => ({
+      chassis_no: vehicle.chassis_no,
+      bg_date: sanitizeDate(vehicle.bg_date),
+      shipment_etd_pkg: sanitizeDate(vehicle.shipment_etd_pkg),
+      shipment_eta_kk_twu_sdk: sanitizeDate(vehicle.shipment_eta_kk_twu_sdk),
+      date_received_by_outlet: sanitizeDate(vehicle.date_received_by_outlet),
+      reg_date: sanitizeDate(vehicle.reg_date),
+      delivery_date: sanitizeDate(vehicle.delivery_date),
+      disb_date: sanitizeDate(vehicle.disb_date),
+      branch_code: vehicle.branch_code,
+      model: vehicle.model,
+      payment_method: vehicle.payment_method,
+      salesman_name: vehicle.salesman_name,
+      customer_name: vehicle.customer_name,
+      remark: vehicle.remark || null,
+      vaa_date: sanitizeDate(vehicle.vaa_date),
+      full_payment_date: sanitizeDate(vehicle.full_payment_date),
+      is_d2d: vehicle.is_d2d,
+      import_batch_id: batchId,
+      source_row_id: vehicle.source_row_id,
+      variant: vehicle.variant || null,
+      dealer_transfer_price: vehicle.dealer_transfer_price || null,
+      full_payment_type: vehicle.full_payment_type || null,
+      shipment_name: vehicle.shipment_name || null,
+      lou: vehicle.lou || null,
+      contra_sola: vehicle.contra_sola || null,
+      reg_no: vehicle.reg_no || null,
+      invoice_no: vehicle.invoice_no || null,
+      obr: vehicle.obr || null,
+      bg_to_delivery: vehicle.bg_to_delivery ?? null,
+      bg_to_shipment_etd: vehicle.bg_to_shipment_etd ?? null,
+      etd_to_outlet: vehicle.etd_to_outlet ?? null,
+      outlet_to_reg: vehicle.outlet_to_reg ?? null,
+      reg_to_delivery: vehicle.reg_to_delivery ?? null,
+      bg_to_disb: vehicle.bg_to_disb ?? null,
+      delivery_to_disb: vehicle.delivery_to_disb ?? null,
+      salesman_id: vehicle.salesman_id ?? null,
+      company_id: companyId,
+    }));
+
+    const dbIssues = qualityIssues.map((issue) => ({
+      chassis_no: issue.chassisNo,
+      field: issue.field,
+      issue_type: issue.issueType,
+      message: issue.message,
+      severity: issue.severity,
+    }));
+
+    const validRows = dbVehicles.length;
+    const errorRows = qualityIssues.filter((i) => i.severity === "error").length;
+
+    const { data, error } = await supabase.rpc("commit_import_batch", {
+      p_batch_id: batchId,
+      p_vehicles: dbVehicles,
+      p_quality_issues: dbIssues,
+      p_valid_rows: validRows,
+      p_error_rows: errorRows,
+    });
+
+    performanceService.endQueryTimer(queryId, "commit_import_batch");
+
+    if (error) {
+      loggingService.error(
+        "commit_import_batch RPC failed",
+        { batchId, error },
+        "ImportService",
+      );
+      return { inserted: 0, qualityIssuesInserted: 0, error };
+    }
+
+    const result = (data ?? {}) as {
+      vehicles_upserted?: number;
+      quality_issues_inserted?: number;
+    };
+
+    loggingService.info(
+      "Import batch committed transactionally",
+      { batchId, result },
+      "ImportService",
+    );
+
+    return {
+      inserted: Number(result.vehicles_upserted ?? 0),
+      qualityIssuesInserted: Number(result.quality_issues_inserted ?? 0),
+      error: null,
+    };
+  } catch (error) {
+    performanceService.endQueryTimer(queryId, "commit_import_batch");
+    loggingService.error(
+      "Unexpected error committing import batch",
+      { batchId, error },
+      "ImportService",
+    );
+    return { inserted: 0, qualityIssuesInserted: 0, error: error as Error };
+  }
+}

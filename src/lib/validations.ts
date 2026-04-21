@@ -68,8 +68,15 @@ export const vehicleSchema = z.object({
   full_payment_type: z.string().nullable().optional(),
   shipment_name: z.string().nullable().optional(),
   variant: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
   remark: z.string().nullable().optional(),
   is_d2d: z.boolean().optional(),
+  commission_paid: z.boolean().nullable().optional(),
+  commission_remark: z.string().nullable().optional(),
+  stage_override: z
+    .enum(['pending_register_free_stock', 'pending_deliver_loan_disburse', 'complete'])
+    .nullable()
+    .optional(),
 });
 
 // User management schemas
@@ -291,3 +298,17 @@ export const approvalFlowWithStepsSchema = approvalFlowSchema.extend({
   steps: z.array(approvalStepSchema).min(1, 'Add at least one approval step'),
 });
 export type ApprovalFlowFormData = z.infer<typeof approvalFlowWithStepsSchema>;
+// Phase 3 #21: Inventory
+export const vehicleTransferSchema = z.object({
+  fromBranch: z.string().min(1, 'From branch is required'),
+  toBranch: z.string().min(1, 'To branch is required'),
+  chassisNo: z.string().min(4, 'Chassis number must be at least 4 characters'),
+  model: z.string().min(1, 'Model is required'),
+  colour: z.string().optional().nullable(),
+  remark: z.string().optional().nullable(),
+}).refine((d) => d.fromBranch !== d.toBranch, {
+  message: 'From and To branches must differ',
+  path: ['toBranch'],
+});
+
+export type VehicleTransferInput = z.infer<typeof vehicleTransferSchema>;

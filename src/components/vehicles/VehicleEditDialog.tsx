@@ -9,6 +9,14 @@ import { toast } from 'sonner';
 import { vehicleSchema, type VehicleFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { VEHICLE_STAGES, VEHICLE_STAGE_LABELS } from '@/utils/vehicleStage';
 
 interface VehicleEditDialogProps {
   vehicle: VehicleCanonical | null;
@@ -25,6 +33,7 @@ export function VehicleEditDialog({ vehicle, open, onOpenChange, onSaved }: Vehi
       branch_code: vehicle?.branch_code || '',
       model: vehicle?.model || '',
       variant: vehicle?.variant || null,
+      color: vehicle?.color || null,
       customer_name: vehicle?.customer_name || '',
       salesman_name: vehicle?.salesman_name || '',
       payment_method: vehicle?.payment_method || '',
@@ -47,6 +56,9 @@ export function VehicleEditDialog({ vehicle, open, onOpenChange, onSaved }: Vehi
       shipment_name: vehicle?.shipment_name || null,
       remark: vehicle?.remark || null,
       is_d2d: vehicle?.is_d2d,
+      commission_paid: vehicle?.commission_paid ?? null,
+      commission_remark: vehicle?.commission_remark || null,
+      stage_override: vehicle?.stage_override ?? null,
     },
     mode: 'onChange',
   });
@@ -68,6 +80,7 @@ export function VehicleEditDialog({ vehicle, open, onOpenChange, onSaved }: Vehi
               { key: 'branch_code', label: 'Branch Code' },
               { key: 'model', label: 'Model' },
               { key: 'variant', label: 'Variant' },
+              { key: 'color', label: 'Color' },
               { key: 'customer_name', label: 'Customer Name' },
               { key: 'salesman_name', label: 'Salesman Name' },
               { key: 'payment_method', label: 'Payment Method' },
@@ -138,6 +151,50 @@ export function VehicleEditDialog({ vehicle, open, onOpenChange, onSaved }: Vehi
                 onCheckedChange={(checked) => form.setValue('is_d2d', checked === true)}
               />
               <Label htmlFor="is_d2d">D2D (Door to Door)</Label>
+            </div>
+
+            <div className="col-span-2 flex items-center space-x-2">
+              <Checkbox
+                id="commission_paid"
+                checked={form.watch('commission_paid') === true}
+                onCheckedChange={(checked) => form.setValue('commission_paid', checked === true)}
+              />
+              <Label htmlFor="commission_paid">Commission paid</Label>
+            </div>
+
+            <div className="col-span-2 space-y-1">
+              <Label htmlFor="commission_remark">Commission remark</Label>
+              <Input
+                id="commission_remark"
+                placeholder='e.g. "Comm not paid", "Paid 15/04"'
+                {...form.register('commission_remark')}
+              />
+            </div>
+
+            <div className="col-span-2 space-y-1">
+              <Label htmlFor="stage_override">Stage override</Label>
+              <Select
+                value={form.watch('stage_override') ?? '__auto__'}
+                onValueChange={(v) =>
+                  form.setValue(
+                    'stage_override',
+                    v === '__auto__' ? null : (v as VehicleFormData['stage_override']),
+                  )
+                }
+              >
+                <SelectTrigger id="stage_override">
+                  <SelectValue placeholder="Auto (derive from dates)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__auto__">Auto (derive from dates)</SelectItem>
+                  {VEHICLE_STAGES.map((s) => (
+                    <SelectItem key={s} value={s}>{VEHICLE_STAGE_LABELS[s]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Pin this vehicle to a specific stage. Leave on Auto to follow milestone dates.
+              </p>
             </div>
           </div>
           <DialogFooter>

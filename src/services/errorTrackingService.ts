@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { loggingService } from "./loggingService";
 
 interface ErrorContext {
@@ -16,6 +17,7 @@ interface Breadcrumb {
 
 class ErrorTrackingService {
   private isInitialized = false;
+  private hasSentry = false;
   private currentUserId?: string;
   private currentEmail?: string;
   private breadcrumbs: Breadcrumb[] = [];
@@ -26,9 +28,33 @@ class ErrorTrackingService {
     this.isInitialized = true;
 
     if (dsn) {
-      // Sentry integration point — when a DSN is provided, initialize Sentry here:
-      // Sentry.init({ dsn, integrations: [...], tracesSampleRate: 0.2 });
-      loggingService.info("Error tracking initialized with DSN", {}, "ErrorTracking");
+      try {
+        Sentry.init({
+          dsn,
+          // Keep traces modest — we can raise this in staging.
+          tracesSampleRate: 0.1,
+          // Error replay is disabled by default to avoid PII leakage until
+          // we have a reviewed privacy config.
+          replaysSessionSampleRate: 0,
+          replaysOnErrorSampleRate: 0,
+          environment: import.meta.env.VITE_APP_ENV ?? "development",
+          release: import.meta.env.VITE_APP_RELEASE,
+          // Drop common noise.
+          ignoreErrors: [
+            "ResizeObserver loop limit exceeded",
+            "ResizeObserver loop completed with undelivered notifications",
+            "Non-Error promise rejection captured",
+          ],
+        });
+        this.hasSentry = true;
+        loggingService.info("Error tracking initialized with Sentry", {}, "ErrorTracking");
+      } catch (err) {
+        loggingService.error(
+          "Failed to initialize Sentry — falling back to local-only tracking",
+          { error: (err as Error).message },
+          "ErrorTracking",
+        );
+      }
     } else {
       loggingService.info("Error tracking running in local-only mode (no DSN)", {}, "ErrorTracking");
     }
@@ -44,8 +70,15 @@ class ErrorTrackingService {
 
     loggingService.error(error.message, enrichedContext, context?.component || "ErrorBoundary");
 
-    // When Sentry is integrated:
-    // Sentry.captureException(error, { extra: enrichedContext, tags: { component: context?.component } });
+    if (this.hasSentry) {
+      Sentry.captureException(error, {
+        extra: enrichedContext,
+        tags: {
+          component: context?.component ?? "unknown",
+          action: context?.action ?? "unknown",
+        },
+      });
+    }
   }
 
   captureMessage(message: string, level: "info" | "warning" | "error" = "info", context?: ErrorContext) {
@@ -53,24 +86,35 @@ class ErrorTrackingService {
       userId: this.currentUserId,
       ...context?.additionalData,
     }, context?.component || "ErrorTracking");
+
+    if (this.hasSentry) {
+      Sentry.captureMessage(message, level === "warning" ? "warning" : level);
+    }
   }
 
   setUser(userId: string, email?: string) {
     this.currentUserId = userId;
     this.currentEmail = email;
-    // Sentry.setUser({ id: userId, email });
+    if (this.hasSentry) {
+      Sentry.setUser({ id: userId, email });
+    }
   }
 
   clearUser() {
     this.currentUserId = undefined;
     this.currentEmail = undefined;
-    // Sentry.setUser(null);
+    if (this.hasSentry) {
+      Sentry.setUser(null);
+    }
   }
 
   addBreadcrumb(category: string, message: string, level: "info" | "warning" | "error" = "info") {
     this.breadcrumbs.push({ category, message, level, timestamp: new Date().toISOString() });
     if (this.breadcrumbs.length > this.maxBreadcrumbs) {
       this.breadcrumbs.shift();
+    }
+    if (this.hasSentry) {
+      Sentry.addBreadcrumb({ category, message, level });
     }
   }
 

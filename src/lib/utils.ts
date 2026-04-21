@@ -33,3 +33,24 @@ export function formatTime(date: string | Date | null | undefined): string {
     minute: '2-digit',
   });
 }
+
+/**
+ * Accounting-style number format: thousand separators, 2 decimals,
+ * negatives wrapped in parentheses. Empty/null/non-numeric → ''.
+ *
+ *   1234.5   → "1,234.50"
+ *   -1234.5  → "(1,234.50)"
+ *   0        → "0.00"
+ *   null     → ""
+ */
+export function formatAccounting(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '';
+  const n = typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''));
+  if (!Number.isFinite(n)) return '';
+  const abs = Math.abs(n).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return n < 0 ? `(${abs})` : abs;
+}
+

@@ -35,7 +35,7 @@ export function AgingTrendChart({ vehicles }: Props) {
   }, [vehicles]);
 
   return (
-    <Card className="glass-panel">
+    <Card className="glass-panel h-full flex flex-col">
       <CardHeader className="border-b border-border/60 pb-4">
         <CardTitle className="text-base font-semibold">Aging Trend Over Time</CardTitle>
         <p className="text-xs text-muted-foreground">

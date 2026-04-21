@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AppRole, AccessScope } from '@/types';
@@ -14,6 +14,7 @@ interface Profile {
   branch_id?: string | null;
   avatar_url?: string | null;
   access_scope: AccessScope;
+  status?: 'active' | 'inactive' | 'resigned' | 'pending';
 }
 
 interface AuthContextType {
@@ -21,6 +22,7 @@ interface AuthContextType {
   session: Session | null;
   isAuthenticated: boolean;
   loading: boolean;
+  profileError: string | null;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   hasRole: (roles: AppRole[]) => boolean;
@@ -33,6 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  const clearSessionArtifacts = useCallback(() => {
+    setProfile(null);
+    setSession(null);
+    loggingService.clearUserId();
+  }, []);
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
@@ -41,38 +50,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .select('*')
         .eq('id', userId)
         .maybeSingle();
-      
+
       if (error) {
         loggingService.error('Error fetching profile', { error }, 'AuthContext');
-        // Create minimal profile if it doesn't exist
-        if (error.code === 'PGRST116') {
-          setProfile({
-            id: userId,
-            email: '',
-            name: 'User',
-            role: 'analyst',
-            company_id: 'default',
-            access_scope: 'self',
-          });
-        }
-      } else if (data) {
-        const p = data as unknown as Profile;
-        setProfile(p);
-        loggingService.setUserId(p.id);
+        setProfileError('We could not load your account profile. Please contact your administrator.');
+        await supabase.auth.signOut();
+        clearSessionArtifacts();
+        return;
       }
+
+      if (!data) {
+        // No profile row — the account was never provisioned by an admin.
+        // Do NOT invent a synthetic profile; that would attach the session to
+        // a fake tenant and defeat RLS scoping.
+        loggingService.warn('No profile row for user; signing out', { userId }, 'AuthContext');
+        setProfileError('Your account has not been activated yet. Please contact your administrator.');
+        await supabase.auth.signOut();
+        clearSessionArtifacts();
+        return;
+      }
+
+      const p = data as unknown as Profile;
+
+      if (!p.company_id || p.status === 'pending') {
+        setProfileError('Your account is pending activation by your administrator.');
+        await supabase.auth.signOut();
+        clearSessionArtifacts();
+        return;
+      }
+
+      if (p.status === 'inactive' || p.status === 'resigned') {
+        setProfileError('Your account is no longer active. Please contact your administrator.');
+        await supabase.auth.signOut();
+        clearSessionArtifacts();
+        return;
+      }
+
+      setProfileError(null);
+      setProfile(p);
+      loggingService.setUserId(p.id);
     } catch (err) {
       loggingService.error('Unexpected error fetching profile', { error: err }, 'AuthContext');
-      // Set minimal profile to prevent app from breaking
-      setProfile({
-        id: userId,
-        email: '',
-        name: 'User',
-        role: 'analyst',
-        company_id: 'default',
-        access_scope: 'self',
-      });
+      setProfileError('Unexpected error loading your profile. Please sign in again.');
+      await supabase.auth.signOut();
+      clearSessionArtifacts();
     }
-  }, []);
+  }, [clearSessionArtifacts]);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -118,10 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
-    loggingService.clearUserId();
-    setProfile(null);
-    setSession(null);
-  }, []);
+    clearSessionArtifacts();
+    setProfileError(null);
+  }, [clearSessionArtifacts]);
 
   const refreshProfile = useCallback(async () => {
     if (session?.user) {
@@ -135,17 +157,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return roles.includes(profile.role);
   }, [profile]);
 
+  const contextValue = useMemo<AuthContextType>(() => ({
+    user: profile,
+    session,
+    isAuthenticated: !!session && !!profile,
+    loading,
+    profileError,
+    login,
+    logout,
+    hasRole,
+    refreshProfile,
+  }), [profile, session, loading, profileError, login, logout, hasRole, refreshProfile]);
+
   return (
-    <AuthContext.Provider value={{
-      user: profile,
-      session,
-      isAuthenticated: !!session && !!profile,
-      loading,
-      login,
-      logout,
-      hasRole,
-      refreshProfile,
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

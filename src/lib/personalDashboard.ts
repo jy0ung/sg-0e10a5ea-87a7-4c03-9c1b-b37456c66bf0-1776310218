@@ -1,4 +1,8 @@
-import type { KpiSummary, SalesOrder, VehicleCanonical, Customer, QualityIssue } from '@/types';
+import type { KpiSummary, SalesOrder, VehicleCanonical, Customer, DataQualityIssue } from '@/types';
+import {
+  sanitizeCustomKpiFormula,
+  type CustomKpiFormula,
+} from './customKpiFormula';
 
 export type DashboardSystemWidgetId =
   | 'snapshot'
@@ -30,7 +34,18 @@ export interface PersonalDashboardCustomMetric {
   metricId: CustomInsightMetricId;
 }
 
-export type PersonalDashboardWidget = PersonalDashboardSectionWidget | PersonalDashboardCustomMetric;
+export interface PersonalDashboardCustomFormula {
+  id: string;
+  type: 'custom-formula';
+  enabled: boolean;
+  title: string;
+  formula: CustomKpiFormula;
+}
+
+export type PersonalDashboardWidget =
+  | PersonalDashboardSectionWidget
+  | PersonalDashboardCustomMetric
+  | PersonalDashboardCustomFormula;
 
 export interface PersonalDashboardPreferences {
   widgets: PersonalDashboardWidget[];
@@ -55,7 +70,7 @@ export interface PersonalDashboardMetricContext {
   salesOrders: SalesOrder[];
   kpiSummaries: KpiSummary[];
   customers: Customer[];
-  qualityIssues: QualityIssue[];
+  qualityIssues: DataQualityIssue[];
 }
 
 const PERSONAL_DASHBOARD_STORAGE_PREFIX = 'flc-bi:personal-dashboard';
@@ -138,30 +153,15 @@ export const CUSTOM_INSIGHT_DEFINITIONS: CustomInsightDefinition[] = [
   },
 ];
 
-const DEFAULT_CUSTOM_WIDGETS: PersonalDashboardCustomMetric[] = [
-  {
-    id: 'custom-slowest-delivery-branch',
-    type: 'custom-metric',
-    enabled: true,
-    title: 'Slowest Delivery Branch',
-    metricId: 'slowest_delivery_branch',
-  },
-  {
-    id: 'custom-highest-booking-branch',
-    type: 'custom-metric',
-    enabled: true,
-    title: 'Highest Booking Branch',
-    metricId: 'highest_booking_branch',
-  },
-];
-
 export const DEFAULT_PERSONAL_DASHBOARD: PersonalDashboardPreferences = {
+  // Start as an empty canvas. Every core section is listed so the user can
+  // toggle it on from Customize, but nothing renders until they opt in or
+  // build their own KPI card.
   widgets: [
-    { id: 'snapshot', type: 'section', enabled: true },
-    { id: 'scorecards', type: 'section', enabled: true },
-    ...DEFAULT_CUSTOM_WIDGETS,
-    { id: 'kpi-analytics', type: 'section', enabled: true },
-    { id: 'branch-comparison', type: 'section', enabled: true },
+    { id: 'snapshot', type: 'section', enabled: false },
+    { id: 'scorecards', type: 'section', enabled: false },
+    { id: 'kpi-analytics', type: 'section', enabled: false },
+    { id: 'branch-comparison', type: 'section', enabled: false },
   ],
 };
 
@@ -246,6 +246,21 @@ export function sanitizeDashboardPreferences(input: unknown): PersonalDashboardP
           metricId: widget.metricId as CustomInsightMetricId,
         };
       }
+      if (
+        widget.type === 'custom-formula'
+        && typeof widget.id === 'string'
+        && typeof widget.title === 'string'
+      ) {
+        const formula = sanitizeCustomKpiFormula(widget.formula);
+        if (!formula) return null;
+        return {
+          id: widget.id,
+          type: 'custom-formula',
+          enabled: widget.enabled !== false,
+          title: widget.title,
+          formula,
+        };
+      }
       return null;
     })
     .filter((widget): widget is PersonalDashboardWidget => Boolean(widget));
@@ -304,6 +319,16 @@ export function createCustomMetricWidget(metricId: CustomInsightMetricId, title?
     enabled: true,
     title: title?.trim() || definition?.label || 'Custom Insight',
     metricId,
+  };
+}
+
+export function createCustomFormulaWidget(title: string, formula: CustomKpiFormula): PersonalDashboardCustomFormula {
+  return {
+    id: `formula-${Math.random().toString(36).slice(2, 10)}`,
+    type: 'custom-formula',
+    enabled: true,
+    title: title.trim() || 'My KPI',
+    formula,
   };
 }
 

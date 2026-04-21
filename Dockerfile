@@ -1,0 +1,64 @@
+# syntax=docker/dockerfile:1.7
+# ============================================================================
+# FLC BI — Production image (multi-stage)
+# ----------------------------------------------------------------------------
+# Stage 1 (`build`): install deps + produce the Vite bundle.
+# Stage 2 (`runtime`): tiny nginx image that serves the static bundle with
+# SPA fallback and a read-only filesystem.
+# ----------------------------------------------------------------------------
+# Build args:
+#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_APP_ENV, VITE_SENTRY_DSN,
+#   VITE_APP_URL — inlined into the client bundle. Only public values.
+# ============================================================================
+
+FROM node:20-alpine AS build
+WORKDIR /app
+
+# Copy manifests first so the cached npm layer is reused when only source
+# changes. npm ci requires package-lock.json to be present.
+COPY package*.json ./
+COPY turbo.json ./
+COPY tsconfig*.json ./
+COPY apps ./apps
+COPY packages ./packages
+
+RUN npm ci --prefer-offline --no-audit --no-fund
+
+COPY . .
+
+# Build-time public envs (baked into the bundle by Vite).
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_APP_ENV=production
+ARG VITE_SENTRY_DSN
+ARG VITE_APP_URL
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
+    VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY \
+    VITE_APP_ENV=$VITE_APP_ENV \
+    VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
+    VITE_APP_URL=$VITE_APP_URL
+
+RUN npm run build
+
+# ---------------------------------------------------------------------------
+FROM nginx:1.27-alpine AS runtime
+
+# Drop the stock default.conf and ship a hardened SPA config.
+RUN rm /etc/nginx/conf.d/default.conf
+COPY docker/nginx.conf /etc/nginx/conf.d/app.conf
+
+# Copy static bundle. Vite's default output dir is `dist`.
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Non-root runtime. The stock nginx image already creates user `nginx`.
+RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx \
+    && touch /var/run/nginx.pid \
+    && chown nginx:nginx /var/run/nginx.pid
+
+USER nginx
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

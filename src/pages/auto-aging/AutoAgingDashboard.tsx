@@ -10,6 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { AgingTrendChart } from '@/components/charts/AgingTrendChart';
 import { OutlierScatterChart } from '@/components/charts/OutlierScatterChart';
 import { PaymentPieChart } from '@/components/charts/PaymentPieChart';
+import { StagePipelineCard } from '@/components/charts/StagePipelineCard';
 import { KpiTrendChart } from '@/components/charts/KpiTrendChart';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
@@ -205,112 +206,167 @@ export default function AutoAgingDashboard() {
         <span className="text-xs text-muted-foreground">{filtered.length} vehicles</span>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-        {filteredKpiSummaries.map(kpi => (
-          <KpiCard
-            key={kpi.kpiId}
-            label={kpi.shortLabel}
-            value={kpi.median}
-            subtitle={`Avg: ${kpi.average}d • P90: ${kpi.p90}d`}
-            status={kpi.overdueCount > 10 ? 'critical' : kpi.overdueCount > 0 ? 'warning' : 'normal'}
-            validCount={kpi.validCount}
-            overdueCount={kpi.overdueCount}
-            onClick={() => handleKpiCardClick(kpi.kpiId)}
-          />
-        ))}
-      </div>
-
-      {/* Trend Chart */}
-      <KpiTrendChart vehicles={filtered} selectedKpiId={selectedKpiId} />
-
-      {/* Branch Heatmap + Quality */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <div className="md:col-span-2 glass-panel p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Branch Comparison — Average Days</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={branchHeatmap} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="branch" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} />
-              <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px', fontSize: '12px', color: 'hsl(var(--foreground))' }} />
-              <Bar dataKey="bgToDelivery" name="BG→Delivery" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="etdToOutlet" name="ETD→Outlet" fill="hsl(199, 89%, 48%)" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="regToDelivery" name="Reg→Delivery" fill="hsl(142, 71%, 45%)" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="glass-panel p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Data Quality</h3>
-          <div className="space-y-2">
-            {filteredQualityIssues.length === 0 && <p className="text-xs text-muted-foreground">No issues detected.</p>}
-            {filteredQualityIssues.slice(0, 8).map(issue => (
-              <div key={issue.id} className="p-2 rounded bg-secondary/50 border border-border/50">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-mono text-foreground">{issue.chassisNo.slice(0, 12)}</span>
-                  <StatusBadge status={issue.issueType} />
-                </div>
-                <p className="text-[10px] text-muted-foreground">{issue.message}</p>
-              </div>
-            ))}
-            {filteredQualityIssues.length > 8 && (
-              <button onClick={() => navigate('/auto-aging/quality')} className="w-full text-xs text-primary hover:underline py-2">
-                View all {filteredQualityIssues.length} issues →
-              </button>
-            )}
+      {/* ── Section 1: Process KPIs ── */}
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Process KPIs</h2>
+            <p className="text-[11px] text-muted-foreground">Median cycle time per milestone. Click a card to inspect the contributing vehicles.</p>
           </div>
         </div>
-      </div>
-
-      {/* Trend + Payment Charts */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <AgingTrendChart vehicles={filtered} />
-        <PaymentPieChart vehicles={filtered} />
-      </div>
-
-      {/* Outlier Scatter */}
-      <OutlierScatterChart vehicles={filtered} onVehicleClick={(chassis) => navigate(`/auto-aging/vehicles/${chassis}`)} />
-
-      {/* Slowest Vehicles Preview */}
-      <div className="glass-panel p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-foreground">Slowest Vehicles (BG → Delivery)</h3>
-          <button onClick={() => navigate('/auto-aging/vehicles')} className="text-xs text-primary hover:underline">View All →</button>
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+          {filteredKpiSummaries.map(kpi => (
+            <KpiCard
+              key={kpi.kpiId}
+              label={kpi.shortLabel}
+              value={kpi.median}
+              subtitle={`Avg: ${kpi.average}d • P90: ${kpi.p90}d`}
+              status={kpi.overdueCount > 10 ? 'critical' : kpi.overdueCount > 0 ? 'warning' : 'normal'}
+              validCount={kpi.validCount}
+              overdueCount={kpi.overdueCount}
+              onClick={() => handleKpiCardClick(kpi.kpiId)}
+            />
+          ))}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left">
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Chassis</th>
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Branch</th>
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Model</th>
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">BG→Del</th>
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">ETD→Out</th>
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Reg→Del</th>
-                <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered
-                .filter(v => v.bg_to_delivery != null && v.bg_to_delivery >= 0)
-                .sort((a, b) => (b.bg_to_delivery ?? 0) - (a.bg_to_delivery ?? 0))
-                .slice(0, 10)
-                .map(v => (
-                  <tr key={v.id} className="data-table-row cursor-pointer" onClick={() => navigate(`/auto-aging/vehicles/${v.chassis_no}`)}>
-                    <td className="px-3 py-2 font-mono text-xs text-foreground">{v.chassis_no}</td>
-                    <td className="px-3 py-2 text-foreground">{v.branch_code}</td>
-                    <td className="px-3 py-2 text-foreground">{v.model}</td>
-                    <td className="px-3 py-2"><span className={(v.bg_to_delivery ?? 0) > 45 ? 'text-destructive font-semibold' : 'text-foreground'}>{v.bg_to_delivery}d</span></td>
-                    <td className="px-3 py-2 text-foreground">{v.etd_to_outlet != null ? `${v.etd_to_outlet}d` : '—'}</td>
-                    <td className="px-3 py-2 text-foreground">{v.reg_to_delivery != null ? `${v.reg_to_delivery}d` : '—'}</td>
-                    <td className="px-3 py-2"><StatusBadge status={(v.bg_to_delivery ?? 0) > 45 ? 'warning' : 'active'} /></td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+      </section>
+
+      {/* ── Section 2: Trend ── */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Cycle Time Trend</h2>
+          <p className="text-[11px] text-muted-foreground">Switch KPI by clicking a card above to explore its trajectory.</p>
         </div>
-      </div>
+        <KpiTrendChart vehicles={filtered} selectedKpiId={selectedKpiId} />
+      </section>
+
+      {/* ── Section 3: Pipeline snapshot ── two equal columns for a balanced snapshot */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Pipeline Snapshot</h2>
+          <p className="text-[11px] text-muted-foreground">Current stage distribution and how aging evolves over time.</p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <AgingTrendChart vehicles={filtered} />
+          <StagePipelineCard
+            vehicles={filtered}
+            onStageClick={(stage) => navigate(`/auto-aging/vehicles?stage=${stage}`)}
+          />
+        </div>
+      </section>
+
+      {/* ── Section 4: Segmentation ── full-width Payment card (dense legend) */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Segmentation</h2>
+          <p className="text-[11px] text-muted-foreground">How the fleet splits across payment channels. Click a slice to drill into that bucket.</p>
+        </div>
+        <PaymentPieChart
+          vehicles={filtered}
+          onSliceClick={(method) =>
+            navigate(`/auto-aging/vehicles?payment=${encodeURIComponent(method)}`)
+          }
+        />
+      </section>
+
+      {/* ── Section 5: Branch performance + Data quality ── */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Branch Performance &amp; Quality</h2>
+          <p className="text-[11px] text-muted-foreground">Branch-level cycle times alongside data-quality alerts for the current filter.</p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="md:col-span-2 glass-panel p-5">
+            <h3 className="text-sm font-semibold text-foreground mb-4">Branch Comparison — Average Days</h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={branchHeatmap} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="branch" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} />
+                <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px', fontSize: '12px', color: 'hsl(var(--foreground))' }} />
+                <Bar dataKey="bgToDelivery" name="BG→Delivery" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="etdToOutlet" name="ETD→Outlet" fill="hsl(199, 89%, 48%)" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="regToDelivery" name="Reg→Delivery" fill="hsl(142, 71%, 45%)" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="glass-panel p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-foreground">Data Quality</h3>
+              {filteredQualityIssues.length > 0 && (
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  {filteredQualityIssues.length} issue{filteredQualityIssues.length === 1 ? '' : 's'}
+                </span>
+              )}
+            </div>
+            <div className="space-y-2">
+              {filteredQualityIssues.length === 0 && <p className="text-xs text-muted-foreground">No issues detected.</p>}
+              {filteredQualityIssues.slice(0, 8).map(issue => (
+                <div key={issue.id} className="p-2 rounded bg-secondary/50 border border-border/50">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-mono text-foreground">{issue.chassisNo.slice(0, 12)}</span>
+                    <StatusBadge status={issue.issueType} />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">{issue.message}</p>
+                </div>
+              ))}
+              {filteredQualityIssues.length > 8 && (
+                <button onClick={() => navigate('/auto-aging/quality')} className="w-full text-xs text-primary hover:underline py-2">
+                  View all {filteredQualityIssues.length} issues →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Section 6: Outliers & slowest vehicles ── */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Outliers &amp; Slowest Vehicles</h2>
+          <p className="text-[11px] text-muted-foreground">Individual vehicles that are dragging the averages.</p>
+        </div>
+        <OutlierScatterChart vehicles={filtered} onVehicleClick={(chassis) => navigate(`/auto-aging/vehicles/${chassis}`)} />
+
+        <div className="glass-panel p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Slowest Vehicles (BG → Delivery)</h3>
+            <button onClick={() => navigate('/auto-aging/vehicles')} className="text-xs text-primary hover:underline">View All →</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left">
+                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Chassis</th>
+                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Branch</th>
+                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Model</th>
+                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">BG→Del</th>
+                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">ETD→Out</th>
+                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Reg→Del</th>
+                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered
+                  .filter(v => v.bg_to_delivery != null && v.bg_to_delivery >= 0)
+                  .sort((a, b) => (b.bg_to_delivery ?? 0) - (a.bg_to_delivery ?? 0))
+                  .slice(0, 10)
+                  .map(v => (
+                    <tr key={v.id} className="data-table-row cursor-pointer" onClick={() => navigate(`/auto-aging/vehicles/${v.chassis_no}`)}>
+                      <td className="px-3 py-2 font-mono text-xs text-foreground">{v.chassis_no}</td>
+                      <td className="px-3 py-2 text-foreground">{v.branch_code}</td>
+                      <td className="px-3 py-2 text-foreground">{v.model}</td>
+                      <td className="px-3 py-2"><span className={(v.bg_to_delivery ?? 0) > 45 ? 'text-destructive font-semibold' : 'text-foreground'}>{v.bg_to_delivery}d</span></td>
+                      <td className="px-3 py-2 text-foreground">{v.etd_to_outlet != null ? `${v.etd_to_outlet}d` : '—'}</td>
+                      <td className="px-3 py-2 text-foreground">{v.reg_to_delivery != null ? `${v.reg_to_delivery}d` : '—'}</td>
+                      <td className="px-3 py-2"><StatusBadge status={(v.bg_to_delivery ?? 0) > 45 ? 'warning' : 'active'} /></td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       {/* Vehicle Details Modal */}
       <Dialog open={vehicleDetailsOpen} onOpenChange={setVehicleDetailsOpen}>

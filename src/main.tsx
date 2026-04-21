@@ -1,11 +1,11 @@
 import "@/index.css";
+import "@/i18n";
 
 import React, { lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { AuthProvider, ProtectedRoute } from "@/contexts/AuthContext";
@@ -14,10 +14,20 @@ import { ModuleAccessProvider } from "@/contexts/ModuleAccessContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RequireRole } from "@/components/shared/RequireRole";
 import { RequireActiveModule } from "@/components/shared/RequireActiveModule";
+import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 import AppLayout from "./components/layout/AppLayout";
 import SalesLayout from "./components/layout/SalesLayout";
 import { SalesProvider } from "./contexts/SalesContext";
 import { errorTrackingService } from "@/services/errorTrackingService";
+import {
+  ADMIN_ONLY,
+  ADMIN_AND_DIRECTOR,
+  EXECUTIVE,
+  MANAGER_AND_UP,
+  HRMS_ADMIN,
+  HRMS_PAYROLL,
+  HRMS_LEAVE,
+} from "@/config/routeRoles";
 
 // Initialise error tracking. Reads VITE_SENTRY_DSN if set; otherwise runs in local-only mode.
 errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
@@ -93,12 +103,29 @@ function S({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageSpinner />}>{children}</Suspense>;
 }
 
+/**
+ * Phase 3 #19: wrap a route element with a per-route error boundary so a single
+ * page crash is contained and the rest of the shell (sidebar, toasts, nav) keeps
+ * working. Use at the route element level, inside any RequireRole/module gates.
+ */
+function R({ scope, children }: { scope: string; children: React.ReactNode }) {
+  return <RouteErrorBoundary scope={scope}>{children}</RouteErrorBoundary>;
+}
+
 function ProtectedAppShell({ redirectTo = "/login" }: { redirectTo?: string | ((pathname: string) => string) }) {
   return (
     <ProtectedRoute redirectTo={redirectTo}>
       <ModuleAccessProvider>
         <DataProvider>
-          <AppLayout />
+          {/*
+            Phase 2 #16: a single SalesProvider at the shell level so the `/`
+            (Executive Dashboard) and `/sales/*` subtrees share one instance
+            rather than mounting duplicate providers with their own realtime
+            subscriptions. Sales data only fetches when companyId is set.
+          */}
+          <SalesProvider>
+            <AppLayout />
+          </SalesProvider>
         </DataProvider>
       </ModuleAccessProvider>
     </ProtectedRoute>
@@ -109,7 +136,24 @@ function withModuleAccess(moduleId: string, element: React.ReactNode) {
   return <RequireActiveModule moduleId={moduleId}>{element}</RequireActiveModule>;
 }
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Data is considered fresh for 60s — avoids refetch storms when users
+      // navigate between pages or components mount in quick succession.
+      staleTime: 60_000,
+      // Keep unused data in memory for 5 minutes so the cache can satisfy
+      // repeat visits without hitting the network.
+      gcTime: 5 * 60_000,
+      // Most dashboards don't need to refetch when the tab regains focus —
+      // DataContext already subscribes to realtime updates for the critical tables.
+      refetchOnWindowFocus: false,
+      // Retry once on transient network errors rather than the default 3x
+      // exponential backoff, which can make failures feel sluggish.
+      retry: 1,
+    },
+  },
+});
 
 const router = createBrowserRouter([
   {
@@ -126,62 +170,62 @@ const router = createBrowserRouter([
       </div>
     ),
     children: [
-      { index: true, element: <SalesProvider><S><ExecutiveDashboard /></S></SalesProvider> },
+      { index: true, element: <R scope="Executive Dashboard"><S><ExecutiveDashboard /></S></R> },
       { path: "profile", element: <Navigate to="/admin/settings" replace /> },
       { path: "modules", element: <S><ModuleDirectory /></S> },
       { path: "notifications", element: <S><Notifications /></S> },
-      { path: "auto-aging", element: withModuleAccess('auto-aging', <S><AutoAgingDashboard /></S>) },
-      { path: "auto-aging/vehicles", element: withModuleAccess('auto-aging', <S><VehicleExplorer /></S>) },
-      { path: "auto-aging/vehicles/:id", element: withModuleAccess('auto-aging', <S><VehicleDetail /></S>) },
-      { path: "auto-aging/import", element: withModuleAccess('auto-aging', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><ImportCenter /></S></RequireRole>) },
-      { path: "auto-aging/quality", element: withModuleAccess('auto-aging', <S><DataQuality /></S>) },
-      { path: "auto-aging/sla", element: withModuleAccess('auto-aging', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager']}><S><SLAAdmin /></S></RequireRole>) },
-      { path: "auto-aging/mappings", element: withModuleAccess('auto-aging', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager']}><S><MappingAdmin /></S></RequireRole>) },
-      { path: "auto-aging/history", element: withModuleAccess('auto-aging', <S><ImportHistory /></S>) },
-      { path: "auto-aging/commissions", element: withModuleAccess('auto-aging', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><CommissionDashboard /></S></RequireRole>) },
-      { path: "auto-aging/reports", element: withModuleAccess('auto-aging', <S><ReportCenter /></S>) },
+      { path: "auto-aging", element: withModuleAccess('auto-aging', <R scope="Auto-Aging"><S><AutoAgingDashboard /></S></R>) },
+      { path: "auto-aging/vehicles", element: withModuleAccess('auto-aging', <R scope="Vehicle Explorer"><S><VehicleExplorer /></S></R>) },
+      { path: "auto-aging/vehicles/:id", element: withModuleAccess('auto-aging', <R scope="Vehicle Detail"><S><VehicleDetail /></S></R>) },
+      { path: "auto-aging/import", element: withModuleAccess('auto-aging', <RequireRole roles={MANAGER_AND_UP}><R scope="Import Center"><S><ImportCenter /></S></R></RequireRole>) },
+      { path: "auto-aging/quality", element: withModuleAccess('auto-aging', <R scope="Data Quality"><S><DataQuality /></S></R>) },
+      { path: "auto-aging/sla", element: withModuleAccess('auto-aging', <RequireRole roles={EXECUTIVE}><R scope="SLA Admin"><S><SLAAdmin /></S></R></RequireRole>) },
+      { path: "auto-aging/mappings", element: withModuleAccess('auto-aging', <RequireRole roles={EXECUTIVE}><R scope="Mapping Admin"><S><MappingAdmin /></S></R></RequireRole>) },
+      { path: "auto-aging/history", element: withModuleAccess('auto-aging', <R scope="Import History"><S><ImportHistory /></S></R>) },
+      { path: "auto-aging/commissions", element: withModuleAccess('auto-aging', <RequireRole roles={MANAGER_AND_UP}><R scope="Commissions"><S><CommissionDashboard /></S></R></RequireRole>) },
+      { path: "auto-aging/reports", element: withModuleAccess('auto-aging', <R scope="Auto-Aging Reports"><S><ReportCenter /></S></R>) },
       {
         path: "sales",
         element: withModuleAccess('sales', <SalesLayout />),
         children: [
-          { index: true, element: <S><SalesDashboard /></S> },
-          { path: "pipeline", element: <S><DealPipeline /></S> },
-          { path: "orders", element: <S><SalesOrders /></S> },
-          { path: "customers", element: <S><Customers /></S> },
-          { path: "invoices", element: <S><Invoices /></S> },
-          { path: "performance", element: <S><SalesmanPerformancePage /></S> },
-          { path: "advisors", element: <S><SalesAdvisors /></S> },
-          { path: "margin", element: <S><MarginAnalysis /></S> },
-          { path: "outstanding", element: <S><OutstandingCollection /></S> },
-          { path: "dealer-invoices", element: <S><DealerInvoices /></S> },
-          { path: "verify-or", element: <S><VerifyOR /></S> },
+          { index: true, element: <R scope="Sales Dashboard"><S><SalesDashboard /></S></R> },
+          { path: "pipeline", element: <RequireRole roles={MANAGER_AND_UP}><R scope="Deal Pipeline"><S><DealPipeline /></S></R></RequireRole> },
+          { path: "orders", element: <R scope="Sales Orders"><S><SalesOrders /></S></R> },
+          { path: "customers", element: <R scope="Customers"><S><Customers /></S></R> },
+          { path: "invoices", element: <RequireRole roles={MANAGER_AND_UP}><R scope="Invoices"><S><Invoices /></S></R></RequireRole> },
+          { path: "performance", element: <R scope="Salesman Performance"><S><SalesmanPerformancePage /></S></R> },
+          { path: "advisors", element: <RequireRole roles={MANAGER_AND_UP}><R scope="Sales Advisors"><S><SalesAdvisors /></S></R></RequireRole> },
+          { path: "margin", element: <RequireRole roles={EXECUTIVE}><R scope="Margin Analysis"><S><MarginAnalysis /></S></R></RequireRole> },
+          { path: "outstanding", element: <R scope="Outstanding"><S><OutstandingCollection /></S></R> },
+          { path: "dealer-invoices", element: <RequireRole roles={MANAGER_AND_UP}><R scope="Dealer Invoices"><S><DealerInvoices /></S></R></RequireRole> },
+          { path: "verify-or", element: <RequireRole roles={MANAGER_AND_UP}><R scope="Verify OR"><S><VerifyOR /></S></R></RequireRole> },
         ],
       },
-      { path: "inventory/stock", element: withModuleAccess('inventory', <S><StockBalance /></S>) },
-      { path: "inventory/transfers", element: withModuleAccess('inventory', <S><VehicleTransfer /></S>) },
-      { path: "inventory/chassis", element: withModuleAccess('inventory', <S><ChassisMovement /></S>) },
-      { path: "purchasing/invoices", element: withModuleAccess('purchasing', <S><PurchaseInvoices /></S>) },
-      { path: "admin/activity", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager']}><S><ActivityDashboard /></S></RequireRole> },
-      { path: "admin/users", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserManagement /></S></RequireRole> },
-      { path: "admin/audit", element: <RequireRole roles={['super_admin', 'company_admin', 'director']}><S><AuditLog /></S></RequireRole> },
+      { path: "inventory/stock", element: withModuleAccess('inventory', <R scope="Stock Balance"><S><StockBalance /></S></R>) },
+      { path: "inventory/transfers", element: withModuleAccess('inventory', <RequireRole roles={MANAGER_AND_UP}><R scope="Vehicle Transfer"><S><VehicleTransfer /></S></R></RequireRole>) },
+      { path: "inventory/chassis", element: withModuleAccess('inventory', <R scope="Chassis Movement"><S><ChassisMovement /></S></R>) },
+      { path: "purchasing/invoices", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP}><R scope="Purchase Invoices"><S><PurchaseInvoices /></S></R></RequireRole>) },
+      { path: "admin/activity", element: <RequireRole roles={EXECUTIVE}><S><ActivityDashboard /></S></RequireRole> },
+      { path: "admin/users", element: <RequireRole roles={ADMIN_ONLY}><S><UserManagement /></S></RequireRole> },
+      { path: "admin/audit", element: <RequireRole roles={ADMIN_AND_DIRECTOR}><S><AuditLog /></S></RequireRole> },
       { path: "admin/settings", element: <S><SettingsPage /></S> },
-      { path: "admin/branches", element: <RequireRole roles={['super_admin', 'company_admin']}><S><BranchManagement /></S></RequireRole> },
-      { path: "admin/master-data", element: <RequireRole roles={['super_admin', 'company_admin']}><S><MasterData /></S></RequireRole> },
-      { path: "admin/suppliers", element: <RequireRole roles={['super_admin', 'company_admin']}><S><Suppliers /></S></RequireRole> },
-      { path: "admin/dealers", element: <RequireRole roles={['super_admin', 'company_admin']}><S><Dealers /></S></RequireRole> },
-      { path: "admin/user-groups", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserGroups /></S></RequireRole> },
-      { path: 'admin/role-permissions', element: <RequireRole roles={['super_admin', 'company_admin']}><S><RolePermissionsPage /></S></RequireRole> },
+      { path: "admin/branches", element: <RequireRole roles={ADMIN_ONLY}><S><BranchManagement /></S></RequireRole> },
+      { path: "admin/master-data", element: <RequireRole roles={ADMIN_ONLY}><S><MasterData /></S></RequireRole> },
+      { path: "admin/suppliers", element: <RequireRole roles={ADMIN_ONLY}><S><Suppliers /></S></RequireRole> },
+      { path: "admin/dealers", element: <RequireRole roles={ADMIN_ONLY}><S><Dealers /></S></RequireRole> },
+      { path: "admin/user-groups", element: <RequireRole roles={ADMIN_ONLY}><S><UserGroups /></S></RequireRole> },
+      { path: 'admin/role-permissions', element: <RequireRole roles={ADMIN_ONLY}><S><RolePermissionsPage /></S></RequireRole> },
       { path: "reports", element: withModuleAccess('reports', <S><ReportsCenter /></S>) },
       { path: "inventory/chassis-filter", element: withModuleAccess('inventory', <S><ChassisFilter /></S>) },
-      { path: "hrms/employees", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><EmployeeDirectory /></S></RequireRole>) },
-      { path: "hrms/leave", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'accounts']}><S><LeaveManagement /></S></RequireRole>) },
-      { path: "hrms/leave-calendar", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><LeaveCalendar /></S></RequireRole>) },
-      { path: "hrms/attendance", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><AttendanceLog /></S></RequireRole>) },
-      { path: "hrms/payroll", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'general_manager']}><S><PayrollSummary /></S></RequireRole>) },
-      { path: "hrms/appraisals", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><PerformanceAppraisals /></S></RequireRole>) },
-      { path: "hrms/announcements", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><HrmsAnnouncements /></S></RequireRole>) },
-      { path: "hrms/admin", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'general_manager', 'manager']}><S><HrmsAdmin /></S></RequireRole>) },
-      { path: "hrms/approval-flows", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'general_manager', 'manager']}><S><ApprovalFlows /></S></RequireRole>) },
+      { path: "hrms/employees", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><S><EmployeeDirectory /></S></RequireRole>) },
+      { path: "hrms/leave", element: withModuleAccess('hrms', <RequireRole roles={HRMS_LEAVE}><S><LeaveManagement /></S></RequireRole>) },
+      { path: "hrms/leave-calendar", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><S><LeaveCalendar /></S></RequireRole>) },
+      { path: "hrms/attendance", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><S><AttendanceLog /></S></RequireRole>) },
+      { path: "hrms/payroll", element: withModuleAccess('hrms', <RequireRole roles={HRMS_PAYROLL}><S><PayrollSummary /></S></RequireRole>) },
+      { path: "hrms/appraisals", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><S><PerformanceAppraisals /></S></RequireRole>) },
+      { path: "hrms/announcements", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><S><HrmsAnnouncements /></S></RequireRole>) },
+      { path: "hrms/admin", element: withModuleAccess('hrms', <RequireRole roles={HRMS_ADMIN}><S><HrmsAdmin /></S></RequireRole>) },
+      { path: "hrms/approval-flows", element: withModuleAccess('hrms', <RequireRole roles={HRMS_ADMIN}><S><ApprovalFlows /></S></RequireRole>) },
     ],
   },
   {
@@ -203,8 +247,8 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to="tickets/new" replace /> },
-      { path: "tickets", element: <S><MyTickets /></S> },
-      { path: "tickets/new", element: <S><NewTicket /></S> },
+      { path: "tickets", element: <S><R scope="My Tickets"><MyTickets /></R></S> },
+      { path: "tickets/new", element: <S><R scope="New Ticket"><NewTicket /></R></S> },
     ],
   },
   {
@@ -232,9 +276,8 @@ const router = createBrowserRouter([
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="flc-ui-theme" disableTransitionOnChange>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="flc-ui-theme" disableTransitionOnChange>
         <TooltipProvider>
-          <Toaster />
           <Sonner />
           <ErrorBoundary>
             <AuthProvider>

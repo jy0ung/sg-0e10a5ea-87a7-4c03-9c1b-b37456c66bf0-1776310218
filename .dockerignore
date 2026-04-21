@@ -1,0 +1,28 @@
+# Build artefacts
+node_modules
+dist
+build
+.turbo
+
+# Env files (inject via --build-arg)
+.env
+.env.local
+.env.*.local
+
+# Source control and IDE
+.git
+.github
+.vscode
+.idea
+
+# Tests and fixtures (not needed in production image)
+coverage
+test-results
+playwright-report
+e2e
+
+# Misc
+*.log
+*.md
+supabase/.branches
+supabase/.temp
