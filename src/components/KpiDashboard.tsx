@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { KpiSummary, VehicleCanonical, KpiDashboardFilters } from '@/types';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, ComposedChart, Line, LabelList } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, AlertCircle, CheckCircle2, Filter, Calendar, ChevronDown, X } from 'lucide-react';
 import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { Progress } from '@/components/ui/progress';
@@ -17,9 +17,10 @@ interface KpiDashboardProps {
   kpiSummaries: KpiSummary[];
   vehicles: VehicleCanonical[];
   showAdvanced?: boolean;
+  showFilters?: boolean;
 }
 
-export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true }: KpiDashboardProps) {
+export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true, showFilters: enableFilters = true }: KpiDashboardProps) {
   const [filters, setFilters] = useState<KpiDashboardFilters>({
     dateRange: { from: null, to: null },
     branches: [],
@@ -154,6 +155,13 @@ export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true }: Kp
     return 'bg-destructive/15 text-destructive';
   };
 
+  const getComplianceBarFill = (compliance: number) => {
+    if (compliance >= 85) return 'hsl(var(--primary))';
+    if (compliance >= 65) return 'hsl(var(--info))';
+    if (compliance >= 45) return 'hsl(var(--warning))';
+    return 'hsl(var(--destructive))';
+  };
+
   const getStatusIcon = (kpi: KpiSummary) => {
     const compliance = kpi.validCount > 0 ? ((kpi.validCount - kpi.overdueCount) / kpi.validCount) * 100 : 100;
     
@@ -172,7 +180,7 @@ export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true }: Kp
     return aCompliance - bCompliance;
   });
 
-  const chartData = kpiSummaries.map((kpi, i) => {
+  const chartData = kpiSummaries.map((kpi) => {
     const compliance = kpi.validCount > 0 ? Math.round(((kpi.validCount - kpi.overdueCount) / kpi.validCount) * 100) : 100;
     const overdueRate = kpi.validCount > 0 ? Math.round((kpi.overdueCount / kpi.validCount) * 100) : 0;
     
@@ -191,145 +199,144 @@ export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true }: Kp
 
   return (
     <div className="space-y-6">
-      {/* Filters Bar */}
-      <Card className="glass-panel">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Filters</span>
-              {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {activeFilterCount} active
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {activeFilterCount > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear all
+      {enableFilters && (
+        <Card className="glass-panel">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filters</span>
+                {activeFilterCount > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {activeFilterCount} active
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {activeFilterCount > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    Clear all
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  {showFilters ? 'Hide' : 'Show'}
+                  <ChevronDown className={`h-3.5 w-3.5 ml-1 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
                 </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                {showFilters ? 'Hide' : 'Show'}
-                <ChevronDown className={`h-3.5 w-3.5 ml-1 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-              </Button>
+              </div>
             </div>
-          </div>
 
-          {showFilters && (
-            <div className="space-y-4 animate-in slide-in-from-top-2">
-              {/* Date Range Filter */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Date Range (BG Date)</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left font-normal"
-                      >
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {filters.dateRange.from ? (
-                          filters.dateRange.to ? (
-                            <>
-                              {format(filters.dateRange.from, 'MMM d, yyyy')} - {format(filters.dateRange.to, 'MMM d, yyyy')}
-                            </>
+            {showFilters && (
+              <div className="space-y-4 animate-in slide-in-from-top-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">Date Range (BG Date)</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {filters.dateRange.from ? (
+                            filters.dateRange.to ? (
+                              <>
+                                {format(filters.dateRange.from, 'MMM d, yyyy')} - {format(filters.dateRange.to, 'MMM d, yyyy')}
+                              </>
+                            ) : (
+                              format(filters.dateRange.from, 'MMM d, yyyy')
+                            )
                           ) : (
-                            format(filters.dateRange.from, 'MMM d, yyyy')
-                          )
-                        ) : (
-                          'Select date range'
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="range"
-                        selected={filters.dateRange.from && filters.dateRange.to ? 
-                          { from: filters.dateRange.from, to: filters.dateRange.to } : undefined}
-                        onSelect={(range) => {
-                          if (range) {
-                            setFilters(prev => ({
-                              ...prev,
-                              dateRange: { from: range.from || null, to: range.to || null }
-                            }));
-                          }
-                        }}
-                        numberOfMonths={2}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              {/* Category Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Branches</label>
-                  <div className="flex flex-wrap gap-1">
-                    {filterOptions.branches.slice(0, 10).map(branch => (
-                      <Badge
-                        key={branch}
-                        variant={filters.branches.includes(branch) ? 'default' : 'outline'}
-                        className="cursor-pointer hover:bg-primary/80"
-                        onClick={() => toggleFilter('branches', branch)}
-                      >
-                        {branch}
-                      </Badge>
-                    ))}
-                    {filterOptions.branches.length > 10 && (
-                      <Badge variant="secondary">+{filterOptions.branches.length - 10} more</Badge>
-                    )}
+                            'Select date range'
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="range"
+                          selected={filters.dateRange.from && filters.dateRange.to ?
+                            { from: filters.dateRange.from, to: filters.dateRange.to } : undefined}
+                          onSelect={(range) => {
+                            if (range) {
+                              setFilters(prev => ({
+                                ...prev,
+                                dateRange: { from: range.from || null, to: range.to || null }
+                              }));
+                            }
+                          }}
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Models</label>
-                  <div className="flex flex-wrap gap-1">
-                    {filterOptions.models.slice(0, 8).map(model => (
-                      <Badge
-                        key={model}
-                        variant={filters.models.includes(model) ? 'default' : 'outline'}
-                        className="cursor-pointer hover:bg-primary/80"
-                        onClick={() => toggleFilter('models', model)}
-                      >
-                        {model}
-                      </Badge>
-                    ))}
-                    {filterOptions.models.length > 8 && (
-                      <Badge variant="secondary">+{filterOptions.models.length - 8} more</Badge>
-                    )}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">Branches</label>
+                    <div className="flex flex-wrap gap-1">
+                      {filterOptions.branches.slice(0, 10).map(branch => (
+                        <Badge
+                          key={branch}
+                          variant={filters.branches.includes(branch) ? 'default' : 'outline'}
+                          className="cursor-pointer hover:bg-primary/80"
+                          onClick={() => toggleFilter('branches', branch)}
+                        >
+                          {branch}
+                        </Badge>
+                      ))}
+                      {filterOptions.branches.length > 10 && (
+                        <Badge variant="secondary">+{filterOptions.branches.length - 10} more</Badge>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Payment Methods</label>
-                  <div className="flex flex-wrap gap-1">
-                    {filterOptions.paymentMethods.map(method => (
-                      <Badge
-                        key={method}
-                        variant={filters.paymentMethods.includes(method) ? 'default' : 'outline'}
-                        className="cursor-pointer hover:bg-primary/80"
-                        onClick={() => toggleFilter('paymentMethods', method)}
-                      >
-                        {method}
-                      </Badge>
-                    ))}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">Models</label>
+                    <div className="flex flex-wrap gap-1">
+                      {filterOptions.models.slice(0, 8).map(model => (
+                        <Badge
+                          key={model}
+                          variant={filters.models.includes(model) ? 'default' : 'outline'}
+                          className="cursor-pointer hover:bg-primary/80"
+                          onClick={() => toggleFilter('models', model)}
+                        >
+                          {model}
+                        </Badge>
+                      ))}
+                      {filterOptions.models.length > 8 && (
+                        <Badge variant="secondary">+{filterOptions.models.length - 8} more</Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted-foreground">Payment Methods</label>
+                    <div className="flex flex-wrap gap-1">
+                      {filterOptions.paymentMethods.map(method => (
+                        <Badge
+                          key={method}
+                          variant={filters.paymentMethods.includes(method) ? 'default' : 'outline'}
+                          className="cursor-pointer hover:bg-primary/80"
+                          onClick={() => toggleFilter('paymentMethods', method)}
+                        >
+                          {method}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filtered Data Summary */}
-      {filteredVehicles.length !== vehicles.length && (
+      {enableFilters && filteredVehicles.length !== vehicles.length && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Filter className="h-4 w-4" />
           Showing {filteredVehicles.length} of {vehicles.length} vehicles
@@ -395,21 +402,38 @@ export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true }: Kp
 
       {/* Compliance Comparison Chart */}
       <Card className="glass-panel">
-        <CardHeader>
+        <CardHeader className="border-b border-border/60 pb-4">
           <CardTitle className="text-base font-semibold">KPI Compliance Overview</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Compliance stays on the percentage axis, while SLA targets are shown as a separate days line for a clearer comparison.
+          </p>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <ResponsiveContainer width="100%" height={320}>
+            <ComposedChart data={chartData} margin={{ top: 18, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border) / 0.8)" />
               <XAxis 
                 dataKey="name" 
                 tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} 
+                tickLine={false}
                 axisLine={false}
               />
               <YAxis 
+                yAxisId="compliance"
+                domain={[0, 100]}
+                tickFormatter={(value: number) => `${value}%`}
                 tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} 
+                tickLine={false}
                 axisLine={false}
+              />
+              <YAxis
+                yAxisId="sla"
+                orientation="right"
+                tickFormatter={(value: number) => `${value}d`}
+                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                tickLine={false}
+                axisLine={false}
+                allowDecimals={false}
               />
               <Tooltip 
                 contentStyle={{ 
@@ -417,8 +441,10 @@ export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true }: Kp
                   border: '1px solid hsl(var(--border))', 
                   borderRadius: '8px',
                   fontSize: '12px',
-                  color: 'hsl(var(--foreground))'
+                  color: 'hsl(var(--foreground))',
+                  boxShadow: '0 16px 40px hsl(var(--foreground) / 0.08)'
                 }}
+                labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
                 formatter={(value: number, name: string) => {
                   if (name === 'compliance') return [`${value}%`, 'Compliance'];
                   if (name === 'overdueRate') return [`${value}%`, 'Overdue Rate'];
@@ -427,10 +453,38 @@ export function KpiDashboard({ kpiSummaries, vehicles, showAdvanced = true }: Kp
                   return [value, name];
                 }}
               />
-              <Legend wrapperStyle={{ fontSize: '11px', paddingBottom: '10px' }} />
-              <Bar dataKey="compliance" name="Compliance %" fill="hsl(142, 71%, 45%)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="sla" name="SLA Target" fill="hsl(var(--muted))" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Legend wrapperStyle={{ fontSize: '11px', paddingBottom: '12px' }} iconType="circle" />
+              <Bar
+                yAxisId="compliance"
+                dataKey="compliance"
+                name="Compliance %"
+                radius={[8, 8, 0, 0]}
+                barSize={26}
+                background={{ fill: 'hsl(var(--accent))', radius: 8 }}
+              >
+                {chartData.map((entry) => (
+                  <Cell key={entry.name} fill={getComplianceBarFill(entry.compliance)} />
+                ))}
+                <LabelList
+                  dataKey="compliance"
+                  position="top"
+                  formatter={(value: number) => `${value}%`}
+                  fill="hsl(var(--foreground))"
+                  fontSize={11}
+                  fontWeight={600}
+                />
+              </Bar>
+              <Line
+                yAxisId="sla"
+                type="monotone"
+                dataKey="sla"
+                name="SLA Target"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2.5}
+                dot={{ r: 4, fill: 'hsl(var(--card))', stroke: 'hsl(var(--primary))', strokeWidth: 2 }}
+                activeDot={{ r: 5, fill: 'hsl(var(--primary))', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>

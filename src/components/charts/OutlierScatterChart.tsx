@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ZAxis, Cell } from 'recharts';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ZAxis, Cell, ReferenceLine } from 'recharts';
 import { VehicleCanonical } from '@/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface Props {
   vehicles: VehicleCanonical[];
@@ -28,53 +29,95 @@ export function OutlierScatterChart({ vehicles, onVehicleClick }: Props) {
     };
   }, [scatterData]);
 
-  const getColor = (d: { bgToDelivery: number; etdToOutlet: number }) => {
-    if (d.bgToDelivery > p90BgDel || d.etdToOutlet > p90EtdOut) return 'hsl(0, 72%, 51%)';
-    if (d.bgToDelivery > p90BgDel * 0.75 || d.etdToOutlet > p90EtdOut * 0.75) return 'hsl(var(--primary))';
-    return 'hsl(199, 89%, 48%)';
+  const getStatus = (d: { bgToDelivery: number; etdToOutlet: number }) => {
+    if (d.bgToDelivery > p90BgDel || d.etdToOutlet > p90EtdOut) return 'outlier';
+    if (d.bgToDelivery > p90BgDel * 0.75 || d.etdToOutlet > p90EtdOut * 0.75) return 'at-risk';
+    return 'normal';
   };
 
+  const getColor = (d: { bgToDelivery: number; etdToOutlet: number }) => {
+    const status = getStatus(d);
+    if (status === 'outlier') return 'hsl(var(--destructive))';
+    if (status === 'at-risk') return 'hsl(var(--warning))';
+    return 'hsl(var(--info))';
+  };
+
+  const statusSummary = useMemo(() => {
+    return scatterData.reduce(
+      (summary, point) => {
+        const status = getStatus(point);
+        summary[status] += 1;
+        return summary;
+      },
+      { normal: 0, 'at-risk': 0, outlier: 0 },
+    );
+  }, [scatterData, p90BgDel, p90EtdOut]);
+
   return (
-    <div className="glass-panel p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-foreground">Outlier Detection — BG→Delivery vs ETD→Outlet</h3>
-        <div className="flex items-center gap-3 text-[10px]">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[hsl(199,89%,48%)]" />Normal</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary" />At Risk</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-destructive" />Outlier</span>
+    <Card className="glass-panel">
+      <CardHeader className="border-b border-border/60 pb-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-base font-semibold">Outlier Detection — BG→Delivery vs ETD→Outlet</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Vehicles breaching the 90th percentile thresholds stand out immediately so exceptions can be reviewed faster.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="rounded-full bg-info/12 px-2.5 py-1 font-medium text-info">Normal {statusSummary.normal}</span>
+            <span className="rounded-full bg-warning/12 px-2.5 py-1 font-medium text-warning">At Risk {statusSummary['at-risk']}</span>
+            <span className="rounded-full bg-destructive/12 px-2.5 py-1 font-medium text-destructive">Outlier {statusSummary.outlier}</span>
+          </div>
         </div>
-      </div>
-      <ResponsiveContainer width="100%" height={280}>
-        <ScatterChart margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+        <p className="text-[11px] text-muted-foreground">P90 thresholds: BG→Delivery {p90BgDel}d • ETD→Outlet {p90EtdOut}d</p>
+      </CardHeader>
+      <CardContent className="pt-6">
+      <ResponsiveContainer width="100%" height={320}>
+        <ScatterChart margin={{ top: 16, right: 12, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.8)" />
           <XAxis
             dataKey="bgToDelivery"
             name="BG→Delivery"
             unit="d"
             tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+            tickLine={false}
             axisLine={false}
             label={{ value: 'BG → Delivery (days)', position: 'insideBottom', offset: -2, fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+            allowDecimals={false}
           />
           <YAxis
             dataKey="etdToOutlet"
             name="ETD→Outlet"
             unit="d"
             tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+            tickLine={false}
             axisLine={false}
             label={{ value: 'ETD → Outlet (days)', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+            allowDecimals={false}
           />
           <ZAxis range={[30, 30]} />
+          <ReferenceLine x={p90BgDel} stroke="hsl(var(--warning))" strokeDasharray="5 5" />
+          <ReferenceLine y={p90EtdOut} stroke="hsl(var(--warning))" strokeDasharray="5 5" />
           <Tooltip
             contentStyle={{
               background: 'hsl(var(--card))',
               border: '1px solid hsl(var(--border))',
-              borderRadius: '8px',
+              borderRadius: '10px',
               fontSize: '12px',
               color: 'hsl(var(--foreground))',
+              boxShadow: '0 18px 40px hsl(var(--foreground) / 0.08)',
             }}
-            formatter={(value: number, name: string) => [`${value}d`, name]}
-            labelFormatter={() => ''}
-            cursor={{ strokeDasharray: '3 3' }}
+            labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+            formatter={(value: number, name: string) => {
+              if (name === 'bgToDelivery') return [`${value}d`, 'BG → Delivery'];
+              if (name === 'etdToOutlet') return [`${value}d`, 'ETD → Outlet'];
+              return [value, name];
+            }}
+            labelFormatter={(_, payload) => {
+              const point = payload?.[0]?.payload as { chassisNo?: string; branch?: string } | undefined;
+              return point?.chassisNo ? `${point.chassisNo} • ${point.branch}` : '';
+            }}
+            cursor={{ stroke: 'hsl(var(--border))', strokeDasharray: '4 4' }}
           />
           <Scatter
             data={scatterData}
@@ -82,11 +125,12 @@ export function OutlierScatterChart({ vehicles, onVehicleClick }: Props) {
             style={{ cursor: 'pointer' }}
           >
             {scatterData.map((entry, i) => (
-              <Cell key={i} fill={getColor(entry)} fillOpacity={0.7} />
+              <Cell key={i} fill={getColor(entry)} fillOpacity={0.82} stroke="hsl(var(--card))" strokeWidth={1} />
             ))}
           </Scatter>
         </ScatterChart>
       </ResponsiveContainer>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

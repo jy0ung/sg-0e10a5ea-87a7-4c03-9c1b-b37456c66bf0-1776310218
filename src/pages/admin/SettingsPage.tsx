@@ -6,14 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Loader2, Save, KeyRound } from 'lucide-react';
+import { Loader2, Save, KeyRound, Power } from 'lucide-react';
 import { getBranches } from '@/services/masterDataService';
 import type { BranchRecord } from '@/types';
 import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
 import { profileUpdateSchema, type ProfileUpdateFormData, changePasswordSchema, type ChangePasswordFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 
 const ROLES: { value: AppRole; label: string }[] = [
   { value: 'super_admin', label: 'Super Admin' },
@@ -28,10 +30,12 @@ const ROLES: { value: AppRole; label: string }[] = [
 
 export default function SettingsPage() {
   const { user, refreshProfile } = useAuth();
+  const { modules, setModuleActive, canManageModules, loading: modulesLoading } = useModuleAccess();
   const [branchId, setBranchId] = useState<string>('none');
   const [saving, setSaving] = useState(false);
   const [branches, setBranches] = useState<BranchRecord[]>([]);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [updatingModuleId, setUpdatingModuleId] = useState<string | null>(null);
 
   const passwordForm = useForm<ChangePasswordFormData>({
     resolver: zodResolver(changePasswordSchema),
@@ -120,6 +124,22 @@ export default function SettingsPage() {
     setSaving(false);
   };
 
+  const configurableModules = modules.filter(module => Boolean(module.path));
+
+  const handleModuleToggle = async (moduleId: string, moduleName: string, nextState: boolean) => {
+    setUpdatingModuleId(moduleId);
+    try {
+      await setModuleActive(moduleId, nextState);
+      toast.success(`${moduleName} ${nextState ? 'activated' : 'deactivated'}`);
+    } catch (error) {
+      toast.error(`Failed to update ${moduleName}`, {
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+      });
+    } finally {
+      setUpdatingModuleId(null);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="Settings" description="Manage your profile and preferences" breadcrumbs={[{ label: 'FLC BI' }, { label: 'Settings' }]} />
@@ -200,6 +220,57 @@ export default function SettingsPage() {
             <div><p className="text-xs text-muted-foreground">Company ID</p><p className="text-foreground font-medium">{user?.company_id || ''}</p></div>
             <div><p className="text-xs text-muted-foreground">Platform</p><p className="text-foreground font-medium">FLC BI v1.0</p></div>
           </div>
+        </div>
+      </div>
+
+      <div className="glass-panel p-6 space-y-5">
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Power className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Module Availability</h3>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 max-w-2xl">
+              Disable a module to move it into Coming Soon, hide it from the working navigation, and block direct access without breaking existing links.
+            </p>
+          </div>
+          {!canManageModules && (
+            <p className="text-xs text-muted-foreground">Read-only. Only company admins can change module access.</p>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          {configurableModules.map(module => {
+            const statusLabel = !module.isToggleable
+              ? 'Core module'
+              : module.isActive
+                ? 'Active'
+                : 'Coming soon';
+
+            return (
+              <div key={module.id} className="rounded-xl border border-border/60 bg-secondary/30 p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">{module.name}</p>
+                    <span className="rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {statusLabel}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground max-w-2xl">{module.description}</p>
+                </div>
+
+                <div className="flex items-center gap-3 self-end md:self-auto">
+                  {updatingModuleId === module.id && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+                  <Switch
+                    checked={module.isActive}
+                    disabled={!canManageModules || !module.isToggleable || modulesLoading || updatingModuleId === module.id}
+                    onCheckedChange={(checked) => handleModuleToggle(module.id, module.name, checked)}
+                    aria-label={`Toggle ${module.name}`}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

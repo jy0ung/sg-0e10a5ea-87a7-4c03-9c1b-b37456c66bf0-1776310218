@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { platformModules } from '@/data/demo-data';
+import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import {
   Timer, DollarSign, TrendingUp, Settings, Package, Users, UserCheck, Brain,
   LayoutDashboard, Bell, HeadphonesIcon, Briefcase, BarChart3, Truck,
@@ -153,10 +153,11 @@ function WorkspaceCard({
 
 export default function ModuleDirectory() {
   const navigate = useNavigate();
+  const { modules } = useModuleAccess();
 
-  const moduleById = Object.fromEntries(platformModules.map(m => [m.id, m]));
+  const moduleById = Object.fromEntries(modules.map(m => [m.id, m]));
 
-  const roadmapModules = platformModules.filter(m => m.status !== 'active');
+  const roadmapModules = modules.filter(m => m.status !== 'active');
 
   return (
     <div className="space-y-8 animate-fade-in">

@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { VehicleRaw, DataQualityIssue, VehicleCanonical } from '@/types';
+import { normalizeSupportedDateValue, parseSupportedDateString } from '@/lib/dateParsing';
 import { loggingService } from '@/services/loggingService';
 
 function normalizeHeader(raw: unknown): string {
@@ -78,7 +79,7 @@ function parseExcelDate(val: unknown): string | undefined {
     try {
       const d = XLSX.SSF.parse_date_code(val);
       if (d && d.y && d.m && d.d) {
-        return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+        return normalizeSupportedDateValue(`${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`);
       }
     } catch {
       return undefined;
@@ -86,41 +87,12 @@ function parseExcelDate(val: unknown): string | undefined {
   }
   
   if (typeof val === 'string') {
-    const trimmed = val.trim();
-    if (!trimmed) return undefined;
-    
-    // dd.mm.yyyy or dd.mm.yy (dot-separated)
-    const dotMatch = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
-    if (dotMatch) {
-      const day = dotMatch[1].padStart(2, '0');
-      const month = dotMatch[2].padStart(2, '0');
-      let year = dotMatch[3];
-      if (year.length === 2) year = (parseInt(year) > 50 ? '19' : '20') + year;
-      return `${year}-${month}-${day}`;
-    }
-    
-    // dd/mm/yyyy or dd/mm/yy (slash-separated)
-    const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-    if (slashMatch) {
-      const day = slashMatch[1].padStart(2, '0');
-      const month = slashMatch[2].padStart(2, '0');
-      let year = slashMatch[3];
-      if (year.length === 2) year = (parseInt(year) > 50 ? '19' : '20') + year;
-      return `${year}-${month}-${day}`;
-    }
-    
-    // ISO or other parseable format
-    try {
-      const d = new Date(trimmed);
-      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-    } catch {
-      return undefined;
-    }
+    return normalizeSupportedDateValue(val);
   }
   
   // Date object (xlsx cellDates mode or openpyxl-style)
   if (val instanceof Date && !isNaN(val.getTime())) {
-    return val.toISOString().split('T')[0];
+    return normalizeSupportedDateValue(val);
   }
   
   return undefined;
@@ -251,17 +223,33 @@ export function publishCanonical(
         return countFields(b) - countFields(a);
       })[0];
 
-      const diffDays = (from?: string, to?: string): number | null => {
-        if (!from || !to) return null;
-        try {
-          const diff = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86400000);
-          return isNaN(diff) ? null : diff;
-        } catch {
-          return null;
-        }
+      const normalizedDates = {
+        bg_date: normalizeSupportedDateValue(best.bg_date),
+        shipment_etd_pkg: normalizeSupportedDateValue(best.shipment_etd_pkg),
+        shipment_eta_kk_twu_sdk: normalizeSupportedDateValue(best.shipment_eta_kk_twu_sdk),
+        date_received_by_outlet: normalizeSupportedDateValue(best.date_received_by_outlet),
+        reg_date: normalizeSupportedDateValue(best.reg_date),
+        delivery_date: normalizeSupportedDateValue(best.delivery_date),
+        disb_date: normalizeSupportedDateValue(best.disb_date),
+        vaa_date: normalizeSupportedDateValue(best.vaa_date),
+        full_payment_date: normalizeSupportedDateValue(best.full_payment_date),
       };
 
-      const resolvedBranchCode = (branchMap && best.branch_code ? (branchMap.get(best.branch_code.toUpperCase()) ?? best.branch_code) : best.branch_code) || undefined;
+      const diffDays = (from?: string, to?: string): number | null => {
+        if (!from || !to) return null;
+        const fromDate = parseSupportedDateString(from);
+        const toDate = parseSupportedDateString(to);
+        if (!fromDate || !toDate) {
+          return null;
+        }
+        const diff = Math.round((toDate.getTime() - fromDate.getTime()) / 86400000);
+        return isNaN(diff) ? null : diff;
+      };
+
+      const normalizedBranchCode = best.branch_code?.trim();
+      const resolvedBranchCode = (branchMap && normalizedBranchCode
+        ? (branchMap.get(normalizedBranchCode.toUpperCase()) ?? normalizedBranchCode)
+        : normalizedBranchCode) || undefined;
 
       // Detect fields that are genuinely missing (need real-world data to complete)
       const pendingFields: string[] = [];
@@ -274,21 +262,23 @@ export function publishCanonical(
       const v: VehicleCanonical = {
         id: `canon-${chassis}`,
         chassis_no: chassis,
-        bg_date: best.bg_date,
-        shipment_etd_pkg: best.shipment_etd_pkg,
-        shipment_eta_kk_twu_sdk: best.shipment_eta_kk_twu_sdk,
-        date_received_by_outlet: best.date_received_by_outlet,
-        reg_date: best.reg_date,
-        delivery_date: best.delivery_date,
-        disb_date: best.disb_date,
+        bg_date: normalizedDates.bg_date,
+        shipment_etd_pkg: normalizedDates.shipment_etd_pkg,
+        shipment_eta_kk_twu_sdk: normalizedDates.shipment_eta_kk_twu_sdk,
+        date_received_by_outlet: normalizedDates.date_received_by_outlet,
+        reg_date: normalizedDates.reg_date,
+        delivery_date: normalizedDates.delivery_date,
+        disb_date: normalizedDates.disb_date,
         branch_code: resolvedBranchCode || 'Unknown',
         model: best.model || 'Unknown',
-        payment_method: (paymentMap && best.payment_method ? (paymentMap.get(best.payment_method.toUpperCase()) ?? best.payment_method) : best.payment_method) || 'Unknown',
+        payment_method: (paymentMap && best.payment_method?.trim()
+          ? (paymentMap.get(best.payment_method.trim().toUpperCase()) ?? best.payment_method.trim())
+          : best.payment_method?.trim()) || 'Unknown',
         salesman_name: best.salesman_name || 'Pending',
         customer_name: best.customer_name || 'Pending',
         remark: best.remark,
-        vaa_date: best.vaa_date,
-        full_payment_date: best.full_payment_date,
+        vaa_date: normalizedDates.vaa_date,
+        full_payment_date: normalizedDates.full_payment_date,
         is_d2d: best.is_d2d || false,
         import_batch_id: best.import_batch_id,
         source_row_id: best.id,
@@ -302,13 +292,13 @@ export function publishCanonical(
         invoice_no: best.invoice_no,
         obr: best.obr,
         // New flow: BG → ETD → Outlet → Reg → Delivery → Disb
-        bg_to_delivery: diffDays(best.bg_date, best.delivery_date),
-        bg_to_shipment_etd: diffDays(best.bg_date, best.shipment_etd_pkg),
-        etd_to_outlet: diffDays(best.shipment_etd_pkg, best.date_received_by_outlet),
-        outlet_to_reg: diffDays(best.date_received_by_outlet, best.reg_date),
-        reg_to_delivery: diffDays(best.reg_date, best.delivery_date),
-        bg_to_disb: diffDays(best.bg_date, best.disb_date),
-        delivery_to_disb: diffDays(best.delivery_date, best.disb_date),
+        bg_to_delivery: diffDays(normalizedDates.bg_date, normalizedDates.delivery_date),
+        bg_to_shipment_etd: diffDays(normalizedDates.bg_date, normalizedDates.shipment_etd_pkg),
+        etd_to_outlet: diffDays(normalizedDates.shipment_etd_pkg, normalizedDates.date_received_by_outlet),
+        outlet_to_reg: diffDays(normalizedDates.date_received_by_outlet, normalizedDates.reg_date),
+        reg_to_delivery: diffDays(normalizedDates.reg_date, normalizedDates.delivery_date),
+        bg_to_disb: diffDays(normalizedDates.bg_date, normalizedDates.disb_date),
+        delivery_to_disb: diffDays(normalizedDates.delivery_date, normalizedDates.disb_date),
         is_incomplete: pendingFields.length > 0,
         pending_fields: pendingFields.length > 0 ? pendingFields : undefined,
         salesman_id: (nameToIdMap && best.salesman_name)

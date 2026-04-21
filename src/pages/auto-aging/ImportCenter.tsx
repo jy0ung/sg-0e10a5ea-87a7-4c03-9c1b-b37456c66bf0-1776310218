@@ -7,6 +7,7 @@ import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCircle, Info, PlusCircle } from 'lucide-react';
 import { parseWorkbook, publishCanonical } from '@/lib/import-parser';
 import { loadBranchMappingLookup, loadPaymentMappingLookup, createBranchMapping } from '@/services/mappingService';
@@ -22,6 +23,7 @@ export default function ImportCenter() {
   const navigate = useNavigate();
   const { addImportBatch, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, vehicles, user } = useData();
   const { toast } = useToast();
+  const companyId = useCompanyId();
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');
   const [rawRows, setRawRows] = useState<VehicleRaw[]>([]);
@@ -29,7 +31,6 @@ export default function ImportCenter() {
   const [serverErrors, setServerErrors] = useState<ValidationError[]>([]);
   const [missingCols, setMissingCols] = useState<string[]>([]);
   const [batchId, setBatchId] = useState('');
-  const [companyId, setCompanyId] = useState('default-company');
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [validationProgress, setValidationProgress] = useState({ processed: 0, total: 0 });
 
@@ -96,6 +97,14 @@ export default function ImportCenter() {
   const handleFileDrop = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!companyId) {
+      toast({
+        title: 'Import unavailable',
+        description: 'Your user profile does not have a company assigned.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setFileName(file.name);
     setValidationProgress({ processed: 0, total: 0 });
     setStep('validating');
@@ -146,7 +155,7 @@ export default function ImportCenter() {
       alert(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setStep('upload');
     }
-  }, [addImportBatch, companyId, user]);
+  }, [addImportBatch, companyId, toast, user]);
 
   const handlePublish = useCallback(async () => {
     if (hasHardErrors) {

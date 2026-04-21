@@ -7,10 +7,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { AuthProvider, ProtectedRoute } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
+import { ModuleAccessProvider } from "@/contexts/ModuleAccessContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RequireRole } from "@/components/shared/RequireRole";
+import { RequireActiveModule } from "@/components/shared/RequireActiveModule";
 import AppLayout from "./components/layout/AppLayout";
 import SalesLayout from "./components/layout/SalesLayout";
 import { SalesProvider } from "./contexts/SalesContext";
@@ -93,11 +96,17 @@ function S({ children }: { children: React.ReactNode }) {
 function ProtectedAppShell({ redirectTo = "/login" }: { redirectTo?: string | ((pathname: string) => string) }) {
   return (
     <ProtectedRoute redirectTo={redirectTo}>
-      <DataProvider>
-        <AppLayout />
-      </DataProvider>
+      <ModuleAccessProvider>
+        <DataProvider>
+          <AppLayout />
+        </DataProvider>
+      </ModuleAccessProvider>
     </ProtectedRoute>
   );
+}
+
+function withModuleAccess(moduleId: string, element: React.ReactNode) {
+  return <RequireActiveModule moduleId={moduleId}>{element}</RequireActiveModule>;
 }
 
 const queryClient = new QueryClient();
@@ -121,19 +130,19 @@ const router = createBrowserRouter([
       { path: "profile", element: <Navigate to="/admin/settings" replace /> },
       { path: "modules", element: <S><ModuleDirectory /></S> },
       { path: "notifications", element: <S><Notifications /></S> },
-      { path: "auto-aging", element: <S><AutoAgingDashboard /></S> },
-      { path: "auto-aging/vehicles", element: <S><VehicleExplorer /></S> },
-      { path: "auto-aging/vehicles/:id", element: <S><VehicleDetail /></S> },
-      { path: "auto-aging/import", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><ImportCenter /></S></RequireRole> },
-      { path: "auto-aging/quality", element: <S><DataQuality /></S> },
-      { path: "auto-aging/sla", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager']}><S><SLAAdmin /></S></RequireRole> },
-      { path: "auto-aging/mappings", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager']}><S><MappingAdmin /></S></RequireRole> },
-      { path: "auto-aging/history", element: <S><ImportHistory /></S> },
-      { path: "auto-aging/commissions", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><CommissionDashboard /></S></RequireRole> },
-      { path: "auto-aging/reports", element: <S><ReportCenter /></S> },
+      { path: "auto-aging", element: withModuleAccess('auto-aging', <S><AutoAgingDashboard /></S>) },
+      { path: "auto-aging/vehicles", element: withModuleAccess('auto-aging', <S><VehicleExplorer /></S>) },
+      { path: "auto-aging/vehicles/:id", element: withModuleAccess('auto-aging', <S><VehicleDetail /></S>) },
+      { path: "auto-aging/import", element: withModuleAccess('auto-aging', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><ImportCenter /></S></RequireRole>) },
+      { path: "auto-aging/quality", element: withModuleAccess('auto-aging', <S><DataQuality /></S>) },
+      { path: "auto-aging/sla", element: withModuleAccess('auto-aging', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager']}><S><SLAAdmin /></S></RequireRole>) },
+      { path: "auto-aging/mappings", element: withModuleAccess('auto-aging', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager']}><S><MappingAdmin /></S></RequireRole>) },
+      { path: "auto-aging/history", element: withModuleAccess('auto-aging', <S><ImportHistory /></S>) },
+      { path: "auto-aging/commissions", element: withModuleAccess('auto-aging', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><CommissionDashboard /></S></RequireRole>) },
+      { path: "auto-aging/reports", element: withModuleAccess('auto-aging', <S><ReportCenter /></S>) },
       {
         path: "sales",
-        element: <SalesLayout />,
+        element: withModuleAccess('sales', <SalesLayout />),
         children: [
           { index: true, element: <S><SalesDashboard /></S> },
           { path: "pipeline", element: <S><DealPipeline /></S> },
@@ -148,10 +157,10 @@ const router = createBrowserRouter([
           { path: "verify-or", element: <S><VerifyOR /></S> },
         ],
       },
-      { path: "inventory/stock", element: <S><StockBalance /></S> },
-      { path: "inventory/transfers", element: <S><VehicleTransfer /></S> },
-      { path: "inventory/chassis", element: <S><ChassisMovement /></S> },
-      { path: "purchasing/invoices", element: <S><PurchaseInvoices /></S> },
+      { path: "inventory/stock", element: withModuleAccess('inventory', <S><StockBalance /></S>) },
+      { path: "inventory/transfers", element: withModuleAccess('inventory', <S><VehicleTransfer /></S>) },
+      { path: "inventory/chassis", element: withModuleAccess('inventory', <S><ChassisMovement /></S>) },
+      { path: "purchasing/invoices", element: withModuleAccess('purchasing', <S><PurchaseInvoices /></S>) },
       { path: "admin/activity", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager']}><S><ActivityDashboard /></S></RequireRole> },
       { path: "admin/users", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserManagement /></S></RequireRole> },
       { path: "admin/audit", element: <RequireRole roles={['super_admin', 'company_admin', 'director']}><S><AuditLog /></S></RequireRole> },
@@ -160,17 +169,19 @@ const router = createBrowserRouter([
       { path: "admin/master-data", element: <RequireRole roles={['super_admin', 'company_admin']}><S><MasterData /></S></RequireRole> },
       { path: "admin/suppliers", element: <RequireRole roles={['super_admin', 'company_admin']}><S><Suppliers /></S></RequireRole> },
       { path: "admin/dealers", element: <RequireRole roles={['super_admin', 'company_admin']}><S><Dealers /></S></RequireRole> },
-      { path: "admin/user-groups", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserGroups /></S></RequireRole> },      { path: 'admin/role-permissions', element: <RequireRole roles={['super_admin', 'company_admin']}><S><RolePermissionsPage /></S></RequireRole> },      { path: "reports", element: <S><ReportsCenter /></S> },
-      { path: "inventory/chassis-filter", element: <S><ChassisFilter /></S> },
-      { path: "hrms/employees", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><EmployeeDirectory /></S></RequireRole> },
-      { path: "hrms/leave", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'accounts']}><S><LeaveManagement /></S></RequireRole> },
-      { path: "hrms/leave-calendar", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><LeaveCalendar /></S></RequireRole> },
-      { path: "hrms/attendance", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><AttendanceLog /></S></RequireRole> },
-      { path: "hrms/payroll", element: <RequireRole roles={['super_admin', 'company_admin', 'general_manager']}><S><PayrollSummary /></S></RequireRole> },
-      { path: "hrms/appraisals", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><PerformanceAppraisals /></S></RequireRole> },
-      { path: "hrms/announcements", element: <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><HrmsAnnouncements /></S></RequireRole> },
-      { path: "hrms/admin", element: <RequireRole roles={['super_admin', 'company_admin', 'general_manager', 'manager']}><S><HrmsAdmin /></S></RequireRole> },
-      { path: "hrms/approval-flows", element: <RequireRole roles={['super_admin', 'company_admin', 'general_manager', 'manager']}><S><ApprovalFlows /></S></RequireRole> },
+      { path: "admin/user-groups", element: <RequireRole roles={['super_admin', 'company_admin']}><S><UserGroups /></S></RequireRole> },
+      { path: 'admin/role-permissions', element: <RequireRole roles={['super_admin', 'company_admin']}><S><RolePermissionsPage /></S></RequireRole> },
+      { path: "reports", element: withModuleAccess('reports', <S><ReportsCenter /></S>) },
+      { path: "inventory/chassis-filter", element: withModuleAccess('inventory', <S><ChassisFilter /></S>) },
+      { path: "hrms/employees", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><EmployeeDirectory /></S></RequireRole>) },
+      { path: "hrms/leave", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'accounts']}><S><LeaveManagement /></S></RequireRole>) },
+      { path: "hrms/leave-calendar", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><LeaveCalendar /></S></RequireRole>) },
+      { path: "hrms/attendance", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><AttendanceLog /></S></RequireRole>) },
+      { path: "hrms/payroll", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'general_manager']}><S><PayrollSummary /></S></RequireRole>) },
+      { path: "hrms/appraisals", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><PerformanceAppraisals /></S></RequireRole>) },
+      { path: "hrms/announcements", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'director', 'general_manager', 'manager']}><S><HrmsAnnouncements /></S></RequireRole>) },
+      { path: "hrms/admin", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'general_manager', 'manager']}><S><HrmsAdmin /></S></RequireRole>) },
+      { path: "hrms/approval-flows", element: withModuleAccess('hrms', <RequireRole roles={['super_admin', 'company_admin', 'general_manager', 'manager']}><S><ApprovalFlows /></S></RequireRole>) },
     ],
   },
   {
@@ -181,9 +192,13 @@ const router = createBrowserRouter([
     path: "/portal",
     element: (
       <ProtectedRoute>
-        <Suspense fallback={<PageSpinner />}>
-          <CustomerServiceLayout />
-        </Suspense>
+        <ModuleAccessProvider>
+          <RequireActiveModule moduleId="support">
+            <Suspense fallback={<PageSpinner />}>
+              <CustomerServiceLayout />
+            </Suspense>
+          </RequireActiveModule>
+        </ModuleAccessProvider>
       </ProtectedRoute>
     ),
     children: [
@@ -217,15 +232,17 @@ const router = createBrowserRouter([
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <ErrorBoundary>
-          <AuthProvider>
-            <RouterProvider router={router} />
-          </AuthProvider>
-        </ErrorBoundary>
-      </TooltipProvider>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="flc-ui-theme" disableTransitionOnChange>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <ErrorBoundary>
+            <AuthProvider>
+              <RouterProvider router={router} />
+            </AuthProvider>
+          </ErrorBoundary>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 };

@@ -1,9 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
+import { normalizeSupportedDateValue } from "@/lib/dateParsing";
+import { publishCanonical } from "@/lib/import-parser";
+import { loadBranchMappingLookup, loadPaymentMappingLookup } from "./mappingService";
 import { loggingService } from "./loggingService";
 import { performanceService } from "./performanceService";
 import { logVehicleEdit } from "./auditService";
+import { resolveNamesToIds } from "./hrmsService";
 import { validateImportBatch } from "./validationService";
-import type { ImportBatch, ImportBatchInsert, ValidationError } from "@/types";
+import type { ImportBatch, ImportBatchInsert, ValidationError, VehicleRaw } from "@/types";
 
 export async function createImportBatch(
   batch: ImportBatchInsert,
@@ -203,42 +207,70 @@ export async function validateAndInsertVehicles(
       return { inserted: 0, errors: [], error: null };
     }
 
-    const dbVehicles = vehicles.map((v) => ({
-      chassis_no: v.chassis_no,
-      bg_date: v.bg_date,
-      shipment_etd_pkg: v.shipment_etd_pkg,
-      shipment_eta_kk_twu_sdk: v.shipment_eta_kk_twu_sdk,
-      date_received_by_outlet: v.date_received_by_outlet,
-      reg_date: v.reg_date,
-      delivery_date: v.delivery_date,
-      disb_date: v.disb_date,
-      branch_code: v.branch_code,
-      model: v.model,
-      payment_method: v.payment_method,
-      salesman_name: v.salesman_name,
-      customer_name: v.customer_name,
-      remark: v.remark,
-      vaa_date: v.vaa_date,
-      full_payment_date: v.full_payment_date,
-      is_d2d: v.is_d2d || false,
+    const sanitizeDate = (value: unknown) => normalizeSupportedDateValue(value) ?? null;
+    const [branchLookup, paymentLookup] = await Promise.all([
+      loadBranchMappingLookup(companyId),
+      loadPaymentMappingLookup(companyId),
+    ]);
+    const allNames = [...new Set(
+      vehicles
+        .map(vehicle => typeof vehicle.salesman_name === 'string' ? vehicle.salesman_name.trim() : '')
+        .filter(Boolean)
+    )];
+    const nameToIdMap = await resolveNamesToIds(companyId, allNames);
+    const { canonical } = publishCanonical(
+      vehicles as VehicleRaw[],
+      branchLookup,
+      paymentLookup,
+      nameToIdMap,
+    );
+
+    const dbVehicles = canonical.map((vehicle) => ({
+      chassis_no: vehicle.chassis_no,
+      bg_date: sanitizeDate(vehicle.bg_date),
+      shipment_etd_pkg: sanitizeDate(vehicle.shipment_etd_pkg),
+      shipment_eta_kk_twu_sdk: sanitizeDate(vehicle.shipment_eta_kk_twu_sdk),
+      date_received_by_outlet: sanitizeDate(vehicle.date_received_by_outlet),
+      reg_date: sanitizeDate(vehicle.reg_date),
+      delivery_date: sanitizeDate(vehicle.delivery_date),
+      disb_date: sanitizeDate(vehicle.disb_date),
+      branch_code: vehicle.branch_code,
+      model: vehicle.model,
+      payment_method: vehicle.payment_method,
+      salesman_name: vehicle.salesman_name,
+      customer_name: vehicle.customer_name,
+      remark: vehicle.remark || null,
+      vaa_date: sanitizeDate(vehicle.vaa_date),
+      full_payment_date: sanitizeDate(vehicle.full_payment_date),
+      is_d2d: vehicle.is_d2d,
       import_batch_id: batchId,
-      source_row_id: v.id,
-      variant: v.variant,
-      dealer_transfer_price: v.dealer_transfer_price,
-      full_payment_type: v.full_payment_type,
-      shipment_name: v.shipment_name,
-      lou: v.lou,
-      contra_sola: v.contra_sola,
-      reg_no: v.reg_no,
-      invoice_no: v.invoice_no,
-      obr: v.obr,
+      source_row_id: vehicle.source_row_id,
+      variant: vehicle.variant || null,
+      dealer_transfer_price: vehicle.dealer_transfer_price || null,
+      full_payment_type: vehicle.full_payment_type || null,
+      shipment_name: vehicle.shipment_name || null,
+      lou: vehicle.lou || null,
+      contra_sola: vehicle.contra_sola || null,
+      reg_no: vehicle.reg_no || null,
+      invoice_no: vehicle.invoice_no || null,
+      obr: vehicle.obr || null,
+      bg_to_delivery: vehicle.bg_to_delivery ?? null,
+      bg_to_shipment_etd: vehicle.bg_to_shipment_etd ?? null,
+      etd_to_outlet: vehicle.etd_to_outlet ?? null,
+      outlet_to_reg: vehicle.outlet_to_reg ?? null,
+      reg_to_delivery: vehicle.reg_to_delivery ?? null,
+      bg_to_disb: vehicle.bg_to_disb ?? null,
+      delivery_to_disb: vehicle.delivery_to_disb ?? null,
+      salesman_id: vehicle.salesman_id ?? null,
       company_id: companyId,
     }));
 
     const CHUNK_SIZE = 500;
     for (let idx = 0; idx < dbVehicles.length; idx += CHUNK_SIZE) {
       const chunk = dbVehicles.slice(idx, idx + CHUNK_SIZE);
-      const { error } = await supabase.from("vehicles").insert(chunk);
+      const { error } = await supabase
+        .from("vehicles")
+        .upsert(chunk, { onConflict: 'chassis_no,company_id' });
       if (error) {
         loggingService.error("Failed to insert vehicle chunk", { chunk: chunk.length, error }, "ImportService");
         return { inserted: idx, errors: [], error };

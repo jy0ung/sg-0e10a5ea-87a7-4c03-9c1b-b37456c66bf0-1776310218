@@ -3,7 +3,7 @@ module.exports = {
     name: 'vite',
     script: 'sh',
     args: '-c "npm run dev"',
-    cwd: '/app',
+    cwd: __dirname,
     autorestart: true,
     watch: false,
     max_memory_restart: '1G',

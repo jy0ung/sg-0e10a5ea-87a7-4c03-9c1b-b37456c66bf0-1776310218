@@ -149,6 +149,33 @@ describe('ValidationService', () => {
       expect(result.errors.some(e => e.code === 'INVALID_BRANCH_CODE')).toBe(true);
     });
 
+    it('should accept a branch code when a saved mapping resolves it', async () => {
+      const row = {
+        chassis_no: 'ABC123456789',
+        branch_code: 'FLAGSHIP',
+        model: 'Corolla',
+        customer_name: 'John Doe',
+        salesman_name: 'Jane Smith',
+        payment_method: 'Cash',
+      };
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'vehicles') {
+          return createMockQueryBuilder({ data: null, error: null });
+        }
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: [{ id: 'b1', code: 'KCH' }], error: null });
+        }
+        if (table === 'branch_mappings') {
+          return createMockQueryBuilder({ data: [{ raw_value: 'FLAGSHIP', canonical_code: 'KCH' }], error: null });
+        }
+        return createMockQueryBuilder({ data: null, error: null });
+      });
+
+      const result = await validateVehicleRow(row, 'company-123', 1);
+      expect(result.errors.some(e => e.code === 'INVALID_BRANCH_CODE')).toBe(false);
+    });
+
     it('should fail for invalid date formats', async () => {
       const row = {
         chassis_no: 'ABC123456789',
@@ -167,6 +194,26 @@ describe('ValidationService', () => {
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.isValid).toBe(false);
       expect(result.errors.some(e => e.code === 'INVALID_DATE_FORMAT')).toBe(true);
+    });
+
+    it('should fail for impossible calendar dates', async () => {
+      const row = {
+        chassis_no: 'ABC123456789',
+        branch_code: 'B001',
+        model: 'Corolla',
+        customer_name: 'John Doe',
+        salesman_name: 'Jane Smith',
+        payment_method: 'Cash',
+        bg_date: '2026-02-31',
+      };
+
+      const mockQueryBuilder = createMockQueryBuilder();
+      mockQueryBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+      mockSupabase.from.mockReturnValue(mockQueryBuilder);
+
+      const result = await validateVehicleRow(row, 'company-123', 1);
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some(e => e.field === 'bg_date' && e.code === 'INVALID_DATE_FORMAT')).toBe(true);
     });
 
     it('should warn when shipment date is before BG date', async () => {
@@ -494,6 +541,60 @@ describe('ValidationService', () => {
       expect(result.summary.totalRows).toBe(2);
       expect(result.summary.validRows).toBe(2);
       expect(result.summary.errorRows).toBe(0);
+    });
+
+    it('should treat mapped branch codes as valid during batch validation', async () => {
+      const rows = [
+        {
+          chassis_no: 'ABC123456789',
+          branch_code: 'FLAGSHIP',
+          model: 'Corolla',
+          customer_name: 'John Doe',
+          salesman_name: 'Jane Smith',
+          payment_method: 'Cash',
+        },
+      ];
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: [{ id: 'b1', code: 'KCH' }], error: null });
+        }
+        if (table === 'branch_mappings') {
+          return createMockQueryBuilder({ data: [{ raw_value: 'FLAGSHIP', canonical_code: 'KCH' }], error: null });
+        }
+        return createMockQueryBuilder({ data: [], error: null });
+      });
+
+      const result = await validateVehicleImportBatch(rows, 'company-123');
+      expect(result.errors.some(e => e.code === 'INVALID_BRANCH_CODE')).toBe(false);
+      expect(result.summary.validRows).toBe(1);
+    });
+
+    it('should treat mapped branch codes as valid even when the mapped canonical code is not in branches', async () => {
+      const rows = [
+        {
+          chassis_no: 'ABC123456789',
+          branch_code: 'API-API',
+          model: 'Corolla',
+          customer_name: 'John Doe',
+          salesman_name: 'Jane Smith',
+          payment_method: 'Cash',
+        },
+      ];
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: [{ id: 'b1', code: 'KCH' }], error: null });
+        }
+        if (table === 'branch_mappings') {
+          return createMockQueryBuilder({ data: [{ raw_value: 'API-API', canonical_code: 'API' }], error: null });
+        }
+        return createMockQueryBuilder({ data: [], error: null });
+      });
+
+      const result = await validateVehicleImportBatch(rows, 'company-123');
+      expect(result.errors.some(e => e.code === 'INVALID_BRANCH_CODE')).toBe(false);
+      expect(result.summary.validRows).toBe(1);
     });
 
     it('should count errors correctly for batch with mixed validity', async () => {

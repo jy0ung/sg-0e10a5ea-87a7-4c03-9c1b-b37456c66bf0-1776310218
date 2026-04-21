@@ -7,7 +7,7 @@ import { VehicleDetailPanel } from '@/components/vehicles/VehicleDetailPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { Download, Search, Filter, Edit, Eye } from 'lucide-react';
+import { Download, Search, Filter, Edit, Eye, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { updateVehicleWithAudit } from '@/services/vehicleService';
 import { getUserPermissions } from '@/services/permissionService';
 import type { VehicleCanonical } from '@/types';
@@ -29,7 +29,7 @@ type VehicleRow = VehicleCanonical & {
 
 export default function VehicleExplorer() {
   const { user } = useAuth();
-  const { vehicles } = useData();
+  const { vehicles, loading, loadErrors, reloadFromDb } = useData();
   const navigate = useNavigate();
   const { chassis_no: chassisParam } = useParams();
 
@@ -418,7 +418,7 @@ export default function VehicleExplorer() {
     if (result.error) {
       loggingService.error('Failed to update vehicle', { error: result.error }, 'VehicleExplorer');
     } else {
-      await useData.reloadFromDb?.();
+      await reloadFromDb();
     }
   };
 
@@ -471,7 +471,7 @@ export default function VehicleExplorer() {
 
   const handleBulkActionComplete = async () => {
     if (pendingBulkAction) {
-      await useData.reloadFromDb?.();
+      await reloadFromDb();
     }
     setPendingBulkAction(null);
   };
@@ -484,6 +484,40 @@ export default function VehicleExplorer() {
     const perm = permissions[col.key];
     return perm === 'edit' || perm === 'view' || (!permissions || userPermissions?.role === 'super_admin');
   });
+
+  if (loading && vehicles.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadErrors.length > 0 && vehicles.length === 0) {
+    return (
+      <div className="space-y-4 animate-fade-in">
+        <PageHeader
+          title="Vehicle Explorer"
+          description="Vehicle inventory and milestone details"
+          breadcrumbs={[
+            { label: 'FLC BI' },
+            { label: 'Auto Aging' },
+            { label: 'Vehicle Explorer' }
+          ]}
+        />
+        <div className="glass-panel p-12 text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">Failed to Load Vehicles</h3>
+          <p className="text-sm text-muted-foreground mb-6">
+            The explorer could not load {loadErrors.join(', ')}. Retry the query, and sign out then sign back in if the problem persists.
+          </p>
+          <Button onClick={() => void reloadFromDb()} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />Retry Load
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -623,7 +657,7 @@ export default function VehicleExplorer() {
           if (result.error) {
             loggingService.error('Failed to update vehicle', { error: result.error }, 'VehicleExplorer');
           } else {
-            await useData.reloadFromDb?.();
+            await reloadFromDb();
           }
         } : undefined}
       />

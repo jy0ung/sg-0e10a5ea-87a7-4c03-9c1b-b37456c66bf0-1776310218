@@ -16,6 +16,7 @@ interface DataContextType {
   qualityIssues: DataQualityIssue[];
   slas: SlaPolicy[];
   kpiSummaries: KpiSummary[];
+  loadErrors: string[];
   lastRefresh: string;
   loading: boolean;
   setVehicles: (v: VehicleCanonical[]) => void;
@@ -115,8 +116,52 @@ export const dataQueryKey = (companyId: string, branchId?: string | null) =>
 /** Fetch all vehicles in chunks of VEHICLE_PAGE_SIZE to avoid unbounded queries. */
 const VEHICLE_PAGE_SIZE = 1_000;
 
-async function fetchAllVehicles(companyId: string, branchCode?: string | null): Promise<VehicleCanonical[]> {
+function isAuthLikeError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const candidate = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+    status?: number;
+  };
+
+  const combined = [candidate.message, candidate.details, candidate.hint]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return candidate.code === 'PGRST301'
+    || candidate.status === 401
+    || combined.includes('jwt')
+    || combined.includes('token')
+    || combined.includes('unauthorized')
+    || combined.includes('no suitable key');
+}
+
+async function recoverSessionForDataLoad(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error || !data.session) {
+      loggingService.warn('Session refresh failed after data load auth error', { error }, 'DataContext');
+      return false;
+    }
+
+    loggingService.info('Session refreshed after data load auth error', { userId: data.session.user.id }, 'DataContext');
+    return true;
+  } catch (error) {
+    loggingService.warn('Unexpected session refresh error after data load auth error', { error }, 'DataContext');
+    return false;
+  }
+}
+
+async function fetchAllVehicles(
+  companyId: string,
+  branchCode?: string | null
+): Promise<{ data: VehicleCanonical[]; error: unknown | null }> {
   const results: VehicleCanonical[] = [];
+  const seenRowIds = new Set<string>();
   let from = 0;
   while (true) {
     let q = supabase
@@ -127,14 +172,32 @@ async function fetchAllVehicles(companyId: string, branchCode?: string | null): 
     if (branchCode) q = q.eq('branch_code', branchCode);
     const { data, error } = await q
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .range(from, from + VEHICLE_PAGE_SIZE - 1);
-    if (error) { loggingService.error('Failed to load vehicles page', { error, from }, 'DataContext'); break; }
+    if (error) {
+      loggingService.error('Failed to load vehicles page', { error, from }, 'DataContext');
+      return { data: results, error };
+    }
+
+    let duplicateCount = 0;
     const rows = (data ?? []).map(r => mapDbVehicle(r as unknown as Record<string, unknown>));
-    results.push(...rows);
-    if (rows.length < VEHICLE_PAGE_SIZE) break;
+    for (const row of rows) {
+      if (!row.id || seenRowIds.has(row.id)) {
+        duplicateCount += 1;
+        continue;
+      }
+      seenRowIds.add(row.id);
+      results.push(row);
+    }
+
+    if (duplicateCount > 0) {
+      loggingService.warn('Skipped duplicate vehicle rows while paging', { duplicateCount, from }, 'DataContext');
+    }
+
+    if ((data ?? []).length < VEHICLE_PAGE_SIZE) break;
     from += VEHICLE_PAGE_SIZE;
   }
-  return results;
+  return { data: results, error: null };
 }
 
 async function fetchDataFromDb(companyId: string, branchCode?: string | null) {
@@ -142,7 +205,7 @@ async function fetchDataFromDb(companyId: string, branchCode?: string | null) {
   performanceService.startQueryTimer(queryId);
 
   const [vehiclesRes, batchesRes, issuesRes, slasRes] = await Promise.all([
-    fetchAllVehicles(companyId, branchCode).then(v => ({ data: v, error: null })),
+    fetchAllVehicles(companyId, branchCode),
     supabase.from('import_batches').select('*').eq('company_id', companyId).order('created_at', { ascending: false }),
     supabase.from('quality_issues').select('*').order('created_at', { ascending: false }),
     supabase.from('sla_policies').select('*').eq('company_id', companyId),
@@ -158,7 +221,10 @@ async function fetchDataFromDb(companyId: string, branchCode?: string | null) {
     batchesRes.error && 'import batches',
     issuesRes.error && 'quality issues',
     slasRes.error && 'SLA policies',
-  ].filter(Boolean);
+  ].filter((value): value is string => Boolean(value));
+
+  const hasAuthError = [vehiclesRes.error, batchesRes.error, issuesRes.error, slasRes.error]
+    .some(error => isAuthLikeError(error));
 
   const dbVehicles = vehiclesRes.data ?? [];
   const dbBatches  = (batchesRes.data  || []).map(r => mapDbBatch(r  as unknown as Record<string, unknown>));
@@ -166,16 +232,23 @@ async function fetchDataFromDb(companyId: string, branchCode?: string | null) {
   const dbSlas     = (slasRes.data     || []).map(r => mapDbSla(r    as unknown as Record<string, unknown>));
 
   performanceService.endQueryTimer(queryId, 'data_reload');
-  loggingService.info('Data reloaded successfully',
-    { vehicles: dbVehicles.length, batches: dbBatches.length, issues: dbIssues.length, slas: dbSlas.length },
-    'DataContext'
-  );
+  if (errors.length > 0) {
+    loggingService.warn('Data reloaded with errors',
+      { errors, vehicles: dbVehicles.length, batches: dbBatches.length, issues: dbIssues.length, slas: dbSlas.length },
+      'DataContext'
+    );
+  } else {
+    loggingService.info('Data reloaded successfully',
+      { vehicles: dbVehicles.length, batches: dbBatches.length, issues: dbIssues.length, slas: dbSlas.length },
+      'DataContext'
+    );
+  }
 
-  return { vehicles: dbVehicles, batches: dbBatches, issues: dbIssues, slas: dbSlas, errors };
+  return { vehicles: dbVehicles, batches: dbBatches, issues: dbIssues, slas: dbSlas, errors, hasAuthError };
 }
 
 type DataQueryResult = Awaited<ReturnType<typeof fetchDataFromDb>>;
-const emptyData: DataQueryResult = { vehicles: [], batches: [], issues: [], slas: [], errors: [] };
+const emptyData: DataQueryResult = { vehicles: [], batches: [], issues: [], slas: [], errors: [], hasAuthError: false };
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const companyId = useCompanyId();
@@ -190,11 +263,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const { data, isLoading, dataUpdatedAt } = useQuery({
     queryKey: dataQueryKey(companyId, branchId),
     queryFn: async () => {
-      let branchCode: string | null = null;
-      if (branchId) {
-        branchCode = await resolveBranchCode(branchId);
+      const loadOnce = async () => {
+        let branchCode: string | null = null;
+        if (branchId) {
+          branchCode = await resolveBranchCode(branchId);
+        }
+        return fetchDataFromDb(companyId, branchCode);
+      };
+
+      let result = await loadOnce();
+      if (result.hasAuthError) {
+        const recovered = await recoverSessionForDataLoad();
+        if (recovered) {
+          result = await loadOnce();
+        }
       }
-      return fetchDataFromDb(companyId, branchCode);
+
+      return result;
     },
     enabled: !!companyId,
     staleTime: 60_000,
@@ -205,6 +290,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const importBatches = data?.batches ?? [];
   const qualityIssues = data?.issues ?? [];
   const slas = data?.slas ?? [];
+  const loadErrors = data?.errors ?? [];
   const kpiSummaries = useMemo(() => computeKpiSummaries(vehicles, slas), [vehicles, slas]);
   const lastRefresh = dataUpdatedAt ? new Date(dataUpdatedAt).toISOString() : new Date().toISOString();
 
@@ -414,7 +500,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient, companyId, branchId, vehicles.length]);
 
   return (
-    <DataContext.Provider value={{ vehicles, importBatches, qualityIssues, slas, kpiSummaries, lastRefresh, loading: isLoading, setVehicles, addImportBatch, updateImportBatch, addQualityIssues, updateSla, refreshKpis, reloadFromDb }}>
+    <DataContext.Provider value={{ vehicles, importBatches, qualityIssues, slas, kpiSummaries, loadErrors, lastRefresh, loading: isLoading, setVehicles, addImportBatch, updateImportBatch, addQualityIssues, updateSla, refreshKpis, reloadFromDb }}>
       {children}
     </DataContext.Provider>
   );

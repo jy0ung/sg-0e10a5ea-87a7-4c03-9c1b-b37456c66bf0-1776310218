@@ -13,6 +13,8 @@ import {
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { loadRolePermissions } from '@/config/rolePermissions';
+import { useModuleAccess } from '@/contexts/ModuleAccessContext';
+import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
 
 interface NavItem {
   label: string;
@@ -189,6 +191,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: AppSidebarProps) {
   const { user, logout, hasRole } = useAuth();
+  const { isModuleActive } = useModuleAccess();
   const location = useLocation();
   const pathname = location.pathname;
 
@@ -198,11 +201,24 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
     ? (rolePermissions[user.role] ?? sectionDefs.map(s => s.name))
     : sectionDefs.map(s => s.name);
 
+  const sectionIsVisible = (section: SectionDef) => {
+    const moduleId = getModuleIdForSection(section.name);
+    return !moduleId || isModuleActive(moduleId);
+  };
+
+  const itemIsVisible = (item: NavItem) => {
+    const moduleId = getModuleIdForPath(item.path);
+    if (moduleId && !isModuleActive(moduleId)) return false;
+    if (!item.roles) return true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return hasRole(item.roles as any);
+  };
+
   // In focused mode, only render the section that matches the current URL.
   const focusedSection = isFocused ? getFocusedSection(pathname) : null;
   const visibleSections = focusedSection
-    ? sectionDefs.filter(s => s.name === focusedSection)
-    : sectionDefs.filter(s => allowedSections.includes(s.name));
+    ? sectionDefs.filter(s => s.name === focusedSection && sectionIsVisible(s))
+    : sectionDefs.filter(s => allowedSections.includes(s.name) && sectionIsVisible(s));
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -257,11 +273,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
 
           {visibleSections.map(({ name, icon: SectionIcon, path: sectionPath }, index) => {
             const items = navItems.filter(n => n.section === name);
-            const visibleItems = items.filter(item => {
-              if (!item.roles) return true;
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              return hasRole(item.roles as any);
-            });
+            const visibleItems = items.filter(itemIsVisible);
             if (visibleItems.length === 0) return null;
 
             const hasActive = visibleItems.some(item => isItemActive(item.path, pathname));

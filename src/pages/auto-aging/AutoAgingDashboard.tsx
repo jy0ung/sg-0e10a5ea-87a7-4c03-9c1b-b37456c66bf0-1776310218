@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { KpiCard } from '@/components/shared/KpiCard';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Download, Filter, Upload, X, Loader2 } from 'lucide-react';
+import { RefreshCw, Download, Upload, X, Loader2, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AgingTrendChart } from '@/components/charts/AgingTrendChart';
 import { OutlierScatterChart } from '@/components/charts/OutlierScatterChart';
@@ -13,12 +13,15 @@ import { PaymentPieChart } from '@/components/charts/PaymentPieChart';
 import { KpiTrendChart } from '@/components/charts/KpiTrendChart';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
+import { BranchPeriodFilter } from '@/components/shared/BranchPeriodFilter';
+import { computeKpiSummaries } from '@/utils/kpi-computation';
+import { getDashboardScopeSummary, loadDashboardFilterState, matchesDashboardPeriod, saveDashboardFilterState } from '@/lib/dashboardFilters';
 
 export default function AutoAgingDashboard() {
-  const { kpiSummaries, vehicles, qualityIssues, lastRefresh, refreshKpis, loading } = useData();
+  const { kpiSummaries, vehicles, qualityIssues, lastRefresh, refreshKpis, reloadFromDb, loading, loadErrors } = useData();
   const navigate = useNavigate();
-  const [branchFilter, setBranchFilter] = useState<string>('all');
-  const [modelFilter, setModelFilter] = useState<string>('all');
+  const [dashboardFilter, setDashboardFilter] = useState(() => loadDashboardFilterState('auto-aging-overview'));
+  const { branch: branchFilter, model: modelFilter, period: periodFilter } = dashboardFilter;
   const [selectedKpiId, setSelectedKpiId] = useState<string>('bg_to_delivery');
   const [vehicleDetailsOpen, setVehicleDetailsOpen] = useState(false);
   const [detailKpiId, setDetailKpiId] = useState<string | null>(null);
@@ -26,17 +29,52 @@ export default function AutoAgingDashboard() {
   const branches = [...new Set(vehicles.map(v => v.branch_code))].sort();
   const models = [...new Set(vehicles.map(v => v.model))].sort();
 
+  useEffect(() => {
+    saveDashboardFilterState('auto-aging-overview', dashboardFilter);
+  }, [dashboardFilter]);
+
+  useEffect(() => {
+    if (branchFilter !== 'all' && branches.length > 0 && !branches.includes(branchFilter)) {
+      setDashboardFilter(prev => ({ ...prev, branch: 'all' }));
+    }
+  }, [branchFilter, branches]);
+
+  useEffect(() => {
+    if (modelFilter !== 'all' && models.length > 0 && !models.includes(modelFilter)) {
+      setDashboardFilter(prev => ({ ...prev, model: 'all' }));
+    }
+  }, [modelFilter, models]);
+
+  const scopeSummary = getDashboardScopeSummary(dashboardFilter);
+
   const filtered = vehicles.filter(v => {
+    if (!matchesDashboardPeriod(v.bg_date, periodFilter)) return false;
     if (branchFilter !== 'all' && v.branch_code !== branchFilter) return false;
     if (modelFilter !== 'all' && v.model !== modelFilter) return false;
     return true;
   });
 
+  const filteredQualityIssues = React.useMemo(() => {
+    const chassisNumbers = new Set(filtered.map(vehicle => vehicle.chassis_no));
+    return qualityIssues.filter(issue => chassisNumbers.has(issue.chassisNo));
+  }, [filtered, qualityIssues]);
+
+  const filteredKpiSummaries = React.useMemo(() => {
+    const slas = kpiSummaries.map(summary => ({
+      id: summary.kpiId,
+      kpiId: summary.kpiId,
+      label: summary.label,
+      slaDays: summary.slaDays,
+      companyId: '',
+    }));
+    return computeKpiSummaries(filtered, slas);
+  }, [filtered, kpiSummaries]);
+
   // Get vehicles for a specific KPI
   const getKpiVehicles = (kpiId: string) => {
     const kpiDef = KPI_DEFINITIONS.find(k => k.id === kpiId);
     if (!kpiDef) return [];
-    const kpiSummary = kpiSummaries.find(k => k.kpiId === kpiId);
+    const kpiSummary = filteredKpiSummaries.find(k => k.kpiId === kpiId);
     if (!kpiSummary) return [];
     
     return filtered.filter(v => {
@@ -91,6 +129,28 @@ export default function AutoAgingDashboard() {
     );
   }
 
+  if (loadErrors.length > 0 && vehicles.length === 0) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader
+          title="Auto Aging Overview"
+          description="Vehicle aging analysis across operational milestones"
+          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Overview' }]}
+        />
+        <div className="glass-panel p-12 text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">Failed to Load Auto Aging Data</h3>
+          <p className="text-sm text-muted-foreground mb-6">
+            The dashboard could not load {loadErrors.join(', ')}. Retry the query, and sign out then sign back in if the problem persists.
+          </p>
+          <Button onClick={() => void reloadFromDb()} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />Retry Load
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (vehicles.length === 0) {
     return (
       <div className="space-y-6 animate-fade-in">
@@ -119,6 +179,17 @@ export default function AutoAgingDashboard() {
         breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Overview' }]}
         actions={
           <div className="flex items-center gap-2">
+            <BranchPeriodFilter
+              branches={branches}
+              branch={branchFilter}
+              period={periodFilter}
+              model={modelFilter}
+              models={models}
+              onBranchChange={(value) => setDashboardFilter(prev => ({ ...prev, branch: value }))}
+              onPeriodChange={(value) => setDashboardFilter(prev => ({ ...prev, period: value }))}
+              onModelChange={(value) => setDashboardFilter(prev => ({ ...prev, model: value }))}
+              periodLabel="Date period (BG date)"
+            />
             <div className="text-right mr-2">
               <p className="text-[10px] text-muted-foreground">Last refresh</p>
               <p className="text-xs text-foreground">{new Date(lastRefresh).toLocaleString()}</p>
@@ -129,23 +200,14 @@ export default function AutoAgingDashboard() {
         }
       />
 
-      {/* Filters */}
-      <div className="glass-panel p-4 flex flex-wrap items-center gap-3">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)} className="h-8 rounded-md bg-secondary border border-border px-3 text-xs text-foreground">
-          <option value="all">All Branches</option>
-          {branches.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
-        <select value={modelFilter} onChange={e => setModelFilter(e.target.value)} className="h-8 rounded-md bg-secondary border border-border px-3 text-xs text-foreground">
-          <option value="all">All Models</option>
-          {models.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-        <span className="text-xs text-muted-foreground ml-auto">{filtered.length} vehicles</span>
+      <div className="glass-panel px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">{scopeSummary}</p>
+        <span className="text-xs text-muted-foreground">{filtered.length} vehicles</span>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-        {kpiSummaries.map(kpi => (
+        {filteredKpiSummaries.map(kpi => (
           <KpiCard
             key={kpi.kpiId}
             label={kpi.shortLabel}
@@ -182,8 +244,8 @@ export default function AutoAgingDashboard() {
         <div className="glass-panel p-5">
           <h3 className="text-sm font-semibold text-foreground mb-3">Data Quality</h3>
           <div className="space-y-2">
-            {qualityIssues.length === 0 && <p className="text-xs text-muted-foreground">No issues detected.</p>}
-            {qualityIssues.slice(0, 8).map(issue => (
+            {filteredQualityIssues.length === 0 && <p className="text-xs text-muted-foreground">No issues detected.</p>}
+            {filteredQualityIssues.slice(0, 8).map(issue => (
               <div key={issue.id} className="p-2 rounded bg-secondary/50 border border-border/50">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-mono text-foreground">{issue.chassisNo.slice(0, 12)}</span>
@@ -192,9 +254,9 @@ export default function AutoAgingDashboard() {
                 <p className="text-[10px] text-muted-foreground">{issue.message}</p>
               </div>
             ))}
-            {qualityIssues.length > 8 && (
+            {filteredQualityIssues.length > 8 && (
               <button onClick={() => navigate('/auto-aging/quality')} className="w-full text-xs text-primary hover:underline py-2">
-                View all {qualityIssues.length} issues →
+                View all {filteredQualityIssues.length} issues →
               </button>
             )}
           </div>
@@ -282,7 +344,7 @@ export default function AutoAgingDashboard() {
                       const kpiDef = KPI_DEFINITIONS.find(k => k.id === detailKpiId);
                       const kpiField = kpiDef?.computedField;
                       const value = kpiField ? (v[kpiField as keyof typeof v] as number) : 0;
-                      const kpiSummary = kpiSummaries.find(k => k.kpiId === detailKpiId);
+                      const kpiSummary = filteredKpiSummaries.find(k => k.kpiId === detailKpiId);
                       const isOverdue = kpiSummary ? value > kpiSummary.slaDays : false;
                       
                       return (

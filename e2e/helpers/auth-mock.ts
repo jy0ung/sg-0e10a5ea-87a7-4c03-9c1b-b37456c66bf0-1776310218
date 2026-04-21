@@ -12,16 +12,42 @@
 import type { Page } from "@playwright/test";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { fileURLToPath } from "url";
 
-// Read VITE_SUPABASE_URL from the project .env file so the mock targets the
-// same Supabase instance the app talks to at runtime.
+const MODULE_DIR = fileURLToPath(new URL(".", import.meta.url));
+const PROJECT_ROOTS = [process.cwd(), resolve(MODULE_DIR, "../..")] as const;
+
+// Read VITE_SUPABASE_URL using Vite's env-file precedence so the mock targets
+// the same Supabase instance the app talks to at runtime.
 function readSupabaseUrl(): string {
-  try {
-    const envPath = resolve(__dirname, "../../.env");
-    const content = readFileSync(envPath, "utf-8");
-    const match = content.match(/VITE_SUPABASE_URL\s*=\s*"?([^"\n]+)"?/);
-    if (match) return match[1];
-  } catch { /* ignore */ }
+  const envValue = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (envValue) return envValue;
+
+  const envFiles = [
+    ".env.development.local",
+    ".env.development",
+    ".env.local",
+    ".env",
+  ];
+
+  const checkedPaths = new Set<string>();
+
+  for (const root of PROJECT_ROOTS) {
+    for (const envFile of envFiles) {
+      const envPath = resolve(root, envFile);
+      if (checkedPaths.has(envPath)) continue;
+      checkedPaths.add(envPath);
+
+      try {
+        const content = readFileSync(envPath, "utf-8");
+        const match = content.match(/(?:VITE_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL)\s*=\s*"?([^"\n]+)"?/);
+        if (match) return match[1];
+      } catch {
+        // Ignore missing env files and continue down the precedence chain.
+      }
+    }
+  }
+
   return "http://127.0.0.1:54321";
 }
 

@@ -40,6 +40,30 @@ describe("import-parser", () => {
       expect(result.issues.length).toBe(0);
     });
 
+    it("drops impossible calendar dates instead of preserving invalid literals", () => {
+      const mockData = [
+        {
+          "Chassis No.": "CH001",
+          "BG Date": "31.02.2026",
+          "Shipment ETD PKG": "2026-03-05",
+          "Date Received by Outlet": "2026-03-10",
+          "Reg Date": "2026-03-15",
+          "Delivery Date": "2026-03-20",
+          "Disb. Date": "2026-03-25",
+          "BRCH": "BR1",
+          "Model": "Model1",
+          "Payment Method": "Cash",
+          "SA Name": "Sales1",
+          "Cust Name": "Cust1",
+        },
+      ];
+
+      const result = parseWorkbook(createMockWorkbook(mockData));
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0].bg_date).toBeUndefined();
+    });
+
     it("handles missing required columns", () => {
       const mockData = [
         {
@@ -213,6 +237,21 @@ describe("import-parser", () => {
       expect(canonical[0].bg_date).toBe("2024-01-01");
       expect(canonical[0].branch_code).toBe("BR1");
       expect(canonical[1].is_d2d).toBe(true);
+    });
+
+    it("nulls impossible dates when building canonical vehicles", () => {
+      const rowsWithInvalidDate: VehicleRaw[] = [
+        {
+          ...mockRawRows[0],
+          bg_date: "2026-02-31",
+          delivery_date: "2026-03-05",
+        },
+      ];
+
+      const { canonical } = publishCanonical(rowsWithInvalidDate);
+
+      expect(canonical[0].bg_date).toBeUndefined();
+      expect(canonical[0].bg_to_delivery).toBeNull();
     });
 
     it("groups duplicate chassis numbers", () => {

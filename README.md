@@ -69,6 +69,37 @@ Self-service sign-up is disabled in the app. If you do not have a local auth use
 
 Use the app's **Forgot Password** link only after the auth user already exists. If email delivery is enabled for your local stack, open Mailpit at `http://127.0.0.1:54324` to retrieve invite or password reset emails.
 
+## Ubuntu Test Server
+
+To turn a fresh Ubuntu host into the LAN test server, run the bootstrap script from the repo root and pass the server IP or hostname:
+
+```bash
+bash scripts/setup-ubuntu-test-server.sh 192.168.1.241
+```
+
+The script installs the OS packages, Node.js 20, Docker, the Supabase CLI, PM2, and the workspace dependencies. It also rewrites `.env.local` so the browser points at the LAN host and updates `supabase/config.toml` so auth redirects return to the same address.
+
+After the bootstrap finishes, open a new shell if Docker group membership was just added. If the current shell still cannot reach the Docker socket, use `sg docker -c 'supabase start'`. Then start the local services:
+
+```bash
+supabase start
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+Expected LAN URLs:
+
+- App: `http://192.168.1.241:3000`
+- Supabase API: `http://192.168.1.241:54321`
+- Supabase Studio: `http://192.168.1.241:54323`
+- Mailpit: `http://192.168.1.241:54324`
+
+If you plan to run Playwright smoke tests on the server, install the Chromium browser after the workspace install:
+
+```bash
+npx playwright install chromium
+```
+
 ## Remote Dev Containers And Codespaces
 
 If the app is running inside a dev container, GitHub Codespace, or another remote environment, the browser cannot use the container's `127.0.0.1:54321` directly. In that setup you must expose the required ports and override the frontend env vars with forwarded URLs.

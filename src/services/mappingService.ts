@@ -174,7 +174,11 @@ export async function deletePaymentMethodMapping(id: string): Promise<{ error: E
 /** Returns a Map<UPPER(rawValue), canonicalCode> for branch mappings */
 export async function loadBranchMappingLookup(companyId: string): Promise<Map<string, string>> {
   const { data } = await getBranchMappings(companyId);
-  return new Map(data.map(m => [m.rawValue.toUpperCase(), m.canonicalCode]));
+  return new Map(
+    data
+      .filter(m => m.rawValue.trim() !== '' && m.canonicalCode.trim() !== '')
+      .map(m => [m.rawValue.trim().toUpperCase(), m.canonicalCode.trim()])
+  );
 }
 
 /** Returns a Map<UPPER(rawValue), canonicalValue> for payment method mappings */

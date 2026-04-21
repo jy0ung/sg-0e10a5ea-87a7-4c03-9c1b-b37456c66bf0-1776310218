@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { parseSupportedDateString } from "@/lib/dateParsing";
 import { loggingService } from "./loggingService";
 import { performanceService } from "./performanceService";
 import type { ValidationError } from "@/types";
@@ -26,6 +27,15 @@ interface ValidationResult {
   warnings: ValidationError[];
 }
 
+interface BranchRow {
+  code: string;
+}
+
+interface BranchMappingRow {
+  raw_value: string;
+  canonical_code: string;
+}
+
 const DATE_FIELD_NAMES = [
   'bg_date', 'shipment_etd_pkg', 'shipment_eta_kk_twu_sdk',
   'date_received_by_outlet', 'reg_date', 'delivery_date',
@@ -37,6 +47,27 @@ const REQUIRED_FIELDS = [
 ];
 
 const VALID_PAYMENT_METHODS = ['cash', 'loan', 'hire purchase', 'hp', 'bank loan', 'leasing'];
+
+function buildKnownBranchSet(
+  branches: BranchRow[] | null | undefined,
+  branchMappings: BranchMappingRow[] | null | undefined,
+): Set<string> {
+  const knownBranchSet = new Set(
+    (branches ?? [])
+      .map(branch => branch.code?.trim().toUpperCase())
+      .filter((code): code is string => Boolean(code))
+  );
+
+  (branchMappings ?? []).forEach(mapping => {
+    const rawCode = mapping.raw_value?.trim().toUpperCase();
+    const canonicalCode = mapping.canonical_code?.trim();
+    if (rawCode && canonicalCode) {
+      knownBranchSet.add(rawCode);
+    }
+  });
+
+  return knownBranchSet;
+}
 
 /**
  * Synchronous per-row validation — no DB calls.
@@ -125,19 +156,25 @@ export async function validateVehicleRow(
   rowNumber: number
 ): Promise<ValidationResult> {
   const chassis = row.chassis_no ? String(row.chassis_no).trim() : '';
-  const branchCode = row.branch_code ? String(row.branch_code).toUpperCase() : '';
+  const branchCode = row.branch_code ? String(row.branch_code).trim().toUpperCase() : '';
 
-  const [chassisResult, branchesResult] = await Promise.all([
+  const [chassisResult, branchesResult, branchMappingsResult] = await Promise.all([
     chassis.length >= 5
       ? supabase.from('vehicles').select('chassis_no').eq('chassis_no', chassis).eq('company_id', companyId).maybeSingle()
       : Promise.resolve({ data: null }),
     branchCode
       ? supabase.from('branches').select('code').eq('company_id', companyId)
       : Promise.resolve({ data: [] }),
+    branchCode
+      ? supabase.from('branch_mappings').select('raw_value, canonical_code').eq('company_id', companyId)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const existingChassisSet = new Set<string>(chassisResult.data ? [chassis] : []);
-  const knownBranchSet = new Set<string>((branchesResult.data ?? []).map((b: { code: string }) => b.code.toUpperCase()));
+  const knownBranchSet = buildKnownBranchSet(
+    branchesResult.data as BranchRow[] | null | undefined,
+    branchMappingsResult.data as BranchMappingRow[] | null | undefined,
+  );
 
   return validateVehicleRowSync(row, rowNumber, existingChassisSet, knownBranchSet);
 }
@@ -375,43 +412,7 @@ export function validateQualityIssue(
  * Helper function to parse date strings
  */
 function parseDate(value: string): Date | null {
-  // Try ISO format first
-  const isoDate = new Date(value);
-  if (!isNaN(isoDate.getTime())) {
-    return isoDate;
-  }
-
-  // Try DD.MM.YYYY or DD.MM.YY
-  const dotMatch = value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
-  if (dotMatch) {
-    const day = parseInt(dotMatch[1]);
-    const month = parseInt(dotMatch[2]) - 1;
-    let year = parseInt(dotMatch[3]);
-    if (year < 100) {
-      year += year > 50 ? 1900 : 2000;
-    }
-    const date = new Date(year, month, day);
-    if (!isNaN(date.getTime())) {
-      return date;
-    }
-  }
-
-  // Try DD/MM/YYYY or DD/MM/YY
-  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (slashMatch) {
-    const day = parseInt(slashMatch[1]);
-    const month = parseInt(slashMatch[2]) - 1;
-    let year = parseInt(slashMatch[3]);
-    if (year < 100) {
-      year += year > 50 ? 1900 : 2000;
-    }
-    const date = new Date(year, month, day);
-    if (!isNaN(date.getTime())) {
-      return date;
-    }
-  }
-
-  return null;
+  return parseSupportedDateString(value);
 }
 
 /**
@@ -443,15 +444,19 @@ export async function validateVehicleImportBatch(
   )];
 
   // 2 parallel queries: existing chassis + all company branch codes
-  const [chassisResult, branchesResult] = await Promise.all([
+  const [chassisResult, branchesResult, branchMappingsResult] = await Promise.all([
     uniqueChassis.length > 0
       ? supabase.from('vehicles').select('chassis_no').eq('company_id', companyId).in('chassis_no', uniqueChassis)
       : Promise.resolve({ data: [] as { chassis_no: string }[], error: null }),
     supabase.from('branches').select('code').eq('company_id', companyId),
+    supabase.from('branch_mappings').select('raw_value, canonical_code').eq('company_id', companyId),
   ]);
 
   const existingChassisSet = new Set<string>((chassisResult.data ?? []).map(v => v.chassis_no));
-  const knownBranchSet = new Set<string>((branchesResult.data ?? []).map((b: { code: string }) => b.code.toUpperCase()));
+  const knownBranchSet = buildKnownBranchSet(
+    branchesResult.data as BranchRow[] | null | undefined,
+    branchMappingsResult.data as BranchMappingRow[] | null | undefined,
+  );
 
   performanceService.endQueryTimer(qid, 'batch_validate_prefetch');
 

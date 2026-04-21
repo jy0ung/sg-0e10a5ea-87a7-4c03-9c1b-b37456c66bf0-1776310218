@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { VehicleCanonical } from '@/types';
 
@@ -26,6 +27,7 @@ export function AgingTrendChart({ vehicles }: Props) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, d]) => ({
         month,
+        label: new Date(`${month}-01`).toLocaleDateString('en-US', { month: 'short' }),
         'BG→Delivery': avg(d.bgToDel),
         'ETD→Outlet': avg(d.etdToOut),
         'Reg→Delivery': avg(d.regToDel),
@@ -33,28 +35,38 @@ export function AgingTrendChart({ vehicles }: Props) {
   }, [vehicles]);
 
   return (
-    <div className="glass-panel p-5">
-      <h3 className="text-sm font-semibold text-foreground mb-4">Aging Trend Over Time</h3>
-      <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={trendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} unit="d" />
-          <Tooltip
-            contentStyle={{
-              background: 'hsl(var(--card))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '8px',
-              fontSize: '12px',
-              color: 'hsl(var(--foreground))',
-            }}
-          />
-          <Legend wrapperStyle={{ fontSize: '11px' }} />
-          <Line type="monotone" dataKey="BG→Delivery" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-          <Line type="monotone" dataKey="ETD→Outlet" stroke="hsl(199, 89%, 48%)" strokeWidth={2} dot={{ r: 3 }} />
-          <Line type="monotone" dataKey="Reg→Delivery" stroke="hsl(142, 71%, 45%)" strokeWidth={2} dot={{ r: 3 }} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <Card className="glass-panel">
+      <CardHeader className="border-b border-border/60 pb-4">
+        <CardTitle className="text-base font-semibold">Aging Trend Over Time</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Monthly average cycle time across the major delivery handoffs, aligned to the new enterprise chart styling.
+        </p>
+      </CardHeader>
+      <CardContent className="pt-6">
+        <ResponsiveContainer width="100%" height={320}>
+          <LineChart data={trendData} margin={{ top: 16, right: 12, bottom: 0, left: 0 }}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border) / 0.8)" />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} unit="d" allowDecimals={false} />
+            <Tooltip
+              contentStyle={{
+                background: 'hsl(var(--card))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: '10px',
+                fontSize: '12px',
+                color: 'hsl(var(--foreground))',
+                boxShadow: '0 18px 40px hsl(var(--foreground) / 0.08)',
+              }}
+              labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+              formatter={(value: number, name: string) => [`${value}d`, name]}
+            />
+            <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} iconType="circle" />
+            <Line type="monotone" dataKey="BG→Delivery" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: 'hsl(var(--primary))', stroke: 'hsl(var(--card))', strokeWidth: 2 }} />
+            <Line type="monotone" dataKey="ETD→Outlet" stroke="hsl(var(--info))" strokeWidth={2.5} strokeDasharray="6 4" dot={false} activeDot={{ r: 5, fill: 'hsl(var(--info))', stroke: 'hsl(var(--card))', strokeWidth: 2 }} />
+            <Line type="monotone" dataKey="Reg→Delivery" stroke="hsl(var(--success))" strokeWidth={2.5} strokeDasharray="3 5" dot={false} activeDot={{ r: 5, fill: 'hsl(var(--success))', stroke: 'hsl(var(--card))', strokeWidth: 2 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
   );
 }
