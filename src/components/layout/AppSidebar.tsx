@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -10,11 +10,18 @@ import {
   TrendingDown, Landmark, Search, HeadphonesIcon, Briefcase,
   Calendar, Clock, CreditCard, Star, Megaphone, Settings2, GitMerge
 } from 'lucide-react';
+import { HRMS_APPROVAL_INBOX_ROLES } from '@/config/hrmsConfig';
+import { HRMS_APPRAISAL_PARTICIPANT_ROLES } from '@/config/hrmsConfig';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { loadRolePermissions } from '@/config/rolePermissions';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
+import { listAppraisals, listLeaveRequests, listPayrollRuns } from '@/services/hrmsService';
+import {
+  buildApprovalInboxItems,
+  HRMS_APPROVAL_INBOX_CHANGED_EVENT,
+} from '@/lib/hrms/approvalInbox';
 
 interface NavItem {
   label: string;
@@ -81,11 +88,12 @@ const navItems: NavItem[] = [
   { label: 'Business Reports', path: '/reports', icon: BarChart3, section: 'Reports', group: 'Workspace' },
 
   { label: 'Employee Directory', path: '/hrms/employees', icon: Users, section: 'HRMS', group: 'Staff', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { label: 'Approval Inbox', path: '/hrms/approvals', icon: UserCheck, section: 'HRMS', group: 'Approvals', roles: [...HRMS_APPROVAL_INBOX_ROLES] },
   { label: 'Leave Management', path: '/hrms/leave', icon: Calendar, section: 'HRMS', group: 'Leave' },
   { label: 'Leave Calendar', path: '/hrms/leave-calendar', icon: Calendar, section: 'HRMS', group: 'Leave' },
   { label: 'Attendance Log', path: '/hrms/attendance', icon: Clock, section: 'HRMS', group: 'Attendance', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'Payroll Summary', path: '/hrms/payroll', icon: CreditCard, section: 'HRMS', group: 'Payroll', roles: ['super_admin', 'company_admin', 'general_manager'] },
-  { label: 'Performance Appraisals', path: '/hrms/appraisals', icon: Star, section: 'HRMS', group: 'Performance', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { label: 'Performance Appraisals', path: '/hrms/appraisals', icon: Star, section: 'HRMS', group: 'Performance', roles: [...HRMS_APPRAISAL_PARTICIPANT_ROLES] },
   { label: 'Announcements', path: '/hrms/announcements', icon: Megaphone, section: 'HRMS', group: 'Communications', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'HRMS Settings', path: '/hrms/admin', icon: Settings2, section: 'HRMS', group: 'Administration', roles: ['super_admin', 'company_admin', 'general_manager', 'manager'] },
   { label: 'Approval Flows', path: '/hrms/approval-flows', icon: GitMerge, section: 'HRMS', group: 'Administration', roles: ['super_admin', 'company_admin', 'general_manager', 'manager'] },
@@ -135,6 +143,7 @@ interface NavItemLinkProps {
   collapsed: boolean;
   pathname: string;
   onNavigate?: () => void;
+  badgeCount?: number;
 }
 
 function groupItems(items: NavItem[]): Array<{ group: string; items: NavItem[] }> {
@@ -153,8 +162,11 @@ function groupItems(items: NavItem[]): Array<{ group: string; items: NavItem[] }
   }));
 }
 
-const NavItemLink = React.memo(function NavItemLink({ item, collapsed, pathname, onNavigate }: NavItemLinkProps) {
+const NavItemLink = React.memo(function NavItemLink({ item, collapsed, pathname, onNavigate, badgeCount }: NavItemLinkProps) {
   const active = isItemActive(item.path, pathname);
+  const badgeLabel = badgeCount
+    ? badgeCount > 99 ? '99+' : String(badgeCount)
+    : null;
   const link = (
     <Link
       to={item.path}
@@ -167,8 +179,25 @@ const NavItemLink = React.memo(function NavItemLink({ item, collapsed, pathname,
           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
       )}
     >
-      <item.icon className="h-4 w-4 flex-shrink-0" />
-      {!collapsed && <span className="truncate">{item.label}</span>}
+      <span className="relative flex items-center">
+        <item.icon className="h-4 w-4 flex-shrink-0" />
+        {collapsed && badgeLabel && (
+          <span className="absolute -top-2 -right-2 min-w-4 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold flex items-center justify-center">
+            {badgeLabel}
+          </span>
+        )}
+      </span>
+      {!collapsed && <span className="truncate flex-1">{item.label}</span>}
+      {!collapsed && badgeLabel && (
+        <span
+          className={cn(
+            'ml-auto min-w-5 h-5 px-1.5 rounded-full text-[10px] font-semibold flex items-center justify-center',
+            active ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary',
+          )}
+        >
+          {badgeLabel}
+        </span>
+      )}
     </Link>
   );
 
@@ -194,6 +223,8 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
   const { isModuleActive } = useModuleAccess();
   const location = useLocation();
   const pathname = location.pathname;
+  const [approvalInboxCount, setApprovalInboxCount] = useState(0);
+  const [approvalRefreshTick, setApprovalRefreshTick] = useState(0);
 
   // Role-based section filtering from permission matrix (persisted to localStorage)
   const rolePermissions = loadRolePermissions();
@@ -213,6 +244,56 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return hasRole(item.roles as any);
   };
+
+  const canSeeApprovalInbox = useMemo(
+    () => Boolean(
+      user?.companyId
+      && user?.role
+      && isModuleActive('hrms')
+      && HRMS_APPROVAL_INBOX_ROLES.includes(user.role),
+    ),
+    [isModuleActive, user?.companyId, user?.role],
+  );
+
+  useEffect(() => {
+    function handleApprovalInboxChanged() {
+      setApprovalRefreshTick(prev => prev + 1);
+    }
+
+    window.addEventListener(HRMS_APPROVAL_INBOX_CHANGED_EVENT, handleApprovalInboxChanged);
+    return () => window.removeEventListener(HRMS_APPROVAL_INBOX_CHANGED_EVENT, handleApprovalInboxChanged);
+  }, []);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadApprovalInboxCount() {
+      if (!canSeeApprovalInbox || !user?.companyId) {
+        setApprovalInboxCount(0);
+        return;
+      }
+
+      const [leaveResult, payrollResult, appraisalResult] = await Promise.all([
+        listLeaveRequests(user.companyId),
+        listPayrollRuns(user.companyId),
+        listAppraisals(user.companyId),
+      ]);
+      if (isCancelled) return;
+
+      if (leaveResult.error || payrollResult.error || appraisalResult.error) {
+        setApprovalInboxCount(0);
+        return;
+      }
+
+      setApprovalInboxCount(buildApprovalInboxItems(leaveResult.data, payrollResult.data, appraisalResult.data, user).length);
+    }
+
+    void loadApprovalInboxCount();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [approvalRefreshTick, canSeeApprovalInbox, pathname, user]);
 
   // In focused mode, only render the section that matches the current URL.
   const focusedSection = isFocused ? getFocusedSection(pathname) : null;
@@ -331,13 +412,27 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
                             {g.group}
                           </p>
                           {g.items.map(item => (
-                            <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
+                            <NavItemLink
+                              key={item.path}
+                              item={item}
+                              collapsed={collapsed}
+                              pathname={pathname}
+                              onNavigate={onNavigate}
+                              badgeCount={item.path === '/hrms/approvals' ? approvalInboxCount : undefined}
+                            />
                           ))}
                         </div>
                       ))
                     ) : (
                       visibleItems.map(item => (
-                        <NavItemLink key={item.path} item={item} collapsed={collapsed} pathname={pathname} onNavigate={onNavigate} />
+                        <NavItemLink
+                          key={item.path}
+                          item={item}
+                          collapsed={collapsed}
+                          pathname={pathname}
+                          onNavigate={onNavigate}
+                          badgeCount={item.path === '/hrms/approvals' ? approvalInboxCount : undefined}
+                        />
                       ))
                     )}
                   </div>

@@ -18,6 +18,7 @@ const MOCK_EMPLOYEES = [
     role: "sales",
     company_id: MOCK_PROFILE.company_id,
     branch_id: "br-001",
+    manager_id: "emp-004",
     status: "active",
     staff_code: "SA001",
     ic_no: "900101-12-1234",
@@ -33,6 +34,7 @@ const MOCK_EMPLOYEES = [
     role: "manager",
     company_id: MOCK_PROFILE.company_id,
     branch_id: "br-002",
+    manager_id: null,
     status: "inactive",
     staff_code: "MGR001",
     ic_no: "850202-14-5678",
@@ -48,12 +50,29 @@ const MOCK_EMPLOYEES = [
     role: "accounts",
     company_id: MOCK_PROFILE.company_id,
     branch_id: "br-001",
+    manager_id: null,
     status: "resigned",
     staff_code: "ACC001",
     ic_no: null,
     contact_no: null,
     join_date: "2018-03-10",
     resign_date: "2024-12-31",
+    avatar_url: null,
+  },
+  {
+    id: "emp-004",
+    email: "farid@flc.test",
+    name: "Farid Noor",
+    role: "general_manager",
+    company_id: MOCK_PROFILE.company_id,
+    branch_id: "br-001",
+    manager_id: null,
+    status: "active",
+    staff_code: "GM001",
+    ic_no: "800101-10-1111",
+    contact_no: "014-2223344",
+    join_date: "2017-02-20",
+    resign_date: null,
     avatar_url: null,
   },
 ];
@@ -164,6 +183,21 @@ test.describe("HRMS – Employee Directory", () => {
 
     await expect(page.locator("text=SA001")).toBeVisible({ timeout: 8000 });
     await expect(page.locator("text=MGR001")).toBeVisible({ timeout: 8000 });
+  });
+
+  test("shows assigned manager and manager picker in employee dialogs", async ({ page }) => {
+    await page.goto("/hrms/employees");
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+    const row = page.locator("tr").filter({ hasText: "Ahmad Ibrahim" });
+    await expect(row.locator("text=Farid Noor")).toBeVisible({ timeout: 8000 });
+
+    await page.locator("button").filter({ hasText: /new employee/i }).click();
+    const dialog = page.locator("[role='dialog']").last();
+    await expect(dialog.locator("text=/reporting manager/i")).toBeVisible({ timeout: 5000 });
+
+    await dialog.locator("button, [role='combobox']").filter({ hasText: /unassigned/i }).last().click();
+    await expect(page.locator("[role='option']").filter({ hasText: /farid noor \(general manager\)/i })).toBeVisible({ timeout: 5000 });
   });
 
   test("search filter narrows visible employees", async ({ page }) => {

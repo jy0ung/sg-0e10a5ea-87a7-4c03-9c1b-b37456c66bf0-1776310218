@@ -7,18 +7,140 @@ import type {
   PublicHoliday, CreateHolidayInput, UpdateHolidayInput,
 } from '@/types';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DEPARTMENTS
-// ═══════════════════════════════════════════════════════════════════════════════
+function isMissingWorkforceSchemaError(message: string | null | undefined): boolean {
+  const text = (message ?? '').toLowerCase();
+  return [
+    'relation "employees" does not exist',
+    'column profiles.employee_id does not exist',
+    'could not find the table',
+    'could not find a relationship',
+  ].some(fragment => text.includes(fragment));
+}
 
-function rowToDepartment(r: Record<string, unknown>): Department {
+function isLegacyEmployeeOwnershipWriteError(message: string | null | undefined): boolean {
+  const text = (message ?? '').toLowerCase();
+  return [
+    'violates foreign key constraint',
+    'violates row-level security policy',
+    'new row violates row-level security policy',
+  ].some(fragment => text.includes(fragment));
+}
+
+type StoredHeadEmployeeIdentity = {
+  employeeId: string;
+  name?: string;
+};
+
+async function resolveLegacyProfileEmployeeId(
+  employeeId: string,
+): Promise<{ data: string; error: string | null }> {
+  if (!employeeId) return { data: employeeId, error: null };
+
+  const { data: directProfile, error: directError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', employeeId)
+    .maybeSingle();
+  if (directError) return { data: employeeId, error: directError.message };
+  if (directProfile?.id) return { data: String(directProfile.id), error: null };
+
+  const { data: linkedProfile, error: linkedError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('employee_id', employeeId)
+    .maybeSingle();
+  if (linkedError) {
+    if (isMissingWorkforceSchemaError(linkedError.message)) {
+      return { data: employeeId, error: null };
+    }
+    return { data: employeeId, error: linkedError.message };
+  }
+
+  return {
+    data: linkedProfile?.id ? String(linkedProfile.id) : employeeId,
+    error: null,
+  };
+}
+
+async function resolveStoredHeadEmployeeIdentities(
+  storedHeadEmployeeIds: string[],
+): Promise<{ data: Map<string, StoredHeadEmployeeIdentity>; error: string | null }> {
+  const uniqueIds = [...new Set(storedHeadEmployeeIds.filter(Boolean))];
+  const identities = new Map<string, StoredHeadEmployeeIdentity>();
+
+  if (!uniqueIds.length) return { data: identities, error: null };
+
+  const { data: profileRows, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, name, employee_id')
+    .in('id', uniqueIds);
+
+  if (profileError) {
+    if (!isMissingWorkforceSchemaError(profileError.message)) {
+      return { data: identities, error: profileError.message };
+    }
+
+    const { data: fallbackRows, error: fallbackError } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .in('id', uniqueIds);
+    if (fallbackError) return { data: identities, error: fallbackError.message };
+
+    for (const row of fallbackRows ?? []) {
+      identities.set(String(row.id), {
+        employeeId: String(row.id),
+        name: row.name ? String(row.name) : undefined,
+      });
+    }
+
+    return { data: identities, error: null };
+  }
+
+  for (const row of profileRows ?? []) {
+    identities.set(String(row.id), {
+      employeeId: row.employee_id ? String(row.employee_id) : String(row.id),
+      name: row.name ? String(row.name) : undefined,
+    });
+  }
+
+  const unresolvedIds = uniqueIds.filter(id => !identities.has(id));
+  if (!unresolvedIds.length) return { data: identities, error: null };
+
+  const { data: employeeRows, error: employeeError } = await supabase
+    .from('employees')
+    .select('id, name')
+    .in('id', unresolvedIds);
+  if (employeeError) {
+    if (isMissingWorkforceSchemaError(employeeError.message)) {
+      return { data: identities, error: null };
+    }
+    return { data: identities, error: employeeError.message };
+  }
+
+  for (const row of employeeRows ?? []) {
+    identities.set(String(row.id), {
+      employeeId: String(row.id),
+      name: row.name ? String(row.name) : undefined,
+    });
+  }
+
+  return { data: identities, error: null };
+}
+
+function rowToDepartment(
+  r: Record<string, unknown>,
+  identityMap?: Map<string, StoredHeadEmployeeIdentity>,
+): Department {
+  const storedHeadEmployeeId = r.head_employee_id ? String(r.head_employee_id) : undefined;
+  const headEmployeeIdentity = storedHeadEmployeeId ? identityMap?.get(storedHeadEmployeeId) : undefined;
+
   return {
     id:               String(r.id ?? ''),
     companyId:        String(r.company_id ?? ''),
     name:             String(r.name ?? ''),
     description:      r.description ? String(r.description) : undefined,
-    headEmployeeId:   r.head_employee_id ? String(r.head_employee_id) : undefined,
-    headEmployeeName: r.head_employee ? String((r.head_employee as Record<string, unknown>)?.name ?? '') : undefined,
+    headEmployeeId:   headEmployeeIdentity?.employeeId ?? storedHeadEmployeeId,
+    headEmployeeName: headEmployeeIdentity?.name,
     costCentre:       r.cost_centre ? String(r.cost_centre) : undefined,
     isActive:         Boolean(r.is_active),
     createdAt:        String(r.created_at ?? ''),
@@ -26,14 +148,33 @@ function rowToDepartment(r: Record<string, unknown>): Department {
   };
 }
 
+async function mapDepartments(
+  rows: Record<string, unknown>[],
+): Promise<{ data: Department[]; error: string | null }> {
+  const identityMap = await resolveStoredHeadEmployeeIdentities(
+    rows.map(row => String(row.head_employee_id ?? '')),
+  );
+  if (identityMap.error) return { data: [], error: identityMap.error };
+
+  return {
+    data: rows.map(row => rowToDepartment(row, identityMap.data)),
+    error: null,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEPARTMENTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export async function listDepartments(companyId: string): Promise<{ data: Department[]; error: string | null }> {
   const { data, error } = await supabase
     .from('departments')
-    .select('*, head_employee:profiles!departments_head_employee_id_fkey(name)')
+    .select('*')
     .eq('company_id', companyId)
     .order('name');
   if (error) return { data: [], error: error.message };
-  return { data: (data ?? []).map(r => rowToDepartment(r as Record<string, unknown>)), error: null };
+
+  return mapDepartments((data ?? []) as Record<string, unknown>[]);
 }
 
 export async function createDepartment(
@@ -41,21 +182,51 @@ export async function createDepartment(
   actorId: string,
   input: CreateDepartmentInput,
 ): Promise<{ data: Department | null; error: string | null }> {
-  const { data, error } = await supabase
-    .from('departments')
-    .insert({
-      company_id:       companyId,
-      name:             input.name,
-      description:      input.description ?? null,
-      head_employee_id: input.headEmployeeId ?? null,
-      cost_centre:      input.costCentre ?? null,
-      is_active:        input.isActive,
-    })
-    .select('*, head_employee:profiles!departments_head_employee_id_fkey(name)')
-    .single();
-  if (error) return { data: null, error: error.message };
-  void logUserAction(actorId, 'create', 'department', String(data.id), { name: input.name });
-  return { data: rowToDepartment(data as Record<string, unknown>), error: null };
+  const legacyHeadEmployeeId = input.headEmployeeId
+    ? await resolveLegacyProfileEmployeeId(input.headEmployeeId)
+    : { data: '', error: null as string | null };
+  if (legacyHeadEmployeeId.error) return { data: null, error: legacyHeadEmployeeId.error };
+
+  const insertDepartment = async (storedHeadEmployeeId?: string | null) => {
+    const { data, error } = await supabase
+      .from('departments')
+      .insert({
+        company_id:       companyId,
+        name:             input.name,
+        description:      input.description ?? null,
+        head_employee_id: storedHeadEmployeeId ?? null,
+        cost_centre:      input.costCentre ?? null,
+        is_active:        input.isActive,
+      })
+      .select('*')
+      .single();
+
+    return {
+      data: data as Record<string, unknown> | null,
+      error: error?.message ?? null,
+    };
+  };
+
+  let createdDepartment = await insertDepartment(input.headEmployeeId ?? null);
+  if (
+    createdDepartment.error
+    && input.headEmployeeId
+    && legacyHeadEmployeeId.data
+    && legacyHeadEmployeeId.data !== input.headEmployeeId
+    && isLegacyEmployeeOwnershipWriteError(createdDepartment.error)
+  ) {
+    createdDepartment = await insertDepartment(legacyHeadEmployeeId.data);
+  }
+
+  if (createdDepartment.error || !createdDepartment.data) {
+    return { data: null, error: createdDepartment.error ?? 'Failed to create department.' };
+  }
+
+  const mappedDepartment = await mapDepartments([createdDepartment.data]);
+  if (mappedDepartment.error) return { data: null, error: mappedDepartment.error };
+
+  void logUserAction(actorId, 'create', 'department', String(createdDepartment.data.id), { name: input.name });
+  return { data: mappedDepartment.data[0] ?? null, error: null };
 }
 
 export async function updateDepartment(
@@ -63,29 +234,66 @@ export async function updateDepartment(
   actorId: string,
   input: UpdateDepartmentInput,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase
-    .from('departments')
-    .update({
-      name:             input.name,
-      description:      input.description ?? null,
-      head_employee_id: input.headEmployeeId ?? null,
-      cost_centre:      input.costCentre ?? null,
-      is_active:        input.isActive,
-      updated_at:       new Date().toISOString(),
-    })
-    .eq('id', id);
+  const legacyHeadEmployeeId = input.headEmployeeId
+    ? await resolveLegacyProfileEmployeeId(input.headEmployeeId)
+    : { data: '', error: null as string | null };
+  if (legacyHeadEmployeeId.error) return { error: legacyHeadEmployeeId.error };
+
+  const updatedAt = new Date().toISOString();
+  const updateDepartmentRow = async (storedHeadEmployeeId?: string | null) => {
+    const { error } = await supabase
+      .from('departments')
+      .update({
+        name:             input.name,
+        description:      input.description ?? null,
+        head_employee_id: storedHeadEmployeeId ?? null,
+        cost_centre:      input.costCentre ?? null,
+        is_active:        input.isActive,
+        updated_at:       updatedAt,
+      })
+      .eq('id', id);
+    return { error: error?.message ?? null };
+  };
+
+  let updateResult = await updateDepartmentRow(input.headEmployeeId ?? null);
+  if (
+    updateResult.error
+    && input.headEmployeeId
+    && legacyHeadEmployeeId.data
+    && legacyHeadEmployeeId.data !== input.headEmployeeId
+    && isLegacyEmployeeOwnershipWriteError(updateResult.error)
+  ) {
+    updateResult = await updateDepartmentRow(legacyHeadEmployeeId.data);
+  }
+
+  const { error } = updateResult;
   if (!error) void logUserAction(actorId, 'update', 'department', id, { name: input.name });
   return { error: error?.message ?? null };
 }
 
 export async function deleteDepartment(id: string, actorId: string): Promise<{ error: string | null }> {
   // Check if any employees are assigned to this department
-  const { count } = await supabase
-    .from('profiles')
+  const { count, error: employeeCountError } = await supabase
+    .from('employees')
     .select('id', { count: 'exact', head: true })
     .eq('department_id', id);
-  if ((count ?? 0) > 0) {
-    return { error: `Cannot delete: ${count} employee(s) are assigned to this department. Reassign them first.` };
+
+  let assignedCount = count ?? 0;
+  if (employeeCountError) {
+    if (!isMissingWorkforceSchemaError(employeeCountError.message)) {
+      return { error: employeeCountError.message };
+    }
+
+    const { count: legacyCount, error: legacyError } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('department_id', id);
+    if (legacyError) return { error: legacyError.message };
+    assignedCount = legacyCount ?? 0;
+  }
+
+  if (assignedCount > 0) {
+    return { error: `Cannot delete: ${assignedCount} employee(s) are assigned to this department. Reassign them first.` };
   }
   const { error } = await supabase.from('departments').delete().eq('id', id);
   if (!error) void logUserAction(actorId, 'delete', 'department', id, {});

@@ -44,6 +44,15 @@ export const HRMS_PAYROLL: readonly AppRole[] = [
   'general_manager',
 ] as const;
 
+export const HRMS_APPROVAL_INBOX: readonly AppRole[] = [
+  'super_admin',
+  'company_admin',
+  'director',
+  'general_manager',
+  'manager',
+  'accounts',
+] as const;
+
 export const HRMS_LEAVE: readonly AppRole[] = [
   'super_admin',
   'company_admin',
@@ -51,4 +60,16 @@ export const HRMS_LEAVE: readonly AppRole[] = [
   'general_manager',
   'manager',
   'accounts',
+] as const;
+
+export const HRMS_APPRAISALS: readonly AppRole[] = [
+  'super_admin',
+  'company_admin',
+  'director',
+  'general_manager',
+  'manager',
+  'sales',
+  'accounts',
+  'analyst',
+  'creator_updater',
 ] as const;

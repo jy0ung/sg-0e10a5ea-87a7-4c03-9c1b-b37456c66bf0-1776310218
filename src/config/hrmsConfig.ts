@@ -19,9 +19,19 @@ export const HRMS_LEAVE_APPROVER_ROLES: AppRole[] = [
   'super_admin', 'company_admin', 'general_manager', 'manager',
 ];
 
+/** Can access the cross-entity approval inbox and action assigned approvals. */
+export const HRMS_APPROVAL_INBOX_ROLES: AppRole[] = [
+  'super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'accounts',
+];
+
 /** Can access any HRMS route (applies leave, views calendar). */
 export const HRMS_ACCESS_ROLES: AppRole[] = [
   'super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'accounts',
+];
+
+/** Can participate in appraisal cycles through self review, manager review, or acknowledgement. */
+export const HRMS_APPRAISAL_PARTICIPANT_ROLES: AppRole[] = [
+  'super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater',
 ];
 
 /** Roles whose IC/contact numbers are shown unmasked in the directory. */

@@ -394,7 +394,7 @@ export type Database = {
         }
         Relationships: [
           { foreignKeyName: "appraisal_items_appraisal_id_fkey"; columns: ["appraisal_id"]; referencedRelation: "appraisals"; referencedColumns: ["id"] },
-          { foreignKeyName: "appraisal_items_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "appraisal_items_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "employees"; referencedColumns: ["id"] },
           { foreignKeyName: "appraisal_items_reviewer_id_fkey"; columns: ["reviewer_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
         ]
       }
@@ -480,7 +480,7 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          { foreignKeyName: "attendance_records_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
+          { foreignKeyName: "attendance_records_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "employees"; referencedColumns: ["id"] }
         ]
       }
       leave_balances: {
@@ -515,7 +515,7 @@ export type Database = {
           year?: number
         }
         Relationships: [
-          { foreignKeyName: "leave_balances_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "leave_balances_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "employees"; referencedColumns: ["id"] },
           { foreignKeyName: "leave_balances_leave_type_id_fkey"; columns: ["leave_type_id"]; referencedRelation: "leave_types"; referencedColumns: ["id"] }
         ]
       }
@@ -569,7 +569,7 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          { foreignKeyName: "leave_requests_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "leave_requests_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "employees"; referencedColumns: ["id"] },
           { foreignKeyName: "leave_requests_leave_type_id_fkey"; columns: ["leave_type_id"]; referencedRelation: "leave_types"; referencedColumns: ["id"] },
           { foreignKeyName: "leave_requests_reviewed_by_fkey"; columns: ["reviewed_by"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
         ]
@@ -666,7 +666,7 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          { foreignKeyName: "payroll_items_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "payroll_items_employee_id_fkey"; columns: ["employee_id"]; referencedRelation: "employees"; referencedColumns: ["id"] },
           { foreignKeyName: "payroll_items_payroll_run_id_fkey"; columns: ["payroll_run_id"]; referencedRelation: "payroll_runs"; referencedColumns: ["id"] }
         ]
       }
@@ -715,6 +715,150 @@ export type Database = {
         }
         Relationships: [
           { foreignKeyName: "payroll_runs_created_by_fkey"; columns: ["created_by"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
+        ]
+      }
+      employee_module_assignments: {
+        Row: {
+          active: boolean
+          assignment_role: string
+          company_id: string
+          created_at: string
+          effective_from: string | null
+          effective_to: string | null
+          employee_id: string
+          id: string
+          is_primary: boolean
+          module_key: string
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          assignment_role: string
+          company_id: string
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          employee_id: string
+          id?: string
+          is_primary?: boolean
+          module_key: string
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          assignment_role?: string
+          company_id?: string
+          created_at?: string
+          effective_from?: string | null
+          effective_to?: string | null
+          employee_id?: string
+          id?: string
+          is_primary?: boolean
+          module_key?: string
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_module_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          avatar_url: string | null
+          branch_id: string | null
+          company_id: string
+          contact_no: string | null
+          created_at: string
+          department_id: string | null
+          ic_no: string | null
+          id: string
+          job_title_id: string | null
+          join_date: string | null
+          legacy_profile_id: string | null
+          manager_employee_id: string | null
+          name: string
+          personal_email: string | null
+          primary_role: string
+          resign_date: string | null
+          staff_code: string | null
+          status: string
+          updated_at: string
+          work_email: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          branch_id?: string | null
+          company_id: string
+          contact_no?: string | null
+          created_at?: string
+          department_id?: string | null
+          ic_no?: string | null
+          id?: string
+          job_title_id?: string | null
+          join_date?: string | null
+          legacy_profile_id?: string | null
+          manager_employee_id?: string | null
+          name: string
+          personal_email?: string | null
+          primary_role?: string
+          resign_date?: string | null
+          staff_code?: string | null
+          status?: string
+          updated_at?: string
+          work_email?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          branch_id?: string | null
+          company_id?: string
+          contact_no?: string | null
+          created_at?: string
+          department_id?: string | null
+          ic_no?: string | null
+          id?: string
+          job_title_id?: string | null
+          join_date?: string | null
+          legacy_profile_id?: string | null
+          manager_employee_id?: string | null
+          name?: string
+          personal_email?: string | null
+          primary_role?: string
+          resign_date?: string | null
+          staff_code?: string | null
+          status?: string
+          updated_at?: string
+          work_email?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_job_title_id_fkey"
+            columns: ["job_title_id"]
+            isOneToOne: false
+            referencedRelation: "job_titles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_manager_employee_id_fkey"
+            columns: ["manager_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
         ]
       }
       import_batches: {
@@ -784,6 +928,7 @@ export type Database = {
           company_id: string | null
           contact_no: string | null
           created_at: string | null
+          employee_id: string | null
           email: string | null
           ic_no: string | null
           id: string
@@ -805,6 +950,7 @@ export type Database = {
           company_id?: string | null
           contact_no?: string | null
           created_at?: string | null
+          employee_id?: string | null
           email?: string | null
           ic_no?: string | null
           id: string
@@ -826,6 +972,7 @@ export type Database = {
           company_id?: string | null
           contact_no?: string | null
           created_at?: string | null
+          employee_id?: string | null
           email?: string | null
           ic_no?: string | null
           id?: string
@@ -850,6 +997,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
         ]

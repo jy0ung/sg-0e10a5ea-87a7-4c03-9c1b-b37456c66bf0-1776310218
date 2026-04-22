@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { listLeaveRequests, listEmployees } from '@/services/hrmsService';
+import { listEmployeeDirectory, listLeaveRequests } from '@/services/hrmsService';
 import type { LeaveRequest, Employee } from '@/types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -43,7 +43,7 @@ export default function LeaveCalendar() {
     if (!user?.companyId) return;
     setLoading(true);
     const [empRes, reqRes] = await Promise.all([
-      listEmployees(user.companyId),
+      listEmployeeDirectory(user.companyId),
       listLeaveRequests(user.companyId, { status: 'approved' }),
     ]);
     setEmployees(empRes.data);

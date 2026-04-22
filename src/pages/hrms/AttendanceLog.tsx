@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { listAttendanceRecords, upsertAttendance, listEmployees } from '@/services/hrmsService';
+import { listAttendanceRecords, listEmployeeDirectory, upsertAttendance } from '@/services/hrmsService';
 import type { AttendanceRecord, UpsertAttendanceInput, AttendanceStatus, Employee } from '@/types';
 import { Plus, Download } from 'lucide-react';
 import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
@@ -40,6 +40,7 @@ export default function AttendanceLog() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
+  const selfServiceEmployeeId = user?.employeeId ?? user?.id;
 
   const [records, setRecords]     = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -56,21 +57,21 @@ export default function AttendanceLog() {
   });
 
   const load = useCallback(async () => {
-    if (!user?.companyId) return;
+    if (!user?.companyId || (!isManager && !selfServiceEmployeeId)) return;
     setLoading(true);
     const [attRes, empRes] = await Promise.all([
       listAttendanceRecords(user.companyId, {
-        employeeId: !isManager ? user.id : (empFilter === 'all' ? undefined : empFilter),
+        employeeId: !isManager ? selfServiceEmployeeId : (empFilter === 'all' ? undefined : empFilter),
         dateFrom,
         dateTo,
       }),
-      isManager ? listEmployees(user.companyId) : Promise.resolve({ data: [], error: null }),
+      isManager ? listEmployeeDirectory(user.companyId) : Promise.resolve({ data: [], error: null }),
     ]);
     setRecords(attRes.data);
     if (isManager) setEmployees(empRes.data);
     setLoading(false);
     if (attRes.error) toast({ title: 'Error', description: attRes.error, variant: 'destructive' });
-  }, [user, isManager, empFilter, dateFrom, dateTo, toast]);
+  }, [user, isManager, selfServiceEmployeeId, empFilter, dateFrom, dateTo, toast]);
 
   useEffect(() => { load(); }, [load]);
 

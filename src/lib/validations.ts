@@ -37,6 +37,7 @@ export const inviteUserSchema = z.object({
   email: z.string().min(1, 'Email is required').email('Invalid email address'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater']),
+  employee_id: z.string().nullable().optional(),
 });
 
 export type InviteSignupFormData = z.infer<typeof inviteSignupSchema>;
@@ -85,6 +86,7 @@ export const userUpdateSchema = z.object({
   role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater']),
   access_scope: z.enum(['self', 'branch', 'company', 'global']),
   branch_id: z.string().nullable().optional(),
+  employee_id: z.string().nullable().optional(),
 });
 
 // Settings schemas

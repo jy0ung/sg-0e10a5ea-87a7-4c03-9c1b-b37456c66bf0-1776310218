@@ -11,10 +11,42 @@ interface Profile {
   name: string;
   role: AppRole;
   company_id: string;
+  companyId: string;
   branch_id?: string | null;
+  branchId?: string | null;
   avatar_url?: string | null;
+  avatarUrl?: string | null;
   access_scope: AccessScope;
+  accessScope: AccessScope;
   status?: 'active' | 'inactive' | 'resigned' | 'pending';
+  employee_id?: string | null;
+  employeeId?: string | null;
+}
+
+function rowToProfile(row: Record<string, unknown>): Profile {
+  const companyId = String(row.company_id ?? '');
+  const branchId = row.branch_id ? String(row.branch_id) : null;
+  const avatarUrl = row.avatar_url ? String(row.avatar_url) : null;
+  const accessScope = (row.access_scope as AccessScope) ?? 'self';
+  const employeeId = row.employee_id ? String(row.employee_id) : null;
+
+  return {
+    id: String(row.id ?? ''),
+    email: String(row.email ?? ''),
+    name: String(row.name ?? ''),
+    role: (row.role as AppRole) ?? 'analyst',
+    company_id: companyId,
+    companyId,
+    branch_id: branchId,
+    branchId,
+    avatar_url: avatarUrl,
+    avatarUrl,
+    access_scope: accessScope,
+    accessScope,
+    status: row.status as Profile['status'],
+    employee_id: employeeId,
+    employeeId,
+  };
 }
 
 interface AuthContextType {
@@ -97,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const p = data as unknown as Profile;
+      const p = rowToProfile(data as Record<string, unknown>);
 
       if (!p.company_id || p.status === 'pending') {
         if (isOnboardingRoute) {

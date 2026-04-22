@@ -13,7 +13,7 @@ import { getBranches } from '@/services/masterDataService';
 import type { BranchRecord } from '@/types';
 import { listDepartments, listJobTitles } from '@/services/hrmsAdminService';
 import {
-  listEmployees,
+  listEmployeeDirectory,
   createEmployee,
   updateEmployee,
   type CreateEmployeeInput,
@@ -59,18 +59,20 @@ const STATUS_BADGE: Record<EmployeeStatus, string> = {
 
 // Roles that can manage employees (add/edit/deactivate) — sourced from hrmsConfig
 const MANAGER_ROLES = HRMS_MANAGER_ROLES;
+const UNASSIGNED_MANAGER = '__unassigned__';
 
 // ─── Form state ───────────────────────────────────────────────────────────────
 
 const EMPTY_CREATE_FORM = {
   staffCode: '', name: '', email: '', ic: '', contact: '',
-  branch: '', role: 'sales' as AppRole, joinDate: new Date().toISOString().split('T')[0],
+  branch: '', managerId: '', role: 'sales' as AppRole, joinDate: new Date().toISOString().split('T')[0],
 };
 
 type EditForm = {
   name: string;
   role: AppRole;
   branch: string;
+  managerId: string;
   staffCode: string;
   ic: string;
   contact: string;
@@ -131,7 +133,7 @@ export default function EmployeeDirectory() {
     if (!user) return;
     setLoading(true);
     const [empResult, branchResult, deptResult, jtResult] = await Promise.all([
-      listEmployees(user.companyId),
+      listEmployeeDirectory(user.companyId),
       getBranches(user.companyId),
       listDepartments(user.companyId),
       listJobTitles(user.companyId),
@@ -147,12 +149,25 @@ export default function EmployeeDirectory() {
   useEffect(() => { load(); }, [load]);
 
   // ── Derived ──
+  const employeeById = new Map(employees.map(employee => [employee.id, employee]));
+  const managerOptions = employees.filter(employee => employee.status === 'active' && MANAGER_ROLES.includes(employee.role));
+
+  function getManagerOptions(selectedManagerId?: string) {
+    const options = [...managerOptions];
+    const selectedManager = selectedManagerId ? employeeById.get(selectedManagerId) : undefined;
+    if (selectedManager && !options.some(option => option.id === selectedManager.id)) {
+      options.push(selectedManager);
+    }
+    return options.sort((left, right) => left.name.localeCompare(right.name));
+  }
+
   const filtered = employees.filter(e => {
     if (roleFilter   !== 'all' && e.role   !== roleFilter)   return false;
     if (statusFilter !== 'all' && e.status !== statusFilter) return false;
     if (branchFilter !== 'all' && e.branchId !== branchFilter) return false;
     const q = search.toLowerCase();
-    return !q || [e.staffCode, e.name, e.email, e.branchId].join(' ').toLowerCase().includes(q);
+    const managerName = e.managerId ? employeeById.get(e.managerId)?.name ?? '' : '';
+    return !q || [e.staffCode, e.name, e.email, e.branchId, managerName].join(' ').toLowerCase().includes(q);
   });
 
   const activeCount   = employees.filter(e => e.status === 'active').length;
@@ -174,6 +189,7 @@ export default function EmployeeDirectory() {
       role:      form.role,
       companyId: user.companyId,
       branchId:  form.branch || undefined,
+      managerId: form.managerId || undefined,
       staffCode: form.staffCode,
       icNo:      form.ic || undefined,
       contactNo: form.contact || undefined,
@@ -198,6 +214,7 @@ export default function EmployeeDirectory() {
       name:         emp.name,
       role:         emp.role,
       branch:       emp.branchId ?? '',
+      managerId:    emp.managerId ?? '',
       staffCode:    emp.staffCode ?? '',
       ic:           emp.icNo ?? '',
       contact:      emp.contactNo ?? '',
@@ -218,6 +235,7 @@ export default function EmployeeDirectory() {
       name:         editForm.name,
       role:         editForm.role,
       branchId:     editForm.branch || null,
+      managerId:    editForm.managerId || null,
       staffCode:    editForm.staffCode,
       icNo:         editForm.ic,
       contactNo:    editForm.contact,
@@ -365,6 +383,7 @@ export default function EmployeeDirectory() {
                 <th className="pb-2 pr-4 font-medium">Email</th>
                 <th className="pb-2 pr-4 font-medium">Department</th>
                 <th className="pb-2 pr-4 font-medium">Job Title</th>
+                <th className="pb-2 pr-4 font-medium">Manager</th>
                 <th className="pb-2 pr-4 font-medium">Branch</th>
                 <th className="pb-2 pr-4 font-medium">Join Date</th>
                 <th className="pb-2 pr-4 font-medium">Status</th>
@@ -374,13 +393,14 @@ export default function EmployeeDirectory() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 12 : 11} className="py-8 text-center text-muted-foreground text-sm">
+                  <td colSpan={canManage ? 13 : 12} className="py-8 text-center text-muted-foreground text-sm">
                     No employees found
                   </td>
                 </tr>
               ) : (
                 filtered.map(emp => {
                   const branchCode = branches.find(b => b.id === emp.branchId)?.code ?? emp.branchId ?? '—';
+                  const managerName = emp.managerId ? employeeById.get(emp.managerId)?.name ?? emp.managerId : '—';
                   return (
                     <tr key={emp.id} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
                       <td className="py-2 pr-4 font-mono text-xs font-medium">{emp.staffCode ?? '—'}</td>
@@ -395,6 +415,7 @@ export default function EmployeeDirectory() {
                       <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.email}</td>
                       <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.departmentName ?? '—'}</td>
                       <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.jobTitleName ?? '—'}</td>
+                      <td className="py-2 pr-4 text-xs text-muted-foreground">{managerName}</td>
                       <td className="py-2 pr-4 text-xs">{branchCode}</td>
                       <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.joinDate ?? '—'}</td>
                       <td className="py-2 pr-4">
@@ -490,6 +511,24 @@ export default function EmployeeDirectory() {
                   onChange={e => setForm(f => ({ ...f, joinDate: e.target.value }))}
                 />
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Reporting Manager</label>
+              <Select
+                value={form.managerId || UNASSIGNED_MANAGER}
+                onValueChange={value => setForm(f => ({ ...f, managerId: value === UNASSIGNED_MANAGER ? '' : value }))}
+              >
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED_MANAGER}>Unassigned</SelectItem>
+                  {getManagerOptions().map(manager => (
+                    <SelectItem key={manager.id} value={manager.id}>
+                      {manager.name} ({ROLE_LABEL[manager.role]})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -637,6 +676,26 @@ export default function EmployeeDirectory() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Reporting Manager</label>
+                <Select
+                  value={editForm.managerId || UNASSIGNED_MANAGER}
+                  onValueChange={value => setEditForm(f => f ? { ...f, managerId: value === UNASSIGNED_MANAGER ? '' : value } : f)}
+                >
+                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED_MANAGER}>Unassigned</SelectItem>
+                    {getManagerOptions(editForm.managerId)
+                      .filter(manager => manager.id !== editTarget.id)
+                      .map(manager => (
+                        <SelectItem key={manager.id} value={manager.id}>
+                          {manager.name} ({ROLE_LABEL[manager.role]})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

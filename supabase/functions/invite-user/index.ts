@@ -7,6 +7,12 @@ interface InvitePayload {
   role: string;
   company_id: string;
   access_scope?: string;
+  employee_id?: string | null;
+}
+
+function isMissingEmployeeLinkColumnError(message: string | null | undefined): boolean {
+  const text = (message ?? '').toLowerCase();
+  return text.includes('column profiles.employee_id does not exist') || text.includes('employee_id');
 }
 
 Deno.serve(async (req: Request) => {
@@ -65,7 +71,7 @@ Deno.serve(async (req: Request) => {
 
     // Parse request body
     const body: InvitePayload = await req.json();
-    const { email, name, role, company_id, access_scope } = body;
+    const { email, name, role, company_id, access_scope, employee_id } = body;
 
     if (!email || !name || !role || !company_id) {
       return new Response(
@@ -117,18 +123,29 @@ Deno.serve(async (req: Request) => {
 
       const finalScope = access_scope || roleDefaultScopes[role] || 'company';
 
-      const { error: profileError } = await adminClient
+      const profilePatch = {
+        id: inviteData.user.id,
+        email,
+        name,
+        role,
+        company_id,
+        access_scope: finalScope,
+        status: 'active',
+        updated_at: new Date().toISOString(),
+        ...(employee_id ? { employee_id } : {}),
+      };
+
+      let { error: profileError } = await adminClient
         .from('profiles')
-        .upsert({
-          id: inviteData.user.id,
-          email,
-          name,
-          role,
-          company_id,
-          access_scope: finalScope,
-          status: 'active',
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'id' });
+        .upsert(profilePatch, { onConflict: 'id' });
+
+      if (profileError && employee_id && isMissingEmployeeLinkColumnError(profileError.message)) {
+        const { employee_id: _employeeId, ...fallbackPatch } = profilePatch;
+        const retry = await adminClient
+          .from('profiles')
+          .upsert(fallbackPatch, { onConflict: 'id' });
+        profileError = retry.error;
+      }
 
       if (profileError) {
         return new Response(

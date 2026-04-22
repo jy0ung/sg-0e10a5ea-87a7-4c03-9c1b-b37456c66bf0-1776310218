@@ -16,6 +16,7 @@ export const ROLE_DEFAULT_SCOPE: Record<AppRole, AccessScope> = {
 
 export interface User {
   id: string;
+  employeeId?: string | null;
   email: string;
   name: string;
   role: AppRole;
@@ -48,6 +49,7 @@ export interface Employee {
   role: AppRole;
   companyId: string;
   branchId?: string;
+  managerId?: string;
   staffCode?: string;
   icNo?: string;
   contactNo?: string;
@@ -101,6 +103,13 @@ export interface LeaveRequest {
   reviewedBy?: string;
   reviewedAt?: string;
   reviewerNote?: string;
+  approvalInstanceId?: string;
+  approvalInstanceStatus?: ApprovalInstanceStatus;
+  currentApprovalStepOrder?: number;
+  currentApprovalStepName?: string;
+  currentApproverRole?: string;
+  currentApproverUserId?: string;
+  approvalHistory?: ApprovalDecision[];
   createdAt: string;
   updatedAt: string;
 }
@@ -150,6 +159,13 @@ export interface PayrollRun {
   periodYear: number;
   periodMonth: number;
   status: PayrollRunStatus;
+  approvalInstanceId?: string;
+  approvalInstanceStatus?: ApprovalInstanceStatus;
+  currentApprovalStepOrder?: number;
+  currentApprovalStepName?: string;
+  currentApproverRole?: string;
+  currentApproverUserId?: string;
+  approvalHistory?: ApprovalDecision[];
   totalHeadcount: number;
   totalGross: number;
   totalNet: number;
@@ -192,6 +208,13 @@ export interface Appraisal {
   periodStart: string;
   periodEnd: string;
   status: AppraisalStatus;
+  approvalInstanceId?: string;
+  approvalInstanceStatus?: ApprovalInstanceStatus;
+  currentApprovalStepOrder?: number;
+  currentApprovalStepName?: string;
+  currentApproverRole?: string;
+  currentApproverUserId?: string;
+  approvalHistory?: ApprovalDecision[];
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
@@ -321,6 +344,8 @@ export type UpdateHolidayInput = CreateHolidayInput;
 // ===== HRMS — Approval Flows =====
 export type ApproverType = 'role' | 'specific_user' | 'direct_manager';
 export type FlowEntityType = 'leave_request' | 'payroll_run' | 'appraisal' | 'general';
+export type ApprovalInstanceStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type ApprovalDecisionStatus = 'approved' | 'rejected';
 
 export interface ApprovalStep {
   id: string;
@@ -355,6 +380,37 @@ export interface CreateApprovalFlowInput {
   steps: Omit<ApprovalStep, 'id' | 'flowId' | 'approverUserName'>[];
 }
 export type UpdateApprovalFlowInput = CreateApprovalFlowInput;
+
+export interface ApprovalInstance {
+  id: string;
+  companyId: string;
+  flowId: string;
+  entityType: FlowEntityType;
+  entityId: string;
+  requesterId: string;
+  currentStepId?: string;
+  currentStepOrder?: number;
+  currentStepName?: string;
+  currentApproverRole?: string;
+  currentApproverUserId?: string;
+  status: ApprovalInstanceStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApprovalDecision {
+  id: string;
+  instanceId: string;
+  stepId: string;
+  stepOrder: number;
+  approverId: string;
+  approverName?: string;
+  stepName?: string;
+  decision: ApprovalDecisionStatus;
+  note?: string;
+  decidedAt: string;
+  createdAt: string;
+}
 
 // ===== Import Pipeline =====
 export type ImportStatus = 'uploaded' | 'validating' | 'validated' | 'normalization_in_progress' | 'normalization_complete' | 'publish_in_progress' | 'published' | 'failed';

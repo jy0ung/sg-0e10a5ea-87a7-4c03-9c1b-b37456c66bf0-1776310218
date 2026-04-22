@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
+import type { Employee } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import type { BranchRecord } from '@/types';
 import { PermissionEditor } from '@/components/admin/PermissionEditor';
@@ -20,6 +21,7 @@ import { userUpdateSchema, inviteUserSchema, type UserUpdateFormData, type Invit
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
+import { listEmployeeDirectory } from '@/services/hrmsService';
 
 const ROLES: { value: AppRole; label: string }[] = [
   { value: 'super_admin', label: 'Super Admin' },
@@ -60,8 +62,10 @@ export default function UserManagement() {
   const [copied, setCopied] = useState(false);
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [activating, setActivating] = useState<string>('');
+  const [employeesByCompany, setEmployeesByCompany] = useState<Record<string, Employee[]>>({});
+  const [supportsEmployeeLinking, setSupportsEmployeeLinking] = useState(false);
   const [pendingSelections, setPendingSelections] = useState<
-    Record<string, { role: AppRole; company_id: string }>
+    Record<string, { role: AppRole; company_id: string; employee_id: string | null }>
   >({});
 
   const editForm = useForm<UserUpdateFormData>({
@@ -71,6 +75,7 @@ export default function UserManagement() {
       role: 'analyst',
       access_scope: 'company',
       branch_id: null,
+      employee_id: null,
     },
     mode: 'onChange',
   });
@@ -83,6 +88,7 @@ export default function UserManagement() {
       email: '',
       name: '',
       role: 'analyst',
+      employee_id: null,
     },
     mode: 'onChange',
   });
@@ -98,8 +104,32 @@ export default function UserManagement() {
         toast.error('Failed to load users: ' + profileRes.error);
       }
       setProfiles(profileRes.data);
+      setSupportsEmployeeLinking(profileRes.supportsEmployeeLinking);
       setBranches(branchRes.data);
       setCompanies((companyRes.data as { id: string; name: string }[] | null) ?? []);
+
+      if (profileRes.supportsEmployeeLinking) {
+        const companyIds = [...new Set(
+          profileRes.data
+            .map(profile => profile.company_id)
+            .concat(user?.company_id ?? null)
+            .filter((companyId): companyId is string => Boolean(companyId)),
+        )];
+
+        const employeeResults = await Promise.all(companyIds.map(async (companyId) => ({
+          companyId,
+          result: await listEmployeeDirectory(companyId),
+        })));
+
+        const nextEmployeesByCompany: Record<string, Employee[]> = {};
+        for (const { companyId, result } of employeeResults) {
+          if (!result.error) nextEmployeesByCompany[companyId] = result.data;
+        }
+        setEmployeesByCompany(nextEmployeesByCompany);
+      } else {
+        setEmployeesByCompany({});
+      }
+
       setLoading(false);
     }
     load();
@@ -115,8 +145,30 @@ export default function UserManagement() {
       role: p.role as UserUpdateFormData['role'],
       access_scope: p.access_scope as UserUpdateFormData['access_scope'],
       branch_id: p.branch_id,
+      employee_id: p.employee_id ?? null,
     });
   };
+
+  const linkedEmployeeProfileIdByEmployeeId = new Map<string, string>();
+  for (const profile of profiles) {
+    if (profile.employee_id) linkedEmployeeProfileIdByEmployeeId.set(profile.employee_id, profile.id);
+  }
+
+  function getEmployeeOptions(companyId: string | null | undefined, currentProfileId?: string) {
+    if (!companyId) return [];
+    return (employeesByCompany[companyId] ?? []).filter(employee => {
+      const linkedProfileId = linkedEmployeeProfileIdByEmployeeId.get(employee.id);
+      return !linkedProfileId || linkedProfileId === currentProfileId;
+    });
+  }
+
+  function getEmployeeLabel(profile: ProfileRow) {
+    if (!supportsEmployeeLinking) return 'Unavailable';
+    if (!profile.employee_id || !profile.company_id) return 'Unlinked';
+    const employee = (employeesByCompany[profile.company_id] ?? []).find(row => row.id === profile.employee_id);
+    if (!employee) return profile.employee_id;
+    return employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name;
+  }
 
   const openPermissions = (p: ProfileRow) => {
     setPermissionUserId(p.id);
@@ -134,12 +186,20 @@ export default function UserManagement() {
       role: data.role,
       access_scope: data.access_scope,
       branch_id: data.branch_id,
+      employee_id: data.employee_id,
     });
     if (error) {
       toast.error('Failed to update user: ' + error);
     } else {
       toast.success('User updated successfully');
-      setProfiles(prev => prev.map(p => p.id === editUser.id ? { ...p, role: data.role, access_scope: data.access_scope, branch_id: data.branch_id } : p));
+      setProfiles(prev => prev.map(p => p.id === editUser.id ? {
+        ...p,
+        name: data.name,
+        role: data.role,
+        access_scope: data.access_scope,
+        branch_id: data.branch_id,
+        employee_id: data.employee_id ?? null,
+      } : p));
       setEditUser(null);
     }
     setSaving(false);
@@ -169,6 +229,7 @@ export default function UserManagement() {
       name: data.name,
       role: data.role,
       companyId: user?.company_id || '',
+      employeeId: data.employee_id,
     });
     setInviting(false);
     if (error) {
@@ -181,6 +242,7 @@ export default function UserManagement() {
     const refreshed = await listProfiles();
     if (!refreshed.error) {
       setProfiles(refreshed.data);
+      setSupportsEmployeeLinking(refreshed.supportsEmployeeLinking);
     }
   };
 
@@ -197,6 +259,7 @@ export default function UserManagement() {
       company_id:
         current?.company_id
         ?? (p.company_id || (hasRole(['super_admin']) ? (companies[0]?.id ?? '') : (user?.company_id ?? ''))),
+      employee_id: current?.employee_id ?? (p.employee_id ?? null),
     };
   };
 
@@ -205,6 +268,9 @@ export default function UserManagement() {
   };
   const setPendingCompany = (id: string, company_id: string) => {
     setPendingSelections(prev => ({ ...prev, [id]: { ...getPendingSelection({ id } as ProfileRow), ...prev[id], company_id } }));
+  };
+  const setPendingEmployee = (id: string, employee_id: string | null) => {
+    setPendingSelections(prev => ({ ...prev, [id]: { ...getPendingSelection({ id } as ProfileRow), ...prev[id], employee_id } }));
   };
 
   const handleActivate = async (p: ProfileRow) => {
@@ -219,6 +285,7 @@ export default function UserManagement() {
       role: sel.role,
       company_id: sel.company_id,
       access_scope: (ROLE_DEFAULT_SCOPE[sel.role] || 'company') as AccessScope,
+      employee_id: supportsEmployeeLinking ? sel.employee_id : undefined,
       status: 'active',
     });
     setActivating('');
@@ -228,7 +295,10 @@ export default function UserManagement() {
     }
     toast.success(`${p.email} activated`);
     const refreshed = await listProfiles();
-    if (!refreshed.error) setProfiles(refreshed.data);
+    if (!refreshed.error) {
+      setProfiles(refreshed.data);
+      setSupportsEmployeeLinking(refreshed.supportsEmployeeLinking);
+    }
     setPendingSelections(prev => {
       const { [p.id]: _removed, ...rest } = prev;
       return rest;
@@ -278,6 +348,7 @@ export default function UserManagement() {
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Name</th>
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Role</th>
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Company</th>
+                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Employee</th>
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium w-32"></th>
               </tr>
             </thead>
@@ -308,6 +379,23 @@ export default function UserManagement() {
                         </SelectContent>
                       </Select>
                     </td>
+                    <td className="px-4 py-2">
+                      {supportsEmployeeLinking ? (
+                        <Select value={sel.employee_id ?? 'none'} onValueChange={(v) => setPendingEmployee(p.id, v === 'none' ? null : v)}>
+                          <SelectTrigger className="h-8"><SelectValue placeholder="Link employee" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No employee link</SelectItem>
+                            {getEmployeeOptions(sel.company_id, p.id).map(employee => (
+                              <SelectItem key={employee.id} value={employee.id}>
+                                {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Unavailable</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2 text-right">
                       <Button
                         size="sm"
@@ -330,6 +418,7 @@ export default function UserManagement() {
             <tr className="border-b border-border bg-secondary/30 text-left">
               <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Name</th>
               <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Email</th>
+              <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Employee</th>
               <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Role</th>
               <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Access Scope</th>
               <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Branch</th>
@@ -339,7 +428,7 @@ export default function UserManagement() {
           <tbody>
             {activeUsers.length === 0 && (
               <tr>
-                <td colSpan={canManage ? 6 : 5} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={canManage ? 7 : 6} className="px-4 py-10 text-center text-muted-foreground">
                   No users found.
                 </td>
               </tr>
@@ -353,6 +442,7 @@ export default function UserManagement() {
                   {p.name}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground text-xs">{p.email}</td>
+                <td className="px-4 py-3 text-muted-foreground text-xs">{getEmployeeLabel(p)}</td>
                 <td className="px-4 py-3">
                   <span className="flex items-center gap-1 text-foreground capitalize">
                     <Shield className="h-3 w-3 text-primary" />
@@ -439,6 +529,28 @@ export default function UserManagement() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Linked Employee</Label>
+              {supportsEmployeeLinking ? (
+                <Select
+                  value={editForm.watch('employee_id') ?? 'none'}
+                  onValueChange={(v) => editForm.setValue('employee_id', v === 'none' ? null : v, { shouldDirty: true, shouldValidate: true })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No employee link</SelectItem>
+                    {getEmployeeOptions(editUser?.company_id, editUser?.id).map(employee => (
+                      <SelectItem key={employee.id} value={employee.id}>
+                        {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-xs text-muted-foreground">Apply the workforce migration to enable employee linking.</p>
+              )}
             </div>
 
             <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
@@ -547,6 +659,28 @@ export default function UserManagement() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Linked Employee</Label>
+                  {supportsEmployeeLinking ? (
+                    <Select
+                      value={inviteForm.watch('employee_id') ?? 'none'}
+                      onValueChange={(v) => inviteForm.setValue('employee_id', v === 'none' ? null : v, { shouldDirty: true, shouldValidate: true })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No employee link</SelectItem>
+                        {getEmployeeOptions(user?.company_id).map(employee => (
+                          <SelectItem key={employee.id} value={employee.id}>
+                            {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Apply the workforce migration to link invited users to employees.</p>
+                  )}
                 </div>
 
                 <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">

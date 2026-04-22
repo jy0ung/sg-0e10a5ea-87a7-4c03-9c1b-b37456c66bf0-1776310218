@@ -49,6 +49,7 @@ const mockProfile = {
   branch_id: null,
   avatar_url: null,
   access_scope: 'company' as const,
+  employee_id: null,
 };
 
 describe('AuthContext', () => {
@@ -93,7 +94,25 @@ describe('AuthContext', () => {
 
       expect(result.current.user).toBeTruthy();
       expect(result.current.user?.name).toBe('Admin User');
+      expect(result.current.user?.companyId).toBe('comp-1');
       expect(result.current.isAuthenticated).toBe(true);
+    });
+
+    it('maps the linked employee id onto the auth user', async () => {
+      const session = { user: { id: 'user-1' } };
+      mockGetSession.mockResolvedValue({ data: { session } });
+      mockFromSelect.mockResolvedValue({
+        data: { ...mockProfile, employee_id: 'emp-1' },
+        error: null,
+      });
+
+      const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        expect(result.current.isAuthenticated).toBe(true);
+      });
+
+      expect(result.current.user?.employeeId).toBe('emp-1');
     });
   });
 

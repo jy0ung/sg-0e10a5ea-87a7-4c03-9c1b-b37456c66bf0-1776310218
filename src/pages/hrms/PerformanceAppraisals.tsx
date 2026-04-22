@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
@@ -16,10 +17,20 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { listAppraisals, createAppraisal, listAppraisalItems } from '@/services/hrmsService';
+import {
+  listAppraisals,
+  createAppraisal,
+  listAppraisalItems,
+  reviewAppraisalActivation,
+  resubmitAppraisalActivation,
+  submitAppraisalSelfReview,
+  reviewAppraisalItem,
+  acknowledgeAppraisalItem,
+} from '@/services/hrmsService';
 import type { Appraisal, AppraisalItem, AppraisalCycle, AppraisalStatus } from '@/types';
-import { Plus, Eye, Star } from 'lucide-react';
+import { Plus, Eye, Star, CheckCircle2, ChevronDown, ChevronUp, Clock, RotateCcw, XCircle } from 'lucide-react';
 import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
+import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
 
 const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 
@@ -48,24 +59,45 @@ function StarRating({ rating }: { rating?: number }) {
   );
 }
 
+type AppraisalItemAction = 'self_review' | 'manager_review' | 'acknowledge';
+
+type AppraisalItemActionState = {
+  item: AppraisalItem;
+  action: AppraisalItemAction;
+} | null;
+
 export default function PerformanceAppraisals() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
+  const selfServiceEmployeeId = user?.employeeId ?? user?.id;
 
   const [appraisals, setAppraisals] = useState<Appraisal[]>([]);
-  const [items, setItems]           = useState<AppraisalItem[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [viewId, setViewId]         = useState<string | null>(null);
+  const [items, setItems] = useState<AppraisalItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewId, setViewId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm]             = useState({
+  const [reviewingAppraisalId, setReviewingAppraisalId] = useState<string | null>(null);
+  const [reviewAction, setReviewAction] = useState<'approved' | 'rejected'>('approved');
+  const [reviewNote, setReviewNote] = useState('');
+  const [itemActionTarget, setItemActionTarget] = useState<AppraisalItemActionState>(null);
+  const [itemForm, setItemForm] = useState({
+    goals: '',
+    achievements: '',
+    areasToImprove: '',
+    reviewerComments: '',
+    employeeComments: '',
+    rating: '3',
+  });
+  const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
+  const [form, setForm] = useState({
     title: '', cycle: 'annual' as AppraisalCycle, periodStart: '', periodEnd: '',
   });
 
   const load = useCallback(async () => {
     if (!user?.companyId) return;
     setLoading(true);
-    const res = await listAppraisals(user.companyId);
+    const res = await listAppraisals(user.companyId, { includeApprovalHistory: true });
     setAppraisals(res.data);
     setLoading(false);
     if (res.error) toast({ title: 'Error', description: res.error, variant: 'destructive' });
@@ -73,22 +105,180 @@ export default function PerformanceAppraisals() {
 
   useEffect(() => { load(); }, [load]);
 
+  function matchesCurrentEmployee(subjectId?: string): boolean {
+    if (!subjectId || !user?.id) return false;
+    return subjectId === user.id || subjectId === selfServiceEmployeeId;
+  }
+
+  function canReviewAppraisal(appraisal: Appraisal): boolean {
+    if (!isManager || !user || appraisal.status !== 'in_progress' || appraisal.approvalInstanceStatus !== 'pending') return false;
+    if (appraisal.currentApproverUserId) return appraisal.currentApproverUserId === user.id;
+    if (appraisal.currentApproverRole) return appraisal.currentApproverRole === user.role;
+    return false;
+  }
+
+  function canResubmitAppraisal(appraisal: Appraisal): boolean {
+    return Boolean(
+      isManager
+      && user
+      && appraisal.status === 'in_progress'
+      && appraisal.approvalInstanceStatus === 'rejected'
+      && appraisal.createdBy === user.id,
+    );
+  }
+
+  function toggleHistory(appraisalId: string) {
+    setExpandedHistory(prev => ({ ...prev, [appraisalId]: !prev[appraisalId] }));
+  }
+
+  function formatTimelineTimestamp(value?: string) {
+    if (!value) return 'Pending';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString('en-MY', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!user?.companyId || !user.id) return;
     const { error } = await createAppraisal(user.companyId, form, user.id);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: 'Appraisal cycle created' });
+    notifyApprovalInboxChanged();
     setShowCreate(false);
     setForm({ title: '', cycle: 'annual', periodStart: '', periodEnd: '' });
     load();
   }
 
+  async function handleReview() {
+    if (!reviewingAppraisalId || !user?.id) return;
+    const { error } = await reviewAppraisalActivation(reviewingAppraisalId, user.id, reviewAction, reviewNote);
+    if (error) {
+      toast({ title: 'Error', description: error, variant: 'destructive' });
+      return;
+    }
+    toast({ title: `Appraisal activation ${reviewAction}` });
+    notifyApprovalInboxChanged();
+    setReviewingAppraisalId(null);
+    setReviewNote('');
+    await load();
+  }
+
+  async function handleResubmit(appraisalId: string) {
+    if (!user?.id) return;
+    const { error } = await resubmitAppraisalActivation(appraisalId, user.id);
+    if (error) {
+      toast({ title: 'Error', description: error, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Appraisal activation resubmitted' });
+    notifyApprovalInboxChanged();
+    await load();
+  }
+
   async function handleView(id: string) {
     const { data, error } = await listAppraisalItems(id);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
-    setItems(data);
+    setItems(
+      isManager || !user?.id
+        ? data
+        : data.filter(item => matchesCurrentEmployee(item.employeeId) || item.reviewerId === user.id),
+    );
     setViewId(id);
+  }
+
+  function resetItemAction() {
+    setItemActionTarget(null);
+    setItemForm({
+      goals: '',
+      achievements: '',
+      areasToImprove: '',
+      reviewerComments: '',
+      employeeComments: '',
+      rating: '3',
+    });
+  }
+
+  function openItemAction(item: AppraisalItem, action: AppraisalItemAction) {
+    setItemActionTarget({ item, action });
+    setItemForm({
+      goals: item.goals ?? '',
+      achievements: item.achievements ?? '',
+      areasToImprove: item.areasToImprove ?? '',
+      reviewerComments: item.reviewerComments ?? '',
+      employeeComments: item.employeeComments ?? '',
+      rating: item.rating ? String(item.rating) : '3',
+    });
+  }
+
+  function canSelfReviewItem(item: AppraisalItem): boolean {
+    return Boolean(
+      selfServiceEmployeeId
+      && viewingAppraisal?.status === 'open'
+      && matchesCurrentEmployee(item.employeeId)
+      && ['pending', 'self_reviewed'].includes(item.status),
+    );
+  }
+
+  function canManagerReviewItem(item: AppraisalItem): boolean {
+    return Boolean(
+      isManager
+      && user?.id
+      && viewingAppraisal?.status === 'open'
+      && item.reviewerId === user.id
+      && ['self_reviewed', 'reviewed'].includes(item.status),
+    );
+  }
+
+  function canAcknowledgeItem(item: AppraisalItem): boolean {
+    return Boolean(
+      selfServiceEmployeeId
+      && viewingAppraisal?.status === 'open'
+      && matchesCurrentEmployee(item.employeeId)
+      && item.status === 'reviewed',
+    );
+  }
+
+  async function handleItemAction() {
+    if (!itemActionTarget || !user?.id) return;
+
+    const employeeActorId = selfServiceEmployeeId ?? user.id;
+
+    const result = itemActionTarget.action === 'self_review'
+      ? await submitAppraisalSelfReview(itemActionTarget.item.id, employeeActorId, {
+        goals: itemForm.goals,
+        achievements: itemForm.achievements,
+        areasToImprove: itemForm.areasToImprove,
+        employeeComments: itemForm.employeeComments,
+      })
+      : itemActionTarget.action === 'manager_review'
+        ? await reviewAppraisalItem(itemActionTarget.item.id, user.id, {
+          rating: Number(itemForm.rating),
+          reviewerComments: itemForm.reviewerComments,
+        })
+        : await acknowledgeAppraisalItem(itemActionTarget.item.id, employeeActorId, itemForm.employeeComments);
+
+    if (result.error) {
+      toast({ title: 'Error', description: result.error, variant: 'destructive' });
+      return;
+    }
+
+    toast({
+      title: itemActionTarget.action === 'self_review'
+        ? 'Self review submitted'
+        : itemActionTarget.action === 'manager_review'
+          ? 'Manager review submitted'
+          : 'Appraisal acknowledged',
+    });
+    resetItemAction();
+    await load();
+    if (viewId) await handleView(viewId);
   }
 
   const viewingAppraisal = appraisals.find(a => a.id === viewId);
@@ -97,7 +287,7 @@ export default function PerformanceAppraisals() {
     <div className="p-6 space-y-6">
       <PageHeader
         title="Performance Appraisals"
-        description="Manage employee performance reviews"
+        description="Manage appraisal cycles, self reviews, and manager feedback"
         breadcrumbs={[{ label: 'HRMS' }, { label: 'Appraisals' }]}
         actions={
           isManager ? (
@@ -131,10 +321,101 @@ export default function PerformanceAppraisals() {
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0">
+              <CardContent className="pt-0 flex items-center gap-2 flex-wrap">
                 <Button size="sm" variant="outline" onClick={() => handleView(a.id)}>
                   <Eye className="h-3.5 w-3.5 mr-1" /> View Reviews
                 </Button>
+                {a.status === 'in_progress' && a.approvalInstanceStatus === 'pending' && (
+                  <span className="text-xs text-muted-foreground">
+                    Current step: {a.currentApprovalStepName ?? 'Activation pending'}
+                  </span>
+                )}
+                {a.status === 'in_progress' && a.approvalInstanceStatus === 'rejected' && (
+                  <span className="text-xs text-red-600">Activation was rejected.</span>
+                )}
+                {canReviewAppraisal(a) && (
+                  <span className="text-xs font-medium text-primary">Assigned to you</span>
+                )}
+                {(a.approvalInstanceId || a.approvalHistory?.length) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => toggleHistory(a.id)}
+                  >
+                    {expandedHistory[a.id] ? <ChevronUp className="h-3.5 w-3.5 mr-1" /> : <ChevronDown className="h-3.5 w-3.5 mr-1" />}
+                    {expandedHistory[a.id] ? 'Hide Timeline' : 'Show Timeline'}
+                  </Button>
+                )}
+                {canResubmitAppraisal(a) && (
+                  <Button size="sm" variant="outline" className="text-amber-700 border-amber-300" onClick={() => handleResubmit(a.id)}>
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" /> Resubmit Activation
+                  </Button>
+                )}
+                {canReviewAppraisal(a) && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-blue-700 border-blue-300"
+                      onClick={() => { setReviewingAppraisalId(a.id); setReviewAction('approved'); }}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve Activation
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-700 border-red-300"
+                      onClick={() => { setReviewingAppraisalId(a.id); setReviewAction('rejected'); }}
+                    >
+                      <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                    </Button>
+                  </>
+                )}
+                {expandedHistory[a.id] && (
+                  <div className="w-full mt-1 space-y-3 border-l border-border pl-4">
+                    {a.approvalHistory?.map(decision => {
+                      const decisionApproved = decision.decision === 'approved';
+                      return (
+                        <div key={decision.id} className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            {decisionApproved ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            ) : (
+                              <XCircle className="h-4 w-4 text-red-600" />
+                            )}
+                            <span>{decision.stepName ?? `Step ${decision.stepOrder}`}</span>
+                            <span className={decisionApproved ? 'text-green-700' : 'text-red-700'}>
+                              {decision.decision}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {decision.approverName ?? 'Unknown approver'} · {formatTimelineTimestamp(decision.decidedAt)}
+                          </p>
+                          {decision.note && (
+                            <p className="text-sm text-muted-foreground">{decision.note}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {a.approvalInstanceStatus === 'pending' && (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>{a.currentApprovalStepName ?? 'Awaiting review'}</span>
+                          <span>pending</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Waiting for {a.currentApproverRole ? a.currentApproverRole.replace(/_/g, ' ') : 'assigned approver'}
+                        </p>
+                      </div>
+                    )}
+                    {!a.approvalHistory?.length && a.approvalInstanceStatus !== 'pending' && (
+                      <p className="text-sm text-muted-foreground">No approval decisions recorded.</p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -192,13 +473,15 @@ export default function PerformanceAppraisals() {
                 <TableHead>Reviewer</TableHead>
                 <TableHead>Rating</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Notes</TableHead>
                 <TableHead>Reviewed At</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground h-20">No reviews assigned</TableCell>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground h-20">No reviews assigned</TableCell>
                 </TableRow>
               ) : items.map(item => (
                 <TableRow key={item.id}>
@@ -210,11 +493,146 @@ export default function PerformanceAppraisals() {
                       {item.status.replace('_', ' ')}
                     </Badge>
                   </TableCell>
+                  <TableCell className="max-w-xs text-xs text-muted-foreground align-top">
+                    <div className="space-y-1 whitespace-normal">
+                      {item.goals && <p>Goals: {item.goals}</p>}
+                      {item.achievements && <p>Achievements: {item.achievements}</p>}
+                      {item.areasToImprove && <p>Improve: {item.areasToImprove}</p>}
+                      {item.reviewerComments && <p>Manager: {item.reviewerComments}</p>}
+                      {item.employeeComments && <p>Employee: {item.employeeComments}</p>}
+                      {!item.goals && !item.achievements && !item.areasToImprove && !item.reviewerComments && !item.employeeComments && '—'}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-muted-foreground text-xs">{item.reviewedAt ? item.reviewedAt.slice(0, 10) : '—'}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2 flex-wrap">
+                      {canSelfReviewItem(item) && (
+                        <Button size="sm" variant="outline" onClick={() => openItemAction(item, 'self_review')}>
+                          Self Review
+                        </Button>
+                      )}
+                      {canManagerReviewItem(item) && (
+                        <Button size="sm" variant="outline" onClick={() => openItemAction(item, 'manager_review')}>
+                          Manager Review
+                        </Button>
+                      )}
+                      {canAcknowledgeItem(item) && (
+                        <Button size="sm" variant="outline" onClick={() => openItemAction(item, 'acknowledge')}>
+                          Acknowledge
+                        </Button>
+                      )}
+                      {!canSelfReviewItem(item) && !canManagerReviewItem(item) && !canAcknowledgeItem(item) && (
+                        <span className="text-xs text-muted-foreground">No action</span>
+                      )}
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!itemActionTarget} onOpenChange={open => { if (!open) resetItemAction(); }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              {itemActionTarget?.action === 'self_review'
+                ? 'Submit Self Review'
+                : itemActionTarget?.action === 'manager_review'
+                  ? 'Submit Manager Review'
+                  : 'Acknowledge Review'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {itemActionTarget?.action === 'self_review' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Goals</Label>
+                <Textarea value={itemForm.goals} onChange={e => setItemForm(f => ({ ...f, goals: e.target.value }))} rows={3} />
+              </div>
+              <div className="space-y-2">
+                <Label>Achievements</Label>
+                <Textarea value={itemForm.achievements} onChange={e => setItemForm(f => ({ ...f, achievements: e.target.value }))} rows={3} />
+              </div>
+              <div className="space-y-2">
+                <Label>Areas To Improve</Label>
+                <Textarea value={itemForm.areasToImprove} onChange={e => setItemForm(f => ({ ...f, areasToImprove: e.target.value }))} rows={3} />
+              </div>
+              <div className="space-y-2">
+                <Label>Employee Comments</Label>
+                <Textarea value={itemForm.employeeComments} onChange={e => setItemForm(f => ({ ...f, employeeComments: e.target.value }))} rows={3} />
+              </div>
+            </div>
+          )}
+
+          {itemActionTarget?.action === 'manager_review' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Rating</Label>
+                <Select value={itemForm.rating} onValueChange={value => setItemForm(f => ({ ...f, rating: value }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5].map(value => (
+                      <SelectItem key={value} value={String(value)}>{value} / 5</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Reviewer Comments</Label>
+                <Textarea value={itemForm.reviewerComments} onChange={e => setItemForm(f => ({ ...f, reviewerComments: e.target.value }))} rows={4} />
+              </div>
+            </div>
+          )}
+
+          {itemActionTarget?.action === 'acknowledge' && (
+            <div className="space-y-4">
+              {itemActionTarget.item.reviewerComments && (
+                <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+                  {itemActionTarget.item.reviewerComments}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label>Employee Comments</Label>
+                <Textarea value={itemForm.employeeComments} onChange={e => setItemForm(f => ({ ...f, employeeComments: e.target.value }))} rows={4} />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={resetItemAction}>Cancel</Button>
+            <Button onClick={handleItemAction}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!reviewingAppraisalId} onOpenChange={v => {
+        if (!v) {
+          setReviewingAppraisalId(null);
+          setReviewNote('');
+        }
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle className="capitalize">{reviewAction} Appraisal Activation</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <label className="text-sm font-medium">Note (optional)</label>
+            <Textarea
+              value={reviewNote}
+              onChange={e => setReviewNote(e.target.value)}
+              rows={3}
+              placeholder="Add a note for the cycle owner..."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReviewingAppraisalId(null)}>Cancel</Button>
+            <Button
+              onClick={handleReview}
+              className={reviewAction === 'approved' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}
+            >
+              Confirm {reviewAction}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

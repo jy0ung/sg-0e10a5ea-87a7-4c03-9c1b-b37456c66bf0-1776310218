@@ -31,7 +31,7 @@ import {
   listAllLeaveTypes, createLeaveType, updateLeaveType, deleteLeaveType,
   listHolidays, createHoliday, updateHoliday, deleteHoliday,
 } from '@/services/hrmsAdminService';
-import { listEmployees } from '@/services/hrmsService';
+import { listEmployeeDirectory } from '@/services/hrmsService';
 import type {
   Department, CreateDepartmentInput,
   JobTitle, CreateJobTitleInput, JobTitleLevel,
@@ -102,7 +102,7 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
     setLoading(true);
     const [depts, emps] = await Promise.all([
       listDepartments(companyId),
-      listEmployees(companyId),
+      listEmployeeDirectory(companyId),
     ]);
     if (!depts.error) setRows(depts.data);
     if (!emps.error) setEmployees(emps.data.map(e => ({ id: e.id, name: e.name })));

@@ -19,13 +19,159 @@ function calcDays(startDate: string, endDate: string): number {
   return Math.max(1, Math.round(ms / 86_400_000) + 1);
 }
 
+function isMissingWorkforceSchemaError(message: string | null | undefined): boolean {
+  const text = (message ?? '').toLowerCase();
+  return [
+    'relation "employees" does not exist',
+    'column profiles.employee_id does not exist',
+    'could not find the table',
+    'could not find a relationship',
+  ].some(fragment => text.includes(fragment));
+}
+
+function isLegacyEmployeeOwnershipWriteError(message: string | null | undefined): boolean {
+  const text = (message ?? '').toLowerCase();
+  return [
+    'violates foreign key constraint',
+    'violates row-level security policy',
+    'new row violates row-level security policy',
+  ].some(fragment => text.includes(fragment));
+}
+
+async function resolveLegacyProfileEmployeeId(employeeId: string): Promise<string> {
+  if (!employeeId) return employeeId;
+
+  const { data: directProfile, error: directError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', employeeId)
+    .maybeSingle();
+  if (directError) throw new Error(directError.message);
+  if (directProfile?.id) return String(directProfile.id);
+
+  const { data: linkedProfile, error: linkedError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('employee_id', employeeId)
+    .maybeSingle();
+  if (linkedError) {
+    if (isMissingWorkforceSchemaError(linkedError.message)) return employeeId;
+    throw new Error(linkedError.message);
+  }
+
+  return linkedProfile?.id ? String(linkedProfile.id) : employeeId;
+}
+
+async function resolveEmployeeOwnershipCandidateIds(employeeId: string): Promise<string[]> {
+  const profileId = await resolveLegacyProfileEmployeeId(employeeId);
+  return [...new Set([employeeId, profileId].filter(Boolean))];
+}
+
+type ApprovalBootstrapStep = {
+  id: string;
+  stepOrder: number;
+  name: string;
+  approverType: 'role' | 'specific_user' | 'direct_manager';
+  approverRole?: string;
+  approverUserId?: string;
+};
+
+function rowToApprovalBootstrapStep(row: Record<string, unknown>): ApprovalBootstrapStep {
+  return {
+    id: String(row.id ?? ''),
+    stepOrder: Number(row.step_order ?? 0),
+    name: String(row.name ?? ''),
+    approverType: (row.approver_type as ApprovalBootstrapStep['approverType']) ?? 'role',
+    approverRole: row.approver_role ? String(row.approver_role) : undefined,
+    approverUserId: row.approver_user_id ? String(row.approver_user_id) : undefined,
+  };
+}
+
+async function resolveStepRouting(
+  step: ApprovalBootstrapStep,
+  requesterId: string,
+): Promise<{ approverRole: string | null; approverUserId: string | null }> {
+  if (step.approverType === 'role') {
+    if (!step.approverRole) throw new Error(`Approval step '${step.name}' is missing an approver role.`);
+    return { approverRole: step.approverRole, approverUserId: null };
+  }
+
+  if (step.approverType === 'specific_user') {
+    if (!step.approverUserId) throw new Error(`Approval step '${step.name}' is missing a specific approver.`);
+    return { approverRole: null, approverUserId: step.approverUserId };
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('manager_id')
+    .eq('id', requesterId)
+    .single();
+  if (error) throw new Error(error.message);
+
+  const managerId = (data as Record<string, unknown> | null)?.manager_id;
+  if (!managerId) {
+    throw new Error('The requester does not have a reporting manager assigned for the active approval flow.');
+  }
+
+  return { approverRole: null, approverUserId: String(managerId) };
+}
+
+async function bootstrapLeaveApprovalInstance(
+  companyId: string,
+  leaveRequestId: string,
+  requesterId: string,
+): Promise<void> {
+  const { data: flows, error: flowError } = await supabase
+    .from('approval_flows')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('entity_type', 'leave_request')
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false })
+    .limit(2);
+  if (flowError) throw new Error(flowError.message);
+  if (!flows?.length) return;
+  if (flows.length > 1) {
+    throw new Error('Multiple active leave approval flows found. Deactivate extras before accepting new requests.');
+  }
+
+  const flowId = String(flows[0].id);
+  const { data: steps, error: stepError } = await supabase
+    .from('approval_steps')
+    .select('id, step_order, name, approver_type, approver_role, approver_user_id')
+    .eq('flow_id', flowId)
+    .order('step_order');
+  if (stepError) throw new Error(stepError.message);
+  if (!steps?.length) throw new Error('The active leave approval flow has no steps configured.');
+
+  const firstStep = rowToApprovalBootstrapStep(steps[0] as Record<string, unknown>);
+  const routing = await resolveStepRouting(firstStep, requesterId);
+
+  const { error: instanceError } = await supabase.from('approval_instances').insert({
+    company_id: companyId,
+    flow_id: flowId,
+    entity_type: 'leave_request',
+    entity_id: leaveRequestId,
+    requester_id: requesterId,
+    current_step_id: firstStep.id,
+    current_step_order: firstStep.stepOrder,
+    current_step_name: firstStep.name,
+    current_approver_role: routing.approverRole,
+    current_approver_user_id: routing.approverUserId,
+    status: 'pending',
+  });
+  if (instanceError) throw new Error(instanceError.message);
+}
+
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 export async function updateContactNo(profileId: string, contactNo: string): Promise<void> {
+  const resolvedProfileId = await resolveLegacyProfileEmployeeId(profileId);
+
   const { error } = await supabase
     .from('profiles')
     .update({ contact_no: contactNo })
-    .eq('id', profileId);
+    .eq('id', resolvedProfileId);
   if (error) throw new Error(error.message);
 }
 
@@ -58,19 +204,23 @@ export async function getMyLeaveRequests(
   employeeId: string,
   companyId: string,
 ): Promise<LeaveRequest[]> {
-  const { data, error } = await supabase
+  const employeeOwnerIds = await resolveEmployeeOwnershipCandidateIds(employeeId);
+
+  let query = supabase
     .from('leave_requests')
-    .select('*, profiles(name), leave_types(name)')
+    .select('*, leave_types(name)')
     .eq('company_id', companyId)
-    .eq('employee_id', employeeId)
     .order('created_at', { ascending: false });
+  query = employeeOwnerIds.length > 1
+    ? query.in('employee_id', employeeOwnerIds)
+    : query.eq('employee_id', employeeOwnerIds[0]);
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []).map((r: Record<string, unknown>) => ({
     id:            String(r.id),
     companyId:     String(r.company_id),
     employeeId:    String(r.employee_id),
-    employeeName:  (r.profiles as Record<string, unknown> | null)?.name
-                     ? String((r.profiles as Record<string, unknown>).name) : undefined,
     leaveTypeId:   String(r.leave_type_id),
     leaveTypeName: (r.leave_types as Record<string, unknown> | null)?.name
                      ? String((r.leave_types as Record<string, unknown>).name) : undefined,
@@ -91,26 +241,69 @@ export async function createLeaveRequest(
   employeeId: string,
   companyId: string,
   payload: CreateLeaveRequestFormData,
-): Promise<void> {
-  const { error } = await supabase.from('leave_requests').insert({
-    company_id:    companyId,
-    employee_id:   employeeId,
-    leave_type_id: payload.leaveTypeId,
-    start_date:    payload.startDate,
-    end_date:      payload.endDate,
-    days:          calcDays(payload.startDate, payload.endDate),
-    reason:        payload.reason ?? null,
-    status:        'pending',
-  });
-  if (error) throw new Error(error.message);
+): Promise<string> {
+  const requesterProfileId = await resolveLegacyProfileEmployeeId(employeeId);
+
+  const insertLeaveRequest = async (storedEmployeeId: string): Promise<string> => {
+    const { data, error } = await supabase.from('leave_requests').insert({
+      company_id:    companyId,
+      employee_id:   storedEmployeeId,
+      leave_type_id: payload.leaveTypeId,
+      start_date:    payload.startDate,
+      end_date:      payload.endDate,
+      days:          calcDays(payload.startDate, payload.endDate),
+      reason:        payload.reason ?? null,
+      status:        'pending',
+    }).select('id').single();
+    if (error) throw new Error(error.message);
+
+    const leaveRequestId = String((data as Record<string, unknown> | null)?.id ?? '');
+    if (!leaveRequestId) throw new Error('Failed to create leave request. Missing identifier.');
+    return leaveRequestId;
+  };
+
+  let leaveRequestId: string;
+  try {
+    leaveRequestId = await insertLeaveRequest(employeeId);
+  } catch (error) {
+    if (!(error instanceof Error) || requesterProfileId === employeeId || !isLegacyEmployeeOwnershipWriteError(error.message)) {
+      throw error;
+    }
+    leaveRequestId = await insertLeaveRequest(requesterProfileId);
+  }
+
+  try {
+    await bootstrapLeaveApprovalInstance(companyId, leaveRequestId, requesterProfileId);
+  } catch (workflowError) {
+    await supabase.from('leave_requests').delete().eq('id', leaveRequestId);
+    throw workflowError;
+  }
+
+  return leaveRequestId;
 }
 
 export async function cancelLeaveRequest(requestId: string): Promise<void> {
+  const updatedAt = new Date().toISOString();
   const { error } = await supabase
     .from('leave_requests')
-    .update({ status: 'cancelled' })
+    .update({ status: 'cancelled', updated_at: updatedAt })
     .eq('id', requestId);
   if (error) throw new Error(error.message);
+
+  const { error: workflowError } = await supabase
+    .from('approval_instances')
+    .update({
+      status: 'cancelled',
+      current_step_id: null,
+      current_step_order: null,
+      current_step_name: null,
+      current_approver_role: null,
+      current_approver_user_id: null,
+      updated_at: updatedAt,
+    })
+    .eq('entity_type', 'leave_request')
+    .eq('entity_id', requestId);
+  if (workflowError) throw new Error(workflowError.message);
 }
 
 // ─── Attendance (self-service) ───────────────────────────────────────────────
@@ -120,14 +313,20 @@ export async function getMyAttendance(
   companyId: string,
   dateRange: { from: string; to: string },
 ): Promise<AttendanceRecord[]> {
-  const { data, error } = await supabase
+  const employeeOwnerIds = await resolveEmployeeOwnershipCandidateIds(employeeId);
+
+  let query = supabase
     .from('attendance_records')
     .select('*')
     .eq('company_id', companyId)
-    .eq('employee_id', employeeId)
     .gte('date', dateRange.from)
     .lte('date', dateRange.to)
     .order('date', { ascending: false });
+  query = employeeOwnerIds.length > 1
+    ? query.in('employee_id', employeeOwnerIds)
+    : query.eq('employee_id', employeeOwnerIds[0]);
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []).map(r => ({
     id:          r.id,
@@ -149,14 +348,27 @@ export async function clockIn(
   companyId: string,
   date: string,
 ): Promise<void> {
-  const { error } = await supabase.from('attendance_records').upsert({
-    company_id:  companyId,
-    employee_id: employeeId,
-    date,
-    clock_in:    new Date().toISOString(),
-    status:      'present',
-  }, { onConflict: 'employee_id,date' });
-  if (error) throw new Error(error.message);
+  const requesterProfileId = await resolveLegacyProfileEmployeeId(employeeId);
+
+  const clockInForOwner = async (storedEmployeeId: string) => {
+    const { error } = await supabase.from('attendance_records').upsert({
+      company_id:  companyId,
+      employee_id: storedEmployeeId,
+      date,
+      clock_in:    new Date().toISOString(),
+      status:      'present',
+    }, { onConflict: 'employee_id,date' });
+    if (error) throw new Error(error.message);
+  };
+
+  try {
+    await clockInForOwner(employeeId);
+  } catch (error) {
+    if (!(error instanceof Error) || requesterProfileId === employeeId || !isLegacyEmployeeOwnershipWriteError(error.message)) {
+      throw error;
+    }
+    await clockInForOwner(requesterProfileId);
+  }
 }
 
 export async function clockOut(
@@ -164,28 +376,46 @@ export async function clockOut(
   companyId: string,
   date: string,
 ): Promise<void> {
+  const requesterProfileId = await resolveLegacyProfileEmployeeId(employeeId);
+  const readOwnerIds = [...new Set([employeeId, requesterProfileId].filter(Boolean))];
   const checkOut = new Date().toISOString();
-  const { data: existing } = await supabase
+  let query = supabase
     .from('attendance_records')
     .select('clock_in')
     .eq('company_id', companyId)
-    .eq('employee_id', employeeId)
     .eq('date', date)
     .maybeSingle();
+  query = readOwnerIds.length > 1
+    ? query.in('employee_id', readOwnerIds)
+    : query.eq('employee_id', readOwnerIds[0]);
+
+  const { data: existing } = await query;
   const hoursWorked = existing?.clock_in
     ? Math.round(
         (new Date(checkOut).getTime() - new Date(existing.clock_in).getTime()) / 3_600_000 * 100
       ) / 100
     : undefined;
-  const { error } = await supabase.from('attendance_records').upsert({
-    company_id:   companyId,
-    employee_id:  employeeId,
-    date,
-    clock_out:    checkOut,
-    hours_worked: hoursWorked ?? null,
-    status:       'present',
-  }, { onConflict: 'employee_id,date' });
-  if (error) throw new Error(error.message);
+
+  const clockOutForOwner = async (storedEmployeeId: string) => {
+    const { error } = await supabase.from('attendance_records').upsert({
+      company_id:   companyId,
+      employee_id:  storedEmployeeId,
+      date,
+      clock_out:    checkOut,
+      hours_worked: hoursWorked ?? null,
+      status:       'present',
+    }, { onConflict: 'employee_id,date' });
+    if (error) throw new Error(error.message);
+  };
+
+  try {
+    await clockOutForOwner(employeeId);
+  } catch (error) {
+    if (!(error instanceof Error) || requesterProfileId === employeeId || !isLegacyEmployeeOwnershipWriteError(error.message)) {
+      throw error;
+    }
+    await clockOutForOwner(requesterProfileId);
+  }
 }
 
 // ─── Payroll (self-service) ──────────────────────────────────────────────────
@@ -203,13 +433,19 @@ export async function getMyPayslips(
   employeeId: string,
   companyId: string,
 ): Promise<PayslipSummary[]> {
-  const { data, error } = await supabase
+  const employeeOwnerIds = await resolveEmployeeOwnershipCandidateIds(employeeId);
+
+  let query = supabase
     .from('payroll_items')
     .select('id, gross_pay, net_pay, payroll_runs!inner(period_year, period_month, status, company_id)')
-    .eq('employee_id', employeeId)
     .eq('payroll_runs.company_id', companyId)
     .order('payroll_runs(period_year)', { ascending: false })
     .order('payroll_runs(period_month)', { ascending: false });
+  query = employeeOwnerIds.length > 1
+    ? query.in('employee_id', employeeOwnerIds)
+    : query.eq('employee_id', employeeOwnerIds[0]);
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []).map((r: Record<string, unknown>) => {
     const run = r.payroll_runs as Record<string, unknown>;

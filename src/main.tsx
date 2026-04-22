@@ -25,8 +25,10 @@ import {
   EXECUTIVE,
   MANAGER_AND_UP,
   HRMS_ADMIN,
+  HRMS_APPROVAL_INBOX,
   HRMS_PAYROLL,
   HRMS_LEAVE,
+  HRMS_APPRAISALS,
 } from "@/config/routeRoles";
 
 // Initialise error tracking. Reads VITE_SENTRY_DSN if set; otherwise runs in local-only mode.
@@ -83,6 +85,7 @@ const VerifyOR = lazy(() => import("./pages/sales/VerifyOR"));
 const ReportsCenter = lazy(() => import("./pages/reports/ReportsCenter"));
 const ChassisFilter = lazy(() => import("./pages/inventory/ChassisFilter"));
 const EmployeeDirectory = lazy(() => import("./pages/hrms/EmployeeDirectory"));
+const ApprovalInbox = lazy(() => import("./pages/hrms/ApprovalInbox"));
 const LeaveManagement = lazy(() => import("./pages/hrms/LeaveManagement"));
 const LeaveCalendar = lazy(() => import("./pages/hrms/LeaveCalendar"));
 const AttendanceLog = lazy(() => import("./pages/hrms/AttendanceLog"));
@@ -219,11 +222,12 @@ const router = createBrowserRouter([
       { path: "reports", element: withModuleAccess('reports', <S><ReportsCenter /></S>) },
       { path: "inventory/chassis-filter", element: withModuleAccess('inventory', <S><ChassisFilter /></S>) },
       { path: "hrms/employees", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><S><EmployeeDirectory /></S></RequireRole>) },
+      { path: "hrms/approvals", element: withModuleAccess('hrms', <RequireRole roles={HRMS_APPROVAL_INBOX}><S><ApprovalInbox /></S></RequireRole>) },
       { path: "hrms/leave", element: withModuleAccess('hrms', <RequireRole roles={HRMS_LEAVE}><S><LeaveManagement /></S></RequireRole>) },
       { path: "hrms/leave-calendar", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><S><LeaveCalendar /></S></RequireRole>) },
       { path: "hrms/attendance", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><S><AttendanceLog /></S></RequireRole>) },
       { path: "hrms/payroll", element: withModuleAccess('hrms', <RequireRole roles={HRMS_PAYROLL}><S><PayrollSummary /></S></RequireRole>) },
-      { path: "hrms/appraisals", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><S><PerformanceAppraisals /></S></RequireRole>) },
+      { path: "hrms/appraisals", element: withModuleAccess('hrms', <RequireRole roles={HRMS_APPRAISALS}><S><PerformanceAppraisals /></S></RequireRole>) },
       { path: "hrms/announcements", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><S><HrmsAnnouncements /></S></RequireRole>) },
       { path: "hrms/admin", element: withModuleAccess('hrms', <RequireRole roles={HRMS_ADMIN}><S><HrmsAdmin /></S></RequireRole>) },
       { path: "hrms/approval-flows", element: withModuleAccess('hrms', <RequireRole roles={HRMS_ADMIN}><S><ApprovalFlows /></S></RequireRole>) },
