@@ -1,18 +1,168 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
+import { createLeaveRequest as createSharedLeaveRequest } from '@flc/hrms-services';
 import {
   Employee, EmployeeStatus, AppRole,
-  LeaveType, LeaveBalance, LeaveRequest, CreateLeaveRequestInput, LeaveStatus,
+  LeaveType, LeaveBalance, LeaveRequest, CreateLeaveRequestInput, LeaveStatus, ApprovalDecision, FlowEntityType,
   AttendanceRecord, UpsertAttendanceInput,
   PayrollRun, PayrollItem, PayrollRunStatus,
   Appraisal, AppraisalItem, AppraisalStatus, AppraisalCycle,
   Announcement, CreateAnnouncementInput,
 } from '@/types';
+import { HRMS_LEAVE_APPROVER_ROLES } from '@/config/hrmsConfig';
 
 // Disambiguate the profiles→departments embed: departments also has a FK
 // back to profiles (departments.head_employee_id), so PostgREST refuses to
 // pick one without a hint. Use the specific FK name.
-const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, department:departments!profiles_department_id_fkey(name), job_title:job_titles!profiles_job_title_id_fkey(name)';
+const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, manager_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, department:departments!profiles_department_id_fkey(name), job_title:job_titles!profiles_job_title_id_fkey(name)';
+
+type ApprovalStepRecord = {
+  id: string;
+  stepOrder: number;
+  name: string;
+  approverType: 'role' | 'specific_user' | 'direct_manager';
+  approverRole?: string;
+  approverUserId?: string;
+  allowSelfApproval: boolean;
+};
+
+type ApprovalInstanceRecord = {
+  id: string;
+  flowId: string;
+  requesterId: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  currentStepId?: string;
+  currentStepOrder?: number;
+  currentStepName?: string;
+  currentApproverRole?: string;
+  currentApproverUserId?: string;
+};
+
+function rowToApprovalStep(row: Record<string, unknown>): ApprovalStepRecord {
+  return {
+    id: String(row.id ?? ''),
+    stepOrder: Number(row.step_order ?? 0),
+    name: String(row.name ?? ''),
+    approverType: (row.approver_type as ApprovalStepRecord['approverType']) ?? 'role',
+    approverRole: row.approver_role ? String(row.approver_role) : undefined,
+    approverUserId: row.approver_user_id ? String(row.approver_user_id) : undefined,
+    allowSelfApproval: Boolean(row.allow_self_approval),
+  };
+}
+
+function rowToApprovalInstance(row: Record<string, unknown>): ApprovalInstanceRecord {
+  return {
+    id: String(row.id ?? ''),
+    flowId: String(row.flow_id ?? ''),
+    requesterId: String(row.requester_id ?? ''),
+    status: (row.status as ApprovalInstanceRecord['status']) ?? 'pending',
+    currentStepId: row.current_step_id ? String(row.current_step_id) : undefined,
+    currentStepOrder: row.current_step_order != null ? Number(row.current_step_order) : undefined,
+    currentStepName: row.current_step_name ? String(row.current_step_name) : undefined,
+    currentApproverRole: row.current_approver_role ? String(row.current_approver_role) : undefined,
+    currentApproverUserId: row.current_approver_user_id ? String(row.current_approver_user_id) : undefined,
+  };
+}
+
+function rowToApprovalDecision(row: Record<string, unknown>): ApprovalDecision {
+  return {
+    id: String(row.id ?? ''),
+    instanceId: String(row.instance_id ?? ''),
+    stepId: String(row.step_id ?? ''),
+    stepOrder: Number(row.step_order ?? 0),
+    approverId: String(row.approver_id ?? ''),
+    approverName: row.approver ? String((row.approver as Record<string, unknown>)?.name ?? '') : undefined,
+    stepName: row.step ? String((row.step as Record<string, unknown>)?.name ?? '') : undefined,
+    decision: (row.decision as ApprovalDecision['decision']) ?? 'approved',
+    note: row.note ? String(row.note) : undefined,
+    decidedAt: String(row.decided_at ?? ''),
+    createdAt: String(row.created_at ?? ''),
+  };
+}
+
+async function resolveStepRouting(
+  step: ApprovalStepRecord,
+  requesterId: string,
+): Promise<{ approverRole: string | null; approverUserId: string | null; error: string | null }> {
+  if (step.approverType === 'role') {
+    return step.approverRole
+      ? { approverRole: step.approverRole, approverUserId: null, error: null }
+      : { approverRole: null, approverUserId: null, error: `Approval step '${step.name}' is missing an approver role.` };
+  }
+
+  if (step.approverType === 'specific_user') {
+    return step.approverUserId
+      ? { approverRole: null, approverUserId: step.approverUserId, error: null }
+      : { approverRole: null, approverUserId: null, error: `Approval step '${step.name}' is missing a specific approver.` };
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('manager_id')
+    .eq('id', requesterId)
+    .single();
+  if (error) {
+    return { approverRole: null, approverUserId: null, error: error.message };
+  }
+
+  const managerId = (data as Record<string, unknown> | null)?.manager_id;
+  return managerId
+    ? { approverRole: null, approverUserId: String(managerId), error: null }
+    : {
+        approverRole: null,
+        approverUserId: null,
+        error: 'The requester does not have a reporting manager assigned for the next approval step.',
+      };
+}
+
+async function bootstrapApprovalInstanceForEntity(
+  companyId: string,
+  entityType: FlowEntityType,
+  entityId: string,
+  requesterId: string,
+): Promise<{ error: string | null }> {
+  const { data: flows, error: flowError } = await supabase
+    .from('approval_flows')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('entity_type', entityType)
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false })
+    .limit(2);
+  if (flowError) return { error: flowError.message };
+  if (!flows?.length) return { error: null };
+  if (flows.length > 1) {
+    return { error: `Multiple active approval flows found for ${entityType}. Deactivate extras before continuing.` };
+  }
+
+  const flowId = String(flows[0].id);
+  const { data: steps, error: stepError } = await supabase
+    .from('approval_steps')
+    .select('id, step_order, name, approver_type, approver_role, approver_user_id, allow_self_approval')
+    .eq('flow_id', flowId)
+    .order('step_order');
+  if (stepError) return { error: stepError.message };
+  if (!steps?.length) return { error: `The active ${entityType} approval flow has no steps configured.` };
+
+  const firstStep = rowToApprovalStep(steps[0] as Record<string, unknown>);
+  const routing = await resolveStepRouting(firstStep, requesterId);
+  if (routing.error) return { error: routing.error };
+
+  const { error: instanceError } = await supabase.from('approval_instances').insert({
+    company_id: companyId,
+    flow_id: flowId,
+    entity_type: entityType,
+    entity_id: entityId,
+    requester_id: requesterId,
+    current_step_id: firstStep.id,
+    current_step_order: firstStep.stepOrder,
+    current_step_name: firstStep.name,
+    current_approver_role: routing.approverRole,
+    current_approver_user_id: routing.approverUserId,
+    status: 'pending',
+  });
+  return { error: instanceError?.message ?? null };
+}
 
 function rowToEmployee(row: Record<string, unknown>): Employee {
   return {
@@ -22,6 +172,7 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     role:           (row.role as AppRole) ?? 'analyst',
     companyId:      String(row.company_id ?? ''),
     branchId:       row.branch_id ? String(row.branch_id) : undefined,
+    managerId:      row.manager_id ? String(row.manager_id) : undefined,
     staffCode:      row.staff_code ? String(row.staff_code) : undefined,
     icNo:           row.ic_no ? String(row.ic_no) : undefined,
     contactNo:      row.contact_no ? String(row.contact_no) : undefined,
@@ -69,6 +220,7 @@ export interface CreateEmployeeInput {
   role: AppRole;
   companyId: string;
   branchId?: string;
+  managerId?: string;
   staffCode?: string;
   icNo?: string;
   contactNo?: string;
@@ -83,6 +235,7 @@ export async function createEmployee(input: CreateEmployeeInput, actorId: string
     role:        input.role,
     company_id:  input.companyId,
     branch_id:   input.branchId ?? null,
+    manager_id:  input.managerId ?? null,
     access_scope: 'self',
     status:      'active',
     staff_code:  input.staffCode?.toUpperCase() ?? null,
@@ -101,6 +254,7 @@ export interface UpdateEmployeeInput {
   name?: string;
   role?: AppRole;
   branchId?: string | null;
+  managerId?: string | null;
   staffCode?: string;
   icNo?: string;
   contactNo?: string;
@@ -117,6 +271,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.name         !== undefined) payload.name          = input.name;
   if (input.role         !== undefined) payload.role          = input.role;
   if (input.branchId     !== undefined) payload.branch_id     = input.branchId;
+  if (input.managerId    !== undefined) payload.manager_id    = input.managerId;
   if (input.staffCode    !== undefined) payload.staff_code    = input.staffCode?.toUpperCase();
   if (input.icNo         !== undefined) payload.ic_no         = input.icNo;
   if (input.contactNo    !== undefined) payload.contact_no    = input.contactNo;
@@ -207,7 +362,7 @@ export async function listLeaveBalances(employeeId: string, year: number): Promi
 
 export async function listLeaveRequests(
   companyId: string,
-  opts?: { employeeId?: string; status?: LeaveStatus },
+  opts?: { employeeId?: string; status?: LeaveStatus; includeApprovalHistory?: boolean },
 ): Promise<{ data: LeaveRequest[]; error: string | null }> {
   let q = supabase
     .from('leave_requests')
@@ -218,6 +373,40 @@ export async function listLeaveRequests(
   if (opts?.status)     q = q.eq('status', opts.status);
   const { data, error } = await q;
   if (error) return { data: [], error: error.message };
+
+  const requestIds = (data ?? []).map(r => String(r.id));
+  const approvalMeta = new Map<string, Record<string, unknown>>();
+  const approvalHistory = new Map<string, ApprovalDecision[]>();
+
+  if (requestIds.length) {
+    const { data: approvals, error: approvalError } = await supabase
+      .from('approval_instances')
+      .select('id, entity_id, status, current_step_order, current_step_name, current_approver_role, current_approver_user_id')
+      .eq('entity_type', 'leave_request')
+      .in('entity_id', requestIds);
+    if (approvalError) return { data: [], error: approvalError.message };
+    for (const approval of approvals ?? []) {
+      approvalMeta.set(String(approval.entity_id), approval as Record<string, unknown>);
+    }
+
+    if (opts?.includeApprovalHistory) {
+      const instanceIds = (approvals ?? []).map(approval => String(approval.id));
+      if (instanceIds.length) {
+        const { data: decisions, error: decisionsError } = await supabase
+          .from('approval_decisions')
+          .select('id, instance_id, step_id, step_order, approver_id, decision, note, decided_at, created_at, approver:profiles!approval_decisions_approver_id_fkey(name), step:approval_steps!approval_decisions_step_id_fkey(name)')
+          .in('instance_id', instanceIds)
+          .order('decided_at');
+        if (decisionsError) return { data: [], error: decisionsError.message };
+        for (const decision of decisions ?? []) {
+          const mapped = rowToApprovalDecision(decision as Record<string, unknown>);
+          if (!approvalHistory.has(mapped.instanceId)) approvalHistory.set(mapped.instanceId, []);
+          approvalHistory.get(mapped.instanceId)!.push(mapped);
+        }
+      }
+    }
+  }
+
   const mapped: LeaveRequest[] = (data ?? []).map((r: Record<string, unknown>) => ({
     id:            String(r.id),
     companyId:     String(r.company_id),
@@ -233,6 +422,23 @@ export async function listLeaveRequests(
     reviewedBy:    r.reviewed_by ? String(r.reviewed_by) : undefined,
     reviewedAt:    r.reviewed_at ? String(r.reviewed_at) : undefined,
     reviewerNote:  r.reviewer_note ? String(r.reviewer_note) : undefined,
+    approvalInstanceId:      approvalMeta.get(String(r.id))?.id ? String(approvalMeta.get(String(r.id))?.id) : undefined,
+    approvalInstanceStatus:  approvalMeta.get(String(r.id))?.status ? String(approvalMeta.get(String(r.id))?.status) as LeaveRequest['approvalInstanceStatus'] : undefined,
+    currentApprovalStepOrder: approvalMeta.get(String(r.id))?.current_step_order != null
+      ? Number(approvalMeta.get(String(r.id))?.current_step_order)
+      : undefined,
+    currentApprovalStepName: approvalMeta.get(String(r.id))?.current_step_name
+      ? String(approvalMeta.get(String(r.id))?.current_step_name)
+      : undefined,
+    currentApproverRole: approvalMeta.get(String(r.id))?.current_approver_role
+      ? String(approvalMeta.get(String(r.id))?.current_approver_role)
+      : undefined,
+    currentApproverUserId: approvalMeta.get(String(r.id))?.current_approver_user_id
+      ? String(approvalMeta.get(String(r.id))?.current_approver_user_id)
+      : undefined,
+    approvalHistory: approvalMeta.get(String(r.id))?.id
+      ? approvalHistory.get(String(approvalMeta.get(String(r.id))?.id)) ?? []
+      : undefined,
     createdAt:     String(r.created_at),
     updatedAt:     String(r.updated_at),
   }));
@@ -244,16 +450,23 @@ export async function createLeaveRequest(
   companyId: string,
   input: CreateLeaveRequestInput,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('leave_requests').insert({
-    company_id:     companyId,
-    employee_id:    employeeId,
-    leave_type_id:  input.leaveTypeId,
-    start_date:     input.startDate,
-    end_date:       input.endDate,
-    days:           input.days,
-    reason:         input.reason ?? null,
-  });
-  return { error: error?.message ?? null };
+  try {
+    const leaveRequestId = await createSharedLeaveRequest(employeeId, companyId, {
+      leaveTypeId: input.leaveTypeId,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      reason: input.reason,
+    });
+    void logUserAction(employeeId, 'create', 'leave_request', leaveRequestId, {
+      leaveTypeId: input.leaveTypeId,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      days: input.days,
+    });
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Failed to create leave request.' };
+  }
 }
 
 export async function reviewLeaveRequest(
@@ -262,26 +475,172 @@ export async function reviewLeaveRequest(
   status: 'approved' | 'rejected',
   note?: string,
 ): Promise<{ error: string | null }> {
-  // Self-approval guard: fetch the request to confirm reviewer !== employee
-  const { data: req } = await supabase
+  const { data: req, error: requestError } = await supabase
     .from('leave_requests')
-    .select('employee_id')
+    .select('employee_id, company_id')
     .eq('id', requestId)
     .single();
+  if (requestError) return { error: requestError.message };
 
-  if (req?.employee_id === reviewerId) {
+  const requesterId = String((req as Record<string, unknown> | null)?.employee_id ?? '');
+  if (!requesterId) return { error: 'Leave request not found.' };
+
+  const { data: reviewer, error: reviewerError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', reviewerId)
+    .single();
+  if (reviewerError) return { error: reviewerError.message };
+
+  const reviewerRole = String((reviewer as Record<string, unknown> | null)?.role ?? '');
+
+  const { data: approvalInstance, error: approvalError } = await supabase
+    .from('approval_instances')
+    .select('id, flow_id, requester_id, status, current_step_id, current_step_order, current_step_name, current_approver_role, current_approver_user_id')
+    .eq('entity_type', 'leave_request')
+    .eq('entity_id', requestId)
+    .maybeSingle();
+  if (approvalError) return { error: approvalError.message };
+
+  if (!approvalInstance) {
+    if (requesterId === reviewerId) {
+      return { error: 'You cannot approve or reject your own leave request.' };
+    }
+    if (!HRMS_LEAVE_APPROVER_ROLES.includes(reviewerRole as AppRole)) {
+      return { error: 'You are not allowed to review this leave request.' };
+    }
+
+    const { error } = await supabase
+      .from('leave_requests')
+      .update({ status, reviewed_by: reviewerId, reviewed_at: new Date().toISOString(), reviewer_note: note ?? null })
+      .eq('id', requestId);
+    if (!error) {
+      void logUserAction(reviewerId, 'update', 'leave_request', requestId,
+        { status, reviewerNote: note ?? null, approvalMode: 'legacy' });
+    }
+    return { error: error?.message ?? null };
+  }
+
+  const instance = rowToApprovalInstance(approvalInstance as Record<string, unknown>);
+  if (instance.status !== 'pending') {
+    return { error: `This leave approval is already ${instance.status}.` };
+  }
+
+  const { data: stepRows, error: stepsError } = await supabase
+    .from('approval_steps')
+    .select('id, step_order, name, approver_type, approver_role, approver_user_id, allow_self_approval')
+    .eq('flow_id', instance.flowId)
+    .order('step_order');
+  if (stepsError) return { error: stepsError.message };
+
+  const steps = (stepRows ?? []).map(row => rowToApprovalStep(row as Record<string, unknown>));
+  const currentStep = steps.find(step => step.id === instance.currentStepId)
+    ?? steps.find(step => step.stepOrder === instance.currentStepOrder);
+  if (!currentStep) {
+    return { error: 'The current approval step could not be resolved.' };
+  }
+
+  if (requesterId === reviewerId && !currentStep.allowSelfApproval) {
     return { error: 'You cannot approve or reject your own leave request.' };
   }
 
-  const { error } = await supabase
-    .from('leave_requests')
-    .update({ status, reviewed_by: reviewerId, reviewed_at: new Date().toISOString(), reviewer_note: note ?? null })
-    .eq('id', requestId);
-  if (!error) {
-    void logUserAction(reviewerId, 'update', 'leave_request', requestId,
-      { status, reviewerNote: note ?? null });
+  const isAssignedApprover = currentStep.approverType === 'role'
+    ? Boolean(instance.currentApproverRole) && instance.currentApproverRole === reviewerRole
+    : Boolean(instance.currentApproverUserId) && instance.currentApproverUserId === reviewerId;
+
+  if (!isAssignedApprover) {
+    return { error: 'You are not the assigned approver for the current step.' };
   }
-  return { error: error?.message ?? null };
+
+  const nextStep = status === 'approved'
+    ? steps.find(step => step.stepOrder > currentStep.stepOrder)
+    : undefined;
+  const nextRouting = nextStep
+    ? await resolveStepRouting(nextStep, requesterId)
+    : { approverRole: null, approverUserId: null, error: null };
+  if (nextRouting.error) return { error: nextRouting.error };
+
+  const reviewedAt = new Date().toISOString();
+
+  const { error: decisionError } = await supabase
+    .from('approval_decisions')
+    .insert({
+      instance_id: instance.id,
+      step_id: currentStep.id,
+      step_order: currentStep.stepOrder,
+      approver_id: reviewerId,
+      decision: status,
+      note: note ?? null,
+      decided_at: reviewedAt,
+    });
+  if (decisionError) return { error: decisionError.message };
+
+  if (status === 'rejected') {
+    const [{ error: workflowError }, { error: leaveError }] = await Promise.all([
+      supabase
+        .from('approval_instances')
+        .update({
+          status: 'rejected',
+          current_step_id: null,
+          current_step_order: null,
+          current_step_name: null,
+          current_approver_role: null,
+          current_approver_user_id: null,
+          updated_at: reviewedAt,
+        })
+        .eq('id', instance.id),
+      supabase
+        .from('leave_requests')
+        .update({ status, reviewed_by: reviewerId, reviewed_at: reviewedAt, reviewer_note: note ?? null, updated_at: reviewedAt })
+        .eq('id', requestId),
+    ]);
+    if (workflowError) return { error: workflowError.message };
+    if (leaveError) return { error: leaveError.message };
+  } else if (nextStep) {
+    const { error: workflowError } = await supabase
+      .from('approval_instances')
+      .update({
+        current_step_id: nextStep.id,
+        current_step_order: nextStep.stepOrder,
+        current_step_name: nextStep.name,
+        current_approver_role: nextRouting.approverRole,
+        current_approver_user_id: nextRouting.approverUserId,
+        updated_at: reviewedAt,
+      })
+      .eq('id', instance.id);
+    if (workflowError) return { error: workflowError.message };
+  } else {
+    const [{ error: workflowError }, { error: leaveError }] = await Promise.all([
+      supabase
+        .from('approval_instances')
+        .update({
+          status: 'approved',
+          current_step_id: null,
+          current_step_order: null,
+          current_step_name: null,
+          current_approver_role: null,
+          current_approver_user_id: null,
+          updated_at: reviewedAt,
+        })
+        .eq('id', instance.id),
+      supabase
+        .from('leave_requests')
+        .update({ status, reviewed_by: reviewerId, reviewed_at: reviewedAt, reviewer_note: note ?? null, updated_at: reviewedAt })
+        .eq('id', requestId),
+    ]);
+    if (workflowError) return { error: workflowError.message };
+    if (leaveError) return { error: leaveError.message };
+  }
+
+  void logUserAction(reviewerId, 'update', 'leave_request', requestId,
+    {
+      status,
+      reviewerNote: note ?? null,
+      approvalStep: currentStep.name,
+      finalDecision: status === 'rejected' || !nextStep,
+      nextApprovalStep: nextStep?.name ?? null,
+    });
+  return { error: null };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -348,12 +707,44 @@ export async function listPayrollRuns(companyId: string): Promise<{ data: Payrol
     .order('period_year', { ascending: false })
     .order('period_month', { ascending: false });
   if (error) return { data: [], error: error.message };
+
+  const runIds = (data ?? []).map(run => String(run.id));
+  const approvalMeta = new Map<string, Record<string, unknown>>();
+
+  if (runIds.length) {
+    const { data: approvals, error: approvalError } = await supabase
+      .from('approval_instances')
+      .select('id, entity_id, status, current_step_order, current_step_name, current_approver_role, current_approver_user_id')
+      .eq('entity_type', 'payroll_run')
+      .in('entity_id', runIds);
+    if (approvalError) return { data: [], error: approvalError.message };
+    for (const approval of approvals ?? []) {
+      approvalMeta.set(String(approval.entity_id), approval as Record<string, unknown>);
+    }
+  }
+
   const mapped: PayrollRun[] = (data ?? []).map(r => ({
     id:             String(r.id),
     companyId:      String(r.company_id),
     periodYear:     Number(r.period_year),
     periodMonth:    Number(r.period_month),
     status:         r.status as PayrollRunStatus,
+    approvalInstanceId: approvalMeta.get(String(r.id))?.id ? String(approvalMeta.get(String(r.id))?.id) : undefined,
+    approvalInstanceStatus: approvalMeta.get(String(r.id))?.status
+      ? String(approvalMeta.get(String(r.id))?.status) as PayrollRun['approvalInstanceStatus']
+      : undefined,
+    currentApprovalStepOrder: approvalMeta.get(String(r.id))?.current_step_order != null
+      ? Number(approvalMeta.get(String(r.id))?.current_step_order)
+      : undefined,
+    currentApprovalStepName: approvalMeta.get(String(r.id))?.current_step_name
+      ? String(approvalMeta.get(String(r.id))?.current_step_name)
+      : undefined,
+    currentApproverRole: approvalMeta.get(String(r.id))?.current_approver_role
+      ? String(approvalMeta.get(String(r.id))?.current_approver_role)
+      : undefined,
+    currentApproverUserId: approvalMeta.get(String(r.id))?.current_approver_user_id
+      ? String(approvalMeta.get(String(r.id))?.current_approver_user_id)
+      : undefined,
     totalHeadcount: Number(r.total_headcount),
     totalGross:     Number(r.total_gross),
     totalNet:       Number(r.total_net),
@@ -377,9 +768,22 @@ export async function createPayrollRun(
     .select()
     .single();
   if (error) return { data: null, error: error.message };
+
+  const runId = String(data.id);
+  const bootstrapResult = await bootstrapApprovalInstanceForEntity(companyId, 'payroll_run', runId, createdBy);
+  if (bootstrapResult.error) {
+    await supabase.from('payroll_runs').delete().eq('id', runId);
+    return { data: null, error: bootstrapResult.error };
+  }
+
+  void logUserAction(createdBy, 'create', 'payroll_run', runId, {
+    periodYear,
+    periodMonth,
+  });
+
   return {
     data: {
-      id: String(data.id), companyId: String(data.company_id),
+      id: runId, companyId: String(data.company_id),
       periodYear: Number(data.period_year), periodMonth: Number(data.period_month),
       status: data.status as PayrollRunStatus,
       totalHeadcount: 0, totalGross: 0, totalNet: 0,
@@ -400,15 +804,29 @@ export async function updatePayrollRunStatus(
   status: PayrollRunStatus,
   actorId?: string,
 ): Promise<{ error: string | null }> {
-  const { data: current } = await supabase
+  const { data: current, error: currentError } = await supabase
     .from('payroll_runs')
     .select('status')
     .eq('id', runId)
     .single();
+  if (currentError) return { error: currentError.message };
 
   const currentStatus = current?.status as PayrollRunStatus | undefined;
   if (currentStatus && !VALID_PAYROLL_TRANSITIONS[currentStatus]?.includes(status)) {
     return { error: `Cannot transition payroll from '${currentStatus}' to '${status}'.` };
+  }
+
+  if (status === 'finalised') {
+    const { data: approvalInstance, error: approvalError } = await supabase
+      .from('approval_instances')
+      .select('id')
+      .eq('entity_type', 'payroll_run')
+      .eq('entity_id', runId)
+      .maybeSingle();
+    if (approvalError) return { error: approvalError.message };
+    if (approvalInstance) {
+      return { error: 'Payroll finalisation is controlled by the approval workflow for this run.' };
+    }
   }
 
   const { error } = await supabase.from('payroll_runs').update({ status }).eq('id', runId);
@@ -417,6 +835,155 @@ export async function updatePayrollRunStatus(
       { status, previousStatus: currentStatus });
   }
   return { error: error?.message ?? null };
+}
+
+export async function reviewPayrollRunFinalisation(
+  runId: string,
+  reviewerId: string,
+  decision: 'approved' | 'rejected',
+  note?: string,
+): Promise<{ error: string | null }> {
+  const { data: run, error: runError } = await supabase
+    .from('payroll_runs')
+    .select('status, created_by')
+    .eq('id', runId)
+    .single();
+  if (runError) return { error: runError.message };
+
+  const runStatus = (run?.status as PayrollRunStatus | undefined) ?? 'draft';
+  if (runStatus !== 'draft') {
+    return { error: `Only draft payroll runs can be reviewed for finalisation.` };
+  }
+
+  const { data: reviewer, error: reviewerError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', reviewerId)
+    .single();
+  if (reviewerError) return { error: reviewerError.message };
+
+  const reviewerRole = String((reviewer as Record<string, unknown> | null)?.role ?? '');
+
+  const { data: approvalInstance, error: approvalError } = await supabase
+    .from('approval_instances')
+    .select('id, flow_id, requester_id, status, current_step_id, current_step_order, current_step_name, current_approver_role, current_approver_user_id')
+    .eq('entity_type', 'payroll_run')
+    .eq('entity_id', runId)
+    .maybeSingle();
+  if (approvalError) return { error: approvalError.message };
+  if (!approvalInstance) {
+    return { error: 'This payroll run does not have an approval workflow.' };
+  }
+
+  const instance = rowToApprovalInstance(approvalInstance as Record<string, unknown>);
+  if (instance.status !== 'pending') {
+    return { error: `This payroll approval is already ${instance.status}.` };
+  }
+
+  const { data: stepRows, error: stepsError } = await supabase
+    .from('approval_steps')
+    .select('id, step_order, name, approver_type, approver_role, approver_user_id, allow_self_approval')
+    .eq('flow_id', instance.flowId)
+    .order('step_order');
+  if (stepsError) return { error: stepsError.message };
+
+  const steps = (stepRows ?? []).map(row => rowToApprovalStep(row as Record<string, unknown>));
+  const currentStep = steps.find(step => step.id === instance.currentStepId)
+    ?? steps.find(step => step.stepOrder === instance.currentStepOrder);
+  if (!currentStep) return { error: 'The current payroll approval step could not be resolved.' };
+
+  const requesterId = instance.requesterId || String((run as Record<string, unknown> | null)?.created_by ?? '');
+  if (requesterId && requesterId === reviewerId && !currentStep.allowSelfApproval) {
+    return { error: 'You cannot approve or reject your own payroll run.' };
+  }
+
+  const isAssignedApprover = currentStep.approverType === 'role'
+    ? Boolean(instance.currentApproverRole) && instance.currentApproverRole === reviewerRole
+    : Boolean(instance.currentApproverUserId) && instance.currentApproverUserId === reviewerId;
+  if (!isAssignedApprover) {
+    return { error: 'You are not the assigned approver for the current payroll step.' };
+  }
+
+  const nextStep = decision === 'approved'
+    ? steps.find(step => step.stepOrder > currentStep.stepOrder)
+    : undefined;
+  const nextRouting = nextStep
+    ? await resolveStepRouting(nextStep, requesterId)
+    : { approverRole: null, approverUserId: null, error: null };
+  if (nextRouting.error) return { error: nextRouting.error };
+
+  const decidedAt = new Date().toISOString();
+  const { error: decisionError } = await supabase
+    .from('approval_decisions')
+    .insert({
+      instance_id: instance.id,
+      step_id: currentStep.id,
+      step_order: currentStep.stepOrder,
+      approver_id: reviewerId,
+      decision,
+      note: note ?? null,
+      decided_at: decidedAt,
+    });
+  if (decisionError) return { error: decisionError.message };
+
+  if (decision === 'rejected') {
+    const { error: workflowError } = await supabase
+      .from('approval_instances')
+      .update({
+        status: 'rejected',
+        current_step_id: null,
+        current_step_order: null,
+        current_step_name: null,
+        current_approver_role: null,
+        current_approver_user_id: null,
+        updated_at: decidedAt,
+      })
+      .eq('id', instance.id);
+    if (workflowError) return { error: workflowError.message };
+  } else if (nextStep) {
+    const { error: workflowError } = await supabase
+      .from('approval_instances')
+      .update({
+        current_step_id: nextStep.id,
+        current_step_order: nextStep.stepOrder,
+        current_step_name: nextStep.name,
+        current_approver_role: nextRouting.approverRole,
+        current_approver_user_id: nextRouting.approverUserId,
+        updated_at: decidedAt,
+      })
+      .eq('id', instance.id);
+    if (workflowError) return { error: workflowError.message };
+  } else {
+    const [{ error: workflowError }, { error: runUpdateError }] = await Promise.all([
+      supabase
+        .from('approval_instances')
+        .update({
+          status: 'approved',
+          current_step_id: null,
+          current_step_order: null,
+          current_step_name: null,
+          current_approver_role: null,
+          current_approver_user_id: null,
+          updated_at: decidedAt,
+        })
+        .eq('id', instance.id),
+      supabase
+        .from('payroll_runs')
+        .update({ status: 'finalised', updated_at: decidedAt })
+        .eq('id', runId),
+    ]);
+    if (workflowError) return { error: workflowError.message };
+    if (runUpdateError) return { error: runUpdateError.message };
+  }
+
+  void logUserAction(reviewerId, 'update', 'payroll_run', runId, {
+    approvalDecision: decision,
+    approvalStep: currentStep.name,
+    reviewerNote: note ?? null,
+    finalDecision: decision === 'rejected' || !nextStep,
+    nextApprovalStep: nextStep?.name ?? null,
+  });
+  return { error: null };
 }
 
 export async function listPayrollItems(runId: string): Promise<{ data: PayrollItem[]; error: string | null }> {
