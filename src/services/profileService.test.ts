@@ -59,7 +59,7 @@ beforeEach(() => {
 });
 
 describe('listProfiles', () => {
-  it('returns employee linking support when employee_id is selectable', async () => {
+  it('returns profile rows including employee_id', async () => {
     queueResolves({
       data: [{ id: 'p1', email: 'user@company.com', name: 'User', role: 'analyst', company_id: 'c1', branch_id: null, employee_id: 'emp-1', access_scope: 'company', status: 'active', created_at: '2026-04-22T00:00:00.000Z' }],
       error: null,
@@ -68,30 +68,22 @@ describe('listProfiles', () => {
     const result = await listProfiles('c1');
 
     expect(result.error).toBeNull();
-    expect(result.supportsEmployeeLinking).toBe(true);
     expect(result.data[0].employee_id).toBe('emp-1');
   });
 
-  it('falls back when profiles.employee_id is not available yet', async () => {
-    queueResolves(
-      { data: null, error: { message: 'column profiles.employee_id does not exist' } },
-      { data: [{ id: 'p1', email: 'user@company.com', name: 'User', role: 'analyst', company_id: 'c1', branch_id: null, access_scope: 'company', status: 'active', created_at: '2026-04-22T00:00:00.000Z' }], error: null },
-    );
+  it('surfaces an error when profile employee links are unavailable', async () => {
+    queueResolves({ data: null, error: { message: 'column profiles.employee_id does not exist' } });
 
     const result = await listProfiles('c1');
 
-    expect(result.error).toBeNull();
-    expect(result.supportsEmployeeLinking).toBe(false);
-    expect(result.data[0].employee_id).toBeUndefined();
+    expect(result.error).toBe('column profiles.employee_id does not exist');
+    expect(result.data).toEqual([]);
   });
 });
 
 describe('updateProfile', () => {
-  it('retries without employee_id when the column is not available', async () => {
-    queueResolves(
-      { data: null, error: { message: 'column profiles.employee_id does not exist' } },
-      { data: null, error: null },
-    );
+  it('surfaces an error when employee_id cannot be updated', async () => {
+    queueResolves({ data: null, error: { message: 'column profiles.employee_id does not exist' } });
 
     const result = await updateProfile({
       id: 'p1',
@@ -99,11 +91,9 @@ describe('updateProfile', () => {
       employee_id: 'emp-1',
     });
 
-    expect(result.error).toBeNull();
-    expect(updateCalls).toHaveLength(2);
+    expect(result.error).toBe('column profiles.employee_id does not exist');
+    expect(updateCalls).toHaveLength(1);
     expect(updateCalls[0].values).toMatchObject({ role: 'manager', employee_id: 'emp-1' });
-    expect(updateCalls[1].values).toMatchObject({ role: 'manager' });
-    expect(updateCalls[1].values).not.toHaveProperty('employee_id');
   });
 });
 

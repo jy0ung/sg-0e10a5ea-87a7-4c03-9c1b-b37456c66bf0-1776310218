@@ -7,60 +7,9 @@ import type {
   PublicHoliday, CreateHolidayInput, UpdateHolidayInput,
 } from '@/types';
 
-function isMissingWorkforceSchemaError(message: string | null | undefined): boolean {
-  const text = (message ?? '').toLowerCase();
-  return [
-    'relation "employees" does not exist',
-    'column profiles.employee_id does not exist',
-    'could not find the table',
-    'could not find a relationship',
-  ].some(fragment => text.includes(fragment));
-}
-
-function isLegacyEmployeeOwnershipWriteError(message: string | null | undefined): boolean {
-  const text = (message ?? '').toLowerCase();
-  return [
-    'violates foreign key constraint',
-    'violates row-level security policy',
-    'new row violates row-level security policy',
-  ].some(fragment => text.includes(fragment));
-}
-
 type StoredHeadEmployeeIdentity = {
-  employeeId: string;
   name?: string;
 };
-
-async function resolveLegacyProfileEmployeeId(
-  employeeId: string,
-): Promise<{ data: string; error: string | null }> {
-  if (!employeeId) return { data: employeeId, error: null };
-
-  const { data: directProfile, error: directError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('id', employeeId)
-    .maybeSingle();
-  if (directError) return { data: employeeId, error: directError.message };
-  if (directProfile?.id) return { data: String(directProfile.id), error: null };
-
-  const { data: linkedProfile, error: linkedError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('employee_id', employeeId)
-    .maybeSingle();
-  if (linkedError) {
-    if (isMissingWorkforceSchemaError(linkedError.message)) {
-      return { data: employeeId, error: null };
-    }
-    return { data: employeeId, error: linkedError.message };
-  }
-
-  return {
-    data: linkedProfile?.id ? String(linkedProfile.id) : employeeId,
-    error: null,
-  };
-}
 
 async function resolveStoredHeadEmployeeIdentities(
   storedHeadEmployeeIds: string[],
@@ -70,56 +19,14 @@ async function resolveStoredHeadEmployeeIdentities(
 
   if (!uniqueIds.length) return { data: identities, error: null };
 
-  const { data: profileRows, error: profileError } = await supabase
-    .from('profiles')
-    .select('id, name, employee_id')
-    .in('id', uniqueIds);
-
-  if (profileError) {
-    if (!isMissingWorkforceSchemaError(profileError.message)) {
-      return { data: identities, error: profileError.message };
-    }
-
-    const { data: fallbackRows, error: fallbackError } = await supabase
-      .from('profiles')
-      .select('id, name')
-      .in('id', uniqueIds);
-    if (fallbackError) return { data: identities, error: fallbackError.message };
-
-    for (const row of fallbackRows ?? []) {
-      identities.set(String(row.id), {
-        employeeId: String(row.id),
-        name: row.name ? String(row.name) : undefined,
-      });
-    }
-
-    return { data: identities, error: null };
-  }
-
-  for (const row of profileRows ?? []) {
-    identities.set(String(row.id), {
-      employeeId: row.employee_id ? String(row.employee_id) : String(row.id),
-      name: row.name ? String(row.name) : undefined,
-    });
-  }
-
-  const unresolvedIds = uniqueIds.filter(id => !identities.has(id));
-  if (!unresolvedIds.length) return { data: identities, error: null };
-
   const { data: employeeRows, error: employeeError } = await supabase
     .from('employees')
     .select('id, name')
-    .in('id', unresolvedIds);
-  if (employeeError) {
-    if (isMissingWorkforceSchemaError(employeeError.message)) {
-      return { data: identities, error: null };
-    }
-    return { data: identities, error: employeeError.message };
-  }
+    .in('id', uniqueIds);
+  if (employeeError) return { data: identities, error: employeeError.message };
 
   for (const row of employeeRows ?? []) {
     identities.set(String(row.id), {
-      employeeId: String(row.id),
       name: row.name ? String(row.name) : undefined,
     });
   }
@@ -139,7 +46,7 @@ function rowToDepartment(
     companyId:        String(r.company_id ?? ''),
     name:             String(r.name ?? ''),
     description:      r.description ? String(r.description) : undefined,
-    headEmployeeId:   headEmployeeIdentity?.employeeId ?? storedHeadEmployeeId,
+    headEmployeeId:   storedHeadEmployeeId,
     headEmployeeName: headEmployeeIdentity?.name,
     costCentre:       r.cost_centre ? String(r.cost_centre) : undefined,
     isActive:         Boolean(r.is_active),
@@ -182,11 +89,6 @@ export async function createDepartment(
   actorId: string,
   input: CreateDepartmentInput,
 ): Promise<{ data: Department | null; error: string | null }> {
-  const legacyHeadEmployeeId = input.headEmployeeId
-    ? await resolveLegacyProfileEmployeeId(input.headEmployeeId)
-    : { data: '', error: null as string | null };
-  if (legacyHeadEmployeeId.error) return { data: null, error: legacyHeadEmployeeId.error };
-
   const insertDepartment = async (storedHeadEmployeeId?: string | null) => {
     const { data, error } = await supabase
       .from('departments')
@@ -207,17 +109,7 @@ export async function createDepartment(
     };
   };
 
-  let createdDepartment = await insertDepartment(input.headEmployeeId ?? null);
-  if (
-    createdDepartment.error
-    && input.headEmployeeId
-    && legacyHeadEmployeeId.data
-    && legacyHeadEmployeeId.data !== input.headEmployeeId
-    && isLegacyEmployeeOwnershipWriteError(createdDepartment.error)
-  ) {
-    createdDepartment = await insertDepartment(legacyHeadEmployeeId.data);
-  }
-
+  const createdDepartment = await insertDepartment(input.headEmployeeId ?? null);
   if (createdDepartment.error || !createdDepartment.data) {
     return { data: null, error: createdDepartment.error ?? 'Failed to create department.' };
   }
@@ -234,11 +126,6 @@ export async function updateDepartment(
   actorId: string,
   input: UpdateDepartmentInput,
 ): Promise<{ error: string | null }> {
-  const legacyHeadEmployeeId = input.headEmployeeId
-    ? await resolveLegacyProfileEmployeeId(input.headEmployeeId)
-    : { data: '', error: null as string | null };
-  if (legacyHeadEmployeeId.error) return { error: legacyHeadEmployeeId.error };
-
   const updatedAt = new Date().toISOString();
   const updateDepartmentRow = async (storedHeadEmployeeId?: string | null) => {
     const { error } = await supabase
@@ -255,20 +142,10 @@ export async function updateDepartment(
     return { error: error?.message ?? null };
   };
 
-  let updateResult = await updateDepartmentRow(input.headEmployeeId ?? null);
-  if (
-    updateResult.error
-    && input.headEmployeeId
-    && legacyHeadEmployeeId.data
-    && legacyHeadEmployeeId.data !== input.headEmployeeId
-    && isLegacyEmployeeOwnershipWriteError(updateResult.error)
-  ) {
-    updateResult = await updateDepartmentRow(legacyHeadEmployeeId.data);
-  }
-
+  const updateResult = await updateDepartmentRow(input.headEmployeeId ?? null);
   const { error } = updateResult;
   if (!error) void logUserAction(actorId, 'update', 'department', id, { name: input.name });
-  return { error: error?.message ?? null };
+  return { error };
 }
 
 export async function deleteDepartment(id: string, actorId: string): Promise<{ error: string | null }> {
@@ -278,19 +155,8 @@ export async function deleteDepartment(id: string, actorId: string): Promise<{ e
     .select('id', { count: 'exact', head: true })
     .eq('department_id', id);
 
-  let assignedCount = count ?? 0;
-  if (employeeCountError) {
-    if (!isMissingWorkforceSchemaError(employeeCountError.message)) {
-      return { error: employeeCountError.message };
-    }
-
-    const { count: legacyCount, error: legacyError } = await supabase
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .eq('department_id', id);
-    if (legacyError) return { error: legacyError.message };
-    assignedCount = legacyCount ?? 0;
-  }
+  if (employeeCountError) return { error: employeeCountError.message };
+  const assignedCount = count ?? 0;
 
   if (assignedCount > 0) {
     return { error: `Cannot delete: ${assignedCount} employee(s) are assigned to this department. Reassign them first.` };

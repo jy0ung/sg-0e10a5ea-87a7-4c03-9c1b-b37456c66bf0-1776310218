@@ -85,6 +85,7 @@ import {
   listAttendanceRecords,
   listEmployeeDirectory,
   listAppraisalItems,
+  listLeaveBalances,
   listLeaveRequests,
   listPayrollItems,
   listPayrollRuns,
@@ -96,6 +97,7 @@ import {
   reviewPayrollRunFinalisation,
   submitAppraisalSelfReview,
   upsertAttendance,
+  updateEmployee,
   updatePayrollRunStatus,
 } from './hrmsService';
 import { createEmployeeSchema, createLeaveRequestSchema, upsertAttendanceSchema } from '@/lib/validations';
@@ -146,38 +148,13 @@ describe('listEmployeeDirectory', () => {
     });
   });
 
-  it('falls back to legacy profiles when the workforce schema is unavailable', async () => {
-    queueResolves(
-      { data: null, error: { message: 'relation "employees" does not exist' } },
-      {
-        data: [{
-          id: 'profile-1',
-          email: 'legacy@company.com',
-          name: 'Legacy User',
-          role: 'analyst',
-          company_id: 'c1',
-          branch_id: 'b1',
-          manager_id: null,
-          status: 'active',
-          staff_code: 'LG001',
-          ic_no: null,
-          contact_no: null,
-          join_date: '2026-04-01',
-          resign_date: null,
-          avatar_url: null,
-          department_id: null,
-          job_title_id: null,
-          department: null,
-          job_title: null,
-        }],
-        error: null,
-      },
-    );
+  it('surfaces an error when the workforce schema is unavailable', async () => {
+    queueResolves({ data: null, error: { message: 'relation "employees" does not exist' } });
 
     const result = await listEmployeeDirectory('c1');
 
-    expect(result.error).toBeNull();
-    expect(result.data[0]).toMatchObject({ id: 'profile-1', role: 'analyst' });
+    expect(result.error).toBe('relation "employees" does not exist');
+    expect(result.data).toEqual([]);
   });
 });
 
@@ -208,11 +185,8 @@ describe('createEmployee', () => {
     }));
   });
 
-  it('falls back to legacy profile creation when the workforce schema is unavailable', async () => {
-    queueResolves(
-      { data: null, error: { message: 'relation "employees" does not exist' } },
-      { data: null, error: null },
-    );
+  it('surfaces an error when workforce employee creation is unavailable', async () => {
+    queueResolves({ data: null, error: { message: 'relation "employees" does not exist' } });
 
     const result = await createEmployee({
       id: 'legacy-1',
@@ -223,23 +197,62 @@ describe('createEmployee', () => {
       staffCode: 'LG001',
     }, 'actor-1');
 
-    expect(result.error).toBeNull();
-    expect(insertCalls).toContainEqual(expect.objectContaining({ table: 'employees' }));
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'profiles',
-      values: expect.objectContaining({
-        id: 'legacy-1',
-        role: 'analyst',
-      }),
-    }));
+    expect(result.error).toBe('relation "employees" does not exist');
+    expect(insertCalls).toEqual([
+      {
+        table: 'employees',
+        values: expect.objectContaining({
+          id: 'legacy-1',
+          primary_role: 'analyst',
+        }),
+      },
+    ]);
+  });
+
+  it('surfaces an error when workforce employee updates are unavailable', async () => {
+    queueResolves({ data: null, error: { message: 'relation "employees" does not exist' } });
+
+    const result = await updateEmployee('emp-1', { status: 'inactive' }, 'actor-1');
+
+    expect(result.error).toBe('relation "employees" does not exist');
+    expect(updateCalls).toEqual([
+      {
+        table: 'employees',
+        values: expect.objectContaining({ status: 'inactive' }),
+      },
+    ]);
   });
 });
 
 describe('listLeaveRequests', () => {
-  it('filters leave requests by both employee and linked profile ids during the ownership transition', async () => {
+  it('filters leave balances by workforce employee id', async () => {
+    queueResolves({
+      data: [{
+        id: 'balance-1',
+        employee_id: 'employee-1',
+        leave_type_id: 'lt-1',
+        year: 2026,
+        entitled_days: 14,
+        used_days: 4,
+      }],
+      error: null,
+    });
+
+    const result = await listLeaveBalances('employee-1', 2026);
+
+    expect(result.error).toBeNull();
+    expect(eqCalls).toEqual(expect.arrayContaining([
+      { table: 'leave_balances', column: 'year', value: 2026 },
+      { table: 'leave_balances', column: 'employee_id', value: 'employee-1' },
+    ]));
+    expect(result.data[0]).toMatchObject({
+      employeeId: 'employee-1',
+      remainingDays: 10,
+    });
+  });
+
+  it('filters leave requests by workforce employee id', async () => {
     queueResolves(
-      { data: null, error: null },
-      { data: { id: 'profile-1' }, error: null },
       { data: [], error: null },
       { data: [], error: null },
     );
@@ -248,21 +261,17 @@ describe('listLeaveRequests', () => {
 
     expect(result.error).toBeNull();
     expect(eqCalls).toEqual(expect.arrayContaining([
-      { table: 'profiles', column: 'id', value: 'employee-1' },
-      { table: 'profiles', column: 'employee_id', value: 'employee-1' },
-    ]));
-    expect(inCalls).toEqual(expect.arrayContaining([
-      { table: 'leave_requests', column: 'employee_id', values: ['employee-1', 'profile-1'] },
+      { table: 'leave_requests', column: 'employee_id', value: 'employee-1' },
     ]));
   });
 
-  it('normalises profile-backed leave rows onto the linked employee identity', async () => {
+  it('hydrates employee names from workforce leave rows', async () => {
     queueResolves(
       {
         data: [{
           id: 'leave-1',
           company_id: 'c1',
-          employee_id: 'profile-1',
+          employee_id: 'employee-1',
           leave_type_id: 'lt-1',
           start_date: '2026-04-10',
           end_date: '2026-04-12',
@@ -275,7 +284,7 @@ describe('listLeaveRequests', () => {
         error: null,
       },
       {
-        data: [{ id: 'profile-1', name: 'Aisyah', employee_id: 'employee-1' }],
+        data: [{ id: 'employee-1', name: 'Aisyah' }],
         error: null,
       },
     );
@@ -287,6 +296,39 @@ describe('listLeaveRequests', () => {
       employeeId: 'employee-1',
       employeeName: 'Aisyah',
     });
+    expect(inCalls).toEqual(expect.arrayContaining([
+      { table: 'employees', column: 'id', values: ['employee-1'] },
+    ]));
+  });
+
+  it('surfaces workforce employee lookup errors while hydrating leave rows', async () => {
+    queueResolves(
+      {
+        data: [{
+          id: 'leave-1',
+          company_id: 'c1',
+          employee_id: 'employee-1',
+          leave_type_id: 'lt-1',
+          start_date: '2026-04-10',
+          end_date: '2026-04-12',
+          days: 3,
+          status: 'approved',
+          created_at: '2026-04-01T00:00:00.000Z',
+          updated_at: '2026-04-01T00:00:00.000Z',
+          leave_types: { name: 'Annual Leave' },
+        }],
+        error: null,
+      },
+      {
+        data: null,
+        error: { message: 'relation "employees" does not exist' },
+      },
+    );
+
+    const result = await listLeaveRequests('c1');
+
+    expect(result.data).toEqual([]);
+    expect(result.error).toBe('relation "employees" does not exist');
   });
 
   it('hydrates approval history when requested', async () => {
@@ -307,7 +349,6 @@ describe('listLeaveRequests', () => {
         }],
         error: null,
       },
-      { data: [], error: null },
       {
         data: [{ id: 'emp-1', name: 'Aisyah' }],
         error: null,
@@ -432,15 +473,13 @@ describe('reviewLeaveRequest', () => {
 });
 
 describe('listAttendanceRecords', () => {
-  it('filters attendance by both employee and linked profile ids and normalises returned ids', async () => {
+  it('filters attendance by workforce employee id and still hydrates the employee name', async () => {
     queueResolves(
-      { data: null, error: null },
-      { data: { id: 'profile-1' }, error: null },
       {
         data: [{
           id: 'att-1',
           company_id: 'c1',
-          employee_id: 'profile-1',
+          employee_id: 'employee-1',
           date: '2026-04-10',
           clock_in: '09:00:00',
           clock_out: '18:00:00',
@@ -453,7 +492,7 @@ describe('listAttendanceRecords', () => {
         error: null,
       },
       {
-        data: [{ id: 'profile-1', name: 'Aisyah', employee_id: 'employee-1' }],
+        data: [{ id: 'employee-1', name: 'Aisyah' }],
         error: null,
       },
     );
@@ -461,24 +500,22 @@ describe('listAttendanceRecords', () => {
     const result = await listAttendanceRecords('c1', { employeeId: 'employee-1' });
 
     expect(result.error).toBeNull();
-    expect(inCalls).toEqual(expect.arrayContaining([
-      { table: 'attendance_records', column: 'employee_id', values: ['employee-1', 'profile-1'] },
+    expect(eqCalls).toEqual(expect.arrayContaining([
+      { table: 'attendance_records', column: 'employee_id', value: 'employee-1' },
     ]));
     expect(result.data[0]).toMatchObject({
       employeeId: 'employee-1',
       employeeName: 'Aisyah',
     });
+    expect(inCalls).toEqual(expect.arrayContaining([
+      { table: 'employees', column: 'id', values: ['employee-1'] },
+    ]));
   });
 });
 
 describe('upsertAttendance', () => {
-  it('falls back to the linked profile id when attendance ownership is still profile-backed', async () => {
-    queueResolves(
-      { data: null, error: null },
-      { data: { id: 'profile-1' }, error: null },
-      { data: null, error: { message: 'violates foreign key constraint "attendance_records_employee_id_fkey"' } },
-      { data: null, error: null },
-    );
+  it('surfaces an error when attendance ownership rejects employee ids', async () => {
+    queueResolves({ data: null, error: { message: 'violates foreign key constraint "attendance_records_employee_id_fkey"' } });
 
     const result = await upsertAttendance('c1', {
       employeeId: 'employee-1',
@@ -487,15 +524,11 @@ describe('upsertAttendance', () => {
       clockIn: '09:00',
     });
 
-    expect(result.error).toBeNull();
+    expect(result.error).toBe('violates foreign key constraint "attendance_records_employee_id_fkey"');
     expect(upsertCalls).toEqual([
       {
         table: 'attendance_records',
         values: expect.objectContaining({ employee_id: 'employee-1' }),
-      },
-      {
-        table: 'attendance_records',
-        values: expect.objectContaining({ employee_id: 'profile-1' }),
       },
     ]);
   });
@@ -566,13 +599,13 @@ describe('listPayrollRuns', () => {
 });
 
 describe('listPayrollItems', () => {
-  it('normalises profile-backed payroll items onto the linked employee identity', async () => {
+  it('hydrates employee names from workforce payroll items', async () => {
     queueResolves(
       {
         data: [{
           id: 'item-1',
           payroll_run_id: 'run-1',
-          employee_id: 'profile-1',
+          employee_id: 'employee-1',
           basic_salary: 3000,
           allowances: 200,
           overtime: 150,
@@ -590,7 +623,7 @@ describe('listPayrollItems', () => {
         error: null,
       },
       {
-        data: [{ id: 'profile-1', name: 'Aisyah', employee_id: 'employee-1' }],
+        data: [{ id: 'employee-1', name: 'Aisyah' }],
         error: null,
       },
     );
@@ -604,7 +637,7 @@ describe('listPayrollItems', () => {
       employeeName: 'Aisyah',
     });
     expect(inCalls).toEqual(expect.arrayContaining([
-      { table: 'profiles', column: 'id', values: ['profile-1'] },
+      { table: 'employees', column: 'id', values: ['employee-1'] },
     ]));
   });
 });
@@ -1012,6 +1045,63 @@ describe('createAppraisal', () => {
     }));
   });
 
+  it('requires workforce employee links for direct-manager appraisal approvals', async () => {
+    queueResolves(
+      { data: [{ id: 'flow-1' }], error: null },
+      {
+        data: {
+          id: 'app-1',
+          company_id: 'c1',
+          title: 'Quarterly Review 2026',
+          cycle: 'quarterly',
+          period_start: '2026-04-01',
+          period_end: '2026-06-30',
+          status: 'in_progress',
+          created_by: 'manager-1',
+          created_at: '2026-04-01T00:00:00.000Z',
+          updated_at: '2026-04-01T00:00:00.000Z',
+        },
+        error: null,
+      },
+      { data: [{ id: 'flow-1' }], error: null },
+      {
+        data: [{
+          id: 'step-1',
+          step_order: 1,
+          name: 'Direct Manager Review',
+          approver_type: 'direct_manager',
+          approver_role: null,
+          approver_user_id: null,
+          allow_self_approval: false,
+        }],
+        error: null,
+      },
+      {
+        data: { id: 'manager-1' },
+        error: null,
+      },
+      {
+        data: {
+          manager_id: 'legacy-manager-1',
+          employee_id: null,
+        },
+        error: null,
+      },
+    );
+
+    const result = await createAppraisal('c1', {
+      title: 'Quarterly Review 2026',
+      cycle: 'quarterly',
+      periodStart: '2026-04-01',
+      periodEnd: '2026-06-30',
+    }, 'manager-1');
+
+    expect(result.error).toBe('The requester must be linked to a workforce employee for direct-manager approval routing.');
+    expect(insertCalls).not.toContainEqual(expect.objectContaining({
+      table: 'approval_instances',
+    }));
+  });
+
   it('seeds appraisal items immediately when no activation approval flow exists', async () => {
     queueResolves(
       { data: [], error: null },
@@ -1060,6 +1150,47 @@ describe('createAppraisal', () => {
         expect.objectContaining({ appraisal_id: 'app-1', employee_id: 'emp-1', reviewer_id: 'manager-2' }),
         expect.objectContaining({ appraisal_id: 'app-1', employee_id: 'emp-2', reviewer_id: 'manager-1' }),
       ],
+    }));
+  });
+
+  it('surfaces reviewer profile lookup errors when seeding appraisal items', async () => {
+    queueResolves(
+      { data: [], error: null },
+      {
+        data: {
+          id: 'app-1',
+          company_id: 'c1',
+          title: 'Probation Review 2026',
+          cycle: 'probation',
+          period_start: '2026-04-01',
+          period_end: '2026-06-30',
+          status: 'open',
+          created_by: 'manager-1',
+          created_at: '2026-04-01T00:00:00.000Z',
+          updated_at: '2026-04-01T00:00:00.000Z',
+        },
+        error: null,
+      },
+      { data: [], error: null },
+      {
+        data: [
+          { id: 'emp-1', manager_employee_id: 'manager-employee-2', status: 'active' },
+        ],
+        error: null,
+      },
+      { data: null, error: { message: 'column profiles.employee_id does not exist' } },
+    );
+
+    const result = await createAppraisal('c1', {
+      title: 'Probation Review 2026',
+      cycle: 'probation',
+      periodStart: '2026-04-01',
+      periodEnd: '2026-06-30',
+    }, 'manager-1');
+
+    expect(result.error).toBe('column profiles.employee_id does not exist');
+    expect(insertCalls).not.toContainEqual(expect.objectContaining({
+      table: 'appraisal_items',
     }));
   });
 });
@@ -1268,7 +1399,6 @@ describe('listAppraisalItems', () => {
         }],
         error: null,
       },
-      { data: [], error: null },
       {
         data: [{ id: 'employee-1', name: 'Aisyah Rahman' }],
         error: null,
@@ -1290,13 +1420,13 @@ describe('listAppraisalItems', () => {
     });
   });
 
-  it('normalises profile-backed appraisal items onto the linked employee identity', async () => {
+  it('hydrates employee names from workforce appraisal items', async () => {
     queueResolves(
       {
         data: [{
           id: 'item-1',
           appraisal_id: 'app-1',
-          employee_id: 'profile-1',
+          employee_id: 'employee-1',
           reviewer_id: 'manager-1',
           rating: null,
           goals: null,
@@ -1311,7 +1441,7 @@ describe('listAppraisalItems', () => {
         error: null,
       },
       {
-        data: [{ id: 'profile-1', name: 'Aisyah Rahman', employee_id: 'employee-1' }],
+        data: [{ id: 'employee-1', name: 'Aisyah Rahman' }],
         error: null,
       },
     );
@@ -1324,14 +1454,33 @@ describe('listAppraisalItems', () => {
       employeeName: 'Aisyah Rahman',
       reviewerName: 'Nur Manager',
     });
+    expect(inCalls).toEqual(expect.arrayContaining([
+      { table: 'employees', column: 'id', values: ['employee-1'] },
+    ]));
   });
 });
 
 describe('submitAppraisalSelfReview', () => {
-  it('accepts a linked employee ID for a legacy profile-backed appraisal item', async () => {
+  it('requires a linked profile for employee appraisal actions', async () => {
     queueResolves(
       { data: null, error: null },
-      { data: { id: 'profile-1', employee_id: 'employee-1' }, error: null },
+      { data: null, error: null },
+    );
+
+    const result = await submitAppraisalSelfReview('item-1', 'employee-1', {
+      goals: 'Improve leadership',
+      achievements: 'Closed major project',
+      areasToImprove: 'Delegation',
+      employeeComments: 'Ready for next step',
+    });
+
+    expect(result.error).toBe("No profile linked to employee 'employee-1'.");
+    expect(updateCalls).toEqual([]);
+  });
+
+  it('rejects legacy profile-backed appraisal ownership', async () => {
+    queueResolves(
+      { data: null, error: null },
       { data: { id: 'profile-1' }, error: null },
       {
         data: {
@@ -1361,20 +1510,12 @@ describe('submitAppraisalSelfReview', () => {
       employeeComments: 'Ready for next step',
     });
 
-    expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisal_items',
-      values: expect.objectContaining({
-        status: 'self_reviewed',
-        goals: 'Improve leadership',
-      }),
-    }));
+    expect(result.error).toBe('You can only submit your own appraisal self review.');
   });
 
-  it('accepts a linked employee ID when the appraisal item owner is stored as an employee id', async () => {
+  it('accepts direct workforce ownership when the appraisal item owner is stored as an employee id', async () => {
     queueResolves(
       { data: null, error: null },
-      { data: { id: 'profile-1', employee_id: 'employee-1' }, error: null },
       { data: { id: 'profile-1' }, error: null },
       {
         data: {
@@ -1416,7 +1557,6 @@ describe('submitAppraisalSelfReview', () => {
 
   it('moves an assigned item to self_reviewed for the employee', async () => {
     queueResolves(
-      { data: { id: 'emp-1', employee_id: 'employee-1' }, error: null },
       { data: { id: 'emp-1' }, error: null },
       {
         data: {
@@ -1505,7 +1645,6 @@ describe('acknowledgeAppraisalItem', () => {
   it('acknowledges the review and completes the appraisal when all items are done', async () => {
     queueResolves(
       { data: null, error: null },
-      { data: { id: 'profile-1', employee_id: 'employee-1' }, error: null },
       { data: { id: 'profile-1' }, error: null },
       {
         data: {

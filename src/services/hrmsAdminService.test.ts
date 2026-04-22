@@ -66,6 +66,7 @@ vi.mock('@/services/auditService', () => ({
 
 import {
   createDepartment,
+  deleteDepartment,
   listDepartments,
   updateDepartment,
 } from './hrmsAdminService';
@@ -80,7 +81,7 @@ beforeEach(() => {
 });
 
 describe('listDepartments', () => {
-  it('normalises employee-backed department heads without relying on a profiles join', async () => {
+  it('hydrates employee-backed department heads from workforce employees', async () => {
     queueResolves(
       {
         data: [{
@@ -96,7 +97,6 @@ describe('listDepartments', () => {
         }],
         error: null,
       },
-      { data: [], error: null },
       {
         data: [{ id: 'employee-1', name: 'Aisyah Rahman' }],
         error: null,
@@ -111,25 +111,46 @@ describe('listDepartments', () => {
       headEmployeeName: 'Aisyah Rahman',
     });
     expect(inCalls).toEqual(expect.arrayContaining([
-      { table: 'profiles', column: 'id', values: ['employee-1'] },
       { table: 'employees', column: 'id', values: ['employee-1'] },
     ]));
   });
 });
 
 describe('createDepartment', () => {
-  it('falls back to the linked profile id when the schema is still profile-backed', async () => {
+  it('surfaces an error when the department head write rejects employee ownership', async () => {
     queueResolves(
-      { data: null, error: null },
-      { data: { id: 'profile-1' }, error: null },
       { data: null, error: { message: 'violates foreign key constraint "departments_head_employee_id_fkey"' } },
+    );
+
+    const result = await createDepartment('c1', 'admin-1', {
+      name: 'HR',
+      headEmployeeId: 'employee-1',
+      costCentre: 'CC-01',
+      isActive: true,
+    });
+
+    expect(result.error).toBe('violates foreign key constraint "departments_head_employee_id_fkey"');
+    expect(result.data).toBeNull();
+    expect(insertCalls).toEqual([
+      {
+        table: 'departments',
+        values: expect.objectContaining({ head_employee_id: 'employee-1' }),
+      },
+    ]);
+    expect(eqCalls).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: 'profiles' }),
+    ]));
+  });
+
+  it('creates the department when the employee-backed write succeeds', async () => {
+    queueResolves(
       {
         data: {
           id: 'dept-1',
           company_id: 'c1',
           name: 'HR',
           description: null,
-          head_employee_id: 'profile-1',
+          head_employee_id: 'employee-1',
           cost_centre: 'CC-01',
           is_active: true,
           created_at: '2026-04-01T00:00:00.000Z',
@@ -138,7 +159,7 @@ describe('createDepartment', () => {
         error: null,
       },
       {
-        data: [{ id: 'profile-1', name: 'Aisyah Rahman', employee_id: 'employee-1' }],
+        data: [{ id: 'employee-1', name: 'Aisyah Rahman' }],
         error: null,
       },
     );
@@ -151,16 +172,6 @@ describe('createDepartment', () => {
     });
 
     expect(result.error).toBeNull();
-    expect(insertCalls).toEqual([
-      {
-        table: 'departments',
-        values: expect.objectContaining({ head_employee_id: 'employee-1' }),
-      },
-      {
-        table: 'departments',
-        values: expect.objectContaining({ head_employee_id: 'profile-1' }),
-      },
-    ]);
     expect(result.data).toMatchObject({
       headEmployeeId: 'employee-1',
       headEmployeeName: 'Aisyah Rahman',
@@ -169,13 +180,8 @@ describe('createDepartment', () => {
 });
 
 describe('updateDepartment', () => {
-  it('falls back to the linked profile id on legacy head employee foreign keys', async () => {
-    queueResolves(
-      { data: null, error: null },
-      { data: { id: 'profile-1' }, error: null },
-      { data: null, error: { message: 'violates foreign key constraint "departments_head_employee_id_fkey"' } },
-      { data: null, error: null },
-    );
+  it('surfaces an error when the department head update rejects employee ownership', async () => {
+    queueResolves({ data: null, error: { message: 'violates foreign key constraint "departments_head_employee_id_fkey"' } });
 
     const result = await updateDepartment('dept-1', 'admin-1', {
       name: 'HR',
@@ -184,16 +190,28 @@ describe('updateDepartment', () => {
       isActive: true,
     });
 
-    expect(result.error).toBeNull();
+    expect(result.error).toBe('violates foreign key constraint "departments_head_employee_id_fkey"');
     expect(updateCalls).toEqual([
       {
         table: 'departments',
         values: expect.objectContaining({ head_employee_id: 'employee-1' }),
       },
-      {
-        table: 'departments',
-        values: expect.objectContaining({ head_employee_id: 'profile-1' }),
-      },
     ]);
+  });
+});
+
+describe('deleteDepartment', () => {
+  it('blocks deletion when workforce employees are still assigned', async () => {
+    queueResolves({ data: null, error: null, count: 2 });
+
+    const result = await deleteDepartment('dept-1', 'admin-1');
+
+    expect(result.error).toBe('Cannot delete: 2 employee(s) are assigned to this department. Reassign them first.');
+    expect(eqCalls).toEqual(expect.arrayContaining([
+      { table: 'employees', column: 'department_id', value: 'dept-1' },
+    ]));
+    expect(eqCalls).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: 'profiles' }),
+    ]));
   });
 });

@@ -10,11 +10,6 @@ import {
   Announcement, CreateAnnouncementInput,
 } from '@/types';
 import { HRMS_LEAVE_APPROVER_ROLES, HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
-
-// Disambiguate the profiles→departments embed: departments also has a FK
-// back to profiles (departments.head_employee_id), so PostgREST refuses to
-// pick one without a hint. Use the specific FK name.
-const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, manager_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, department:departments!profiles_department_id_fkey(name), job_title:job_titles!profiles_job_title_id_fkey(name)';
 const DIRECTORY_EMPLOYEE_SELECT = 'id, company_id, branch_id, manager_employee_id, primary_role, status, staff_code, name, work_email, personal_email, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, department:departments!employees_department_id_fkey(name), job_title:job_titles!employees_job_title_id_fkey(name)';
 
 type ApprovalStepRecord = {
@@ -116,92 +111,63 @@ function rowToAppraisalItem(row: Record<string, unknown>): AppraisalItemRecord {
 async function resolveDirectManagerApproverUserId(
   requesterId: string,
 ): Promise<{ data: string | null; error: string | null }> {
-  const requesterProfileId = await resolveLegacyProfileEmployeeId(requesterId);
+  const requesterProfileId = await resolveRequiredProfileId(requesterId);
   if (requesterProfileId.error) return { data: null, error: requesterProfileId.error };
 
   const requesterProfileResult = await supabase
     .from('profiles')
-    .select('manager_id, employee_id')
+    .select('employee_id')
     .eq('id', requesterProfileId.data)
     .maybeSingle();
 
   if (requesterProfileResult.error) {
-    if (!isMissingWorkforceSchemaError(requesterProfileResult.error.message)) {
-      return { data: null, error: requesterProfileResult.error.message };
-    }
-
-    const { data: legacyRequesterProfile, error: legacyRequesterProfileError } = await supabase
-      .from('profiles')
-      .select('manager_id')
-      .eq('id', requesterProfileId.data)
-      .maybeSingle();
-    if (legacyRequesterProfileError) {
-      return { data: null, error: legacyRequesterProfileError.message };
-    }
-
-    const legacyManagerId = (legacyRequesterProfile as Record<string, unknown> | null)?.manager_id;
-    return legacyManagerId
-      ? { data: String(legacyManagerId), error: null }
-      : {
-          data: null,
-          error: 'The requester does not have a reporting manager assigned for the next approval step.',
-        };
+    return { data: null, error: requesterProfileResult.error.message };
   }
 
   const requesterProfile = requesterProfileResult.data as Record<string, unknown> | null;
-  const legacyManagerId = requesterProfile?.manager_id ? String(requesterProfile.manager_id) : null;
   const requesterEmployeeId = requesterProfile?.employee_id ? String(requesterProfile.employee_id) : null;
 
-  if (requesterEmployeeId) {
-    const { data: requesterEmployee, error: requesterEmployeeError } = await supabase
-      .from('employees')
-      .select('manager_employee_id')
-      .eq('id', requesterEmployeeId)
-      .maybeSingle();
-
-    if (requesterEmployeeError) {
-      if (!isMissingWorkforceSchemaError(requesterEmployeeError.message)) {
-        return { data: null, error: requesterEmployeeError.message };
-      }
-    } else {
-      const managerEmployeeId = (requesterEmployee as Record<string, unknown> | null)?.manager_employee_id;
-      if (managerEmployeeId) {
-        const managerEmployeeIdText = String(managerEmployeeId);
-
-        const { data: managerProfile, error: managerProfileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('employee_id', managerEmployeeIdText)
-          .maybeSingle();
-        if (managerProfileError) {
-          if (!isMissingWorkforceSchemaError(managerProfileError.message)) {
-            return { data: null, error: managerProfileError.message };
-          }
-        } else if (managerProfile?.id) {
-          return { data: String(managerProfile.id), error: null };
-        }
-
-        const { data: directManagerProfile, error: directManagerProfileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', managerEmployeeIdText)
-          .maybeSingle();
-        if (directManagerProfileError) {
-          return { data: null, error: directManagerProfileError.message };
-        }
-        if (directManagerProfile?.id) {
-          return { data: String(directManagerProfile.id), error: null };
-        }
-      }
-    }
+  if (!requesterEmployeeId) {
+    return {
+      data: null,
+      error: 'The requester must be linked to a workforce employee for direct-manager approval routing.',
+    };
   }
 
-  return legacyManagerId
-    ? { data: legacyManagerId, error: null }
-    : {
-        data: null,
-        error: 'The requester does not have a reporting manager assigned for the next approval step.',
-      };
+  const { data: requesterEmployee, error: requesterEmployeeError } = await supabase
+    .from('employees')
+    .select('manager_employee_id')
+    .eq('id', requesterEmployeeId)
+    .maybeSingle();
+  if (requesterEmployeeError) {
+    return { data: null, error: requesterEmployeeError.message };
+  }
+
+  const managerEmployeeId = (requesterEmployee as Record<string, unknown> | null)?.manager_employee_id;
+  if (!managerEmployeeId) {
+    return {
+      data: null,
+      error: 'The requester does not have a reporting manager assigned for the next approval step.',
+    };
+  }
+
+  const managerEmployeeIdText = String(managerEmployeeId);
+  const { data: managerProfile, error: managerProfileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('employee_id', managerEmployeeIdText)
+    .maybeSingle();
+  if (managerProfileError) {
+    return { data: null, error: managerProfileError.message };
+  }
+  if (!managerProfile?.id) {
+    return {
+      data: null,
+      error: 'The requester reporting manager does not have a linked user profile.',
+    };
+  }
+
+  return { data: String(managerProfile.id), error: null };
 }
 
 async function resolveStepRouting(
@@ -357,29 +323,6 @@ async function getAppraisalItemActionContext(itemId: string): Promise<{
   };
 }
 
-function rowToEmployee(row: Record<string, unknown>): Employee {
-  return {
-    id:             String(row.id ?? ''),
-    email:          String(row.email ?? ''),
-    name:           String(row.name ?? ''),
-    role:           (row.role as AppRole) ?? 'analyst',
-    companyId:      String(row.company_id ?? ''),
-    branchId:       row.branch_id ? String(row.branch_id) : undefined,
-    managerId:      row.manager_id ? String(row.manager_id) : undefined,
-    staffCode:      row.staff_code ? String(row.staff_code) : undefined,
-    icNo:           row.ic_no ? String(row.ic_no) : undefined,
-    contactNo:      row.contact_no ? String(row.contact_no) : undefined,
-    joinDate:       row.join_date ? String(row.join_date) : undefined,
-    resignDate:     row.resign_date ? String(row.resign_date) : undefined,
-    status:         (row.status as EmployeeStatus) ?? 'active',
-    avatarUrl:      row.avatar_url ? String(row.avatar_url) : undefined,
-    departmentId:   row.department_id ? String(row.department_id) : undefined,
-    departmentName: row.department ? String((row.department as Record<string, unknown>)?.name ?? '') : undefined,
-    jobTitleId:     row.job_title_id ? String(row.job_title_id) : undefined,
-    jobTitleName:   row.job_title ? String((row.job_title as Record<string, unknown>)?.name ?? '') : undefined,
-  };
-}
-
 function rowToDirectoryEmployee(row: Record<string, unknown>): Employee {
   return {
     id:             String(row.id ?? ''),
@@ -403,28 +346,7 @@ function rowToDirectoryEmployee(row: Record<string, unknown>): Employee {
   };
 }
 
-function isMissingWorkforceSchemaError(message: string | null | undefined): boolean {
-  const text = (message ?? '').toLowerCase();
-  return [
-    'relation "employees" does not exist',
-    'relation "employee_module_assignments" does not exist',
-    'column employees.primary_role does not exist',
-    'column profiles.employee_id does not exist',
-    'could not find the table',
-    'could not find a relationship',
-  ].some(fragment => text.includes(fragment));
-}
-
-function isLegacyEmployeeOwnershipWriteError(message: string | null | undefined): boolean {
-  const text = (message ?? '').toLowerCase();
-  return [
-    'violates foreign key constraint',
-    'violates row-level security policy',
-    'new row violates row-level security policy',
-  ].some(fragment => text.includes(fragment));
-}
-
-async function resolveLegacyProfileEmployeeId(
+async function resolveRequiredProfileId(
   employeeId: string,
 ): Promise<{ data: string; error: string | null }> {
   if (!employeeId) return { data: employeeId, error: null };
@@ -443,76 +365,18 @@ async function resolveLegacyProfileEmployeeId(
     .eq('employee_id', employeeId)
     .maybeSingle();
 
-  if (linkedError) {
-    if (isMissingWorkforceSchemaError(linkedError.message)) {
-      return { data: employeeId, error: null };
-    }
-    return { data: employeeId, error: linkedError.message };
+  if (linkedError) return { data: employeeId, error: linkedError.message };
+  if (!linkedProfile?.id) {
+    return { data: employeeId, error: `No profile linked to employee '${employeeId}'.` };
   }
 
   return {
-    data: linkedProfile?.id ? String(linkedProfile.id) : employeeId,
-    error: null,
-  };
-}
-
-async function resolveEmployeeOwnershipCandidateIds(
-  employeeId: string,
-): Promise<{ data: string[]; error: string | null }> {
-  if (!employeeId) return { data: [], error: null };
-
-  const candidateIds = new Set<string>([employeeId]);
-
-  const { data: directProfile, error: directError } = await supabase
-    .from('profiles')
-    .select('id, employee_id')
-    .eq('id', employeeId)
-    .maybeSingle();
-  if (directError) {
-    if (!isMissingWorkforceSchemaError(directError.message)) {
-      return { data: [], error: directError.message };
-    }
-
-    const { data: legacyDirectProfile, error: legacyDirectError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', employeeId)
-      .maybeSingle();
-    if (legacyDirectError) return { data: [], error: legacyDirectError.message };
-    if (legacyDirectProfile?.id) candidateIds.add(String(legacyDirectProfile.id));
-
-    return { data: [...candidateIds], error: null };
-  }
-
-  if (directProfile?.id) {
-    candidateIds.add(String(directProfile.id));
-    if (directProfile.employee_id) candidateIds.add(String(directProfile.employee_id));
-    return { data: [...candidateIds], error: null };
-  }
-
-  const { data: linkedProfile, error: linkedError } = await supabase
-    .from('profiles')
-    .select('id, employee_id')
-    .eq('employee_id', employeeId)
-    .maybeSingle();
-  if (linkedError) {
-    if (isMissingWorkforceSchemaError(linkedError.message)) {
-      return { data: [...candidateIds], error: null };
-    }
-    return { data: [], error: linkedError.message };
-  }
-
-  if (linkedProfile?.employee_id) candidateIds.add(String(linkedProfile.employee_id));
-  if (linkedProfile?.id) candidateIds.add(String(linkedProfile.id));
-
-  return {
-    data: [...candidateIds],
+    data: String(linkedProfile.id),
     error: null,
   };
 }
 
 type StoredEmployeeIdentity = {
-  employeeId: string;
   name?: string;
 };
 
@@ -524,54 +388,14 @@ async function resolveStoredEmployeeIdentities(
 
   if (!uniqueIds.length) return { data: identities, error: null };
 
-  const { data: profileRows, error: profileError } = await supabase
-    .from('profiles')
-    .select('id, name, employee_id')
-    .in('id', uniqueIds);
-
-  if (profileError) {
-    if (!isMissingWorkforceSchemaError(profileError.message)) {
-      return { data: identities, error: profileError.message };
-    }
-
-    const { data: fallbackRows, error: fallbackError } = await supabase
-      .from('profiles')
-      .select('id, name')
-      .in('id', uniqueIds);
-    if (fallbackError) return { data: identities, error: fallbackError.message };
-
-    for (const row of fallbackRows ?? []) {
-      identities.set(String(row.id), {
-        employeeId: String(row.id),
-        name: row.name ? String(row.name) : undefined,
-      });
-    }
-  } else {
-    for (const row of profileRows ?? []) {
-      identities.set(String(row.id), {
-        employeeId: row.employee_id ? String(row.employee_id) : String(row.id),
-        name: row.name ? String(row.name) : undefined,
-      });
-    }
-  }
-
-  const unresolvedIds = uniqueIds.filter(id => !identities.has(id));
-  if (!unresolvedIds.length) return { data: identities, error: null };
-
   const { data: employeeRows, error: employeeError } = await supabase
     .from('employees')
     .select('id, name')
-    .in('id', unresolvedIds);
-  if (employeeError) {
-    if (isMissingWorkforceSchemaError(employeeError.message)) {
-      return { data: identities, error: null };
-    }
-    return { data: identities, error: employeeError.message };
-  }
+    .in('id', uniqueIds);
+  if (employeeError) return { data: identities, error: employeeError.message };
 
   for (const row of employeeRows ?? []) {
     identities.set(String(row.id), {
-      employeeId: String(row.id),
       name: row.name ? String(row.name) : undefined,
     });
   }
@@ -591,23 +415,7 @@ async function resolveStoredProfileIds(
     .from('profiles')
     .select('id, employee_id')
     .in('id', uniqueIds);
-  if (directError) {
-    if (!isMissingWorkforceSchemaError(directError.message)) {
-      return { data: profileIds, error: directError.message };
-    }
-
-    const { data: fallbackRows, error: fallbackError } = await supabase
-      .from('profiles')
-      .select('id')
-      .in('id', uniqueIds);
-    if (fallbackError) return { data: profileIds, error: fallbackError.message };
-
-    for (const row of fallbackRows ?? []) {
-      profileIds.set(String(row.id), String(row.id));
-    }
-
-    return { data: profileIds, error: null };
-  }
+  if (directError) return { data: profileIds, error: directError.message };
 
   for (const row of directRows ?? []) {
     profileIds.set(String(row.id), String(row.id));
@@ -621,12 +429,7 @@ async function resolveStoredProfileIds(
     .from('profiles')
     .select('id, employee_id')
     .in('employee_id', unresolvedIds);
-  if (linkedError) {
-    if (isMissingWorkforceSchemaError(linkedError.message)) {
-      return { data: profileIds, error: null };
-    }
-    return { data: profileIds, error: linkedError.message };
-  }
+  if (linkedError) return { data: profileIds, error: linkedError.message };
 
   for (const row of linkedRows ?? []) {
     if (row.employee_id) profileIds.set(String(row.employee_id), String(row.id));
@@ -643,43 +446,12 @@ export async function listEmployeeDirectory(companyId: string): Promise<{ data: 
     .eq('company_id', companyId)
     .order('name');
 
-  if (error) {
-    if (isMissingWorkforceSchemaError(error.message)) {
-      return listEmployees(companyId);
-    }
-    return { data: [], error: error.message };
-  }
+  if (error) return { data: [], error: error.message };
 
   return {
     data: (data ?? []).map((row: Record<string, unknown>) => rowToDirectoryEmployee(row)),
     error: null,
   };
-}
-
-/** Fetch all employees (all roles) for a company, ordered by name. */
-export async function listEmployees(companyId: string): Promise<{ data: Employee[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(PROFILE_SELECT)
-    .eq('company_id', companyId)
-    .order('name');
-  if (error) return { data: [], error: error.message };
-  return { data: (data ?? []).map(r => rowToEmployee(r as Record<string, unknown>)), error: null };
-}
-
-/** Look up a profile by exact name (case-insensitive) — used to resolve salesman_name → salesman_id during import. */
-export async function findEmployeeByName(
-  companyId: string,
-  name: string,
-): Promise<Employee | null> {
-  const { data } = await supabase
-    .from('profiles')
-    .select(PROFILE_SELECT)
-    .eq('company_id', companyId)
-    .ilike('name', name.trim())
-    .limit(1)
-    .single();
-  return data ? rowToEmployee(data as Record<string, unknown>) : null;
 }
 
 export interface CreateEmployeeInput {
@@ -726,29 +498,6 @@ async function syncSalesAdvisorAssignment(
   return { error: error?.message ?? null };
 }
 
-async function createLegacyProfileEmployee(input: CreateEmployeeInput, actorId?: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('profiles').insert({
-    id:          input.id,
-    email:       input.email,
-    name:        input.name,
-    role:        input.role,
-    company_id:  input.companyId,
-    branch_id:   input.branchId ?? null,
-    manager_id:  input.managerId ?? null,
-    access_scope: 'self',
-    status:      'active',
-    staff_code:  input.staffCode?.toUpperCase() ?? null,
-    ic_no:       input.icNo ?? null,
-    contact_no:  input.contactNo ?? null,
-    join_date:   input.joinDate ?? null,
-  });
-  if (!error && actorId) {
-    void logUserAction(actorId, 'create', 'employee', input.id,
-      { name: input.name, role: input.role, staffCode: input.staffCode });
-  }
-  return { error: error?.message ?? null };
-}
-
 export async function createEmployee(input: CreateEmployeeInput, actorId?: string): Promise<{ error: string | null }> {
   const { error } = await supabase.from('employees').insert({
     id:                  input.id,
@@ -765,15 +514,10 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
     join_date:           input.joinDate ?? null,
   });
 
-  if (error) {
-    if (!isMissingWorkforceSchemaError(error.message)) return { error: error.message };
-    return createLegacyProfileEmployee(input, actorId);
-  }
+  if (error) return { error: error.message };
 
   const assignment = await syncSalesAdvisorAssignment(input.id, input.companyId, input.role);
-  if (assignment.error && !isMissingWorkforceSchemaError(assignment.error)) {
-    return assignment;
-  }
+  if (assignment.error) return assignment;
 
   if (actorId) {
     void logUserAction(actorId, 'create', 'employee', input.id,
@@ -797,32 +541,6 @@ export interface UpdateEmployeeInput {
   jobTitleId?: string | null;
 }
 
-async function updateLegacyProfileEmployee(
-  id: string,
-  input: UpdateEmployeeInput,
-  actorId?: string,
-): Promise<{ error: string | null }> {
-  const payload: Record<string, unknown> = {};
-  if (input.name         !== undefined) payload.name          = input.name;
-  if (input.role         !== undefined) payload.role          = input.role;
-  if (input.branchId     !== undefined) payload.branch_id     = input.branchId;
-  if (input.managerId    !== undefined) payload.manager_id    = input.managerId;
-  if (input.staffCode    !== undefined) payload.staff_code    = input.staffCode?.toUpperCase();
-  if (input.icNo         !== undefined) payload.ic_no         = input.icNo;
-  if (input.contactNo    !== undefined) payload.contact_no    = input.contactNo;
-  if (input.joinDate     !== undefined) payload.join_date     = input.joinDate;
-  if (input.resignDate   !== undefined) payload.resign_date   = input.resignDate;
-  if (input.status       !== undefined) payload.status        = input.status;
-  if (input.departmentId !== undefined) payload.department_id = input.departmentId;
-  if (input.jobTitleId   !== undefined) payload.job_title_id  = input.jobTitleId;
-
-  const { error } = await supabase.from('profiles').update(payload).eq('id', id);
-  if (!error && actorId) {
-    void logUserAction(actorId, 'update', 'employee', id, { changes: payload });
-  }
-  return { error: error?.message ?? null };
-}
-
 export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string): Promise<{ error: string | null }> {
   const payload: Record<string, unknown> = {};
   if (input.name         !== undefined) payload.name                = input.name;
@@ -839,10 +557,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.jobTitleId   !== undefined) payload.job_title_id        = input.jobTitleId;
 
   const { error } = await supabase.from('employees').update(payload).eq('id', id);
-  if (error) {
-    if (!isMissingWorkforceSchemaError(error.message)) return { error: error.message };
-    return updateLegacyProfileEmployee(id, input, actorId);
-  }
+  if (error) return { error: error.message };
 
   if (input.role !== undefined) {
     const { data: employeeRow, error: employeeError } = await supabase
@@ -850,14 +565,10 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
       .select('company_id')
       .eq('id', id)
       .single();
-    if (employeeError && !isMissingWorkforceSchemaError(employeeError.message)) {
-      return { error: employeeError.message };
-    }
+    if (employeeError) return { error: employeeError.message };
     if (employeeRow?.company_id) {
       const assignment = await syncSalesAdvisorAssignment(id, String(employeeRow.company_id), input.role);
-      if (assignment.error && !isMissingWorkforceSchemaError(assignment.error)) {
-        return assignment;
-      }
+      if (assignment.error) return assignment;
     }
   }
 
@@ -921,25 +632,16 @@ export async function listLeaveTypes(companyId: string): Promise<{ data: LeaveTy
 }
 
 export async function listLeaveBalances(employeeId: string, year: number): Promise<{ data: LeaveBalance[]; error: string | null }> {
-  const employeeOwnerIds = await resolveEmployeeOwnershipCandidateIds(employeeId);
-  if (employeeOwnerIds.error) return { data: [], error: employeeOwnerIds.error };
-
-  let query = supabase
+  const { data, error } = await supabase
     .from('leave_balances')
     .select('*, leave_types(name)')
-    .eq('year', year);
-  query = employeeOwnerIds.data.length > 1
-    ? query.in('employee_id', employeeOwnerIds.data)
-    : query.eq('employee_id', employeeOwnerIds.data[0]);
-
-  const { data, error } = await query;
+    .eq('year', year)
+    .eq('employee_id', employeeId);
   if (error) return { data: [], error: error.message };
-  const identityMap = await resolveStoredEmployeeIdentities((data ?? []).map(row => String(row.employee_id ?? '')));
-  if (identityMap.error) return { data: [], error: identityMap.error };
 
   const mapped: LeaveBalance[] = (data ?? []).map(r => ({
     id:            String(r.id),
-    employeeId:    identityMap.data.get(String(r.employee_id ?? ''))?.employeeId ?? String(r.employee_id),
+    employeeId:    String(r.employee_id ?? ''),
     leaveTypeId:   String(r.leave_type_id),
     year:          Number(r.year),
     entitledDays:  Number(r.entitled_days),
@@ -953,18 +655,12 @@ export async function listLeaveRequests(
   companyId: string,
   opts?: { employeeId?: string; status?: LeaveStatus; includeApprovalHistory?: boolean },
 ): Promise<{ data: LeaveRequest[]; error: string | null }> {
-  const employeeOwnerIds = opts?.employeeId
-    ? await resolveEmployeeOwnershipCandidateIds(opts.employeeId)
-    : { data: [] as string[], error: null as string | null };
-  if (employeeOwnerIds.error) return { data: [], error: employeeOwnerIds.error };
-
   let q = supabase
     .from('leave_requests')
     .select('*, leave_types(name)')
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
-  if (employeeOwnerIds.data.length > 1) q = q.in('employee_id', employeeOwnerIds.data);
-  else if (employeeOwnerIds.data.length === 1) q = q.eq('employee_id', employeeOwnerIds.data[0]);
+  if (opts?.employeeId) q = q.eq('employee_id', opts.employeeId);
   if (opts?.status)     q = q.eq('status', opts.status);
   const { data, error } = await q;
   if (error) return { data: [], error: error.message };
@@ -1008,7 +704,7 @@ export async function listLeaveRequests(
   const mapped: LeaveRequest[] = (data ?? []).map((r: Record<string, unknown>) => ({
     id:            String(r.id),
     companyId:     String(r.company_id),
-    employeeId:    identityMap.data.get(String(r.employee_id ?? ''))?.employeeId ?? String(r.employee_id),
+    employeeId:    String(r.employee_id ?? ''),
     employeeName:  identityMap.data.get(String(r.employee_id ?? ''))?.name,
     leaveTypeId:   String(r.leave_type_id),
     leaveTypeName: (r.leave_types as Record<string, unknown> | null)?.name ? String((r.leave_types as Record<string, unknown>).name) : undefined,
@@ -1049,7 +745,7 @@ export async function createLeaveRequest(
   input: CreateLeaveRequestInput,
 ): Promise<{ error: string | null }> {
   try {
-    const requesterProfileId = await resolveLegacyProfileEmployeeId(employeeId);
+    const requesterProfileId = await resolveRequiredProfileId(employeeId);
     if (requesterProfileId.error) return { error: requesterProfileId.error };
 
     const leaveRequestId = await createSharedLeaveRequest(employeeId, companyId, {
@@ -1086,7 +782,7 @@ export async function reviewLeaveRequest(
   const requestOwnerId = String((req as Record<string, unknown> | null)?.employee_id ?? '');
   if (!requestOwnerId) return { error: 'Leave request not found.' };
 
-  const requesterProfileId = await resolveLegacyProfileEmployeeId(requestOwnerId);
+  const requesterProfileId = await resolveRequiredProfileId(requestOwnerId);
   if (requesterProfileId.error) return { error: requesterProfileId.error };
 
   const { data: reviewer, error: reviewerError } = await supabase
@@ -1256,18 +952,12 @@ export async function listAttendanceRecords(
   companyId: string,
   opts?: { employeeId?: string; dateFrom?: string; dateTo?: string },
 ): Promise<{ data: AttendanceRecord[]; error: string | null }> {
-  const employeeOwnerIds = opts?.employeeId
-    ? await resolveEmployeeOwnershipCandidateIds(opts.employeeId)
-    : { data: [] as string[], error: null as string | null };
-  if (employeeOwnerIds.error) return { data: [], error: employeeOwnerIds.error };
-
   let q = supabase
     .from('attendance_records')
     .select('*')
     .eq('company_id', companyId)
     .order('date', { ascending: false });
-  if (employeeOwnerIds.data.length > 1) q = q.in('employee_id', employeeOwnerIds.data);
-  else if (employeeOwnerIds.data.length === 1) q = q.eq('employee_id', employeeOwnerIds.data[0]);
+  if (opts?.employeeId) q = q.eq('employee_id', opts.employeeId);
   if (opts?.dateFrom)   q = q.gte('date', opts.dateFrom);
   if (opts?.dateTo)     q = q.lte('date', opts.dateTo);
   const { data, error } = await q;
@@ -1278,7 +968,7 @@ export async function listAttendanceRecords(
   const mapped: AttendanceRecord[] = (data ?? []).map((r: Record<string, unknown>) => ({
     id:           String(r.id),
     companyId:    String(r.company_id),
-    employeeId:   identityMap.data.get(String(r.employee_id ?? ''))?.employeeId ?? String(r.employee_id),
+    employeeId:   String(r.employee_id ?? ''),
     employeeName: identityMap.data.get(String(r.employee_id ?? ''))?.name,
     date:         String(r.date),
     clockIn:      r.clock_in ? String(r.clock_in) : undefined,
@@ -1296,31 +986,18 @@ export async function upsertAttendance(
   companyId: string,
   input: UpsertAttendanceInput,
 ): Promise<{ error: string | null }> {
-  const requesterProfileId = await resolveLegacyProfileEmployeeId(input.employeeId);
-  if (requesterProfileId.error) return { error: requesterProfileId.error };
+  const { error } = await supabase.from('attendance_records').upsert({
+    company_id:   companyId,
+    employee_id:  input.employeeId,
+    date:         input.date,
+    clock_in:     input.clockIn ?? null,
+    clock_out:    input.clockOut ?? null,
+    hours_worked: input.hoursWorked ?? null,
+    status:       input.status,
+    notes:        input.notes ?? null,
+  }, { onConflict: 'employee_id,date' });
 
-  const upsertForOwner = async (storedEmployeeId: string): Promise<{ error: string | null }> => {
-    const { error } = await supabase.from('attendance_records').upsert({
-      company_id:   companyId,
-      employee_id:  storedEmployeeId,
-      date:         input.date,
-      clock_in:     input.clockIn ?? null,
-      clock_out:    input.clockOut ?? null,
-      hours_worked: input.hoursWorked ?? null,
-      status:       input.status,
-      notes:        input.notes ?? null,
-    }, { onConflict: 'employee_id,date' });
-    return { error: error?.message ?? null };
-  };
-
-  const directWrite = await upsertForOwner(input.employeeId);
-  if (!directWrite.error) return directWrite;
-
-  if (requesterProfileId.data === input.employeeId || !isLegacyEmployeeOwnershipWriteError(directWrite.error)) {
-    return directWrite;
-  }
-
-  return upsertForOwner(requesterProfileId.data);
+  return { error: error?.message ?? null };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1724,7 +1401,7 @@ export async function listPayrollItems(runId: string): Promise<{ data: PayrollIt
   const mapped: PayrollItem[] = (data ?? []).map((r: Record<string, unknown>) => ({
     id:              String(r.id),
     payrollRunId:    String(r.payroll_run_id),
-    employeeId:      identityMap.data.get(String(r.employee_id ?? ''))?.employeeId ?? String(r.employee_id),
+    employeeId:      String(r.employee_id ?? ''),
     employeeName:    identityMap.data.get(String(r.employee_id ?? ''))?.name,
     basicSalary:     Number(r.basic_salary),
     allowances:      Number(r.allowances),
@@ -2172,7 +1849,7 @@ export async function listAppraisalItems(appraisalId: string): Promise<{ data: A
   const mapped: AppraisalItem[] = (data ?? []).map((r: Record<string, unknown>) => ({
     id:               String(r.id),
     appraisalId:      String(r.appraisal_id),
-    employeeId:       identityMap.data.get(String(r.employee_id ?? ''))?.employeeId ?? String(r.employee_id),
+    employeeId:       String(r.employee_id ?? ''),
     employeeName:     identityMap.data.get(String(r.employee_id ?? ''))?.name,
     reviewerId:       r.reviewer_id ? String(r.reviewer_id) : undefined,
     reviewerName:     (r.reviewer as Record<string, unknown> | null)?.name ? String((r.reviewer as Record<string, unknown>).name) : undefined,
@@ -2193,10 +1870,7 @@ export async function submitAppraisalSelfReview(
   employeeId: string,
   input: Pick<AppraisalItem, 'goals' | 'achievements' | 'areasToImprove' | 'employeeComments'>,
 ): Promise<{ error: string | null }> {
-  const employeeOwnerIds = await resolveEmployeeOwnershipCandidateIds(employeeId);
-  if (employeeOwnerIds.error) return { error: employeeOwnerIds.error };
-
-  const requesterProfileId = await resolveLegacyProfileEmployeeId(employeeId);
+  const requesterProfileId = await resolveRequiredProfileId(employeeId);
   if (requesterProfileId.error) return { error: requesterProfileId.error };
 
   const context = await getAppraisalItemActionContext(itemId);
@@ -2205,7 +1879,7 @@ export async function submitAppraisalSelfReview(
 
   const { item, appraisalStatus } = context.data;
   if (appraisalStatus !== 'open') return { error: 'Self review is only available for active appraisal cycles.' };
-  if (!employeeOwnerIds.data.includes(item.employeeId)) return { error: 'You can only submit your own appraisal self review.' };
+  if (item.employeeId !== employeeId) return { error: 'You can only submit your own appraisal self review.' };
   if (!['pending', 'self_reviewed'].includes(item.status)) {
     return { error: 'This appraisal item is no longer open for self review.' };
   }
@@ -2275,10 +1949,7 @@ export async function acknowledgeAppraisalItem(
   employeeId: string,
   employeeComments?: string,
 ): Promise<{ error: string | null }> {
-  const employeeOwnerIds = await resolveEmployeeOwnershipCandidateIds(employeeId);
-  if (employeeOwnerIds.error) return { error: employeeOwnerIds.error };
-
-  const requesterProfileId = await resolveLegacyProfileEmployeeId(employeeId);
+  const requesterProfileId = await resolveRequiredProfileId(employeeId);
   if (requesterProfileId.error) return { error: requesterProfileId.error };
 
   const context = await getAppraisalItemActionContext(itemId);
@@ -2289,7 +1960,7 @@ export async function acknowledgeAppraisalItem(
   if (!['open', 'completed'].includes(appraisalStatus)) {
     return { error: 'Acknowledgement is only available for active appraisal cycles.' };
   }
-  if (!employeeOwnerIds.data.includes(item.employeeId)) {
+  if (item.employeeId !== employeeId) {
     return { error: 'You can only acknowledge your own appraisal review.' };
   }
   if (!['reviewed', 'acknowledged'].includes(item.status)) {

@@ -63,7 +63,6 @@ export default function UserManagement() {
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [activating, setActivating] = useState<string>('');
   const [employeesByCompany, setEmployeesByCompany] = useState<Record<string, Employee[]>>({});
-  const [supportsEmployeeLinking, setSupportsEmployeeLinking] = useState(false);
   const [pendingSelections, setPendingSelections] = useState<
     Record<string, { role: AppRole; company_id: string; employee_id: string | null }>
   >({});
@@ -104,31 +103,26 @@ export default function UserManagement() {
         toast.error('Failed to load users: ' + profileRes.error);
       }
       setProfiles(profileRes.data);
-      setSupportsEmployeeLinking(profileRes.supportsEmployeeLinking);
       setBranches(branchRes.data);
       setCompanies((companyRes.data as { id: string; name: string }[] | null) ?? []);
 
-      if (profileRes.supportsEmployeeLinking) {
-        const companyIds = [...new Set(
-          profileRes.data
-            .map(profile => profile.company_id)
-            .concat(user?.company_id ?? null)
-            .filter((companyId): companyId is string => Boolean(companyId)),
-        )];
+      const companyIds = [...new Set(
+        profileRes.data
+          .map(profile => profile.company_id)
+          .concat(user?.company_id ?? null)
+          .filter((companyId): companyId is string => Boolean(companyId)),
+      )];
 
-        const employeeResults = await Promise.all(companyIds.map(async (companyId) => ({
-          companyId,
-          result: await listEmployeeDirectory(companyId),
-        })));
+      const employeeResults = await Promise.all(companyIds.map(async (companyId) => ({
+        companyId,
+        result: await listEmployeeDirectory(companyId),
+      })));
 
-        const nextEmployeesByCompany: Record<string, Employee[]> = {};
-        for (const { companyId, result } of employeeResults) {
-          if (!result.error) nextEmployeesByCompany[companyId] = result.data;
-        }
-        setEmployeesByCompany(nextEmployeesByCompany);
-      } else {
-        setEmployeesByCompany({});
+      const nextEmployeesByCompany: Record<string, Employee[]> = {};
+      for (const { companyId, result } of employeeResults) {
+        if (!result.error) nextEmployeesByCompany[companyId] = result.data;
       }
+      setEmployeesByCompany(nextEmployeesByCompany);
 
       setLoading(false);
     }
@@ -163,7 +157,6 @@ export default function UserManagement() {
   }
 
   function getEmployeeLabel(profile: ProfileRow) {
-    if (!supportsEmployeeLinking) return 'Unavailable';
     if (!profile.employee_id || !profile.company_id) return 'Unlinked';
     const employee = (employeesByCompany[profile.company_id] ?? []).find(row => row.id === profile.employee_id);
     if (!employee) return profile.employee_id;
@@ -240,10 +233,7 @@ export default function UserManagement() {
     setSignupUrl(getSignupUrl());
     inviteForm.reset();
     const refreshed = await listProfiles();
-    if (!refreshed.error) {
-      setProfiles(refreshed.data);
-      setSupportsEmployeeLinking(refreshed.supportsEmployeeLinking);
-    }
+    if (!refreshed.error) setProfiles(refreshed.data);
   };
 
   // Pending users: created without a company assignment (e.g. via the
@@ -285,7 +275,7 @@ export default function UserManagement() {
       role: sel.role,
       company_id: sel.company_id,
       access_scope: (ROLE_DEFAULT_SCOPE[sel.role] || 'company') as AccessScope,
-      employee_id: supportsEmployeeLinking ? sel.employee_id : undefined,
+      employee_id: sel.employee_id,
       status: 'active',
     });
     setActivating('');
@@ -295,10 +285,7 @@ export default function UserManagement() {
     }
     toast.success(`${p.email} activated`);
     const refreshed = await listProfiles();
-    if (!refreshed.error) {
-      setProfiles(refreshed.data);
-      setSupportsEmployeeLinking(refreshed.supportsEmployeeLinking);
-    }
+    if (!refreshed.error) setProfiles(refreshed.data);
     setPendingSelections(prev => {
       const { [p.id]: _removed, ...rest } = prev;
       return rest;
@@ -380,21 +367,17 @@ export default function UserManagement() {
                       </Select>
                     </td>
                     <td className="px-4 py-2">
-                      {supportsEmployeeLinking ? (
-                        <Select value={sel.employee_id ?? 'none'} onValueChange={(v) => setPendingEmployee(p.id, v === 'none' ? null : v)}>
-                          <SelectTrigger className="h-8"><SelectValue placeholder="Link employee" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No employee link</SelectItem>
-                            {getEmployeeOptions(sel.company_id, p.id).map(employee => (
-                              <SelectItem key={employee.id} value={employee.id}>
-                                {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Unavailable</span>
-                      )}
+                      <Select value={sel.employee_id ?? 'none'} onValueChange={(v) => setPendingEmployee(p.id, v === 'none' ? null : v)}>
+                        <SelectTrigger className="h-8"><SelectValue placeholder="Link employee" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No employee link</SelectItem>
+                          {getEmployeeOptions(sel.company_id, p.id).map(employee => (
+                            <SelectItem key={employee.id} value={employee.id}>
+                              {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </td>
                     <td className="px-4 py-2 text-right">
                       <Button
@@ -533,24 +516,20 @@ export default function UserManagement() {
 
             <div className="space-y-2">
               <Label>Linked Employee</Label>
-              {supportsEmployeeLinking ? (
-                <Select
-                  value={editForm.watch('employee_id') ?? 'none'}
-                  onValueChange={(v) => editForm.setValue('employee_id', v === 'none' ? null : v, { shouldDirty: true, shouldValidate: true })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No employee link</SelectItem>
-                    {getEmployeeOptions(editUser?.company_id, editUser?.id).map(employee => (
-                      <SelectItem key={employee.id} value={employee.id}>
-                        {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <p className="text-xs text-muted-foreground">Apply the workforce migration to enable employee linking.</p>
-              )}
+              <Select
+                value={editForm.watch('employee_id') ?? 'none'}
+                onValueChange={(v) => editForm.setValue('employee_id', v === 'none' ? null : v, { shouldDirty: true, shouldValidate: true })}
+              >
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No employee link</SelectItem>
+                  {getEmployeeOptions(editUser?.company_id, editUser?.id).map(employee => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
@@ -663,24 +642,20 @@ export default function UserManagement() {
 
                 <div className="space-y-2">
                   <Label>Linked Employee</Label>
-                  {supportsEmployeeLinking ? (
-                    <Select
-                      value={inviteForm.watch('employee_id') ?? 'none'}
-                      onValueChange={(v) => inviteForm.setValue('employee_id', v === 'none' ? null : v, { shouldDirty: true, shouldValidate: true })}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No employee link</SelectItem>
-                        {getEmployeeOptions(user?.company_id).map(employee => (
-                          <SelectItem key={employee.id} value={employee.id}>
-                            {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">Apply the workforce migration to link invited users to employees.</p>
-                  )}
+                  <Select
+                    value={inviteForm.watch('employee_id') ?? 'none'}
+                    onValueChange={(v) => inviteForm.setValue('employee_id', v === 'none' ? null : v, { shouldDirty: true, shouldValidate: true })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No employee link</SelectItem>
+                      {getEmployeeOptions(user?.company_id).map(employee => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">

@@ -25,15 +25,6 @@ export interface ProfileRow {
 export interface ListProfilesResult {
   data: ProfileRow[];
   error: string | null;
-  supportsEmployeeLinking: boolean;
-}
-
-function isMissingEmployeeLinkColumnError(message: string | null | undefined): boolean {
-  const text = (message ?? '').toLowerCase();
-  return [
-    'column profiles.employee_id does not exist',
-    'employee_id',
-  ].some(fragment => text.includes(fragment));
 }
 
 /** List all profiles (optionally scoped to a company for non-super-admins). */
@@ -44,30 +35,8 @@ export async function listProfiles(companyId?: string): Promise<ListProfilesResu
     .order('created_at', { ascending: true });
   if (companyId) q = q.eq('company_id', companyId);
   const { data, error } = await q;
-  if (!error) {
-    return { data: (data ?? []) as unknown as ProfileRow[], error: null, supportsEmployeeLinking: true };
-  }
-
-  if (!isMissingEmployeeLinkColumnError(error.message)) {
-    return { data: [], error: error.message, supportsEmployeeLinking: false };
-  }
-
-  let fallbackQuery = supabase
-    .from('profiles')
-    .select('id, email, name, role, company_id, branch_id, access_scope, status, created_at')
-    .order('created_at', { ascending: true });
-  if (companyId) fallbackQuery = fallbackQuery.eq('company_id', companyId);
-
-  const { data: fallbackData, error: fallbackError } = await fallbackQuery;
-  if (fallbackError) {
-    return { data: [], error: fallbackError.message, supportsEmployeeLinking: false };
-  }
-
-  return {
-    data: (fallbackData ?? []) as unknown as ProfileRow[],
-    error: null,
-    supportsEmployeeLinking: false,
-  };
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []) as unknown as ProfileRow[], error: null };
 }
 
 export interface UpdateProfileInput {
@@ -94,11 +63,6 @@ export async function updateProfile(
   if (input.company_id !== undefined)   patch.company_id   = input.company_id;
   if (input.status !== undefined)       patch.status       = input.status;
   const { error } = await supabase.from('profiles').update(patch).eq('id', input.id);
-  if (error && input.employee_id !== undefined && isMissingEmployeeLinkColumnError(error.message)) {
-    const { employee_id: _employeeId, ...fallbackPatch } = patch;
-    const { error: fallbackError } = await supabase.from('profiles').update(fallbackPatch).eq('id', input.id);
-    return { error: fallbackError?.message ?? null };
-  }
   return { error: error?.message ?? null };
 }
 
