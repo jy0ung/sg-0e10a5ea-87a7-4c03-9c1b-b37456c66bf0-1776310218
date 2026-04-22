@@ -938,6 +938,80 @@ describe('createAppraisal', () => {
     }));
   });
 
+  it('routes direct-manager appraisal approvals from the workforce reporting line', async () => {
+    queueResolves(
+      { data: [{ id: 'flow-1' }], error: null },
+      {
+        data: {
+          id: 'app-1',
+          company_id: 'c1',
+          title: 'Quarterly Review 2026',
+          cycle: 'quarterly',
+          period_start: '2026-04-01',
+          period_end: '2026-06-30',
+          status: 'in_progress',
+          created_by: 'manager-1',
+          created_at: '2026-04-01T00:00:00.000Z',
+          updated_at: '2026-04-01T00:00:00.000Z',
+        },
+        error: null,
+      },
+      { data: [{ id: 'flow-1' }], error: null },
+      {
+        data: [{
+          id: 'step-1',
+          step_order: 1,
+          name: 'Direct Manager Review',
+          approver_type: 'direct_manager',
+          approver_role: null,
+          approver_user_id: null,
+          allow_self_approval: false,
+        }],
+        error: null,
+      },
+      {
+        data: { id: 'manager-1' },
+        error: null,
+      },
+      {
+        data: {
+          manager_id: null,
+          employee_id: 'employee-1',
+        },
+        error: null,
+      },
+      {
+        data: {
+          manager_employee_id: 'manager-employee-1',
+        },
+        error: null,
+      },
+      {
+        data: { id: 'manager-profile-1' },
+        error: null,
+      },
+      { data: null, error: null },
+    );
+
+    const result = await createAppraisal('c1', {
+      title: 'Quarterly Review 2026',
+      cycle: 'quarterly',
+      periodStart: '2026-04-01',
+      periodEnd: '2026-06-30',
+    }, 'manager-1');
+
+    expect(result.error).toBeNull();
+    expect(insertCalls).toContainEqual(expect.objectContaining({
+      table: 'approval_instances',
+      values: expect.objectContaining({
+        entity_type: 'appraisal',
+        entity_id: 'app-1',
+        current_step_name: 'Direct Manager Review',
+        current_approver_user_id: 'manager-profile-1',
+      }),
+    }));
+  });
+
   it('seeds appraisal items immediately when no activation approval flow exists', async () => {
     queueResolves(
       { data: [], error: null },

@@ -67,6 +67,88 @@ async function resolveEmployeeOwnershipCandidateIds(employeeId: string): Promise
   return [...new Set([employeeId, profileId].filter(Boolean))];
 }
 
+async function resolveDirectManagerApproverUserId(requesterId: string): Promise<string> {
+  const requesterProfileId = await resolveLegacyProfileEmployeeId(requesterId);
+
+  const requesterProfileResult = await supabase
+    .from('profiles')
+    .select('manager_id, employee_id')
+    .eq('id', requesterProfileId)
+    .maybeSingle();
+
+  if (requesterProfileResult.error) {
+    if (!isMissingWorkforceSchemaError(requesterProfileResult.error.message)) {
+      throw new Error(requesterProfileResult.error.message);
+    }
+
+    const { data: legacyRequesterProfile, error: legacyRequesterProfileError } = await supabase
+      .from('profiles')
+      .select('manager_id')
+      .eq('id', requesterProfileId)
+      .maybeSingle();
+    if (legacyRequesterProfileError) throw new Error(legacyRequesterProfileError.message);
+
+    const legacyManagerId = (legacyRequesterProfile as Record<string, unknown> | null)?.manager_id;
+    if (!legacyManagerId) {
+      throw new Error('The requester does not have a reporting manager assigned for the active approval flow.');
+    }
+
+    return String(legacyManagerId);
+  }
+
+  const requesterProfile = requesterProfileResult.data as Record<string, unknown> | null;
+  const legacyManagerId = requesterProfile?.manager_id ? String(requesterProfile.manager_id) : null;
+  const requesterEmployeeId = requesterProfile?.employee_id ? String(requesterProfile.employee_id) : null;
+
+  if (requesterEmployeeId) {
+    const { data: requesterEmployee, error: requesterEmployeeError } = await supabase
+      .from('employees')
+      .select('manager_employee_id')
+      .eq('id', requesterEmployeeId)
+      .maybeSingle();
+
+    if (requesterEmployeeError) {
+      if (!isMissingWorkforceSchemaError(requesterEmployeeError.message)) {
+        throw new Error(requesterEmployeeError.message);
+      }
+    } else {
+      const managerEmployeeId = (requesterEmployee as Record<string, unknown> | null)?.manager_employee_id;
+      if (managerEmployeeId) {
+        const managerEmployeeIdText = String(managerEmployeeId);
+
+        const { data: managerProfile, error: managerProfileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('employee_id', managerEmployeeIdText)
+          .maybeSingle();
+        if (managerProfileError) {
+          if (!isMissingWorkforceSchemaError(managerProfileError.message)) {
+            throw new Error(managerProfileError.message);
+          }
+        } else if (managerProfile?.id) {
+          return String(managerProfile.id);
+        }
+
+        const { data: directManagerProfile, error: directManagerProfileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', managerEmployeeIdText)
+          .maybeSingle();
+        if (directManagerProfileError) throw new Error(directManagerProfileError.message);
+        if (directManagerProfile?.id) {
+          return String(directManagerProfile.id);
+        }
+      }
+    }
+  }
+
+  if (!legacyManagerId) {
+    throw new Error('The requester does not have a reporting manager assigned for the active approval flow.');
+  }
+
+  return legacyManagerId;
+}
+
 type ApprovalBootstrapStep = {
   id: string;
   stepOrder: number;
@@ -101,19 +183,7 @@ async function resolveStepRouting(
     return { approverRole: null, approverUserId: step.approverUserId };
   }
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('manager_id')
-    .eq('id', requesterId)
-    .single();
-  if (error) throw new Error(error.message);
-
-  const managerId = (data as Record<string, unknown> | null)?.manager_id;
-  if (!managerId) {
-    throw new Error('The requester does not have a reporting manager assigned for the active approval flow.');
-  }
-
-  return { approverRole: null, approverUserId: String(managerId) };
+  return { approverRole: null, approverUserId: await resolveDirectManagerApproverUserId(requesterId) };
 }
 
 async function bootstrapLeaveApprovalInstance(

@@ -113,6 +113,97 @@ function rowToAppraisalItem(row: Record<string, unknown>): AppraisalItemRecord {
   };
 }
 
+async function resolveDirectManagerApproverUserId(
+  requesterId: string,
+): Promise<{ data: string | null; error: string | null }> {
+  const requesterProfileId = await resolveLegacyProfileEmployeeId(requesterId);
+  if (requesterProfileId.error) return { data: null, error: requesterProfileId.error };
+
+  const requesterProfileResult = await supabase
+    .from('profiles')
+    .select('manager_id, employee_id')
+    .eq('id', requesterProfileId.data)
+    .maybeSingle();
+
+  if (requesterProfileResult.error) {
+    if (!isMissingWorkforceSchemaError(requesterProfileResult.error.message)) {
+      return { data: null, error: requesterProfileResult.error.message };
+    }
+
+    const { data: legacyRequesterProfile, error: legacyRequesterProfileError } = await supabase
+      .from('profiles')
+      .select('manager_id')
+      .eq('id', requesterProfileId.data)
+      .maybeSingle();
+    if (legacyRequesterProfileError) {
+      return { data: null, error: legacyRequesterProfileError.message };
+    }
+
+    const legacyManagerId = (legacyRequesterProfile as Record<string, unknown> | null)?.manager_id;
+    return legacyManagerId
+      ? { data: String(legacyManagerId), error: null }
+      : {
+          data: null,
+          error: 'The requester does not have a reporting manager assigned for the next approval step.',
+        };
+  }
+
+  const requesterProfile = requesterProfileResult.data as Record<string, unknown> | null;
+  const legacyManagerId = requesterProfile?.manager_id ? String(requesterProfile.manager_id) : null;
+  const requesterEmployeeId = requesterProfile?.employee_id ? String(requesterProfile.employee_id) : null;
+
+  if (requesterEmployeeId) {
+    const { data: requesterEmployee, error: requesterEmployeeError } = await supabase
+      .from('employees')
+      .select('manager_employee_id')
+      .eq('id', requesterEmployeeId)
+      .maybeSingle();
+
+    if (requesterEmployeeError) {
+      if (!isMissingWorkforceSchemaError(requesterEmployeeError.message)) {
+        return { data: null, error: requesterEmployeeError.message };
+      }
+    } else {
+      const managerEmployeeId = (requesterEmployee as Record<string, unknown> | null)?.manager_employee_id;
+      if (managerEmployeeId) {
+        const managerEmployeeIdText = String(managerEmployeeId);
+
+        const { data: managerProfile, error: managerProfileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('employee_id', managerEmployeeIdText)
+          .maybeSingle();
+        if (managerProfileError) {
+          if (!isMissingWorkforceSchemaError(managerProfileError.message)) {
+            return { data: null, error: managerProfileError.message };
+          }
+        } else if (managerProfile?.id) {
+          return { data: String(managerProfile.id), error: null };
+        }
+
+        const { data: directManagerProfile, error: directManagerProfileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', managerEmployeeIdText)
+          .maybeSingle();
+        if (directManagerProfileError) {
+          return { data: null, error: directManagerProfileError.message };
+        }
+        if (directManagerProfile?.id) {
+          return { data: String(directManagerProfile.id), error: null };
+        }
+      }
+    }
+  }
+
+  return legacyManagerId
+    ? { data: legacyManagerId, error: null }
+    : {
+        data: null,
+        error: 'The requester does not have a reporting manager assigned for the next approval step.',
+      };
+}
+
 async function resolveStepRouting(
   step: ApprovalStepRecord,
   requesterId: string,
@@ -129,23 +220,10 @@ async function resolveStepRouting(
       : { approverRole: null, approverUserId: null, error: `Approval step '${step.name}' is missing a specific approver.` };
   }
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('manager_id')
-    .eq('id', requesterId)
-    .single();
-  if (error) {
-    return { approverRole: null, approverUserId: null, error: error.message };
-  }
-
-  const managerId = (data as Record<string, unknown> | null)?.manager_id;
-  return managerId
-    ? { approverRole: null, approverUserId: String(managerId), error: null }
-    : {
-        approverRole: null,
-        approverUserId: null,
-        error: 'The requester does not have a reporting manager assigned for the next approval step.',
-      };
+  const managerApprover = await resolveDirectManagerApproverUserId(requesterId);
+  return managerApprover.error
+    ? { approverRole: null, approverUserId: null, error: managerApprover.error }
+    : { approverRole: null, approverUserId: managerApprover.data, error: null };
 }
 
 async function bootstrapApprovalInstanceForEntity(
