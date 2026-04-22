@@ -8,7 +8,7 @@ Required values are loaded at boot and validated by the zod schema in `src/confi
 | ----------------------- | ------------------------------------------- | ---------------------------------- |
 | `VITE_SUPABASE_URL`     | Supabase project URL                        | `http://127.0.0.1:54321` locally   |
 | `VITE_SUPABASE_ANON_KEY`| Supabase anon/publishable key               | From `supabase start` output       |
-| `VITE_SITE_URL`         | Canonical app URL used for auth redirects   | Must match browser origin          |
+| `VITE_APP_URL`          | Canonical app URL used for auth redirects   | Must match browser origin. `VITE_SITE_URL` still accepted as a legacy fallback. |
 
 ## Optional
 

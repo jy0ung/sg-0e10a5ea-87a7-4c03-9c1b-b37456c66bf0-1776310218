@@ -171,19 +171,20 @@ configure_env_files() {
   else
     # Phase 0 hardening: do not bake in demo/project-specific keys. Operator
     # must populate .env.local with the real VITE_SUPABASE_URL /
-    # VITE_SUPABASE_ANON_KEY / VITE_SITE_URL before the app will boot.
+    # VITE_SUPABASE_ANON_KEY / VITE_APP_URL before the app will boot.
     cat > .env.local <<'EOF'
 # Populate these before running `npm run dev`.
 VITE_SUPABASE_URL=""
 VITE_SUPABASE_ANON_KEY=""
 VITE_SUPABASE_PUBLISHABLE_KEY=""
 VITE_SUPABASE_PROJECT_ID=""
-VITE_SITE_URL="http://127.0.0.1:3000"
+VITE_APP_URL="http://127.0.0.1:3000"
 EOF
   fi
 
   sed -i \
     -e "s|^VITE_SUPABASE_URL=.*$|VITE_SUPABASE_URL=\"${SUPABASE_API_URL}\"|" \
+    -e "s|^VITE_APP_URL=.*$|VITE_APP_URL=\"${APP_URL}\"|" \
     -e "s|^VITE_SITE_URL=.*$|VITE_SITE_URL=\"${APP_URL}\"|" \
     .env.local
 }

@@ -18,12 +18,13 @@ const RESET_PASSWORD_PATH = 'reset-password';
 
 // Dynamic URL Helper
 const getURL = () => {
-  let url = import.meta.env.VITE_VERCEL_URL ?? 
-           import.meta.env.NEXT_PUBLIC_VERCEL_URL ?? 
-           import.meta.env.VITE_SITE_URL ?? 
-           import.meta.env.NEXT_PUBLIC_SITE_URL ?? 
+  let url = import.meta.env.VITE_APP_URL ??
+           import.meta.env.VITE_VERCEL_URL ??
+           import.meta.env.NEXT_PUBLIC_VERCEL_URL ??
+           import.meta.env.VITE_SITE_URL ??
+           import.meta.env.NEXT_PUBLIC_SITE_URL ??
            'http://localhost:3000'
-  
+
   // Handle undefined or null url
   if (!url) {
     url = 'http://localhost:3000';

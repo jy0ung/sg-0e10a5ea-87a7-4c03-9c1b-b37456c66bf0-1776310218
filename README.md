@@ -151,7 +151,7 @@ cp .env .env.local
 
 ```env
 VITE_SUPABASE_URL="https://<your-forwarded-54321-url>"
-VITE_SITE_URL="https://<your-forwarded-app-url>"
+VITE_APP_URL="https://<your-forwarded-app-url>"
 ```
 
 Keep the existing anon or publishable key values from `.env` unless your local `supabase start` output shows different keys.

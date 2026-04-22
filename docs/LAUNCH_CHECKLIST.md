@@ -26,6 +26,17 @@ One-time gate before first production cutover. Every box must be checked.
 - [ ] All edge functions validate JWT + same-company checks
 - [ ] CORS allow-list pinned to production origins only
 - [ ] Service-role key set via `supabase secrets set` (never in client)
+- [ ] **Environment provisioned via one-shot script** — run
+      `./scripts/provision-supabase-env.sh` after copying
+      `scripts/provision-supabase-env.env.example` outside the repo
+      (chmod 600) and filling in secrets. The script is idempotent and
+      links the project, dry-runs migrations, applies them on approval,
+      verifies the schema, bootstraps the first `super_admin`, and sets
+      the `SITE_URL` / `APP_URL` edge-function secrets. Required because
+      `handle_new_user` creates every user as `status='pending'` /
+      `company_id=NULL`, and `AuthContext` signs such users out — a fresh
+      environment has no admin to activate the first admin.
+  - [ ] Verify login lands on `/dashboard` (no redirect back to `/login`)
 
 ## Observability
 

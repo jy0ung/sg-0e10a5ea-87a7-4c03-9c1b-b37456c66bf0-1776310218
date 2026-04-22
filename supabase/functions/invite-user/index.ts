@@ -76,7 +76,9 @@ Deno.serve(async (req: Request) => {
 
     // Determine the signup redirect URL
     // Use the site URL from env or the request origin
-    const siteUrl = Deno.env.get('SITE_URL')
+    const siteUrl = Deno.env.get('APP_URL')
+      || Deno.env.get('SITE_URL')
+      || Deno.env.get('VITE_APP_URL')
       || Deno.env.get('VITE_SITE_URL')
       || req.headers.get('origin')
       || 'http://localhost:3000';
