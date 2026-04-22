@@ -44,6 +44,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchProfile = useCallback(async (userId: string) => {
+    // Signup / password-reset flows establish a short-lived session from an
+    // invite or recovery token so the user can set their password. During
+    // that window they may have no profile row yet (or a pending one) and we
+    // MUST NOT sign them out — doing so kills the very session they need to
+    // call auth.updateUser().
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+    const isOnboardingRoute = pathname === '/signup' || pathname === '/reset-password';
+    const isPendingRoute = pathname === '/account-pending';
+
+    // Helper: keep the session alive, clear profile, and send the user to
+    // /account-pending. Admins will see them in User Management and activate
+    // them; this avoids the login-loop they'd otherwise hit when AuthContext
+    // signs them out repeatedly.
+    const sendToPending = (reason: string) => {
+      loggingService.warn(reason, { userId }, 'AuthContext');
+      setProfile(null);
+      setProfileError(null);
+      if (typeof window !== 'undefined' && !isPendingRoute && !isOnboardingRoute) {
+        window.location.replace('/account-pending');
+      }
+    };
+
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -53,6 +75,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         loggingService.error('Error fetching profile', { error }, 'AuthContext');
+        if (isOnboardingRoute) {
+          // Preserve the session so signup/reset can complete.
+          return;
+        }
         setProfileError('We could not load your account profile. Please contact your administrator.');
         await supabase.auth.signOut();
         clearSessionArtifacts();
@@ -63,19 +89,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // No profile row — the account was never provisioned by an admin.
         // Do NOT invent a synthetic profile; that would attach the session to
         // a fake tenant and defeat RLS scoping.
-        loggingService.warn('No profile row for user; signing out', { userId }, 'AuthContext');
-        setProfileError('Your account has not been activated yet. Please contact your administrator.');
-        await supabase.auth.signOut();
-        clearSessionArtifacts();
+        if (isOnboardingRoute) {
+          // User is mid-signup; profile will be created after they finish.
+          return;
+        }
+        sendToPending('No profile row for user; sending to /account-pending');
         return;
       }
 
       const p = data as unknown as Profile;
 
       if (!p.company_id || p.status === 'pending') {
-        setProfileError('Your account is pending activation by your administrator.');
-        await supabase.auth.signOut();
-        clearSessionArtifacts();
+        if (isOnboardingRoute) {
+          // Pending profile is expected during signup completion.
+          return;
+        }
+        sendToPending('Profile pending activation; sending to /account-pending');
         return;
       }
 

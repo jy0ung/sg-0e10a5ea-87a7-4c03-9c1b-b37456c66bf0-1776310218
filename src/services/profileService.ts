@@ -14,9 +14,10 @@ export interface ProfileRow {
   email: string;
   name: string;
   role: AppRole;
-  company_id: string;
+  company_id: string | null;
   branch_id: string | null;
   access_scope: AccessScope;
+  status: 'active' | 'inactive' | 'resigned' | 'pending';
   created_at: string;
 }
 
@@ -29,7 +30,7 @@ export interface ListProfilesResult {
 export async function listProfiles(companyId?: string): Promise<ListProfilesResult> {
   let q = supabase
     .from('profiles')
-    .select('id, email, name, role, company_id, branch_id, access_scope, created_at')
+    .select('id, email, name, role, company_id, branch_id, access_scope, status, created_at')
     .order('created_at', { ascending: true });
   if (companyId) q = q.eq('company_id', companyId);
   const { data, error } = await q;
@@ -43,6 +44,8 @@ export interface UpdateProfileInput {
   role?: AppRole;
   access_scope?: AccessScope;
   branch_id?: string | null;
+  company_id?: string;
+  status?: 'active' | 'inactive' | 'resigned' | 'pending';
 }
 
 /** Admin-side user update (Users & Roles). */
@@ -54,6 +57,8 @@ export async function updateProfile(
   if (input.role !== undefined)         patch.role         = input.role;
   if (input.access_scope !== undefined) patch.access_scope = input.access_scope;
   if (input.branch_id !== undefined)    patch.branch_id    = input.branch_id;
+  if (input.company_id !== undefined)   patch.company_id   = input.company_id;
+  if (input.status !== undefined)       patch.status       = input.status;
   const { error } = await supabase.from('profiles').update(patch).eq('id', input.id);
   return { error: error?.message ?? null };
 }

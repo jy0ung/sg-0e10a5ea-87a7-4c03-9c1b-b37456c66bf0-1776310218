@@ -3,7 +3,8 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { listProfiles, updateProfile, inviteUser, type ProfileRow } from '@/services/profileService';
-import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -57,6 +58,11 @@ export default function UserManagement() {
   const [inviting, setInviting] = useState(false);
   const [signupUrl, setSignupUrl] = useState('');
   const [copied, setCopied] = useState(false);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [activating, setActivating] = useState<string>('');
+  const [pendingSelections, setPendingSelections] = useState<
+    Record<string, { role: AppRole; company_id: string }>
+  >({});
 
   const editForm = useForm<UserUpdateFormData>({
     resolver: zodResolver(userUpdateSchema),
@@ -83,15 +89,17 @@ export default function UserManagement() {
 
   useEffect(() => {
     async function load() {
-      const [profileRes, branchRes] = await Promise.all([
+      const [profileRes, branchRes, companyRes] = await Promise.all([
         listProfiles(),
         getBranches(user?.company_id || ''),
+        supabase.from('companies').select('id, name').order('name', { ascending: true }),
       ]);
       if (profileRes.error) {
         toast.error('Failed to load users: ' + profileRes.error);
       }
       setProfiles(profileRes.data);
       setBranches(branchRes.data);
+      setCompanies((companyRes.data as { id: string; name: string }[] | null) ?? []);
       setLoading(false);
     }
     load();
@@ -176,6 +184,57 @@ export default function UserManagement() {
     }
   };
 
+  // Pending users: created without a company assignment (e.g. via the
+  // Supabase Dashboard invite flow) or still flagged status='pending' by the
+  // handle_new_user trigger. Admins activate them by assigning role + company.
+  const pendingUsers = profiles.filter(p => !p.company_id || p.status === 'pending');
+  const activeUsers = profiles.filter(p => p.company_id && p.status !== 'pending');
+
+  const getPendingSelection = (p: ProfileRow) => {
+    const current = pendingSelections[p.id];
+    return {
+      role: current?.role ?? (p.role || 'analyst'),
+      company_id:
+        current?.company_id
+        ?? (p.company_id || (hasRole(['super_admin']) ? (companies[0]?.id ?? '') : (user?.company_id ?? ''))),
+    };
+  };
+
+  const setPendingRole = (id: string, role: AppRole) => {
+    setPendingSelections(prev => ({ ...prev, [id]: { ...getPendingSelection({ id } as ProfileRow), ...prev[id], role } }));
+  };
+  const setPendingCompany = (id: string, company_id: string) => {
+    setPendingSelections(prev => ({ ...prev, [id]: { ...getPendingSelection({ id } as ProfileRow), ...prev[id], company_id } }));
+  };
+
+  const handleActivate = async (p: ProfileRow) => {
+    const sel = getPendingSelection(p);
+    if (!sel.company_id) {
+      toast.error('Select a company before activating.');
+      return;
+    }
+    setActivating(p.id);
+    const { error } = await updateProfile({
+      id: p.id,
+      role: sel.role,
+      company_id: sel.company_id,
+      access_scope: (ROLE_DEFAULT_SCOPE[sel.role] || 'company') as AccessScope,
+      status: 'active',
+    });
+    setActivating('');
+    if (error) {
+      toast.error('Failed to activate user: ' + error);
+      return;
+    }
+    toast.success(`${p.email} activated`);
+    const refreshed = await listProfiles();
+    if (!refreshed.error) setProfiles(refreshed.data);
+    setPendingSelections(prev => {
+      const { [p.id]: _removed, ...rest } = prev;
+      return rest;
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -201,6 +260,70 @@ export default function UserManagement() {
           </div>
         )}
       </div>
+      {pendingUsers.length > 0 && canManage && (
+        <div className="glass-panel overflow-hidden border border-primary/30">
+          <div className="px-4 py-3 bg-primary/10 border-b border-primary/30 flex items-center gap-2">
+            <UserCheck className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-foreground">
+              {pendingUsers.length} user{pendingUsers.length === 1 ? '' : 's'} awaiting activation
+            </span>
+            <span className="text-xs text-muted-foreground ml-2">
+              Users created via the Supabase Dashboard or that haven't been assigned a company appear here.
+            </span>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-secondary/30 text-left">
+                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Email</th>
+                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Name</th>
+                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Role</th>
+                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Company</th>
+                <th className="px-4 py-2 text-xs text-muted-foreground font-medium w-32"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingUsers.map(p => {
+                const sel = getPendingSelection(p);
+                return (
+                  <tr key={p.id} className="data-table-row">
+                    <td className="px-4 py-2 text-foreground text-xs">{p.email}</td>
+                    <td className="px-4 py-2 text-foreground">{p.name || '—'}</td>
+                    <td className="px-4 py-2">
+                      <Select value={sel.role} onValueChange={(v) => setPendingRole(p.id, v as AppRole)}>
+                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {ROLES.map(r => (
+                            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="px-4 py-2">
+                      <Select value={sel.company_id} onValueChange={(v) => setPendingCompany(p.id, v)}>
+                        <SelectTrigger className="h-8"><SelectValue placeholder="Select company" /></SelectTrigger>
+                        <SelectContent>
+                          {companies.map(c => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <Button
+                        size="sm"
+                        onClick={() => handleActivate(p)}
+                        disabled={activating === p.id || !sel.company_id}
+                      >
+                        {activating === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Activate'}
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
       <div className="glass-panel overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -214,14 +337,14 @@ export default function UserManagement() {
             </tr>
           </thead>
           <tbody>
-            {profiles.length === 0 && (
+            {activeUsers.length === 0 && (
               <tr>
                 <td colSpan={canManage ? 6 : 5} className="px-4 py-10 text-center text-muted-foreground">
                   No users found.
                 </td>
               </tr>
             )}
-            {profiles.map(p => (
+            {activeUsers.map(p => (
               <tr key={p.id} className="data-table-row">
                 <td className="px-4 py-3 text-foreground font-medium flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center">

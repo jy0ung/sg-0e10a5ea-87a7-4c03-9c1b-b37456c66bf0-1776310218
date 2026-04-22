@@ -126,6 +126,7 @@ Deno.serve(async (req: Request) => {
           role,
           company_id,
           access_scope: finalScope,
+          status: 'active',
           updated_at: new Date().toISOString(),
         }, { onConflict: 'id' });
 

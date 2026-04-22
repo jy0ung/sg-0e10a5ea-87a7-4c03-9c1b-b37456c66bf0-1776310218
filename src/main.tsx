@@ -41,6 +41,7 @@ const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const SignUpPage = lazy(() => import("./pages/SignUpPage"));
+const AccountPending = lazy(() => import("./pages/AccountPending"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const ModuleDirectory = lazy(() => import("./pages/ModuleDirectory"));
@@ -268,6 +269,10 @@ const router = createBrowserRouter([
     element: <S><SignUpPage /></S>,
   },
   {
+    path: "/account-pending",
+    element: <S><AccountPending /></S>,
+  },
+  {
     path: "*",
     element: <S><NotFound /></S>,
   },
@@ -313,5 +318,33 @@ if (!shouldRedirectInviteToSignup()) {
   const root = createRoot(document.getElementById("root")!);
   root.render(<App />);
 }
+
+// After a redeploy, hashed asset filenames change. Any tab that was open
+// before the deploy still holds the old index.html → when React tries to
+// lazy-load a route chunk it gets a 404 and throws:
+//   "Failed to fetch dynamically imported module: .../assets/xxx.js"
+// We catch that one specific error and do a single auto-reload so users
+// silently pick up the new build instead of seeing an error page. Uses
+// sessionStorage to prevent an infinite loop if the reload itself fails.
+function isChunkLoadError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  return (
+    /Failed to fetch dynamically imported module/i.test(msg)
+    || /Importing a module script failed/i.test(msg)
+    || /ChunkLoadError/i.test(msg)
+  );
+}
+function reloadOnce() {
+  const key = 'flc.chunk-reloaded';
+  if (sessionStorage.getItem(key) === '1') return;
+  sessionStorage.setItem(key, '1');
+  window.location.reload();
+}
+window.addEventListener('error', (e) => {
+  if (isChunkLoadError(e.error ?? e.message)) reloadOnce();
+});
+window.addEventListener('unhandledrejection', (e) => {
+  if (isChunkLoadError(e.reason)) reloadOnce();
+});
 
 export default App;
