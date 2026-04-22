@@ -9,7 +9,10 @@ import {
   Announcement, CreateAnnouncementInput,
 } from '@/types';
 
-const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, department:departments(name), job_title:job_titles(name)';
+// Disambiguate the profiles→departments embed: departments also has a FK
+// back to profiles (departments.head_employee_id), so PostgREST refuses to
+// pick one without a hint. Use the specific FK name.
+const PROFILE_SELECT = 'id, email, name, role, company_id, branch_id, status, staff_code, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, department:departments!profiles_department_id_fkey(name), job_title:job_titles!profiles_job_title_id_fkey(name)';
 
 function rowToEmployee(row: Record<string, unknown>): Employee {
   return {
