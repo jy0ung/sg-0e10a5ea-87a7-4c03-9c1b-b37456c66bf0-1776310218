@@ -9,15 +9,28 @@ name: Deploy Image
 #   • workflow_dispatch → choose environment + image tag
 #
 # Required per-environment secrets:
-#   SSH_HOST                e.g. uat.example.com
+#   SSH_HOST                Cloudflare Access hostname, e.g. ssh.uat.example.com
 #   SSH_USER                e.g. deploy
 #   SSH_PORT                (optional, default 22)
 #   SSH_PRIVATE_KEY         OpenSSH private key (begins with -----BEGIN…)
-#   SSH_KNOWN_HOSTS         `ssh-keyscan <host>` output
+#   SSH_KNOWN_HOSTS         `ssh-keyscan <host>` output (collected through the
+#                           tunnel once; see docs/DEPLOY.md)
+#   CF_ACCESS_CLIENT_ID     Service-token client ID from a Cloudflare Access
+#                           Service Auth policy on the SSH app
+#   CF_ACCESS_CLIENT_SECRET Service-token secret
 #   DEPLOY_CONTAINER_NAME   e.g. flc-bi-uat
 #   DEPLOY_HOST_PORT        e.g. 8080
 #   GHCR_READ_TOKEN         (only if the GHCR package is private)
 #   GHCR_READ_USERNAME      (only if the GHCR package is private)
+#
+# Host-side prerequisites (see docs/DEPLOY.md for full recipe):
+#   1. cloudflared tunnel route exposes the host's SSH port as a Public
+#      Hostname with service=ssh://localhost:22
+#   2. Cloudflare Access Application protects that hostname with a
+#      Service Auth policy that allows a service token (NOT email OTP,
+#      which can't be satisfied from CI).
+#   3. The service-token client ID + secret are added as environment
+#      secrets above.
 
 on:
   workflow_run:
@@ -75,10 +88,20 @@ jobs:
         run: |
           echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
-      - name: Configure SSH
+      - name: Install cloudflared
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/cloudflared.deb \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i /tmp/cloudflared.deb
+          cloudflared --version
+
+      - name: Configure SSH (with Cloudflare Access ProxyCommand)
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
@@ -88,20 +111,33 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Copy deploy script to host
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
-        run: |
-          scp -i ~/.ssh/id_deploy -P "$SSH_PORT" -o UserKnownHostsFile=~/.ssh/known_hosts \
-            scripts/deploy-image.sh "${SSH_USER}@${SSH_HOST}:/tmp/deploy-image.sh"
+          # Route SSH traffic through cloudflared. cloudflared reads the
+          # service-token header pair from the env so no secret lands on disk.
+          cat > ~/.ssh/config <<EOF
+          Host deploy-target
+            HostName $SSH_HOST
+            Port $SSH_PORT
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+            ProxyCommand cloudflared access ssh --hostname %h
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+          EOF
+          chmod 600 ~/.ssh/config
 
-      - name: Run deploy on host
+      - name: Copy deploy script through the tunnel
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          scp scripts/deploy-image.sh deploy-target:/tmp/deploy-image.sh
+
+      - name: Run deploy on host through the tunnel
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           CONTAINER_NAME: ${{ secrets.DEPLOY_CONTAINER_NAME }}
           HOST_PORT: ${{ secrets.DEPLOY_HOST_PORT }}
           GHCR_USERNAME: ${{ secrets.GHCR_READ_USERNAME }}
@@ -109,8 +145,7 @@ jobs:
           IMAGE: ghcr.io/${{ steps.img.outputs.name }}:${{ steps.tag.outputs.value }}
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/id_deploy -p "$SSH_PORT" -o UserKnownHostsFile=~/.ssh/known_hosts \
-            "${SSH_USER}@${SSH_HOST}" \
+          ssh deploy-target \
             "chmod +x /tmp/deploy-image.sh && \
              CONTAINER_NAME='${CONTAINER_NAME}' \
              HOST_PORT='${HOST_PORT}' \
