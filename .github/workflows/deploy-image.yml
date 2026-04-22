@@ -1,0 +1,130 @@
+name: Deploy Image
+
+# Pulls a published GHCR image onto the UAT / production host over SSH and
+# performs a health-gated container swap via scripts/deploy-image.sh.
+#
+# Triggers:
+#   • completion of a successful Release workflow on a semver tag
+#     → auto-deploys to "uat"
+#   • workflow_dispatch → choose environment + image tag
+#
+# Required per-environment secrets:
+#   SSH_HOST                e.g. uat.example.com
+#   SSH_USER                e.g. deploy
+#   SSH_PORT                (optional, default 22)
+#   SSH_PRIVATE_KEY         OpenSSH private key (begins with -----BEGIN…)
+#   SSH_KNOWN_HOSTS         `ssh-keyscan <host>` output
+#   DEPLOY_CONTAINER_NAME   e.g. flc-bi-uat
+#   DEPLOY_HOST_PORT        e.g. 8080
+#   GHCR_READ_TOKEN         (only if the GHCR package is private)
+#   GHCR_READ_USERNAME      (only if the GHCR package is private)
+
+on:
+  workflow_run:
+    workflows: ['Release']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        type: choice
+        required: true
+        default: uat
+        options:
+          - uat
+          - production
+      image_tag:
+        description: 'Image tag to deploy (e.g. v1.2.0 or sha-abc1234)'
+        required: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy (${{ github.event.inputs.environment || 'uat' }})
+    # Only auto-deploy when the upstream Release succeeded.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'uat' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.image_tag }}
+          RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [[ -n "${INPUT_TAG:-}" ]]; then
+            echo "value=${INPUT_TAG}" >> "$GITHUB_OUTPUT"
+          elif [[ "${RUN_HEAD_BRANCH:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "value=${RUN_HEAD_BRANCH}" >> "$GITHUB_OUTPUT"
+          else
+            # workflow_run was triggered by a push to main (not a tag) — fall
+            # back to the short SHA tag produced by the release build.
+            short_sha="${{ github.event.workflow_run.head_sha }}"
+            echo "value=sha-${short_sha:0:7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lowercase image name
+        id: img
+        run: |
+          echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Copy deploy script to host
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        run: |
+          scp -i ~/.ssh/id_deploy -P "$SSH_PORT" -o UserKnownHostsFile=~/.ssh/known_hosts \
+            scripts/deploy-image.sh "${SSH_USER}@${SSH_HOST}:/tmp/deploy-image.sh"
+
+      - name: Run deploy on host
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          CONTAINER_NAME: ${{ secrets.DEPLOY_CONTAINER_NAME }}
+          HOST_PORT: ${{ secrets.DEPLOY_HOST_PORT }}
+          GHCR_USERNAME: ${{ secrets.GHCR_READ_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          IMAGE: ghcr.io/${{ steps.img.outputs.name }}:${{ steps.tag.outputs.value }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_deploy -p "$SSH_PORT" -o UserKnownHostsFile=~/.ssh/known_hosts \
+            "${SSH_USER}@${SSH_HOST}" \
+            "chmod +x /tmp/deploy-image.sh && \
+             CONTAINER_NAME='${CONTAINER_NAME}' \
+             HOST_PORT='${HOST_PORT}' \
+             GHCR_USERNAME='${GHCR_USERNAME:-}' \
+             GHCR_TOKEN='${GHCR_TOKEN:-}' \
+             /tmp/deploy-image.sh '${IMAGE}'"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Deploy to ${{ github.event.inputs.environment || 'uat' }}"
+            echo ""
+            echo "- Image: \`ghcr.io/${{ steps.img.outputs.name }}:${{ steps.tag.outputs.value }}\`"
+            echo "- Host: \`${{ secrets.SSH_HOST }}\`"
+            echo "- Container: \`${{ secrets.DEPLOY_CONTAINER_NAME }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
