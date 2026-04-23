@@ -98,8 +98,13 @@ export async function logVehicleEdit(
   const queryId = `audit-log-${vehicleId}-${Date.now()}`;
   performanceService.startQueryTimer(queryId);
 
+  // audit_logs.user_id is a uuid column; legacy callers sometimes pass sentinel
+  // strings like 'system-user'. Drop those to NULL so the insert doesn't fail.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const safeUserId = UUID_RE.test(userId) ? userId : null;
+
   const { error } = await supabase.from("audit_logs").insert({
-    user_id: userId,
+    user_id: safeUserId,
     action: "update",
     entity_type: "vehicle",
     entity_id: vehicleId,

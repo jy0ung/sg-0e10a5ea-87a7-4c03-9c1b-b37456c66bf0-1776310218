@@ -123,15 +123,24 @@ export default function ImportCenter() {
         (processed, total) => setValidationProgress({ processed, total })
       );
 
-      // Always create the batch record in DB first so we get a real UUID
+      // Always create the batch record in DB first so we get a real UUID.
+      // Validation errors can appear multiple times per row (one per offending
+      // field), so count unique row numbers — not raw error count — to derive
+      // validRows. And stay in the 'validated' state even when errors exist:
+      // the user decides whether to publish. 'failed' is reserved for a
+      // publish step that actually throws.
+      const errorRowNumbers = new Set(
+        validationResult.errors.map(e => e.rowNumber).filter((n): n is number => typeof n === 'number')
+      );
+      const errorRowCount = errorRowNumbers.size;
       const batch: ImportBatchInsert = {
         fileName: file.name,
         uploadedBy: user?.email || 'Unknown',
         uploadedAt: new Date().toISOString(),
-        status: validationResult.isValid ? 'validated' : 'failed',
+        status: 'validated',
         totalRows: rows.length,
-        validRows: rows.length - validationResult.errors.length,
-        errorRows: validationResult.errors.length,
+        validRows: Math.max(0, rows.length - errorRowCount),
+        errorRows: errorRowCount,
         duplicateRows: issues.filter(i => i.issueType === 'duplicate').length,
         companyId,
       };

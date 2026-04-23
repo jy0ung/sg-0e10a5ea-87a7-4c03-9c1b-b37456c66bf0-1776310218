@@ -469,11 +469,21 @@ export async function validateVehicleImportBatch(
     if ((i + 1) % 50 === 0 || i === rows.length - 1) onProgress?.(i + 1, rows.length);
   }
 
+  // Errors can repeat per row (one per offending field). Summary metrics must
+  // reflect *row* counts, not raw error/warning counts, otherwise validRows
+  // can go negative when a single bad row produces multiple errors.
+  const errorRowNumbers = new Set(
+    allErrors.map(e => e.rowNumber).filter((n): n is number => typeof n === 'number')
+  );
+  const warningRowNumbers = new Set(
+    allWarnings.map(w => w.rowNumber).filter((n): n is number => typeof n === 'number')
+  );
+
   const summary = {
     totalRows: rows.length,
-    validRows: rows.length - allErrors.length,
-    errorRows: allErrors.length,
-    warningRows: allWarnings.length,
+    validRows: Math.max(0, rows.length - errorRowNumbers.size),
+    errorRows: errorRowNumbers.size,
+    warningRows: warningRowNumbers.size,
   };
 
   loggingService.info("Vehicle import validation completed", summary, "ValidationService");
