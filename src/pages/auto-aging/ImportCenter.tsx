@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -38,6 +38,13 @@ export default function ImportCenter() {
   const [branchMappingInputs, setBranchMappingInputs] = useState<Record<string, string>>({});
   const [savedBranchMappings, setSavedBranchMappings] = useState<Set<string>>(new Set());
   const [savingBranch, setSavingBranch] = useState<string | null>(null);
+
+  // Ref to the hidden file input so we can trigger the native picker from a
+  // real <button> click-handler. This is the most reliable pattern across
+  // iPadOS Safari, Android Chrome, and desktop browsers — `label htmlFor` and
+  // `sr-only` inputs can silently fail on some tablet Safari versions because
+  // the synthetic click is not treated as a user-activation.
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Error classification helpers ────────────────────────────────────────────
   // Hard blockers: rows that genuinely cannot be published
@@ -106,6 +113,9 @@ export default function ImportCenter() {
 
   const handleFileDrop = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Reset so the same file can be chosen again (iOS Safari otherwise skips
+    // the onChange when re-selecting). Must be done before any early return.
+    try { e.target.value = ''; } catch { /* noop */ }
     if (!file) return;
     if (!companyId) {
       toast({
@@ -115,13 +125,27 @@ export default function ImportCenter() {
       });
       return;
     }
+    // Immediate feedback so the user knows the tap registered — critical on
+    // tablets where there's no cursor / hover state to indicate progress.
+    toast({ title: 'Reading file', description: file.name });
     setFileName(file.name);
     setValidationProgress({ processed: 0, total: 0 });
     setStep('validating');
 
     try {
-      // Parse the workbook
-      const buffer = await file.arrayBuffer();
+      // Parse the workbook. `file.arrayBuffer()` is supported on iOS 14+ and
+      // modern Android; guard with a FileReader fallback for older tablets.
+      let buffer: ArrayBuffer;
+      if (typeof file.arrayBuffer === 'function') {
+        buffer = await file.arrayBuffer();
+      } else {
+        buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as ArrayBuffer);
+          reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+          reader.readAsArrayBuffer(file);
+        });
+      }
       const { rows, issues, missingColumns } = parseWorkbook(buffer);
 
       setMissingCols(missingColumns);
@@ -313,36 +337,51 @@ export default function ImportCenter() {
       {step === 'upload' && (
         <div className="glass-panel p-6 sm:p-12 text-center">
           {/*
-            Mobile-safe file picker:
-            - The <input> is `sr-only` (kept in layout & a11y tree). iOS/Android
-              browsers refuse to open the picker from a `display:none` input.
-            - Avoid the legacy <label> wrapping: nesting an interactive <button>
-              inside <label> is invalid HTML and on iOS Safari the synthetic
-              click on the label cancels the button's programmatic
-              `input.click()`. Use an htmlFor-only label as the visual surface
-              instead.
+            Tablet-safe file picker:
+            - A *visible* (but `hidden`-via-CSS) <input> kept in the DOM and a11y tree.
+            - Native <button> that calls `inputRef.current?.click()` directly —
+              this is the most reliable pattern on iPadOS Safari, Android
+              Chrome, and desktop. `label htmlFor=` + `sr-only` inputs
+              intermittently fail on iPadOS Safari because the synthetic tap
+              is not treated as a user-activation gesture.
+            - The whole drop zone is also a button so tapping anywhere opens
+              the picker. No nested interactive elements.
           */}
           <input
+            ref={fileInputRef}
             id="import-file-input"
             type="file"
             accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             onChange={handleFileDrop}
             className="sr-only"
+            aria-label="Choose Excel workbook to import"
           />
-          <label
-            htmlFor="import-file-input"
-            className="block cursor-pointer border-2 border-dashed border-border rounded-lg p-8 sm:p-12 hover:border-primary/50 transition-colors"
+          <button
+            type="button"
+            onClick={() => {
+              const el = fileInputRef.current;
+              if (!el) {
+                toast({ title: 'Picker unavailable', description: 'Please refresh the page and try again.', variant: 'destructive' });
+                return;
+              }
+              try {
+                el.click();
+              } catch (err) {
+                loggingService.error('File picker click failed', { error: err }, 'ImportCenter');
+                toast({ title: 'Could not open file picker', description: 'Your browser blocked the file chooser. Please try another browser.', variant: 'destructive' });
+              }
+            }}
+            className="w-full block cursor-pointer border-2 border-dashed border-border rounded-lg p-8 sm:p-12 hover:border-primary/50 transition-colors text-center"
           >
             <Upload className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-foreground font-medium mb-1">Tap to choose a workbook</p>
             <p className="text-sm text-muted-foreground mb-4">Supports .xlsx and .xls files with a "Combine Data" sheet</p>
             <span
-              role="button"
-              className="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow hover:bg-primary/90"
+              className="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow"
             >
               <Upload className="h-4 w-4" />Browse files
             </span>
-          </label>
+          </button>
         </div>
       )}
 
