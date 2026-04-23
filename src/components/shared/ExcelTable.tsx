@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { SortAsc, SortDesc, ChevronLeft, ChevronRight, Check, X, AlertCircle } from 'lucide-react';
+import { SortAsc, SortDesc, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export type ColumnType = 'text' | 'number' | 'date' | 'select' | 'textarea';
@@ -215,27 +215,6 @@ export function ExcelTable<T>({
               {validationError}
             </div>
           )}
-          
-          <div className="flex gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleCellSave(rowId, column.key, column)}
-            >
-              <Check className="h-3.5 w-3.5 text-success" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={handleCellCancel}
-            >
-              <X className="h-3.5 w-3.5 text-destructive" />
-            </Button>
-          </div>
         </div>
       );
     }
@@ -365,8 +344,10 @@ export function ExcelTable<T>({
                         title={canEditColumn(column) ? 'Click to edit' : undefined}
                         style={column.width ? { minWidth: `${column.width}px` } : undefined}
                         onClick={(e) => {
-                          e.stopPropagation();
-                          handleCellClick(row, column);
+                          if (canEditColumn(column)) {
+                            e.stopPropagation();
+                            handleCellClick(row, column);
+                          }
                         }}
                       >
                         {renderCellContent(row, column, rowIndex)}

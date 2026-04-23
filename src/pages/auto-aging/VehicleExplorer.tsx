@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ExcelTable } from '@/components/shared/ExcelTable';
 import { VehicleDetailPanel } from '@/components/vehicles/VehicleDetailPanel';
@@ -29,10 +29,13 @@ const DEFAULT_FILTERS: VehicleFilterState = {
   pageSize: 50,
 };
 
+function getRowValue(row: VehicleRow, key: string): unknown {
+  return (row as unknown as Record<string, unknown>)[key];
+}
+
 export default function VehicleExplorer() {
   const { user } = useAuth();
   const { vehicles, loading, loadErrors, reloadFromDb } = useData();
-  const navigate = useNavigate();
   const { chassis_no: chassisParam } = useParams();
   const [searchParams] = useSearchParams();
 
@@ -64,7 +67,7 @@ export default function VehicleExplorer() {
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [userPermissions, setUserPermissions] = useState<UserPermissions>(null);
   const [exportLoading, setExportLoading] = useState(false);
-  const [readOnlyMode, setReadOnlyMode] = useState(false);
+  const [readOnlyMode, setReadOnlyMode] = useState(true);
   const [pendingBulkAction, setPendingBulkAction] = useState<{ action: string; vehicles: VehicleCanonical[] } | null>(null);
 
   useEffect(() => {
@@ -144,8 +147,8 @@ export default function VehicleExplorer() {
         aVal = filtered.indexOf(a);
         bVal = filtered.indexOf(b);
       } else {
-        aVal = (a as Record<string, unknown>)[sortField];
-        bVal = (b as Record<string, unknown>)[sortField];
+        aVal = getRowValue(a, sortField);
+        bVal = getRowValue(b, sortField);
       }
 
       if (aVal == null) return 1;
@@ -178,11 +181,17 @@ export default function VehicleExplorer() {
     startIdx,
   });
 
-  const permissions = useMemo(() => {
-    return userPermissions?.columns
-      ? Object.fromEntries(Array.from(userPermissions.columns.entries()).map(([col, level]) => [col, level]))
-      : {};
-  }, [userPermissions]);
+  const permissions = useMemo<Record<string, 'view' | 'edit'>>(
+    () =>
+      userPermissions?.columns
+        ? Object.fromEntries(
+            Array.from(userPermissions.columns.entries()).filter(
+              (entry): entry is [string, 'view' | 'edit'] => entry[1] === 'view' || entry[1] === 'edit',
+            ),
+          )
+        : {},
+    [userPermissions?.columns],
+  );
 
   const filteredColumns = useMemo(
     () =>
@@ -201,11 +210,14 @@ export default function VehicleExplorer() {
 
   const handleCellEdit = async (
     rowId: string,
-    column: { key: string; onSave?: (rowId: string, value: unknown) => Partial<VehicleCanonical> },
+    columnKey: string,
     value: unknown,
   ) => {
     if (!user?.id) return;
-    const updates = column.onSave ? column.onSave(rowId, value) : { [column.key]: value };
+    const column = allColumns.find((candidate) => candidate.key === columnKey);
+    if (!column) return;
+
+    const updates = column.onSave ? column.onSave(rowId, value) : { [columnKey]: value };
     const result = await updateVehicleWithAudit(rowId, updates, user.id);
     if (result.error) {
       loggingService.error('Failed to update vehicle', { error: result.error }, 'VehicleExplorer');
@@ -216,20 +228,21 @@ export default function VehicleExplorer() {
   };
 
   const handleExportCSV = () => {
-    if (!userPermissions?.canEdit && !userPermissions?.canView) {
-      loggingService.warn('No permission to export', {}, 'VehicleExplorer');
+    if (!userPermissions) {
+      loggingService.warn('Permissions not loaded yet; skipping export', {}, 'VehicleExplorer');
       return;
     }
     setExportLoading(true);
     try {
-      const headers = allColumns.map((c) => c.label).join(',');
+      const exportColumns = filteredColumns;
+      const headers = exportColumns.map((c) => c.label).join(',');
       const rows = sorted
         .map((vehicle) =>
-          allColumns
+          exportColumns
             .map((col) => {
               const value = col.format
-                ? col.format((vehicle as Record<string, unknown>)[col.key], sorted.indexOf(vehicle))
-                : (vehicle as Record<string, unknown>)[col.key] || '';
+                ? col.format(getRowValue(vehicle as VehicleRow, col.key), sorted.indexOf(vehicle))
+                : getRowValue(vehicle as VehicleRow, col.key) || '';
               return `"${String(value).replace(/"/g, '""')}"`;
             })
             .join(','),
@@ -255,7 +268,6 @@ export default function VehicleExplorer() {
   const handleRowClick = (row: VehicleRow) => {
     setSelectedVehicle(row);
     setDetailPanelOpen(true);
-    navigate(`/auto-aging/vehicles/${row.chassis_no}`);
   };
 
   const handleBulkAction = async (action: string, selectedVehicles: VehicleCanonical[]) => {
@@ -380,7 +392,6 @@ export default function VehicleExplorer() {
         onClose={() => {
           setDetailPanelOpen(false);
           setSelectedVehicle(null);
-          navigate('/auto-aging/vehicles');
         }}
         canEdit={userPermissions?.canEdit || false}
         onEdit={
