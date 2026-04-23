@@ -212,7 +212,7 @@ async function fetchDataFromDb(companyId: string, branchCode?: string | null) {
   const [vehiclesRes, batchesRes, issuesRes, slasRes] = await Promise.all([
     fetchAllVehicles(companyId, branchCode),
     supabase.from('import_batches').select('*').eq('company_id', companyId).order('created_at', { ascending: false }),
-    supabase.from('quality_issues').select('*').order('created_at', { ascending: false }),
+    supabase.from('quality_issues').select('*').eq('company_id', companyId).order('created_at', { ascending: false }),
     supabase.from('sla_policies').select('*').eq('company_id', companyId),
   ]);
 

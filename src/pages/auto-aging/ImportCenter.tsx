@@ -152,7 +152,11 @@ export default function ImportCenter() {
       setStep('review');
     } catch (error) {
       loggingService.error('Import error', { error }, 'ImportCenter');
-      alert(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast({
+        title: 'Import failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
       setStep('upload');
     }
   }, [addImportBatch, companyId, toast, user]);
@@ -223,7 +227,11 @@ export default function ImportCenter() {
       setStep('done');
     } catch (error) {
       loggingService.error('Publish error', { error }, 'ImportCenter');
-      alert(`Publish failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast({
+        title: 'Publish failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
       updateImportBatch(batchId, { status: 'failed' });
       setStep('review');
     }
