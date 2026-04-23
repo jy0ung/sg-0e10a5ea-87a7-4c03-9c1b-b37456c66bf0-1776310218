@@ -39,15 +39,14 @@ export default function SalesmanPerformancePage() {
   const invalidatePerf = () => queryClient.invalidateQueries({ queryKey: ['salesman-performance', companyId, year, month] });
 
   const handleSaveTarget = async () => {
-    if (!form.salesmanId || !form.targetUnits) return toast({ title: 'Salesman ID and Target Units required', variant: 'destructive' });
+    if (!form.salesmanName.trim() || !form.targetUnits) return toast({ title: 'Salesman name and Target Units required', variant: 'destructive' });
     const { error } = await upsertSalesmanTarget(companyId, {
-      salesmanId: form.salesmanId,
-      salesmanName: form.salesmanName,
+      salesmanName: form.salesmanName.trim(),
       branchCode: form.branchCode,
-      year,
-      month,
+      periodYear: year,
+      periodMonth: month,
       targetUnits: parseInt(form.targetUnits),
-      targetRevenue: form.targetRevenue ? parseFloat(form.targetRevenue) : undefined,
+      targetRevenue: form.targetRevenue ? parseFloat(form.targetRevenue) : 0,
     });
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await queryClient.invalidateQueries({ queryKey: ['sales', companyId] });
@@ -63,7 +62,7 @@ export default function SalesmanPerformancePage() {
     toast({ title: 'Target removed' });
   };
 
-  const monthTargets = salesmanTargets.filter(t => t.year === year && t.month === month);
+  const monthTargets = salesmanTargets.filter(t => t.periodYear === year && t.periodMonth === month);
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1];
   const months = Array.from({ length: 12 }, (_, i) => ({ val: i + 1, label: new Date(2000, i).toLocaleString('default', { month: 'long' }) }));
 
@@ -101,17 +100,17 @@ export default function SalesmanPerformancePage() {
           </thead>
           <tbody>
             {performance.map(p => {
-              const pct = p.achievementPct ?? (p.targetUnits > 0 ? (p.confirmedOrders / p.targetUnits) * 100 : undefined);
+              const pct = p.targetAchievement ?? (p.targetUnits && p.targetUnits > 0 ? (p.totalDeals / p.targetUnits) * 100 : undefined);
               const color = pct === undefined ? '' : pct >= 100 ? 'text-emerald-600' : pct >= 70 ? 'text-yellow-600' : 'text-red-500';
               return (
-                <tr key={p.salesmanId} className="border-b border-border last:border-0 hover:bg-secondary/20">
+                <tr key={`${p.salesmanName}-${p.branchCode}`} className="border-b border-border last:border-0 hover:bg-secondary/20">
                   <td className="px-3 py-2 font-medium">{p.salesmanName}</td>
                   <td className="px-3 py-2 text-muted-foreground">{p.branchCode}</td>
-                  <td className="px-3 py-2">{p.totalOrders}</td>
-                  <td className="px-3 py-2">{p.deliveredOrders}</td>
+                  <td className="px-3 py-2">{p.totalDeals}</td>
+                  <td className="px-3 py-2">{p.closedDeals}</td>
                   <td className="px-3 py-2">RM {p.totalRevenue.toLocaleString()}</td>
-                  <td className="px-3 py-2">RM {p.avgDealSize.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                  <td className="px-3 py-2">{p.targetUnits > 0 ? p.targetUnits : <span className="text-muted-foreground">—</span>}</td>
+                  <td className="px-3 py-2">RM {p.avgDealValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                  <td className="px-3 py-2">{p.targetUnits && p.targetUnits > 0 ? p.targetUnits : <span className="text-muted-foreground">—</span>}</td>
                   <td className={`px-3 py-2 font-semibold ${color}`}>{pct !== undefined ? `${pct.toFixed(0)}%` : '—'}</td>
                 </tr>
               );

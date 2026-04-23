@@ -72,7 +72,17 @@ export default function ImportCenter() {
   // Count rows affected by incomplete data (deduplicate by row number)
   const incompleteRowNums = [...new Set(incompleteErrors.map(e => e.rowNumber).filter(Boolean))];
 
-  const hasHardErrors = hardBlockers.length > 0 || missingCols.length > 0;
+  // Count unique rows affected by hard-blocker issues (will be skipped on publish).
+  // publishCanonical already filters chassis-less rows and dedupes duplicates, so
+  // these rows do not break the publish RPC — they are simply excluded.
+  const hardBlockerRowNums = [...new Set(hardBlockers.map(e => e.rowNumber).filter(Boolean))];
+
+  // Only a structurally-broken file (missing required columns) truly blocks publish.
+  // Per-row hard blockers (duplicate / too-short / missing chassis) are skipped during
+  // canonicalisation, so we let the user proceed and clearly disclose how many rows
+  // will be excluded.
+  const hasHardErrors = missingCols.length > 0;
+  const skippedRowCount = hardBlockerRowNums.length;
 
   // Save a proposed branch mapping to the DB
   const handleSaveBranchMapping = useCallback(async (rawCode: string) => {
@@ -270,11 +280,12 @@ export default function ImportCenter() {
     setSavedBranchMappings(new Set());
   };
 
-  const publishLabel = incompleteErrors.length > 0 || referenceErrors.filter(e => {
-    const match = e.message.match(/Branch code '([^']+)'/);
-    return match ? !savedBranchMappings.has(match[1]) : true;
-  }).length > 0
-    ? `Publish (${incompleteRowNums.length} record${incompleteRowNums.length !== 1 ? 's' : ''} will be marked incomplete)`
+  const publishableRowCount = Math.max(0, rawRows.length - skippedRowCount);
+  const labelParts: string[] = [];
+  if (skippedRowCount > 0) labelParts.push(`${skippedRowCount} skipped`);
+  if (incompleteRowNums.length > 0) labelParts.push(`${incompleteRowNums.length} incomplete`);
+  const publishLabel = labelParts.length > 0
+    ? `Publish ${publishableRowCount} row${publishableRowCount !== 1 ? 's' : ''} (${labelParts.join(', ')})`
     : 'Publish Canonical Data';
 
   return (
@@ -300,14 +311,37 @@ export default function ImportCenter() {
       </div>
 
       {step === 'upload' && (
-        <div className="glass-panel p-12 text-center">
-          <label className="cursor-pointer block">
-            <input type="file" accept=".xlsx,.xls" onChange={handleFileDrop} className="hidden" />
-            <div className="border-2 border-dashed border-border rounded-lg p-12 hover:border-primary/50 transition-colors">
-              <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-foreground font-medium mb-1">Drop your workbook here or click to browse</p>
-              <p className="text-sm text-muted-foreground">Supports .xlsx and .xls files with a "Combine Data" sheet</p>
-            </div>
+        <div className="glass-panel p-6 sm:p-12 text-center">
+          {/*
+            Mobile-safe file picker:
+            - The <input> is `sr-only` (kept in layout & a11y tree). iOS/Android
+              browsers refuse to open the picker from a `display:none` input.
+            - Avoid the legacy <label> wrapping: nesting an interactive <button>
+              inside <label> is invalid HTML and on iOS Safari the synthetic
+              click on the label cancels the button's programmatic
+              `input.click()`. Use an htmlFor-only label as the visual surface
+              instead.
+          */}
+          <input
+            id="import-file-input"
+            type="file"
+            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            onChange={handleFileDrop}
+            className="sr-only"
+          />
+          <label
+            htmlFor="import-file-input"
+            className="block cursor-pointer border-2 border-dashed border-border rounded-lg p-8 sm:p-12 hover:border-primary/50 transition-colors"
+          >
+            <Upload className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-foreground font-medium mb-1">Tap to choose a workbook</p>
+            <p className="text-sm text-muted-foreground mb-4">Supports .xlsx and .xls files with a "Combine Data" sheet</p>
+            <span
+              role="button"
+              className="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow hover:bg-primary/90"
+            >
+              <Upload className="h-4 w-4" />Browse files
+            </span>
           </label>
         </div>
       )}
@@ -377,12 +411,20 @@ export default function ImportCenter() {
             )}
 
             {/* ── Hard blockers (duplicate chassis, chassis too short, missing chassis) ── */}
+            {/* These rows are skipped — not blocked. publishCanonical drops chassis-less rows
+                and de-duplicates by chassis, so the publish RPC accepts the remaining rows. */}
             {hardBlockers.length > 0 && (
               <div className="mb-4 p-3 rounded-md bg-destructive/10 border border-destructive/20">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertCircle className="h-4 w-4 text-destructive" />
-                  <h4 className="text-sm font-semibold text-destructive">{hardBlockers.length} blocking error{hardBlockers.length !== 1 ? 's' : ''} — these rows cannot be published</h4>
+                  <h4 className="text-sm font-semibold text-destructive">
+                    {skippedRowCount} row{skippedRowCount !== 1 ? 's' : ''} will be skipped — duplicate, too-short, or missing chassis number
+                  </h4>
                 </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  These rows cannot be uniquely identified, so they are excluded from the publish.
+                  All other valid rows in the file will still be published.
+                </p>
                 <div className="space-y-1 max-h-36 overflow-y-auto">
                   {hardBlockers.map((error, idx) => (
                     <div key={idx} className="flex items-start gap-2 p-2 rounded bg-destructive/5 text-xs">
@@ -497,14 +539,14 @@ export default function ImportCenter() {
             )}
 
             {/* ── Summary stats ── */}
-            <div className="grid grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
               <div className="p-3 rounded bg-secondary/50 text-center">
                 <p className="text-2xl font-bold text-foreground">{rawRows.length}</p>
                 <p className="text-xs text-muted-foreground">Total Rows</p>
               </div>
               <div className="p-3 rounded bg-secondary/50 text-center">
                 <p className="text-2xl font-bold text-success">
-                  {rawRows.length - hardBlockers.length - incompleteRowNums.length}
+                  {Math.max(0, rawRows.length - skippedRowCount - incompleteRowNums.length)}
                 </p>
                 <p className="text-xs text-muted-foreground">Clean</p>
               </div>
@@ -513,8 +555,8 @@ export default function ImportCenter() {
                 <p className="text-xs text-muted-foreground">Incomplete</p>
               </div>
               <div className="p-3 rounded bg-secondary/50 text-center">
-                <p className="text-2xl font-bold text-destructive">{hardBlockers.length}</p>
-                <p className="text-xs text-muted-foreground">Blocked</p>
+                <p className="text-2xl font-bold text-destructive">{skippedRowCount}</p>
+                <p className="text-xs text-muted-foreground">Skipped</p>
               </div>
             </div>
 

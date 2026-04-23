@@ -98,13 +98,18 @@ export async function logVehicleEdit(
   const queryId = `audit-log-${vehicleId}-${Date.now()}`;
   performanceService.startQueryTimer(queryId);
 
-  // audit_logs.user_id is a uuid column; legacy callers sometimes pass sentinel
-  // strings like 'system-user'. Drop those to NULL so the insert doesn't fail.
+  // audit_logs.user_id is a non-null uuid column; legacy callers sometimes pass
+  // sentinel strings like 'system-user'. Treat audit logging as best-effort:
+  // when the caller has no real user uuid we silently skip the insert rather
+  // than emit a noisy 23502 NOT NULL violation that pollutes app logs.
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const safeUserId = UUID_RE.test(userId) ? userId : null;
+  if (!UUID_RE.test(userId)) {
+    performanceService.endQueryTimer(queryId, "log_vehicle_edit_skipped");
+    return { error: null };
+  }
 
   const { error } = await supabase.from("audit_logs").insert({
-    user_id: safeUserId,
+    user_id: userId,
     action: "update",
     entity_type: "vehicle",
     entity_id: vehicleId,

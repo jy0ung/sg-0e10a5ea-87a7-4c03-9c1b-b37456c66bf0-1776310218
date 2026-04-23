@@ -11,7 +11,7 @@ function mapInvoice(row: Record<string, unknown>): Invoice {
     salesOrderId: row.sales_order_id as string,
     customerId: row.customer_id as string | undefined,
     customerName: row.customer_name as string | undefined,
-    issueDate: row.issue_date as string,
+    issueDate: (row.invoice_date ?? row.issue_date) as string,
     dueDate: row.due_date as string | undefined,
     subtotal: row.subtotal as number,
     taxAmount: row.tax_amount as number | undefined,
@@ -32,7 +32,7 @@ export async function getInvoices(companyId: string): Promise<{ data: Invoice[];
     .from('invoices')
     .select('*')
     .eq('company_id', companyId)
-    .order('issue_date', { ascending: false });
+    .order('invoice_date', { ascending: false });
   performanceService.endQueryTimer(timerId);
   if (error) { loggingService.error('getInvoices failed', { error }); return { data: [], error: new Error(error.message) }; }
   return { data: (data ?? []).map(r => mapInvoice(r as Record<string, unknown>)), error: null };
@@ -47,7 +47,7 @@ export async function createInvoice(companyId: string, fields: Omit<Invoice, 'id
       sales_order_id: fields.salesOrderId,
       customer_id: fields.customerId,
       customer_name: fields.customerName,
-      issue_date: fields.issueDate,
+      invoice_date: fields.issueDate,
       due_date: fields.dueDate,
       subtotal: fields.subtotal,
       tax_amount: fields.taxAmount,
