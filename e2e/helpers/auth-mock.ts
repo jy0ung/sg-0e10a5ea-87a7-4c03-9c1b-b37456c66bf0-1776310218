@@ -52,8 +52,7 @@ function readSupabaseUrl(): string {
 }
 
 export const SUPABASE_URL = readSupabaseUrl();
-const PROJECT_REF = new URL(SUPABASE_URL).hostname.split(".")[0];
-const LS_KEY = `sb-${PROJECT_REF}-auth-token`;
+const LS_KEY = 'flc.auth.session';
 
 export const MOCK_USER = {
   id: "00000000-0000-0000-0000-000000000001",
@@ -111,13 +110,15 @@ const FAKE_SESSION = {
   user: MOCK_USER,
 };
 
+const FAKE_SESSION_USER = { user: MOCK_USER };
+
 /**
  * Inject only a fake session into localStorage so the Supabase SDK will
  * attempt `updateUser` calls (which require an active session). Does NOT
  * set up full table mocks — callers can add their own route interceptors.
  */
 export async function setupSessionForUpdateUser(page: Page) {
-  await page.addInitScript(
+  await page.context().addInitScript(
     ({ key, value, userKey, userValue }) => {
       localStorage.setItem(key, JSON.stringify(value));
       localStorage.setItem(userKey, JSON.stringify(userValue));
@@ -126,7 +127,7 @@ export async function setupSessionForUpdateUser(page: Page) {
       key: LS_KEY,
       value: FAKE_SESSION,
       userKey: LS_KEY + "-user",
-      userValue: { user: MOCK_USER },
+      userValue: FAKE_SESSION_USER,
     }
   );
 
@@ -152,7 +153,7 @@ export async function setupAuthMocks(page: Page) {
   //    finds an existing session on first load.
   //    Supabase SDK v2.103+ stores user separately under storageKey + '-user'
   // ------------------------------------------------------------------
-  await page.addInitScript(
+  await page.context().addInitScript(
     ({ key, value, userKey, userValue }) => {
       localStorage.setItem(key, JSON.stringify(value));
       localStorage.setItem(userKey, JSON.stringify(userValue));
@@ -161,7 +162,7 @@ export async function setupAuthMocks(page: Page) {
       key: LS_KEY,
       value: FAKE_SESSION,
       userKey: LS_KEY + "-user",
-      userValue: { user: MOCK_USER },
+      userValue: FAKE_SESSION_USER,
     }
   );
 

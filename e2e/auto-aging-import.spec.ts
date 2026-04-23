@@ -191,7 +191,7 @@ test('Auto-aging import smoke test uploads and publishes canonical data', async 
     buffer: workbookBuffer(),
   });
 
-  await expect(page.getByText('Combined.xlsx')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText('Combined.xlsx', { exact: true })).toBeVisible({ timeout: 10000 });
   await expect(page.getByText(/2 rows parsed/i)).toBeVisible({ timeout: 10000 });
   await expect(page.getByText(/unknown branch codes/i)).toHaveCount(0);
   await expect(page.getByText(/missing data — will be published as incomplete/i)).toBeVisible({ timeout: 10000 });
@@ -215,4 +215,67 @@ test('Auto-aging import smoke test uploads and publishes canonical data', async 
     salesman_name: 'Pending',
     customer_name: 'Pending',
   });
+});
+
+test('Auto-aging import touch regression opens native chooser in tablet desktop-site layout and publishes canonical data', async ({ browser }) => {
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    deviceScaleFactor: 2,
+    hasTouch: true,
+    isMobile: false,
+  });
+
+  const page = await context.newPage();
+
+  try {
+    const { dialogs, vehicleWrites } = await setupAutoAgingImportMocks(page);
+
+    await page.goto('/auto-aging/import');
+    await expect(page.getByText(/import center/i)).toBeVisible({ timeout: 10000 });
+
+    const fileInput = page.locator('#import-file-input');
+    const inputBox = await fileInput.boundingBox();
+    expect(inputBox).not.toBeNull();
+
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.touchscreen.tap(
+        inputBox!.x + inputBox!.width / 2,
+        inputBox!.y + inputBox!.height / 2,
+      ),
+    ]);
+
+    await fileChooser.setFiles({
+      name: 'Combined-Android-Tablet.xlsx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      buffer: workbookBuffer(),
+    });
+
+    await expect(page.getByText(/reading file/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Combined-Android-Tablet.xlsx', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/2 rows parsed/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/missing data — will be published as incomplete/i)).toBeVisible({ timeout: 10000 });
+
+    await page.getByRole('button', { name: /publish/i }).click();
+
+    await expect(page.getByText(/import published successfully/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/published as incomplete/i)).toBeVisible({ timeout: 10000 });
+    expect(dialogs).toEqual([]);
+
+    await expect.poll(() => vehicleWrites.length).toBeGreaterThan(0);
+
+    const canonicalWrite = vehicleWrites.find(payload =>
+      payload.length === 1 && payload[0]?.chassis_no === 'PW-IMPORT-0001'
+    );
+
+    expect(canonicalWrite).toBeDefined();
+    expect(canonicalWrite?.[0]).toMatchObject({
+      chassis_no: 'PW-IMPORT-0001',
+      branch_code: 'KK',
+      salesman_name: 'Pending',
+      customer_name: 'Pending',
+    });
+  } finally {
+    await context.close();
+  }
 });
