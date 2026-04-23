@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -38,13 +38,6 @@ export default function ImportCenter() {
   const [branchMappingInputs, setBranchMappingInputs] = useState<Record<string, string>>({});
   const [savedBranchMappings, setSavedBranchMappings] = useState<Set<string>>(new Set());
   const [savingBranch, setSavingBranch] = useState<string | null>(null);
-
-  // Ref to the hidden file input so we can trigger the native picker from a
-  // real <button> click-handler. This is the most reliable pattern across
-  // iPadOS Safari, Android Chrome, and desktop browsers — `label htmlFor` and
-  // `sr-only` inputs can silently fail on some tablet Safari versions because
-  // the synthetic click is not treated as a user-activation.
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Error classification helpers ────────────────────────────────────────────
   // Hard blockers: rows that genuinely cannot be published
@@ -338,41 +331,28 @@ export default function ImportCenter() {
         <div className="glass-panel p-6 sm:p-12 text-center">
           {/*
             Tablet-safe file picker:
-            - A *visible* (but `hidden`-via-CSS) <input> kept in the DOM and a11y tree.
-            - Native <button> that calls `inputRef.current?.click()` directly —
-              this is the most reliable pattern on iPadOS Safari, Android
-              Chrome, and desktop. `label htmlFor=` + `sr-only` inputs
-              intermittently fail on iPadOS Safari because the synthetic tap
-              is not treated as a user-activation gesture.
-            - The whole drop zone is also a button so tapping anywhere opens
-              the picker. No nested interactive elements.
+            - The actual tap target is the native file input itself, stretched
+              over the whole drop zone with `opacity: 0`. This avoids the
+              synthetic `element.click()` path that iPadOS Safari can silently
+              ignore.
+            - Keep the input in the normal layout tree; some tablet browsers do
+              not allow opening the picker from `display:none`/visually-hidden
+              controls.
+            - Clear the current value on click so picking the same workbook a
+              second time still fires `onChange`.
           */}
-          <input
-            ref={fileInputRef}
-            id="import-file-input"
-            type="file"
-            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-            onChange={handleFileDrop}
-            className="sr-only"
-            aria-label="Choose Excel workbook to import"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              const el = fileInputRef.current;
-              if (!el) {
-                toast({ title: 'Picker unavailable', description: 'Please refresh the page and try again.', variant: 'destructive' });
-                return;
-              }
-              try {
-                el.click();
-              } catch (err) {
-                loggingService.error('File picker click failed', { error: err }, 'ImportCenter');
-                toast({ title: 'Could not open file picker', description: 'Your browser blocked the file chooser. Please try another browser.', variant: 'destructive' });
-              }
-            }}
-            className="w-full block cursor-pointer border-2 border-dashed border-border rounded-lg p-8 sm:p-12 hover:border-primary/50 transition-colors text-center"
-          >
+          <div className="relative w-full border-2 border-dashed border-border rounded-lg p-8 sm:p-12 hover:border-primary/50 transition-colors text-center overflow-hidden">
+            <input
+              id="import-file-input"
+              type="file"
+              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              onChange={handleFileDrop}
+              onClick={event => {
+                event.currentTarget.value = '';
+              }}
+              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+              aria-label="Choose Excel workbook to import"
+            />
             <Upload className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-foreground font-medium mb-1">Tap to choose a workbook</p>
             <p className="text-sm text-muted-foreground mb-4">Supports .xlsx and .xls files with a "Combine Data" sheet</p>
@@ -381,7 +361,7 @@ export default function ImportCenter() {
             >
               <Upload className="h-4 w-4" />Browse files
             </span>
-          </button>
+          </div>
         </div>
       )}
 
