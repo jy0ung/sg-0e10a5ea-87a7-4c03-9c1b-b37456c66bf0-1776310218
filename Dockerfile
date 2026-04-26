@@ -43,9 +43,12 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 FROM nginx:1.27-alpine AS runtime
 
+ARG SUPABASE_INTERNAL_URL=http://192.168.1.241:54321
+
 # Drop the stock default.conf and ship a hardened SPA config.
 RUN rm /etc/nginx/conf.d/default.conf
 COPY docker/nginx.conf /etc/nginx/conf.d/app.conf
+RUN sed -i "s|__SUPABASE_INTERNAL_URL__|${SUPABASE_INTERNAL_URL}|g" /etc/nginx/conf.d/app.conf
 
 # Copy static bundle. Vite's default output dir is `dist`.
 COPY --from=build /app/dist /usr/share/nginx/html
