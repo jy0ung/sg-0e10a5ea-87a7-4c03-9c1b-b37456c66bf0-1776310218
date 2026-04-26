@@ -115,7 +115,7 @@ export default function Invoices() {
   const handlePay = async () => {
     if (!payTarget || !payAmount) return;
     setSaving(true);
-    const { error } = await recordPayment(payTarget.id, parseFloat(payAmount));
+    const { error } = await recordPayment(companyId, payTarget.id, parseFloat(payAmount));
     setSaving(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await reloadSales();

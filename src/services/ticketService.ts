@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logUserAction } from './auditService';
 import { loggingService } from './loggingService';
 
 /**
@@ -35,12 +36,10 @@ export interface TicketRecord {
 }
 
 export interface CreateTicketInput {
-  company_id: string;
   subject: string;
   category: TicketCategory;
   priority: TicketPriority;
   description: string;
-  submitted_by: string;
 }
 
 export interface TicketServiceResult<T> {
@@ -51,12 +50,16 @@ export interface TicketServiceResult<T> {
 type TicketsClient = {
   from: (table: 'tickets') => {
     select: (cols: string) => {
-      order: (
-        col: string,
-        opts?: { ascending?: boolean },
-      ) => Promise<{ data: TicketRecord[] | null; error: Error | null }>;
+      eq: (col: string, val: string) => {
+        eq: (col: string, val: string) => {
+          order: (
+            col: string,
+            opts?: { ascending?: boolean },
+          ) => Promise<{ data: TicketRecord[] | null; error: Error | null }>;
+        };
+      };
     };
-    insert: (row: CreateTicketInput & { status: TicketStatus }) => Promise<{
+    insert: (row: CreateTicketInput & { company_id: string; submitted_by: string; status: TicketStatus }) => Promise<{
       data: unknown;
       error: Error | null;
     }>;
@@ -68,11 +71,13 @@ type TicketsClient = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const client = supabase as unknown as TicketsClient;
 
-export async function listMyTickets(): Promise<TicketServiceResult<TicketRecord[]>> {
+export async function listMyTickets(userId: string, companyId: string): Promise<TicketServiceResult<TicketRecord[]>> {
   try {
     const { data, error } = await client
       .from('tickets')
       .select('id, subject, category, priority, status, description, created_at, updated_at, company_id, submitted_by')
+      .eq('submitted_by', userId)
+      .eq('company_id', companyId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -86,13 +91,17 @@ export async function listMyTickets(): Promise<TicketServiceResult<TicketRecord[
 
 export async function createTicket(
   input: CreateTicketInput,
+  context: { userId: string; companyId: string },
 ): Promise<TicketServiceResult<true>> {
   try {
     const { error } = await client.from('tickets').insert({
       ...input,
+      company_id: context.companyId,
+      submitted_by: context.userId,
       status: 'open',
     });
     if (error) throw error;
+    void logUserAction(context.userId, 'create', 'ticket', undefined, { component: 'TicketService' });
     return { data: true, error: null };
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to create ticket');

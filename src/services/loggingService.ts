@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
 
 export type LogLevel = "info" | "warn" | "error" | "debug";
 
@@ -10,6 +9,77 @@ export interface LogEntry {
   userId?: string;
   timestamp: string;
   component?: string;
+}
+
+const REDACTED = "[redacted]";
+const MAX_SANITIZE_DEPTH = 5;
+const SENSITIVE_KEY_FRAGMENTS = [
+  "authorization",
+  "cookie",
+  "email",
+  "icno",
+  "nric",
+  "password",
+  "phone",
+  "refresh",
+  "secret",
+  "session",
+  "token",
+  "jwt",
+] as const;
+
+function normalizeKey(key: string): string {
+  return key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+function isSensitiveKey(key: string): boolean {
+  const normalized = normalizeKey(key);
+  return SENSITIVE_KEY_FRAGMENTS.some(fragment => normalized.includes(fragment));
+}
+
+function redactString(value: string): string {
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, REDACTED)
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, `Bearer ${REDACTED}`)
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, REDACTED)
+    .replace(/\b(access_token|refresh_token|token|password|secret|api_key|apikey)=([^\s&]+)/gi, `$1=${REDACTED}`);
+}
+
+function sanitizeLogValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+  if (typeof value === "string") return redactString(value);
+  if (value === null || typeof value !== "object") return value;
+  if (depth >= MAX_SANITIZE_DEPTH) return "[truncated]";
+
+  if (seen.has(value)) return "[circular]";
+  seen.add(value);
+
+  if (value instanceof Error) {
+    const enriched = value as Error & { code?: unknown; status?: unknown; details?: unknown; hint?: unknown };
+    return {
+      name: enriched.name,
+      message: redactString(enriched.message),
+      code: sanitizeLogValue(enriched.code, depth + 1, seen),
+      status: sanitizeLogValue(enriched.status, depth + 1, seen),
+      details: sanitizeLogValue(enriched.details, depth + 1, seen),
+      hint: sanitizeLogValue(enriched.hint, depth + 1, seen),
+    };
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(item => sanitizeLogValue(item, depth + 1, seen));
+  }
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [
+      key,
+      isSensitiveKey(key) ? REDACTED : sanitizeLogValue(nestedValue, depth + 1, seen),
+    ]),
+  );
+}
+
+function sanitizeLogContext(context?: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (!context) return undefined;
+  return sanitizeLogValue(context) as Record<string, unknown>;
 }
 
 class LoggingService {
@@ -71,8 +141,8 @@ class LoggingService {
   ): LogEntry {
     return {
       level,
-      message,
-      context,
+      message: redactString(message),
+      context: sanitizeLogContext(context),
       userId: this.currentUserId,
       timestamp: new Date().toISOString(),
       component,
@@ -98,9 +168,9 @@ class LoggingService {
     const prefix = `[${entry.timestamp}] [${entry.level.toUpperCase()}]${entry.component ? ` [${entry.component}]` : ""}`;
     
     if (entry.context) {
-      console.log(`%c${prefix} ${entry.message}`, style, entry.context);
+      console.info(`%c${prefix} ${entry.message}`, style, entry.context);
     } else {
-      console.log(`%c${prefix} ${entry.message}`, style);
+      console.info(`%c${prefix} ${entry.message}`, style);
     }
 
     this.persistLog(entry);

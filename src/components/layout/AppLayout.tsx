@@ -56,7 +56,7 @@ export default function AppLayout() {
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Link to="/notifications" className="relative rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+            <Link to="/notifications" className="relative rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" aria-label="Open notifications">
               <Bell className="h-5 w-5" />
               <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
             </Link>

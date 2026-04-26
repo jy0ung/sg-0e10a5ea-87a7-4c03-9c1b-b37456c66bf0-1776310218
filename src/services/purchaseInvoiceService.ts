@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { logUserAction } from './auditService';
 import { loggingService } from "./loggingService";
 import { insertVehicle } from "./vehicleService";
 
@@ -50,6 +51,7 @@ export async function listPurchaseInvoices(
 
 export interface CreatePurchaseInvoiceInput {
   companyId: string;
+  actorId?: string;
   invoiceNo: string;
   supplier: string;
   chassisNo: string;
@@ -77,6 +79,7 @@ export async function createPurchaseInvoice(
     loggingService.error('createPurchaseInvoice failed', { error }, 'PurchaseInvoiceService');
     return { error: new Error(error.message) };
   }
+  if (input.actorId) void logUserAction(input.actorId, 'create', 'purchase_invoice', undefined, { component: 'PurchaseInvoiceService' });
   return { error: null };
 }
 
@@ -87,13 +90,14 @@ export async function createPurchaseInvoice(
  */
 export async function markPurchaseInvoiceReceived(
   id: string,
-  options: { companyId: string; chassisNo: string; model: string },
+  options: { companyId: string; chassisNo: string; model: string; actorId?: string },
 ): Promise<{ error: Error | null }> {
   const receivedDate = new Date().toISOString().split('T')[0];
 
   const { error } = await supabase
     .from('purchase_invoices')
     .update({ status: 'received', received_date: receivedDate })
+    .eq('company_id', options.companyId)
     .eq('id', id);
   if (error) {
     loggingService.error('markPurchaseInvoiceReceived failed', { id, error }, 'PurchaseInvoiceService');
@@ -122,6 +126,7 @@ export async function markPurchaseInvoiceReceived(
       const { error: updateError } = await supabase
         .from('vehicles')
         .update({ date_received_by_outlet: receivedDate })
+        .eq('company_id', options.companyId)
         .eq('id', row.id);
       if (updateError) {
         return { error: new Error(updateError.message) };
@@ -130,12 +135,14 @@ export async function markPurchaseInvoiceReceived(
     return { error: null };
   }
 
-  const { error: insertError } = await insertVehicle({
+  const { error: insertError } = await insertVehicle(options.companyId, {
     chassis_no: options.chassisNo,
     model: options.model,
-    company_id: options.companyId,
     date_received_by_outlet: receivedDate,
-  });
+  }, options.actorId);
+  if (!insertError && options.actorId) {
+    void logUserAction(options.actorId, 'update', 'purchase_invoice', id, { component: 'PurchaseInvoiceService' });
+  }
   return { error: insertError };
 }
 

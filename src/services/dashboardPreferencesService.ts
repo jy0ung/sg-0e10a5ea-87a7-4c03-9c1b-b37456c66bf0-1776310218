@@ -49,12 +49,13 @@ export async function fetchDashboardPreferences(
 }
 
 export async function upsertDashboardPreferences(
-  row: DashboardPreferencesRow,
+  userId: string,
+  row: Omit<DashboardPreferencesRow, 'user_id' | 'updated_at'>,
 ): Promise<{ error: Error | null }> {
   const { error } = await client
     .from('dashboard_preferences')
     .upsert(
-      { ...row, updated_at: new Date().toISOString() },
+      { ...row, user_id: userId, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' },
     );
   return { error };

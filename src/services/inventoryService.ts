@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logUserAction } from './auditService';
 import { loggingService } from './loggingService';
 
 // -----------------------------------------------------------------------------
@@ -23,6 +24,7 @@ export interface VehicleTransferRecord {
 
 export interface CreateVehicleTransferInput {
   companyId: string;
+  actorId?: string;
   runningNo: string;
   fromBranch: string;
   toBranch: string;
@@ -79,7 +81,12 @@ export async function createVehicleTransfer(
     loggingService.error('createVehicleTransfer failed', { error }, 'InventoryService');
     return { error: new Error(error.message) };
   }
+  if (input.actorId) void logUserAction(input.actorId, 'create', 'vehicle_transfer', undefined, { component: 'InventoryService' });
   return { error: null };
+}
+
+function missingCompanyError(): Error {
+  return new Error('Company context is required for vehicle transfer mutations');
 }
 
 /**
@@ -91,11 +98,14 @@ export async function updateVehicleTransferStatus(
   status: TransferStatus,
   options: {
     companyId?: string;
+    actorId?: string;
     chassisNo?: string;
     toBranch?: string;
     previousArrivedAt?: string | null;
   } = {},
 ): Promise<{ error: Error | null }> {
+  if (!options.companyId) return { error: missingCompanyError() };
+
   const arrivedAt =
     status === 'arrived'
       ? new Date().toISOString().split('T')[0]
@@ -104,13 +114,14 @@ export async function updateVehicleTransferStatus(
   const { error } = await supabase
     .from('vehicle_transfers')
     .update({ status, arrived_at: arrivedAt })
+    .eq('company_id', options.companyId)
     .eq('id', id);
   if (error) {
     loggingService.error('updateVehicleTransferStatus failed', { id, error }, 'InventoryService');
     return { error: new Error(error.message) };
   }
 
-  if (status === 'arrived' && options.companyId && options.chassisNo && options.toBranch) {
+  if (status === 'arrived' && options.chassisNo && options.toBranch) {
     const { error: vehicleError } = await supabase
       .from('vehicles')
       .update({ branch_code: options.toBranch })
@@ -126,6 +137,8 @@ export async function updateVehicleTransferStatus(
       return { error: new Error(vehicleError.message) };
     }
   }
+
+  if (options.actorId) void logUserAction(options.actorId, 'update', 'vehicle_transfer', id, { component: 'InventoryService' });
 
   return { error: null };
 }

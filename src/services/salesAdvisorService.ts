@@ -113,10 +113,11 @@ export async function createSalesAdvisor(
 }
 
 export async function updateSalesAdvisorStatus(
+  companyId: string,
   id: string,
   status: SalesAdvisorStatus,
 ): Promise<{ error: Error | null }> {
-  const { error } = await updateEmployee(id, { status });
+  const { error } = await updateEmployee(id, { status }, undefined, companyId);
   if (error) {
     loggingService.error('updateSalesAdvisorStatus failed', { id, error }, 'SalesAdvisorService');
     return { error: new Error(error) };

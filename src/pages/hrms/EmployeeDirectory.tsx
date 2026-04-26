@@ -245,7 +245,7 @@ export default function EmployeeDirectory() {
       departmentId: editForm.departmentId || null,
       jobTitleId:   editForm.jobTitleId || null,
     };
-    const { error } = await updateEmployee(editTarget.id, input, user?.id);
+    const { error } = await updateEmployee(editTarget.id, input, user?.id, user.companyId);
     setEditSaving(false);
     if (error) {
       toast({ title: 'Failed to update employee', description: error, variant: 'destructive' });
@@ -262,7 +262,7 @@ export default function EmployeeDirectory() {
     const next: EmployeeStatus = emp.status === 'active' ? 'inactive' : 'active';
     // Optimistic update
     setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, status: next } : e));
-    const { error } = await updateEmployee(emp.id, { status: next }, user?.id);
+    const { error } = await updateEmployee(emp.id, { status: next }, user?.id, user.companyId);
     if (error) {
       setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, status: emp.status } : e));
       toast({ title: 'Failed to update status', description: error, variant: 'destructive' });

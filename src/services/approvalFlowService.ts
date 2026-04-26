@@ -127,6 +127,7 @@ export async function updateApprovalFlow(
       is_active:   input.isActive,
       updated_at:  new Date().toISOString(),
     })
+    .eq('company_id', companyId)
     .eq('id', flowId);
   if (flowError) return { error: flowError.message };
 
@@ -157,6 +158,7 @@ export async function updateApprovalFlow(
 }
 
 export async function toggleApprovalFlowActive(
+  companyId: string,
   flowId: string,
   isActive: boolean,
   actorId: string,
@@ -164,14 +166,15 @@ export async function toggleApprovalFlowActive(
   const { error } = await supabase
     .from('approval_flows')
     .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .eq('company_id', companyId)
     .eq('id', flowId);
   if (!error) void logUserAction(actorId, 'update', 'approval_flow', flowId, { isActive });
   return { error: error?.message ?? null };
 }
 
-export async function deleteApprovalFlow(flowId: string, actorId: string): Promise<{ error: string | null }> {
+export async function deleteApprovalFlow(companyId: string, flowId: string, actorId: string): Promise<{ error: string | null }> {
   // Steps cascade-delete via FK
-  const { error } = await supabase.from('approval_flows').delete().eq('id', flowId);
+  const { error } = await supabase.from('approval_flows').delete().eq('company_id', companyId).eq('id', flowId);
   if (!error) void logUserAction(actorId, 'delete', 'approval_flow', flowId, {});
   return { error: error?.message ?? null };
 }

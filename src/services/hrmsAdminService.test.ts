@@ -183,7 +183,7 @@ describe('updateDepartment', () => {
   it('surfaces an error when the department head update rejects employee ownership', async () => {
     queueResolves({ data: null, error: { message: 'violates foreign key constraint "departments_head_employee_id_fkey"' } });
 
-    const result = await updateDepartment('dept-1', 'admin-1', {
+    const result = await updateDepartment('c1', 'dept-1', 'admin-1', {
       name: 'HR',
       headEmployeeId: 'employee-1',
       costCentre: 'CC-01',
@@ -204,10 +204,11 @@ describe('deleteDepartment', () => {
   it('blocks deletion when workforce employees are still assigned', async () => {
     queueResolves({ data: null, error: null, count: 2 });
 
-    const result = await deleteDepartment('dept-1', 'admin-1');
+    const result = await deleteDepartment('c1', 'dept-1', 'admin-1');
 
     expect(result.error).toBe('Cannot delete: 2 employee(s) are assigned to this department. Reassign them first.');
     expect(eqCalls).toEqual(expect.arrayContaining([
+      { table: 'employees', column: 'company_id', value: 'c1' },
       { table: 'employees', column: 'department_id', value: 'dept-1' },
     ]));
     expect(eqCalls).not.toEqual(expect.arrayContaining([

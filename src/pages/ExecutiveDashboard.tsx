@@ -136,8 +136,7 @@ export default function ExecutiveDashboard() {
       const payload = latestPayloadRef.current;
       latestPayloadRef.current = null;
       if (!payload) return;
-      void upsertDashboardPreferences({
-        user_id: userId,
+      void upsertDashboardPreferences(userId, {
         selected_kpis: payload.kpis,
         show_advanced_kpis: payload.advanced,
         personal_dashboard: payload.dashboard,

@@ -39,6 +39,11 @@
   3. Export the returned credentials as `RLS_USER_A_*` / `RLS_USER_B_*` along with `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`.
   4. `npm run test:rls`.
 - Run this harness before every release; a red run blocks the tag.
+- CI now includes an optional `RLS Matrix` job on pushes. Configure the staging
+  secrets `RLS_SUPABASE_URL`, `RLS_SUPABASE_ANON_KEY`, `RLS_USER_A_EMAIL`,
+  `RLS_USER_A_PASSWORD`, `RLS_USER_B_EMAIL`, and `RLS_USER_B_PASSWORD`. Set the
+  repository variable `RLS_CI_REQUIRED=true` once those secrets are in place so
+  missing credentials fail the job instead of skipping it.
 - `audit_logs` INSERT policy requires `user_id = auth.uid()`; SELECT is scoped by company.
 
 ## Threat model (condensed)

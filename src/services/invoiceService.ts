@@ -64,9 +64,9 @@ export async function createInvoice(companyId: string, fields: Omit<Invoice, 'id
   return { data: mapInvoice(data as Record<string, unknown>), error: null };
 }
 
-export async function recordPayment(id: string, amountPaid: number): Promise<{ data: Invoice | null; error: Error | null }> {
+export async function recordPayment(companyId: string, id: string, amountPaid: number): Promise<{ data: Invoice | null; error: Error | null }> {
   // First, get current totals
-  const { data: existing, error: fetchErr } = await supabase.from('invoices').select('total_amount, paid_amount').eq('id', id).single();
+  const { data: existing, error: fetchErr } = await supabase.from('invoices').select('total_amount, paid_amount').eq('company_id', companyId).eq('id', id).single();
   if (fetchErr || !existing) return { data: null, error: new Error(fetchErr?.message ?? 'Invoice not found') };
 
   const totalAmount = (existing as Record<string, unknown>).total_amount as number;
@@ -76,6 +76,7 @@ export async function recordPayment(id: string, amountPaid: number): Promise<{ d
   const { data, error } = await supabase
     .from('invoices')
     .update({ paid_amount: newPaid, payment_status: newStatus, updated_at: new Date().toISOString() })
+    .eq('company_id', companyId)
     .eq('id', id)
     .select()
     .single();
@@ -83,13 +84,13 @@ export async function recordPayment(id: string, amountPaid: number): Promise<{ d
   return { data: mapInvoice(data as Record<string, unknown>), error: null };
 }
 
-export async function updateInvoice(id: string, fields: Partial<Omit<Invoice, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>>): Promise<{ data: Invoice | null; error: Error | null }> {
+export async function updateInvoice(companyId: string, id: string, fields: Partial<Omit<Invoice, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>>): Promise<{ data: Invoice | null; error: Error | null }> {
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (fields.dueDate !== undefined) updates.due_date = fields.dueDate;
   if (fields.notes !== undefined) updates.notes = fields.notes;
   if (fields.paymentStatus !== undefined) updates.payment_status = fields.paymentStatus;
 
-  const { data, error } = await supabase.from('invoices').update(updates).eq('id', id).select().single();
+  const { data, error } = await supabase.from('invoices').update(updates).eq('company_id', companyId).eq('id', id).select().single();
   if (error) return { data: null, error: new Error(error.message) };
   return { data: mapInvoice(data as Record<string, unknown>), error: null };
 }

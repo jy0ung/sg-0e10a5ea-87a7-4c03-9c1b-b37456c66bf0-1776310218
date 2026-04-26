@@ -41,7 +41,7 @@ export default function MyTickets() {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await listMyTickets();
+      const { data, error: fetchError } = await listMyTickets(user.id, user.company_id);
       if (cancelled) return;
       if (fetchError) {
         setError(fetchError.message || 'Unable to load tickets.');

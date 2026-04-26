@@ -27,11 +27,12 @@ export async function getNotifications(userId: string): Promise<{ data: Notifica
   return { data: (data ?? []) as unknown as NotificationRow[], error: null };
 }
 
-export async function markAsRead(notificationId: string): Promise<{ error: Error | null }> {
+export async function markAsRead(notificationId: string, userId: string): Promise<{ error: Error | null }> {
   const { error } = await supabase
     .from('notifications')
     .update({ read: true })
-    .eq('id', notificationId);
+    .eq('id', notificationId)
+    .eq('user_id', userId);
 
   if (error) {
     loggingService.error('Failed to mark notification as read', { error: error.message }, 'NotificationService');

@@ -104,19 +104,19 @@ export function SalesProvider({ children }: { children: ReactNode }) {
 
   /** Optimistically update deal-stage in cache then persist to DB. */
   const moveOrderStage = useCallback(async (orderId: string, stageId: string) => {
-    await moveSalesOrderStage(orderId, stageId);
+    await moveSalesOrderStage(companyId, orderId, stageId, user?.id);
     queryClient.setQueryData<SalesData>(salesQueryKey(companyId, branchId), prev =>
       prev ? { ...prev, salesOrders: prev.salesOrders.map(o => o.id === orderId ? { ...o, dealStageId: stageId } : o) } : prev
     );
-  }, [queryClient, companyId, branchId]);
+  }, [queryClient, companyId, branchId, user?.id]);
 
   /** Optimistically update order fields in cache then persist to DB. */
   const updateOrder = useCallback(async (id: string, fields: Partial<SalesOrder>) => {
-    await updateSalesOrder(id, fields);
+    await updateSalesOrder(companyId, id, fields, user?.id);
     queryClient.setQueryData<SalesData>(salesQueryKey(companyId, branchId), prev =>
       prev ? { ...prev, salesOrders: prev.salesOrders.map(o => o.id === id ? { ...o, ...fields } : o) } : prev
     );
-  }, [queryClient, companyId, branchId]);
+  }, [queryClient, companyId, branchId, user?.id]);
 
   const contextValue = useMemo(
     () => ({

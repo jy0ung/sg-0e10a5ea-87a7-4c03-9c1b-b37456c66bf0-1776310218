@@ -12,7 +12,7 @@ const createDefaultBuilder = () => {
   builder.order = vi.fn(() => builder);
   builder.range = vi.fn(() => Promise.resolve({ data: [], error: null }));
   builder.insert = vi.fn().mockResolvedValue({ error: null });
-  builder.update = vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) }));
+  builder.update = vi.fn(() => builder);
   builder.upsert = vi.fn().mockResolvedValue({ error: null });
   builder.then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
   return builder;
@@ -205,12 +205,11 @@ describe('DataContext', () => {
     });
 
     it('updateImportBatch updates batch in database', async () => {
-      const updateMock = vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      });
+      const updateMock = vi.fn();
       
       vi.mocked(supabase.from).mockImplementation(() => {
         const builder: any = createDefaultBuilder();
+        updateMock.mockReturnValue(builder);
         builder.update = updateMock;
         return builder;
       });
@@ -262,12 +261,11 @@ describe('DataContext', () => {
     });
 
     it('updateSla updates SLA in database and refreshes KPIs', async () => {
-      const updateMock = vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      });
+      const updateMock = vi.fn();
       
       vi.mocked(supabase.from).mockImplementation(() => {
         const builder: any = createDefaultBuilder();
+        updateMock.mockReturnValue(builder);
         builder.update = updateMock;
         return builder;
       });

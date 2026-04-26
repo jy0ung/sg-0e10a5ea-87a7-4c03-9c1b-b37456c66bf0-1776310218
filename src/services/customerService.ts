@@ -2,6 +2,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Customer } from '@/types';
 import { loggingService } from './loggingService';
 import { performanceService } from './performanceService';
+import { logUserAction } from './auditService';
+
+type CustomerEditableFields = Omit<Customer, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>;
+
+function missingCompanyError(): Error {
+  return new Error('Company context is required for customer mutations');
+}
 
 function mapCustomer(row: Record<string, unknown>): Customer {
   return {
@@ -30,38 +37,47 @@ export async function getCustomers(companyId: string): Promise<{ data: Customer[
   return { data: (data ?? []).map(mapCustomer), error: null };
 }
 
-export async function getCustomerById(id: string): Promise<{ data: Customer | null; error: Error | null }> {
-  const { data, error } = await supabase.from('customers').select('*').eq('id', id).single();
+export async function getCustomerById(companyId: string, id: string): Promise<{ data: Customer | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
+  const { data, error } = await supabase.from('customers').select('*').eq('company_id', companyId).eq('id', id).single();
   if (error) return { data: null, error: new Error(error.message) };
   return { data: mapCustomer(data as Record<string, unknown>), error: null };
 }
 
-export async function createCustomer(companyId: string, fields: Omit<Customer, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>): Promise<{ data: Customer | null; error: Error | null }> {
+export async function createCustomer(companyId: string, fields: CustomerEditableFields, actorId?: string): Promise<{ data: Customer | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase
     .from('customers')
     .insert({ company_id: companyId, name: fields.name, email: fields.email, phone: fields.phone, address: fields.address, nric: fields.nric })
     .select()
     .single();
   if (error) { loggingService.error('createCustomer failed', { error }); return { data: null, error: new Error(error.message) }; }
+  if (actorId) void logUserAction(actorId, 'create', 'customer', String(data.id), { component: 'CustomerService' });
   return { data: mapCustomer(data as Record<string, unknown>), error: null };
 }
 
-export async function updateCustomer(id: string, fields: Partial<Omit<Customer, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>>): Promise<{ data: Customer | null; error: Error | null }> {
+export async function updateCustomer(companyId: string, id: string, fields: Partial<CustomerEditableFields>, actorId?: string): Promise<{ data: Customer | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase
     .from('customers')
     .update({ name: fields.name, email: fields.email, phone: fields.phone, address: fields.address, nric: fields.nric, updated_at: new Date().toISOString() })
+    .eq('company_id', companyId)
     .eq('id', id)
     .select()
     .single();
   if (error) { loggingService.error('updateCustomer failed', { error }); return { data: null, error: new Error(error.message) }; }
+  if (actorId) void logUserAction(actorId, 'update', 'customer', id, { component: 'CustomerService' });
   return { data: mapCustomer(data as Record<string, unknown>), error: null };
 }
 
-export async function deleteCustomer(id: string): Promise<{ error: Error | null }> {
+export async function deleteCustomer(companyId: string, id: string, actorId?: string): Promise<{ error: Error | null }> {
+  if (!companyId) return { error: missingCompanyError() };
   const { error } = await supabase
     .from('customers')
     .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+    .eq('company_id', companyId)
     .eq('id', id);
   if (error) return { error: new Error(error.message) };
+  if (actorId) void logUserAction(actorId, 'delete', 'customer', id, { component: 'CustomerService' });
   return { error: null };
 }

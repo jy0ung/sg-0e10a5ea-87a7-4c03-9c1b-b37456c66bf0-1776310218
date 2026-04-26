@@ -61,12 +61,13 @@ export default function NewTicket() {
     if (!user) return;
     setSubmitting(true);
     const { error } = await createTicket({
-      company_id: user.company_id,
       subject: data.subject,
       category: data.category,
       priority: data.priority,
       description: data.description,
-      submitted_by: user.id,
+    }, {
+      userId: user.id,
+      companyId: user.company_id,
     });
     if (error) {
       toast.error('Failed to submit ticket', {

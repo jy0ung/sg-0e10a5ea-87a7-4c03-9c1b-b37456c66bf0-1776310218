@@ -453,7 +453,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
                     to="/profile"
                     className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center hover:bg-primary/30 transition-colors flex-shrink-0"
                   >
-                    <span className="text-primary text-xs font-bold">{getInitials(user?.name)}</span>
+                    <span className="text-foreground text-xs font-bold">{getInitials(user?.name)}</span>
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side="right">
@@ -465,7 +465,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
               <>
                 <Link to="/profile" className="flex items-center gap-2.5 min-w-0 flex-1 group">
                   <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/30 transition-colors">
-                    <span className="text-primary text-xs font-bold">{getInitials(user?.name)}</span>
+                    <span className="text-foreground text-xs font-bold">{getInitials(user?.name)}</span>
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-sidebar-accent-foreground truncate leading-tight">{user?.name}</p>
@@ -477,6 +477,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
                     <button
                       onClick={logout}
                       className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
+                      aria-label="Sign out"
                     >
                       <LogOut className="h-4 w-4" />
                     </button>
@@ -495,6 +496,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
                   <button
                     onClick={logout}
                     className="w-full flex justify-center py-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    aria-label="Sign out"
                   >
                     <LogOut className="h-4 w-4" />
                   </button>

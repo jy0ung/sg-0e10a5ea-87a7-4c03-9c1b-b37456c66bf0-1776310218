@@ -80,6 +80,7 @@ export async function createImportBatch(
 }
 
 export async function updateImportBatch(
+  companyId: string,
   id: string,
   updates: Partial<ImportBatch>,
   userId: string
@@ -91,6 +92,7 @@ export async function updateImportBatch(
     const { data: current, error: fetchError } = await supabase
       .from("import_batches")
       .select("*")
+      .eq("company_id", companyId)
       .eq("id", id)
       .single();
 
@@ -109,6 +111,7 @@ export async function updateImportBatch(
     const { data, error } = await supabase
       .from("import_batches")
       .update(dbUpdates)
+      .eq("company_id", companyId)
       .eq("id", id)
       .select()
       .single();

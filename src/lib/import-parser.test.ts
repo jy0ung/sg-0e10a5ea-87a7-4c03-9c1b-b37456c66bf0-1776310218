@@ -1,17 +1,22 @@
+import ExcelJS from "exceljs";
 import { describe, it, expect, beforeEach } from "vitest";
 import { parseWorkbook, publishCanonical } from "./import-parser";
 import type { VehicleRaw, DataQualityIssue } from "@/types";
 
 describe("import-parser", () => {
   describe("parseWorkbook", () => {
-    const createMockWorkbook = (data: Record<string, unknown>[]): ArrayBuffer => {
-      const csv = data.length > 0 ? Object.keys(data[0]).join(",") + "\n" : "";
-      const rows = data.map(row => Object.values(row).join(","));
-      const csvContent = csv + rows.join("\n");
-      return new TextEncoder().encode(csvContent).buffer;
+    const createMockWorkbook = async (data: Record<string, unknown>[]): Promise<ArrayBuffer> => {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Combine Data");
+      if (data.length > 0) {
+        const headers = Object.keys(data[0]);
+        worksheet.addRow(headers);
+        data.forEach(row => worksheet.addRow(headers.map(header => row[header] ?? "")));
+      }
+      return workbook.xlsx.writeBuffer();
     };
 
-    it("parses valid workbook data correctly", () => {
+    it("parses valid workbook data correctly", async () => {
       const mockData = [
         {
           "Chassis No.": "CH001",
@@ -30,7 +35,7 @@ describe("import-parser", () => {
         },
       ];
 
-      const result = parseWorkbook(createMockWorkbook(mockData));
+      const result = await parseWorkbook(await createMockWorkbook(mockData));
       
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].chassis_no).toBe("CH001");
@@ -40,7 +45,7 @@ describe("import-parser", () => {
       expect(result.issues.length).toBe(0);
     });
 
-    it("drops impossible calendar dates instead of preserving invalid literals", () => {
+    it("drops impossible calendar dates instead of preserving invalid literals", async () => {
       const mockData = [
         {
           "Chassis No.": "CH001",
@@ -58,13 +63,13 @@ describe("import-parser", () => {
         },
       ];
 
-      const result = parseWorkbook(createMockWorkbook(mockData));
+      const result = await parseWorkbook(await createMockWorkbook(mockData));
 
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0].bg_date).toBeUndefined();
     });
 
-    it("handles missing required columns", () => {
+    it("handles missing required columns", async () => {
       const mockData = [
         {
           "Chassis No.": "CH001",
@@ -72,12 +77,12 @@ describe("import-parser", () => {
         },
       ];
 
-      const result = parseWorkbook(createMockWorkbook(mockData));
+      const result = await parseWorkbook(await createMockWorkbook(mockData));
       
       expect(result.missingColumns.length).toBeGreaterThan(0);
     });
 
-    it("creates issues for missing chassis numbers", () => {
+    it("creates issues for missing chassis numbers", async () => {
       const mockData = [
         {
           "BG Date": "2024-01-01",
@@ -92,12 +97,12 @@ describe("import-parser", () => {
         },
       ];
 
-      const result = parseWorkbook(createMockWorkbook(mockData));
+      const result = await parseWorkbook(await createMockWorkbook(mockData));
       
       expect(result.issues.some(i => i.issueType === "missing")).toBe(true);
     });
 
-    it("detects duplicate chassis numbers", () => {
+    it("detects duplicate chassis numbers", async () => {
       const mockData = [
         {
           "Chassis No.": "CH001",
@@ -125,12 +130,12 @@ describe("import-parser", () => {
         },
       ];
 
-      const result = parseWorkbook(createMockWorkbook(mockData));
+      const result = await parseWorkbook(await createMockWorkbook(mockData));
       
       expect(result.issues.some(i => i.issueType === "duplicate")).toBe(true);
     });
 
-    it("sets is_d2d flag based on remark", () => {
+    it("sets is_d2d flag based on remark", async () => {
       const mockData = [
         {
           "Chassis No.": "CH001",
@@ -147,12 +152,12 @@ describe("import-parser", () => {
         },
       ];
 
-      const result = parseWorkbook(createMockWorkbook(mockData));
+      const result = await parseWorkbook(await createMockWorkbook(mockData));
       
       expect(result.rows[0].is_d2d).toBe(true);
     });
 
-    it("normalizes header names correctly", () => {
+    it("normalizes header names correctly", async () => {
       const mockData = [
         {
           "Chassis No": "CH001",
@@ -168,20 +173,20 @@ describe("import-parser", () => {
         },
       ];
 
-      const result = parseWorkbook(createMockWorkbook(mockData));
+      const result = await parseWorkbook(await createMockWorkbook(mockData));
       
       expect(result.rows[0].chassis_no).toBe("CH001");
       expect(result.rows[0].branch_code).toBe("BR1");
       expect(result.rows[0].disb_date).toBe("2024-01-25");
     });
 
-    it("handles empty workbook", () => {
-      const result = parseWorkbook(new ArrayBuffer(0));
+    it("handles empty workbook", async () => {
+      const result = await parseWorkbook(new ArrayBuffer(0));
       
       expect(result.rows).toHaveLength(0);
     });
 
-    it("parses COLOR column into the vehicle row", () => {
+    it("parses COLOR column into the vehicle row", async () => {
       const mockData = [
         {
           "Chassis No.": "CH001",
@@ -197,11 +202,11 @@ describe("import-parser", () => {
           "Color": "Solid White",
         },
       ];
-      const result = parseWorkbook(createMockWorkbook(mockData));
+      const result = await parseWorkbook(await createMockWorkbook(mockData));
       expect(result.rows[0].color).toBe("Solid White");
     });
 
-    it("parses COMM PAYOUT header into commission fields", () => {
+    it("parses COMM PAYOUT header into commission fields", async () => {
       const mockData = [
         {
           "Chassis No.": "CH001",
@@ -230,7 +235,7 @@ describe("import-parser", () => {
           "COMM PAYOUT (on or before 30/04)": "Paid 15/04",
         },
       ];
-      const result = parseWorkbook(createMockWorkbook(mockData));
+      const result = await parseWorkbook(await createMockWorkbook(mockData));
       const a = result.rows.find(r => r.chassis_no === "CH001");
       const b = result.rows.find(r => r.chassis_no === "CH002");
       expect(a?.commission_paid).toBe(false);

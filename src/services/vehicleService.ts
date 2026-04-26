@@ -1,49 +1,57 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { VehicleCanonical } from "@/types";
-import { logVehicleEdit } from "./auditService";
+import { logUserAction, logVehicleEdit } from "./auditService";
 import { performanceService } from "./performanceService";
 import { loggingService } from "./loggingService";
 import { LruCache } from "@/lib/lruCache";
 
-export async function getVehicleById(id: string): Promise<{
+function missingCompanyError(): Error {
+  return new Error('Company context is required for vehicle operations');
+}
+
+export async function getVehicleById(companyId: string, id: string): Promise<{
   data: VehicleCanonical | null;
   error: Error | null;
 }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
   const queryId = `vehicle-get-${id}`;
   performanceService.startQueryTimer(queryId);
 
   const { data, error } = await supabase
     .from("vehicles")
     .select("*")
+    .eq("company_id", companyId)
     .eq("id", id)
     .single();
 
   performanceService.endQueryTimer(queryId, "get_vehicle_by_id");
 
   if (error) {
-    loggingService.error("Failed to get vehicle", { id, error }, "VehicleService");
+    loggingService.error("Failed to get vehicle", { companyId, id, error }, "VehicleService");
   }
 
   return { data, error: error || null };
 }
 
-export async function getVehicleByChassis(chassisNo: string): Promise<{
+export async function getVehicleByChassis(companyId: string, chassisNo: string): Promise<{
   data: VehicleCanonical | null;
   error: Error | null;
 }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
   const queryId = `vehicle-chassis-${chassisNo}`;
   performanceService.startQueryTimer(queryId);
 
   const { data, error } = await supabase
     .from("vehicles")
     .select("*")
+    .eq("company_id", companyId)
     .eq("chassis_no", chassisNo)
     .maybeSingle();
 
   performanceService.endQueryTimer(queryId, "get_vehicle_by_chassis");
 
   if (error) {
-    loggingService.error("Failed to get vehicle by chassis", { chassisNo, error }, "VehicleService");
+    loggingService.error("Failed to get vehicle by chassis", { companyId, chassisNo, error }, "VehicleService");
   }
 
   return { data, error: error || null };
@@ -99,12 +107,20 @@ export async function getVehicles(filters?: {
 }
 
 export async function updateVehicleWithAudit(
+  companyId: string,
   id: string,
   updates: Partial<Record<string, unknown>>,
   userId: string,
 ): Promise<{ data: VehicleCanonical | null; error: Error | null }> {
-  const { data: before } = await getVehicleById(id);
-  const { data, error } = await supabase.from('vehicles').update(updates).eq('id', id).select().single();
+  if (!companyId) return { data: null, error: missingCompanyError() };
+  const { data: before } = await getVehicleById(companyId, id);
+  const { data, error } = await supabase
+    .from('vehicles')
+    .update(updates)
+    .eq('company_id', companyId)
+    .eq('id', id)
+    .select()
+    .single();
   if (error) return { data: null, error: new Error(error.message) };
   const changes: Record<string, unknown> = {};
   for (const key of Object.keys(updates)) {
@@ -120,15 +136,30 @@ export async function updateVehicleWithAudit(
  * diffs that the service cannot reconstruct generically.
  */
 export async function bulkUpdateVehicles(
+  companyId: string,
   ids: string[],
   updates: Partial<Record<string, unknown>>,
+  actorId?: string,
 ): Promise<{ error: Error | null }> {
   if (ids.length === 0) return { error: null };
-  const { error } = await supabase.from('vehicles').update(updates).in('id', ids);
+  if (!companyId) return { error: missingCompanyError() };
+
+  const { data: scopedRows, error: scopeError } = await supabase
+    .from('vehicles')
+    .select('id')
+    .eq('company_id', companyId)
+    .in('id', ids);
+  if (scopeError) return { error: new Error(scopeError.message) };
+  if ((scopedRows ?? []).length !== ids.length) {
+    return { error: new Error('One or more vehicles are outside the current company scope') };
+  }
+
+  const { error } = await supabase.from('vehicles').update(updates).eq('company_id', companyId).in('id', ids);
   if (error) {
     loggingService.error('Bulk vehicle update failed', { count: ids.length, error }, 'VehicleService');
     return { error: new Error(error.message) };
   }
+  if (actorId) void logUserAction(actorId, 'update', 'vehicle', undefined, { component: 'VehicleService', itemCount: ids.length });
   return { error: null };
 }
 
@@ -137,17 +168,33 @@ export async function bulkUpdateVehicles(
  * columns and returns after the DB round-trip so callers can log audit rows.
  */
 export async function softDeleteVehicles(
+  companyId: string,
   ids: string[],
+  actorId?: string,
 ): Promise<{ error: Error | null }> {
   if (ids.length === 0) return { error: null };
+  if (!companyId) return { error: missingCompanyError() };
+
+  const { data: scopedRows, error: scopeError } = await supabase
+    .from('vehicles')
+    .select('id')
+    .eq('company_id', companyId)
+    .in('id', ids);
+  if (scopeError) return { error: new Error(scopeError.message) };
+  if ((scopedRows ?? []).length !== ids.length) {
+    return { error: new Error('One or more vehicles are outside the current company scope') };
+  }
+
   const { error } = await supabase
     .from('vehicles')
     .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+    .eq('company_id', companyId)
     .in('id', ids);
   if (error) {
     loggingService.error('Soft-delete vehicles failed', { count: ids.length, error }, 'VehicleService');
     return { error: new Error(error.message) };
   }
+  if (actorId) void logUserAction(actorId, 'delete', 'vehicle', undefined, { component: 'VehicleService', itemCount: ids.length });
   return { error: null };
 }
 
@@ -156,17 +203,21 @@ export async function softDeleteVehicles(
  * creates a vehicle record at invoice time.
  */
 export async function insertVehicle(
+  companyId: string,
   row: Record<string, unknown>,
+  actorId?: string,
 ): Promise<{ data: VehicleCanonical | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase
     .from('vehicles')
-    .insert(row)
+    .insert({ ...row, company_id: companyId })
     .select()
     .single();
   if (error) {
     loggingService.error('Vehicle insert failed', { error }, 'VehicleService');
     return { data: null, error: new Error(error.message) };
   }
+  if (actorId) void logUserAction(actorId, 'create', 'vehicle', String((data as Record<string, unknown>).id), { component: 'VehicleService' });
   return { data: data as VehicleCanonical, error: null };
 }
 
@@ -177,6 +228,8 @@ export async function insertVehicle(
 export interface VehicleSearchParams {
   branch?: string | null;
   model?: string | null;
+  payment?: string | null;
+  stage?: string | null;
   search?: string | null;
   hasDeliveryDate?: boolean | null;
   limit?: number;
@@ -188,6 +241,57 @@ export interface VehicleSearchParams {
 export interface VehicleSearchResult {
   rows: VehicleCanonical[];
   totalCount: number;
+}
+
+function mapSearchVehicle(row: Record<string, unknown>): VehicleCanonical {
+  return {
+    id: String(row.id || ''),
+    chassis_no: String(row.chassis_no || ''),
+    is_deleted: Boolean(row.is_deleted),
+    deleted_at: row.deleted_at ? String(row.deleted_at) : undefined,
+    bg_date: row.bg_date ? String(row.bg_date) : undefined,
+    shipment_etd_pkg: row.shipment_etd_pkg ? String(row.shipment_etd_pkg) : undefined,
+    shipment_eta_kk_twu_sdk: row.shipment_eta_kk_twu_sdk ? String(row.shipment_eta_kk_twu_sdk) : undefined,
+    date_received_by_outlet: row.date_received_by_outlet ? String(row.date_received_by_outlet) : undefined,
+    reg_date: row.reg_date ? String(row.reg_date) : undefined,
+    delivery_date: row.delivery_date ? String(row.delivery_date) : undefined,
+    disb_date: row.disb_date ? String(row.disb_date) : undefined,
+    branch_code: String(row.branch_code || 'Unknown'),
+    model: String(row.model || 'Unknown'),
+    payment_method: String(row.payment_method || 'Unknown'),
+    salesman_name: String(row.salesman_name || 'Unknown'),
+    customer_name: String(row.customer_name || 'Unknown'),
+    remark: row.remark ? String(row.remark) : undefined,
+    vaa_date: row.vaa_date ? String(row.vaa_date) : undefined,
+    full_payment_date: row.full_payment_date ? String(row.full_payment_date) : undefined,
+    is_d2d: Boolean(row.is_d2d),
+    import_batch_id: String(row.import_batch_id || ''),
+    source_row_id: String(row.source_row_id || ''),
+    variant: row.variant ? String(row.variant) : undefined,
+    color: row.color ? String(row.color) : undefined,
+    dealer_transfer_price: row.dealer_transfer_price ? String(row.dealer_transfer_price) : undefined,
+    full_payment_type: row.full_payment_type ? String(row.full_payment_type) : undefined,
+    shipment_name: row.shipment_name ? String(row.shipment_name) : undefined,
+    lou: row.lou ? String(row.lou) : undefined,
+    contra_sola: row.contra_sola ? String(row.contra_sola) : undefined,
+    reg_no: row.reg_no ? String(row.reg_no) : undefined,
+    invoice_no: row.invoice_no ? String(row.invoice_no) : undefined,
+    obr: row.obr ? String(row.obr) : undefined,
+    commission_paid: row.commission_paid == null ? undefined : Boolean(row.commission_paid),
+    commission_remark: row.commission_remark ? String(row.commission_remark) : undefined,
+    stage: row.stage ? (String(row.stage) as VehicleCanonical['stage']) : undefined,
+    stage_override: row.stage_override ? (String(row.stage_override) as VehicleCanonical['stage_override']) : undefined,
+    bg_to_delivery: typeof row.bg_to_delivery === 'number' ? row.bg_to_delivery : null,
+    bg_to_shipment_etd: typeof row.bg_to_shipment_etd === 'number' ? row.bg_to_shipment_etd : null,
+    etd_to_outlet: typeof row.etd_to_outlet === 'number' ? row.etd_to_outlet : null,
+    outlet_to_reg: typeof row.outlet_to_reg === 'number' ? row.outlet_to_reg : null,
+    reg_to_delivery: typeof row.reg_to_delivery === 'number' ? row.reg_to_delivery : null,
+    bg_to_disb: typeof row.bg_to_disb === 'number' ? row.bg_to_disb : null,
+    delivery_to_disb: typeof row.delivery_to_disb === 'number' ? row.delivery_to_disb : null,
+    is_incomplete: Boolean(row.is_incomplete),
+    pending_fields: Array.isArray(row.pending_fields) ? row.pending_fields.map(String) : undefined,
+    salesman_id: row.salesman_id ? String(row.salesman_id) : null,
+  };
 }
 
 export interface VehicleKpiSummary {
@@ -232,6 +336,8 @@ export async function searchVehicles(
   const { data, error } = await supabase.rpc('search_vehicles', {
     p_branch: params.branch ?? null,
     p_model: params.model ?? null,
+    p_payment: params.payment ?? null,
+    p_stage: params.stage ?? null,
     p_search: params.search ?? null,
     p_has_delivery_date: params.hasDeliveryDate ?? null,
     p_limit: params.limit ?? 50,
@@ -250,7 +356,7 @@ export async function searchVehicles(
   // The RPC returns a table with exactly one row of shape {rows, total_count}.
   const row = Array.isArray(data) ? data[0] : data;
   const result: VehicleSearchResult = {
-    rows: (row?.rows ?? []) as VehicleCanonical[],
+    rows: ((row?.rows ?? []) as Record<string, unknown>[]).map(mapSearchVehicle),
     totalCount: Number(row?.total_count ?? 0),
   };
 

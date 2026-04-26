@@ -232,13 +232,13 @@ export default function ApprovalFlows() {
 
   async function handleToggleActive(flow: ApprovalFlow) {
     setFlows(prev => prev.map(f => f.id === flow.id ? { ...f, isActive: !f.isActive } : f));
-    const { error } = await toggleApprovalFlowActive(flow.id, !flow.isActive, user.id);
+    const { error } = await toggleApprovalFlowActive(companyId, flow.id, !flow.isActive, user.id);
     if (error) { void load(); toast({ title: 'Error', description: error, variant: 'destructive' }); }
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    const { error } = await deleteApprovalFlow(deleteTarget.id, user.id);
+    const { error } = await deleteApprovalFlow(companyId, deleteTarget.id, user.id);
     if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
     else toast({ title: 'Flow deleted' });
     setDeleteTarget(null);

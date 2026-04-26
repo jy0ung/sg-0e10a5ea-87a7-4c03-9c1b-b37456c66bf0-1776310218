@@ -148,7 +148,7 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
       isActive:       parsed.data.isActive,
     };
     const { error } = editTarget
-      ? await updateDepartment(editTarget.id, actorId, input)
+      ? await updateDepartment(companyId, editTarget.id, actorId, input)
       : await createDepartment(companyId, actorId, input);
     setSaving(false);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
@@ -159,7 +159,7 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    const { error } = await deleteDepartment(deleteTarget.id, actorId);
+    const { error } = await deleteDepartment(companyId, deleteTarget.id, actorId);
     if (error) { toast({ title: 'Cannot delete', description: error, variant: 'destructive' }); }
     else toast({ title: 'Department deleted' });
     setDeleteTarget(null);
@@ -355,7 +355,7 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
       isActive:     parsed.data.isActive,
     };
     const { error } = editTarget
-      ? await updateJobTitle(editTarget.id, actorId, input)
+      ? await updateJobTitle(companyId, editTarget.id, actorId, input)
       : await createJobTitle(companyId, actorId, input);
     setSaving(false);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
@@ -366,7 +366,7 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    const { error } = await deleteJobTitle(deleteTarget.id, actorId);
+    const { error } = await deleteJobTitle(companyId, deleteTarget.id, actorId);
     if (error) { toast({ title: 'Cannot delete', description: error, variant: 'destructive' }); }
     else toast({ title: 'Job title deleted' });
     setDeleteTarget(null);
@@ -551,7 +551,7 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
       daysPerYear: parsed.data.daysPerYear, isPaid: parsed.data.isPaid, active: parsed.data.active,
     };
     const { error } = editTarget
-      ? await updateLeaveType(editTarget.id, actorId, input)
+      ? await updateLeaveType(companyId, editTarget.id, actorId, input)
       : await createLeaveType(companyId, actorId, input);
     setSaving(false);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
@@ -561,13 +561,13 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
   }
 
   async function handleQuickToggle(lt: LeaveType, active: boolean) {
-    await updateLeaveType(lt.id, actorId, { ...lt, active });
+    await updateLeaveType(companyId, lt.id, actorId, { ...lt, active });
     void load();
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    const { error } = await deleteLeaveType(deleteTarget.id, actorId);
+    const { error } = await deleteLeaveType(companyId, deleteTarget.id, actorId);
     if (error) toast({ title: 'Leave type deactivated', description: 'This leave type has existing balances and was deactivated instead of deleted.' });
     else toast({ title: 'Leave type deleted' });
     setDeleteTarget(null);
@@ -759,7 +759,7 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
       holidayType: parsed.data.holidayType as HolidayType, isRecurring: parsed.data.isRecurring,
     };
     const { error } = editTarget
-      ? await updateHoliday(editTarget.id, actorId, input)
+      ? await updateHoliday(companyId, editTarget.id, actorId, input)
       : await createHoliday(companyId, actorId, input);
     setSaving(false);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
@@ -770,7 +770,7 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    const { error } = await deleteHoliday(deleteTarget.id, actorId);
+    const { error } = await deleteHoliday(companyId, deleteTarget.id, actorId);
     if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
     else toast({ title: 'Holiday deleted' });
     setDeleteTarget(null);

@@ -431,7 +431,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (updates.validRows !== undefined) dbUpdates.valid_rows = updates.validRows;
       if (updates.errorRows !== undefined) dbUpdates.error_rows = updates.errorRows;
 
-      const { error } = await supabase.from('import_batches').update(dbUpdates).eq('id', id);
+      const { error } = await supabase.from('import_batches').update(dbUpdates).eq('company_id', companyId).eq('id', id);
       
       if (error) {
         loggingService.error('Import batch update error', { error, id, updates }, 'DataContext');
@@ -481,7 +481,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const updateSla = useCallback(async (id: string, slaDays: number) => {
     try {
-      const { error } = await supabase.from('sla_policies').update({ sla_days: slaDays }).eq('id', id);
+      const { error } = await supabase.from('sla_policies').update({ sla_days: slaDays }).eq('company_id', companyId).eq('id', id);
       
       if (error) {
         loggingService.error('SLA update error', { error, id, slaDays }, 'DataContext');

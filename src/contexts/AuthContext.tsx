@@ -256,7 +256,7 @@ export function ProtectedRoute({
   children: React.ReactNode;
   redirectTo?: RedirectTarget;
 }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, session, profileError } = useAuth();
   const location = useLocation();
   
   if (loading) {
@@ -265,6 +265,14 @@ export function ProtectedRoute({
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
+  }
+
+  // A Supabase session alone is not enough for enterprise access. The user
+  // must also have an active, company-scoped profile loaded from `profiles`;
+  // otherwise pending/provisioning accounts can briefly navigate into the
+  // shell during auth listener/profile-fetch races.
+  if (session && !isAuthenticated && !profileError) {
+    return <Navigate to="/account-pending" state={{ from: location }} replace />;
   }
   
   if (!isAuthenticated) {

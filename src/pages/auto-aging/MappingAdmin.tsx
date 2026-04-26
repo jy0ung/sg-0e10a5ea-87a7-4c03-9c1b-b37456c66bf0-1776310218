@@ -175,13 +175,13 @@ export default function MappingAdmin() {
     await load();
   };
   const handleUpdateBranch = async (id: string, rawValue: string, canonical: string, notes: string) => {
-    const { error } = await updateBranchMapping(id, { rawValue, canonicalCode: canonical, notes });
+    const { error } = await updateBranchMapping(companyId, id, { rawValue, canonicalCode: canonical, notes }, user?.id);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Branch mapping updated' });
     await load();
   };
   const handleDeleteBranch = async (id: string) => {
-    const { error } = await deleteBranchMapping(id);
+    const { error } = await deleteBranchMapping(companyId, id, user?.id);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Branch mapping deleted' });
     await load();
@@ -195,13 +195,13 @@ export default function MappingAdmin() {
     await load();
   };
   const handleUpdatePayment = async (id: string, rawValue: string, canonical: string, notes: string) => {
-    const { error } = await updatePaymentMethodMapping(id, { rawValue, canonicalValue: canonical, notes });
+    const { error } = await updatePaymentMethodMapping(companyId, id, { rawValue, canonicalValue: canonical, notes }, user?.id);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Payment mapping updated' });
     await load();
   };
   const handleDeletePayment = async (id: string) => {
-    const { error } = await deletePaymentMethodMapping(id);
+    const { error } = await deletePaymentMethodMapping(companyId, id, user?.id);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Payment mapping deleted' });
     await load();

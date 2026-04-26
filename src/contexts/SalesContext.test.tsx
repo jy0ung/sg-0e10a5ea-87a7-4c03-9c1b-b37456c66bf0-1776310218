@@ -53,7 +53,7 @@ vi.mock('@/integrations/supabase/client', () => {
   };
 });
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { company_id: 'comp1' } }),
+  useAuth: () => ({ user: { id: 'user1', company_id: 'comp1' } }),
 }));
 vi.mock('@/hooks/useCompanyId', () => ({
   useCompanyId: () => 'comp1',
@@ -132,7 +132,7 @@ describe('SalesContext', () => {
         await result.current.moveOrderStage('so1', 'ds2');
       });
 
-      expect(moveSalesOrderStage).toHaveBeenCalledWith('so1', 'ds2');
+      expect(moveSalesOrderStage).toHaveBeenCalledWith('comp1', 'so1', 'ds2', 'user1');
 
       await waitFor(() => {
         const order = result.current.salesOrders.find(o => o.id === 'so1');

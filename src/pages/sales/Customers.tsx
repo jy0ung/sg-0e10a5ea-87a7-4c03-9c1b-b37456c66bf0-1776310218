@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -46,8 +45,8 @@ export default function Customers() {
     }
     setSaving(true);
     const { error } = editing
-      ? await updateCustomer(editing.id, form)
-      : await createCustomer(companyId, form);
+      ? await updateCustomer(companyId, editing.id, form, user?.id)
+      : await createCustomer(companyId, form, user?.id);
     setSaving(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await reloadSales();
@@ -57,7 +56,7 @@ export default function Customers() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const { error } = await deleteCustomer(deleteTarget.id);
+    const { error } = await deleteCustomer(companyId, deleteTarget.id, user?.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await reloadSales();
     setDeleteTarget(null);

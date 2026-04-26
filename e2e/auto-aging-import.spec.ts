@@ -1,10 +1,11 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { MOCK_PROFILE, setupAuthMocks, SUPABASE_URL } from './helpers/auth-mock';
 
-function workbookBuffer(): Buffer {
-  const workbook = XLSX.utils.book_new();
-  const worksheet = XLSX.utils.json_to_sheet([
+async function workbookBuffer(): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Combine Data');
+  const rows = [
     {
       'Chassis No.': 'PW-IMPORT-0001',
       'BG Date': '2026-01-01',
@@ -35,9 +36,12 @@ function workbookBuffer(): Buffer {
       'Cust Name': '',
       Remark: 'Second duplicate row with more complete model',
     },
-  ]);
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Combine Data');
-  return XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' }) as Buffer;
+  ];
+  const headers = Object.keys(rows[0]);
+  worksheet.addRow(headers);
+  rows.forEach(row => worksheet.addRow(headers.map(header => row[header as keyof typeof row] ?? '')));
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
 }
 
 function wantsSingleObject(route: Route): boolean {
@@ -188,7 +192,7 @@ test('Auto-aging import smoke test uploads and publishes canonical data', async 
   await page.locator('input[type="file"]').setInputFiles({
     name: 'Combined.xlsx',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    buffer: workbookBuffer(),
+    buffer: await workbookBuffer(),
   });
 
   await expect(page.getByText('Combined.xlsx', { exact: true })).toBeVisible({ timeout: 10000 });
@@ -248,7 +252,7 @@ test('Auto-aging import touch regression opens native chooser in tablet desktop-
     await fileChooser.setFiles({
       name: 'Combined-Android-Tablet.xlsx',
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: workbookBuffer(),
+      buffer: await workbookBuffer(),
     });
 
     await expect(page.getByText(/reading file/i)).toBeVisible({ timeout: 10000 });

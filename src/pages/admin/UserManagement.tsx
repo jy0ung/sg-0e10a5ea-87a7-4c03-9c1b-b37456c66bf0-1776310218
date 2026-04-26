@@ -180,6 +180,10 @@ export default function UserManagement() {
       access_scope: data.access_scope,
       branch_id: data.branch_id,
       employee_id: data.employee_id,
+    }, {
+      actorId: user?.id,
+      companyId: editUser.company_id ?? user?.company_id,
+      allowGlobalScope: hasRole(['super_admin']),
     });
     if (error) {
       toast.error('Failed to update user: ' + error);
@@ -277,6 +281,11 @@ export default function UserManagement() {
       access_scope: (ROLE_DEFAULT_SCOPE[sel.role] || 'company') as AccessScope,
       employee_id: sel.employee_id,
       status: 'active',
+    }, {
+      actorId: user?.id,
+      companyId: user?.company_id ?? sel.company_id,
+      allowCompanyAssignment: true,
+      allowGlobalScope: hasRole(['super_admin']),
     });
     setActivating('');
     if (error) {

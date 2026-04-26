@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCircle, Info, PlusCircle } from 'lucide-react';
 import { parseWorkbook, publishCanonical } from '@/lib/import-parser';
+import { preloadExcelJS } from '@/lib/exceljs-loader';
 import { loadBranchMappingLookup, loadPaymentMappingLookup, createBranchMapping } from '@/services/mappingService';
 import { validateVehicleImportBatch } from '@/services/validationService';
 import { createImportBatch, commitImportBatch } from '@/services/importService';
@@ -139,7 +140,7 @@ export default function ImportCenter() {
           reader.readAsArrayBuffer(file);
         });
       }
-      const { rows, issues, missingColumns } = parseWorkbook(buffer);
+      const { rows, issues, missingColumns } = await parseWorkbook(buffer);
 
       setMissingCols(missingColumns);
 
@@ -341,7 +342,11 @@ export default function ImportCenter() {
             - Clear the current value on click so picking the same workbook a
               second time still fires `onChange`.
           */}
-          <div className="relative w-full border-2 border-dashed border-border rounded-lg p-8 sm:p-12 hover:border-primary/50 transition-colors text-center overflow-hidden">
+          <div
+            className="relative w-full border-2 border-dashed border-border rounded-lg p-8 sm:p-12 hover:border-primary/50 transition-colors text-center overflow-hidden"
+            onPointerEnter={preloadExcelJS}
+            onFocusCapture={preloadExcelJS}
+          >
             <input
               id="import-file-input"
               type="file"

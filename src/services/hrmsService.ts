@@ -541,7 +541,7 @@ export interface UpdateEmployeeInput {
   jobTitleId?: string | null;
 }
 
-export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string): Promise<{ error: string | null }> {
+export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string, companyId?: string): Promise<{ error: string | null }> {
   const payload: Record<string, unknown> = {};
   if (input.name         !== undefined) payload.name                = input.name;
   if (input.role         !== undefined) payload.primary_role        = input.role;
@@ -556,15 +556,18 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.departmentId !== undefined) payload.department_id       = input.departmentId;
   if (input.jobTitleId   !== undefined) payload.job_title_id        = input.jobTitleId;
 
-  const { error } = await supabase.from('employees').update(payload).eq('id', id);
+  let updateQuery = supabase.from('employees').update(payload).eq('id', id);
+  if (companyId) updateQuery = updateQuery.eq('company_id', companyId);
+  const { error } = await updateQuery;
   if (error) return { error: error.message };
 
   if (input.role !== undefined) {
-    const { data: employeeRow, error: employeeError } = await supabase
+    let employeeQuery = supabase
       .from('employees')
       .select('company_id')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+    if (companyId) employeeQuery = employeeQuery.eq('company_id', companyId);
+    const { data: employeeRow, error: employeeError } = await employeeQuery.single();
     if (employeeError) return { error: employeeError.message };
     if (employeeRow?.company_id) {
       const assignment = await syncSalesAdvisorAssignment(id, String(employeeRow.company_id), input.role);

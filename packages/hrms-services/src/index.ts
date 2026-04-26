@@ -216,7 +216,7 @@ export async function getMyLeaveRequests(
   employeeId: string,
   companyId: string,
 ): Promise<LeaveRequest[]> {
-  let query = supabase
+  const query = supabase
     .from('leave_requests')
     .select('*, leave_types(name)')
     .eq('company_id', companyId)
@@ -308,7 +308,7 @@ export async function getMyAttendance(
   companyId: string,
   dateRange: { from: string; to: string },
 ): Promise<AttendanceRecord[]> {
-  let query = supabase
+  const query = supabase
     .from('attendance_records')
     .select('*')
     .eq('company_id', companyId)

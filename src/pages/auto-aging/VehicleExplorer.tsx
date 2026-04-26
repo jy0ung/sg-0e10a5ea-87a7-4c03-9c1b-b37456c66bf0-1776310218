@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ExcelTable } from '@/components/shared/ExcelTable';
 import { VehicleDetailPanel } from '@/components/vehicles/VehicleDetailPanel';
@@ -7,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
 import { Download, Edit, Eye, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { updateVehicleWithAudit, invalidateVehicleCaches } from '@/services/vehicleService';
+import { updateVehicleWithAudit, invalidateVehicleCaches, searchVehicles } from '@/services/vehicleService';
 import { getUserPermissions } from '@/services/permissionService';
 import type { VehicleCanonical } from '@/types';
 import { loggingService } from '@/services/loggingService';
@@ -33,9 +34,65 @@ function getRowValue(row: VehicleRow, key: string): unknown {
   return (row as unknown as Record<string, unknown>)[key];
 }
 
+function filterVehicles(vehicles: VehicleCanonical[], filters: VehicleFilterState): VehicleCanonical[] {
+  const { search, branch, model, payment, stage } = filters;
+  const needle = search.toLowerCase();
+  return vehicles.filter((v) => {
+    if (
+      needle &&
+      !v.chassis_no.toLowerCase().includes(needle) &&
+      !v.customer_name.toLowerCase().includes(needle) &&
+      !v.invoice_no?.toLowerCase().includes(needle)
+    ) {
+      return false;
+    }
+    if (branch !== 'all' && v.branch_code !== branch) return false;
+    if (model !== 'all' && v.model !== model) return false;
+    if (payment !== 'all') {
+      const raw = (v.payment_method ?? '').trim();
+      if (payment === 'Unspecified') {
+        const isUnspec = !raw || raw.toLowerCase() === 'unknown' || raw === '-' || raw === '\u2014';
+        if (!isUnspec) return false;
+      } else if (raw.toUpperCase() !== payment.toUpperCase()) {
+        return false;
+      }
+    }
+    if (stage !== 'all') {
+      const current = v.stage_override ?? v.stage ?? deriveVehicleStage(v);
+      if (current !== stage) return false;
+    }
+    return true;
+  });
+}
+
+function sortVehicles(rows: VehicleCanonical[], sortField: string, sortDir: 'asc' | 'desc'): VehicleCanonical[] {
+  return [...rows].sort((a, b) => {
+    const aVal = getRowValue(a as VehicleRow, sortField);
+    const bVal = getRowValue(b as VehicleRow, sortField);
+
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      return sortDir === 'desc' ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
+    }
+    return sortDir === 'desc'
+      ? (bVal as number) - (aVal as number)
+      : (aVal as number) - (bVal as number);
+  });
+}
+
+function toServerValue(value: string): string | null {
+  return value === 'all' ? null : value;
+}
+
+function normalizeServerSortField(sortField: string): string {
+  return sortField === 'row_no' ? 'created_at' : sortField;
+}
+
 export default function VehicleExplorer() {
   const { user } = useAuth();
   const { vehicles, loading, loadErrors, reloadFromDb } = useData();
+  const queryClient = useQueryClient();
   const { chassis_no: chassisParam } = useParams();
   const [searchParams] = useSearchParams();
 
@@ -69,6 +126,46 @@ export default function VehicleExplorer() {
   const [exportLoading, setExportLoading] = useState(false);
   const [readOnlyMode, setReadOnlyMode] = useState(true);
   const [pendingBulkAction, setPendingBulkAction] = useState<{ action: string; vehicles: VehicleCanonical[] } | null>(null);
+  const serverOffset = (page - 1) * filters.pageSize;
+
+  const serverQuery = useQuery({
+    queryKey: [
+      'vehicle-explorer-search',
+      user?.company_id,
+      filters.search,
+      filters.branch,
+      filters.model,
+      filters.payment,
+      filters.stage,
+      filters.pageSize,
+      page,
+      sortField,
+      sortDir,
+    ],
+    queryFn: () => searchVehicles({
+      branch: toServerValue(filters.branch),
+      model: toServerValue(filters.model),
+      payment: toServerValue(filters.payment),
+      stage: toServerValue(filters.stage),
+      search: filters.search.trim() || null,
+      limit: filters.pageSize,
+      offset: serverOffset,
+      sortColumn: normalizeServerSortField(sortField),
+      sortDirection: sortDir,
+    }).then(result => {
+      if (result.error) throw result.error;
+      return result.data;
+    }),
+    enabled: !!user?.id && !!user.company_id,
+    placeholderData: (previousData) => previousData,
+    staleTime: 15_000,
+  });
+
+  const usingServerData = Boolean(serverQuery.data && !serverQuery.error);
+  const optionRows = useMemo(
+    () => (vehicles.length > 0 ? vehicles : serverQuery.data?.rows ?? []),
+    [vehicles, serverQuery.data?.rows],
+  );
 
   useEffect(() => {
     if (user?.id) {
@@ -89,88 +186,38 @@ export default function VehicleExplorer() {
   // Distinct values for filter dropdowns, derived from the full dataset so
   // users can still filter to any legal value regardless of the visible page.
   const branches = useMemo(
-    () => [...new Set(vehicles.map((v) => v.branch_code))].sort(),
-    [vehicles],
+    () => [...new Set(optionRows.map((v) => v.branch_code))].sort(),
+    [optionRows],
   );
   const models = useMemo(
-    () => [...new Set(vehicles.map((v) => v.model))].sort(),
-    [vehicles],
+    () => [...new Set(optionRows.map((v) => v.model))].sort(),
+    [optionRows],
   );
   const payments = useMemo(
-    () => [...new Set(vehicles.map((v) => v.payment_method))].sort(),
-    [vehicles],
+    () => [...new Set(optionRows.map((v) => v.payment_method))].sort(),
+    [optionRows],
   );
 
-  const filtered = useMemo(() => {
-    const { search, branch, model, payment, stage } = filters;
-    const needle = search.toLowerCase();
-    return vehicles.filter((v) => {
-      if (
-        needle &&
-        !v.chassis_no.toLowerCase().includes(needle) &&
-        !v.customer_name.toLowerCase().includes(needle) &&
-        !v.invoice_no?.toLowerCase().includes(needle)
-      ) {
-        return false;
-      }
-      if (branch !== 'all' && v.branch_code !== branch) return false;
-      if (model !== 'all' && v.model !== model) return false;
-      if (payment !== 'all') {
-        // Case-insensitive match so drill-downs from PaymentPieChart (which
-        // upper-cases labels to merge duplicates like "Floor Stock" vs
-        // "FLOOR STOCK") still select the right rows.
-        const raw = (v.payment_method ?? '').trim();
-        if (payment === 'Unspecified') {
-          const isUnspec = !raw || raw.toLowerCase() === 'unknown' || raw === '-' || raw === '\u2014';
-          if (!isUnspec) return false;
-        } else if (raw.toUpperCase() !== payment.toUpperCase()) {
-          return false;
-        }
-      }
-      if (stage !== 'all') {
-        // Prefer persisted stage (set by DB trigger), fall back to derivation
-        // so the filter still works on locally-loaded rows before sync.
-        const current = v.stage ?? deriveVehicleStage(v);
-        if (current !== stage) return false;
-      }
-      return true;
-    });
-  }, [vehicles, filters]);
-
-  const sorted = useMemo(() => {
-    const rows = [...filtered];
-    rows.sort((a, b) => {
-      let aVal: unknown;
-      let bVal: unknown;
-
-      if (sortField === 'row_no') {
-        aVal = filtered.indexOf(a);
-        bVal = filtered.indexOf(b);
-      } else {
-        aVal = getRowValue(a, sortField);
-        bVal = getRowValue(b, sortField);
-      }
-
-      if (aVal == null) return 1;
-      if (bVal == null) return -1;
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return sortDir === 'desc' ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
-      }
-      return sortDir === 'desc'
-        ? (bVal as number) - (aVal as number)
-        : (aVal as number) - (bVal as number);
-    });
-    return rows;
-  }, [filtered, sortField, sortDir]);
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / filters.pageSize));
+  const fallbackFiltered = useMemo(
+    () => (usingServerData ? [] : filterVehicles(vehicles, filters)),
+    [usingServerData, vehicles, filters],
+  );
+  const fallbackSorted = useMemo(
+    () => (usingServerData ? [] : sortVehicles(fallbackFiltered, sortField, sortDir)),
+    [usingServerData, fallbackFiltered, sortField, sortDir],
+  );
+  const filteredCount = usingServerData ? serverQuery.data?.totalCount ?? 0 : fallbackFiltered.length;
+  const totalVehicleCount = vehicles.length > 0 ? vehicles.length : filteredCount;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / filters.pageSize));
   const currentPage = Math.min(page, totalPages);
   const startIdx = (currentPage - 1) * filters.pageSize;
-  const pageData = sorted.slice(startIdx, startIdx + filters.pageSize);
+  const pageData = usingServerData
+    ? serverQuery.data?.rows ?? []
+    : fallbackSorted.slice(startIdx, startIdx + filters.pageSize);
 
   useEffect(() => {
     setPage(1);
-  }, [filters.search, filters.branch, filters.model, filters.payment, filters.pageSize]);
+  }, [filters.search, filters.branch, filters.model, filters.payment, filters.stage, filters.pageSize]);
 
   const canEdit = (userPermissions?.canEdit || false) && !readOnlyMode;
   const allColumns = useVehicleExplorerColumns({
@@ -213,17 +260,20 @@ export default function VehicleExplorer() {
     columnKey: string,
     value: unknown,
   ) => {
-    if (!user?.id) return;
+    if (!user?.id || !user.company_id) return;
     const column = allColumns.find((candidate) => candidate.key === columnKey);
     if (!column) return;
 
     const updates = column.onSave ? column.onSave(rowId, value) : { [columnKey]: value };
-    const result = await updateVehicleWithAudit(rowId, updates, user.id);
+    const result = await updateVehicleWithAudit(user.company_id, rowId, updates, user.id);
     if (result.error) {
       loggingService.error('Failed to update vehicle', { error: result.error }, 'VehicleExplorer');
     } else {
       invalidateVehicleCaches();
-      await reloadFromDb();
+      await Promise.all([
+        reloadFromDb(),
+        queryClient.invalidateQueries({ queryKey: ['vehicle-explorer-search'] }),
+      ]);
     }
   };
 
@@ -236,12 +286,12 @@ export default function VehicleExplorer() {
     try {
       const exportColumns = filteredColumns;
       const headers = exportColumns.map((c) => c.label).join(',');
-      const rows = sorted
-        .map((vehicle) =>
+      const rows = sortVehicles(filterVehicles(vehicles, filters), sortField, sortDir)
+        .map((vehicle, index) =>
           exportColumns
             .map((col) => {
               const value = col.format
-                ? col.format(getRowValue(vehicle as VehicleRow, col.key), sorted.indexOf(vehicle))
+                ? col.format(getRowValue(vehicle as VehicleRow, col.key), index)
                 : getRowValue(vehicle as VehicleRow, col.key) || '';
               return `"${String(value).replace(/"/g, '""')}"`;
             })
@@ -277,12 +327,15 @@ export default function VehicleExplorer() {
   const handleBulkActionComplete = async () => {
     if (pendingBulkAction) {
       invalidateVehicleCaches();
-      await reloadFromDb();
+      await Promise.all([
+        reloadFromDb(),
+        queryClient.invalidateQueries({ queryKey: ['vehicle-explorer-search'] }),
+      ]);
     }
     setPendingBulkAction(null);
   };
 
-  if (loading && vehicles.length === 0) {
+  if (loading && vehicles.length === 0 && !serverQuery.data && !serverQuery.isFetching) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 text-primary animate-spin" aria-label="Loading vehicles" />
@@ -290,7 +343,7 @@ export default function VehicleExplorer() {
     );
   }
 
-  if (loadErrors.length > 0 && vehicles.length === 0) {
+  if (loadErrors.length > 0 && vehicles.length === 0 && !usingServerData) {
     return (
       <div className="space-y-4 animate-fade-in">
         <PageHeader
@@ -317,7 +370,7 @@ export default function VehicleExplorer() {
     <div className="space-y-4 animate-fade-in">
       <PageHeader
         title="Vehicle Explorer"
-        description={`${filtered.length} of ${vehicles.length} vehicles`}
+        description={`${filteredCount} of ${totalVehicleCount} vehicles`}
         breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Vehicle Explorer' }]}
         actions={
           <div className="flex items-center gap-2">
@@ -346,14 +399,15 @@ export default function VehicleExplorer() {
         models={models}
         payments={payments}
         pageSizeOptions={PAGE_SIZE_OPTIONS}
-        resultCount={filtered.length}
-        totalCount={vehicles.length}
+        resultCount={filteredCount}
+        totalCount={totalVehicleCount}
         defaultPageSize={DEFAULT_FILTERS.pageSize}
       />
 
       <ExcelTable<VehicleRow>
         data={pageData as VehicleRow[]}
         columns={filteredColumns}
+        loading={serverQuery.isFetching && pageData.length === 0}
         sort={{ key: sortField, direction: sortDir }}
         onSort={(key) => {
           if (sortField === key) {
@@ -367,7 +421,7 @@ export default function VehicleExplorer() {
           page: currentPage,
           pageSize: filters.pageSize,
           totalPages,
-          total: filtered.length,
+          total: filteredCount,
           onPageChange: setPage,
           onPageSizeChange: (pageSize) => setFilters((prev) => ({ ...prev, pageSize })),
         }}
@@ -397,13 +451,16 @@ export default function VehicleExplorer() {
         onEdit={
           userPermissions?.canEdit
             ? async (id, updates) => {
-                if (!user?.id) return;
-                const result = await updateVehicleWithAudit(id, updates, user.id);
+                if (!user?.id || !user.company_id) return;
+                const result = await updateVehicleWithAudit(user.company_id, id, updates, user.id);
                 if (result.error) {
                   loggingService.error('Failed to update vehicle', { error: result.error }, 'VehicleExplorer');
                 } else {
                   invalidateVehicleCaches();
-                  await reloadFromDb();
+                  await Promise.all([
+                    reloadFromDb(),
+                    queryClient.invalidateQueries({ queryKey: ['vehicle-explorer-search'] }),
+                  ]);
                 }
               }
             : undefined

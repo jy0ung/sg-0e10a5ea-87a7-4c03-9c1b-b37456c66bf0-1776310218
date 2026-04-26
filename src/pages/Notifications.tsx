@@ -9,13 +9,14 @@ import { Button } from '@/components/ui/button';
 import { CheckCheck, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
+import { EmptyState, PageErrorState } from '@/components/shared/PageState';
 
 export default function Notifications() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const notifKey = ['notifications', user?.id ?? ''] as const;
 
-  const { data: notifications = [], isLoading } = useQuery({
+  const { data: notifications = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: notifKey,
     queryFn: () => getNotifications(user!.id).then(r => r.data),
     enabled: !!user,
@@ -51,7 +52,8 @@ export default function Notifications() {
   }, [user?.id]);
 
   const handleMarkRead = async (id: string) => {
-    const { error } = await markAsRead(id);
+    if (!user?.id) return;
+    const { error } = await markAsRead(id, user.id);
     if (error) { toast.error('Failed to mark as read'); return; }
     queryClient.setQueryData<NotificationRow[]>(notifKey, prev =>
       (prev ?? []).map(n => n.id === id ? { ...n, read: true } : n)
@@ -79,6 +81,15 @@ export default function Notifications() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader title="Notifications" description="System alerts and updates" />
+        <PageErrorState title="Unable to load notifications" error={error} onRetry={() => void refetch()} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -91,10 +102,7 @@ export default function Notifications() {
       </div>
 
       {notifications.length === 0 ? (
-        <div className="glass-panel p-12 text-center">
-          <Bell className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No notifications yet</p>
-        </div>
+        <EmptyState title="No notifications yet" description="New system alerts and updates will appear here." icon={<Bell className="h-5 w-5" aria-hidden />} />
       ) : (
         <div className="space-y-2">
           {notifications.map(n => (

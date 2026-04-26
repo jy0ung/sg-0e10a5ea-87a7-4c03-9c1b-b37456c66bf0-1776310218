@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import { loggingService } from './loggingService';
+import { logPermissionChange } from './auditService';
 
 export type PermissionLevel = 'none' | 'view' | 'edit';
 export type ColumnPermission = Tables<'column_permissions'>;
@@ -10,6 +11,38 @@ export interface UserPermissions {
   canViewDetails: boolean;
   canEdit: boolean;
   canBulkEdit: boolean;
+}
+
+interface PermissionMutationAuditContext {
+  actorId?: string;
+  companyId?: string;
+}
+
+function serializePermissions(permissions: { column_name: string; permission_level: PermissionLevel }[]) {
+  return permissions
+    .map(permission => ({
+      column_name: permission.column_name,
+      permission_level: permission.permission_level,
+    }))
+    .sort((a, b) => a.column_name.localeCompare(b.column_name));
+}
+
+async function assertTargetUserInCompany(
+  userId: string,
+  companyId?: string,
+): Promise<{ error: Error | null }> {
+  if (!companyId) return { error: null };
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .eq('company_id', companyId)
+    .maybeSingle();
+
+  if (error) return { error: new Error(error.message) };
+  if (!data) return { error: new Error('Target user is outside the current company scope') };
+  return { error: null };
 }
 
 /**
@@ -39,8 +72,17 @@ export async function getUserColumnPermissions(
 export async function setUserColumnPermissions(
   userId: string,
   permissions: { column_name: string; permission_level: PermissionLevel }[],
-  tableName: string = 'vehicles'
+  tableName: string = 'vehicles',
+  auditContext: PermissionMutationAuditContext = {}
 ): Promise<{ error: Error | null }> {
+  const scopeCheck = await assertTargetUserInCompany(userId, auditContext.companyId);
+  if (scopeCheck.error) {
+    loggingService.error('Permission update blocked by company scope check', { userId, tableName, error: scopeCheck.error }, 'PermissionService');
+    return scopeCheck;
+  }
+
+  const previousPermissions = await getUserColumnPermissions(userId, tableName);
+
   // Delete existing permissions for this user/table
   const { error: deleteError } = await supabase
     .from('column_permissions')
@@ -70,6 +112,19 @@ export async function setUserColumnPermissions(
       loggingService.error('Error inserting new permissions', { error: insertError }, 'PermissionService');
       return { error: insertError };
     }
+  }
+
+  if (auditContext.actorId) {
+    void logPermissionChange(auditContext.actorId, userId, {
+      column_permissions: {
+        before: serializePermissions(previousPermissions),
+        after: serializePermissions(permissions),
+      },
+      table_name: {
+        before: tableName,
+        after: tableName,
+      },
+    });
   }
 
   return { error: null };

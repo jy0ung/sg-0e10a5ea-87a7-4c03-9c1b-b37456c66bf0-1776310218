@@ -56,6 +56,9 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Bundle budget
+        run: npm run bundle:budget
+
   # ── Mobile app: build gate ──────────────────────────────────────────────────
   mobile:
     name: Mobile App (hrms-mobile)
@@ -121,14 +124,63 @@ jobs:
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
-      - name: Run smoke specs
-        # Only the routes spec is safe to run without a live Supabase backend;
-        # expand this list as we add auth-mocked fixtures.
-        run: npx playwright test e2e/routes.spec.ts
-        continue-on-error: true
+      - name: Run desktop route smoke specs
+        run: npx playwright test e2e/routes.spec.ts --project=chromium
+      - name: Run responsive smoke specs
+        run: npx playwright test e2e/responsive.spec.ts --project=mobile-chromium --project=tablet-chromium
+      - name: Run accessibility smoke specs
+        run: npx playwright test e2e/accessibility.spec.ts --project=chromium
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # ── RLS acceptance gate (requires seeded staging/local RLS users) ───────────
+  rls:
+    name: RLS Matrix
+    runs-on: ubuntu-latest
+    needs: [web]
+    if: github.event_name == 'push'
+    env:
+      RLS_CI_REQUIRED: ${{ vars.RLS_CI_REQUIRED }}
+      VITE_SUPABASE_URL: ${{ secrets.RLS_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.RLS_SUPABASE_ANON_KEY }}
+      RLS_USER_A_EMAIL: ${{ secrets.RLS_USER_A_EMAIL }}
+      RLS_USER_A_PASSWORD: ${{ secrets.RLS_USER_A_PASSWORD }}
+      RLS_USER_B_EMAIL: ${{ secrets.RLS_USER_B_EMAIL }}
+      RLS_USER_B_PASSWORD: ${{ secrets.RLS_USER_B_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check RLS credentials
+        id: rls-env
+        shell: bash
+        run: |
+          missing=0
+          for name in VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY RLS_USER_A_EMAIL RLS_USER_A_PASSWORD RLS_USER_B_EMAIL RLS_USER_B_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::notice::Missing $name for RLS matrix job"
+              missing=1
+            fi
+          done
+
+          if [[ "$missing" == "0" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$RLS_CI_REQUIRED" == "true" ]]; then
+            echo "RLS_CI_REQUIRED=true but one or more RLS secrets are missing" >&2
+            exit 1
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.rls-env.outputs.ready == 'true'
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        if: steps.rls-env.outputs.ready == 'true'
+        run: npm ci
+      - name: Run RLS matrix
+        if: steps.rls-env.outputs.ready == 'true'
+        run: npm run test:rls

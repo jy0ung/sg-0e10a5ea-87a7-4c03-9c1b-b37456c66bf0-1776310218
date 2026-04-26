@@ -23,6 +23,7 @@ describe('auditService', () => {
   describe('logVehicleEdit', () => {
     it('inserts audit log correctly', async () => {
       const insertMock = vi.fn().mockResolvedValue({ error: null });
+      const userId = '00000000-0000-4000-8000-000000000001';
       
       vi.mocked(supabase.from).mockImplementation(() => ({
         insert: insertMock
@@ -32,11 +33,11 @@ describe('auditService', () => {
         status: { before: 'Pending', after: 'Delivered' }
       };
 
-      const result = await logVehicleEdit('user1', 'v1', changes);
+      const result = await logVehicleEdit(userId, 'v1', changes);
       
       expect(result.error).toBeNull();
       expect(insertMock).toHaveBeenCalledWith(expect.objectContaining({
-        user_id: 'user1',
+        user_id: userId,
         action: 'update',
         entity_type: 'vehicle',
         entity_id: 'v1',

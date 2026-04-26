@@ -38,11 +38,11 @@ export function VehicleBulkActions({ selectedVehicles, action, onComplete }: Veh
   };
 
   const handleDelete = async () => {
-    if (!user?.id || selectedVehicles.length === 0) return;
+    if (!user?.id || !user.company_id || selectedVehicles.length === 0) return;
     setLoading(true);
     try {
       const ids = selectedVehicles.map(v => v.id);
-      const { error } = await softDeleteVehicles(ids);
+      const { error } = await softDeleteVehicles(user.company_id, ids, user.id);
       if (error) throw error;
       await Promise.all(
         selectedVehicles.map(v => logVehicleEdit(user.id, v.id, { is_deleted: { before: false, after: true } }))
@@ -58,11 +58,11 @@ export function VehicleBulkActions({ selectedVehicles, action, onComplete }: Veh
   };
 
   const handleMarkComplete = async () => {
-    if (!user?.id || selectedVehicles.length === 0) return;
+    if (!user?.id || !user.company_id || selectedVehicles.length === 0) return;
     setLoading(true);
     try {
       const ids = selectedVehicles.map(v => v.id);
-      const { error } = await bulkUpdateVehicles(ids, { remark: 'Completed' });
+      const { error } = await bulkUpdateVehicles(user.company_id, ids, { remark: 'Completed' }, user.id);
       if (error) throw error;
       await Promise.all(
         selectedVehicles.map(v =>
@@ -80,11 +80,11 @@ export function VehicleBulkActions({ selectedVehicles, action, onComplete }: Veh
   };
 
   const handleAssign = async () => {
-    if (!user?.id || !targetBranch || selectedVehicles.length === 0) return;
+    if (!user?.id || !user.company_id || !targetBranch || selectedVehicles.length === 0) return;
     setLoading(true);
     try {
       const ids = selectedVehicles.map(v => v.id);
-      const { error } = await bulkUpdateVehicles(ids, { branch_code: targetBranch });
+      const { error } = await bulkUpdateVehicles(user.company_id, ids, { branch_code: targetBranch }, user.id);
       if (error) throw error;
       await Promise.all(
         selectedVehicles.map(v =>

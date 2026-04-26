@@ -1,6 +1,6 @@
 import type { VehicleCanonical, KpiSummary, SlaPolicy } from '@/types';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
-import * as XLSX from 'xlsx';
+import { loadExcelJS } from '@/lib/exceljs-loader';
 
 export interface ReportOptions {
   branchFilter?: string;
@@ -142,11 +142,23 @@ export function generateVehicleExportData(
 
 // ─── XLSX Download Helpers ────────────────────────────────────────────────────
 
-export function downloadAsXlsx(rows: Record<string, unknown>[], fileName: string, sheetName = 'Report') {
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  XLSX.writeFile(wb, `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`);
+export async function downloadAsXlsx(rows: Record<string, unknown>[], fileName: string, sheetName = 'Report') {
+  const ExcelJS = await loadExcelJS();
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet(sheetName.slice(0, 31) || 'Report');
+  const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+  worksheet.columns = headers.map(header => ({ header, key: header, width: Math.max(12, Math.min(32, header.length + 4)) }));
+  worksheet.addRows(rows);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 export function downloadAsCsv(rows: Record<string, unknown>[], fileName: string) {

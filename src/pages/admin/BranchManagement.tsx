@@ -64,7 +64,7 @@ export default function BranchManagement() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const { error } = await deleteBranch(deleteTarget.id);
+    const { error } = await deleteBranch(companyId, deleteTarget.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await load();
     setDeleteTarget(null);

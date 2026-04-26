@@ -53,8 +53,8 @@ export default defineConfig(({ mode }) => ({
           "vendor-data": ["@tanstack/react-query", "@supabase/supabase-js"],
           // Charting library — large, only used on dashboard pages
           "vendor-charts": ["recharts"],
-          // Excel export — large, only used on import/report pages
-          "vendor-xlsx": ["xlsx"],
+          // Excel import/export — large, only used on import/report pages
+          "vendor-excel": ["exceljs"],
           // Form utilities
           "vendor-forms": ["react-hook-form", "@hookform/resolvers", "zod", "date-fns",
                            "tailwind-merge", "clsx", "class-variance-authority"],

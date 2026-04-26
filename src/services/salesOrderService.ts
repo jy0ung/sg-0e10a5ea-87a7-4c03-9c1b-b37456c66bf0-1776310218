@@ -2,7 +2,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { SalesOrder, SalesOrderStatus } from '@/types';
 import { loggingService } from './loggingService';
 import { performanceService } from './performanceService';
-import { logVehicleEdit } from './auditService';
+import { logUserAction, logVehicleEdit } from './auditService';
+
+type SalesOrderEditableFields = Omit<SalesOrder, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>;
+
+function missingCompanyError(): Error {
+  return new Error('Company context is required for sales order mutations');
+}
 
 function mapOrder(row: Record<string, unknown>): SalesOrder {
   return {
@@ -53,7 +59,8 @@ export async function getSalesOrders(companyId: string, branchCode?: string | nu
   return { data: (data ?? []).map(r => mapOrder(r as Record<string, unknown>)), error: null };
 }
 
-export async function createSalesOrder(companyId: string, fields: Omit<SalesOrder, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>): Promise<{ data: SalesOrder | null; error: Error | null }> {
+export async function createSalesOrder(companyId: string, fields: SalesOrderEditableFields, actorId?: string): Promise<{ data: SalesOrder | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase
     .from('sales_orders')
     .insert({
@@ -87,10 +94,12 @@ export async function createSalesOrder(companyId: string, fields: Omit<SalesOrde
     .select()
     .single();
   if (error) { loggingService.error('createSalesOrder failed', { error }); return { data: null, error: new Error(error.message) }; }
+  if (actorId) void logUserAction(actorId, 'create', 'sales_order', String(data.id), { component: 'SalesOrderService' });
   return { data: mapOrder(data as Record<string, unknown>), error: null };
 }
 
-export async function updateSalesOrder(id: string, fields: Partial<Omit<SalesOrder, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>>): Promise<{ data: SalesOrder | null; error: Error | null }> {
+export async function updateSalesOrder(companyId: string, id: string, fields: Partial<SalesOrderEditableFields>, actorId?: string): Promise<{ data: SalesOrder | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (fields.orderNo !== undefined) updates.order_no = fields.orderNo;
   if (fields.customerId !== undefined) updates.customer_id = fields.customerId;
@@ -118,17 +127,27 @@ export async function updateSalesOrder(id: string, fields: Partial<Omit<SalesOrd
   if (fields.insuranceCompany !== undefined) updates.insurance_company = fields.insuranceCompany;
   if (fields.plateNo !== undefined) updates.plate_no = fields.plateNo;
 
-  const { data, error } = await supabase.from('sales_orders').update(updates).eq('id', id).select().single();
+  const { data, error } = await supabase
+    .from('sales_orders')
+    .update(updates)
+    .eq('company_id', companyId)
+    .eq('id', id)
+    .select()
+    .single();
   if (error) { loggingService.error('updateSalesOrder failed', { error }); return { data: null, error: new Error(error.message) }; }
+  if (actorId) void logUserAction(actorId, 'update', 'sales_order', id, { component: 'SalesOrderService', itemCount: Object.keys(updates).length });
   return { data: mapOrder(data as Record<string, unknown>), error: null };
 }
 
-export async function moveSalesOrderStage(id: string, dealStageId: string): Promise<{ error: Error | null }> {
+export async function moveSalesOrderStage(companyId: string, id: string, dealStageId: string, actorId?: string): Promise<{ error: Error | null }> {
+  if (!companyId) return { error: missingCompanyError() };
   const { error } = await supabase
     .from('sales_orders')
     .update({ deal_stage_id: dealStageId, updated_at: new Date().toISOString() })
+    .eq('company_id', companyId)
     .eq('id', id);
   if (error) return { error: new Error(error.message) };
+  if (actorId) void logUserAction(actorId, 'update', 'sales_order', id, { component: 'SalesOrderService' });
   return { error: null };
 }
 
@@ -142,10 +161,13 @@ export async function createVehicleFromSalesOrder(
   userId: string,
   companyId: string,
 ): Promise<{ vehicleId: string | null; error: Error | null }> {
+  if (!companyId) return { vehicleId: null, error: missingCompanyError() };
+
   // 1. Fetch the order
   const { data: orderRow, error: orderErr } = await supabase
     .from('sales_orders')
     .select('*')
+    .eq('company_id', companyId)
     .eq('id', orderId)
     .single();
   if (orderErr || !orderRow) return { vehicleId: null, error: new Error(orderErr?.message ?? 'Order not found') };
@@ -174,22 +196,31 @@ export async function createVehicleFromSalesOrder(
   const vehicleId = (vehicleRow as Record<string, unknown>).id as string;
 
   // 3. Link vehicle back to order + chassis_no
-  await supabase
+  const { error: linkErr } = await supabase
     .from('sales_orders')
     .update({ vehicle_id: vehicleId, chassis_no: chassisNo, status: 'confirmed', updated_at: new Date().toISOString() })
+    .eq('company_id', companyId)
     .eq('id', orderId);
+  if (linkErr) return { vehicleId: null, error: new Error(linkErr.message) };
 
   // 4. Audit log
-  await logVehicleEdit(vehicleId, userId, { source: null, remark: null }, {
-    source: `Sales Order ${order.orderNo}`,
-    remark: `BG entry created from Sales Order ${order.orderNo}`,
+  await logVehicleEdit(userId, vehicleId, {
+    source: { before: null, after: `Sales Order ${order.orderNo}` },
+    remark: { before: null, after: `BG entry created from Sales Order ${order.orderNo}` },
   });
+  if (userId) void logUserAction(userId, 'update', 'sales_order', orderId, { component: 'SalesOrderService' });
 
   return { vehicleId, error: null };
 }
 
-export async function deleteSalesOrder(id: string): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('sales_orders').delete().eq('id', id);
+export async function deleteSalesOrder(companyId: string, id: string, actorId?: string): Promise<{ error: Error | null }> {
+  if (!companyId) return { error: missingCompanyError() };
+  const { error } = await supabase
+    .from('sales_orders')
+    .update({ is_deleted: true, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('company_id', companyId)
+    .eq('id', id);
   if (error) return { error: new Error(error.message) };
+  if (actorId) void logUserAction(actorId, 'delete', 'sales_order', id, { component: 'SalesOrderService' });
   return { error: null };
 }

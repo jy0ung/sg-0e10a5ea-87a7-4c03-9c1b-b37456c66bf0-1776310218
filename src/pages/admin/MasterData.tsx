@@ -247,7 +247,7 @@ export default function MasterData() {
   };
   const fcDel = async () => {
     if (!fcDelete) return;
-    const { error } = await deleteFinanceCompany(fcDelete.id);
+    const { error } = await deleteFinanceCompany(companyId, fcDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setFcDelete(null);
@@ -267,7 +267,7 @@ export default function MasterData() {
   };
   const icDel = async () => {
     if (!icDelete) return;
-    const { error } = await deleteInsuranceCompany(icDelete.id);
+    const { error } = await deleteInsuranceCompany(companyId, icDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setIcDelete(null);
@@ -287,7 +287,7 @@ export default function MasterData() {
   };
   const mdDel = async () => {
     if (!mdDelete) return;
-    const { error } = await deleteVehicleModel(mdDelete.id);
+    const { error } = await deleteVehicleModel(companyId, mdDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setMdDelete(null);
@@ -307,7 +307,7 @@ export default function MasterData() {
   };
   const clDel = async () => {
     if (!clDelete) return;
-    const { error } = await deleteVehicleColour(clDelete.id);
+    const { error } = await deleteVehicleColour(companyId, clDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setClDelete(null);
@@ -325,7 +325,7 @@ export default function MasterData() {
   };
   const ttDel = async () => {
     if (!ttDelete) return;
-    const { error } = await deleteTinType(ttDelete.id);
+    const { error } = await deleteTinType(companyId, ttDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setTtDelete(null);
@@ -343,7 +343,7 @@ export default function MasterData() {
   };
   const rfDel = async () => {
     if (!rfDelete) return;
-    const { error } = await deleteRegistrationFee(rfDelete.id);
+    const { error } = await deleteRegistrationFee(companyId, rfDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setRfDelete(null);
@@ -361,7 +361,7 @@ export default function MasterData() {
   };
   const rtDel = async () => {
     if (!rtDelete) return;
-    const { error } = await deleteRoadTaxFee(rtDelete.id);
+    const { error } = await deleteRoadTaxFee(companyId, rtDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setRtDelete(null);
@@ -379,7 +379,7 @@ export default function MasterData() {
   };
   const ifDel = async () => {
     if (!ifDelete) return;
-    const { error } = await deleteInspectionFee(ifDelete.id);
+    const { error } = await deleteInspectionFee(companyId, ifDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setIfDelete(null);
@@ -397,7 +397,7 @@ export default function MasterData() {
   };
   const hfDel = async () => {
     if (!hfDelete) return;
-    const { error } = await deleteHandlingFee(hfDelete.id);
+    const { error } = await deleteHandlingFee(companyId, hfDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setHfDelete(null);
@@ -415,7 +415,7 @@ export default function MasterData() {
   };
   const aiDel = async () => {
     if (!aiDelete) return;
-    const { error } = await deleteAdditionalItem(aiDelete.id);
+    const { error } = await deleteAdditionalItem(companyId, aiDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setAiDelete(null);
@@ -433,7 +433,7 @@ export default function MasterData() {
   };
   const ptDel = async () => {
     if (!ptDelete) return;
-    const { error } = await deletePaymentType(ptDelete.id);
+    const { error } = await deletePaymentType(companyId, ptDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setPtDelete(null);
@@ -451,7 +451,7 @@ export default function MasterData() {
   };
   const bkDel = async () => {
     if (!bkDelete) return;
-    const { error } = await deleteBank(bkDelete.id);
+    const { error } = await deleteBank(companyId, bkDelete.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await loadAll();
     setBkDelete(null);

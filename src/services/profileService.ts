@@ -8,6 +8,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import type { AppRole, AccessScope } from '@/types';
+import { logUserAction } from './auditService';
 
 export interface ProfileRow {
   id: string;
@@ -50,10 +51,27 @@ export interface UpdateProfileInput {
   status?: 'active' | 'inactive' | 'resigned' | 'pending';
 }
 
+export interface UpdateProfileContext {
+  actorId?: string;
+  companyId?: string | null;
+  allowCompanyAssignment?: boolean;
+  allowGlobalScope?: boolean;
+}
+
 /** Admin-side user update (Users & Roles). */
 export async function updateProfile(
   input: UpdateProfileInput,
+  context: UpdateProfileContext = {},
 ): Promise<{ error: string | null }> {
+  if (!context.actorId) return { error: 'Actor context is required for profile updates' };
+  if (!context.companyId && !context.allowGlobalScope) return { error: 'Company context is required for profile updates' };
+  if (input.company_id !== undefined && !context.allowCompanyAssignment) {
+    return { error: 'Company assignment requires explicit activation context' };
+  }
+  if (input.company_id && context.companyId && input.company_id !== context.companyId && !context.allowGlobalScope) {
+    return { error: 'Cannot assign a user outside the current company scope' };
+  }
+
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input.name !== undefined)         patch.name         = input.name;
   if (input.role !== undefined)         patch.role         = input.role;
@@ -62,7 +80,21 @@ export async function updateProfile(
   if (input.employee_id !== undefined)  patch.employee_id  = input.employee_id;
   if (input.company_id !== undefined)   patch.company_id   = input.company_id;
   if (input.status !== undefined)       patch.status       = input.status;
-  const { error } = await supabase.from('profiles').update(patch).eq('id', input.id);
+
+  let query = supabase.from('profiles').update(patch).eq('id', input.id);
+  if (context.companyId) {
+    query = input.company_id !== undefined && context.allowCompanyAssignment
+      ? query.or(`company_id.eq.${context.companyId},company_id.is.null`)
+      : query.eq('company_id', context.companyId);
+  }
+
+  const { error } = await query;
+  if (!error) {
+    void logUserAction(context.actorId, 'update', 'profile', input.id, {
+      component: 'ProfileService',
+      itemCount: Object.keys(patch).length,
+    });
+  }
   return { error: error?.message ?? null };
 }
 

@@ -1,7 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { BranchMapping, PaymentMethodMapping } from '@/types';
+import { logUserAction } from './auditService';
 import { loggingService } from './loggingService';
 import { performanceService } from './performanceService';
+
+function missingCompanyError(): Error {
+  return new Error('Company context is required for mapping mutations');
+}
 
 // ─── Branch Mappings ──────────────────────────────────────────────────────────
 
@@ -60,29 +65,35 @@ export async function createBranchMapping(
 }
 
 export async function updateBranchMapping(
+  companyId: string,
   id: string,
   updates: Partial<Pick<BranchMapping, 'rawValue' | 'canonicalCode' | 'notes'>>,
+  actorId?: string,
 ): Promise<{ error: Error | null }> {
+  if (!companyId) return { error: missingCompanyError() };
   const dbUpdates: Record<string, unknown> = {};
   if (updates.rawValue !== undefined) dbUpdates.raw_value = updates.rawValue;
   if (updates.canonicalCode !== undefined) dbUpdates.canonical_code = updates.canonicalCode;
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
   dbUpdates.updated_at = new Date().toISOString();
 
-  const { error } = await supabase.from('branch_mappings').update(dbUpdates).eq('id', id);
+  const { error } = await supabase.from('branch_mappings').update(dbUpdates).eq('company_id', companyId).eq('id', id);
   if (error) {
     loggingService.error('Failed to update branch mapping', { error }, 'MappingService');
     return { error: new Error(error.message) };
   }
+  if (actorId) void logUserAction(actorId, 'update', 'branch_mapping', id, { component: 'MappingService' });
   return { error: null };
 }
 
-export async function deleteBranchMapping(id: string): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('branch_mappings').delete().eq('id', id);
+export async function deleteBranchMapping(companyId: string, id: string, actorId?: string): Promise<{ error: Error | null }> {
+  if (!companyId) return { error: missingCompanyError() };
+  const { error } = await supabase.from('branch_mappings').delete().eq('company_id', companyId).eq('id', id);
   if (error) {
     loggingService.error('Failed to delete branch mapping', { error }, 'MappingService');
     return { error: new Error(error.message) };
   }
+  if (actorId) void logUserAction(actorId, 'delete', 'branch_mapping', id, { component: 'MappingService' });
   return { error: null };
 }
 
@@ -143,29 +154,35 @@ export async function createPaymentMethodMapping(
 }
 
 export async function updatePaymentMethodMapping(
+  companyId: string,
   id: string,
   updates: Partial<Pick<PaymentMethodMapping, 'rawValue' | 'canonicalValue' | 'notes'>>,
+  actorId?: string,
 ): Promise<{ error: Error | null }> {
+  if (!companyId) return { error: missingCompanyError() };
   const dbUpdates: Record<string, unknown> = {};
   if (updates.rawValue !== undefined) dbUpdates.raw_value = updates.rawValue;
   if (updates.canonicalValue !== undefined) dbUpdates.canonical_value = updates.canonicalValue;
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
   dbUpdates.updated_at = new Date().toISOString();
 
-  const { error } = await supabase.from('payment_method_mappings').update(dbUpdates).eq('id', id);
+  const { error } = await supabase.from('payment_method_mappings').update(dbUpdates).eq('company_id', companyId).eq('id', id);
   if (error) {
     loggingService.error('Failed to update payment method mapping', { error }, 'MappingService');
     return { error: new Error(error.message) };
   }
+  if (actorId) void logUserAction(actorId, 'update', 'payment_method_mapping', id, { component: 'MappingService' });
   return { error: null };
 }
 
-export async function deletePaymentMethodMapping(id: string): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('payment_method_mappings').delete().eq('id', id);
+export async function deletePaymentMethodMapping(companyId: string, id: string, actorId?: string): Promise<{ error: Error | null }> {
+  if (!companyId) return { error: missingCompanyError() };
+  const { error } = await supabase.from('payment_method_mappings').delete().eq('company_id', companyId).eq('id', id);
   if (error) {
     loggingService.error('Failed to delete payment method mapping', { error }, 'MappingService');
     return { error: new Error(error.message) };
   }
+  if (actorId) void logUserAction(actorId, 'delete', 'payment_method_mapping', id, { component: 'MappingService' });
   return { error: null };
 }
 

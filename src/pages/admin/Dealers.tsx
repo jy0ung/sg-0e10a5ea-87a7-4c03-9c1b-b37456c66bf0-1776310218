@@ -73,7 +73,7 @@ export default function Dealers() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const { error } = await deleteDealer(deleteTarget.id);
+    const { error } = await deleteDealer(companyId, deleteTarget.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await load();
     setDeleteTarget(null);

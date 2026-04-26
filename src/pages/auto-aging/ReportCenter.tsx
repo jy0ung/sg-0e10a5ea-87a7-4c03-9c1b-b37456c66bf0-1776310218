@@ -12,6 +12,7 @@ import {
   downloadAsXlsx,
   downloadAsCsv,
 } from '@/services/reportService';
+import { preloadExcelJS } from '@/lib/exceljs-loader';
 import { Download, FileSpreadsheet, Loader2 } from 'lucide-react';
 
 type ReportType = 'aging_summary' | 'sla_compliance' | 'salesman_performance' | 'vehicle_full';
@@ -60,7 +61,7 @@ export default function ReportCenter() {
     try {
       const data = generateData();
       const report = REPORT_TYPES.find(r => r.value === reportType)!;
-      downloadAsXlsx(data, report.label.replace(/\s+/g, '_'), report.label);
+      await downloadAsXlsx(data, report.label.replace(/\s+/g, '_'), report.label);
     } finally {
       setExporting(false);
     }
@@ -141,7 +142,14 @@ export default function ReportCenter() {
           <Button variant="outline" size="sm" onClick={handlePreview}>
             Preview (first 10 rows)
           </Button>
-          <Button variant="outline" size="sm" onClick={handleDownloadXlsx} disabled={exporting}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadXlsx}
+            onPointerEnter={preloadExcelJS}
+            onFocus={preloadExcelJS}
+            disabled={exporting}
+          >
             {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />}
             Export XLSX
           </Button>

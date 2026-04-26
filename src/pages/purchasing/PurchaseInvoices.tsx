@@ -17,6 +17,7 @@ import {
 import { purchaseInvoiceSchema } from '@/lib/validations';
 import { Search, Plus, Truck } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
+import { PageErrorState } from '@/components/shared/PageState';
 
 type PIStatus = 'pending' | 'received' | 'cancelled';
 
@@ -44,7 +45,7 @@ export default function PurchaseInvoices() {
   const [form, setForm]           = useState(EMPTY_FORM);
   const [saving, setSaving]       = useState(false);
 
-  const { data: invoices = [], isLoading } = useQuery({
+  const { data: invoices = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['purchase-invoices', companyId],
     queryFn: () => listPurchaseInvoices(companyId),
     enabled: !!companyId,
@@ -78,6 +79,7 @@ export default function PurchaseInvoices() {
     setSaving(true);
     const { error } = await createPurchaseInvoice({
       companyId: user.company_id,
+      actorId: user.id,
       invoiceNo: parsed.data.invoiceNo,
       supplier: parsed.data.supplier,
       chassisNo: parsed.data.chassisNo,
@@ -105,6 +107,7 @@ export default function PurchaseInvoices() {
       companyId: user.company_id,
       chassisNo: prev.chassisNo,
       model: prev.model,
+      actorId: user.id,
     });
     if (error) {
       toast({ title: 'Failed to mark received', description: error.message, variant: 'destructive' });
@@ -119,6 +122,16 @@ export default function PurchaseInvoices() {
         <PageHeader title="Purchase Invoices" description="CBU vehicle procurement invoices from suppliers"
           breadcrumbs={[{ label: 'FLC BI' }, { label: 'Purchasing' }, { label: 'Purchase Invoices' }]} />
         <TableSkeleton rows={8} cols={6} colWidths={['w-24','w-32','w-28','w-24','w-20','w-16']} />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader title="Purchase Invoices" description="CBU vehicle procurement invoices from suppliers"
+          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Purchasing' }, { label: 'Purchase Invoices' }]} />
+        <PageErrorState title="Unable to load purchase invoices" error={error} onRetry={() => void refetch()} />
       </div>
     );
   }

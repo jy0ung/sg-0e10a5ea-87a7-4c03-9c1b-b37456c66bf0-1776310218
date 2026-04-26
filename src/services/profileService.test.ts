@@ -23,6 +23,7 @@ vi.mock('@/integrations/supabase/client', () => {
 
     proxy.select = (..._args: unknown[]) => proxy;
     proxy.eq = (..._args: unknown[]) => proxy;
+    proxy.or = (..._args: unknown[]) => proxy;
     proxy.order = (..._args: unknown[]) => proxy;
     proxy.update = (values: unknown) => {
       updateCalls.push({ table, values });
@@ -48,6 +49,10 @@ vi.mock('@/integrations/supabase/client', () => {
     },
   };
 });
+
+vi.mock('./auditService', () => ({
+  logUserAction: vi.fn().mockResolvedValue({ error: null }),
+}));
 
 import { inviteUser, listProfiles, updateProfile } from './profileService';
 
@@ -89,6 +94,9 @@ describe('updateProfile', () => {
       id: 'p1',
       role: 'manager',
       employee_id: 'emp-1',
+    }, {
+      actorId: 'admin-1',
+      companyId: 'c1',
     });
 
     expect(result.error).toBe('column profiles.employee_id does not exist');

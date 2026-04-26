@@ -15,6 +15,7 @@ import { DealerInvoice } from '@/types';
 import { Plus, Pencil, Trash2, Eye } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { dealerInvoiceSchema } from '@/lib/validations';
+import { PageErrorState } from '@/components/shared/PageState';
 
 type FormState = {
   invoiceNo: string; branchId: string; dealerName: string; carModel: string;
@@ -39,7 +40,7 @@ export default function DealerInvoices() {
   const [deleteTarget, setDeleteTarget] = useState<DealerInvoice | null>(null);
   const [search, setSearch] = useState('');
 
-  const { data: invoices = [], isLoading } = useQuery({
+  const { data: invoices = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['dealer-invoices', companyId],
     queryFn: () => getDealerInvoices(companyId).then(r => r.data),
     enabled: !!companyId,
@@ -98,7 +99,7 @@ export default function DealerInvoices() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await deleteDealerInvoice(deleteTarget.id);
+    await deleteDealerInvoice(companyId, deleteTarget.id);
     await invalidate();
     setDeleteTarget(null);
     toast({ title: 'Invoice deleted' });
@@ -109,6 +110,15 @@ export default function DealerInvoices() {
   const filtered = invoices.filter(inv =>
     !search || [inv.invoiceNo, inv.dealerName, inv.carModel, inv.chassisNo ?? ''].some(v => v.toLowerCase().includes(search.toLowerCase()))
   );
+
+  if (isError) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader title="Dealer Invoices" description="Manage dealer invoice records" breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Dealer Invoices' }]} />
+        <PageErrorState title="Unable to load dealer invoices" error={error} onRetry={() => void refetch()} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { SalesmanTarget, SalesmanPerformance } from '@/types';
+import { logUserAction } from './auditService';
 import { loggingService } from './loggingService';
 import { performanceService } from './performanceService';
 
@@ -27,7 +28,12 @@ export async function getSalesmanTargets(companyId: string, year?: number, month
   return { data: (data ?? []).map(r => mapTarget(r as Record<string, unknown>)), error: null };
 }
 
-export async function upsertSalesmanTarget(companyId: string, fields: Omit<SalesmanTarget, 'id' | 'companyId'>): Promise<{ data: SalesmanTarget | null; error: Error | null }> {
+function missingCompanyError(): Error {
+  return new Error('Company context is required for salesman target mutations');
+}
+
+export async function upsertSalesmanTarget(companyId: string, fields: Omit<SalesmanTarget, 'id' | 'companyId'>, actorId?: string): Promise<{ data: SalesmanTarget | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase
     .from('salesman_targets')
     .upsert({
@@ -42,12 +48,15 @@ export async function upsertSalesmanTarget(companyId: string, fields: Omit<Sales
     .select()
     .single();
   if (error) { loggingService.error('upsertSalesmanTarget failed', { error }); return { data: null, error: new Error(error.message) }; }
+  if (actorId) void logUserAction(actorId, 'update', 'salesman_target', String((data as Record<string, unknown>).id), { component: 'SalesTargetService' });
   return { data: mapTarget(data as Record<string, unknown>), error: null };
 }
 
-export async function deleteSalesmanTarget(id: string): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('salesman_targets').delete().eq('id', id);
+export async function deleteSalesmanTarget(companyId: string, id: string, actorId?: string): Promise<{ error: Error | null }> {
+  if (!companyId) return { error: missingCompanyError() };
+  const { error } = await supabase.from('salesman_targets').delete().eq('company_id', companyId).eq('id', id);
   if (error) return { error: new Error(error.message) };
+  if (actorId) void logUserAction(actorId, 'delete', 'salesman_target', id, { component: 'SalesTargetService' });
   return { error: null };
 }
 

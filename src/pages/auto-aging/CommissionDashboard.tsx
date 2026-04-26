@@ -87,7 +87,7 @@ export default function CommissionDashboard() {
   const handleSaveRule = async () => {
     if (!ruleForm.ruleName || ruleForm.amount === undefined) return;
     if (editingRule) {
-      const { error } = await updateCommissionRule(editingRule.id, ruleForm);
+      const { error } = await updateCommissionRule(companyId, editingRule.id, ruleForm);
       if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
       toast({ title: 'Rule updated' });
     } else {
@@ -101,7 +101,7 @@ export default function CommissionDashboard() {
 
   const handleDeleteRule = async () => {
     if (!deleteRuleId) return;
-    const { error } = await deleteCommissionRule(deleteRuleId);
+    const { error } = await deleteCommissionRule(companyId, deleteRuleId);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Rule deleted' });
     setDeleteRuleId(null);
@@ -109,7 +109,7 @@ export default function CommissionDashboard() {
   };
 
   const handleStatusChange = async (recordId: string, status: CommissionRecord['status']) => {
-    const { error } = await updateCommissionRecordStatus(recordId, status);
+    const { error } = await updateCommissionRecordStatus(companyId, recordId, status);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     setRecords(prev => prev.map(r => r.id === recordId ? { ...r, status } : r));
   };

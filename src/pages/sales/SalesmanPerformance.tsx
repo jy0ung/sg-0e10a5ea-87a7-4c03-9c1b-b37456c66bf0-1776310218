@@ -12,6 +12,7 @@ import { useSales } from '@/contexts/SalesContext';
 import { computeSalesmanActuals, upsertSalesmanTarget, deleteSalesmanTarget } from '@/services/salesTargetService';
 import { SalesmanPerformance, SalesmanTarget } from '@/types';
 import { Target, Plus, Pencil, Trash2 } from 'lucide-react';
+import { PageErrorState } from '@/components/shared/PageState';
 
 export default function SalesmanPerformancePage() {
   const { user } = useAuth();
@@ -26,7 +27,7 @@ export default function SalesmanPerformancePage() {
   const [editTarget, setEditTarget] = useState<SalesmanTarget | null>(null);
   const [form, setForm] = useState({ salesmanId: '', salesmanName: '', branchCode: '', targetUnits: '', targetRevenue: '' });
 
-  const { data: performance = [], isFetching: loading } = useQuery({
+  const { data: performance = [], isFetching: loading, isError, error, refetch } = useQuery({
     queryKey: ['salesman-performance', companyId, year, month],
     queryFn: async () => {
       const { data } = await computeSalesmanActuals(companyId, year, month);
@@ -47,7 +48,7 @@ export default function SalesmanPerformancePage() {
       periodMonth: month,
       targetUnits: parseInt(form.targetUnits),
       targetRevenue: form.targetRevenue ? parseFloat(form.targetRevenue) : 0,
-    });
+    }, user?.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await queryClient.invalidateQueries({ queryKey: ['sales', companyId] });
     await invalidatePerf();
@@ -56,7 +57,7 @@ export default function SalesmanPerformancePage() {
   };
 
   const handleDeleteTarget = async (id: string) => {
-    await deleteSalesmanTarget(id);
+    await deleteSalesmanTarget(companyId, id, user?.id);
     await queryClient.invalidateQueries({ queryKey: ['sales', companyId] });
     await invalidatePerf();
     toast({ title: 'Target removed' });
@@ -74,6 +75,8 @@ export default function SalesmanPerformancePage() {
         breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Performance' }]}
         actions={<Button size="sm" onClick={() => { setEditTarget(null); setForm({ salesmanId:'',salesmanName:'',branchCode:'',targetUnits:'',targetRevenue:'' }); setTargetOpen(true); }}><Plus className="h-4 w-4 mr-1" />Set Target</Button>}
       />
+
+      {isError && <PageErrorState title="Unable to load salesman performance" error={error} onRetry={() => void refetch()} />}
 
       {/* Period selector */}
       <div className="flex items-center gap-2">

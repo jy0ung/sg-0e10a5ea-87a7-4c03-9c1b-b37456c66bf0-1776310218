@@ -72,6 +72,7 @@ export async function createCommissionRule(
 }
 
 export async function updateCommissionRule(
+  companyId: string,
   id: string,
   updates: Partial<Omit<CommissionRule, 'id' | 'companyId'>>,
 ): Promise<{ error: Error | null }> {
@@ -82,7 +83,7 @@ export async function updateCommissionRule(
   if (updates.thresholdDays !== undefined) dbUpdates.threshold_days = updates.thresholdDays ?? null;
   if (updates.amount !== undefined) dbUpdates.amount = updates.amount;
 
-  const { error } = await supabase.from('commission_rules').update(dbUpdates).eq('id', id);
+  const { error } = await supabase.from('commission_rules').update(dbUpdates).eq('company_id', companyId).eq('id', id);
   if (error) {
     loggingService.error('Failed to update commission rule', { error }, 'CommissionService');
     return { error: new Error(error.message) };
@@ -90,8 +91,8 @@ export async function updateCommissionRule(
   return { error: null };
 }
 
-export async function deleteCommissionRule(id: string): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('commission_rules').delete().eq('id', id);
+export async function deleteCommissionRule(companyId: string, id: string): Promise<{ error: Error | null }> {
+  const { error } = await supabase.from('commission_rules').delete().eq('company_id', companyId).eq('id', id);
   if (error) {
     loggingService.error('Failed to delete commission rule', { error }, 'CommissionService');
     return { error: new Error(error.message) };
@@ -145,12 +146,14 @@ export async function getCommissionRecords(
 }
 
 export async function updateCommissionRecordStatus(
+  companyId: string,
   id: string,
   status: CommissionRecord['status'],
 ): Promise<{ error: Error | null }> {
   const { error } = await supabase
     .from('commission_records')
     .update({ status, updated_at: new Date().toISOString() })
+    .eq('company_id', companyId)
     .eq('id', id);
 
   if (error) {

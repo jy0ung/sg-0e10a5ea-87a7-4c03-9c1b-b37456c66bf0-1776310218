@@ -62,7 +62,7 @@ export default function UserGroups() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const { error } = await deleteUserGroup(deleteTarget.id);
+    const { error } = await deleteUserGroup(companyId, deleteTarget.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await load();
     setDeleteTarget(null);

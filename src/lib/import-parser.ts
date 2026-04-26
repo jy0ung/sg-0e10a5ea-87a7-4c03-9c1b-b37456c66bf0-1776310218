@@ -1,8 +1,8 @@
-import * as XLSX from 'xlsx';
 import { VehicleRaw, DataQualityIssue, VehicleCanonical } from '@/types';
 import { normalizeSupportedDateValue, parseSupportedDateString } from '@/lib/dateParsing';
 import { loggingService } from '@/services/loggingService';
 import { deriveVehicleStage } from '@/utils/vehicleStage';
+import { loadExcelJS } from '@/lib/exceljs-loader';
 
 function normalizeHeader(raw: unknown): string {
   return String(raw ?? '')
@@ -142,14 +142,9 @@ function parseExcelDate(val: unknown): string | undefined {
   
   // Excel serial number
   if (typeof val === 'number') {
-    try {
-      const d = XLSX.SSF.parse_date_code(val);
-      if (d && d.y && d.m && d.d) {
-        return normalizeSupportedDateValue(`${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`);
-      }
-    } catch {
-      return undefined;
-    }
+    const excelEpoch = Date.UTC(1899, 11, 30);
+    const date = new Date(excelEpoch + Math.floor(val) * 86_400_000);
+    return normalizeSupportedDateValue(date);
   }
   
   if (typeof val === 'string') {
@@ -164,16 +159,17 @@ function parseExcelDate(val: unknown): string | undefined {
   return undefined;
 }
 
-export function parseWorkbook(file: ArrayBuffer): { rows: VehicleRaw[]; issues: DataQualityIssue[]; missingColumns: string[] } {
+export async function parseWorkbook(file: ArrayBuffer): Promise<{ rows: VehicleRaw[]; issues: DataQualityIssue[]; missingColumns: string[] }> {
   try {
-    const wb = XLSX.read(file, { type: 'array', cellDates: false });
+    const ExcelJS = await loadExcelJS();
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(file);
 
-    if (!wb.SheetNames || wb.SheetNames.length === 0) {
+    if (!wb.worksheets || wb.worksheets.length === 0) {
       return { rows: [], issues: [], missingColumns: ['No sheets found in workbook'] };
     }
 
-    const sheetName = wb.SheetNames.find(s => s.toLowerCase().includes('combine')) || wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
+    const ws = wb.worksheets.find(s => s.name.toLowerCase().includes('combine')) || wb.worksheets[0];
 
     if (!ws) {
       return { rows: [], issues: [], missingColumns: ['Sheet not found'] };
@@ -182,7 +178,11 @@ export function parseWorkbook(file: ArrayBuffer): { rows: VehicleRaw[]; issues: 
     // Pull as 2D array so we can locate the real header row; the new template
     // prefixes the data with section-banner rows ("STOCK IN", "DEPOSIT PAYMENT",
     // etc.) and the category-label rows ("1. PENDING REGISTER & FREE STOCK").
-    const grid = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' });
+    const grid: unknown[][] = [];
+    ws.eachRow({ includeEmpty: true }, (row) => {
+      const values = row.values as unknown[];
+      grid.push(values.slice(1).map(value => value ?? ''));
+    });
 
     if (grid.length === 0) {
       return { rows: [], issues: [], missingColumns: ['No data found in sheet'] };

@@ -73,7 +73,7 @@ export default function Suppliers() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const { error } = await deleteSupplier(deleteTarget.id);
+    const { error } = await deleteSupplier(companyId, deleteTarget.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await load();
     setDeleteTarget(null);

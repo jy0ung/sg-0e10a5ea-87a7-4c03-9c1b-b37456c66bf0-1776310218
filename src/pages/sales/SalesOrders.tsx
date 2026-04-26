@@ -90,7 +90,7 @@ export default function SalesOrders() {
       financeCompany: form.financeCompany || undefined,
       insuranceCompany: form.insuranceCompany || undefined,
       plateNo: form.plateNo || undefined,
-    });
+    }, user?.id);
     setCreating(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await reloadSales();

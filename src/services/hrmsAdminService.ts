@@ -122,6 +122,7 @@ export async function createDepartment(
 }
 
 export async function updateDepartment(
+  companyId: string,
   id: string,
   actorId: string,
   input: UpdateDepartmentInput,
@@ -138,6 +139,7 @@ export async function updateDepartment(
         is_active:        input.isActive,
         updated_at:       updatedAt,
       })
+      .eq('company_id', companyId)
       .eq('id', id);
     return { error: error?.message ?? null };
   };
@@ -148,11 +150,12 @@ export async function updateDepartment(
   return { error };
 }
 
-export async function deleteDepartment(id: string, actorId: string): Promise<{ error: string | null }> {
+export async function deleteDepartment(companyId: string, id: string, actorId: string): Promise<{ error: string | null }> {
   // Check if any employees are assigned to this department
   const { count, error: employeeCountError } = await supabase
     .from('employees')
     .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
     .eq('department_id', id);
 
   if (employeeCountError) return { error: employeeCountError.message };
@@ -161,7 +164,7 @@ export async function deleteDepartment(id: string, actorId: string): Promise<{ e
   if (assignedCount > 0) {
     return { error: `Cannot delete: ${assignedCount} employee(s) are assigned to this department. Reassign them first.` };
   }
-  const { error } = await supabase.from('departments').delete().eq('id', id);
+  const { error } = await supabase.from('departments').delete().eq('company_id', companyId).eq('id', id);
   if (!error) void logUserAction(actorId, 'delete', 'department', id, {});
   return { error: error?.message ?? null };
 }
@@ -218,6 +221,7 @@ export async function createJobTitle(
 }
 
 export async function updateJobTitle(
+  companyId: string,
   id: string,
   actorId: string,
   input: UpdateJobTitleInput,
@@ -232,21 +236,23 @@ export async function updateJobTitle(
       is_active:     input.isActive,
       updated_at:    new Date().toISOString(),
     })
+    .eq('company_id', companyId)
     .eq('id', id);
   if (!error) void logUserAction(actorId, 'update', 'job_title', id, { name: input.name });
   return { error: error?.message ?? null };
 }
 
-export async function deleteJobTitle(id: string, actorId: string): Promise<{ error: string | null }> {
+export async function deleteJobTitle(companyId: string, id: string, actorId: string): Promise<{ error: string | null }> {
   // Check if any employees have this job title
   const { count } = await supabase
     .from('profiles')
     .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
     .eq('job_title_id', id);
   if ((count ?? 0) > 0) {
     return { error: `Cannot delete: ${count} employee(s) have this job title. Reassign them first.` };
   }
-  const { error } = await supabase.from('job_titles').delete().eq('id', id);
+  const { error } = await supabase.from('job_titles').delete().eq('company_id', companyId).eq('id', id);
   if (!error) void logUserAction(actorId, 'delete', 'job_title', id, {});
   return { error: error?.message ?? null };
 }
@@ -303,6 +309,7 @@ export async function createLeaveType(
 }
 
 export async function updateLeaveType(
+  companyId: string,
   id: string,
   actorId: string,
   input: UpdateLeaveTypeInput,
@@ -317,27 +324,30 @@ export async function updateLeaveType(
       active:        input.active,
       updated_at:    new Date().toISOString(),
     })
+    .eq('company_id', companyId)
     .eq('id', id);
   if (!error) void logUserAction(actorId, 'update', 'leave_type', id, { name: input.name });
   return { error: error?.message ?? null };
 }
 
 /** Soft delete: deactivates the leave type. Hard delete only if no balances reference it. */
-export async function deleteLeaveType(id: string, actorId: string): Promise<{ error: string | null }> {
+export async function deleteLeaveType(companyId: string, id: string, actorId: string): Promise<{ error: string | null }> {
   const { count } = await supabase
     .from('leave_balances')
     .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
     .eq('leave_type_id', id);
   if ((count ?? 0) > 0) {
     // Soft delete: just deactivate
     const { error } = await supabase
       .from('leave_types')
       .update({ active: false, updated_at: new Date().toISOString() })
+      .eq('company_id', companyId)
       .eq('id', id);
     if (!error) void logUserAction(actorId, 'update', 'leave_type', id, { action: 'deactivated' });
     return { error: error ? `Could not deactivate: ${error.message}` : null };
   }
-  const { error } = await supabase.from('leave_types').delete().eq('id', id);
+  const { error } = await supabase.from('leave_types').delete().eq('company_id', companyId).eq('id', id);
   if (!error) void logUserAction(actorId, 'delete', 'leave_type', id, {});
   return { error: error?.message ?? null };
 }
@@ -391,6 +401,7 @@ export async function createHoliday(
 }
 
 export async function updateHoliday(
+  companyId: string,
   id: string,
   actorId: string,
   input: UpdateHolidayInput,
@@ -404,13 +415,14 @@ export async function updateHoliday(
       is_recurring: input.isRecurring,
       updated_at:   new Date().toISOString(),
     })
+    .eq('company_id', companyId)
     .eq('id', id);
   if (!error) void logUserAction(actorId, 'update', 'holiday', id, { name: input.name });
   return { error: error?.message ?? null };
 }
 
-export async function deleteHoliday(id: string, actorId: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('public_holidays').delete().eq('id', id);
+export async function deleteHoliday(companyId: string, id: string, actorId: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from('public_holidays').delete().eq('company_id', companyId).eq('id', id);
   if (!error) void logUserAction(actorId, 'delete', 'holiday', id, {});
   return { error: error?.message ?? null };
 }

@@ -87,7 +87,7 @@ export default function VerifyOR() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await deleteOfficialReceipt(deleteTarget.id);
+    await deleteOfficialReceipt(companyId, deleteTarget.id);
     await load();
     setDeleteTarget(null);
     toast({ title: 'Official receipt deleted' });

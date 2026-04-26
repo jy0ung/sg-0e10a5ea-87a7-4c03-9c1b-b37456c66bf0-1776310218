@@ -15,9 +15,6 @@ import {
   setUserColumnPermissions,
   getUserColumnPermissions 
 } from '@/services/permissionService';
-import { 
-  logPermissionChange 
-} from '@/services/auditService';
 import { useAuth } from '@/contexts/AuthContext';
 import { User, Save, Eye, EyeOff, Edit, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -162,16 +159,11 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
         .filter(([_, level]) => level !== 'none')
         .map(([column, level]) => ({ column_name: column, permission_level: level }));
 
-      const { error } = await setUserColumnPermissions(userId, permissions);
-      if (error) throw error;
-
-      // Log permission change
-      await logPermissionChange(currentUser?.id || '', userId, {
-        columns: { before: 'previous', after: columnPermissions },
-        canEdit: { before: 'previous', after: canEdit },
-        canBulkEdit: { before: 'previous', after: canBulkEdit },
-        canViewDetails: { before: 'previous', after: canViewDetails },
+      const { error } = await setUserColumnPermissions(userId, permissions, 'vehicles', {
+        actorId: currentUser?.id,
+        companyId: currentUser?.companyId ?? currentUser?.company_id,
       });
+      if (error) throw error;
 
       toast.success('Permissions updated successfully');
       setUnsavedChanges(false);

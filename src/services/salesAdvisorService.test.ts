@@ -170,9 +170,9 @@ describe('updateSalesAdvisorStatus', () => {
   it('returns an error when employee updates fail', async () => {
     updateEmployeeMock.mockResolvedValue({ error: 'relation "employees" does not exist' });
 
-    const result = await updateSalesAdvisorStatus('employee-1', 'inactive');
+    const result = await updateSalesAdvisorStatus('c1', 'employee-1', 'inactive');
 
-    expect(updateEmployeeMock).toHaveBeenCalledWith('employee-1', { status: 'inactive' });
+    expect(updateEmployeeMock).toHaveBeenCalledWith('employee-1', { status: 'inactive' }, undefined, 'c1');
     expect(result.error).toBeInstanceOf(Error);
     expect(result.error?.message).toBe('relation "employees" does not exist');
   });

@@ -37,12 +37,11 @@ describe('dashboardPreferencesService', () => {
   it('upsertDashboardPreferences stamps updated_at and sets onConflict', async () => {
     upsert.mockResolvedValueOnce({ error: null });
     const row = {
-      user_id: 'u1',
       selected_kpis: ['a'],
       show_advanced_kpis: false,
       personal_dashboard: null,
     };
-    const res = await upsertDashboardPreferences(row);
+    const res = await upsertDashboardPreferences('u1', row);
     expect(res.error).toBeNull();
     const [payload, opts] = upsert.mock.calls[0];
     expect(payload.user_id).toBe('u1');
@@ -53,8 +52,7 @@ describe('dashboardPreferencesService', () => {
   it('propagates upsert errors', async () => {
     const err = new Error('boom');
     upsert.mockResolvedValueOnce({ error: err });
-    const res = await upsertDashboardPreferences({
-      user_id: 'u1',
+    const res = await upsertDashboardPreferences('u1', {
       selected_kpis: null,
       show_advanced_kpis: null,
       personal_dashboard: null,

@@ -11,22 +11,14 @@ import { toast } from 'sonner';
 import { Loader2, Save, KeyRound, Power } from 'lucide-react';
 import { getBranches } from '@/services/masterDataService';
 import type { BranchRecord } from '@/types';
-import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
 import { profileUpdateSchema, type ProfileUpdateFormData, changePasswordSchema, type ChangePasswordFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 
-const ROLES: { value: AppRole; label: string }[] = [
-  { value: 'super_admin', label: 'Super Admin' },
-  { value: 'company_admin', label: 'Company Admin' },
-  { value: 'director', label: 'Director' },
-  { value: 'general_manager', label: 'General Manager' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'sales', label: 'Sales' },
-  { value: 'accounts', label: 'Accounts' },
-  { value: 'analyst', label: 'Analyst' },
-];
+function formatRole(role?: string) {
+  return role ? role.replace(/_/g, ' ') : 'Unassigned';
+}
 
 export default function SettingsPage() {
   const { user, refreshProfile } = useAuth();
@@ -68,10 +60,6 @@ export default function SettingsPage() {
     getBranches(user?.company_id || '').then(res => setBranches(res.data));
   }, [user?.company_id]);
 
-  const handleRoleChange = (newRole: string) => {
-    form.setValue('role', newRole as ProfileUpdateFormData['role']);
-  };
-
   const handleChangePassword = async (data: ChangePasswordFormData) => {
     if (!user) return;
     setChangingPassword(true);
@@ -101,13 +89,13 @@ export default function SettingsPage() {
   const handleSave = async (data: ProfileUpdateFormData) => {
     if (!user) return;
     setSaving(true);
-    const newScope = ROLE_DEFAULT_SCOPE[data.role] || 'company';
     const { error } = await updateProfile({
       id: user.id,
       name: data.name,
-      role: data.role,
       branch_id: data.branch_id,
-      access_scope: newScope,
+    }, {
+      actorId: user.id,
+      companyId: user.company_id,
     });
 
     if (error) {
@@ -160,16 +148,7 @@ export default function SettingsPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Select value={form.watch('role')} onValueChange={handleRoleChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROLES.map((r) => (
-                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input id="role" value={formatRole(user?.role)} disabled className="bg-muted/50 capitalize" />
               </div>
 
               <div className="space-y-2">
@@ -193,8 +172,8 @@ export default function SettingsPage() {
               <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
                 <p className="font-medium text-foreground">Your Access Level</p>
                 <p className="text-muted-foreground">
-                  Scope: <strong className="text-foreground capitalize">{ROLE_DEFAULT_SCOPE[form.watch('role')] || 'company'}</strong>
-                  {' • '}Role: <strong className="text-foreground capitalize">{form.watch('role').replace(/_/g, ' ')}</strong>
+                  Scope: <strong className="text-foreground capitalize">{user?.access_scope || 'company'}</strong>
+                  {' • '}Role: <strong className="text-foreground capitalize">{formatRole(user?.role)}</strong>
                   {branchId !== 'none' && <> • Branch: <strong className="text-foreground">{branchId}</strong></>}
                 </p>
               </div>

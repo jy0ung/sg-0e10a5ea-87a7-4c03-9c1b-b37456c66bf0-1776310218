@@ -20,6 +20,7 @@ import {
 import { vehicleTransferSchema } from '@/lib/validations';
 import { Search, Plus, ArrowRight } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
+import { PageErrorState } from '@/components/shared/PageState';
 
 type Transfer = VehicleTransferRecord;
 
@@ -47,7 +48,7 @@ export default function VehicleTransfer() {
 
   const branches = [...new Set(vehicles.map(v => v.branch_code).filter(Boolean))].sort() as string[];
 
-  const { data: transfers = [], isLoading } = useQuery({
+  const { data: transfers = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['vehicle-transfers', companyId],
     queryFn: () => listVehicleTransfers(companyId ?? ''),
     enabled: !!companyId,
@@ -75,6 +76,7 @@ export default function VehicleTransfer() {
     const runningNo = `TRF-${String(transfers.length + 1).padStart(4, '0')}`;
     const { error } = await createVehicleTransfer({
       companyId: user.company_id,
+      actorId: user.id,
       runningNo,
       fromBranch: parsed.data.fromBranch,
       toBranch: parsed.data.toBranch,
@@ -99,6 +101,7 @@ export default function VehicleTransfer() {
     if (!prev) return;
     const { error } = await updateVehicleTransferStatus(id, status, {
       companyId: user?.company_id,
+      actorId: user?.id,
       chassisNo: prev.chassisNo,
       toBranch: prev.toBranch,
       previousArrivedAt: prev.arrivedAt ?? null,
@@ -116,6 +119,16 @@ export default function VehicleTransfer() {
         <PageHeader title="Vehicle Transfer" description="Inter-branch chassis movement tracking"
           breadcrumbs={[{ label: 'FLC BI' }, { label: 'Inventory' }, { label: 'Vehicle Transfer' }]} />
         <TableSkeleton rows={8} cols={7} colWidths={['w-20','w-20','w-20','w-28','w-20','w-24','w-16']} />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader title="Vehicle Transfer" description="Inter-branch chassis movement tracking"
+          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Inventory' }, { label: 'Vehicle Transfer' }]} />
+        <PageErrorState title="Unable to load vehicle transfers" error={error} onRetry={() => void refetch()} />
       </div>
     );
   }
