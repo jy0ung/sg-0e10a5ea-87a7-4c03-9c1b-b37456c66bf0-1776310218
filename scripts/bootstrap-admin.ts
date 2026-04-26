@@ -43,11 +43,15 @@ if (!SERVICE_KEY) fail('Missing SUPABASE_SERVICE_ROLE_KEY.');
 if (!ADMIN_EMAIL) fail('Missing ADMIN_EMAIL.');
 if (!ADMIN_PASSWORD) fail('Missing ADMIN_PASSWORD.');
 
-// Guardrail: reject keys that look like anon/publishable keys. The service
-// role key is a JWT whose payload declares "role":"service_role"; anon keys
-// declare "role":"anon". Publishable keys start with "sb_publishable_".
-if (SERVICE_KEY.startsWith('sb_publishable_') || SERVICE_KEY.startsWith('sb_')) {
+// Guardrail: reject keys that look like anon/publishable keys. Legacy service
+// role keys are JWTs whose payload declares "role":"service_role"; anon keys
+// declare "role":"anon". Current local Supabase stacks expose non-JWT
+// secret keys prefixed with "sb_secret_".
+if (SERVICE_KEY.startsWith('sb_publishable_')) {
   fail('SUPABASE_SERVICE_ROLE_KEY looks like a publishable key. Use the service-role key.');
+}
+if (SERVICE_KEY.startsWith('sb_') && !SERVICE_KEY.startsWith('sb_secret_')) {
+  fail('SUPABASE_SERVICE_ROLE_KEY has an unrecognized sb_ prefix. Use the service-role/secret key.');
 }
 try {
   const payload = JSON.parse(Buffer.from(SERVICE_KEY.split('.')[1] ?? '', 'base64').toString());
@@ -91,7 +95,6 @@ async function findAuthUserId(email: string): Promise<string | null> {
   // listUsers paginates 50 at a time by default. Walk pages until we find
   // the email or exhaust the list. Fine for day-1 bootstrap on a small env.
   let page = 1;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
     if (error) throw new Error(`auth.admin.listUsers failed: ${error.message}`);

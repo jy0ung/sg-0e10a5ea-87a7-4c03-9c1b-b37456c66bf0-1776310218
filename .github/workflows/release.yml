@@ -4,11 +4,18 @@ name: Release
 # The image bundles the static SPA (Vite build) served by nginx. Deployment
 # to the UAT / production host is handled by deploy-image.yml.
 #
-# Required repo secrets (used as Docker build args — inlined into the SPA):
-#   VITE_SUPABASE_URL         https://<ref>.supabase.co
+# Required repo/environment secrets (used as Docker build args — public values
+# are inlined into the SPA):
+#   VITE_SUPABASE_URL         Public browser-facing URL. For self-hosted UAT,
+#                             use https://uat.protonfookloi.com so nginx can
+#                             proxy Supabase API paths to the private upstream.
 #   VITE_SUPABASE_ANON_KEY    sb_publishable_... (anon/publishable key only)
-#   VITE_APP_URL              https://app.<domain>           (production origin)
+#   VITE_APP_URL              https://app.<domain> or UAT origin
 #   VITE_SENTRY_DSN           (optional)
+#
+# Optional repo/environment secrets:
+#   SUPABASE_INTERNAL_URL     Private upstream for nginx proxy routes. Defaults
+#                             to the current LAN Supabase host for UAT.
 #
 # Optional Sentry release: SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT,
 # plus repo variable ENABLE_SENTRY_RELEASE=true to opt in.
@@ -80,6 +87,14 @@ jobs:
         id: img
         run: echo "name=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve Supabase upstream
+        id: supabase-upstream
+        env:
+          SUPABASE_INTERNAL_URL: ${{ secrets.SUPABASE_INTERNAL_URL }}
+        run: |
+          value="${SUPABASE_INTERNAL_URL:-http://192.168.1.241:54321}"
+          echo "value=${value}" >> "$GITHUB_OUTPUT"
+
       - name: Derive image tags + labels
         id: meta
         uses: docker/metadata-action@v5
@@ -109,6 +124,7 @@ jobs:
             VITE_APP_URL=${{ secrets.VITE_APP_URL }}
             VITE_APP_VERSION=${{ steps.tag.outputs.value }}
             VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}
+            SUPABASE_INTERNAL_URL=${{ steps.supabase-upstream.outputs.value }}
 
       - name: Summary
         run: |
@@ -153,92 +169,3 @@ jobs:
           npx --yes @sentry/cli releases new "$VERSION"
           npx --yes @sentry/cli releases files "$VERSION" upload-sourcemaps dist --rewrite
           npx --yes @sentry/cli releases finalize "$VERSION"
-name: Release
-
-on:
-  push:
-    tags:
-      - 'v*.*.*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag (e.g. v1.2.0)'
-        required: true
-
-jobs:
-  build-and-publish:
-    name: Build & Publish Docker image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Resolve tag
-        id: tag
-        run: |
-          if [ -n "${{ inputs.tag }}" ]; then
-            echo "value=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Unit tests
-        run: npm test
-
-      - name: Production build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_APP_ENV: production
-          VITE_APP_VERSION: ${{ steps.tag.outputs.value }}
-          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-        run: npm run build
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build & push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.value }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Upload source maps to Sentry
-        if: ${{ secrets.SENTRY_AUTH_TOKEN != '' }}
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-        run: |
-          npx --yes @sentry/cli releases new "${{ steps.tag.outputs.value }}"
-          npx --yes @sentry/cli releases files "${{ steps.tag.outputs.value }}" \
-            upload-sourcemaps dist --rewrite
-          npx --yes @sentry/cli releases finalize "${{ steps.tag.outputs.value }}"

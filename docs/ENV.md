@@ -6,7 +6,7 @@ Required values are loaded at boot and validated by the zod schema in `src/confi
 
 | Variable                | Purpose                                     | Notes                              |
 | ----------------------- | ------------------------------------------- | ---------------------------------- |
-| `VITE_SUPABASE_URL`     | Supabase project URL                        | `http://127.0.0.1:54321` locally   |
+| `VITE_SUPABASE_URL`     | Browser-facing Supabase URL                 | `http://127.0.0.1:54321` locally; for self-hosted UAT behind nginx, use the public app origin so browsers call same-origin proxy paths. |
 | `VITE_SUPABASE_ANON_KEY`| Supabase anon/publishable key               | From `supabase start` output       |
 | `VITE_APP_URL`          | Canonical app URL used for auth redirects   | Must match browser origin. `VITE_SITE_URL` still accepted as a legacy fallback. |
 
@@ -18,6 +18,7 @@ Required values are loaded at boot and validated by the zod schema in `src/confi
 | `VITE_SENTRY_ENVIRONMENT`     | Environment label (e.g. `production`)          |
 | `VITE_SENTRY_RELEASE`         | Release tag for source map association         |
 | `VITE_APP_VERSION`            | Shown in footer / sent to Sentry               |
+| `SUPABASE_INTERNAL_URL`        | Docker/nginx build arg for the private Supabase upstream behind same-origin proxy routes. Defaults to the current UAT LAN host. |
 
 ## Files
 
