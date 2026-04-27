@@ -37,7 +37,7 @@ function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEY_FRAGMENTS.some(fragment => normalized.includes(fragment));
 }
 
-function redactString(value: string): string {
+export function redactString(value: string): string {
   return value
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, REDACTED)
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, `Bearer ${REDACTED}`)
@@ -77,7 +77,7 @@ function sanitizeLogValue(value: unknown, depth = 0, seen = new WeakSet<object>(
   );
 }
 
-function sanitizeLogContext(context?: Record<string, unknown>): Record<string, unknown> | undefined {
+export function sanitizeLogContext(context?: Record<string, unknown>): Record<string, unknown> | undefined {
   if (!context) return undefined;
   return sanitizeLogValue(context) as Record<string, unknown>;
 }

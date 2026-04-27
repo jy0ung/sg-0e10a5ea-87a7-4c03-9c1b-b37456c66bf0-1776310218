@@ -8,7 +8,7 @@
 # ----------------------------------------------------------------------------
 # Build args:
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_APP_ENV, VITE_SENTRY_DSN,
-#   VITE_APP_URL — inlined into the client bundle. Only public values.
+#   VITE_APP_URL, VITE_APP_VERSION — inlined into the client bundle. Only public values.
 # ============================================================================
 
 FROM node:20-alpine AS build
@@ -32,11 +32,13 @@ ARG VITE_SUPABASE_ANON_KEY
 ARG VITE_APP_ENV=production
 ARG VITE_SENTRY_DSN
 ARG VITE_APP_URL
+ARG VITE_APP_VERSION
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY \
     VITE_APP_ENV=$VITE_APP_ENV \
     VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
-    VITE_APP_URL=$VITE_APP_URL
+    VITE_APP_URL=$VITE_APP_URL \
+    VITE_APP_VERSION=$VITE_APP_VERSION
 
 RUN npm run build
 

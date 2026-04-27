@@ -41,6 +41,7 @@ One-time gate before first production cutover. Every box must be checked.
 
 ## Observability
 
+- [x] Root and route error boundaries report through `errorTrackingService`
 - [ ] Sentry project created; DSN wired via `VITE_SENTRY_DSN`
 - [ ] Sentry source-map upload succeeds on release build
 - [ ] Sentry → Slack / email alert route configured

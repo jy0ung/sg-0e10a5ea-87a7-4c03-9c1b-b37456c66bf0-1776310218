@@ -86,6 +86,14 @@ login instead of skipping that optional check.
 - Supabase PITR is enabled on staging and production.
 - A monthly restore-to-staging drill verifies backups.
 
+## Phase 2 production readiness
+
+Phase 2 started on 2026-04-27. The first slice is the observability foundation:
+React error boundaries report through `errorTrackingService`, Sentry metadata is
+driven by the validated env contract, and source maps are generated only for the
+Sentry release upload job. Track the full phase in
+`docs/PHASE2_PRODUCTION_READINESS.md`.
+
 ## Launch checklist
 
 - [x] UAT synthetic verification workflow

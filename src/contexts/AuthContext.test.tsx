@@ -9,6 +9,8 @@ const mockSignOut = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 const mockFromSelect = vi.fn();
 const mockLogError = vi.fn();
+const mockTrackSetUser = vi.fn();
+const mockTrackClearUser = vi.fn();
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -39,6 +41,13 @@ vi.mock('@/services/loggingService', () => ({
     warn: vi.fn(),
     setUserId: vi.fn(),
     clearUserId: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/errorTrackingService', () => ({
+  errorTrackingService: {
+    setUser: (...args: unknown[]) => mockTrackSetUser(...args),
+    clearUser: (...args: unknown[]) => mockTrackClearUser(...args),
   },
 }));
 
@@ -110,6 +119,7 @@ describe('AuthContext', () => {
       expect(result.current.user?.name).toBe('Admin User');
       expect(result.current.user?.companyId).toBe('comp-1');
       expect(result.current.isAuthenticated).toBe(true);
+      expect(mockTrackSetUser).toHaveBeenCalledWith('user-1');
     });
 
     it('maps the linked employee id onto the auth user', async () => {

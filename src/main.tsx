@@ -19,6 +19,7 @@ import AppLayout from "./components/layout/AppLayout";
 import SalesLayout from "./components/layout/SalesLayout";
 import { SalesProvider } from "./contexts/SalesContext";
 import { errorTrackingService } from "@/services/errorTrackingService";
+import { env } from "@/config/env";
 import {
   ADMIN_ONLY,
   ADMIN_AND_DIRECTOR,
@@ -31,8 +32,12 @@ import {
   HRMS_APPRAISALS,
 } from "@/config/routeRoles";
 
-// Initialise error tracking. Reads VITE_SENTRY_DSN if set; otherwise runs in local-only mode.
-errorTrackingService.init(import.meta.env.VITE_SENTRY_DSN);
+errorTrackingService.init({
+  dsn: env.VITE_SENTRY_DSN,
+  environment: env.VITE_APP_ENV,
+  release: env.VITE_APP_VERSION,
+  tracesSampleRate: env.VITE_SENTRY_TRACES_SAMPLE_RATE,
+});
 
 // Route-level code splitting — all pages are loaded on demand
 const LandingPage = lazy(() => import("./pages/LandingPage"));

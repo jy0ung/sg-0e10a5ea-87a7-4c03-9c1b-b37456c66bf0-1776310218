@@ -2,7 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle } from "lucide-react";
-import { loggingService } from "@/services/loggingService";
+import { errorTrackingService } from "@/services/errorTrackingService";
 
 interface Props {
   children: ReactNode;
@@ -24,11 +24,13 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    loggingService.error("React error boundary caught error", { 
-      error: error.message, 
-      stack: error.stack,
-      componentStack: errorInfo.componentStack 
-    }, "ErrorBoundary");
+    errorTrackingService.captureException(error, {
+      component: "ErrorBoundary",
+      action: "componentDidCatch",
+      additionalData: {
+        componentStack: errorInfo.componentStack,
+      },
+    });
   }
 
   render() {

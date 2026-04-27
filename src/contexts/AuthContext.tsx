@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AppRole, AccessScope } from '@/types';
 import { useLocation, Navigate } from 'react-router-dom';
 import { loggingService } from '@/services/loggingService';
+import { errorTrackingService } from '@/services/errorTrackingService';
 
 interface Profile {
   id: string;
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
     setSession(null);
     loggingService.clearUserId();
+    errorTrackingService.clearUser();
   }, []);
 
   const fetchProfile = useCallback(async (userId: string) => {
@@ -150,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfileError(null);
       setProfile(p);
       loggingService.setUserId(p.id);
+      errorTrackingService.setUser(p.id);
     } catch (err) {
       loggingService.error('Unexpected error fetching profile', { error: err }, 'AuthContext');
       setProfileError('Unexpected error loading your profile. Please sign in again.');
@@ -174,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
           }, 0);
         } else {
-          setProfile(null);
+          clearSessionArtifacts();
           setLoading(false);
         }
       }
@@ -188,12 +191,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         });
       } else {
+        clearSessionArtifacts();
         setLoading(false);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+  }, [clearSessionArtifacts, fetchProfile]);
 
   const login = useCallback(async (email: string, password: string) => {
     try {

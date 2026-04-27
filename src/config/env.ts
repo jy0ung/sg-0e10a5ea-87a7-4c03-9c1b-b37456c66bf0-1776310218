@@ -18,10 +18,12 @@ const envSchema = z.object({
     .min(20, 'VITE_SUPABASE_ANON_KEY looks too short to be a real key'),
   VITE_SUPABASE_PROJECT_ID: z.string().optional(),
   VITE_SENTRY_DSN: z.string().url().optional().or(z.literal('')),
+  VITE_SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).optional(),
   VITE_APP_ENV: z
     .enum(['development', 'staging', 'production'])
     .default('development'),
   VITE_APP_URL: z.string().url().optional(),
+  VITE_APP_VERSION: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -37,8 +39,10 @@ function parseEnv(): AppEnv {
       import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     VITE_SUPABASE_PROJECT_ID: import.meta.env.VITE_SUPABASE_PROJECT_ID,
     VITE_SENTRY_DSN: import.meta.env.VITE_SENTRY_DSN,
+    VITE_SENTRY_TRACES_SAMPLE_RATE: import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE || undefined,
     VITE_APP_ENV: import.meta.env.VITE_APP_ENV,
     VITE_APP_URL: import.meta.env.VITE_APP_URL,
+    VITE_APP_VERSION: import.meta.env.VITE_APP_VERSION || undefined,
   };
 
   const result = envSchema.safeParse(raw);

@@ -15,10 +15,17 @@ Required values are loaded at boot and validated by the zod schema in `src/confi
 | Variable                      | Purpose                                        |
 | ----------------------------- | ---------------------------------------------- |
 | `VITE_SENTRY_DSN`             | Enables Sentry error reporting                 |
-| `VITE_SENTRY_ENVIRONMENT`     | Environment label (e.g. `production`)          |
-| `VITE_SENTRY_RELEASE`         | Release tag for source map association         |
-| `VITE_APP_VERSION`            | Shown in footer / sent to Sentry               |
+| `VITE_SENTRY_TRACES_SAMPLE_RATE` | Browser tracing sample rate from `0` to `1`; defaults to `0.1` when omitted. |
+| `VITE_APP_ENV`                | Environment label sent to Sentry (`development`, `staging`, `production`). |
+| `VITE_APP_VERSION`            | Release tag sent to Sentry for source map association. |
 | `SUPABASE_INTERNAL_URL`        | Docker/nginx build arg for the private Supabase upstream behind same-origin proxy routes. Defaults to the current UAT LAN host. |
+
+## Source maps
+
+Production browser source maps are disabled by default. The release workflow
+sets `BUILD_SOURCEMAP=true` only in the Sentry upload job, builds a matching
+bundle with `VITE_APP_VERSION`, uploads `dist` source maps to Sentry, and keeps
+the Docker image build free of public source maps.
 
 ## Files
 

@@ -2,7 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle } from 'lucide-react';
-import { loggingService } from '@/services/loggingService';
+import { errorTrackingService } from '@/services/errorTrackingService';
 
 interface Props {
   children: ReactNode;
@@ -33,16 +33,14 @@ export class RouteErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    loggingService.error(
-      'RouteErrorBoundary caught error',
-      {
+    errorTrackingService.captureException(error, {
+      component: 'RouteErrorBoundary',
+      action: 'componentDidCatch',
+      additionalData: {
         scope: this.props.scope ?? 'unknown',
-        error: error.message,
-        stack: error.stack,
         componentStack: info.componentStack,
       },
-      'RouteErrorBoundary',
-    );
+    });
   }
 
   reset = () => this.setState({ hasError: false, error: null });
