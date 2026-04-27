@@ -59,6 +59,11 @@ verification job.
 `UAT_LOGIN_EMAIL` and `UAT_LOGIN_PASSWORD` as UAT environment secrets to include
 the real browser login check in that automated deploy gate.
 
+`uat-synthetic.yml` also runs the same verifier hourly and on manual dispatch.
+It fails on health, bundle configuration, or required-login regressions without
+needing a deploy event. Set `UAT_VERIFY_FETCH_ATTEMPTS` if the synthetic check
+needs a different retry count than the default three attempts.
+
 ## Phase 1 closure
 
 Phase 1 performance hardening is closed as of 2026-04-27. The release criteria
@@ -83,7 +88,8 @@ login instead of skipping that optional check.
 
 ## Launch checklist
 
-- [ ] Uptime monitoring (StatusCake / BetterUptime)
+- [x] UAT synthetic verification workflow
+- [ ] Production uptime monitoring (StatusCake / BetterUptime)
 - [ ] Sentry alert routes to on-call channel
 - [ ] Error budget defined per module
 - [ ] Load test at ≥100k vehicles / ≥10k orders

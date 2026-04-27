@@ -14,16 +14,17 @@ type CheckResult = {
   detail?: string;
 };
 
-const targetUrl = normalizeUrl(process.env.UAT_URL ?? DEFAULT_UAT_URL);
-const expectedSupabaseUrl = normalizeUrl(process.env.UAT_EXPECTED_SUPABASE_URL ?? targetUrl.origin);
-const healthUrl = normalizeUrl(process.env.UAT_HEALTH_URL ?? `${targetUrl.origin}/healthz`);
-const forbiddenPatterns = (process.env.UAT_FORBIDDEN_SUPABASE_PATTERNS ?? DEFAULT_FORBIDDEN_PATTERNS.join(','))
+const targetUrl = normalizeUrl(readEnv('UAT_URL') ?? DEFAULT_UAT_URL);
+const expectedSupabaseUrl = normalizeUrl(readEnv('UAT_EXPECTED_SUPABASE_URL') ?? targetUrl.origin);
+const healthUrl = normalizeUrl(readEnv('UAT_HEALTH_URL') ?? `${targetUrl.origin}/healthz`);
+const forbiddenPatterns = (readEnv('UAT_FORBIDDEN_SUPABASE_PATTERNS') ?? DEFAULT_FORBIDDEN_PATTERNS.join(','))
   .split(',')
   .map((pattern) => pattern.trim())
   .filter(Boolean);
-const loginEmail = process.env.UAT_LOGIN_EMAIL;
-const loginPassword = process.env.UAT_LOGIN_PASSWORD;
-const loginRequired = process.env.UAT_LOGIN_REQUIRED === '1' || process.env.UAT_LOGIN_REQUIRED === 'true';
+const loginEmail = readEnv('UAT_LOGIN_EMAIL');
+const loginPassword = readEnv('UAT_LOGIN_PASSWORD');
+const loginRequired = ['1', 'true'].includes((readEnv('UAT_LOGIN_REQUIRED') ?? '').toLowerCase());
+const maxFetchAttempts = parsePositiveInteger(readEnv('UAT_VERIFY_FETCH_ATTEMPTS'), 3);
 
 const results: CheckResult[] = [];
 
@@ -35,12 +36,43 @@ function normalizeUrl(rawUrl: string): URL {
   }
 }
 
-async function fetchText(url: URL): Promise<string> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`${url.toString()} returned HTTP ${response.status}`);
+function readEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
+function parsePositiveInteger(rawValue: string | undefined, fallback: number): number {
+  if (!rawValue) {
+    return fallback;
   }
-  return response.text();
+
+  const value = Number.parseInt(rawValue, 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchText(url: URL): Promise<string> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxFetchAttempts; attempt += 1) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`${url.toString()} returned HTTP ${response.status}`);
+      }
+      return response.text();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxFetchAttempts) {
+        await wait(500 * attempt);
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 function addResult(name: string, ok: boolean, detail?: string) {

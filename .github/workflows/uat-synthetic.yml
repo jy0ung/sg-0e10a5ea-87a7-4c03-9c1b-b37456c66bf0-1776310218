@@ -1,0 +1,69 @@
+name: UAT Synthetic Check
+
+on:
+  schedule:
+    # Every hour at minute 17 UTC.
+    - cron: '17 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uat-synthetic-check
+  cancel-in-progress: false
+
+jobs:
+  verify-uat:
+    name: Verify live UAT
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium for login verification
+        env:
+          UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
+          UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${UAT_LOGIN_EMAIL:-}" && -n "${UAT_LOGIN_PASSWORD:-}" ]]; then
+            npx playwright install --with-deps chromium
+          else
+            echo "Skipping browser install; UAT login credentials are not configured."
+          fi
+
+      - name: Run UAT verifier
+        env:
+          UAT_URL: ${{ secrets.UAT_URL || 'https://uat.protonfookloi.com' }}
+          UAT_EXPECTED_SUPABASE_URL: ${{ secrets.UAT_EXPECTED_SUPABASE_URL || secrets.UAT_URL || 'https://uat.protonfookloi.com' }}
+          UAT_HEALTH_URL: ${{ secrets.UAT_HEALTH_URL }}
+          UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
+          UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
+          UAT_LOGIN_REQUIRED: ${{ secrets.UAT_LOGIN_REQUIRED }}
+        run: npm run verify:uat
+
+      - name: Summary
+        if: always()
+        env:
+          UAT_URL: ${{ secrets.UAT_URL || 'https://uat.protonfookloi.com' }}
+          UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
+        run: |
+          login_configured="no"
+          if [[ -n "${UAT_LOGIN_EMAIL:-}" ]]; then
+            login_configured="yes"
+          fi
+
+          {
+            echo "### UAT Synthetic Check"
+            echo ""
+            echo "- Target: \`${UAT_URL:-https://uat.protonfookloi.com}\`"
+            echo "- Login check configured: \`${login_configured}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
