@@ -18,13 +18,15 @@ One-time gate before first production cutover. Every box must be checked.
 ## Security
 
 - [ ] RLS matrix sign-off (`docs/RLS_MATRIX.md`) complete
+- [x] Security sign-off checklist exists in `docs/SECURITY_SIGNOFF.md`
 - [ ] `scripts/security-check.sh` passes on the release commit
 - [ ] `npm audit` high+ clean; open items tracked as issues
 - [ ] `osv-scanner` findings reviewed
 - [ ] CodeQL scan attached to release
 - [ ] Supabase `[auth] enable_signup = false` confirmed in production
       `config.toml`
-- [ ] All edge functions validate JWT + same-company checks
+- [x] Edge-function static guardrails wired into `scripts/security-check.sh`
+- [ ] All edge functions validate JWT + same-company checks with release evidence attached
 - [ ] CORS allow-list pinned to production origins only
 - [ ] Service-role key set via `supabase secrets set` (never in client)
 - [ ] **Environment provisioned via one-shot script** — run

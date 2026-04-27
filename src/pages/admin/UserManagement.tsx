@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
-import { listProfiles, updateProfile, inviteUser, type ProfileRow } from '@/services/profileService';
-import { supabase } from '@/integrations/supabase/client';
+import { listProfiles, updateProfile, inviteUser, listCompanyOptions, type ProfileRow, type CompanyOption } from '@/services/profileService';
 import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,7 +59,7 @@ export default function UserManagement() {
   const [inviting, setInviting] = useState(false);
   const [signupUrl, setSignupUrl] = useState('');
   const [copied, setCopied] = useState(false);
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [activating, setActivating] = useState<string>('');
   const [employeesByCompany, setEmployeesByCompany] = useState<Record<string, Employee[]>>({});
   const [pendingSelections, setPendingSelections] = useState<
@@ -97,14 +96,14 @@ export default function UserManagement() {
       const [profileRes, branchRes, companyRes] = await Promise.all([
         listProfiles(),
         getBranches(user?.company_id || ''),
-        supabase.from('companies').select('id, name').order('name', { ascending: true }),
+        listCompanyOptions(),
       ]);
       if (profileRes.error) {
         toast.error('Failed to load users: ' + profileRes.error);
       }
       setProfiles(profileRes.data);
       setBranches(branchRes.data);
-      setCompanies((companyRes.data as { id: string; name: string }[] | null) ?? []);
+      setCompanies(companyRes.data);
 
       const companyIds = [...new Set(
         profileRes.data

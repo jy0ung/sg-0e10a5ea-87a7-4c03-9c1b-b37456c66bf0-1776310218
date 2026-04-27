@@ -23,6 +23,7 @@
     "test:rls": "RLS_E2E=1 vitest run src/test/rls-matrix.spec.ts",
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "provision:env": "bash scripts/provision-supabase-env.sh",
+    "security:edge-functions": "tsx scripts/check-edge-functions.ts",
     "verify:uat": "tsx scripts/verify-uat-deploy.ts"
   },
   "dependencies": {

@@ -48,6 +48,14 @@ else
   green "No (supabase as any) casts."
 fi
 
+step "Edge function auth/CORS guardrails"
+if ! npm run security:edge-functions; then
+  red "Edge function security guardrails failed."
+  FAIL=1
+else
+  green "Edge function security guardrails passed."
+fi
+
 step "OSV scanner (optional)"
 if command -v osv-scanner >/dev/null 2>&1; then
   if ! osv-scanner --recursive --skip-git .; then

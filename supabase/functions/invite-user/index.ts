@@ -58,7 +58,7 @@ Deno.serve(async (req: Request) => {
     // Check caller has admin role — use service role to bypass RLS
     const { data: callerProfile } = await adminClient
       .from('profiles')
-      .select('role')
+      .select('role, company_id')
       .eq('id', caller.id)
       .single();
 
@@ -78,6 +78,22 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: 'Missing required fields: email, name, role, company_id' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
+    }
+
+    if (callerProfile.role === 'company_admin') {
+      if (callerProfile.company_id !== company_id) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden: company mismatch' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      if (role === 'super_admin' || access_scope === 'global') {
+        return new Response(
+          JSON.stringify({ error: 'Company administrators cannot grant global access' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
     }
 
     // Determine the signup redirect URL

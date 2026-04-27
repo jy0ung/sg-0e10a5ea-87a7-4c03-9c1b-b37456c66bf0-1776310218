@@ -28,6 +28,11 @@ export interface ListProfilesResult {
   error: string | null;
 }
 
+export interface CompanyOption {
+  id: string;
+  name: string;
+}
+
 /** List all profiles (optionally scoped to a company for non-super-admins). */
 export async function listProfiles(companyId?: string): Promise<ListProfilesResult> {
   let q = supabase
@@ -38,6 +43,15 @@ export async function listProfiles(companyId?: string): Promise<ListProfilesResu
   const { data, error } = await q;
   if (error) return { data: [], error: error.message };
   return { data: (data ?? []) as unknown as ProfileRow[], error: null };
+}
+
+export async function listCompanyOptions(): Promise<{ data: CompanyOption[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('companies')
+    .select('id, name')
+    .order('name', { ascending: true });
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []) as CompanyOption[], error: null };
 }
 
 export interface UpdateProfileInput {
