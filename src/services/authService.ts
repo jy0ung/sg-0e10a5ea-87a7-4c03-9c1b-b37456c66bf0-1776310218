@@ -4,8 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 export interface AuthUser {
   id: string;
   email: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  user_metadata?: any;
+  user_metadata?: Record<string, unknown>;
   created_at?: string;
 }
 
@@ -87,7 +86,7 @@ export const authService = {
       } : null;
 
       return { user: authUser, error: null };
-    } catch (error) {
+    } catch {
       return { 
         user: null, 
         error: { message: "An unexpected error occurred during sign in" } 
@@ -105,7 +104,7 @@ export const authService = {
       }
 
       return { error: null };
-    } catch (error) {
+    } catch {
       return { 
         error: { message: "An unexpected error occurred during sign out" } 
       };
@@ -124,7 +123,7 @@ export const authService = {
       }
 
       return { error: null };
-    } catch (error) {
+    } catch {
       return { 
         error: { message: "An unexpected error occurred during password reset" } 
       };

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { authService } from './authService';
 import { supabase } from '@/integrations/supabase/client';
@@ -81,6 +80,15 @@ describe('authService', () => {
       expect(result.user).toBeNull();
       expect(result.error?.message).toBe('Invalid credentials');
     });
+
+    it('returns a safe error when sign in throws unexpectedly', async () => {
+      vi.mocked(supabase.auth.signInWithPassword).mockRejectedValue(new Error('network failed'));
+
+      const result = await authService.signIn('test@test.com', 'password123');
+
+      expect(result.user).toBeNull();
+      expect(result.error?.message).toBe('An unexpected error occurred during sign in');
+    });
   });
 
   describe('signOut', () => {
@@ -89,6 +97,14 @@ describe('authService', () => {
 
       const result = await authService.signOut();
       expect(result.error).toBeNull();
+    });
+
+    it('returns a safe error when sign out throws unexpectedly', async () => {
+      vi.mocked(supabase.auth.signOut).mockRejectedValue(new Error('network failed'));
+
+      const result = await authService.signOut();
+
+      expect(result.error?.message).toBe('An unexpected error occurred during sign out');
     });
   });
 
@@ -102,6 +118,14 @@ describe('authService', () => {
       expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith('test@test.com', {
         redirectTo: 'http://localhost:3000/reset-password',
       });
+    });
+
+    it('returns a safe error when password reset throws unexpectedly', async () => {
+      vi.mocked(supabase.auth.resetPasswordForEmail).mockRejectedValue(new Error('network failed'));
+
+      const result = await authService.resetPassword('test@test.com');
+
+      expect(result.error?.message).toBe('An unexpected error occurred during password reset');
     });
   });
 });
