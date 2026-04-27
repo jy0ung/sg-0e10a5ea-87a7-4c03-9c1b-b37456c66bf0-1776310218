@@ -196,8 +196,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message || null };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      return { error: error?.message || null };
+    } catch (err) {
+      loggingService.error('Unexpected sign-in error', { error: err }, 'AuthContext');
+      return { error: 'An unexpected error occurred during sign in' };
+    }
   }, []);
 
   const logout = useCallback(async () => {
@@ -237,6 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');

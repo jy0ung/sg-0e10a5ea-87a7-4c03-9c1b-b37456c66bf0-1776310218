@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import React from 'react';
@@ -9,14 +8,15 @@ const mockSignInWithPassword = vi.fn();
 const mockSignOut = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 const mockFromSelect = vi.fn();
+const mockLogError = vi.fn();
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
       getSession: () => mockGetSession(),
-      signInWithPassword: (creds: any) => mockSignInWithPassword(creds),
+      signInWithPassword: (creds: unknown) => mockSignInWithPassword(creds),
       signOut: () => mockSignOut(),
-      onAuthStateChange: (cb: any) => mockOnAuthStateChange(cb),
+      onAuthStateChange: (cb: unknown) => mockOnAuthStateChange(cb),
     },
     from: (table: string) => ({
       select: () => ({
@@ -31,6 +31,15 @@ vi.mock('@/integrations/supabase/client', () => ({
 vi.mock('react-router-dom', () => ({
   useLocation: () => ({ pathname: '/' }),
   Navigate: ({ to }: { to: string }) => React.createElement('div', { 'data-testid': 'navigate', 'data-to': to }),
+}));
+
+vi.mock('@/services/loggingService', () => ({
+  loggingService: {
+    error: (...args: unknown[]) => mockLogError(...args),
+    warn: vi.fn(),
+    setUserId: vi.fn(),
+    clearUserId: vi.fn(),
+  },
 }));
 
 import { AuthProvider, useAuth } from './AuthContext';
@@ -65,9 +74,14 @@ describe('AuthContext', () => {
 
   describe('useAuth', () => {
     it('throws when used outside AuthProvider', () => {
-      expect(() => renderHook(() => useAuth())).toThrow(
-        'useAuth must be used within AuthProvider'
-      );
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        expect(() => renderHook(() => useAuth())).toThrow(
+          'useAuth must be used within AuthProvider'
+        );
+      } finally {
+        consoleError.mockRestore();
+      }
     });
 
     it('returns unauthenticated state initially', async () => {
@@ -216,6 +230,28 @@ describe('AuthContext', () => {
       });
 
       expect(loginResult.error).toBe('Invalid credentials');
+    });
+
+    it('returns a safe error when login throws unexpectedly', async () => {
+      mockSignInWithPassword.mockRejectedValue(new Error('network failed'));
+
+      const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let loginResult: { error: string | null } = { error: null };
+      await act(async () => {
+        loginResult = await result.current.login('test@test.com', 'password');
+      });
+
+      expect(loginResult.error).toBe('An unexpected error occurred during sign in');
+      expect(mockLogError).toHaveBeenCalledWith(
+        'Unexpected sign-in error',
+        { error: expect.any(Error) },
+        'AuthContext',
+      );
     });
   });
 
