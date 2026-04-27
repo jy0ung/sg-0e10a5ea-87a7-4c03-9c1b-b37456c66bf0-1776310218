@@ -22,6 +22,10 @@ name: Deploy Image
 #   DEPLOY_HOST_PORT        e.g. 8080
 #   GHCR_READ_TOKEN         (only if the GHCR package is private)
 #   GHCR_READ_USERNAME      (only if the GHCR package is private)
+#   UAT_URL                 (optional, default https://uat.protonfookloi.com)
+#   UAT_LOGIN_EMAIL         (optional, enables real browser login check)
+#   UAT_LOGIN_PASSWORD      (optional, enables real browser login check)
+#   UAT_LOGIN_REQUIRED      (optional, set to 1 to fail when login creds absent)
 #
 # Host-side prerequisites (see docs/DEPLOY.md for full recipe):
 #   1. cloudflared tunnel route exposes the host's SSH port as a Public
@@ -65,6 +69,15 @@ jobs:
       name: ${{ github.event.inputs.environment || 'uat' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve target environment
+        id: env
+        run: |
+          if [[ -n "${{ github.event.inputs.environment }}" ]]; then
+            echo "value=${{ github.event.inputs.environment }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=uat" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Resolve image tag
         id: tag
@@ -145,6 +158,8 @@ jobs:
           IMAGE: ghcr.io/${{ steps.img.outputs.name }}:${{ steps.tag.outputs.value }}
         run: |
           set -euo pipefail
+          # Expand env locally before sending the remote deploy command.
+          # shellcheck disable=SC2029
           ssh deploy-target \
             "chmod +x /tmp/deploy-image.sh && \
              CONTAINER_NAME='${CONTAINER_NAME}' \
@@ -152,6 +167,40 @@ jobs:
              GHCR_USERNAME='${GHCR_USERNAME:-}' \
              GHCR_TOKEN='${GHCR_TOKEN:-}' \
              /tmp/deploy-image.sh '${IMAGE}'"
+
+      - uses: actions/setup-node@v4
+        if: ${{ steps.env.outputs.value == 'uat' }}
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install verifier dependencies
+        if: ${{ steps.env.outputs.value == 'uat' }}
+        run: npm ci
+
+      - name: Install Playwright Chromium for login verification
+        if: ${{ steps.env.outputs.value == 'uat' }}
+        env:
+          UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
+          UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${UAT_LOGIN_EMAIL:-}" && -n "${UAT_LOGIN_PASSWORD:-}" ]]; then
+            npx playwright install --with-deps chromium
+          else
+            echo "Skipping browser install; UAT login credentials are not configured."
+          fi
+
+      - name: Verify UAT deployment
+        if: ${{ steps.env.outputs.value == 'uat' }}
+        env:
+          UAT_URL: ${{ secrets.UAT_URL || 'https://uat.protonfookloi.com' }}
+          UAT_EXPECTED_SUPABASE_URL: ${{ secrets.UAT_EXPECTED_SUPABASE_URL || secrets.UAT_URL || 'https://uat.protonfookloi.com' }}
+          UAT_HEALTH_URL: ${{ secrets.UAT_HEALTH_URL }}
+          UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
+          UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
+          UAT_LOGIN_REQUIRED: ${{ secrets.UAT_LOGIN_REQUIRED }}
+        run: npm run verify:uat
 
       - name: Summary
         if: always()

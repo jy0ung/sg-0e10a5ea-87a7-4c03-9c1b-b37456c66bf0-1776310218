@@ -55,6 +55,10 @@ UAT_LOGIN_EMAIL=<email> UAT_LOGIN_PASSWORD=<password> npm run verify:uat
 Set `UAT_LOGIN_REQUIRED=1` in CI if missing login credentials should fail the
 verification job.
 
+`deploy-image.yml` runs this verifier automatically after UAT deployments. Add
+`UAT_LOGIN_EMAIL` and `UAT_LOGIN_PASSWORD` as UAT environment secrets to include
+the real browser login check in that automated deploy gate.
+
 ## Backups
 
 - Supabase PITR is enabled on staging and production.
