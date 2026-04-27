@@ -36,6 +36,25 @@ Staging is seeded from `scripts/seed-from-extract.ts` with rotated keys.
 2. Re-deploy the previous image tag.
 3. If the release ran migrations, run the inverse migration or restore from PITR.
 
+## UAT verification
+
+After deploying to UAT, run:
+
+```bash
+npm run verify:uat
+```
+
+The verifier checks `/healthz`, confirms the live Vite bundle uses the public
+same-origin Supabase URL instead of a private LAN/localhost URL, and skips the
+real browser login check unless credentials are supplied. To include login:
+
+```bash
+UAT_LOGIN_EMAIL=<email> UAT_LOGIN_PASSWORD=<password> npm run verify:uat
+```
+
+Set `UAT_LOGIN_REQUIRED=1` in CI if missing login credentials should fail the
+verification job.
+
 ## Backups
 
 - Supabase PITR is enabled on staging and production.

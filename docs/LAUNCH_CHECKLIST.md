@@ -13,6 +13,7 @@ One-time gate before first production cutover. Every box must be checked.
 - [ ] Docker image published to GHCR via `release.yml`
 - [ ] Nginx/reverse proxy routes `/` to the static bundle with HSTS +
       CSP headers
+- [ ] UAT deploy verification passes with `npm run verify:uat`
 
 ## Security
 
