@@ -17,6 +17,8 @@ jobs:
   verify-uat:
     name: Verify live UAT
     runs-on: ubuntu-latest
+    environment:
+      name: uat
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +50,7 @@ jobs:
           UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
           UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
           UAT_LOGIN_REQUIRED: ${{ secrets.UAT_LOGIN_REQUIRED }}
+          UAT_VERIFY_FETCH_ATTEMPTS: ${{ secrets.UAT_VERIFY_FETCH_ATTEMPTS }}
         run: npm run verify:uat
 
       - name: Summary

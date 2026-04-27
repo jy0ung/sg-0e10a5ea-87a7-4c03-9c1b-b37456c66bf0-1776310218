@@ -26,6 +26,7 @@ name: Deploy Image
 #   UAT_LOGIN_EMAIL         (optional, enables real browser login check)
 #   UAT_LOGIN_PASSWORD      (optional, enables real browser login check)
 #   UAT_LOGIN_REQUIRED      (optional, set to 1 to fail when login creds absent)
+#   UAT_VERIFY_FETCH_ATTEMPTS (optional, default 3)
 #
 # Host-side prerequisites (see docs/DEPLOY.md for full recipe):
 #   1. cloudflared tunnel route exposes the host's SSH port as a Public
@@ -200,6 +201,7 @@ jobs:
           UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
           UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
           UAT_LOGIN_REQUIRED: ${{ secrets.UAT_LOGIN_REQUIRED }}
+          UAT_VERIFY_FETCH_ATTEMPTS: ${{ secrets.UAT_VERIFY_FETCH_ATTEMPTS }}
         run: npm run verify:uat
 
       - name: Summary
