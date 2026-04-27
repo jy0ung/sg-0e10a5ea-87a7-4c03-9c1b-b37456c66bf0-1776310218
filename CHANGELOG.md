@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Phase 1 performance closeout: bundle budget enforcement, lazy `exceljs`
+  workbook loading, server-backed Vehicle Explorer filtering/sorting, UAT
+  deploy verification, and same-origin Supabase proxying for UAT.
 - Phase 3 (#19–#25): per-route `RouteErrorBoundary`, service-layer extraction
   for sales/inventory/purchasing/admin/tickets/executive dashboard, shared
   `@flc/hrms-services` package, auto-aging vehicle-bucket classifier,
@@ -22,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   security sign-off script, launch checklist.
 
 ### Changed
+- Replaced `xlsx` runtime usage with lazy-loaded `exceljs` in workbook import
+  and export paths.
+- Vehicle Explorer now uses the `search_vehicles` RPC for paginated search,
+  payment/stage filters, and sortable table columns with client fallback.
 - `handle_new_user` now ignores client-supplied role/company/access metadata.
 - Public signup disabled (`supabase/config.toml`).
 - RLS hardened on `vehicles`, `import_batches`, `quality_issues`,
@@ -29,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `branches`, and master-data tables.
 
 ### Security
+- Removed the accepted `xlsx` audit exception by replacing the dependency path.
 - Removed `company_id: 'default'` fallback in `AuthContext.fetchProfile`.
 - `send-push-notification` validates JWT + same-company target check.
 - CORS tightened to an explicit allow-list.

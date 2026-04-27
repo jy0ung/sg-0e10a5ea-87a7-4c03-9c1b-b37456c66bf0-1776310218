@@ -13,7 +13,7 @@ One-time gate before first production cutover. Every box must be checked.
 - [ ] Docker image published to GHCR via `release.yml`
 - [ ] Nginx/reverse proxy routes `/` to the static bundle with HSTS +
       CSP headers
-- [ ] UAT deploy verification passes with `npm run verify:uat`
+- [x] UAT deploy verification passes with `npm run verify:uat`
 
 ## Security
 
@@ -60,14 +60,8 @@ One-time gate before first production cutover. Every box must be checked.
 
 ## Performance
 
-- [ ] Load test at expected volumes passed:
-  - [ ] ≥ 100,000 vehicles
-  - [ ] ≥ 10,000 sales orders
-  - [ ] VehicleExplorer p95 < 2s with server-side pagination
-- [ ] Bundle-analyzer confirms vendor chunks within targets
-  - [ ] `vendor-react` < 150KB gz
-  - [ ] `vendor-ui` < 200KB gz
-  - [ ] `vendor-charts` lazy-loaded only on dashboard routes
+- [ ] Load test at expected volumes passed: 100,000 vehicles, 10,000 sales orders, VehicleExplorer p95 < 2s with server-side pagination
+- [x] Bundle budget gate confirms vendor chunks within targets: `vendor-react` < 150KB gz, `vendor-ui` < 200KB gz, and `vendor-charts` lazy-loaded only on dashboard routes
 
 ## Product
 
@@ -79,7 +73,7 @@ One-time gate before first production cutover. Every box must be checked.
 
 ## Process
 
-- [ ] Changeset / CHANGELOG entry for the release tag
+- [x] Changeset / CHANGELOG entry for the release tag
 - [ ] Rollback playbook tested (revert + re-deploy previous tag)
 - [ ] Backup + DR drill recorded (`docs/BACKUP_DR.md`)
 - [ ] RLS pen-test report filed

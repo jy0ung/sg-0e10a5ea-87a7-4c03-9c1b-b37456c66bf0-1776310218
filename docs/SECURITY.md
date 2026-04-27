@@ -63,7 +63,6 @@
 
 | Package | Severity | Advisory | Rationale | Mitigation |
 | --- | --- | --- | --- | --- |
-| `xlsx` | high | Prototype Pollution, ReDoS | No upstream fix on npm (SheetJS moved distribution). Used only by `src/lib/import-parser.ts` and `src/services/reportService.ts`. | Parsing runs only behind admin-gated import/report routes; file-name/size validation at upload. Replacement with `exceljs` tracked as follow-up. |
 | `esbuild`, `vite` (moderate) | moderate | Dev-server request leak | Affects local dev server only; production is a static bundle behind Nginx. | Bump to Vite 8 deferred to avoid churn during release; not exposed in prod. |
 | `jsdom`, `http-proxy-agent`, `@tootallnate/once` (low) | low | Transitive via Vitest/jsdom | Test runtime only; no production reach. | Will be resolved by the next minor bump to `jsdom` in vitest 4. |
 

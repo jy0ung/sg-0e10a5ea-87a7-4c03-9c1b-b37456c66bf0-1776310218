@@ -59,6 +59,23 @@ verification job.
 `UAT_LOGIN_EMAIL` and `UAT_LOGIN_PASSWORD` as UAT environment secrets to include
 the real browser login check in that automated deploy gate.
 
+## Phase 1 closure
+
+Phase 1 performance hardening is closed as of 2026-04-27. The release criteria
+are the default validation gates, bundle budget, and UAT deploy verifier:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build:budget
+npm run verify:uat
+```
+
+The remaining UAT follow-up is operational: add `UAT_LOGIN_EMAIL` and
+`UAT_LOGIN_PASSWORD` secrets so the automated verifier exercises a real browser
+login instead of skipping that optional check.
+
 ## Backups
 
 - Supabase PITR is enabled on staging and production.
