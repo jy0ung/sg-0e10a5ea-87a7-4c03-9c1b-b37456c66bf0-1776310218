@@ -83,8 +83,11 @@ login instead of skipping that optional check.
 
 ## Backups
 
-- Supabase PITR is enabled on staging and production.
-- A monthly restore-to-staging drill verifies backups.
+- Supabase PITR must be enabled on staging and production.
+- `db-backup.yml` creates nightly encrypted logical dumps once `SUPABASE_DB_URL`
+    and `DB_BACKUP_GPG_PASSPHRASE` are configured in the target environment.
+- A monthly restore-to-staging drill verifies backups and is recorded in
+    `docs/DR_DRILLS.md`.
 
 ## Phase 2 production readiness
 
@@ -101,5 +104,5 @@ Sentry release upload job. Track the full phase in
 - [ ] Sentry alert routes to on-call channel
 - [ ] Error budget defined per module
 - [ ] Load test at ≥100k vehicles / ≥10k orders
-- [ ] Incident response runbook linked from README
+- [x] Incident response runbook linked from README
 - [ ] `npm audit` + `osv-scanner` reports filed as issues

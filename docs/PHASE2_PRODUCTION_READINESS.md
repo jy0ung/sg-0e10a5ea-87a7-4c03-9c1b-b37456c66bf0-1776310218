@@ -33,3 +33,26 @@ npm run build
 - Run the expected-volume load test: 100,000 vehicles, 10,000 sales orders, and Vehicle Explorer p95 below 2 seconds with server-side pagination.
 - Confirm backup and restore operations: production PITR, nightly logical dump, and restore-to-staging drill.
 - Decide backend topology for UAT/staging/production: self-hosted Supabase behind same-origin proxy or public/cloud Supabase projects.
+
+## Slice 2: Operational Runbooks And Backups
+
+Scope:
+
+- Add the nightly encrypted logical dump workflow.
+- Document required backup secrets, optional S3 retention path, and restore-drill logging.
+- Add the incident response runbook.
+- Add the on-call process contract.
+- Link operational docs from README and launch checklist.
+
+Exit checks:
+
+```bash
+npm run verify:uat
+```
+
+Still requires external setup before production launch:
+
+- Configure production `SUPABASE_DB_URL` and `DB_BACKUP_GPG_PASSPHRASE` secrets.
+- Configure S3 backup destination or accept short-lived encrypted GitHub artifacts as a temporary fallback.
+- Fill the private live on-call rota.
+- Execute and record the first restore drill in `docs/DR_DRILLS.md`.

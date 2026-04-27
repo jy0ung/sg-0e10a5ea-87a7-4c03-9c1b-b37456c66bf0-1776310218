@@ -1,0 +1,127 @@
+name: Database Backup
+
+on:
+  schedule:
+    # Nightly at 18:30 UTC.
+    - cron: '30 18 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment whose database should be backed up'
+        type: choice
+        required: true
+        default: production
+        options:
+          - production
+          - uat
+          - staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup-${{ github.event.inputs.environment || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  logical-dump:
+    name: Logical dump (${{ github.event.inputs.environment || 'production' }})
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+    env:
+      TARGET_ENV: ${{ github.event.inputs.environment || 'production' }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      DB_BACKUP_GPG_PASSPHRASE: ${{ secrets.DB_BACKUP_GPG_PASSPHRASE }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION || 'ap-southeast-1' }}
+      DB_BACKUP_S3_BUCKET: ${{ secrets.DB_BACKUP_S3_BUCKET }}
+      DB_BACKUP_S3_PREFIX: ${{ secrets.DB_BACKUP_S3_PREFIX || 'flc-bi/db-backups' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install backup tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client gnupg
+
+      - name: Verify required secrets
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in SUPABASE_DB_URL DB_BACKUP_GPG_PASSPHRASE; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required secret: ${name}" >&2
+              missing=1
+            fi
+          done
+          if [[ "$missing" -ne 0 ]]; then
+            exit 1
+          fi
+
+      - name: Create encrypted logical dump
+        id: dump
+        run: |
+          set -euo pipefail
+          mkdir -p backup
+          timestamp="$(date -u +'%Y%m%dT%H%M%SZ')"
+          dump_file="backup/${TARGET_ENV}-${timestamp}.dump"
+          encrypted_file="${dump_file}.gpg"
+          checksum_file="${encrypted_file}.sha256"
+
+          pg_dump \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --file "$dump_file" \
+            "$SUPABASE_DB_URL"
+
+          gpg \
+            --batch \
+            --yes \
+            --pinentry-mode loopback \
+            --passphrase "$DB_BACKUP_GPG_PASSPHRASE" \
+            --symmetric \
+            --cipher-algo AES256 \
+            --output "$encrypted_file" \
+            "$dump_file"
+
+          rm -f "$dump_file"
+          sha256sum "$encrypted_file" > "$checksum_file"
+
+          echo "encrypted_file=${encrypted_file}" >> "$GITHUB_OUTPUT"
+          echo "checksum_file=${checksum_file}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$(basename "$encrypted_file")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload encrypted dump to S3
+        if: ${{ env.DB_BACKUP_S3_BUCKET != '' }}
+        run: |
+          set -euo pipefail
+          aws s3 cp "${{ steps.dump.outputs.encrypted_file }}" \
+            "s3://${DB_BACKUP_S3_BUCKET}/${DB_BACKUP_S3_PREFIX}/${TARGET_ENV}/${{ steps.dump.outputs.artifact_name }}" \
+            --sse AES256
+          aws s3 cp "${{ steps.dump.outputs.checksum_file }}" \
+            "s3://${DB_BACKUP_S3_BUCKET}/${DB_BACKUP_S3_PREFIX}/${TARGET_ENV}/${{ steps.dump.outputs.artifact_name }}.sha256" \
+            --sse AES256
+
+      - name: Upload encrypted dump artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.dump.outputs.artifact_name }}
+          path: |
+            ${{ steps.dump.outputs.encrypted_file }}
+            ${{ steps.dump.outputs.checksum_file }}
+          retention-days: 7
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Database Backup"
+            echo ""
+            echo "- Environment: \`${TARGET_ENV}\`"
+            echo "- Encrypted artifact: \`${{ steps.dump.outputs.artifact_name }}\`"
+            echo "- S3 upload configured: \`${DB_BACKUP_S3_BUCKET:+yes}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

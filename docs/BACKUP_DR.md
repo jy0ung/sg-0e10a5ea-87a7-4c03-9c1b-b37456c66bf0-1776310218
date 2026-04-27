@@ -17,10 +17,32 @@ Scope: Supabase Postgres data, storage buckets, edge function code, and configur
 
 ```bash
 # 1. Turn on PITR in the Supabase dashboard for staging and prod projects.
-# 2. Schedule the nightly logical dump via GitHub Actions
-#    (.github/workflows/db-backup.yml) using SUPABASE_DB_URL (service role).
+# 2. Configure .github/workflows/db-backup.yml with SUPABASE_DB_URL and
+#    DB_BACKUP_GPG_PASSPHRASE secrets in the target environment.
 # 3. Enable object versioning on every storage bucket.
 ```
+
+## Nightly logical dump workflow
+
+`.github/workflows/db-backup.yml` runs nightly and on manual dispatch. It uses
+`pg_dump --format=custom`, encrypts the dump with GPG before upload, writes a
+SHA-256 checksum, and optionally copies both files to S3 when the S3 secrets are
+configured.
+
+Required environment secrets:
+
+- `SUPABASE_DB_URL` — Postgres connection string for the target Supabase project.
+- `DB_BACKUP_GPG_PASSPHRASE` — passphrase used to symmetrically encrypt dumps.
+
+Optional environment secrets:
+
+- `DB_BACKUP_S3_BUCKET` — encrypted S3 destination bucket.
+- `DB_BACKUP_S3_PREFIX` — key prefix; defaults to `flc-bi/db-backups`.
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` — required only for S3 upload.
+
+If S3 is not configured, the workflow still uploads the encrypted dump and
+checksum as short-lived GitHub Actions artifacts. Treat those artifacts as
+sensitive even though the database content is encrypted.
 
 ## Restore drill (monthly)
 
@@ -28,7 +50,7 @@ Scope: Supabase Postgres data, storage buckets, edge function code, and configur
 2. Use the Supabase dashboard to restore the DB into a **new** staging project at T.
 3. Deploy the matching git tag to the restored project.
 4. Run the e2e smoke suite (`npm run test:e2e`) against the restored stack.
-5. Record pass/fail + duration in `docs/dr-drills.md` (not yet created).
+5. Record pass/fail + duration in `docs/DR_DRILLS.md`.
 6. Tear down the scratch staging project.
 
 Target RTO: ≤ 2 hours. Target RPO: ≤ 5 minutes (PITR granularity).

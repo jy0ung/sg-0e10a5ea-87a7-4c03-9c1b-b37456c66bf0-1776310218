@@ -10,6 +10,9 @@ This project is a Vite React application backed by a local Supabase stack for de
 - [RLS matrix](docs/RLS_MATRIX.md) — per-table policy posture
 - [Release flow](docs/RELEASE.md) — branches, CI gates, rollback
 - [Backup & DR](docs/BACKUP_DR.md) — PITR, restore drills, incident response
+- [Incident response](docs/INCIDENT_RESPONSE.md) — severity, roles, mitigation, postmortems
+- [On-call](docs/ONCALL.md) — alert ownership, triage, escalation, handoff
+- [DR drill log](docs/DR_DRILLS.md) — restore drill template and history
 - [Launch checklist](docs/LAUNCH_CHECKLIST.md) — one-time production gate
 
 ## Prerequisites

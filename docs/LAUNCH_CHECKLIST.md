@@ -52,12 +52,14 @@ One-time gate before first production cutover. Every box must be checked.
 ## Reliability
 
 - [ ] Supabase PITR enabled on production
-- [ ] Nightly logical dump job green
+- [x] Nightly logical dump workflow defined in `.github/workflows/db-backup.yml`
+- [ ] Nightly logical dump job green with production secrets configured
 - [ ] Monthly restore-to-staging drill scheduled
 - [ ] Uptime monitoring (StatusCake / BetterUptime) pinging `/health`
 - [ ] Error-budget policy documented per module
-- [ ] Incident response runbook linked from README
-- [ ] On-call rotation defined in `docs/ONCALL.md` (to be created)
+- [x] Incident response runbook linked from README
+- [x] On-call process defined in `docs/ONCALL.md`
+- [ ] Live on-call rota filled in private team calendar/tool
 
 ## Performance
 
@@ -76,6 +78,6 @@ One-time gate before first production cutover. Every box must be checked.
 
 - [x] Changeset / CHANGELOG entry for the release tag
 - [ ] Rollback playbook tested (revert + re-deploy previous tag)
-- [ ] Backup + DR drill recorded (`docs/BACKUP_DR.md`)
+- [ ] Backup + DR drill recorded (`docs/DR_DRILLS.md`)
 - [ ] RLS pen-test report filed
 - [ ] CLA / DPA in place if required for enterprise customers
