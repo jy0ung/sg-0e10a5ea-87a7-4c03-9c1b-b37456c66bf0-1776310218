@@ -319,7 +319,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-foreground font-bold text-sm leading-tight tracking-tight">FLC BI</p>
+              <p className="text-foreground font-bold text-sm leading-tight tracking-tight">Fook Loi UBS</p>
               <p className="text-[10px] text-muted-foreground leading-tight">Business Intelligence</p>
             </div>
           )}

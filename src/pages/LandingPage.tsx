@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { HeadphonesIcon, TicketCheck, ClipboardList, ArrowRight } from 'lucide-react';
 
 export default function LandingPage() {
@@ -14,7 +14,7 @@ export default function LandingPage() {
             <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-base">F</span>
             </div>
-            <span className="text-lg font-bold text-foreground">FLC BI</span>
+            <span className="text-lg font-bold text-foreground">Fook Loi Group UBS</span>
           </div>
           <Button asChild variant="outline" size="sm">
             <Link to="/login">Staff Sign In</Link>
@@ -28,10 +28,10 @@ export default function LandingPage() {
           <HeadphonesIcon className="h-8 w-8 text-primary" />
         </div>
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-          Welcome to FLC BI
+          Welcome to Fook Loi Group UBS
         </h1>
         <p className="mt-4 max-w-xl text-lg text-muted-foreground">
-          Your business intelligence platform for vehicle sales, inventory, and operations.
+          Your unified business system for vehicle sales, inventory, and operations.
           Need help? Access the customer service portal to raise and track support tickets.
         </p>
 
@@ -80,7 +80,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-6 text-center text-sm text-muted-foreground">
-        &copy; {new Date().getFullYear()} FLC BI. All rights reserved.
+        &copy; {new Date().getFullYear()} Fook Loi Group UBS. All rights reserved.
       </footer>
     </div>
   );

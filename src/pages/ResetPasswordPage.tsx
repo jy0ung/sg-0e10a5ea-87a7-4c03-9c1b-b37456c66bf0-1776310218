@@ -133,7 +133,7 @@ export default function ResetPasswordPage() {
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-lg">F</span>
             </div>
-            <h1 className="text-2xl font-bold text-foreground">FLC BI</h1>
+            <h1 className="text-2xl font-bold text-foreground">Fook Loi Group UBS</h1>
           </div>
           <p className="text-muted-foreground text-sm">Set your new password</p>
         </div>
