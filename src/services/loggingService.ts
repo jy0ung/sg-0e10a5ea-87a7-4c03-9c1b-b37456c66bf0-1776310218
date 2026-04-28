@@ -101,14 +101,15 @@ class LoggingService {
   }
 
   private async persistLog(entry: LogEntry) {
-    // Only persist logs in production
-    if (!this.isDevelopment) {
+    // Only persist authenticated production logs; unauthenticated login-page
+    // logs are kept client-side because RLS correctly rejects anonymous writes.
+    if (!this.isDevelopment && entry.userId) {
       try {
         const { error } = await supabase.from("application_logs").insert({
           level: entry.level,
           message: entry.message,
           context: entry.context || null,
-          user_id: entry.userId || null,
+          user_id: entry.userId,
           component: entry.component || null,
           created_at: entry.timestamp,
         });
