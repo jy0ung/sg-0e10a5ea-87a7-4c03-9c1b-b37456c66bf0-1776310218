@@ -54,6 +54,7 @@ export default function DealPipeline() {
           return (
             <div
               key={stage.id}
+              role="list"
               className={`flex-shrink-0 w-60 rounded-xl border border-border ${STAGE_COLORS[idx % STAGE_COLORS.length]} flex flex-col`}
               onDrop={e => handleDrop(e, stage.id)}
               onDragOver={handleDragOver}
@@ -89,6 +90,7 @@ export default function DealPipeline() {
 function OrderCard({ order, dragging, onDragStart }: { order: SalesOrder; dragging: boolean; onDragStart: (e: React.DragEvent, id: string) => void }) {
   return (
     <div
+      role="listitem"
       draggable
       onDragStart={e => onDragStart(e, order.id)}
       className={`rounded-lg border border-border bg-background p-2.5 cursor-grab active:cursor-grabbing transition-opacity ${dragging ? 'opacity-50' : ''}`}

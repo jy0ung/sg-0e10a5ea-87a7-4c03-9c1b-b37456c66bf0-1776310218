@@ -237,37 +237,37 @@ export default function VehicleTransfer() {
           <div className="space-y-3 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">From Branch *</label>
+                <label htmlFor="vehicle-transfer-from-branch" className="text-xs font-medium text-muted-foreground">From Branch *</label>
                 <Select value={form.fromBranch} onValueChange={v => setForm(f => ({ ...f, fromBranch: v }))}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectTrigger id="vehicle-transfer-from-branch" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>{branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">To Branch *</label>
+                <label htmlFor="vehicle-transfer-to-branch" className="text-xs font-medium text-muted-foreground">To Branch *</label>
                 <Select value={form.toBranch} onValueChange={v => setForm(f => ({ ...f, toBranch: v }))}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectTrigger id="vehicle-transfer-to-branch" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>{branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Chassis No *</label>
-              <Input className="h-8 text-sm uppercase" placeholder="e.g. PM00012345" value={form.chassisNo} onChange={e => setForm(f => ({ ...f, chassisNo: e.target.value }))} />
+              <label htmlFor="vehicle-transfer-chassis-no" className="text-xs font-medium text-muted-foreground">Chassis No *</label>
+              <Input id="vehicle-transfer-chassis-no" className="h-8 text-sm uppercase" placeholder="e.g. PM00012345" value={form.chassisNo} onChange={e => setForm(f => ({ ...f, chassisNo: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Model *</label>
-                <Input className="h-8 text-sm" placeholder="e.g. X50 1.5T" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} />
+                <label htmlFor="vehicle-transfer-model" className="text-xs font-medium text-muted-foreground">Model *</label>
+                <Input id="vehicle-transfer-model" className="h-8 text-sm" placeholder="e.g. X50 1.5T" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Colour</label>
-                <Input className="h-8 text-sm" placeholder="e.g. Jet White" value={form.colour} onChange={e => setForm(f => ({ ...f, colour: e.target.value }))} />
+                <label htmlFor="vehicle-transfer-colour" className="text-xs font-medium text-muted-foreground">Colour</label>
+                <Input id="vehicle-transfer-colour" className="h-8 text-sm" placeholder="e.g. Jet White" value={form.colour} onChange={e => setForm(f => ({ ...f, colour: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Remark</label>
-              <Input className="h-8 text-sm" placeholder="Optional note" value={form.remark} onChange={e => setForm(f => ({ ...f, remark: e.target.value }))} />
+              <label htmlFor="vehicle-transfer-remark" className="text-xs font-medium text-muted-foreground">Remark</label>
+              <Input id="vehicle-transfer-remark" className="h-8 text-sm" placeholder="Optional note" value={form.remark} onChange={e => setForm(f => ({ ...f, remark: e.target.value }))} />
             </div>
           </div>
           <DialogFooter className="mt-4">

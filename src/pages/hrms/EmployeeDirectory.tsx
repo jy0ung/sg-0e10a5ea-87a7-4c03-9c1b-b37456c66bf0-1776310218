@@ -60,6 +60,8 @@ const STATUS_BADGE: Record<EmployeeStatus, string> = {
 // Roles that can manage employees (add/edit/deactivate) — sourced from hrmsConfig
 const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 const UNASSIGNED_MANAGER = '__unassigned__';
+const NO_DEPARTMENT = '__none_department__';
+const NO_JOB_TITLE = '__none_job_title__';
 
 // ─── Form state ───────────────────────────────────────────────────────────────
 
@@ -461,8 +463,9 @@ export default function EmployeeDirectory() {
           <div className="space-y-3 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Staff Code *</label>
+                <label htmlFor="employee-add-staff-code" className="text-xs font-medium text-muted-foreground">Staff Code *</label>
                 <Input
+                  id="employee-add-staff-code"
                   className="h-8 text-sm uppercase"
                   placeholder="e.g. SA001"
                   value={form.staffCode}
@@ -470,9 +473,9 @@ export default function EmployeeDirectory() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Role *</label>
+                <label htmlFor="employee-add-role" className="text-xs font-medium text-muted-foreground">Role *</label>
                 <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v as AppRole }))}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="employee-add-role" className="h-8 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ALL_ROLES.map(r => (
                       <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>
@@ -483,8 +486,9 @@ export default function EmployeeDirectory() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Full Name *</label>
+              <label htmlFor="employee-add-name" className="text-xs font-medium text-muted-foreground">Full Name *</label>
               <Input
+                id="employee-add-name"
                 className="h-8 text-sm"
                 placeholder="e.g. Ahmad bin Ibrahim"
                 value={form.name}
@@ -494,17 +498,18 @@ export default function EmployeeDirectory() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Branch</label>
+                <label htmlFor="employee-add-branch" className="text-xs font-medium text-muted-foreground">Branch</label>
                 <Select value={form.branch} onValueChange={v => setForm(f => ({ ...f, branch: v }))}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectTrigger id="employee-add-branch" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>
                     {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.code}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Join Date</label>
+                <label htmlFor="employee-add-join-date" className="text-xs font-medium text-muted-foreground">Join Date</label>
                 <Input
+                  id="employee-add-join-date"
                   type="date"
                   className="h-8 text-sm"
                   value={form.joinDate}
@@ -514,12 +519,12 @@ export default function EmployeeDirectory() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Reporting Manager</label>
+              <label htmlFor="employee-add-manager" className="text-xs font-medium text-muted-foreground">Reporting Manager</label>
               <Select
                 value={form.managerId || UNASSIGNED_MANAGER}
                 onValueChange={value => setForm(f => ({ ...f, managerId: value === UNASSIGNED_MANAGER ? '' : value }))}
               >
-                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <SelectTrigger id="employee-add-manager" className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={UNASSIGNED_MANAGER}>Unassigned</SelectItem>
                   {getManagerOptions().map(manager => (
@@ -533,8 +538,9 @@ export default function EmployeeDirectory() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">IC Number</label>
+                <label htmlFor="employee-add-ic" className="text-xs font-medium text-muted-foreground">IC Number</label>
                 <Input
+                  id="employee-add-ic"
                   className="h-8 text-sm"
                   placeholder="e.g. 900101-12-1234"
                   value={form.ic}
@@ -542,8 +548,9 @@ export default function EmployeeDirectory() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Contact No</label>
+                <label htmlFor="employee-add-contact" className="text-xs font-medium text-muted-foreground">Contact No</label>
                 <Input
+                  id="employee-add-contact"
                   className="h-8 text-sm"
                   placeholder="e.g. 012-3456789"
                   value={form.contact}
@@ -553,8 +560,9 @@ export default function EmployeeDirectory() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Email</label>
+              <label htmlFor="employee-add-email" className="text-xs font-medium text-muted-foreground">Email</label>
               <Input
+                id="employee-add-email"
                 type="email"
                 className="h-8 text-sm"
                 placeholder="staff@company.com"
@@ -582,20 +590,21 @@ export default function EmployeeDirectory() {
             <div className="space-y-3 mt-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Staff Code</label>
+                  <label htmlFor="employee-edit-staff-code" className="text-xs font-medium text-muted-foreground">Staff Code</label>
                   <Input
+                    id="employee-edit-staff-code"
                     className="h-8 text-sm uppercase"
                     value={editForm.staffCode}
                     onChange={e => setEditForm(f => f ? { ...f, staffCode: e.target.value } : f)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Role</label>
+                  <label htmlFor="employee-edit-role" className="text-xs font-medium text-muted-foreground">Role</label>
                   <Select
                     value={editForm.role}
                     onValueChange={v => setEditForm(f => f ? { ...f, role: v as AppRole } : f)}
                   >
-                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="employee-edit-role" className="h-8 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {ALL_ROLES.map(r => (
                         <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>
@@ -606,8 +615,9 @@ export default function EmployeeDirectory() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Full Name</label>
+                <label htmlFor="employee-edit-name" className="text-xs font-medium text-muted-foreground">Full Name</label>
                 <Input
+                  id="employee-edit-name"
                   className="h-8 text-sm"
                   value={editForm.name}
                   onChange={e => setEditForm(f => f ? { ...f, name: e.target.value } : f)}
@@ -616,14 +626,18 @@ export default function EmployeeDirectory() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Department</label>
+                  <label htmlFor="employee-edit-department" className="text-xs font-medium text-muted-foreground">Department</label>
                   <Select
-                    value={editForm.departmentId}
-                    onValueChange={v => setEditForm(f => f ? { ...f, departmentId: v, jobTitleId: '' } : f)}
+                    value={editForm.departmentId || NO_DEPARTMENT}
+                    onValueChange={v => setEditForm(f => f ? {
+                      ...f,
+                      departmentId: v === NO_DEPARTMENT ? '' : v,
+                      jobTitleId: '',
+                    } : f)}
                   >
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectTrigger id="employee-edit-department" className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value={NO_DEPARTMENT}>None</SelectItem>
                       {departments.filter(d => d.isActive).map(d => (
                         <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                       ))}
@@ -631,14 +645,14 @@ export default function EmployeeDirectory() {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Job Title</label>
+                  <label htmlFor="employee-edit-job-title" className="text-xs font-medium text-muted-foreground">Job Title</label>
                   <Select
-                    value={editForm.jobTitleId}
-                    onValueChange={v => setEditForm(f => f ? { ...f, jobTitleId: v } : f)}
+                    value={editForm.jobTitleId || NO_JOB_TITLE}
+                    onValueChange={v => setEditForm(f => f ? { ...f, jobTitleId: v === NO_JOB_TITLE ? '' : v } : f)}
                   >
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
+                    <SelectTrigger id="employee-edit-job-title" className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value={NO_JOB_TITLE}>None</SelectItem>
                       {jobTitles
                         .filter(jt => jt.isActive && (!editForm.departmentId || jt.departmentId === editForm.departmentId || !jt.departmentId))
                         .map(jt => (
@@ -651,24 +665,24 @@ export default function EmployeeDirectory() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Branch</label>
+                  <label htmlFor="employee-edit-branch" className="text-xs font-medium text-muted-foreground">Branch</label>
                   <Select
                     value={editForm.branch}
                     onValueChange={v => setEditForm(f => f ? { ...f, branch: v } : f)}
                   >
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                    <SelectTrigger id="employee-edit-branch" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
                     <SelectContent>
                       {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.code}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Status</label>
+                  <label htmlFor="employee-edit-status" className="text-xs font-medium text-muted-foreground">Status</label>
                   <Select
                     value={editForm.status}
                     onValueChange={v => setEditForm(f => f ? { ...f, status: v as EmployeeStatus } : f)}
                   >
-                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="employee-edit-status" className="h-8 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="inactive">Inactive</SelectItem>
@@ -679,12 +693,12 @@ export default function EmployeeDirectory() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Reporting Manager</label>
+                <label htmlFor="employee-edit-manager" className="text-xs font-medium text-muted-foreground">Reporting Manager</label>
                 <Select
                   value={editForm.managerId || UNASSIGNED_MANAGER}
                   onValueChange={value => setEditForm(f => f ? { ...f, managerId: value === UNASSIGNED_MANAGER ? '' : value } : f)}
                 >
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectTrigger id="employee-edit-manager" className="h-8 text-sm"><SelectValue placeholder="Unassigned" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={UNASSIGNED_MANAGER}>Unassigned</SelectItem>
                     {getManagerOptions(editForm.managerId)
@@ -700,16 +714,18 @@ export default function EmployeeDirectory() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">IC Number</label>
+                  <label htmlFor="employee-edit-ic" className="text-xs font-medium text-muted-foreground">IC Number</label>
                   <Input
+                    id="employee-edit-ic"
                     className="h-8 text-sm"
                     value={editForm.ic}
                     onChange={e => setEditForm(f => f ? { ...f, ic: e.target.value } : f)}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Contact No</label>
+                  <label htmlFor="employee-edit-contact" className="text-xs font-medium text-muted-foreground">Contact No</label>
                   <Input
+                    id="employee-edit-contact"
                     className="h-8 text-sm"
                     value={editForm.contact}
                     onChange={e => setEditForm(f => f ? { ...f, contact: e.target.value } : f)}
@@ -719,8 +735,9 @@ export default function EmployeeDirectory() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <label htmlFor="employee-edit-email" className="text-xs font-medium text-muted-foreground">Email</label>
                   <Input
+                    id="employee-edit-email"
                     type="email"
                     className="h-8 text-sm"
                     value={editForm.email}
@@ -731,8 +748,9 @@ export default function EmployeeDirectory() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Join Date</label>
+                  <label htmlFor="employee-edit-join-date" className="text-xs font-medium text-muted-foreground">Join Date</label>
                   <Input
+                    id="employee-edit-join-date"
                     type="date"
                     className="h-8 text-sm"
                     value={editForm.joinDate}
@@ -740,8 +758,9 @@ export default function EmployeeDirectory() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Resign Date</label>
+                  <label htmlFor="employee-edit-resign-date" className="text-xs font-medium text-muted-foreground">Resign Date</label>
                   <Input
+                    id="employee-edit-resign-date"
                     type="date"
                     className="h-8 text-sm"
                     value={editForm.resignDate}

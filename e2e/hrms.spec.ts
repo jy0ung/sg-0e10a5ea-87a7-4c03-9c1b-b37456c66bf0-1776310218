@@ -13,12 +13,13 @@ import { setupAuthMocks, SUPABASE_URL, MOCK_PROFILE } from "./helpers/auth-mock"
 const MOCK_EMPLOYEES = [
   {
     id: "emp-001",
-    email: "ahmad@flc.test",
+    work_email: "ahmad@flc.test",
+    personal_email: null,
     name: "Ahmad Ibrahim",
-    role: "sales",
+    primary_role: "sales",
     company_id: MOCK_PROFILE.company_id,
     branch_id: "br-001",
-    manager_id: "emp-004",
+    manager_employee_id: "emp-004",
     status: "active",
     staff_code: "SA001",
     ic_no: "900101-12-1234",
@@ -26,15 +27,20 @@ const MOCK_EMPLOYEES = [
     join_date: "2022-01-15",
     resign_date: null,
     avatar_url: null,
+    department_id: null,
+    job_title_id: null,
+    department: null,
+    job_title: null,
   },
   {
     id: "emp-002",
-    email: "siti@flc.test",
+    work_email: "siti@flc.test",
+    personal_email: null,
     name: "Siti Rahimah",
-    role: "manager",
+    primary_role: "manager",
     company_id: MOCK_PROFILE.company_id,
     branch_id: "br-002",
-    manager_id: null,
+    manager_employee_id: null,
     status: "inactive",
     staff_code: "MGR001",
     ic_no: "850202-14-5678",
@@ -42,15 +48,20 @@ const MOCK_EMPLOYEES = [
     join_date: "2019-06-01",
     resign_date: null,
     avatar_url: null,
+    department_id: null,
+    job_title_id: null,
+    department: null,
+    job_title: null,
   },
   {
     id: "emp-003",
-    email: "david@flc.test",
+    work_email: "david@flc.test",
+    personal_email: null,
     name: "David Lim",
-    role: "accounts",
+    primary_role: "accounts",
     company_id: MOCK_PROFILE.company_id,
     branch_id: "br-001",
-    manager_id: null,
+    manager_employee_id: null,
     status: "resigned",
     staff_code: "ACC001",
     ic_no: null,
@@ -58,15 +69,20 @@ const MOCK_EMPLOYEES = [
     join_date: "2018-03-10",
     resign_date: "2024-12-31",
     avatar_url: null,
+    department_id: null,
+    job_title_id: null,
+    department: null,
+    job_title: null,
   },
   {
     id: "emp-004",
-    email: "farid@flc.test",
+    work_email: "farid@flc.test",
+    personal_email: null,
     name: "Farid Noor",
-    role: "general_manager",
+    primary_role: "general_manager",
     company_id: MOCK_PROFILE.company_id,
     branch_id: "br-001",
-    manager_id: null,
+    manager_employee_id: null,
     status: "active",
     staff_code: "GM001",
     ic_no: "800101-10-1111",
@@ -74,6 +90,10 @@ const MOCK_EMPLOYEES = [
     join_date: "2017-02-20",
     resign_date: null,
     avatar_url: null,
+    department_id: null,
+    job_title_id: null,
+    department: null,
+    job_title: null,
   },
 ];
 
@@ -98,10 +118,20 @@ async function setupHrmsMocks(page: import("@playwright/test").Page) {
     }
   });
 
-  // Mock profiles table for employee LIST queries only (company_id filter).
-  // Auth profile fetch (id=eq.<userId>) is handled by setupAuthMocks and returns MOCK_PROFILE.
-  // We register this AFTER setupAuthMocks so it has HIGHER Playwright priority (LIFO),
-  // but we only intercept requests that include "company_id=eq." — otherwise we fall through.
+  // Mock employees table for Employee Directory list queries.
+  await page.route(`${SUPABASE_URL}/rest/v1/employees*`, (route) => {
+    if (route.request().method() === "GET") {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_EMPLOYEES),
+      });
+    } else {
+      route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+    }
+  });
+
+  // Mock profiles table for auth profile fetches and profile-id lookups.
   await page.route(`${SUPABASE_URL}/rest/v1/profiles*`, (route) => {
     const url = route.request().url();
     const method = route.request().method();
@@ -111,12 +141,15 @@ async function setupHrmsMocks(page: import("@playwright/test").Page) {
       return;
     }
 
-    if (url.includes("company_id=eq.")) {
-      // This is the HRMS employee list query → return full mock employees
+    if (url.includes("employee_id=in.")) {
+      const linkedProfiles = MOCK_EMPLOYEES.map((employee) => ({
+        id: employee.id,
+        employee_id: employee.id,
+      }));
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(MOCK_EMPLOYEES),
+        body: JSON.stringify(linkedProfiles),
       });
     } else {
       // Auth profile fetch or any other profiles query — delegate to the
@@ -258,10 +291,11 @@ test.describe("HRMS – Employee Directory", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
     await page.locator("button").filter({ hasText: /new employee/i }).click();
-    await expect(page.locator("input[placeholder*='SA001']")).toBeVisible({ timeout: 5000 });
+    const dialog = page.locator("[role='dialog']");
+    await expect(dialog.locator("input[placeholder*='SA001']")).toBeVisible({ timeout: 5000 });
 
     await page.locator("button").filter({ hasText: /^cancel$/i }).click();
-    await expect(page.locator("input[placeholder*='SA001']")).not.toBeVisible({ timeout: 3000 });
+    await expect(dialog).not.toBeVisible({ timeout: 3000 });
   });
 
   test("Edit button opens edit dialog for an employee", async ({ page }) => {
@@ -315,7 +349,7 @@ test.describe("Module Directory – HRMS card", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
     // Click the HRMS module card
-    await page.locator("[role='button']").filter({ hasText: /hrms/i }).first().click();
+    await page.getByRole("button", { name: /hrms/i }).click();
     await expect(page).toHaveURL(/\/hrms\/employees/, { timeout: 8000 });
   });
 });
@@ -331,9 +365,9 @@ test.describe("Sidebar – HRMS navigation", () => {
     await page.goto("/");
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
-    // HRMS section header button should be visible for super_admin
+    // HRMS top-level sidebar link should be visible for super_admin
     await expect(
-      page.locator("button").filter({ hasText: /^hrms$/i }).first()
+      page.locator("a").filter({ hasText: /^hrms$/i }).first()
     ).toBeVisible({ timeout: 8000 });
   });
 
@@ -341,8 +375,7 @@ test.describe("Sidebar – HRMS navigation", () => {
     await page.goto("/");
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
-    // Section header with a path defined navigates directly on click
-    await page.locator("button").filter({ hasText: /^hrms$/i }).first().click();
+    await page.locator("a").filter({ hasText: /^hrms$/i }).first().click();
     await expect(page).toHaveURL(/\/hrms\/employees/, { timeout: 8000 });
   });
 
@@ -444,8 +477,8 @@ test.describe("HRMS – Leave Management", () => {
 
     // MOCK_PROFILE is super_admin — should see action buttons for pending requests
     await expect(page.locator("text=Siti Rahimah")).toBeVisible({ timeout: 8000 });
-    const pendingSection = page.locator("tr, [data-testid]").filter({ hasText: "Siti Rahimah" }).first();
-    await expect(pendingSection.locator("button").filter({ hasText: /approve/i })).toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole("button", { name: "Approve", exact: true })).toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole("button", { name: "Reject", exact: true })).toBeVisible({ timeout: 3000 });
   });
 });
 
@@ -511,7 +544,7 @@ test.describe("HRMS – Attendance Log", () => {
     await page.goto("/hrms/attendance");
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
-    await page.locator("button").filter({ hasText: /log.?attendance|add.?attendance/i }).first().click();
+    await page.locator("button").filter({ hasText: /mark.?attendance|log.?attendance|add.?attendance/i }).first().click();
     await expect(page.locator("[role='dialog']")).toBeVisible({ timeout: 5000 });
   });
 });
@@ -579,12 +612,10 @@ test.describe("HRMS – Payroll Summary", () => {
 
 const MOCK_APPRAISALS = [
   {
-    id: "ap-001", company_id: MOCK_PROFILE.company_id, employee_id: "emp-001",
-    reviewer_id: MOCK_PROFILE.id, cycle_id: null,
-    period_label: "H1 2024", status: "draft",
-    overall_score: null, comments: null,
+    id: "ap-001", company_id: MOCK_PROFILE.company_id,
+    title: "H1 2024 Performance Review", cycle: "mid_year",
+    period_start: "2024-01-01", period_end: "2024-06-30", status: "open",
     created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z",
-    profiles: { name: "Ahmad Ibrahim" },
   },
 ];
 
@@ -627,8 +658,8 @@ test.describe("HRMS – Performance Appraisals", () => {
     await page.goto("/hrms/appraisals");
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
-    await expect(page.locator("text=Ahmad Ibrahim")).toBeVisible({ timeout: 8000 });
     await expect(page.locator("text=H1 2024")).toBeVisible({ timeout: 8000 });
+    await expect(page.locator("text=/mid year/i")).toBeVisible({ timeout: 8000 });
   });
 });
 
@@ -648,7 +679,7 @@ const MOCK_ANNOUNCEMENTS = [
     id: "ann-002", company_id: MOCK_PROFILE.company_id,
     author_id: MOCK_PROFILE.id,
     title: "Public Holiday Reminder", body: "Office closed on Hari Raya.",
-    category: "hr", priority: "high", pinned: true,
+    category: "holiday", priority: "high", pinned: true,
     published_at: "2024-06-05T08:00:00Z", expires_at: null,
     created_at: "2024-06-05T00:00:00Z", updated_at: "2024-06-05T00:00:00Z",
     profiles: { name: "Super Admin" },
@@ -691,19 +722,17 @@ test.describe("HRMS – Announcements", () => {
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
     // "Public Holiday Reminder" is pinned — expect a pin indicator
-    await expect(page.locator("text=Public Holiday Reminder")).toBeVisible({ timeout: 8000 });
-    await expect(page.locator("[data-pinned='true'], .pinned, [aria-label*='pinned']").first()
-      .or(page.locator("text=/pinned/i").first())).toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole("heading", { name: /public holiday reminder/i })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText("high")).toBeVisible({ timeout: 3000 });
   });
 
-  test("category filter shows only HR announcements", async ({ page }) => {
+  test("category filter shows only holiday announcements", async ({ page }) => {
     await page.goto("/hrms/announcements");
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
 
     await expect(page.locator("text=System Maintenance Notice")).toBeVisible({ timeout: 8000 });
 
-    // Click HR category filter
-    await page.locator("button, [role='tab']").filter({ hasText: /^hr$/i }).first().click();
+    await page.locator("button, [role='tab']").filter({ hasText: /holiday/i }).first().click();
 
     await expect(page.locator("text=Public Holiday Reminder")).toBeVisible({ timeout: 3000 });
     await expect(page.locator("text=System Maintenance Notice")).not.toBeVisible({ timeout: 3000 });

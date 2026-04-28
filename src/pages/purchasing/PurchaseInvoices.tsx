@@ -240,35 +240,35 @@ export default function PurchaseInvoices() {
           <div className="space-y-3 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Invoice No *</label>
-                <Input className="h-8 text-sm" placeholder="e.g. PI-2026-001" value={form.invoiceNo} onChange={e => setForm(f => ({ ...f, invoiceNo: e.target.value }))} />
+                <label htmlFor="purchase-invoice-no" className="text-xs font-medium text-muted-foreground">Invoice No *</label>
+                <Input id="purchase-invoice-no" className="h-8 text-sm" placeholder="e.g. PI-2026-001" value={form.invoiceNo} onChange={e => setForm(f => ({ ...f, invoiceNo: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Invoice Date *</label>
-                <Input type="date" className="h-8 text-sm" value={form.invoiceDate} onChange={e => setForm(f => ({ ...f, invoiceDate: e.target.value }))} />
+                <label htmlFor="purchase-invoice-date" className="text-xs font-medium text-muted-foreground">Invoice Date *</label>
+                <Input id="purchase-invoice-date" type="date" className="h-8 text-sm" value={form.invoiceDate} onChange={e => setForm(f => ({ ...f, invoiceDate: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Supplier *</label>
-              <Input className="h-8 text-sm" placeholder="e.g. Proton Edar Sdn Bhd" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} />
+              <label htmlFor="purchase-invoice-supplier" className="text-xs font-medium text-muted-foreground">Supplier *</label>
+              <Input id="purchase-invoice-supplier" className="h-8 text-sm" placeholder="e.g. Proton Edar Sdn Bhd" value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Chassis No *</label>
-                <Input className="h-8 text-sm uppercase" placeholder="e.g. PM00012345" value={form.chassisNo} onChange={e => setForm(f => ({ ...f, chassisNo: e.target.value }))} />
+                <label htmlFor="purchase-invoice-chassis-no" className="text-xs font-medium text-muted-foreground">Chassis No *</label>
+                <Input id="purchase-invoice-chassis-no" className="h-8 text-sm uppercase" placeholder="e.g. PM00012345" value={form.chassisNo} onChange={e => setForm(f => ({ ...f, chassisNo: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Model *</label>
-                <Input className="h-8 text-sm" placeholder="e.g. X50 1.5T Premium" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} />
+                <label htmlFor="purchase-invoice-model" className="text-xs font-medium text-muted-foreground">Model *</label>
+                <Input id="purchase-invoice-model" className="h-8 text-sm" placeholder="e.g. X50 1.5T Premium" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Amount (RM) *</label>
-              <Input type="number" className="h-8 text-sm" placeholder="e.g. 85000.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} />
+              <label htmlFor="purchase-invoice-amount" className="text-xs font-medium text-muted-foreground">Amount (RM) *</label>
+              <Input id="purchase-invoice-amount" type="number" className="h-8 text-sm" placeholder="e.g. 85000.00" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Remark</label>
-              <Input className="h-8 text-sm" placeholder="Optional note" value={form.remark} onChange={e => setForm(f => ({ ...f, remark: e.target.value }))} />
+              <label htmlFor="purchase-invoice-remark" className="text-xs font-medium text-muted-foreground">Remark</label>
+              <Input id="purchase-invoice-remark" className="h-8 text-sm" placeholder="Optional note" value={form.remark} onChange={e => setForm(f => ({ ...f, remark: e.target.value }))} />
             </div>
           </div>
           <DialogFooter className="mt-4">

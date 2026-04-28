@@ -204,23 +204,23 @@ export default function SalesOrders() {
               { field: 'plateNo', label: 'Plate No' },
             ].map(({ field, label, type }) => (
               <div key={field} className="space-y-1">
-                <label className="text-xs text-muted-foreground">{label}</label>
-                <Input type={type ?? 'text'} className="h-8 text-sm" value={form[field as keyof typeof form]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
+                <label htmlFor={`sales-order-${field}`} className="text-xs text-muted-foreground">{label}</label>
+                <Input id={`sales-order-${field}`} type={type ?? 'text'} className="h-8 text-sm" value={form[field as keyof typeof form]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
               </div>
             ))}
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Customer *</label>
+              <label htmlFor="sales-order-customer" className="text-xs text-muted-foreground">Customer *</label>
               <Select value={form.customerId} onValueChange={v => setForm(f => ({ ...f, customerId: v }))}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectTrigger id="sales-order-customer" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent>
                   {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Status</label>
+              <label htmlFor="sales-order-status" className="text-xs text-muted-foreground">Status</label>
               <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v as SalesOrderStatus }))}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="sales-order-status" className="h-8 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
               </Select>
             </div>
@@ -238,8 +238,8 @@ export default function SalesOrders() {
           <DialogHeader><DialogTitle>Create Auto Aging BG Entry</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground">Order: {linkOrder?.orderNo} — {linkOrder?.model}</p>
           <div className="space-y-2 py-2">
-            <label className="text-xs font-medium text-muted-foreground">Chassis Number *</label>
-            <Input className="h-8 text-sm font-mono" placeholder="e.g. PM00A1234" value={chassisNo} onChange={e => setChassisNo(e.target.value)} />
+            <label htmlFor="sales-order-bg-chassis-no" className="text-xs font-medium text-muted-foreground">Chassis Number *</label>
+            <Input id="sales-order-bg-chassis-no" className="h-8 text-sm font-mono" placeholder="e.g. PM00A1234" value={chassisNo} onChange={e => setChassisNo(e.target.value)} />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLinkOpen(false)}>Cancel</Button>

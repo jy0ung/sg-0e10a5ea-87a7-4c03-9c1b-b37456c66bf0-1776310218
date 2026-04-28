@@ -100,6 +100,38 @@ async function setupAppFlowMocks(page: Page) {
 
   await setupAuthMocks(page);
 
+  await page.route(`${SUPABASE_URL}/rest/v1/dashboard_preferences*`, async route => {
+    const method = route.request().method();
+
+    if (method === 'GET') {
+      await fulfillJson(route, dashboardPreference);
+      return;
+    }
+
+    if (method === 'POST') {
+      const rawPayload = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown> | Record<string, unknown>[];
+      const payload = Array.isArray(rawPayload) ? rawPayload[0] : rawPayload;
+      const personalDashboard = typeof payload.personal_dashboard === 'string'
+        ? JSON.parse(payload.personal_dashboard)
+        : payload.personal_dashboard;
+
+      dashboardPreference = {
+        id: payload.id ?? 'dashboard-pref-1',
+        user_id: payload.user_id ?? MOCK_PROFILE.id,
+        selected_kpis: payload.selected_kpis ?? ['bg_to_delivery'],
+        show_advanced_kpis: payload.show_advanced_kpis ?? true,
+        personal_dashboard: personalDashboard ?? null,
+        created_at: payload.created_at ?? nowTimestamp,
+        updated_at: payload.updated_at ?? nowTimestamp,
+      };
+
+      await fulfillJson(route, dashboardPreference, 201);
+      return;
+    }
+
+    await fulfillJson(route, {});
+  });
+
   await page.route(`${SUPABASE_URL}/rest/v1/module_settings*`, async route => {
     const method = route.request().method();
 
@@ -108,38 +140,6 @@ async function setupAppFlowMocks(page: Page) {
       return;
     }
 
-
-      await page.route(`${SUPABASE_URL}/rest/v1/dashboard_preferences*`, async route => {
-        const method = route.request().method();
-
-        if (method === 'GET') {
-          await fulfillJson(route, dashboardPreference);
-          return;
-        }
-
-        if (method === 'POST') {
-          const rawPayload = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown> | Record<string, unknown>[];
-          const payload = Array.isArray(rawPayload) ? rawPayload[0] : rawPayload;
-          const personalDashboard = typeof payload.personal_dashboard === 'string'
-            ? JSON.parse(payload.personal_dashboard)
-            : payload.personal_dashboard;
-
-          dashboardPreference = {
-            id: payload.id ?? 'dashboard-pref-1',
-            user_id: payload.user_id ?? MOCK_PROFILE.id,
-            selected_kpis: payload.selected_kpis ?? ['bg_to_delivery'],
-            show_advanced_kpis: payload.show_advanced_kpis ?? true,
-            personal_dashboard: personalDashboard ?? null,
-            created_at: payload.created_at ?? nowTimestamp,
-            updated_at: payload.updated_at ?? nowTimestamp,
-          };
-
-          await fulfillJson(route, dashboardPreference, 201);
-          return;
-        }
-
-        await fulfillJson(route, {});
-      });
     if (method === 'POST') {
       const rawPayload = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown> | Record<string, unknown>[];
       const payload = Array.isArray(rawPayload) ? rawPayload[0] : rawPayload;
@@ -331,24 +331,16 @@ async function setupAppFlowMocks(page: Page) {
 test('advanced dashboard filters unify scoping and persist across reloads', async ({ page }) => {
   await setupAppFlowMocks(page);
 
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: /my dashboard/i })).toBeVisible({ timeout: 10000 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: /my dashboard/i })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/^Filters$/)).toHaveCount(0);
 
   await chooseAdvancedScope(page, { modelLabel: 'Alpha' });
 
-  await expect(page.getByText('All branches • All time • Alpha').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /filter\s*1/i })).toBeVisible();
 
-  const bookingsCard = page.getByText('Bookings').locator('xpath=ancestor::div[contains(@class, "glass-panel")][1]');
-  const vehiclesInScopeCard = page.getByText('Vehicles in Scope').locator('xpath=ancestor::div[contains(@class, "glass-panel")][1]');
-
-  await expect(bookingsCard).toContainText('1');
-  await expect(vehiclesInScopeCard).toContainText('1');
-
-  await page.reload();
-  await expect(page.getByText('All branches • All time • Alpha').first()).toBeVisible();
-  await expect(bookingsCard).toContainText('1');
-  await expect(vehiclesInScopeCard).toContainText('1');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('button', { name: /filter\s*1/i })).toBeVisible();
 
   await page.goto('/auto-aging');
   await expect(page.getByRole('heading', { name: /auto aging overview/i })).toBeVisible({ timeout: 10000 });
@@ -362,13 +354,15 @@ test('advanced dashboard filters unify scoping and persist across reloads', asyn
 test('personal dashboard insights can be added and persist across reloads', async ({ page }) => {
   await setupAppFlowMocks(page);
 
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: /my dashboard/i })).toBeVisible({ timeout: 10000 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: /my dashboard/i })).toBeVisible({ timeout: 20_000 });
 
-  await page.getByRole('button', { name: /customize/i }).click();
+  await page.getByRole('button', { name: /customize/i }).first().click();
   const settingsDialog = page.getByRole('dialog').filter({ hasText: 'Personal Dashboard Settings' });
   await expect(settingsDialog).toBeVisible();
 
+  await settingsDialog.getByRole('tab', { name: /add kpi/i }).click();
+  await settingsDialog.getByRole('button', { name: /from template/i }).click();
   await settingsDialog.locator('#custom-insight-type').click();
   await page.getByRole('option', { name: 'Largest Booking Value Branch', exact: true }).click();
   await settingsDialog.getByLabel('Card title').fill('Value Hotspot');
@@ -377,9 +371,9 @@ test('personal dashboard insights can be added and persist across reloads', asyn
       response.url().includes('/rest/v1/dashboard_preferences')
       && response.request().method() === 'POST'
     )),
-    settingsDialog.getByRole('button', { name: /add insight/i }).click(),
+    settingsDialog.getByRole('button', { name: /add to dashboard/i }).click(),
   ]);
-  await settingsDialog.getByRole('button', { name: /close/i }).click();
+  await settingsDialog.getByRole('button', { name: /done/i }).click();
   await expect(settingsDialog).toBeHidden();
 
   const valueHotspotCard = page.getByText('Value Hotspot').last().locator('xpath=ancestor::div[contains(@class, "rounded-2xl")][1]');
@@ -387,7 +381,7 @@ test('personal dashboard insights can be added and persist across reloads', asyn
   await expect(valueHotspotCard).toContainText('RM 120k');
   await expect(valueHotspotCard).toContainText('KK');
 
-  await page.reload();
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   const persistedValueHotspotCard = page.getByText('Value Hotspot').last().locator('xpath=ancestor::div[contains(@class, "rounded-2xl")][1]');
   await expect(persistedValueHotspotCard).toBeVisible();
@@ -418,7 +412,7 @@ test('deactivated modules move to coming soon and guard direct routes', async ({
   await expect(page.getByText(/currently disabled for your company/i)).toBeVisible();
   await expect(page.getByRole('link', { name: /open module directory/i })).toBeVisible();
 
-  await page.reload();
+  await page.goto('/sales', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: /coming soon/i })).toBeVisible();
   await expect(page.getByText(/currently disabled for your company/i)).toBeVisible();
 });

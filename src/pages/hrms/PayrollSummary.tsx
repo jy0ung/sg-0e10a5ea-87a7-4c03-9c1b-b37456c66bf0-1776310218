@@ -306,18 +306,18 @@ export default function PayrollSummary() {
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Year</label>
+                <label htmlFor="payroll-run-year" className="text-sm font-medium">Year</label>
                 <Select value={newYear} onValueChange={setNewYear}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="payroll-run-year"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[2024, 2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Month</label>
+                <label htmlFor="payroll-run-month" className="text-sm font-medium">Month</label>
                 <Select value={newMonth} onValueChange={setNewMonth}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="payroll-run-month"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {MONTHS.map((m, i) => <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>)}
                   </SelectContent>
@@ -378,8 +378,9 @@ export default function PayrollSummary() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle className="capitalize">{reviewAction} Payroll Finalisation</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <label className="text-sm font-medium">Note (optional)</label>
+            <label htmlFor="payroll-review-note" className="text-sm font-medium">Note (optional)</label>
             <Textarea
+              id="payroll-review-note"
               value={reviewNote}
               onChange={e => setReviewNote(e.target.value)}
               rows={3}

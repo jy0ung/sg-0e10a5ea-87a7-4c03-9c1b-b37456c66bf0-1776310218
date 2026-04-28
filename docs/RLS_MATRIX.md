@@ -47,7 +47,6 @@ This document tracks row-level-security posture per table. Every tenant-scoped t
 | `approval_steps`              | Company           | Admin             | Admin             | Admin             |                                          |
 | `role_sections`               | Company           | Admin             | Admin             | Admin             | Replaces localStorage matrix             |
 | `tickets`                     | Company           | Company           | Company or Admin  | Admin             |                                          |
-| `ticket_comments`             | Company           | Company           | Self              | Self              |                                          |
 | `sales_orders`                | Company           | Company           | Company           | Admin             |                                          |
 | `invoices`                    | Company           | Company           | Company           | Admin             |                                          |
 | `customers`                   | Company           | Company           | Company           | Admin             |                                          |

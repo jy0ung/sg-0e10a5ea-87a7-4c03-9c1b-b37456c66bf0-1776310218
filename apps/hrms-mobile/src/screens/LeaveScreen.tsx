@@ -54,8 +54,9 @@ export default function LeaveScreen() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">Leave Type</label>
+            <label htmlFor="leave-type" className="mb-1.5 block text-sm font-medium text-foreground">Leave Type</label>
             <select
+              id="leave-type"
               {...register('leaveTypeId')}
               className="w-full rounded-lg border border-input bg-secondary px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             >
@@ -68,8 +69,9 @@ export default function LeaveScreen() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">Start Date</label>
+            <label htmlFor="leave-start-date" className="mb-1.5 block text-sm font-medium text-foreground">Start Date</label>
             <input
+              id="leave-start-date"
               type="date"
               {...register('startDate')}
               className="w-full rounded-lg border border-input bg-secondary px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
@@ -78,8 +80,9 @@ export default function LeaveScreen() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">End Date</label>
+            <label htmlFor="leave-end-date" className="mb-1.5 block text-sm font-medium text-foreground">End Date</label>
             <input
+              id="leave-end-date"
               type="date"
               {...register('endDate')}
               className="w-full rounded-lg border border-input bg-secondary px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
@@ -88,8 +91,9 @@ export default function LeaveScreen() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">Reason (optional)</label>
+            <label htmlFor="leave-reason" className="mb-1.5 block text-sm font-medium text-foreground">Reason (optional)</label>
             <textarea
+              id="leave-reason"
               {...register('reason')}
               rows={3}
               className="w-full rounded-lg border border-input bg-secondary px-4 py-3 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"

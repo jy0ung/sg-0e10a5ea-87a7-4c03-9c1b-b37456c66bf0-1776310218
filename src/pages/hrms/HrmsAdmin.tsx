@@ -68,6 +68,8 @@ const JOB_LEVELS: { value: JobTitleLevel; label: string }[] = [
   { value: 'executive', label: 'Executive' },
 ];
 
+const NONE_SELECT_VALUE = '__none__';
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function cn(...classes: (string | undefined | false)[]) {
@@ -241,10 +243,13 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Department Head</Label>
-              <Select value={form.headEmployeeId ?? ''} onValueChange={v => setForm(f => ({ ...f, headEmployeeId: v }))}>
+              <Select
+                value={form.headEmployeeId || NONE_SELECT_VALUE}
+                onValueChange={v => setForm(f => ({ ...f, headEmployeeId: v === NONE_SELECT_VALUE ? '' : v }))}
+              >
                 <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select employee (optional)" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">— None —</SelectItem>
+                  <SelectItem value={NONE_SELECT_VALUE}>— None —</SelectItem>
                   {employees.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -441,20 +446,26 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Department</Label>
-              <Select value={form.departmentId ?? ''} onValueChange={v => setForm(f => ({ ...f, departmentId: v }))}>
+              <Select
+                value={form.departmentId || NONE_SELECT_VALUE}
+                onValueChange={v => setForm(f => ({ ...f, departmentId: v === NONE_SELECT_VALUE ? '' : v }))}
+              >
                 <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select department (optional)" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">— None —</SelectItem>
+                  <SelectItem value={NONE_SELECT_VALUE}>— None —</SelectItem>
                   {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Level</Label>
-              <Select value={form.level ?? ''} onValueChange={v => setForm(f => ({ ...f, level: v as JobTitleLevel | '' }))}>
+              <Select
+                value={form.level || NONE_SELECT_VALUE}
+                onValueChange={v => setForm(f => ({ ...f, level: v === NONE_SELECT_VALUE ? '' : v as JobTitleLevel }))}
+              >
                 <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select level (optional)" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">— None —</SelectItem>
+                  <SelectItem value={NONE_SELECT_VALUE}>— None —</SelectItem>
                   {JOB_LEVELS.map(l => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
                 </SelectContent>
               </Select>

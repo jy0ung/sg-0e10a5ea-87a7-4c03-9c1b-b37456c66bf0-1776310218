@@ -83,17 +83,8 @@ function ModuleCard({
   iconColor: string;
 }) {
   const isActive = status === 'active';
-  return (
-    <div
-      role={isActive ? 'button' : undefined}
-      tabIndex={isActive ? 0 : undefined}
-      onKeyDown={isActive && onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
-      className={[
-        'glass-panel p-5 flex flex-col gap-3 transition-all duration-150',
-        isActive ? 'cursor-pointer hover:border-primary/30 hover:shadow-md hover:-translate-y-px' : 'opacity-50 cursor-default',
-      ].join(' ')}
-      onClick={isActive ? onClick : undefined}
-    >
+  const content = (
+    <>
       <div className="flex items-start justify-between">
         <div className={`w-10 h-10 rounded-lg ${accent} flex items-center justify-center flex-shrink-0`}>
           <Icon className={`h-5 w-5 ${iconColor}`} />
@@ -108,10 +99,28 @@ function ModuleCard({
           <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
         )}
       </div>
-      <div>
-        <h3 className="text-sm font-semibold text-foreground leading-snug">{name}</h3>
-        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</p>
+      <div className="space-y-1 text-left">
+        <h3 className="font-semibold text-sm text-foreground">{name}</h3>
+        <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
       </div>
+    </>
+  );
+
+  if (isActive) {
+    return (
+      <button
+        type="button"
+        className="glass-panel p-5 flex flex-col gap-3 transition-all duration-150 cursor-pointer hover:border-primary/30 hover:shadow-md hover:-translate-y-px"
+        onClick={onClick}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="glass-panel p-5 flex flex-col gap-3 transition-all duration-150 opacity-50 cursor-default">
+      {content}
     </div>
   );
 }
@@ -130,10 +139,8 @@ function WorkspaceCard({
   Icon: React.ElementType;
 }) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
+    <button
+      type="button"
       className="glass-panel p-4 flex items-center gap-4 cursor-pointer hover:border-primary/30 hover:shadow-md hover:-translate-y-px transition-all duration-150"
       onClick={onClick}
     >
@@ -145,7 +152,7 @@ function WorkspaceCard({
         <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
       </div>
       <ChevronRight className="h-4 w-4 text-muted-foreground/40 flex-shrink-0 ml-auto" />
-    </div>
+    </button>
   );
 }
 

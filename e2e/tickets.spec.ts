@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("My Tickets renders empty state when the user has no tickets", async ({ page }) => {
-  await page.goto("/support/tickets");
+  await page.goto("/portal/tickets");
 
   await expect(
     page.getByRole("heading", { name: /my tickets/i }),
@@ -44,7 +44,7 @@ test("New Ticket submits successfully and shows a confirmation toast", async ({ 
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
 
-  await page.goto("/support/tickets/new");
+  await page.goto("/portal/tickets/new");
 
   await expect(
     page.getByRole("heading", { name: /raise a ticket/i }),

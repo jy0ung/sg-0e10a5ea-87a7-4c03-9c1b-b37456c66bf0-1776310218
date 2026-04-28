@@ -233,7 +233,7 @@ function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFil
               <div className="space-y-4 animate-in slide-in-from-top-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground">Date Range (BG Date)</label>
+                    <p className="text-xs font-medium text-muted-foreground">Date Range (BG Date)</p>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
@@ -276,7 +276,7 @@ function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFil
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground">Branches</label>
+                    <p className="text-xs font-medium text-muted-foreground">Branches</p>
                     <div className="flex flex-wrap gap-1">
                       {filterOptions.branches.slice(0, 10).map(branch => (
                         <Badge
@@ -295,7 +295,7 @@ function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFil
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground">Models</label>
+                    <p className="text-xs font-medium text-muted-foreground">Models</p>
                     <div className="flex flex-wrap gap-1">
                       {filterOptions.models.slice(0, 8).map(model => (
                         <Badge
@@ -314,7 +314,7 @@ function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFil
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-medium text-muted-foreground">Payment Methods</label>
+                    <p className="text-xs font-medium text-muted-foreground">Payment Methods</p>
                     <div className="flex flex-wrap gap-1">
                       {filterOptions.paymentMethods.map(method => (
                         <Badge

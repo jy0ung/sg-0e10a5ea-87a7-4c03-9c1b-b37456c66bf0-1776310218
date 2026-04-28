@@ -36,8 +36,9 @@ export default function LoginScreen() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-sm space-y-4">
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-foreground">Email</label>
+          <label htmlFor="mobile-login-email" className="mb-1.5 block text-sm font-medium text-foreground">Email</label>
           <input
+            id="mobile-login-email"
             type="email"
             autoComplete="email"
             {...register('email')}
@@ -48,8 +49,9 @@ export default function LoginScreen() {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-foreground">Password</label>
+          <label htmlFor="mobile-login-password" className="mb-1.5 block text-sm font-medium text-foreground">Password</label>
           <input
+            id="mobile-login-password"
             type="password"
             autoComplete="current-password"
             {...register('password')}

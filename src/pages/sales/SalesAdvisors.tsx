@@ -231,39 +231,39 @@ export default function SalesAdvisors() {
           <div className="space-y-3 mt-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">SA Code *</label>
-                <Input className="h-8 text-sm uppercase" placeholder="e.g. SA001" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} />
+                <label htmlFor="sales-advisor-code" className="text-xs font-medium text-muted-foreground">SA Code *</label>
+                <Input id="sales-advisor-code" className="h-8 text-sm uppercase" placeholder="e.g. SA001" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Branch *</label>
+                <label htmlFor="sales-advisor-branch" className="text-xs font-medium text-muted-foreground">Branch *</label>
                 <Select value={form.branch} onValueChange={v => setForm(f => ({ ...f, branch: v }))}>
-                  <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectTrigger id="sales-advisor-branch" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>{branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Full Name *</label>
-              <Input className="h-8 text-sm" placeholder="e.g. Ahmad bin Ibrahim" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+              <label htmlFor="sales-advisor-name" className="text-xs font-medium text-muted-foreground">Full Name *</label>
+              <Input id="sales-advisor-name" className="h-8 text-sm" placeholder="e.g. Ahmad bin Ibrahim" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">IC Number</label>
-                <Input className="h-8 text-sm" placeholder="e.g. 900101-12-1234" value={form.ic} onChange={e => setForm(f => ({ ...f, ic: e.target.value }))} />
+                <label htmlFor="sales-advisor-ic" className="text-xs font-medium text-muted-foreground">IC Number</label>
+                <Input id="sales-advisor-ic" className="h-8 text-sm" placeholder="e.g. 900101-12-1234" value={form.ic} onChange={e => setForm(f => ({ ...f, ic: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Contact No</label>
-                <Input className="h-8 text-sm" placeholder="e.g. 012-3456789" value={form.contact} onChange={e => setForm(f => ({ ...f, contact: e.target.value }))} />
+                <label htmlFor="sales-advisor-contact" className="text-xs font-medium text-muted-foreground">Contact No</label>
+                <Input id="sales-advisor-contact" className="h-8 text-sm" placeholder="e.g. 012-3456789" value={form.contact} onChange={e => setForm(f => ({ ...f, contact: e.target.value }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Email</label>
-                <Input type="email" className="h-8 text-sm" placeholder="sa@flc.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                <label htmlFor="sales-advisor-email" className="text-xs font-medium text-muted-foreground">Email</label>
+                <Input id="sales-advisor-email" type="email" className="h-8 text-sm" placeholder="sa@flc.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Join Date</label>
-                <Input type="date" className="h-8 text-sm" value={form.joinDate} onChange={e => setForm(f => ({ ...f, joinDate: e.target.value }))} />
+                <label htmlFor="sales-advisor-join-date" className="text-xs font-medium text-muted-foreground">Join Date</label>
+                <Input id="sales-advisor-join-date" type="date" className="h-8 text-sm" value={form.joinDate} onChange={e => setForm(f => ({ ...f, joinDate: e.target.value }))} />
               </div>
             </div>
           </div>

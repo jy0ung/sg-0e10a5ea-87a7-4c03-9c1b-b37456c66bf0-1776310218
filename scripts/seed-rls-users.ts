@@ -24,16 +24,16 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
 });
 
-async function upsertCompany(name: string): Promise<string> {
+async function upsertCompany(id: string, name: string, code: string): Promise<string> {
   const { data: existing } = await admin
     .from('companies')
     .select('id')
-    .eq('name', name)
+    .eq('id', id)
     .maybeSingle();
   if (existing?.id) return existing.id as string;
   const { data, error } = await admin
     .from('companies')
-    .insert({ name })
+    .insert({ id, name, code })
     .select('id')
     .single();
   if (error) throw new Error(`companies insert failed: ${error.message}`);
@@ -60,17 +60,19 @@ async function upsertUser(email: string, password: string, companyId: string): P
   const { error } = await admin.from('profiles').upsert({
     id: userId,
     email,
+    name: email.split('@')[0],
     role: 'analyst',
     access_scope: 'self',
     company_id: companyId,
+    status: 'active',
   });
   if (error) throw new Error(`profiles upsert failed for ${email}: ${error.message}`);
   return userId;
 }
 
 async function main() {
-  const companyAId = await upsertCompany('RLS Company A');
-  const companyBId = await upsertCompany('RLS Company B');
+  const companyAId = await upsertCompany('rls-a', 'RLS Company A', 'RLS-A');
+  const companyBId = await upsertCompany('rls-b', 'RLS Company B', 'RLS-B');
   const userAId = await upsertUser('a@rls.test', 'Test1234!', companyAId);
   const userBId = await upsertUser('b@rls.test', 'Test1234!', companyBId);
   console.info(

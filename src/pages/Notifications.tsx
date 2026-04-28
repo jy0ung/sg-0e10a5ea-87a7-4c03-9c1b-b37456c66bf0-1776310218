@@ -106,10 +106,12 @@ export default function Notifications() {
       ) : (
         <div className="space-y-2">
           {notifications.map(n => (
-            <div
+            <button
+              type="button"
               key={n.id}
-              className={`glass-panel p-4 flex items-start gap-3 cursor-pointer transition-colors hover:bg-secondary/30 ${!n.read ? 'border-l-2 border-primary' : ''}`}
+              className={`glass-panel w-full p-4 flex items-start gap-3 text-left transition-colors hover:bg-secondary/30 ${!n.read ? 'border-l-2 border-primary cursor-pointer' : 'cursor-default'}`}
               onClick={() => !n.read && handleMarkRead(n.id)}
+              disabled={n.read}
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
@@ -121,7 +123,7 @@ export default function Notifications() {
                   {n.created_at ? new Date(n.created_at).toLocaleString() : ''}
                 </p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

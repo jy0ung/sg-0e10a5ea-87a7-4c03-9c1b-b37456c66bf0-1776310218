@@ -396,8 +396,9 @@ export default function ApprovalInbox() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <label className="text-sm font-medium">Note (optional)</label>
+            <label htmlFor="approval-review-note" className="text-sm font-medium">Note (optional)</label>
             <Textarea
+              id="approval-review-note"
               value={reviewNote}
               onChange={event => setReviewNote(event.target.value)}
               rows={3}

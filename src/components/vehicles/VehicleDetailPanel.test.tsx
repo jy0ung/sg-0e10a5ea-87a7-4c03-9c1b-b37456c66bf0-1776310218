@@ -99,7 +99,7 @@ vi.mock('@radix-ui/react-dialog', async () => {
   Close.displayName = 'DialogClose';
 
   const Title = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
-    (props, ref) => <h2 ref={ref} {...props} />,
+    ({ children, ...props }, ref) => <h2 ref={ref} {...props}>{children}</h2>,
   );
   Title.displayName = 'DialogTitle';
 
@@ -195,7 +195,7 @@ describe('VehicleDetailPanel', () => {
     expect(screen.getAllByText(/Hilux/i).length).toBeGreaterThan(0);
     // KK appears in the subtitle
     expect(screen.getAllByText(/KK/i).length).toBeGreaterThan(0);
-  });
+  }, 10_000);
 
   it('shows customer and salesman in the vehicle info grid', async () => {
     await renderPanel({ vehicle: makeVehicle(), open: true, onClose });

@@ -17,7 +17,9 @@ export default function CustomerServiceLayout() {
     <div className="h-screen flex w-full bg-background overflow-hidden">
       {/* Mobile overlay */}
       {sidebarOpen && (
-        <div
+        <button
+          type="button"
+          aria-label="Close navigation menu"
           className="fixed inset-0 z-20 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -37,6 +39,8 @@ export default function CustomerServiceLayout() {
           </div>
           <span className="font-semibold text-sm text-foreground">Customer Service</span>
           <button
+            type="button"
+            aria-label="Close navigation menu"
             className="ml-auto text-muted-foreground hover:text-foreground lg:hidden"
             onClick={() => setSidebarOpen(false)}
           >

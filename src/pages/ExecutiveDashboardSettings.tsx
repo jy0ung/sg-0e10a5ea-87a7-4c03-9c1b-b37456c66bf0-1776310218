@@ -274,9 +274,11 @@ export function ExecutiveDashboardSettings(props: ExecutiveDashboardSettingsProp
                   {KPI_DEFINITIONS.map(kpi => (
                     <label
                       key={kpi.id}
+                      htmlFor={`scorecard-kpi-${kpi.id}`}
                       className="flex items-center gap-3 p-3 hover:bg-secondary/30 cursor-pointer border-b border-border/60 last:border-b-0"
                     >
                       <Checkbox
+                        id={`scorecard-kpi-${kpi.id}`}
                         checked={selectedKpis.includes(kpi.id)}
                         onCheckedChange={() => onToggleKpi(kpi.id)}
                       />

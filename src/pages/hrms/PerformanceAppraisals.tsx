@@ -616,8 +616,9 @@ export default function PerformanceAppraisals() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle className="capitalize">{reviewAction} Appraisal Activation</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <label className="text-sm font-medium">Note (optional)</label>
+            <label htmlFor="appraisal-review-note" className="text-sm font-medium">Note (optional)</label>
             <Textarea
+              id="appraisal-review-note"
               value={reviewNote}
               onChange={e => setReviewNote(e.target.value)}
               rows={3}

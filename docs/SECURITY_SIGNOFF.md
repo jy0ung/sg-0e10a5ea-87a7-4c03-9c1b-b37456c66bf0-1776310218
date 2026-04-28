@@ -1,7 +1,7 @@
 # Security Release Sign-Off
 
-Status: Draft
-Last updated: 2026-04-27
+Status: Draft - static guardrails and local RLS matrix passed; live release evidence pending
+Last updated: 2026-04-28
 
 Use this document for the production release security review. Keep customer-identifying evidence, credentials, and raw logs out of the repository; link to private tickets or internal evidence stores where needed.
 
@@ -27,9 +27,9 @@ npm run test:rls
 
 | Gate | Result | Evidence | Reviewer | Date |
 | ---- | ------ | -------- | -------- | ---- |
-| Edge function static guardrail | Pending | `npm run security:edge-functions` | | |
-| Full security script | Pending | `bash scripts/security-check.sh` | | |
-| RLS cross-company integration suite | Pending | `npm run test:rls` | | |
+| Edge function static guardrail | Passed | `npm run security:edge-functions` | | 2026-04-27 |
+| Full security script | Passed | `bash scripts/security-check.sh` | | 2026-04-28 |
+| RLS cross-company integration suite | Passed locally; live evidence pending | Local seeded Supabase: `npm run test:rls`, `84 passed`. Rerun with live `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `RLS_USER_A_EMAIL`, `RLS_USER_A_PASSWORD`, `RLS_USER_B_EMAIL`, and `RLS_USER_B_PASSWORD` before cutover | | 2026-04-28 |
 | Sentry redaction/user-context review | Passed in Phase 2 slice 1 | `src/services/errorTrackingService.test.ts` | | 2026-04-27 |
 | Backup/incident/on-call runbook review | Passed in Phase 2 slice 2 | `docs/BACKUP_DR.md`, `docs/INCIDENT_RESPONSE.md`, `docs/ONCALL.md` | | 2026-04-27 |
 

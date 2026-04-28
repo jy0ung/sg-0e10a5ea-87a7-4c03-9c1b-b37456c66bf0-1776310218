@@ -158,8 +158,8 @@ export function SalesOrderDetail({ order, invoices, onClose }: SalesOrderDetailP
           <DialogHeader><DialogTitle>Create Auto Aging BG Entry</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground">Order: {order.orderNo} — {order.model}<br />BG Date will be set to booking date: <strong>{order.bookingDate}</strong></p>
           <div className="space-y-2 py-2">
-            <label className="text-xs font-medium text-muted-foreground">Chassis Number *</label>
-            <Input className="h-8 text-sm font-mono" placeholder="e.g. PM00A1234" value={chassisNo} onChange={e => setChassisNo(e.target.value)} />
+            <label htmlFor="sales-order-chassis-no" className="text-xs font-medium text-muted-foreground">Chassis Number *</label>
+            <Input id="sales-order-chassis-no" className="h-8 text-sm font-mono" placeholder="e.g. PM00A1234" value={chassisNo} onChange={e => setChassisNo(e.target.value)} />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLinkOpen(false)}>Cancel</Button>

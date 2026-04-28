@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -66,6 +66,12 @@ export function ExcelTable<T>({
   const [editValue, setEditValue] = useState<unknown>('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const editingControlRef = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
+
+  useEffect(() => {
+    if (!editingCell) return;
+    editingControlRef.current?.focus();
+  }, [editingCell]);
 
   const canEditColumn = useCallback((column: TableColumn<T>): boolean => {
     // Column must be declared editable by the caller (reflects canEdit + field-level rules),
@@ -148,6 +154,7 @@ export function ExcelTable<T>({
         <div className="space-y-1">
           {column.type === 'number' && (
             <Input
+              ref={editingControlRef}
               type="number"
               value={editValue as string}
               onChange={(e) => setEditValue(parseFloat(e.target.value))}
@@ -157,12 +164,12 @@ export function ExcelTable<T>({
                 if (e.key === 'Escape') handleCellCancel();
               }}
               className={cn("h-8", validationError && "border-destructive")}
-              autoFocus
             />
           )}
           
           {column.type === 'date' && (
             <input
+              ref={editingControlRef}
               type="date"
               value={editValue as string}
               onChange={(e) => setEditValue(e.target.value)}
@@ -172,12 +179,12 @@ export function ExcelTable<T>({
                 if (e.key === 'Escape') handleCellCancel();
               }}
               className={cn("h-8 px-2 rounded border border-input bg-background text-foreground", validationError && "border-destructive")}
-              autoFocus
             />
           )}
           
           {column.type === 'select' && (
             <select
+              ref={editingControlRef}
               value={editValue as string}
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={() => handleCellSave(rowId, column.key, column)}
@@ -186,7 +193,6 @@ export function ExcelTable<T>({
                 if (e.key === 'Escape') handleCellCancel();
               }}
               className={cn("h-8 px-2 rounded border border-input bg-background text-foreground", validationError && "border-destructive")}
-              autoFocus
             >
               <option value="">-- Select --</option>
               {column.options?.map(opt => (
@@ -197,6 +203,7 @@ export function ExcelTable<T>({
           
           {column.type !== 'number' && column.type !== 'date' && column.type !== 'select' && (
             <Input
+              ref={editingControlRef}
               value={editValue as string}
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={() => handleCellSave(rowId, column.key, column)}
@@ -205,7 +212,6 @@ export function ExcelTable<T>({
                 if (e.key === 'Escape') handleCellCancel();
               }}
               className={cn("h-8", validationError && "border-destructive")}
-              autoFocus
             />
           )}
           

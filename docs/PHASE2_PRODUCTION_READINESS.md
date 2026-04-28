@@ -1,7 +1,8 @@
 # Phase 2 Production Readiness
 
-Status: In progress
+Status: Closed for Phase 2 local engineering readiness - production launch evidence remains tracked in `docs/LAUNCH_CHECKLIST.md`
 Started: 2026-04-27
+Closed: 2026-04-28
 
 ## Objective
 
@@ -25,14 +26,35 @@ npm run test -- src/services/errorTrackingService.test.ts src/contexts/AuthConte
 npm run build
 ```
 
-## Remaining Phase 2 Work
+## Formal Close Record
 
-- Configure GitHub UAT environment secrets `UAT_LOGIN_EMAIL`, `UAT_LOGIN_PASSWORD`, and `UAT_LOGIN_REQUIRED=1` so scheduled UAT synthetic checks include a real browser login.
-- Create or connect the production Sentry project, configure alert routing, and prove a synthetic frontend error appears within 60 seconds.
-- Execute RLS matrix sign-off using `docs/SECURITY_SIGNOFF.md` and attach release evidence for `npm run test:rls`.
-- Run the expected-volume load test: 100,000 vehicles, 10,000 sales orders, and Vehicle Explorer p95 below 2 seconds with server-side pagination.
-- Confirm backup and restore operations: production PITR, nightly logical dump, and restore-to-staging drill.
-- Decide backend topology for UAT/staging/production: self-hosted Supabase behind same-origin proxy or public/cloud Supabase projects.
+Phase gate decision, 2026-04-28: close Phase 2 as the local engineering-readiness and hardening phase. This close confirms the app is locally validated across type safety, unit tests, RLS isolation, core browser flows, accessibility smoke, UAT deploy smoke, security guardrails, and build budget. It is not a production cutover approval; the production launch checklist remains open for environment-specific evidence and owner sign-off.
+
+Validation snapshot, 2026-04-28:
+
+- Passed: `npm run lint` with 0 errors, 144 existing non-blocking warnings, and no `jsx-a11y` warnings reported.
+- Passed: `npm run typecheck`.
+- Passed: `npm run test`, `291 passed`.
+- Passed: `npm run test:coverage`, `291 passed`; coverage target remains a launch gap because current grouped coverage is below the checklist target (`services` 49.42%, `contexts` 68.20%, `lib` 67.83%).
+- Passed: `npm run build:budget`.
+- Passed: `bash scripts/security-check.sh`; high+ npm audit gate is clean, OSV is skipped because `osv-scanner` is not installed, and moderate advisories remain for tracked dependency review.
+- Passed: `npm run verify:uat`; health endpoint and bundle Supabase URL checks passed, credentialed browser login skipped because credentials were not provided.
+- Passed: `git diff --check`.
+- Passed: full Chromium Playwright project, `108 passed`, `21 skipped`.
+- Passed: local seeded Supabase RLS matrix, `npm run test:rls`, `84 passed`.
+
+## Gap Assessment
+
+Production cutover remains blocked until the following evidence is captured and approved:
+
+- Infrastructure: provision separate staging and production Supabase projects, rotated `.env.staging` and production `.env`, production DNS/TLS, GHCR image release, and reverse-proxy security headers.
+- Credentialed UAT: configure `UAT_LOGIN_EMAIL`, `UAT_LOGIN_PASSWORD`, and `UAT_LOGIN_REQUIRED=1` so UAT verification includes a real browser login.
+- Live RLS and edge-function security: rerun `npm run test:rls` against the seeded live stack, attach the evidence to `docs/SECURITY_SIGNOFF.md`, confirm all edge functions validate JWT and same-company access, pin CORS to production origins, and complete reviewer sign-off.
+- Observability: create/connect the production Sentry project, set `VITE_SENTRY_DSN`, upload source maps in the release job, configure alert routing, and prove a synthetic frontend error arrives within 60 seconds.
+- Reliability: enable production PITR, run the nightly logical dump with production secrets, complete a restore-to-staging drill, configure uptime monitoring, and fill the live on-call rota.
+- Performance: run the expected-volume load test for 100,000 vehicles and 10,000 sales orders with Vehicle Explorer p95 below 2 seconds.
+- Product coverage: raise or rescope the coverage target for `services`, `contexts`, and `lib`; the command passes, but the checklist target of 70% is not met by current grouped coverage.
+- Release process: attach CodeQL and OSV review evidence, test rollback, record the DR drill, complete RLS pen-test notes, and confirm CLA/DPA needs for enterprise customers.
 
 ## Slice 2: Operational Runbooks And Backups
 

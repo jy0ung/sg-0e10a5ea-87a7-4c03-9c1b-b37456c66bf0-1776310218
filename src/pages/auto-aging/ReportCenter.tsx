@@ -92,9 +92,9 @@ export default function ReportCenter() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Report Type */}
           <div className="lg:col-span-1 space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Report Type</label>
+            <label htmlFor="auto-aging-report-type" className="text-xs font-medium text-muted-foreground">Report Type</label>
             <Select value={reportType} onValueChange={v => { setReportType(v as ReportType); setPreview(null); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="auto-aging-report-type"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {REPORT_TYPES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
               </SelectContent>
@@ -104,9 +104,9 @@ export default function ReportCenter() {
 
           {/* Branch Filter */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Branch</label>
+            <label htmlFor="auto-aging-report-branch" className="text-xs font-medium text-muted-foreground">Branch</label>
             <Select value={branchFilter} onValueChange={setBranchFilter}>
-              <SelectTrigger><SelectValue placeholder="All Branches" /></SelectTrigger>
+              <SelectTrigger id="auto-aging-report-branch"><SelectValue placeholder="All Branches" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Branches</SelectItem>
                 {branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
@@ -116,9 +116,9 @@ export default function ReportCenter() {
 
           {/* Model Filter */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Model</label>
+            <label htmlFor="auto-aging-report-model" className="text-xs font-medium text-muted-foreground">Model</label>
             <Select value={modelFilter} onValueChange={setModelFilter}>
-              <SelectTrigger><SelectValue placeholder="All Models" /></SelectTrigger>
+              <SelectTrigger id="auto-aging-report-model"><SelectValue placeholder="All Models" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Models</SelectItem>
                 {models.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
@@ -128,12 +128,12 @@ export default function ReportCenter() {
 
           {/* Date Range */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">BG Date From</label>
-            <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 text-sm" />
+            <label htmlFor="auto-aging-report-date-from" className="text-xs font-medium text-muted-foreground">BG Date From</label>
+            <Input id="auto-aging-report-date-from" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 text-sm" />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">BG Date To</label>
-            <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 text-sm" />
+            <label htmlFor="auto-aging-report-date-to" className="text-xs font-medium text-muted-foreground">BG Date To</label>
+            <Input id="auto-aging-report-date-to" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 text-sm" />
           </div>
         </div>
 

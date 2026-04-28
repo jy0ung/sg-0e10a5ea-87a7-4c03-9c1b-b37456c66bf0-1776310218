@@ -19,8 +19,8 @@ One-time gate before first production cutover. Every box must be checked.
 
 - [ ] RLS matrix sign-off (`docs/RLS_MATRIX.md`) complete
 - [x] Security sign-off checklist exists in `docs/SECURITY_SIGNOFF.md`
-- [ ] `scripts/security-check.sh` passes on the release commit
-- [ ] `npm audit` high+ clean; open items tracked as issues
+- [x] `scripts/security-check.sh` passes on the release commit
+- [x] `npm audit` high+ clean; open items tracked as issues
 - [ ] `osv-scanner` findings reviewed
 - [ ] CodeQL scan attached to release
 - [ ] Supabase `[auth] enable_signup = false` confirmed in production
@@ -68,13 +68,19 @@ One-time gate before first production cutover. Every box must be checked.
 - [ ] Load test at expected volumes passed: 100,000 vehicles, 10,000 sales orders, VehicleExplorer p95 < 2s with server-side pagination
 - [x] Bundle budget gate confirms vendor chunks within targets: `vendor-react` < 150KB gz, `vendor-ui` < 200KB gz, and `vendor-charts` lazy-loaded only on dashboard routes
 
+## Latest Validation Snapshot
+
+2026-04-28 local/UAT validation passed: `npm run lint` (0 errors, 144 existing non-blocking warnings, no `jsx-a11y` warnings reported), `npm run typecheck`, `npm run test` (`291 passed`), `npm run test:coverage` (`291 passed`), `npm run build:budget`, `bash scripts/security-check.sh`, `git diff --check`, `npm run verify:uat`, full Chromium Playwright (`108 passed`, `21 skipped`), focused accessibility smoke (`2 passed`), and local seeded RLS matrix (`npm run test:rls`, `84 passed`). `npm run verify:uat` confirms the UAT health endpoint and deployed bundle Supabase URL; credentialed browser login remains skipped because credentials were not provided. Coverage command passes, but grouped coverage remains below the checklist target: `services` 49.42%, `contexts` 68.20%, `lib` 67.83%.
+
+Phase decision: Phase 2 local engineering readiness is formally closed. Keep this launch checklist open until the remaining unchecked infrastructure, security, observability, reliability, performance, product coverage, and process gates have owner-approved production evidence.
+
 ## Product
 
 - [ ] Every module has a smoke e2e spec in `e2e/`
 - [ ] Vitest coverage ≥ 70 % on `services/`, `contexts/`, `lib/`
-- [ ] All pages pass `jsx-a11y` lint (no new errors)
-- [ ] i18n scaffold boots; `en` bundle seeded
-- [ ] Dark mode + system theme toggle verified
+- [x] All pages pass `jsx-a11y` lint (no new errors)
+- [x] i18n scaffold boots; `en` bundle seeded
+- [x] Dark mode + system theme toggle verified
 
 ## Process
 

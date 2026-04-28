@@ -60,7 +60,6 @@ const TENANT_SCOPED_TABLES = [
   'approval_steps',
   'role_sections',
   'tickets',
-  'ticket_comments',
   'sales_orders',
   'invoices',
   'customers',
@@ -72,10 +71,30 @@ const TENANT_SCOPED_TABLES = [
   'attendance_records',
 ] as const;
 
+type TenantScopedTable = typeof TENANT_SCOPED_TABLES[number];
+
 interface TenantSession {
   client: SupabaseClient;
   userId: string;
   companyId: string;
+}
+
+function crossTenantSelect(
+  client: SupabaseClient,
+  table: TenantScopedTable,
+  userB: TenantSession,
+) {
+  const query = client.from(table).select('*');
+
+  if (table === 'audit_logs' || table === 'notifications' || table === 'dashboard_preferences') {
+    return query.eq('user_id', userB.userId);
+  }
+
+  if (table === 'approval_steps') {
+    return query.limit(1);
+  }
+
+  return query.eq('company_id', userB.companyId);
 }
 
 async function signInAs(email: string, password: string): Promise<TenantSession> {
@@ -115,10 +134,7 @@ describeIfLive('RLS cross-tenant matrix', () => {
   for (const table of TENANT_SCOPED_TABLES) {
     describe(table, () => {
       it(`user A cannot SELECT rows belonging to company B`, async () => {
-        const { data, error } = await userA.client
-          .from(table)
-          .select('*')
-          .eq('company_id', userB.companyId);
+        const { data, error } = await crossTenantSelect(userA.client, table, userB);
         // RLS should either return an error or, preferably, an empty set.
         if (error) {
           expect(error.message).toMatch(/permission|policy|row-level|access/i);

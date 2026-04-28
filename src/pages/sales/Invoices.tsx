@@ -168,9 +168,9 @@ export default function Invoices() {
           <DialogHeader><DialogTitle>New Invoice</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3 py-2">
             <div className="col-span-2 space-y-1">
-              <label className="text-xs text-muted-foreground">Invoice Type *</label>
+              <label htmlFor="sales-invoice-type" className="text-xs text-muted-foreground">Invoice Type *</label>
               <Select value={form.invoiceType} onValueChange={v => setForm(f => ({ ...f, invoiceType: v as InvoiceType }))}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="sales-invoice-type" className="h-8 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="customer_sales">Customer Sales</SelectItem>
                   <SelectItem value="dealer_sales">Dealer Sales</SelectItem>
@@ -187,27 +187,27 @@ export default function Invoices() {
               { field: 'discountAmount', label: 'Discount', type: 'number' },
             ].map(({ field, label, type }) => (
               <div key={field} className="space-y-1">
-                <label className="text-xs text-muted-foreground">{label}</label>
-                <Input type={type ?? 'text'} className="h-8 text-sm" value={form[field as keyof typeof form] as string} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
+                <label htmlFor={`sales-invoice-${field}`} className="text-xs text-muted-foreground">{label}</label>
+                <Input id={`sales-invoice-${field}`} type={type ?? 'text'} className="h-8 text-sm" value={form[field as keyof typeof form] as string} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
               </div>
             ))}
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Sales Order *</label>
+              <label htmlFor="sales-invoice-order" className="text-xs text-muted-foreground">Sales Order *</label>
               <Select value={form.salesOrderId} onValueChange={v => { const o = salesOrders.find(s => s.id === v); setForm(f => ({ ...f, salesOrderId: v, customerId: o?.customerId ?? f.customerId })); }}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectTrigger id="sales-invoice-order" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent>{salesOrders.map(o => <SelectItem key={o.id} value={o.id}>{o.orderNo}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Customer *</label>
+              <label htmlFor="sales-invoice-customer" className="text-xs text-muted-foreground">Customer *</label>
               <Select value={form.customerId} onValueChange={v => setForm(f => ({ ...f, customerId: v }))}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectTrigger id="sales-invoice-customer" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="col-span-2 space-y-1">
-              <label className="text-xs text-muted-foreground">Notes</label>
-              <Input className="h-8 text-sm" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+              <label htmlFor="sales-invoice-notes" className="text-xs text-muted-foreground">Notes</label>
+              <Input id="sales-invoice-notes" className="h-8 text-sm" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>
@@ -223,8 +223,8 @@ export default function Invoices() {
           <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground">Invoice: {payTarget?.invoiceNo} — Outstanding: RM {((payTarget?.totalAmount ?? 0) - (payTarget?.paidAmount ?? 0)).toLocaleString()}</p>
           <div className="space-y-2 py-2">
-            <label className="text-xs font-medium text-muted-foreground">Amount Paid *</label>
-            <Input type="number" className="h-8 text-sm" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+            <label htmlFor="sales-invoice-payment-amount" className="text-xs font-medium text-muted-foreground">Amount Paid *</label>
+            <Input id="sales-invoice-payment-amount" type="number" className="h-8 text-sm" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setPayOpen(false)}>Cancel</Button>

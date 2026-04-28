@@ -271,13 +271,13 @@ export default function CommissionDashboard() {
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <div className="col-span-2 space-y-1">
-              <label className="text-xs text-muted-foreground">Rule Name *</label>
-              <Input value={ruleForm.ruleName ?? ''} onChange={e => setRuleForm(f => ({ ...f, ruleName: e.target.value }))} placeholder="e.g. Fast Delivery Bonus" />
+              <label htmlFor="commission-rule-name" className="text-xs text-muted-foreground">Rule Name *</label>
+              <Input id="commission-rule-name" value={ruleForm.ruleName ?? ''} onChange={e => setRuleForm(f => ({ ...f, ruleName: e.target.value }))} placeholder="e.g. Fast Delivery Bonus" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Salesman (leave blank for all)</label>
+              <label htmlFor="commission-rule-salesman" className="text-xs text-muted-foreground">Salesman (leave blank for all)</label>
               <Select value={ruleForm.salesmanName ?? '_all'} onValueChange={v => setRuleForm(f => ({ ...f, salesmanName: v === '_all' ? undefined : v }))}>
-                <SelectTrigger><SelectValue placeholder="All salesmen" /></SelectTrigger>
+                <SelectTrigger id="commission-rule-salesman"><SelectValue placeholder="All salesmen" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all">All salesmen</SelectItem>
                   {salesmen.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -285,9 +285,9 @@ export default function CommissionDashboard() {
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Branch (leave blank for all)</label>
+              <label htmlFor="commission-rule-branch" className="text-xs text-muted-foreground">Branch (leave blank for all)</label>
               <Select value={ruleForm.branchCode ?? '_all'} onValueChange={v => setRuleForm(f => ({ ...f, branchCode: v === '_all' ? undefined : v }))}>
-                <SelectTrigger><SelectValue placeholder="All branches" /></SelectTrigger>
+                <SelectTrigger id="commission-rule-branch"><SelectValue placeholder="All branches" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all">All branches</SelectItem>
                   {branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
@@ -295,12 +295,12 @@ export default function CommissionDashboard() {
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Threshold Days (BG→Delivery ≤ N days)</label>
-              <Input type="number" value={ruleForm.thresholdDays ?? ''} onChange={e => setRuleForm(f => ({ ...f, thresholdDays: e.target.value ? Number(e.target.value) : undefined }))} placeholder="Optional" />
+              <label htmlFor="commission-rule-threshold" className="text-xs text-muted-foreground">Threshold Days (BG→Delivery ≤ N days)</label>
+              <Input id="commission-rule-threshold" type="number" value={ruleForm.thresholdDays ?? ''} onChange={e => setRuleForm(f => ({ ...f, thresholdDays: e.target.value ? Number(e.target.value) : undefined }))} placeholder="Optional" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Commission Amount (MYR) *</label>
-              <Input type="number" value={ruleForm.amount ?? ''} onChange={e => setRuleForm(f => ({ ...f, amount: Number(e.target.value) }))} placeholder="0.00" />
+              <label htmlFor="commission-rule-amount" className="text-xs text-muted-foreground">Commission Amount (MYR) *</label>
+              <Input id="commission-rule-amount" type="number" value={ruleForm.amount ?? ''} onChange={e => setRuleForm(f => ({ ...f, amount: Number(e.target.value) }))} placeholder="0.00" />
             </div>
           </div>
           <DialogFooter>

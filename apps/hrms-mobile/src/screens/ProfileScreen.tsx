@@ -58,8 +58,9 @@ export default function ProfileScreen() {
 
         {/* Editable contact number */}
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-foreground">Contact No</label>
+          <label htmlFor="profile-contact-no" className="mb-1.5 block text-sm font-medium text-foreground">Contact No</label>
           <input
+            id="profile-contact-no"
             type="tel"
             value={contactNo}
             onChange={e => setContactNo(e.target.value)}

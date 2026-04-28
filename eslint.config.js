@@ -7,7 +7,7 @@ import importPlugin from "eslint-plugin-import";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "test-results", "playwright-report", "apps/*/dist"] },
+  { ignores: ["coverage", "dist", "test-results", "playwright-report", "apps/*/dist"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

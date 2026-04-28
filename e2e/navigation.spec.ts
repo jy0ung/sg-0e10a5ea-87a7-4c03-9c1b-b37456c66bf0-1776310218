@@ -24,7 +24,7 @@ const navLinks: Array<{ label: string | RegExp; expectedPath: RegExp }> = [
   { label: /mapping/i, expectedPath: /\/auto-aging\/mappings$/ },
   { label: /import.?history/i, expectedPath: /\/auto-aging\/history$/ },
   { label: /commission/i, expectedPath: /\/auto-aging\/commissions$/ },
-  { label: /report/i, expectedPath: /\/auto-aging\/reports$/ },
+  { label: /report/i, expectedPath: /\/reports$/ },
   { label: /sales.?dashboard/i, expectedPath: /\/sales$/ },
   { label: /deal.?pipeline/i, expectedPath: /\/sales\/pipeline$/ },
   { label: /sales.?order/i, expectedPath: /\/sales\/orders$/ },

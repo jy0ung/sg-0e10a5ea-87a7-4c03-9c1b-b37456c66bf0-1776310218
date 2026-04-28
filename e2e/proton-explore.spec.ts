@@ -237,7 +237,7 @@ test.describe("Proton CRM — Read-Only Exploration", () => {
     ensureDir(SCREENSHOT_DIR);
     ensureDir(path.dirname(MAP_OUTPUT_PATH));
 
-    await page.goto("sign-in.php", { waitUntil: "domcontentloaded" });
+    await page.goto(`${BASE}/sign-in.php`, { waitUntil: "domcontentloaded" });
     await page.screenshot({
       path: path.join(SCREENSHOT_DIR, "00-login-page.png"),
       fullPage: true,
@@ -274,18 +274,18 @@ test.describe("Proton CRM — Read-Only Exploration", () => {
 
   // ── 2. Crawl discovered + seeded pages ───────────────────────────────────
   test("Step 2 — Crawl all reachable pages", async ({ browser }) => {
-    // Override timeout for this step — crawling 100+ remote pages takes several minutes
-    test.setTimeout(360_000);
+    // Override timeout for this step — crawling remote pages can be slow and is non-mutating.
+    test.setTimeout(900_000);
     ensureDir(SCREENSHOT_DIR);
 
     // Reuse the saved auth state so we start already logged in
     const context = await browser.newContext({
       storageState: fs.existsSync(AUTH_STATE_PATH) ? AUTH_STATE_PATH : undefined,
     });
-    const page = await context.newPage();
+    let page = await context.newPage();
 
     // ── 2a. Navigate to landing and discover links ──────────────────────────
-    await page.goto("sign-in.php", { waitUntil: "domcontentloaded" });
+    await page.goto(`${BASE}/sign-in.php`, { waitUntil: "domcontentloaded" });
 
     // If not yet logged in (auth state didn't work), log in again
     if (page.url().includes("sign-in")) {
@@ -316,6 +316,8 @@ test.describe("Proton CRM — Read-Only Exploration", () => {
     console.log(`Total URLs to probe: ${queue.length}`);
 
     // ── 2b. Visit each URL ──────────────────────────────────────────────────
+    let abortCrawl = false;
+
     for (const url of queue) {
       if (visitedUrls.has(url)) continue;
       visitedUrls.add(url);
@@ -343,7 +345,7 @@ test.describe("Proton CRM — Read-Only Exploration", () => {
       try {
         const response = await page.goto(url, {
           waitUntil: "domcontentloaded",
-          timeout: 30_000,
+          timeout: 10_000,
         });
 
         const finalUrl = page.url();
@@ -409,6 +411,17 @@ test.describe("Proton CRM — Read-Only Exploration", () => {
         record.status = "error";
         record.error = String(err);
         console.log(`  ✗ ERROR: ${url} — ${err}`);
+
+        if (!page.isClosed()) {
+          await page.close().catch(() => {});
+        }
+        try {
+          page = await context.newPage();
+        } catch (newPageError) {
+          record.error = `${record.error}; crawler stopped early: ${newPageError}`;
+          console.log(`  ⚠ crawler stopped early after browser context closed: ${newPageError}`);
+          abortCrawl = true;
+        }
       }
 
       siteMap.push(record);
@@ -423,10 +436,14 @@ test.describe("Proton CRM — Read-Only Exploration", () => {
       fs.writeFileSync(MAP_OUTPUT_PATH, JSON.stringify(partialOutput, null, 2), "utf-8");
 
       // Small pause to be polite to the remote server
-      await page.waitForTimeout(200);
+      if (abortCrawl) break;
+
+      if (!page.isClosed()) {
+        await page.waitForTimeout(50);
+      }
     }
 
-    await context.close();
+    await context.close().catch(() => {});
 
     // ── 2c. Write JSON output ───────────────────────────────────────────────
     const output = {
@@ -458,7 +475,7 @@ test.describe("Proton CRM — Read-Only Exploration", () => {
     });
     const page = await context.newPage();
 
-    await page.goto("sign-in.php", { waitUntil: "domcontentloaded" });
+    await page.goto(`${BASE}/sign-in.php`, { waitUntil: "domcontentloaded" });
 
     // Re-authenticate if needed
     if (page.url().includes("sign-in")) {

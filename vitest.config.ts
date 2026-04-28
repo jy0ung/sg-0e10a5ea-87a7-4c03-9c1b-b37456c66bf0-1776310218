@@ -10,7 +10,7 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     // RLS matrix requires a live Supabase stack + seeded users. Run via
-    // `npm run test:rls` which sets RLS_E2E=1 and scopes to this file.
+    // `npm run test:rls`, which uses vitest.rls.config.ts.
     exclude: [
       "**/node_modules/**",
       "**/dist/**",

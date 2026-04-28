@@ -13,13 +13,11 @@ test.describe("Login page", () => {
     await expect(page.locator('button[type="submit"]')).toBeVisible();
   });
 
-  test("shows admin-managed onboarding guidance", async ({ page }) => {
+  test("shows invite-based onboarding guidance", async ({ page }) => {
     await page.goto("/login");
-    await expect(
-      page.locator("text=/staff accounts are created by an administrator/i")
-    ).toBeVisible();
+    await expect(page.locator("text=/received an invitation/i")).toBeVisible();
+    await expect(page.locator('a[href="/signup"]')).toHaveText(/complete your sign up/i);
     await expect(page.locator("#name")).toHaveCount(0);
-    await expect(page.locator("text=/sign.?up|create.?account/i")).toHaveCount(0);
   });
 
   test("submit button is disabled until form is valid", async ({ page }) => {

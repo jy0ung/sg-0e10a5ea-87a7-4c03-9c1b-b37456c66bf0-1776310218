@@ -164,14 +164,14 @@ test.describe("HRMS Admin — Settings Hub (/hrms/admin)", () => {
     await page.goto("/hrms/admin");
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
     // MOCK_PROFILE role is 'company_admin' which is in HRMS_ADMIN_ROLES
-    const newBtn = page.getByRole("button", { name: /\+ New/i }).first();
+    const newBtn = page.getByRole("button", { name: /new department/i }).first();
     await expect(newBtn).toBeVisible({ timeout: 10000 });
   });
 
   test("clicking + New Department opens the dialog", async ({ page }) => {
     await page.goto("/hrms/admin");
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-    await page.getByRole("button", { name: /\+ New/i }).first().click();
+    await page.getByRole("button", { name: /new department/i }).first().click();
     await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
   });
 });
@@ -199,7 +199,7 @@ test.describe("HRMS Admin — Approval Flows (/hrms/approval-flows)", () => {
   test("shows Leave Request badge for the mock flow", async ({ page }) => {
     await page.goto("/hrms/approval-flows");
     await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-    await expect(page.getByText("Leave Request")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("table").getByText("Leave Request")).toBeVisible({ timeout: 10000 });
   });
 
   test("clicking + New Flow opens the builder dialog", async ({ page }) => {
