@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": {
+      "@/*": ["../../src/*"],
+      "@hrms-web/*": ["./src/*"],
+      "@flc/types": ["../../packages/types/src/index.ts"],
+      "@flc/supabase": ["../../packages/supabase/src/index.ts"],
+      "@flc/hrms-schemas": ["../../packages/hrms-schemas/src/index.ts"],
+      "@flc/hrms-services": ["../../packages/hrms-services/src/index.ts"]
+    },
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "target": "ES2020",
+    "types": ["vite/client"],
+    "useDefineForClassFields": true
+  },
+  "include": ["src"]
+}

@@ -274,6 +274,8 @@ Acceptance criteria:
 
 ### Phase 3: Bring Over Core HRMS Pages
 
+Status: Started on 2026-04-28. Current implementation evidence is tracked in `docs/PHASE3_HRMS_WEB.md`.
+
 Initial priority pages:
 
 1. leave

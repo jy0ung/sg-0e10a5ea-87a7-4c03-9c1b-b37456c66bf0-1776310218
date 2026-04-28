@@ -7,6 +7,8 @@
 # SPA fallback and a read-only filesystem.
 # ----------------------------------------------------------------------------
 # Build args:
+#   BUILD_WORKSPACE, BUILD_OUTPUT_DIR — optional workspace build target and
+#   dist directory. Defaults keep the root app behavior.
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_APP_ENV, VITE_SENTRY_DSN,
 #   VITE_APP_URL, VITE_APP_VERSION — inlined into the client bundle. Only public values.
 # ============================================================================
@@ -33,6 +35,8 @@ ARG VITE_APP_ENV=production
 ARG VITE_SENTRY_DSN
 ARG VITE_APP_URL
 ARG VITE_APP_VERSION
+ARG BUILD_WORKSPACE=
+ARG BUILD_OUTPUT_DIR=dist
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY \
     VITE_APP_ENV=$VITE_APP_ENV \
@@ -40,7 +44,10 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_APP_URL=$VITE_APP_URL \
     VITE_APP_VERSION=$VITE_APP_VERSION
 
-RUN npm run build
+RUN if [ -n "$BUILD_WORKSPACE" ]; then npm run build --workspace "$BUILD_WORKSPACE"; else npm run build; fi \
+    && rm -rf /app/.deploy-dist \
+    && mkdir -p /app/.deploy-dist \
+    && cp -a "$BUILD_OUTPUT_DIR"/. /app/.deploy-dist/
 
 # ---------------------------------------------------------------------------
 FROM nginx:1.27-alpine AS runtime
@@ -52,8 +59,8 @@ RUN rm /etc/nginx/conf.d/default.conf
 COPY docker/nginx.conf /etc/nginx/conf.d/app.conf
 RUN sed -i "s|__SUPABASE_INTERNAL_URL__|${SUPABASE_INTERNAL_URL}|g" /etc/nginx/conf.d/app.conf
 
-# Copy static bundle. Vite's default output dir is `dist`.
-COPY --from=build /app/dist /usr/share/nginx/html
+# Copy static bundle selected by the build stage.
+COPY --from=build /app/.deploy-dist /usr/share/nginx/html
 
 # Non-root runtime. The stock nginx image already creates user `nginx`.
 RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx \
