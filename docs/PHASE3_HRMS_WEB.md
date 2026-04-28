@@ -32,6 +32,7 @@ Delivered:
   - `/approval-flows`
 - Added compatibility redirects from existing main-app HRMS paths such as `/hrms/leave` to the dedicated route shape.
 - Kept non-HRMS modules out of the dedicated route tree.
+- UAT routing decision, 2026-04-28: keep `https://uat.protonfookloi.com` as the main Fook Loi Group UBS app and mount the dedicated HRMS web app at `https://uat.protonfookloi.com/hrms/` until a separate HRMS subdomain is provisioned.
 
 Validation:
 

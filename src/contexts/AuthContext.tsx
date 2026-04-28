@@ -64,6 +64,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function getBasePath(): string {
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  if (baseUrl === '/') return '';
+  return baseUrl.replace(/\/$/, '');
+}
+
+function getAppPath(pathname: string): string {
+  const basePath = getBasePath();
+  if (!basePath || !pathname.startsWith(basePath)) return pathname;
+  return pathname.slice(basePath.length) || '/';
+}
+
+function toAppPath(pathname: string): string {
+  return `${getBasePath()}${pathname}`;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -83,7 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // that window they may have no profile row yet (or a pending one) and we
     // MUST NOT sign them out — doing so kills the very session they need to
     // call auth.updateUser().
-    const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+    const pathname = typeof window !== 'undefined' ? getAppPath(window.location.pathname) : '';
     const isOnboardingRoute = pathname === '/signup' || pathname === '/reset-password';
     const isPendingRoute = pathname === '/account-pending';
 
@@ -96,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(null);
       setProfileError(null);
       if (typeof window !== 'undefined' && !isPendingRoute && !isOnboardingRoute) {
-        window.location.replace('/account-pending');
+        window.location.replace(toAppPath('/account-pending'));
       }
     };
 

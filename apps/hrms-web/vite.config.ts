@@ -5,6 +5,7 @@ import path from 'path';
 const rootDir = path.resolve(__dirname, '../..');
 
 export default defineConfig({
+  base: process.env.VITE_BASE_PATH || '/',
   envDir: rootDir,
   envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   plugins: [react()],

@@ -7,8 +7,9 @@
 # SPA fallback and a read-only filesystem.
 # ----------------------------------------------------------------------------
 # Build args:
-#   BUILD_WORKSPACE, BUILD_OUTPUT_DIR — optional workspace build target and
-#   dist directory. Defaults keep the root app behavior.
+#   BUILD_WORKSPACE, BUILD_OUTPUT_DIR — optional single workspace build target
+#   and dist directory. Defaults keep the root app behavior.
+#   BUILD_HRMS_WEB — when true, build the root app at `/` and HRMS web at `/hrms/`.
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_APP_ENV, VITE_SENTRY_DSN,
 #   VITE_APP_URL, VITE_APP_VERSION — inlined into the client bundle. Only public values.
 # ============================================================================
@@ -37,6 +38,7 @@ ARG VITE_APP_URL
 ARG VITE_APP_VERSION
 ARG BUILD_WORKSPACE=
 ARG BUILD_OUTPUT_DIR=dist
+ARG BUILD_HRMS_WEB=false
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY \
     VITE_APP_ENV=$VITE_APP_ENV \
@@ -47,7 +49,12 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
 RUN if [ -n "$BUILD_WORKSPACE" ]; then npm run build --workspace "$BUILD_WORKSPACE"; else npm run build; fi \
     && rm -rf /app/.deploy-dist \
     && mkdir -p /app/.deploy-dist \
-    && cp -a "$BUILD_OUTPUT_DIR"/. /app/.deploy-dist/
+        && cp -a "$BUILD_OUTPUT_DIR"/. /app/.deploy-dist/ \
+        && if [ "$BUILD_HRMS_WEB" = "true" ]; then \
+            VITE_BASE_PATH=/hrms/ npm run build --workspace apps/hrms-web \
+            && mkdir -p /app/.deploy-dist/hrms \
+            && cp -a apps/hrms-web/dist/. /app/.deploy-dist/hrms/; \
+        fi
 
 # ---------------------------------------------------------------------------
 FROM nginx:1.27-alpine AS runtime

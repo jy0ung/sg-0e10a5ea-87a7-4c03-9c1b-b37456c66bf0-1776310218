@@ -121,6 +121,10 @@ const hrmsCompatibilityRedirects = [
   { path: 'hrms/approval-flows', to: '/approval-flows' },
 ];
 
+const routerBaseName = import.meta.env.BASE_URL === '/'
+  ? '/'
+  : import.meta.env.BASE_URL.replace(/\/$/, '');
+
 const router = createBrowserRouter([
   {
     path: '/',
@@ -151,7 +155,7 @@ const router = createBrowserRouter([
   { path: '/signup', element: <S><SignUpPage /></S> },
   { path: '/account-pending', element: <S><AccountPending /></S> },
   { path: '*', element: <S><NotFound /></S> },
-]);
+], { basename: routerBaseName });
 
 export default function App() {
   return (
