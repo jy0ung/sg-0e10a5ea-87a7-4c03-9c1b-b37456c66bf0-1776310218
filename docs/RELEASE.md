@@ -30,7 +30,40 @@ The release workflow supports three image targets:
 | `main` | `ghcr.io/<owner>/<repo>:<tag>` | Root app only. |
 | `hrms-web` | `ghcr.io/<owner>/<repo>-hrms-web:<tag>` | Standalone `apps/hrms-web` app for an HRMS subdomain. |
 
-Use the manual Release workflow with `build_target=hrms-web` to publish a standalone HRMS image. Use the Deploy Image workflow with `app=hrms-web` and an HRMS-specific environment such as `uat-hrms` or `production-hrms` to deploy that image to a separate container/port/domain.
+Use the manual Release workflow with `build_target=hrms-web` to publish a standalone HRMS image. Select the Release workflow `environment` that owns the browser build secrets, such as `uat-hrms` or `production-hrms`. Use the Deploy Image workflow with `app=hrms-web` and the matching deploy environment to deploy that image to a separate container/port/domain.
+
+The Vite public environment is baked into each static image at build time. Publish separate HRMS images for UAT and production when their browser origins or Supabase projects differ; do not promote a UAT-built HRMS image to production or a production-built HRMS image back to UAT.
+
+Standalone HRMS UAT release values:
+
+| Secret / input | Value |
+| -------------- | ----- |
+| Release `environment` | `uat-hrms` |
+| Release `build_target` | `hrms-web` |
+| Release `VITE_SUPABASE_URL` | `https://uat.protonfookloi.com` |
+| Release `VITE_SUPABASE_ANON_KEY` | UAT anon/publishable key |
+| Release `VITE_APP_URL` | `https://hrms-uat.protonfookloi.com` |
+| Deploy `environment` | `uat-hrms` |
+| Deploy `app` | `hrms-web` |
+| Deploy `DEPLOY_CONTAINER_NAME` | `flc-bi-hrms-uat` |
+| Deploy `DEPLOY_HOST_PORT` | `8082` |
+| Deploy `UAT_URL` | `https://hrms-uat.protonfookloi.com` |
+| Deploy `UAT_EXPECTED_SUPABASE_URL` | `https://uat.protonfookloi.com` |
+| Deploy `UAT_HEALTH_URL` | `https://hrms-uat.protonfookloi.com/healthz` |
+
+Standalone HRMS production release values:
+
+| Secret / input | Value |
+| -------------- | ----- |
+| Release `environment` | `production-hrms` |
+| Release `build_target` | `hrms-web` |
+| Release `VITE_SUPABASE_URL` | Production browser-facing Supabase URL |
+| Release `VITE_SUPABASE_ANON_KEY` | Production anon/publishable key |
+| Release `VITE_APP_URL` | `https://hrms.protonfookloi.com` |
+| Deploy `environment` | `production-hrms` |
+| Deploy `app` | `hrms-web` |
+| Deploy `DEPLOY_CONTAINER_NAME` | Production HRMS container name |
+| Deploy `DEPLOY_HOST_PORT` | Production HRMS host port |
 
 For UAT break/fix validation before publishing a GHCR image, the host can run:
 

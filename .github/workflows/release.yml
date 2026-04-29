@@ -35,6 +35,16 @@ on:
       tag:
         description: 'Release tag (e.g. v1.2.0)'
         required: true
+      environment:
+        description: 'Environment secrets to use for browser build values'
+        type: choice
+        required: true
+        default: production
+        options:
+          - uat
+          - uat-hrms
+          - production
+          - production-hrms
       build_target:
         description: 'Docker image target to build'
         type: choice
@@ -53,6 +63,8 @@ jobs:
   build-and-publish:
     name: Build & Publish Docker image
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment || 'production' }}
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
@@ -64,8 +76,34 @@ jobs:
       build_output_dir: ${{ steps.build-target.outputs.output_dir }}
       build_hrms_web: ${{ steps.build-target.outputs.build_hrms_web }}
       image_name: ${{ steps.img.outputs.name }}
+      release_environment: ${{ steps.release-env.outputs.value }}
+      app_env: ${{ steps.release-env.outputs.app_env }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve release environment
+        id: release-env
+        env:
+          INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          release_environment="${INPUT_ENVIRONMENT:-production}"
+
+          case "$release_environment" in
+            uat|uat-hrms)
+              app_env="staging"
+              ;;
+            production|production-hrms)
+              app_env="production"
+              ;;
+            *)
+              echo "Unsupported release environment: $release_environment" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "value=$release_environment" >> "$GITHUB_OUTPUT"
+          echo "app_env=$app_env" >> "$GITHUB_OUTPUT"
 
       - name: Resolve tag
         id: tag
@@ -179,7 +217,7 @@ jobs:
           build-args: |
             VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
             VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
-            VITE_APP_ENV=production
+            VITE_APP_ENV=${{ steps.release-env.outputs.app_env }}
             VITE_APP_URL=${{ secrets.VITE_APP_URL }}
             VITE_HRMS_APP_URL=${{ secrets.VITE_HRMS_APP_URL }}
             VITE_APP_VERSION=${{ steps.tag.outputs.value }}
@@ -194,6 +232,10 @@ jobs:
           {
             echo "### Release ${{ steps.tag.outputs.value }}"
             echo ""
+            echo "**Environment:** ${{ steps.release-env.outputs.value }}"
+            echo ""
+            echo "**Vite app env:** ${{ steps.release-env.outputs.app_env }}"
+            echo ""
             echo "**Build target:** \`${{ steps.build-target.outputs.value }}\`"
             echo ""
             echo "**Image tags:**"
@@ -207,6 +249,8 @@ jobs:
     name: Sentry release + source maps
     needs: build-and-publish
     runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.build-and-publish.outputs.release_environment }}
     if: ${{ vars.ENABLE_SENTRY_RELEASE == 'true' }}
     steps:
       - uses: actions/checkout@v4
@@ -220,7 +264,7 @@ jobs:
           BUILD_SOURCEMAP: 'true'
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_APP_ENV: production
+          VITE_APP_ENV: ${{ needs.build-and-publish.outputs.app_env }}
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
           VITE_HRMS_APP_URL: ${{ secrets.VITE_HRMS_APP_URL }}
           VITE_APP_VERSION: ${{ needs.build-and-publish.outputs.version }}
