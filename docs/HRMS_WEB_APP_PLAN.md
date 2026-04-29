@@ -328,7 +328,7 @@ Do this incrementally, not as a prerequisite for the first HRMS web launch.
 
 ### Phase 5: Standalone HRMS Rollout
 
-Status: UAT subdomain validated on 2026-04-29. Production rollout remains gated on release tagging, CI/CD environment secrets, production DNS, and production auth verification.
+Status: UAT subdomain validated on 2026-04-29 with the official standalone HRMS GHCR image. Production rollout remains gated on production DNS, production Supabase/auth verification, and production deploy secrets.
 
 Completed UAT deliverables:
 
@@ -338,12 +338,15 @@ Completed UAT deliverables:
 - standalone HRMS password-reset email flow verified on the HRMS UAT domain
 - reset link handling fixed for Supabase recovery callbacks that are consumed before the React page reads URL parameters
 - local break/fix deployment path added through `scripts/deploy-hrms-uat-local.sh`
+- official standalone HRMS image published from Release workflow run `25108328607`
+- official standalone HRMS image deployed to HRMS UAT through the local health-gated deploy script
 - standalone HRMS verifier passes against `https://hrms-uat.protonfookloi.com`
 
 Current UAT evidence:
 
 - live HRMS UAT container: `flc-bi-hrms-uat`
-- latest validated local image: `flc-bi-uat:hrms-web-uat-helper-20260429-r2`
+- latest validated image: `ghcr.io/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218-hrms-web:0.1.0`
+- release run: `25108328607`, `v0.1.0`, digest `sha256:92de21a8433b8dbb1bded9f69e359fd6dbfb4efa5ab3ed3c9a201da75ec84192`
 - public health check: `https://hrms-uat.protonfookloi.com/healthz` returns `ok`
 - verifier: `UAT_APP=hrms-web UAT_URL=https://hrms-uat.protonfookloi.com UAT_EXPECTED_SUPABASE_URL=https://uat.protonfookloi.com UAT_HEALTH_URL=https://hrms-uat.protonfookloi.com/healthz npm run verify:uat` passed
 - fresh Mailpit reset email redirects to `https://hrms-uat.protonfookloi.com/reset-password` and opens the `Set your new password` form
@@ -352,11 +355,11 @@ Gap assessment, 2026-04-29:
 
 | Area | Status | Gap | Required action |
 | ---- | ------ | --- | --------------- |
-| UAT standalone domain | Closed | None for shell, health, bundle config, mocked-auth shell smoke, and reset-link landing | Keep `scripts/deploy-hrms-uat-local.sh` for break/fix validation until GHCR release is published |
+| UAT standalone domain | Closed | None for shell, health, bundle config, mocked-auth shell smoke, and reset-link landing on the official `hrms-web:0.1.0` image | Keep `scripts/deploy-hrms-uat-local.sh` for break/fix validation; use GHCR image tags for release candidates |
 | UAT credentialed automation | Partial | The standalone verifier currently skips real login unless secrets are supplied | Configure `UAT_LOGIN_EMAIL`, `UAT_LOGIN_PASSWORD`, and optionally `UAT_LOGIN_REQUIRED=1` for the `uat-hrms` GitHub environment |
 | Password update acceptance | Partial | Reset link landing is verified; changing the user's real password was not automated to avoid altering a user credential without an explicit acceptance step | Have the user complete one password update in UAT, then log in with the new password and record evidence |
-| Release publication | Open | Local UAT image is validated, but no immutable GHCR `hrms-web` release tag has been published | Choose first semver tag, run Release workflow with `build_target=hrms-web`, then deploy with `app=hrms-web` to `uat-hrms` |
-| CI/CD deploy environments | Open | `uat-hrms` and `production-hrms` secrets must match the standalone container names, ports, URLs, and Cloudflare Access SSH target | Add environment secrets for HRMS container `flc-bi-hrms-uat`, UAT host port `8082`, HRMS UAT URL, expected Supabase URL, and GHCR read credentials if needed |
+| Release publication | Closed | `v0.1.0` was published as GHCR image tag `0.1.0` | Use `TAG=v0.1.0` for Release workflow dispatch and `IMAGE_TAG=0.1.0` for deploy workflow dispatch |
+| CI/CD deploy environments | Partial | `uat-hrms` release/verifier secrets are set, but GitHub Deploy workflow still lacks SSH and Cloudflare Access service-token secrets | Add `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET` to `uat-hrms`; add full production equivalents later |
 | Production DNS/ingress | Open | `hrms.protonfookloi.com` is not yet deployed or verified | Add Cloudflare tunnel ingress/DNS for production HRMS and map it to the production HRMS container/upstream |
 | Production Supabase/auth | Open | Production auth allow-list and SMTP/reset email behavior still need live verification | Confirm production Supabase redirect URLs include `https://hrms.protonfookloi.com/reset-password`; send a recovery email and verify redirect acceptance |
 | Production launch evidence | Open | No production health, login, reset, or HRMS workflow evidence exists yet | Run production verifier equivalent plus manual smoke for login, leave, appraisals, approvals, and reset-password |
@@ -365,12 +368,11 @@ Gap assessment, 2026-04-29:
 Updated Phase 5 implementation sequence:
 
 1. Complete UAT acceptance by having a real user update their password from the HRMS UAT reset form and log in with the new password.
-2. Configure `uat-hrms` GitHub environment secrets so `deploy-image.yml` can deploy and verify the standalone HRMS image without host-local manual builds.
-3. Select the first semver release tag for the standalone HRMS image, publish through the Release workflow with `build_target=hrms-web`, and deploy that immutable image to `uat-hrms`.
-4. Replace the current local helper-built UAT image with the GHCR-published image and rerun the standalone verifier with credentialed login enabled.
-5. Configure production HRMS DNS/Cloudflare ingress and production deploy environment secrets.
-6. Deploy the `hrms-web` image to `production-hrms` and validate health, bundle config, login, password reset, and representative HRMS workflows.
-7. Send user communications and set a support/rollback window.
+2. Add the missing `uat-hrms` SSH/Cloudflare Access deploy secrets so `deploy-image.yml` can deploy and verify the standalone HRMS image without host-local manual deploys.
+3. Rerun the standalone verifier with credentialed login enabled.
+4. Configure production HRMS DNS/Cloudflare ingress and production deploy environment secrets.
+5. Deploy the `hrms-web` image to `production-hrms` and validate health, bundle config, login, password reset, and representative HRMS workflows.
+6. Send user communications and set a support/rollback window.
 
 Acceptance criteria for Phase 5 closure:
 

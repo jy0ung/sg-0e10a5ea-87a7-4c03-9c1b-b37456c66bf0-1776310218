@@ -2,6 +2,7 @@
 set -euo pipefail
 
 TAG="${TAG:-v0.1.0}"
+IMAGE_TAG="${IMAGE_TAG:-${TAG#v}}"
 RELEASE_ENVIRONMENT="${RELEASE_ENVIRONMENT:-uat-hrms}"
 DEPLOY_ENVIRONMENT="${DEPLOY_ENVIRONMENT:-$RELEASE_ENVIRONMENT}"
 REF="${REF:-main}"
@@ -50,12 +51,12 @@ EOF
 if [[ "$DEPLOY_AFTER_RELEASE" == "1" || "$DEPLOY_AFTER_RELEASE" == "true" ]]; then
   scripts/check-hrms-github-env.sh "$DEPLOY_ENVIRONMENT" deploy
   printf 'Dispatching Deploy Image workflow: environment=%s app=hrms-web image_tag=%s ref=%s\n' \
-    "$DEPLOY_ENVIRONMENT" "$TAG" "$REF"
+    "$DEPLOY_ENVIRONMENT" "$IMAGE_TAG" "$REF"
   gh workflow run deploy-image.yml \
     --ref "$REF" \
     --field environment="$DEPLOY_ENVIRONMENT" \
     --field app=hrms-web \
-    --field image_tag="$TAG"
+    --field image_tag="$IMAGE_TAG"
 
   cat <<EOF
 
@@ -69,9 +70,9 @@ else
   cat <<EOF
 
 After the Release workflow succeeds, deploy with:
-  DEPLOY_AFTER_RELEASE=1 TAG=$TAG RELEASE_ENVIRONMENT=$RELEASE_ENVIRONMENT DEPLOY_ENVIRONMENT=$DEPLOY_ENVIRONMENT scripts/release-hrms-web.sh
+  DEPLOY_AFTER_RELEASE=1 TAG=$TAG IMAGE_TAG=$IMAGE_TAG RELEASE_ENVIRONMENT=$RELEASE_ENVIRONMENT DEPLOY_ENVIRONMENT=$DEPLOY_ENVIRONMENT scripts/release-hrms-web.sh
 
 Or dispatch Deploy Image manually with:
-  gh workflow run deploy-image.yml --ref $REF --field environment=$DEPLOY_ENVIRONMENT --field app=hrms-web --field image_tag=$TAG
+  gh workflow run deploy-image.yml --ref $REF --field environment=$DEPLOY_ENVIRONMENT --field app=hrms-web --field image_tag=$IMAGE_TAG
 EOF
 fi

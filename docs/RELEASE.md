@@ -34,6 +34,8 @@ Use the manual Release workflow with `build_target=hrms-web` to publish a standa
 
 The Vite public environment is baked into each static image at build time. Publish separate HRMS images for UAT and production when their browser origins or Supabase projects differ; do not promote a UAT-built HRMS image to production or a production-built HRMS image back to UAT.
 
+Release workflow tags use the git-style `v` prefix, such as `v0.1.0`. The Docker metadata action publishes semver image tags without that prefix, such as `0.1.0`, plus `0.1`, `latest`, and a `sha-...` tag.
+
 Standalone HRMS UAT release values:
 
 | Secret / input | Value |
@@ -83,7 +85,7 @@ TAG=v0.1.0 RELEASE_ENVIRONMENT=uat-hrms scripts/release-hrms-web.sh
 After the Release workflow succeeds, deploy the published image to HRMS UAT with:
 
 ```bash
-TAG=v0.1.0 RELEASE_ENVIRONMENT=uat-hrms DEPLOY_ENVIRONMENT=uat-hrms DEPLOY_AFTER_RELEASE=1 scripts/release-hrms-web.sh
+TAG=v0.1.0 IMAGE_TAG=0.1.0 RELEASE_ENVIRONMENT=uat-hrms DEPLOY_ENVIRONMENT=uat-hrms DEPLOY_AFTER_RELEASE=1 scripts/release-hrms-web.sh
 ```
 
 For production, use the same helper with `RELEASE_ENVIRONMENT=production-hrms` and `DEPLOY_ENVIRONMENT=production-hrms` after production DNS, Supabase auth redirects, and deploy secrets are ready.

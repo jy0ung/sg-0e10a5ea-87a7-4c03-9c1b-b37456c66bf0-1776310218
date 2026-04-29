@@ -63,7 +63,7 @@ on:
           - main
           - hrms-web
       image_tag:
-        description: 'Image tag to deploy (e.g. v1.2.0 or sha-abc1234)'
+        description: 'Image tag to deploy (e.g. 1.2.0 or sha-abc1234; semver image tags omit the leading v)'
         required: true
 
 permissions:
