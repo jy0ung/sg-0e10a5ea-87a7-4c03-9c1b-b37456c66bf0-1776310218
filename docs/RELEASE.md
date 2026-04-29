@@ -139,6 +139,9 @@ It fails on health, bundle configuration, or required-login regressions without
 needing a deploy event. Set `UAT_VERIFY_FETCH_ATTEMPTS` if the synthetic check
 needs a different retry count than the default three attempts.
 
+For a manual standalone HRMS UAT check after adding `uat-hrms` login secrets,
+dispatch `uat-synthetic.yml` with `environment=uat-hrms` and `app=hrms-web`.
+
 ## Phase 1 closure
 
 Phase 1 performance hardening is closed as of 2026-04-27. The release criteria
