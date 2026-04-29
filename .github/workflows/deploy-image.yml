@@ -183,7 +183,7 @@ jobs:
              GHCR_TOKEN='${GHCR_TOKEN:-}' \
              /tmp/deploy-image.sh '${IMAGE}'"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         if: ${{ startsWith(steps.env.outputs.value, 'uat') }}
         with:
           node-version: '20'

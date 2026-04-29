@@ -118,7 +118,7 @@ jobs:
       # Typecheck + unit tests still run in-repo so we never ship an image
       # that failed verification. The Docker build stage runs its own
       # `npm run build`, so we do NOT pre-build dist/ here.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -210,7 +210,7 @@ jobs:
     if: ${{ vars.ENABLE_SENTRY_RELEASE == 'true' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
