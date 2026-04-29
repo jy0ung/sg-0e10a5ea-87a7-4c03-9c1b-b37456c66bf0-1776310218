@@ -192,6 +192,9 @@ This is simpler, safer, and aligned with the current implementation.
 
 Set `VITE_APP_URL` for the HRMS web app to the HRMS domain so password-reset and auth redirects resolve correctly.
 Set `VITE_HRMS_APP_URL` for the main app when the launcher should send users to a separate HRMS origin instead of the same-origin `/hrms/` mount.
+Keep `VITE_SUPABASE_ANON_KEY` in the standalone HRMS build args; the dedicated app will not boot without it even if `VITE_SUPABASE_URL` is correct.
+
+For the local/self-hosted Supabase config, disable public signup at `[auth].enable_signup = false`, but leave `[auth.email].enable_signup = true` so invited users can still sign in and request password resets.
 
 Example:
 

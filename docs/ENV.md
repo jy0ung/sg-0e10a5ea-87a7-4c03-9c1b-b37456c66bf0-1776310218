@@ -7,8 +7,8 @@ Required values are loaded at boot and validated by the zod schema in `src/confi
 | Variable                | Purpose                                     | Notes                              |
 | ----------------------- | ------------------------------------------- | ---------------------------------- |
 | `VITE_SUPABASE_URL`     | Browser-facing Supabase URL                 | `http://127.0.0.1:54321` locally; for self-hosted UAT behind nginx, use the public app origin so browsers call same-origin proxy paths. |
-| `VITE_SUPABASE_ANON_KEY`| Supabase anon/publishable key               | From `supabase start` output       |
-| `VITE_APP_URL`          | Canonical app URL used for auth redirects   | Must match browser origin. `VITE_SITE_URL` still accepted as a legacy fallback. |
+| `VITE_SUPABASE_ANON_KEY`| Supabase anon/publishable key               | From `supabase start` output. Required for every web build target, including standalone `apps/hrms-web`; omitting it causes the client to fail boot with missing Supabase env errors. |
+| `VITE_APP_URL`          | Canonical app URL used for auth redirects   | Must match browser origin. `VITE_SITE_URL` still accepted as a legacy fallback. Standalone HRMS builds must set this to the HRMS domain so recovery links redirect to `/reset-password` on `hrms-...`, not a localhost smoke URL. |
 
 ## Optional
 
@@ -42,3 +42,12 @@ Set via `supabase secrets set` — never via client env:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `RESEND_API_KEY` (or SMTP equivalents)
 - `PUSH_NOTIFICATION_KEY`
+
+## Supabase auth config
+
+`supabase/config.toml` now follows the current Supabase CLI schema:
+
+- keep public self-signup disabled at `[auth].enable_signup = false`
+- keep email auth enabled at `[auth.email].enable_signup = true` so email login and password recovery still work
+
+Disabling signup under `[auth.email]` turns off the email provider entirely and breaks password reset.
