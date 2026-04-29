@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/attendance', emoji: '⏱️',  label: 'Attendance',  desc: 'Clock in / out' },
   { to: '/announcements', emoji: '📣', label: 'Updates',   desc: 'Company notices' },
   { to: '/appraisals', emoji: '⭐', label: 'Appraisals',    desc: 'Reviews and goals' },
+  { to: '/notifications', emoji: '🔔', label: 'Alerts',    desc: 'Approvals and updates' },
   { to: '/payslip',    emoji: '💵',  label: 'Payslips',    desc: 'View pay history' },
   { to: '/profile',    emoji: '👤',  label: 'Profile',     desc: 'My account' },
 ];

@@ -8,7 +8,7 @@
  * No React hooks, no audit logging dependency — thin, testable wrappers.
  */
 import { supabase } from '@flc/supabase';
-import type { Announcement, AppraisalCycle, AppraisalItem, AppraisalStatus, LeaveRequest, AttendanceRecord, LeaveType } from '@flc/types';
+import type { Announcement, AppraisalCycle, AppraisalItem, AppraisalStatus, LeaveRequest, AttendanceRecord, LeaveType, Notification } from '@flc/types';
 import type { CreateLeaveRequestFormData } from '@flc/hrms-schemas';
 
 const untypedSupabase = supabase as any;
@@ -306,6 +306,49 @@ export async function listAnnouncements(
     createdAt:   String(row.created_at),
     updatedAt:   String(row.updated_at),
   }));
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export async function listNotifications(userId: string, opts?: { limit?: number }): Promise<Notification[]> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(opts?.limit ?? 50);
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map(row => ({
+    id:        String(row.id),
+    title:     String(row.title),
+    message:   String(row.message),
+    type:      row.type as Notification['type'],
+    read:      Boolean(row.read),
+    createdAt: row.created_at ? String(row.created_at) : '',
+    userId:    String(row.user_id),
+  }));
+}
+
+export async function markNotificationRead(notificationId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('id', notificationId)
+    .eq('user_id', userId);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function markAllNotificationsRead(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('user_id', userId)
+    .eq('read', false);
+
+  if (error) throw new Error(error.message);
 }
 
 // ─── Appraisals (self-service) ───────────────────────────────────────────────

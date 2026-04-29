@@ -8,6 +8,7 @@ import LeaveHistoryScreen from '@/screens/LeaveHistoryScreen';
 import AttendanceScreen   from '@/screens/AttendanceScreen';
 import AnnouncementsScreen from '@/screens/AnnouncementsScreen';
 import AppraisalsScreen   from '@/screens/AppraisalsScreen';
+import NotificationsScreen from '@/screens/NotificationsScreen';
 import PayslipScreen      from '@/screens/PayslipScreen';
 import ProfileScreen      from '@/screens/ProfileScreen';
 
@@ -31,6 +32,7 @@ function AppRoutes() {
       <Route path="/attendance"    element={<ProtectedRoute><AttendanceScreen /></ProtectedRoute>} />
       <Route path="/announcements" element={<ProtectedRoute><AnnouncementsScreen /></ProtectedRoute>} />
       <Route path="/appraisals"    element={<ProtectedRoute><AppraisalsScreen /></ProtectedRoute>} />
+      <Route path="/notifications" element={<ProtectedRoute><NotificationsScreen /></ProtectedRoute>} />
       <Route path="/payslip"       element={<ProtectedRoute><PayslipScreen /></ProtectedRoute>} />
       <Route path="/profile"       element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
       <Route path="*"              element={<Navigate to="/" replace />} />
