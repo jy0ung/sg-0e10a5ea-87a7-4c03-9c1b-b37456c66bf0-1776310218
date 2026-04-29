@@ -73,6 +73,21 @@ scripts/deploy-hrms-uat-local.sh
 
 The helper builds `apps/hrms-web` with the HRMS UAT app URL, includes the required Supabase anon key from `.env` unless already exported, promotes the local image through the same health-gated container swap, and runs the standalone HRMS UAT verifier.
 
+Once the GitHub environment secrets are present, validate and dispatch the official standalone HRMS workflows with:
+
+```bash
+scripts/check-hrms-github-env.sh uat-hrms
+TAG=v0.1.0 RELEASE_ENVIRONMENT=uat-hrms scripts/release-hrms-web.sh
+```
+
+After the Release workflow succeeds, deploy the published image to HRMS UAT with:
+
+```bash
+TAG=v0.1.0 RELEASE_ENVIRONMENT=uat-hrms DEPLOY_ENVIRONMENT=uat-hrms DEPLOY_AFTER_RELEASE=1 scripts/release-hrms-web.sh
+```
+
+For production, use the same helper with `RELEASE_ENVIRONMENT=production-hrms` and `DEPLOY_ENVIRONMENT=production-hrms` after production DNS, Supabase auth redirects, and deploy secrets are ready.
+
 ## Environments
 
 | Env        | Supabase project          | URL                         |
