@@ -386,7 +386,7 @@ Acceptance criteria for Phase 5 closure:
 
 ### Phase 6: Mobile Expansion
 
-Status: Started on 2026-04-29 with read-only company announcements, employee appraisal self-review and acknowledgement, and the mobile notification inbox in `apps/hrms-mobile`.
+Status: Completed on 2026-04-29 with read-only company announcements, employee appraisal self-review and acknowledgement, a mobile notification inbox, and enhanced mobile profile management in `apps/hrms-mobile`.
 
 After HRMS web launch, extend `apps/hrms-mobile` with the next employee-first flows:
 
@@ -394,7 +394,7 @@ After HRMS web launch, extend `apps/hrms-mobile` with the next employee-first fl
 2. appraisal self review - shipped for assigned employee appraisal items
 3. appraisal acknowledgement - shipped after manager review is completed
 4. approval notifications - shipped as a mobile notification inbox with realtime inserts and mark-read actions
-5. profile improvements
+5. profile improvements - shipped with richer employee details, synced contact-number updates, and account actions
 
 Keep web as the primary channel for admin-heavy HRMS workflows unless mobile usage proves necessary.
 

@@ -10,6 +10,7 @@ interface AuthContextValue {
   loading:  boolean;
   signIn:   (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut:  () => Promise<void>;
+  refreshEmployee: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -108,8 +109,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setEmployee(null);
   }
 
+  async function refreshEmployee() {
+    if (!session?.user?.id) return;
+    await loadEmployee(session.user.id);
+  }
+
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, employee, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, employee, loading, signIn, signOut, refreshEmployee }}>
       {children}
     </AuthContext.Provider>
   );
