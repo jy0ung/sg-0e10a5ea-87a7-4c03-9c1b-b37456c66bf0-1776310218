@@ -51,13 +51,14 @@ interface CategoryDef {
   label: string;
   icon: React.ElementType;
   description: string;
+  summary: string;
 }
 
 const CATEGORIES: CategoryDef[] = [
-  { id: 'departments',  label: 'Departments',     icon: Building2,   description: 'Organise employees into departments and assign department heads.' },
-  { id: 'job-titles',   label: 'Job Titles',       icon: Briefcase,   description: 'Define job titles and optionally link them to departments.' },
-  { id: 'leave-types',  label: 'Leave Types',      icon: Calendar,    description: 'Configure leave types, entitlements, and paid/unpaid status.' },
-  { id: 'holidays',     label: 'Holiday Calendar', icon: CalendarDays, description: 'Manage public and company holidays.' },
+  { id: 'departments',  label: 'Departments',     icon: Building2,    description: 'Organise employees into departments and assign department heads.', summary: 'Teams and cost centres' },
+  { id: 'job-titles',   label: 'Job Titles',       icon: Briefcase,    description: 'Define job titles and optionally link them to departments.', summary: 'Roles and seniority' },
+  { id: 'leave-types',  label: 'Leave Types',      icon: Calendar,     description: 'Configure leave types, entitlements, and paid/unpaid status.', summary: 'Entitlements and rules' },
+  { id: 'holidays',     label: 'Holiday Calendar', icon: CalendarDays, description: 'Manage public and company holidays.', summary: 'Company calendar' },
 ];
 
 const JOB_LEVELS: { value: JobTitleLevel; label: string }[] = [
@@ -74,6 +75,41 @@ const NONE_SELECT_VALUE = '__none__';
 
 function cn(...classes: (string | undefined | false)[]) {
   return classes.filter(Boolean).join(' ');
+}
+
+function getCategoryDef(category: Category) {
+  return CATEGORIES.find(c => c.id === category)!;
+}
+
+interface SettingsSectionHeaderProps {
+  category: Category;
+  action?: React.ReactNode;
+  controls?: React.ReactNode;
+}
+
+function SettingsSectionHeader({ category, action, controls }: SettingsSectionHeaderProps) {
+  const def = getCategoryDef(category);
+  const Icon = def.icon;
+
+  return (
+    <div className="flex flex-col gap-4 rounded-lg border border-border bg-card/40 p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold leading-tight text-foreground">{def.label}</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{def.description}</p>
+        </div>
+      </div>
+      {(controls || action) && (
+        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+          {controls}
+          {action}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -171,17 +207,18 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
   return (
     <>
       <div className="space-y-4">
-        {canWrite && (
-          <div className="flex justify-end">
+        <SettingsSectionHeader
+          category="departments"
+          action={canWrite && (
             <Button size="sm" onClick={openCreate}>
               <Plus className="h-4 w-4 mr-1" />New Department
             </Button>
-          </div>
-        )}
-        <div className="glass-panel overflow-auto">
-          <table className="w-full text-sm">
+          )}
+        />
+        <div className="glass-panel overflow-auto rounded-lg">
+          <table className="w-full min-w-[720px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Name</th>
                 <th className="px-3 py-2 font-medium">Head</th>
                 <th className="px-3 py-2 font-medium">Cost Centre</th>
@@ -191,9 +228,9 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canWrite ? 5 : 4} className="py-8 text-center text-muted-foreground text-xs">Loading…</td></tr>
+                <tr><td colSpan={canWrite ? 5 : 4} className="py-12 text-center text-muted-foreground text-xs">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={canWrite ? 5 : 4} className="py-8 text-center text-muted-foreground text-xs">No departments yet</td></tr>
+                <tr><td colSpan={canWrite ? 5 : 4} className="py-12 text-center text-muted-foreground text-xs">No departments yet</td></tr>
               ) : rows.map(dept => (
                 <tr key={dept.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
                   <td className="px-3 py-2 font-medium">{dept.name}</td>
@@ -381,17 +418,18 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
   return (
     <>
       <div className="space-y-4">
-        {canWrite && (
-          <div className="flex justify-end">
+        <SettingsSectionHeader
+          category="job-titles"
+          action={canWrite && (
             <Button size="sm" onClick={openCreate}>
               <Plus className="h-4 w-4 mr-1" />New Job Title
             </Button>
-          </div>
-        )}
-        <div className="glass-panel overflow-auto">
-          <table className="w-full text-sm">
+          )}
+        />
+        <div className="glass-panel overflow-auto rounded-lg">
+          <table className="w-full min-w-[720px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Title</th>
                 <th className="px-3 py-2 font-medium">Department</th>
                 <th className="px-3 py-2 font-medium">Level</th>
@@ -401,9 +439,9 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canWrite ? 5 : 4} className="py-8 text-center text-muted-foreground text-xs">Loading…</td></tr>
+                <tr><td colSpan={canWrite ? 5 : 4} className="py-12 text-center text-muted-foreground text-xs">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={canWrite ? 5 : 4} className="py-8 text-center text-muted-foreground text-xs">No job titles yet</td></tr>
+                <tr><td colSpan={canWrite ? 5 : 4} className="py-12 text-center text-muted-foreground text-xs">No job titles yet</td></tr>
               ) : rows.map(jt => (
                 <tr key={jt.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
                   <td className="px-3 py-2 font-medium">{jt.name}</td>
@@ -588,17 +626,18 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
   return (
     <>
       <div className="space-y-4">
-        {canWrite && (
-          <div className="flex justify-end">
+        <SettingsSectionHeader
+          category="leave-types"
+          action={canWrite && (
             <Button size="sm" onClick={openCreate}>
               <Plus className="h-4 w-4 mr-1" />New Leave Type
             </Button>
-          </div>
-        )}
-        <div className="glass-panel overflow-auto">
-          <table className="w-full text-sm">
+          )}
+        />
+        <div className="glass-panel overflow-auto rounded-lg">
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Name</th>
                 <th className="px-3 py-2 font-medium">Code</th>
                 <th className="px-3 py-2 font-medium">Days/Year</th>
@@ -609,9 +648,9 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canWrite ? 6 : 5} className="py-8 text-center text-muted-foreground text-xs">Loading…</td></tr>
+                <tr><td colSpan={canWrite ? 6 : 5} className="py-12 text-center text-muted-foreground text-xs">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={canWrite ? 6 : 5} className="py-8 text-center text-muted-foreground text-xs">No leave types yet</td></tr>
+                <tr><td colSpan={canWrite ? 6 : 5} className="py-12 text-center text-muted-foreground text-xs">No leave types yet</td></tr>
               ) : rows.map(lt => (
                 <tr key={lt.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
                   <td className="px-3 py-2 font-medium">{lt.name}</td>
@@ -794,8 +833,10 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
   return (
     <>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <SettingsSectionHeader
+          category="holidays"
+          controls={(
+            <div className="flex items-center gap-2">
             <Label className="text-sm text-muted-foreground">Year:</Label>
             <Select value={String(yearFilter)} onValueChange={v => setYearFilter(Number(v))}>
               <SelectTrigger className="h-8 w-28 text-sm"><SelectValue /></SelectTrigger>
@@ -803,17 +844,18 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
                 {yearOptions.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          {canWrite && (
+            </div>
+          )}
+          action={canWrite && (
             <Button size="sm" onClick={openCreate}>
               <Plus className="h-4 w-4 mr-1" />New Holiday
             </Button>
           )}
-        </div>
-        <div className="glass-panel overflow-auto">
-          <table className="w-full text-sm">
+        />
+        <div className="glass-panel overflow-auto rounded-lg">
+          <table className="w-full min-w-[720px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Name</th>
                 <th className="px-3 py-2 font-medium">Date</th>
                 <th className="px-3 py-2 font-medium">Type</th>
@@ -823,9 +865,9 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canWrite ? 5 : 4} className="py-8 text-center text-muted-foreground text-xs">Loading…</td></tr>
+                <tr><td colSpan={canWrite ? 5 : 4} className="py-12 text-center text-muted-foreground text-xs">Loading…</td></tr>
               ) : displayRows.length === 0 ? (
-                <tr><td colSpan={canWrite ? 5 : 4} className="py-8 text-center text-muted-foreground text-xs">No holidays for {yearFilter}</td></tr>
+                <tr><td colSpan={canWrite ? 5 : 4} className="py-12 text-center text-muted-foreground text-xs">No holidays for {yearFilter}</td></tr>
               ) : displayRows.map(h => (
                 <tr key={h.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
                   <td className="px-3 py-2 font-medium">{h.name}</td>
@@ -924,18 +966,18 @@ export default function HrmsAdmin() {
     return <UnauthorizedAccess />;
   }
 
-  const activeDef = CATEGORIES.find(c => c.id === activeCategory)!;
-
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-4 sm:p-6">
       <PageHeader
         title="HRMS Settings"
         breadcrumbs={[{ label: 'HRMS' }, { label: 'HRMS Settings' }]}
       />
 
-      <div className="flex gap-6">
-        {/* Left nav */}
-        <nav className="w-48 shrink-0 space-y-1">
+      <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <nav className="rounded-lg border border-border bg-card/40 p-2 shadow-sm lg:sticky lg:top-6 lg:self-start">
+          <div className="px-2 pb-2 pt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Configuration
+          </div>
           {CATEGORIES.map(cat => {
             const Icon = cat.icon;
             const active = cat.id === activeCategory;
@@ -944,26 +986,30 @@ export default function HrmsAdmin() {
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
                 className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-left',
+                  'group w-full rounded-md px-3 py-2.5 text-left transition-colors',
                   active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-secondary/60 text-muted-foreground',
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
                 )}
               >
-                <Icon className="h-4 w-4 shrink-0" />
-                {cat.label}
+                <span className="flex items-start gap-3">
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium leading-5">{cat.label}</span>
+                    <span className={cn(
+                      'block truncate text-xs leading-4',
+                      active ? 'text-primary-foreground/75' : 'text-muted-foreground',
+                    )}>
+                      {cat.summary}
+                    </span>
+                  </span>
+                </span>
               </button>
             );
           })}
         </nav>
 
-        {/* Right panel */}
-        <div className="flex-1 min-w-0 space-y-4">
-          <div>
-            <h2 className="text-base font-semibold">{activeDef.label}</h2>
-            <p className="text-sm text-muted-foreground">{activeDef.description}</p>
-          </div>
-
+        <div className="min-w-0 space-y-4">
           {activeCategory === 'departments' && (
             <DepartmentsPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />
           )}
