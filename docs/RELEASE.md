@@ -20,6 +20,18 @@ lint  →  typecheck  →  unit  →  build-web  →  build-mobile  →  e2e
 - Changesets-driven semver bumps per merged PR.
 - Tags trigger a Docker image build and publish (see `docs/HOSTING.md`).
 
+## Docker Build Targets
+
+The release workflow supports three image targets:
+
+| Target | Image | Output |
+| ------ | ----- | ------ |
+| `main-with-hrms` | `ghcr.io/<owner>/<repo>:<tag>` | Root app plus HRMS web mounted at `/hrms/`. This is the default for tag releases and current UAT. |
+| `main` | `ghcr.io/<owner>/<repo>:<tag>` | Root app only. |
+| `hrms-web` | `ghcr.io/<owner>/<repo>-hrms-web:<tag>` | Standalone `apps/hrms-web` app for an HRMS subdomain. |
+
+Use the manual Release workflow with `build_target=hrms-web` to publish a standalone HRMS image. Use the Deploy Image workflow with `app=hrms-web` and an HRMS-specific environment such as `uat-hrms` or `production-hrms` to deploy that image to a separate container/port/domain.
+
 ## Environments
 
 | Env        | Supabase project          | URL                         |

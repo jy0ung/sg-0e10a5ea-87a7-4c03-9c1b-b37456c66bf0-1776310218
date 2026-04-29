@@ -29,6 +29,7 @@ import type { Appraisal, ApprovalDecision, LeaveRequest, PayrollRun } from '@/ty
 import {
   buildApprovalInboxItems,
   filterApprovalInboxItems,
+  getApprovalInboxSourcePath,
   notifyApprovalInboxChanged,
   type ApprovalInboxEntityType,
   type ApprovalInboxFilter,
@@ -364,13 +365,7 @@ export default function ApprovalInbox() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => navigate(
-                          isLeaveItem
-                            ? '/hrms/leave'
-                            : item.entityType === 'appraisal'
-                              ? '/hrms/appraisals'
-                              : '/hrms/payroll',
-                        )}
+                        onClick={() => navigate(getApprovalInboxSourcePath(item.entityType))}
                       >
                         <Eye className="h-3.5 w-3.5 mr-1" /> Open Source Page
                       </Button>

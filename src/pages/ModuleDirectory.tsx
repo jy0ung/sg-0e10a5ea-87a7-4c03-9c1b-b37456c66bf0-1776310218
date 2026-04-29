@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
+import { isHrmsWorkspacePath, openDedicatedHrmsWorkspace } from '@/lib/hrmsWorkspace';
 import {
   Timer, DollarSign, TrendingUp, Settings, Package, Users, UserCheck, Brain,
   LayoutDashboard, Bell, HeadphonesIcon, Briefcase, BarChart3, Truck,
@@ -166,6 +167,15 @@ export default function ModuleDirectory() {
 
   const roadmapModules = modules.filter(m => m.status !== 'active');
 
+  function openModule(path?: string) {
+    if (!path) return;
+    if (isHrmsWorkspacePath(path)) {
+      openDedicatedHrmsWorkspace(path);
+      return;
+    }
+    navigate(path);
+  }
+
   return (
     <div className="space-y-8 animate-fade-in">
       <PageHeader
@@ -225,7 +235,7 @@ export default function ModuleDirectory() {
                     name={mod.name}
                     description={mod.description}
                     status={mod.status}
-                    onClick={() => mod.path && navigate(mod.path)}
+                    onClick={() => openModule(mod.path)}
                     Icon={Icon}
                     accent={section.accent}
                     iconColor={section.iconColor}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -8,20 +8,12 @@ import {
   ShoppingCart, Users, KanbanSquare, Receipt, Target, TrendingUp,
   Package, ArrowLeftRight, Truck, UserCheck, GitBranch, Database,
   TrendingDown, Landmark, Search, HeadphonesIcon, Briefcase,
-  Calendar, Clock, CreditCard, Star, Megaphone, Settings2, GitMerge
 } from 'lucide-react';
-import { HRMS_APPROVAL_INBOX_ROLES } from '@/config/hrmsConfig';
-import { HRMS_APPRAISAL_PARTICIPANT_ROLES } from '@/config/hrmsConfig';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { loadRolePermissions } from '@/config/rolePermissions';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
-import { listAppraisals, listLeaveRequests, listPayrollRuns } from '@/services/hrmsService';
-import {
-  buildApprovalInboxItems,
-  HRMS_APPROVAL_INBOX_CHANGED_EVENT,
-} from '@/lib/hrms/approvalInbox';
 
 interface NavItem {
   label: string;
@@ -30,6 +22,7 @@ interface NavItem {
   section: string;
   group?: string;
   roles?: string[];
+  external?: boolean;
 }
 
 interface SectionDef {
@@ -37,6 +30,7 @@ interface SectionDef {
   icon: React.ElementType;
   /** Entry path — navigated to when the section header is clicked in non-focused mode */
   path?: string;
+  external?: boolean;
 }
 
 const sectionDefs: SectionDef[] = [
@@ -46,7 +40,7 @@ const sectionDefs: SectionDef[] = [
   { name: 'Inventory',  icon: Package,    path: '/inventory/stock' },
   { name: 'Purchasing', icon: Truck,      path: '/purchasing/invoices' },
   { name: 'Reports',    icon: BarChart3,  path: '/reports' },
-  { name: 'HRMS',       icon: Briefcase,  path: '/hrms/employees' },
+  { name: 'HRMS',       icon: Briefcase,  path: '/hrms/', external: true },
   { name: 'Admin',      icon: Shield,     path: '/admin/settings' },
 ];
 
@@ -87,16 +81,7 @@ const navItems: NavItem[] = [
 
   { label: 'Business Reports', path: '/reports', icon: BarChart3, section: 'Reports', group: 'Workspace' },
 
-  { label: 'Employee Directory', path: '/hrms/employees', icon: Users, section: 'HRMS', group: 'Staff', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
-  { label: 'Approval Inbox', path: '/hrms/approvals', icon: UserCheck, section: 'HRMS', group: 'Approvals', roles: [...HRMS_APPROVAL_INBOX_ROLES] },
-  { label: 'Leave Management', path: '/hrms/leave', icon: Calendar, section: 'HRMS', group: 'Leave' },
-  { label: 'Leave Calendar', path: '/hrms/leave-calendar', icon: Calendar, section: 'HRMS', group: 'Leave' },
-  { label: 'Attendance Log', path: '/hrms/attendance', icon: Clock, section: 'HRMS', group: 'Attendance', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
-  { label: 'Payroll Summary', path: '/hrms/payroll', icon: CreditCard, section: 'HRMS', group: 'Payroll', roles: ['super_admin', 'company_admin', 'general_manager'] },
-  { label: 'Performance Appraisals', path: '/hrms/appraisals', icon: Star, section: 'HRMS', group: 'Performance', roles: [...HRMS_APPRAISAL_PARTICIPANT_ROLES] },
-  { label: 'Announcements', path: '/hrms/announcements', icon: Megaphone, section: 'HRMS', group: 'Communications', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
-  { label: 'HRMS Settings', path: '/hrms/admin', icon: Settings2, section: 'HRMS', group: 'Administration', roles: ['super_admin', 'company_admin', 'general_manager', 'manager'] },
-  { label: 'Approval Flows', path: '/hrms/approval-flows', icon: GitMerge, section: 'HRMS', group: 'Administration', roles: ['super_admin', 'company_admin', 'general_manager', 'manager'] },
+  { label: 'Open HRMS Workspace', path: '/hrms/', icon: Briefcase, section: 'HRMS', group: 'Workspace', external: true },
 
   { label: 'Activity Overview', path: '/admin/activity', icon: BarChart3, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin'] },
   { label: 'Audit Log', path: '/admin/audit', icon: FileText, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
@@ -135,7 +120,8 @@ function getInitials(name?: string): string {
 
 function isItemActive(path: string, pathname: string): boolean {
   if (path === '/') return pathname === '/';
-  return pathname.startsWith(path);
+  const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+  return pathname === normalizedPath || pathname.startsWith(`${normalizedPath}/`);
 }
 
 interface NavItemLinkProps {
@@ -167,18 +153,15 @@ const NavItemLink = React.memo(function NavItemLink({ item, collapsed, pathname,
   const badgeLabel = badgeCount
     ? badgeCount > 99 ? '99+' : String(badgeCount)
     : null;
-  const link = (
-    <Link
-      to={item.path}
-      onClick={onNavigate}
-      className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150",
-        collapsed && "justify-center px-2 py-2.5",
-        active
-          ? "nav-item-active"
-          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-      )}
-    >
+  const linkClassName = cn(
+    "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150",
+    collapsed && "justify-center px-2 py-2.5",
+    active
+      ? "nav-item-active"
+      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+  );
+  const linkContent = (
+    <>
       <span className="relative flex items-center">
         <item.icon className="h-4 w-4 flex-shrink-0" />
         {collapsed && badgeLabel && (
@@ -198,6 +181,23 @@ const NavItemLink = React.memo(function NavItemLink({ item, collapsed, pathname,
           {badgeLabel}
         </span>
       )}
+    </>
+  );
+  const link = item.external ? (
+    <a
+      href={item.path}
+      onClick={onNavigate}
+      className={linkClassName}
+    >
+      {linkContent}
+    </a>
+  ) : (
+    <Link
+      to={item.path}
+      onClick={onNavigate}
+      className={linkClassName}
+    >
+      {linkContent}
     </Link>
   );
 
@@ -223,8 +223,6 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
   const { isModuleActive } = useModuleAccess();
   const location = useLocation();
   const pathname = location.pathname;
-  const [approvalInboxCount, setApprovalInboxCount] = useState(0);
-  const [approvalRefreshTick, setApprovalRefreshTick] = useState(0);
 
   // Role-based section filtering from permission matrix (persisted to localStorage)
   const rolePermissions = loadRolePermissions();
@@ -244,56 +242,6 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return hasRole(item.roles as any);
   };
-
-  const canSeeApprovalInbox = useMemo(
-    () => Boolean(
-      user?.companyId
-      && user?.role
-      && isModuleActive('hrms')
-      && HRMS_APPROVAL_INBOX_ROLES.includes(user.role),
-    ),
-    [isModuleActive, user?.companyId, user?.role],
-  );
-
-  useEffect(() => {
-    function handleApprovalInboxChanged() {
-      setApprovalRefreshTick(prev => prev + 1);
-    }
-
-    window.addEventListener(HRMS_APPROVAL_INBOX_CHANGED_EVENT, handleApprovalInboxChanged);
-    return () => window.removeEventListener(HRMS_APPROVAL_INBOX_CHANGED_EVENT, handleApprovalInboxChanged);
-  }, []);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadApprovalInboxCount() {
-      if (!canSeeApprovalInbox || !user?.companyId) {
-        setApprovalInboxCount(0);
-        return;
-      }
-
-      const [leaveResult, payrollResult, appraisalResult] = await Promise.all([
-        listLeaveRequests(user.companyId),
-        listPayrollRuns(user.companyId),
-        listAppraisals(user.companyId),
-      ]);
-      if (isCancelled) return;
-
-      if (leaveResult.error || payrollResult.error || appraisalResult.error) {
-        setApprovalInboxCount(0);
-        return;
-      }
-
-      setApprovalInboxCount(buildApprovalInboxItems(leaveResult.data, payrollResult.data, appraisalResult.data, user).length);
-    }
-
-    void loadApprovalInboxCount();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [approvalRefreshTick, canSeeApprovalInbox, pathname, user]);
 
   // In focused mode, only render the section that matches the current URL.
   const focusedSection = isFocused ? getFocusedSection(pathname) : null;
@@ -352,7 +300,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
             )
           )}
 
-          {visibleSections.map(({ name, icon: SectionIcon, path: sectionPath }, index) => {
+          {visibleSections.map(({ name, icon: SectionIcon, path: sectionPath, external: sectionExternal }, index) => {
             const items = navItems.filter(n => n.section === name);
             const visibleItems = items.filter(itemIsVisible);
             if (visibleItems.length === 0) return null;
@@ -384,22 +332,41 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
                   </div>
                 ) : (
                   // Other sections: clickable link header; shows active state when focused here
-                  <Link
-                    to={sectionPath!}
-                    onClick={onNavigate}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-widest mb-0.5 transition-colors",
-                      hasActive
-                        ? "text-primary bg-primary/5"
-                        : "text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50"
-                    )}
-                  >
-                    <SectionIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="flex-1">{name}</span>
-                    {!isFocused && (
-                      <ChevronRight className="h-3 w-3 opacity-40" />
-                    )}
-                  </Link>
+                  sectionExternal ? (
+                    <a
+                      href={sectionPath!}
+                      onClick={onNavigate}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-widest mb-0.5 transition-colors",
+                        hasActive
+                          ? "text-primary bg-primary/5"
+                          : "text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <SectionIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="flex-1">{name}</span>
+                      {!isFocused && (
+                        <ChevronRight className="h-3 w-3 opacity-40" />
+                      )}
+                    </a>
+                  ) : (
+                    <Link
+                      to={sectionPath!}
+                      onClick={onNavigate}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-widest mb-0.5 transition-colors",
+                        hasActive
+                          ? "text-primary bg-primary/5"
+                          : "text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <SectionIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="flex-1">{name}</span>
+                      {!isFocused && (
+                        <ChevronRight className="h-3 w-3 opacity-40" />
+                      )}
+                    </Link>
+                  )
                 )}
 
                 {/* Sub-items: shown only for Platform (always) or when focused on this section */}
@@ -418,7 +385,6 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
                               collapsed={collapsed}
                               pathname={pathname}
                               onNavigate={onNavigate}
-                              badgeCount={item.path === '/hrms/approvals' ? approvalInboxCount : undefined}
                             />
                           ))}
                         </div>
@@ -431,7 +397,6 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
                           collapsed={collapsed}
                           pathname={pathname}
                           onNavigate={onNavigate}
-                          badgeCount={item.path === '/hrms/approvals' ? approvalInboxCount : undefined}
                         />
                       ))
                     )}

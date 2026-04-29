@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -10,9 +9,12 @@ import { AuthProvider, ProtectedRoute } from '@/contexts/AuthContext';
 import { ModuleAccessProvider, useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/shared/RouteErrorBoundary';
+import { LocationPreservingNavigate } from '@/components/shared/LocationPreservingNavigate';
+import { PageSpinner } from '@/components/shared/PageSpinner';
 import { RequireRole } from '@/components/shared/RequireRole';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { env } from '@/config/env';
+import { createAppQueryClient } from '@/lib/queryClient';
 import { errorTrackingService } from '@/services/errorTrackingService';
 import {
   HRMS_ADMIN,
@@ -24,6 +26,7 @@ import {
 } from '@/config/routeRoles';
 import HrmsLayout from './layout/HrmsLayout';
 import ProfilePage from './pages/ProfilePage';
+import { getHrmsRouterBaseName, hrmsCompatibilityRedirects } from './routes';
 
 errorTrackingService.init({
   dsn: env.VITE_SENTRY_DSN,
@@ -49,24 +52,7 @@ const EmployeeDirectory = lazy(() => import('@/pages/hrms/EmployeeDirectory'));
 const HrmsAdmin = lazy(() => import('@/pages/hrms/HrmsAdmin'));
 const ApprovalFlows = lazy(() => import('@/pages/hrms/ApprovalFlows'));
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60_000,
-      gcTime: 5 * 60_000,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
-
-function PageSpinner() {
-  return (
-    <div className="flex h-64 items-center justify-center">
-      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-    </div>
-  );
-}
+const queryClient = createAppQueryClient();
 
 function S({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageSpinner />}>{children}</Suspense>;
@@ -108,29 +94,14 @@ function ProtectedHrmsShell() {
   );
 }
 
-const hrmsCompatibilityRedirects = [
-  { path: 'hrms/leave', to: '/leave' },
-  { path: 'hrms/leave-calendar', to: '/leave/calendar' },
-  { path: 'hrms/attendance', to: '/attendance' },
-  { path: 'hrms/approvals', to: '/approvals' },
-  { path: 'hrms/appraisals', to: '/appraisals' },
-  { path: 'hrms/announcements', to: '/announcements' },
-  { path: 'hrms/employees', to: '/employees' },
-  { path: 'hrms/payroll', to: '/payroll' },
-  { path: 'hrms/admin', to: '/settings' },
-  { path: 'hrms/approval-flows', to: '/approval-flows' },
-];
-
-const routerBaseName = import.meta.env.BASE_URL === '/'
-  ? '/'
-  : import.meta.env.BASE_URL.replace(/\/$/, '');
+const routerBaseName = getHrmsRouterBaseName(import.meta.env.BASE_URL);
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: <ProtectedHrmsShell />,
     children: [
-      { index: true, element: <Navigate to="/leave" replace /> },
+      { index: true, element: <Navigate to="leave" replace /> },
       { path: 'profile', element: <R scope="Profile"><ProfilePage /></R> },
       { path: 'leave', element: <RequireRole roles={HRMS_LEAVE}><R scope="Leave"><S><LeaveManagement /></S></R></RequireRole> },
       { path: 'leave/calendar', element: <RequireRole roles={MANAGER_AND_UP}><R scope="Leave Calendar"><S><LeaveCalendar /></S></R></RequireRole> },
@@ -145,7 +116,7 @@ const router = createBrowserRouter([
       { path: 'unauthorized', element: <UnauthorizedAccess /> },
       ...hrmsCompatibilityRedirects.map((route) => ({
         path: route.path,
-        element: <Navigate to={route.to} replace />,
+        element: <LocationPreservingNavigate to={route.to} />,
       })),
     ],
   },

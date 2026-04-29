@@ -191,11 +191,13 @@ This is simpler, safer, and aligned with the current implementation.
 ### Required Environment Behavior
 
 Set `VITE_APP_URL` for the HRMS web app to the HRMS domain so password-reset and auth redirects resolve correctly.
+Set `VITE_HRMS_APP_URL` for the main app when the launcher should send users to a separate HRMS origin instead of the same-origin `/hrms/` mount.
 
 Example:
 
 ```env
 VITE_APP_URL=https://hrms.example.com
+VITE_HRMS_APP_URL=https://hrms.example.com
 ```
 
 ## Deployment Shape
@@ -305,6 +307,8 @@ Acceptance criteria:
 - approval flows behave the same as in the main app
 
 ### Phase 4: Shared Frontend Extraction
+
+Status: UAT validated on 2026-04-29. Current implementation evidence is tracked in `docs/PHASE4_HRMS_SHARED_FRONTEND.md`.
 
 Goal:
 

@@ -3,9 +3,13 @@ import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 
 const rootDir = path.resolve(__dirname, '../..');
+const buildSourceMaps = process.env.BUILD_SOURCEMAP === 'true';
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
+  define: {
+    'import.meta.env.VITE_HRMS_WEB_APP': JSON.stringify('true'),
+  },
   envDir: rootDir,
   envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   plugins: [react()],
@@ -26,7 +30,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false,
+    sourcemap: buildSourceMaps,
     rollupOptions: {
       output: {
         manualChunks: {

@@ -15,6 +15,12 @@ export interface AuthError {
 
 const RESET_PASSWORD_PATH = 'reset-password';
 
+function getBasePath() {
+  const basePath = import.meta.env.BASE_URL || '/';
+  const normalized = basePath.endsWith('/') ? basePath : `${basePath}/`;
+  return normalized === '/' ? '' : normalized.replace(/^\/+/, '');
+}
+
 // Dynamic URL Helper
 const getURL = () => {
   let url = import.meta.env.VITE_APP_URL ??
@@ -115,7 +121,7 @@ export const authService = {
   async resetPassword(email: string): Promise<{ error: AuthError | null }> {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${getURL()}${RESET_PASSWORD_PATH}`,
+        redirectTo: `${getURL()}${getBasePath()}${RESET_PASSWORD_PATH}`,
       });
 
       if (error) {

@@ -48,8 +48,7 @@ test.describe("responsive shell", () => {
       "/sales/verify-or",
       "/inventory/transfers",
       "/purchasing/invoices",
-      "/hrms/employees",
-      "/hrms/admin",
+      "/hrms/",
       "/reports",
     ]) {
       await page.goto(path, { waitUntil: "domcontentloaded" });

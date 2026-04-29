@@ -3,6 +3,7 @@ import type { Appraisal, LeaveRequest, PayrollRun } from '@/types';
 import {
   buildApprovalInboxItems,
   filterApprovalInboxItems,
+  getApprovalInboxSourcePath,
   isApprovalAssignedToApprover,
 } from '@/lib/hrms/approvalInbox';
 
@@ -131,5 +132,19 @@ describe('buildApprovalInboxItems', () => {
     expect(filterApprovalInboxItems(items, 'payroll_run')).toHaveLength(1);
     expect(filterApprovalInboxItems(items, 'appraisal')).toHaveLength(1);
     expect(filterApprovalInboxItems(items, 'all')).toHaveLength(3);
+  });
+});
+
+describe('getApprovalInboxSourcePath', () => {
+  it('keeps source links inside the main app HRMS route tree by default', () => {
+    expect(getApprovalInboxSourcePath('leave_request', { dedicatedHrmsApp: false })).toBe('/hrms/leave');
+    expect(getApprovalInboxSourcePath('payroll_run', { dedicatedHrmsApp: false })).toBe('/hrms/payroll');
+    expect(getApprovalInboxSourcePath('appraisal', { dedicatedHrmsApp: false })).toBe('/hrms/appraisals');
+  });
+
+  it('uses dedicated app routes when Approval Inbox runs in apps/hrms-web', () => {
+    expect(getApprovalInboxSourcePath('leave_request', { dedicatedHrmsApp: true })).toBe('/leave');
+    expect(getApprovalInboxSourcePath('payroll_run', { dedicatedHrmsApp: true })).toBe('/payroll');
+    expect(getApprovalInboxSourcePath('appraisal', { dedicatedHrmsApp: true })).toBe('/appraisals');
   });
 });

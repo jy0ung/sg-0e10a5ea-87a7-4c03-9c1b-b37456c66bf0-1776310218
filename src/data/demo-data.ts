@@ -32,7 +32,7 @@ export const platformModules: PlatformModule[] = [
   { id: 'purchasing', name: 'Purchasing', description: 'Procurement invoice workflows and inbound purchasing activity', icon: 'Settings', status: 'active', path: '/purchasing/invoices' },
   { id: 'reports', name: 'Business Reports', description: 'Cross-module operational reporting, exports, and business summaries', icon: 'DollarSign', status: 'active', path: '/reports' },
   { id: 'admin', name: 'Administration', description: 'User access, configuration, master data, and governance tools', icon: 'UserCheck', status: 'active', path: '/admin/settings' },
-  { id: 'hrms', name: 'HRMS', description: 'Employee directory, leave management, attendance, payroll, appraisals, and announcements', icon: 'Briefcase', status: 'active', path: '/hrms/employees' },
+  { id: 'hrms', name: 'HRMS', description: 'Dedicated workforce workspace for staff records, leave, attendance, payroll, appraisals, and announcements', icon: 'Briefcase', status: 'active', path: '/hrms/' },
   { id: 'support', name: 'Customer Service', description: 'Support ticket submission and customer service workflows', icon: 'Users', status: 'active', path: '/portal/tickets/new' },
   { id: 'forecasting', name: 'Forecasting & AI Insights', description: 'Predictive analytics and AI recommendations', icon: 'Brain', status: 'planned' },
 ];

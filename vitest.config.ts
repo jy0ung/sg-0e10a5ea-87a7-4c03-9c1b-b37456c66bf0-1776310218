@@ -8,7 +8,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "apps/hrms-web/src/**/*.{test,spec}.{ts,tsx}"],
     // RLS matrix requires a live Supabase stack + seeded users. Run via
     // `npm run test:rls`, which uses vitest.rls.config.ts.
     exclude: [

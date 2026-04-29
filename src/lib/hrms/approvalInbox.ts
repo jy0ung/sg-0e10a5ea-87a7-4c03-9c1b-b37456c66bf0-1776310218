@@ -11,6 +11,16 @@ export type ApprovalInboxApproverIdentity = {
 export type ApprovalInboxEntityType = 'leave_request' | 'payroll_run' | 'appraisal';
 export type ApprovalInboxFilter = 'all' | ApprovalInboxEntityType;
 
+type ApprovalInboxSourcePathOptions = {
+  dedicatedHrmsApp?: boolean;
+};
+
+const sourcePaths: Record<ApprovalInboxEntityType, string> = {
+  leave_request: 'leave',
+  payroll_run: 'payroll',
+  appraisal: 'appraisals',
+};
+
 type ApprovalInboxBaseItem = {
   entityType: ApprovalInboxEntityType;
   entityId: string;
@@ -103,6 +113,15 @@ export function filterApprovalInboxItems(
   return filter === 'all'
     ? items
     : items.filter(item => item.entityType === filter);
+}
+
+export function getApprovalInboxSourcePath(
+  entityType: ApprovalInboxEntityType,
+  options: ApprovalInboxSourcePathOptions = {},
+): string {
+  const dedicatedHrmsApp = options.dedicatedHrmsApp ?? import.meta.env.VITE_HRMS_WEB_APP === 'true';
+  const prefix = dedicatedHrmsApp ? '' : '/hrms';
+  return `${prefix}/${sourcePaths[entityType]}`;
 }
 
 export function notifyApprovalInboxChanged() {

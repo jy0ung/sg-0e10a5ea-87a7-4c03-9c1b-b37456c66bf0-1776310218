@@ -20,6 +20,9 @@ vi.mock('@/integrations/supabase/client', () => ({
 describe('authService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    vi.stubEnv('BASE_URL', '/');
+    vi.stubEnv('VITE_APP_URL', 'http://localhost:3000');
   });
 
   describe('signUp', () => {
@@ -117,6 +120,18 @@ describe('authService', () => {
       expect(result.error).toBeNull();
       expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith('test@test.com', {
         redirectTo: 'http://localhost:3000/reset-password',
+      });
+    });
+
+    it('includes the HRMS app base path when the app is mounted under /hrms/', async () => {
+      vi.stubEnv('BASE_URL', '/hrms/');
+      vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({ data: {}, error: null } as any);
+
+      const result = await authService.resetPassword('hrms@test.com');
+
+      expect(result.error).toBeNull();
+      expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith('hrms@test.com', {
+        redirectTo: 'http://localhost:3000/hrms/reset-password',
       });
     });
 

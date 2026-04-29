@@ -3,19 +3,9 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
   Bell,
   Briefcase,
-  Calendar,
-  Clock,
-  CreditCard,
-  GitMerge,
   LogOut,
-  Megaphone,
   Menu,
-  Settings2,
   ShieldCheck,
-  Star,
-  UserCheck,
-  UserRound,
-  Users,
 } from 'lucide-react';
 import type { AppRole } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,36 +15,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
-import {
-  HRMS_ADMIN,
-  HRMS_APPRAISALS,
-  HRMS_APPROVAL_INBOX,
-  HRMS_LEAVE,
-  HRMS_PAYROLL,
-  MANAGER_AND_UP,
-} from '@/config/routeRoles';
-
-interface HrmsNavItem {
-  label: string;
-  path: string;
-  icon: React.ElementType;
-  group: string;
-  roles?: readonly AppRole[];
-}
-
-const navItems: HrmsNavItem[] = [
-  { label: 'Leave', path: '/leave', icon: Calendar, group: 'Self Service', roles: HRMS_LEAVE },
-  { label: 'Approvals', path: '/approvals', icon: UserCheck, group: 'Self Service', roles: HRMS_APPROVAL_INBOX },
-  { label: 'Appraisals', path: '/appraisals', icon: Star, group: 'Self Service', roles: HRMS_APPRAISALS },
-  { label: 'Announcements', path: '/announcements', icon: Megaphone, group: 'Self Service', roles: MANAGER_AND_UP },
-  { label: 'Profile', path: '/profile', icon: UserRound, group: 'Self Service' },
-  { label: 'Attendance', path: '/attendance', icon: Clock, group: 'Workforce', roles: MANAGER_AND_UP },
-  { label: 'Leave Calendar', path: '/leave/calendar', icon: Calendar, group: 'Workforce', roles: MANAGER_AND_UP },
-  { label: 'Employees', path: '/employees', icon: Users, group: 'Workforce', roles: MANAGER_AND_UP },
-  { label: 'Payroll', path: '/payroll', icon: CreditCard, group: 'Administration', roles: HRMS_PAYROLL },
-  { label: 'Settings', path: '/settings', icon: Settings2, group: 'Administration', roles: HRMS_ADMIN },
-  { label: 'Approval Flows', path: '/approval-flows', icon: GitMerge, group: 'Administration', roles: HRMS_ADMIN },
-];
+import { hrmsNavItems, type HrmsNavItem } from './navItems';
 
 function isActive(path: string, pathname: string): boolean {
   if (path === '/leave') return pathname === '/leave';
@@ -71,7 +32,7 @@ function HrmsSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { hasRole, logout, user } = useAuth();
   const { pathname } = useLocation();
   const visibleItems = useMemo(
-    () => navItems.filter((item) => !item.roles || hasRole(item.roles as AppRole[])),
+    () => hrmsNavItems.filter((item) => !item.roles || hasRole(item.roles as AppRole[])),
     [hasRole],
   );
 

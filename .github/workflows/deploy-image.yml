@@ -51,7 +51,17 @@ on:
         default: uat
         options:
           - uat
+          - uat-hrms
           - production
+          - production-hrms
+      app:
+        description: 'Published app image to deploy'
+        type: choice
+        required: true
+        default: main
+        options:
+          - main
+          - hrms-web
       image_tag:
         description: 'Image tag to deploy (e.g. v1.2.0 or sha-abc1234)'
         required: true
@@ -100,7 +110,11 @@ jobs:
       - name: Lowercase image name
         id: img
         run: |
-          echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          suffix=""
+          if [[ "${{ github.event.inputs.app }}" == "hrms-web" ]]; then
+            suffix="-hrms-web"
+          fi
+          echo "name=$(echo '${{ github.repository }}'"$suffix" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Install cloudflared
         run: |
@@ -170,17 +184,17 @@ jobs:
              /tmp/deploy-image.sh '${IMAGE}'"
 
       - uses: actions/setup-node@v4
-        if: ${{ steps.env.outputs.value == 'uat' }}
+        if: ${{ startsWith(steps.env.outputs.value, 'uat') }}
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install verifier dependencies
-        if: ${{ steps.env.outputs.value == 'uat' }}
+        if: ${{ startsWith(steps.env.outputs.value, 'uat') }}
         run: npm ci
 
       - name: Install Playwright Chromium for login verification
-        if: ${{ steps.env.outputs.value == 'uat' }}
+        if: ${{ startsWith(steps.env.outputs.value, 'uat') }}
         env:
           UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
           UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
@@ -193,7 +207,7 @@ jobs:
           fi
 
       - name: Verify UAT deployment
-        if: ${{ steps.env.outputs.value == 'uat' }}
+        if: ${{ startsWith(steps.env.outputs.value, 'uat') }}
         env:
           UAT_URL: ${{ secrets.UAT_URL || 'https://uat.protonfookloi.com' }}
           UAT_EXPECTED_SUPABASE_URL: ${{ secrets.UAT_EXPECTED_SUPABASE_URL || secrets.UAT_URL || 'https://uat.protonfookloi.com' }}
@@ -210,6 +224,7 @@ jobs:
           {
             echo "### Deploy to ${{ github.event.inputs.environment || 'uat' }}"
             echo ""
+            echo "- App: \`${{ github.event.inputs.app || 'main' }}\`"
             echo "- Image: \`ghcr.io/${{ steps.img.outputs.name }}:${{ steps.tag.outputs.value }}\`"
             echo "- Host: \`${{ secrets.SSH_HOST }}\`"
             echo "- Container: \`${{ secrets.DEPLOY_CONTAINER_NAME }}\`"

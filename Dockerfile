@@ -11,7 +11,7 @@
 #   and dist directory. Defaults keep the root app behavior.
 #   BUILD_HRMS_WEB — when true, build the root app at `/` and HRMS web at `/hrms/`.
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_APP_ENV, VITE_SENTRY_DSN,
-#   VITE_APP_URL, VITE_APP_VERSION — inlined into the client bundle. Only public values.
+#   VITE_APP_URL, VITE_HRMS_APP_URL, VITE_APP_VERSION — inlined into the client bundle. Only public values.
 # ============================================================================
 
 FROM node:20-alpine AS build
@@ -35,6 +35,7 @@ ARG VITE_SUPABASE_ANON_KEY
 ARG VITE_APP_ENV=production
 ARG VITE_SENTRY_DSN
 ARG VITE_APP_URL
+ARG VITE_HRMS_APP_URL
 ARG VITE_APP_VERSION
 ARG BUILD_WORKSPACE=
 ARG BUILD_OUTPUT_DIR=dist
@@ -44,6 +45,7 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_APP_ENV=$VITE_APP_ENV \
     VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
     VITE_APP_URL=$VITE_APP_URL \
+    VITE_HRMS_APP_URL=$VITE_HRMS_APP_URL \
     VITE_APP_VERSION=$VITE_APP_VERSION
 
 RUN if [ -n "$BUILD_WORKSPACE" ]; then npm run build --workspace "$BUILD_WORKSPACE"; else npm run build; fi \

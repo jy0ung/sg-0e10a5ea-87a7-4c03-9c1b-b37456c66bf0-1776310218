@@ -11,11 +11,17 @@ name: Release
 #                             proxy Supabase API paths to the private upstream.
 #   VITE_SUPABASE_ANON_KEY    sb_publishable_... (anon/publishable key only)
 #   VITE_APP_URL              https://app.<domain> or UAT origin
+#   VITE_HRMS_APP_URL         (optional) https://hrms.<domain> for the main app launcher
 #   VITE_SENTRY_DSN           (optional)
 #
 # Optional repo/environment secrets:
 #   SUPABASE_INTERNAL_URL     Private upstream for nginx proxy routes. Defaults
 #                             to the current LAN Supabase host for UAT.
+#
+# Build targets:
+#   main-with-hrms            Root app plus HRMS web mounted at /hrms/.
+#   main                      Root app only.
+#   hrms-web                  Standalone apps/hrms-web image for HRMS subdomain.
 #
 # Optional Sentry release: SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT,
 # plus repo variable ENABLE_SENTRY_RELEASE=true to opt in.
@@ -29,6 +35,15 @@ on:
       tag:
         description: 'Release tag (e.g. v1.2.0)'
         required: true
+      build_target:
+        description: 'Docker image target to build'
+        type: choice
+        required: true
+        default: main-with-hrms
+        options:
+          - main-with-hrms
+          - main
+          - hrms-web
 
 permissions:
   contents: read
@@ -44,6 +59,11 @@ jobs:
     outputs:
       version: ${{ steps.tag.outputs.value }}
       digest: ${{ steps.push.outputs.digest }}
+      build_target: ${{ steps.build-target.outputs.value }}
+      build_workspace: ${{ steps.build-target.outputs.workspace }}
+      build_output_dir: ${{ steps.build-target.outputs.output_dir }}
+      build_hrms_web: ${{ steps.build-target.outputs.build_hrms_web }}
+      image_name: ${{ steps.img.outputs.name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -55,6 +75,45 @@ jobs:
           else
             echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Resolve build target
+        id: build-target
+        env:
+          INPUT_BUILD_TARGET: ${{ inputs.build_target }}
+        run: |
+          set -euo pipefail
+          target="${INPUT_BUILD_TARGET:-main-with-hrms}"
+
+          case "$target" in
+            main-with-hrms)
+              workspace=""
+              output_dir="dist"
+              build_hrms_web="true"
+              image_suffix=""
+              ;;
+            main)
+              workspace=""
+              output_dir="dist"
+              build_hrms_web="false"
+              image_suffix=""
+              ;;
+            hrms-web)
+              workspace="apps/hrms-web"
+              output_dir="apps/hrms-web/dist"
+              build_hrms_web="false"
+              image_suffix="-hrms-web"
+              ;;
+            *)
+              echo "Unsupported build target: $target" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "value=$target" >> "$GITHUB_OUTPUT"
+          echo "workspace=$workspace" >> "$GITHUB_OUTPUT"
+          echo "output_dir=$output_dir" >> "$GITHUB_OUTPUT"
+          echo "build_hrms_web=$build_hrms_web" >> "$GITHUB_OUTPUT"
+          echo "image_suffix=$image_suffix" >> "$GITHUB_OUTPUT"
 
       # Typecheck + unit tests still run in-repo so we never ship an image
       # that failed verification. The Docker build stage runs its own
@@ -85,7 +144,7 @@ jobs:
 
       - name: Lowercase image name
         id: img
-        run: echo "name=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+        run: echo "name=$(echo '${{ env.IMAGE_NAME }}${{ steps.build-target.outputs.image_suffix }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Resolve Supabase upstream
         id: supabase-upstream
@@ -122,14 +181,20 @@ jobs:
             VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
             VITE_APP_ENV=production
             VITE_APP_URL=${{ secrets.VITE_APP_URL }}
+            VITE_HRMS_APP_URL=${{ secrets.VITE_HRMS_APP_URL }}
             VITE_APP_VERSION=${{ steps.tag.outputs.value }}
             VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}
             SUPABASE_INTERNAL_URL=${{ steps.supabase-upstream.outputs.value }}
+            BUILD_WORKSPACE=${{ steps.build-target.outputs.workspace }}
+            BUILD_OUTPUT_DIR=${{ steps.build-target.outputs.output_dir }}
+            BUILD_HRMS_WEB=${{ steps.build-target.outputs.build_hrms_web }}
 
       - name: Summary
         run: |
           {
             echo "### Release ${{ steps.tag.outputs.value }}"
+            echo ""
+            echo "**Build target:** \`${{ steps.build-target.outputs.value }}\`"
             echo ""
             echo "**Image tags:**"
             echo '```'
@@ -157,9 +222,22 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_APP_ENV: production
           VITE_APP_URL: ${{ secrets.VITE_APP_URL }}
+          VITE_HRMS_APP_URL: ${{ secrets.VITE_HRMS_APP_URL }}
           VITE_APP_VERSION: ${{ needs.build-and-publish.outputs.version }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-        run: npm run build
+          BUILD_WORKSPACE: ${{ needs.build-and-publish.outputs.build_workspace }}
+          BUILD_OUTPUT_DIR: ${{ needs.build-and-publish.outputs.build_output_dir }}
+          BUILD_HRMS_WEB: ${{ needs.build-and-publish.outputs.build_hrms_web }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${BUILD_WORKSPACE:-}" ]]; then
+            npm run build --workspace "$BUILD_WORKSPACE"
+          else
+            npm run build
+            if [[ "${BUILD_HRMS_WEB:-false}" == "true" ]]; then
+              VITE_BASE_PATH=/hrms/ npm run build --workspace apps/hrms-web
+            fi
+          fi
       - name: Upload source maps to Sentry
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -167,6 +245,11 @@ jobs:
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
         run: |
           VERSION="${{ needs.build-and-publish.outputs.version }}"
+          SOURCEMAP_DIR="${{ needs.build-and-publish.outputs.build_output_dir }}"
+          if [[ "${{ needs.build-and-publish.outputs.build_hrms_web }}" == "true" ]]; then
+            SOURCEMAP_DIR="$SOURCEMAP_DIR apps/hrms-web/dist"
+          fi
           npx --yes @sentry/cli releases new "$VERSION"
-          npx --yes @sentry/cli releases files "$VERSION" upload-sourcemaps dist --rewrite
+          # shellcheck disable=SC2086
+          npx --yes @sentry/cli releases files "$VERSION" upload-sourcemaps $SOURCEMAP_DIR --rewrite
           npx --yes @sentry/cli releases finalize "$VERSION"

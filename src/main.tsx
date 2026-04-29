@@ -4,7 +4,7 @@ import "@/i18n";
 import React, { lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
@@ -15,21 +15,19 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RequireRole } from "@/components/shared/RequireRole";
 import { RequireActiveModule } from "@/components/shared/RequireActiveModule";
 import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
+import { LocationPreservingNavigate } from "@/components/shared/LocationPreservingNavigate";
+import { PageSpinner } from "@/components/shared/PageSpinner";
 import AppLayout from "./components/layout/AppLayout";
 import SalesLayout from "./components/layout/SalesLayout";
 import { SalesProvider } from "./contexts/SalesContext";
 import { errorTrackingService } from "@/services/errorTrackingService";
 import { env } from "@/config/env";
+import { createAppQueryClient } from "@/lib/queryClient";
 import {
   ADMIN_ONLY,
   ADMIN_AND_DIRECTOR,
   EXECUTIVE,
   MANAGER_AND_UP,
-  HRMS_ADMIN,
-  HRMS_APPROVAL_INBOX,
-  HRMS_PAYROLL,
-  HRMS_LEAVE,
-  HRMS_APPRAISALS,
 } from "@/config/routeRoles";
 
 errorTrackingService.init({
@@ -89,23 +87,8 @@ const DealerInvoices = lazy(() => import("./pages/sales/DealerInvoices"));
 const VerifyOR = lazy(() => import("./pages/sales/VerifyOR"));
 const ReportsCenter = lazy(() => import("./pages/reports/ReportsCenter"));
 const ChassisFilter = lazy(() => import("./pages/inventory/ChassisFilter"));
-const EmployeeDirectory = lazy(() => import("./pages/hrms/EmployeeDirectory"));
-const ApprovalInbox = lazy(() => import("./pages/hrms/ApprovalInbox"));
-const LeaveManagement = lazy(() => import("./pages/hrms/LeaveManagement"));
-const LeaveCalendar = lazy(() => import("./pages/hrms/LeaveCalendar"));
-const AttendanceLog = lazy(() => import("./pages/hrms/AttendanceLog"));
-const PayrollSummary = lazy(() => import("./pages/hrms/PayrollSummary"));
-const PerformanceAppraisals = lazy(() => import("./pages/hrms/PerformanceAppraisals"));
-const HrmsAnnouncements = lazy(() => import("./pages/hrms/Announcements"));
-const HrmsAdmin = lazy(() => import('./pages/hrms/HrmsAdmin'));
-const ApprovalFlows = lazy(() => import('./pages/hrms/ApprovalFlows'));
+const HrmsWorkspaceRedirect = lazy(() => import("./pages/hrms/HrmsWorkspaceRedirect"));
 const RolePermissionsPage = lazy(() => import('./pages/admin/RolePermissions'));
-// Lightweight spinner shown while a lazy page chunk loads
-const PageSpinner = () => (
-  <div className="flex items-center justify-center h-64">
-    <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-  </div>
-);
 
 // Shorthand Suspense wrapper used on every route element
 function S({ children }: { children: React.ReactNode }) {
@@ -145,24 +128,7 @@ function withModuleAccess(moduleId: string, element: React.ReactNode) {
   return <RequireActiveModule moduleId={moduleId}>{element}</RequireActiveModule>;
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Data is considered fresh for 60s — avoids refetch storms when users
-      // navigate between pages or components mount in quick succession.
-      staleTime: 60_000,
-      // Keep unused data in memory for 5 minutes so the cache can satisfy
-      // repeat visits without hitting the network.
-      gcTime: 5 * 60_000,
-      // Most dashboards don't need to refetch when the tab regains focus —
-      // DataContext already subscribes to realtime updates for the critical tables.
-      refetchOnWindowFocus: false,
-      // Retry once on transient network errors rather than the default 3x
-      // exponential backoff, which can make failures feel sluggish.
-      retry: 1,
-    },
-  },
-});
+const queryClient = createAppQueryClient();
 
 const router = createBrowserRouter([
   {
@@ -226,16 +192,10 @@ const router = createBrowserRouter([
       { path: 'admin/role-permissions', element: <RequireRole roles={ADMIN_ONLY}><R scope="Role Permissions"><S><RolePermissionsPage /></S></R></RequireRole> },
       { path: "reports", element: withModuleAccess('reports', <R scope="Reports"><S><ReportsCenter /></S></R>) },
       { path: "inventory/chassis-filter", element: withModuleAccess('inventory', <R scope="Chassis Filter"><S><ChassisFilter /></S></R>) },
-      { path: "hrms/employees", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><R scope="Employees"><S><EmployeeDirectory /></S></R></RequireRole>) },
-      { path: "hrms/approvals", element: withModuleAccess('hrms', <RequireRole roles={HRMS_APPROVAL_INBOX}><R scope="Approval Inbox"><S><ApprovalInbox /></S></R></RequireRole>) },
-      { path: "hrms/leave", element: withModuleAccess('hrms', <RequireRole roles={HRMS_LEAVE}><R scope="Leave Management"><S><LeaveManagement /></S></R></RequireRole>) },
-      { path: "hrms/leave-calendar", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><R scope="Leave Calendar"><S><LeaveCalendar /></S></R></RequireRole>) },
-      { path: "hrms/attendance", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><R scope="Attendance"><S><AttendanceLog /></S></R></RequireRole>) },
-      { path: "hrms/payroll", element: withModuleAccess('hrms', <RequireRole roles={HRMS_PAYROLL}><R scope="Payroll"><S><PayrollSummary /></S></R></RequireRole>) },
-      { path: "hrms/appraisals", element: withModuleAccess('hrms', <RequireRole roles={HRMS_APPRAISALS}><R scope="Appraisals"><S><PerformanceAppraisals /></S></R></RequireRole>) },
-      { path: "hrms/announcements", element: withModuleAccess('hrms', <RequireRole roles={MANAGER_AND_UP}><R scope="Announcements"><S><HrmsAnnouncements /></S></R></RequireRole>) },
-      { path: "hrms/admin", element: withModuleAccess('hrms', <RequireRole roles={HRMS_ADMIN}><R scope="HRMS Admin"><S><HrmsAdmin /></S></R></RequireRole>) },
-      { path: "hrms/approval-flows", element: withModuleAccess('hrms', <RequireRole roles={HRMS_ADMIN}><R scope="Approval Flows"><S><ApprovalFlows /></S></R></RequireRole>) },
+      { path: "hrms", element: withModuleAccess('hrms', <R scope="HRMS Workspace"><S><HrmsWorkspaceRedirect /></S></R>) },
+      { path: "hrms/admin", element: <LocationPreservingNavigate to="/hrms/settings" /> },
+      { path: "hrms/leave-calendar", element: <LocationPreservingNavigate to="/hrms/leave/calendar" /> },
+      { path: "hrms/*", element: withModuleAccess('hrms', <R scope="HRMS Workspace"><S><HrmsWorkspaceRedirect /></S></R>) },
     ],
   },
   {

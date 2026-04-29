@@ -17,6 +17,7 @@ Required values are loaded at boot and validated by the zod schema in `src/confi
 | `VITE_SENTRY_DSN`             | Enables Sentry error reporting                 |
 | `VITE_SENTRY_TRACES_SAMPLE_RATE` | Browser tracing sample rate from `0` to `1`; defaults to `0.1` when omitted. |
 | `VITE_APP_ENV`                | Environment label sent to Sentry (`development`, `staging`, `production`). |
+| `VITE_HRMS_APP_URL`           | Dedicated HRMS web origin used by the main app launcher. Leave unset to use same-origin `/hrms/`. |
 | `VITE_APP_VERSION`            | Release tag sent to Sentry for source map association. |
 | `SUPABASE_INTERNAL_URL`        | Docker/nginx build arg for the private Supabase upstream behind same-origin proxy routes. Defaults to the current UAT LAN host. |
 

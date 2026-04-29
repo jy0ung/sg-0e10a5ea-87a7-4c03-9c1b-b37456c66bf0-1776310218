@@ -2,7 +2,27 @@ project_id = "rbmsbppvpgcrmtkdfahy"
 
 [auth]
 site_url = "http://192.168.1.241:3000"
-additional_redirect_urls = ["http://192.168.1.241:3000/signup", "http://192.168.1.241:3000/reset-password", "http://localhost:3000/signup", "http://localhost:3000/reset-password"]
+additional_redirect_urls = [
+	"http://192.168.1.241:3000/signup",
+	"http://192.168.1.241:3000/reset-password",
+	"http://192.168.1.241:3000/hrms/signup",
+	"http://192.168.1.241:3000/hrms/forgot-password",
+	"http://192.168.1.241:3000/hrms/reset-password",
+	"http://localhost:3000/signup",
+	"http://localhost:3000/reset-password",
+	"http://localhost:3000/hrms/signup",
+	"http://localhost:3000/hrms/forgot-password",
+	"http://localhost:3000/hrms/reset-password",
+	"http://localhost:3001/signup",
+	"http://localhost:3001/forgot-password",
+	"http://localhost:3001/reset-password",
+	"https://uat.protonfookloi.com/hrms/signup",
+	"https://uat.protonfookloi.com/hrms/forgot-password",
+	"https://uat.protonfookloi.com/hrms/reset-password",
+	"https://protonfookloi.com/hrms/signup",
+	"https://protonfookloi.com/hrms/forgot-password",
+	"https://protonfookloi.com/hrms/reset-password",
+]
 
 [auth.email]
 # Phase 0 hotfix: self-signup is disabled platform-wide.
