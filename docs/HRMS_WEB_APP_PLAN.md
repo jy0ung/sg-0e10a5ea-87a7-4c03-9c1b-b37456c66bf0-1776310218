@@ -346,9 +346,11 @@ Current UAT evidence:
 
 - live HRMS UAT container: `flc-bi-hrms-uat`
 - latest validated image: `ghcr.io/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218-hrms-web:0.1.0`
+- latest live break/fix image after settings layout polish: `flc-bi-uat:hrms-settings-layout-04510e3`
 - release run: `25108328607`, `v0.1.0`, digest `sha256:92de21a8433b8dbb1bded9f69e359fd6dbfb4efa5ab3ed3c9a201da75ec84192`
 - public health check: `https://hrms-uat.protonfookloi.com/healthz` returns `ok`
 - verifier: `UAT_APP=hrms-web UAT_URL=https://hrms-uat.protonfookloi.com UAT_EXPECTED_SUPABASE_URL=https://uat.protonfookloi.com UAT_HEALTH_URL=https://hrms-uat.protonfookloi.com/healthz npm run verify:uat` passed
+- credentialed GitHub UAT synthetic run `25111751762` passed on 2026-04-29 with `environment=uat-hrms`, `app=hrms-web`, and `PASS browser login flow - redirected to /`
 - fresh Mailpit reset email redirects to `https://hrms-uat.protonfookloi.com/reset-password` and opens the `Set your new password` form
 
 Gap assessment, 2026-04-29:
@@ -356,7 +358,7 @@ Gap assessment, 2026-04-29:
 | Area | Status | Gap | Required action |
 | ---- | ------ | --- | --------------- |
 | UAT standalone domain | Closed | None for shell, health, bundle config, mocked-auth shell smoke, and reset-link landing on the official `hrms-web:0.1.0` image | Keep `scripts/deploy-hrms-uat-local.sh` for break/fix validation; use GHCR image tags for release candidates |
-| UAT credentialed automation | Partial | The standalone verifier currently skips real login unless secrets are supplied | Configure `UAT_LOGIN_EMAIL`, `UAT_LOGIN_PASSWORD`, and optionally `UAT_LOGIN_REQUIRED=1` for the `uat-hrms` GitHub environment |
+| UAT credentialed automation | Closed | `uat-hrms` verifier secrets are configured and workflow run `25111751762` passed credentialed browser login | Keep `UAT_LOGIN_EMAIL`, `UAT_LOGIN_PASSWORD`, and optionally `UAT_LOGIN_REQUIRED=1` current in the `uat-hrms` GitHub environment |
 | Password update acceptance | Partial | Reset link landing is verified; changing the user's real password was not automated to avoid altering a user credential without an explicit acceptance step | Have the user complete one password update in UAT, then log in with the new password and record evidence |
 | Release publication | Closed | `v0.1.0` was published as GHCR image tag `0.1.0` | Use `TAG=v0.1.0` for Release workflow dispatch and `IMAGE_TAG=0.1.0` for deploy workflow dispatch |
 | CI/CD deploy environments | Partial | `uat-hrms` release/verifier secrets are set, but GitHub Deploy workflow still lacks SSH and Cloudflare Access service-token secrets | Add `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET` to `uat-hrms`; add full production equivalents later |
@@ -369,10 +371,9 @@ Updated Phase 5 implementation sequence:
 
 1. Complete UAT acceptance by having a real user update their password from the HRMS UAT reset form and log in with the new password.
 2. Add the missing `uat-hrms` SSH/Cloudflare Access deploy secrets so `deploy-image.yml` can deploy and verify the standalone HRMS image without host-local manual deploys.
-3. Rerun the standalone verifier with credentialed login enabled.
-4. Configure production HRMS DNS/Cloudflare ingress and production deploy environment secrets.
-5. Deploy the `hrms-web` image to `production-hrms` and validate health, bundle config, login, password reset, and representative HRMS workflows.
-6. Send user communications and set a support/rollback window.
+3. Configure production HRMS DNS/Cloudflare ingress and production deploy environment secrets when production rollout is approved.
+4. Deploy the `hrms-web` image to `production-hrms` and validate health, bundle config, login, password reset, and representative HRMS workflows.
+5. Send user communications and set a support/rollback window.
 
 Acceptance criteria for Phase 5 closure:
 
