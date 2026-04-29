@@ -79,7 +79,7 @@ jobs:
       release_environment: ${{ steps.release-env.outputs.value }}
       app_env: ${{ steps.release-env.outputs.app_env }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Resolve release environment
         id: release-env
@@ -253,7 +253,7 @@ jobs:
       name: ${{ needs.build-and-publish.outputs.release_environment }}
     if: ${{ vars.ENABLE_SENTRY_RELEASE == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

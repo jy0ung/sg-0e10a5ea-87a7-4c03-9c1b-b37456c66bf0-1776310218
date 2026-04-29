@@ -68,7 +68,7 @@ jobs:
     outputs:
       env_name: ${{ steps.select.outputs.env_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Select target environment
         id: select
@@ -121,7 +121,7 @@ jobs:
       name: ${{ needs.plan.outputs.env_name }}
       url: ${{ secrets.SITE_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v4
         with:
