@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { VehicleCanonical } from "@/types";
+import type { DataQualityIssue, KpiSummary, VehicleCanonical } from "@/types";
 import { logUserAction, logVehicleEdit } from "./auditService";
 import { performanceService } from "./performanceService";
 import { loggingService } from "./loggingService";
@@ -231,6 +231,8 @@ export interface VehicleSearchParams {
   payment?: string | null;
   stage?: string | null;
   search?: string | null;
+  bgDateFrom?: string | null;
+  bgDateTo?: string | null;
   hasDeliveryDate?: boolean | null;
   limit?: number;
   offset?: number;
@@ -309,15 +311,32 @@ export interface VehicleKpiSummary {
   byModel: Record<string, number>;
 }
 
+export interface AutoAgingDashboardSummaryParams {
+  branch?: string | null;
+  model?: string | null;
+  bgDateFrom?: string | null;
+  bgDateTo?: string | null;
+}
+
+export interface AutoAgingDashboardSummary {
+  availableBranches: string[];
+  availableModels: string[];
+  kpiSummaries: KpiSummary[];
+  qualityIssueCount: number;
+  qualityIssueSample: DataQualityIssue[];
+}
+
 // LRU caches for hot RPCs. Keyed on the serialized args; 30 s TTL keeps
 // transient toggles fast without masking fresh mutations for long.
 const searchCache = new LruCache<string, VehicleSearchResult>({ max: 64, ttlMs: 30_000 });
 const kpiCache = new LruCache<string, VehicleKpiSummary>({ max: 16, ttlMs: 30_000 });
+const dashboardSummaryCache = new LruCache<string, AutoAgingDashboardSummary>({ max: 32, ttlMs: 30_000 });
 
 /** Clear the paginated search + KPI caches. Call after vehicle mutations. */
 export function invalidateVehicleCaches(): void {
   searchCache.clear();
   kpiCache.clear();
+  dashboardSummaryCache.clear();
 }
 
 export async function searchVehicles(
@@ -339,6 +358,8 @@ export async function searchVehicles(
     p_payment: params.payment ?? null,
     p_stage: params.stage ?? null,
     p_search: params.search ?? null,
+    p_bg_date_from: params.bgDateFrom ?? null,
+    p_bg_date_to: params.bgDateTo ?? null,
     p_has_delivery_date: params.hasDeliveryDate ?? null,
     p_limit: params.limit ?? 50,
     p_offset: params.offset ?? 0,
@@ -405,5 +426,81 @@ export async function getVehicleKpiSummary(
   };
 
   kpiCache.set(cacheKey, summary);
+  return { data: summary, error: null };
+}
+
+function mapDashboardIssue(row: Record<string, unknown>): DataQualityIssue {
+  return {
+    id: String(row.id || ''),
+    chassisNo: String(row.chassis_no || ''),
+    field: String(row.field || ''),
+    issueType: String(row.issue_type || 'invalid') as DataQualityIssue['issueType'],
+    message: String(row.message || ''),
+    severity: String(row.severity || 'warning') as DataQualityIssue['severity'],
+    importBatchId: String(row.import_batch_id || ''),
+  };
+}
+
+function mapDashboardKpiSummary(row: Record<string, unknown>): KpiSummary {
+  return {
+    kpiId: String(row.kpi_id || ''),
+    label: String(row.label || ''),
+    shortLabel: String(row.short_label || ''),
+    validCount: Number(row.valid_count ?? 0),
+    invalidCount: Number(row.invalid_count ?? 0),
+    missingCount: Number(row.missing_count ?? 0),
+    median: Number(row.median ?? 0),
+    average: Number(row.average ?? 0),
+    p90: Number(row.p90 ?? 0),
+    overdueCount: Number(row.overdue_count ?? 0),
+    slaDays: Number(row.sla_days ?? 0),
+  };
+}
+
+export async function getAutoAgingDashboardSummary(
+  params: AutoAgingDashboardSummaryParams = {},
+): Promise<{ data: AutoAgingDashboardSummary | null; error: Error | null }> {
+  const queryId = `auto-aging-dashboard-summary-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
+  const cacheKey = JSON.stringify(params);
+  const cached = dashboardSummaryCache.get(cacheKey);
+  if (cached) {
+    performanceService.endQueryTimer(queryId, 'auto_aging_dashboard_summary_cached');
+    return { data: cached, error: null };
+  }
+
+  const { data, error } = await supabase.rpc('auto_aging_dashboard_summary', {
+    p_branch: params.branch ?? null,
+    p_model: params.model ?? null,
+    p_from: params.bgDateFrom ?? null,
+    p_to: params.bgDateTo ?? null,
+  });
+
+  performanceService.endQueryTimer(queryId, 'auto_aging_dashboard_summary');
+
+  if (error) {
+    loggingService.error('auto_aging_dashboard_summary RPC failed', { params, error }, 'VehicleService');
+    return { data: null, error: new Error(error.message) };
+  }
+
+  const raw = (data ?? {}) as Record<string, unknown>;
+  const summary: AutoAgingDashboardSummary = {
+    availableBranches: Array.isArray(raw.available_branches)
+      ? raw.available_branches.map(String).filter(Boolean)
+      : [],
+    availableModels: Array.isArray(raw.available_models)
+      ? raw.available_models.map(String).filter(Boolean)
+      : [],
+    kpiSummaries: Array.isArray(raw.kpi_summaries)
+      ? raw.kpi_summaries.map(item => mapDashboardKpiSummary(item as Record<string, unknown>))
+      : [],
+    qualityIssueCount: Number(raw.quality_issue_count ?? 0),
+    qualityIssueSample: Array.isArray(raw.quality_issue_sample)
+      ? raw.quality_issue_sample.map(item => mapDashboardIssue(item as Record<string, unknown>))
+      : [],
+  };
+
+  dashboardSummaryCache.set(cacheKey, summary);
   return { data: summary, error: null };
 }

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getVehicleById, updateVehicleWithAudit, searchVehicles, invalidateVehicleCaches } from './vehicleService';
+import {
+  getAutoAgingDashboardSummary,
+  getVehicleById,
+  invalidateVehicleCaches,
+  searchVehicles,
+  updateVehicleWithAudit,
+} from './vehicleService';
 import { supabase } from '@/integrations/supabase/client';
 import * as auditService from './auditService';
 
@@ -107,6 +113,8 @@ describe('vehicleService', () => {
         payment: 'Cash',
         stage: 'complete',
         search: 'CH001',
+        bgDateFrom: '2026-04-01',
+        bgDateTo: '2026-04-30',
         limit: 25,
         offset: 50,
         sortColumn: 'chassis_no',
@@ -122,11 +130,98 @@ describe('vehicleService', () => {
         p_payment: 'Cash',
         p_stage: 'complete',
         p_search: 'CH001',
+        p_bg_date_from: '2026-04-01',
+        p_bg_date_to: '2026-04-30',
         p_has_delivery_date: null,
         p_limit: 25,
         p_offset: 50,
         p_sort_column: 'chassis_no',
         p_sort_direction: 'asc',
+      });
+    });
+  });
+
+  describe('getAutoAgingDashboardSummary', () => {
+    it('maps the dashboard summary RPC payload', async () => {
+      vi.mocked(supabase.rpc).mockResolvedValue({
+        data: {
+          available_branches: ['KK', 'TWU'],
+          available_models: ['X50', 'X70'],
+          kpi_summaries: [
+            {
+              kpi_id: 'bg_to_delivery',
+              label: 'BG Date to Delivery Date',
+              short_label: 'BG → Delivery',
+              valid_count: 10,
+              invalid_count: 1,
+              missing_count: 2,
+              median: 42,
+              average: 44,
+              p90: 58,
+              overdue_count: 3,
+              sla_days: 45,
+            },
+          ],
+          quality_issue_count: 4,
+          quality_issue_sample: [
+            {
+              id: 'issue-1',
+              chassis_no: 'CH001',
+              field: 'delivery_date',
+              issue_type: 'missing',
+              message: 'Delivery date is required',
+              severity: 'warning',
+              import_batch_id: 'batch-1',
+            },
+          ],
+        },
+        error: null,
+      } as any);
+
+      const result = await getAutoAgingDashboardSummary({
+        branch: 'KK',
+        model: 'X50',
+        bgDateFrom: '2026-04-01',
+        bgDateTo: '2026-04-30',
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({
+        availableBranches: ['KK', 'TWU'],
+        availableModels: ['X50', 'X70'],
+        kpiSummaries: [
+          {
+            kpiId: 'bg_to_delivery',
+            label: 'BG Date to Delivery Date',
+            shortLabel: 'BG → Delivery',
+            validCount: 10,
+            invalidCount: 1,
+            missingCount: 2,
+            median: 42,
+            average: 44,
+            p90: 58,
+            overdueCount: 3,
+            slaDays: 45,
+          },
+        ],
+        qualityIssueCount: 4,
+        qualityIssueSample: [
+          {
+            id: 'issue-1',
+            chassisNo: 'CH001',
+            field: 'delivery_date',
+            issueType: 'missing',
+            message: 'Delivery date is required',
+            severity: 'warning',
+            importBatchId: 'batch-1',
+          },
+        ],
+      });
+      expect(supabase.rpc).toHaveBeenCalledWith('auto_aging_dashboard_summary', {
+        p_branch: 'KK',
+        p_model: 'X50',
+        p_from: '2026-04-01',
+        p_to: '2026-04-30',
       });
     });
   });

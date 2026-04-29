@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { DataProvider, useData } from './DataContext';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -41,10 +42,12 @@ vi.mock('@/hooks/useCompanyId', () => ({
   useCompanyId: () => 'c1'
 }));
 
-const makeWrapper = () => {
+const makeWrapper = (initialEntry = '/') => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={qc}><DataProvider>{children}</DataProvider></QueryClientProvider>
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <QueryClientProvider client={qc}><DataProvider>{children}</DataProvider></QueryClientProvider>
+    </MemoryRouter>
   );
 };
 
@@ -106,6 +109,46 @@ describe('DataContext', () => {
 
       expect(result.current.vehicles).toHaveLength(1);
       expect(result.current.importBatches).toHaveLength(1);
+    });
+
+    it('skips vehicle paging on the auto-aging overview route', async () => {
+      const vehicleRangeMock = vi.fn(() => Promise.resolve({ data: [], error: null }));
+
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        const result = {
+          data: table === 'import_batches' ? [{
+            id: 'b1',
+            file_name: 'test.xlsx',
+            uploaded_by: 'user1',
+            uploaded_at: new Date().toISOString(),
+            status: 'completed',
+            total_rows: 10,
+            valid_rows: 10,
+            error_rows: 0,
+            duplicate_rows: 0,
+          }] : [],
+          error: null,
+        };
+
+        const builder: any = {};
+        builder.select = vi.fn(() => builder);
+        builder.eq = vi.fn(() => builder);
+        builder.order = vi.fn(() => builder);
+        builder.range = table === 'vehicles' ? vehicleRangeMock : vi.fn(() => Promise.resolve(result));
+        builder.then = (resolve: any) => Promise.resolve(result).then(resolve);
+        return builder;
+      });
+
+      const wrapper = makeWrapper('/auto-aging');
+      const { result } = renderHook(() => useData(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(vehicleRangeMock).not.toHaveBeenCalled();
+      expect(result.current.importBatches).toHaveLength(1);
+      expect(result.current.vehicles).toEqual([]);
     });
   });
 
@@ -289,7 +332,9 @@ describe('DataContext', () => {
       // Wait a tick so the timestamp differs
       await new Promise(resolve => setTimeout(resolve, 5));
 
-      result.current.refreshKpis();
+      await act(async () => {
+        result.current.refreshKpis();
+      });
 
       await waitFor(() => {
         expect(result.current.lastRefresh).not.toBe(lastRefreshBefore);

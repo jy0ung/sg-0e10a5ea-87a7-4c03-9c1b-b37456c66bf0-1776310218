@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { VehicleCanonical, ImportBatch, DataQualityIssue, SlaPolicy, KpiSummary } from '@/types';
 import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { supabase } from '@/integrations/supabase/client';
@@ -118,6 +119,12 @@ function mapDbSla(row: Record<string, unknown>): SlaPolicy {
 export const dataQueryKey = (companyId: string, branchId?: string | null) =>
   ['data', companyId, branchId ?? 'all'] as const;
 
+type DataLoadMode = 'full' | 'summary-only';
+
+function getDataLoadMode(pathname: string): DataLoadMode {
+  return pathname === '/auto-aging' ? 'summary-only' : 'full';
+}
+
 /** Fetch all vehicles in chunks of VEHICLE_PAGE_SIZE to avoid unbounded queries. */
 const VEHICLE_PAGE_SIZE = 1_000;
 
@@ -205,12 +212,20 @@ async function fetchAllVehicles(
   return { data: results, error: null };
 }
 
-async function fetchDataFromDb(companyId: string, branchCode?: string | null) {
+async function fetchDataFromDb(
+  companyId: string,
+  branchCode?: string | null,
+  mode: DataLoadMode = 'full',
+) {
   const queryId = `data-reload-${Date.now()}`;
   performanceService.startQueryTimer(queryId);
 
+  const includeVehicles = mode === 'full';
+
   const [vehiclesRes, batchesRes, issuesRes, slasRes] = await Promise.all([
-    fetchAllVehicles(companyId, branchCode),
+    includeVehicles
+      ? fetchAllVehicles(companyId, branchCode)
+      : Promise.resolve({ data: [] as VehicleCanonical[], error: null }),
     supabase.from('import_batches').select('*').eq('company_id', companyId).order('created_at', { ascending: false }),
     supabase.from('quality_issues').select('*').eq('company_id', companyId).order('created_at', { ascending: false }),
     supabase.from('sla_policies').select('*').eq('company_id', companyId),
@@ -258,22 +273,25 @@ const emptyData: DataQueryResult = { vehicles: [], batches: [], issues: [], slas
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const companyId = useCompanyId();
   const { user } = useAuth();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   // Branch-scoped users only see their branch's vehicles.
   const branchId = user?.access_scope === 'branch' ? (user.branch_id ?? null) : null;
+  const routeLoadMode = getDataLoadMode(location.pathname);
+  const activeDataQueryKey = [...dataQueryKey(companyId, branchId), routeLoadMode] as const;
 
   // React Query is the single source of truth — no local useState mirrors.
   const { data, isLoading, dataUpdatedAt } = useQuery({
-    queryKey: dataQueryKey(companyId, branchId),
+    queryKey: activeDataQueryKey,
     queryFn: async () => {
       const loadOnce = async () => {
         let branchCode: string | null = null;
         if (branchId) {
           branchCode = await resolveBranchCode(branchId);
         }
-        return fetchDataFromDb(companyId, branchCode);
+        return fetchDataFromDb(companyId, branchCode, routeLoadMode);
       };
 
       let result = await loadOnce();
@@ -411,7 +429,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         loggingService.error('Import batch insert error', { error, batch: b }, 'DataContext');
       } else {
-        queryClient.setQueryData<DataQueryResult>(dataQueryKey(companyId, branchId), prev => {
+        queryClient.setQueryData<DataQueryResult>(activeDataQueryKey, prev => {
           const base = prev ?? emptyData;
           return { ...base, batches: [b, ...base.batches] };
         });
@@ -420,7 +438,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       loggingService.error('Unexpected error adding import batch', { error: err }, 'DataContext');
     }
-  }, [companyId, queryClient, branchId]);
+  }, [companyId, queryClient, branchId, activeDataQueryKey]);
 
   const updateImportBatch = useCallback(async (id: string, updates: Partial<ImportBatch>) => {
     try {
@@ -436,7 +454,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         loggingService.error('Import batch update error', { error, id, updates }, 'DataContext');
       } else {
-        queryClient.setQueryData<DataQueryResult>(dataQueryKey(companyId, branchId), prev => {
+        queryClient.setQueryData<DataQueryResult>(activeDataQueryKey, prev => {
           const base = prev ?? emptyData;
           return { ...base, batches: base.batches.map(b => b.id === id ? { ...b, ...updates } : b) };
         });
@@ -445,7 +463,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       loggingService.error('Unexpected error updating import batch', { error: err }, 'DataContext');
     }
-  }, [queryClient, companyId, branchId]);
+  }, [queryClient, companyId, branchId, activeDataQueryKey]);
 
   const addQualityIssues = useCallback(async (issues: DataQualityIssue[]) => {
     if (issues.length === 0) return;
@@ -469,7 +487,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      queryClient.setQueryData<DataQueryResult>(dataQueryKey(companyId, branchId), prev => {
+      queryClient.setQueryData<DataQueryResult>(activeDataQueryKey, prev => {
         const base = prev ?? emptyData;
         return { ...base, issues: [...issues, ...base.issues] };
       });
@@ -477,7 +495,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       loggingService.error('Unexpected error adding quality issues', { error: err }, 'DataContext');
     }
-  }, [companyId, queryClient, branchId]);
+  }, [companyId, queryClient, branchId, activeDataQueryKey]);
 
   const updateSla = useCallback(async (id: string, slaDays: number) => {
     try {
@@ -486,7 +504,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         loggingService.error('SLA update error', { error, id, slaDays }, 'DataContext');
       } else {
-        queryClient.setQueryData<DataQueryResult>(dataQueryKey(companyId, branchId), prev => {
+        queryClient.setQueryData<DataQueryResult>(activeDataQueryKey, prev => {
           const base = prev ?? emptyData;
           return { ...base, slas: base.slas.map(s => s.id === id ? { ...s, slaDays } : s) };
         });
@@ -495,7 +513,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       loggingService.error('Unexpected error updating SLA', { error: err }, 'DataContext');
     }
-  }, [queryClient, companyId, branchId]);
+  }, [queryClient, companyId, branchId, activeDataQueryKey]);
 
   const refreshKpis = useCallback(() => {
     // KPIs are auto-derived via useMemo; this function triggers a cache touch
