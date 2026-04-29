@@ -19,9 +19,15 @@ additional_redirect_urls = [
 	"https://uat.protonfookloi.com/hrms/signup",
 	"https://uat.protonfookloi.com/hrms/forgot-password",
 	"https://uat.protonfookloi.com/hrms/reset-password",
+	"https://hrms-uat.protonfookloi.com/signup",
+	"https://hrms-uat.protonfookloi.com/forgot-password",
+	"https://hrms-uat.protonfookloi.com/reset-password",
 	"https://protonfookloi.com/hrms/signup",
 	"https://protonfookloi.com/hrms/forgot-password",
 	"https://protonfookloi.com/hrms/reset-password",
+	"https://hrms.protonfookloi.com/signup",
+	"https://hrms.protonfookloi.com/forgot-password",
+	"https://hrms.protonfookloi.com/reset-password",
 ]
 
 [auth.email]
