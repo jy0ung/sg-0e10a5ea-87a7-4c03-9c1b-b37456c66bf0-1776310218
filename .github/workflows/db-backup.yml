@@ -39,7 +39,7 @@ jobs:
       DB_BACKUP_S3_BUCKET: ${{ secrets.DB_BACKUP_S3_BUCKET }}
       DB_BACKUP_S3_PREFIX: ${{ secrets.DB_BACKUP_S3_PREFIX || 'flc-bi/db-backups' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install backup tools
         run: |
