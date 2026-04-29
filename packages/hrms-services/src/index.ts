@@ -8,7 +8,7 @@
  * No React hooks, no audit logging dependency — thin, testable wrappers.
  */
 import { supabase } from '@flc/supabase';
-import type { Announcement, LeaveRequest, AttendanceRecord, LeaveType } from '@flc/types';
+import type { Announcement, AppraisalCycle, AppraisalItem, AppraisalStatus, LeaveRequest, AttendanceRecord, LeaveType } from '@flc/types';
 import type { CreateLeaveRequestFormData } from '@flc/hrms-schemas';
 
 const untypedSupabase = supabase as any;
@@ -41,6 +41,67 @@ async function resolveRequiredProfileId(employeeId: string): Promise<string> {
   if (!linkedProfile?.id) throw new Error(`No profile linked to employee '${employeeId}'.`);
 
   return String(linkedProfile.id);
+}
+
+export interface SelfServiceAppraisalItem extends AppraisalItem {
+  appraisalTitle: string;
+  appraisalCycle: AppraisalCycle;
+  periodStart: string;
+  periodEnd: string;
+  appraisalStatus: AppraisalStatus;
+}
+
+function rowToSelfServiceAppraisalItem(row: Record<string, unknown>): SelfServiceAppraisalItem {
+  const appraisal = (row.appraisal ?? row.appraisals ?? {}) as Record<string, unknown>;
+  const reviewer = row.reviewer as Record<string, unknown> | null;
+
+  return {
+    id:               String(row.id ?? ''),
+    appraisalId:      String(row.appraisal_id ?? ''),
+    employeeId:       String(row.employee_id ?? ''),
+    reviewerId:       row.reviewer_id ? String(row.reviewer_id) : undefined,
+    reviewerName:     reviewer?.name ? String(reviewer.name) : undefined,
+    rating:           row.rating != null ? Number(row.rating) : undefined,
+    goals:            row.goals ? String(row.goals) : undefined,
+    achievements:     row.achievements ? String(row.achievements) : undefined,
+    areasToImprove:   row.areas_to_improve ? String(row.areas_to_improve) : undefined,
+    reviewerComments: row.reviewer_comments ? String(row.reviewer_comments) : undefined,
+    employeeComments: row.employee_comments ? String(row.employee_comments) : undefined,
+    status:           (row.status as AppraisalItem['status']) ?? 'pending',
+    reviewedAt:       row.reviewed_at ? String(row.reviewed_at) : undefined,
+    appraisalTitle:   String(appraisal.title ?? 'Appraisal'),
+    appraisalCycle:   (appraisal.cycle as AppraisalCycle) ?? 'annual',
+    periodStart:      String(appraisal.period_start ?? ''),
+    periodEnd:        String(appraisal.period_end ?? ''),
+    appraisalStatus:  (appraisal.status as AppraisalStatus) ?? 'open',
+  };
+}
+
+async function getSelfServiceAppraisalItem(itemId: string): Promise<SelfServiceAppraisalItem> {
+  const { data, error } = await supabase
+    .from('appraisal_items')
+    .select('*, reviewer:profiles!reviewer_id(name), appraisal:appraisals!appraisal_id(title, cycle, period_start, period_end, status)')
+    .eq('id', itemId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return rowToSelfServiceAppraisalItem(data as Record<string, unknown>);
+}
+
+async function syncAppraisalCompletionStatus(appraisalId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('appraisal_items')
+    .select('status')
+    .eq('appraisal_id', appraisalId);
+  if (error) throw new Error(error.message);
+
+  if (!data?.length || data.some(item => String(item.status ?? 'pending') !== 'acknowledged')) return;
+
+  const { error: updateError } = await supabase
+    .from('appraisals')
+    .update({ status: 'completed', updated_at: new Date().toISOString() })
+    .eq('id', appraisalId);
+  if (updateError) throw new Error(updateError.message);
 }
 
 async function resolveDirectManagerApproverUserId(requesterId: string): Promise<string> {
@@ -245,6 +306,84 @@ export async function listAnnouncements(
     createdAt:   String(row.created_at),
     updatedAt:   String(row.updated_at),
   }));
+}
+
+// ─── Appraisals (self-service) ───────────────────────────────────────────────
+
+export async function getMyAppraisalItems(
+  employeeId: string,
+  companyId: string,
+): Promise<SelfServiceAppraisalItem[]> {
+  const { data, error } = await supabase
+    .from('appraisal_items')
+    .select('*, reviewer:profiles!reviewer_id(name), appraisal:appraisals!appraisal_id(title, cycle, period_start, period_end, status, company_id)')
+    .eq('employee_id', employeeId)
+    .order('updated_at', { ascending: false });
+  if (error) throw new Error(error.message);
+
+  return (data ?? [])
+    .filter(row => {
+      const appraisal = (row as Record<string, unknown>).appraisal as Record<string, unknown> | undefined;
+      return String(appraisal?.company_id ?? companyId) === companyId;
+    })
+    .map(row => rowToSelfServiceAppraisalItem(row as Record<string, unknown>));
+}
+
+export async function submitAppraisalSelfReview(
+  itemId: string,
+  employeeId: string,
+  input: Pick<AppraisalItem, 'goals' | 'achievements' | 'areasToImprove' | 'employeeComments'>,
+): Promise<void> {
+  await resolveRequiredProfileId(employeeId);
+
+  const item = await getSelfServiceAppraisalItem(itemId);
+  if (item.appraisalStatus !== 'open') throw new Error('Self review is only available for active appraisal cycles.');
+  if (item.employeeId !== employeeId) throw new Error('You can only submit your own appraisal self review.');
+  if (!['pending', 'self_reviewed'].includes(item.status)) {
+    throw new Error('This appraisal item is no longer open for self review.');
+  }
+
+  const { error } = await supabase
+    .from('appraisal_items')
+    .update({
+      goals: input.goals ?? null,
+      achievements: input.achievements ?? null,
+      areas_to_improve: input.areasToImprove ?? null,
+      employee_comments: input.employeeComments ?? null,
+      status: 'self_reviewed',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', itemId);
+  if (error) throw new Error(error.message);
+}
+
+export async function acknowledgeAppraisalItem(
+  itemId: string,
+  employeeId: string,
+  employeeComments?: string,
+): Promise<void> {
+  await resolveRequiredProfileId(employeeId);
+
+  const item = await getSelfServiceAppraisalItem(itemId);
+  if (!['open', 'completed'].includes(item.appraisalStatus)) {
+    throw new Error('Acknowledgement is only available for active appraisal cycles.');
+  }
+  if (item.employeeId !== employeeId) throw new Error('You can only acknowledge your own appraisal review.');
+  if (!['reviewed', 'acknowledged'].includes(item.status)) {
+    throw new Error('Manager review must be completed before acknowledgement.');
+  }
+
+  const { error } = await supabase
+    .from('appraisal_items')
+    .update({
+      employee_comments: employeeComments ?? item.employeeComments ?? null,
+      status: 'acknowledged',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', itemId);
+  if (error) throw new Error(error.message);
+
+  await syncAppraisalCompletionStatus(item.appraisalId);
 }
 
 // ─── Leave Requests (self-service) ───────────────────────────────────────────
