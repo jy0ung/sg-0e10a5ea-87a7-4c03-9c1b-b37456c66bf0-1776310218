@@ -20,7 +20,7 @@ const envSchema = z.object({
   VITE_SENTRY_DSN: z.string().url().optional().or(z.literal('')),
   VITE_SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).optional(),
   VITE_APP_ENV: z
-    .enum(['development', 'staging', 'production'])
+    .enum(['development', 'staging', 'uat', 'production'])
     .default('development'),
   VITE_APP_URL: z.string().url().optional(),
   VITE_HRMS_APP_URL: z.string().url().optional(),
