@@ -17,6 +17,7 @@
 #   CONTAINER_NAME   (default: flc-bi-uat)         — canonical container name
 #   HOST_PORT        (default: 8080)               — port bound on 127.0.0.1
 #   HEALTH_TIMEOUT   (default: 60)                 — seconds to wait for /healthz
+#   SKIP_PULL        (default: 0)                  — set to 1 for local images
 #   GHCR_USERNAME    (optional)                    — only needed for private images
 #   GHCR_TOKEN       (optional)                    — PAT with read:packages
 # ─────────────────────────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ IMAGE="${1:-}"
 CONTAINER_NAME="${CONTAINER_NAME:-flc-bi-uat}"
 HOST_PORT="${HOST_PORT:-8080}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-60}"
+SKIP_PULL="${SKIP_PULL:-0}"
 STAGING_NAME="${CONTAINER_NAME}-staging"
 STAGING_PORT="$(( HOST_PORT + 1 ))"
 
@@ -43,8 +45,12 @@ if [[ -n "${GHCR_TOKEN:-}" && -n "${GHCR_USERNAME:-}" ]]; then
   echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin >/dev/null
 fi
 
-log "Pulling $IMAGE"
-docker pull "$IMAGE"
+if [[ "$SKIP_PULL" == "1" || "$SKIP_PULL" == "true" ]]; then
+  log "Skipping pull for local image $IMAGE"
+else
+  log "Pulling $IMAGE"
+  docker pull "$IMAGE"
+fi
 
 # Clean any leftover staging container from a previous failed run.
 if docker ps -a --format '{{.Names}}' | grep -qx "$STAGING_NAME"; then

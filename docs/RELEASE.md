@@ -32,6 +32,14 @@ The release workflow supports three image targets:
 
 Use the manual Release workflow with `build_target=hrms-web` to publish a standalone HRMS image. Use the Deploy Image workflow with `app=hrms-web` and an HRMS-specific environment such as `uat-hrms` or `production-hrms` to deploy that image to a separate container/port/domain.
 
+For UAT break/fix validation before publishing a GHCR image, the host can run:
+
+```bash
+scripts/deploy-hrms-uat-local.sh
+```
+
+The helper builds `apps/hrms-web` with the HRMS UAT app URL, includes the required Supabase anon key from `.env` unless already exported, promotes the local image through the same health-gated container swap, and runs the standalone HRMS UAT verifier.
+
 ## Environments
 
 | Env        | Supabase project          | URL                         |
