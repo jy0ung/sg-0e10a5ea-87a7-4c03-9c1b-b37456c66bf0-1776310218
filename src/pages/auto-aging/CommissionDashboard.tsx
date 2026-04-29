@@ -19,6 +19,7 @@ import { Plus, Pencil, Trash2, Check, Loader2, DollarSign, TrendingUp } from 'lu
 
 const PERIODS = Array.from({ length: 12 }, (_, i) => {
   const d = new Date();
+  d.setDate(1);
   d.setMonth(d.getMonth() - i);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 });
