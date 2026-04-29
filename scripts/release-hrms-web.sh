@@ -28,7 +28,7 @@ case "$DEPLOY_ENVIRONMENT" in
   *) die "Unsupported DEPLOY_ENVIRONMENT '$DEPLOY_ENVIRONMENT'. Expected uat-hrms or production-hrms." ;;
 esac
 
-scripts/check-hrms-github-env.sh "$RELEASE_ENVIRONMENT"
+scripts/check-hrms-github-env.sh "$RELEASE_ENVIRONMENT" release
 
 printf 'Dispatching Release workflow: tag=%s environment=%s build_target=hrms-web ref=%s\n' \
   "$TAG" "$RELEASE_ENVIRONMENT" "$REF"
@@ -48,7 +48,7 @@ Watch it with:
 EOF
 
 if [[ "$DEPLOY_AFTER_RELEASE" == "1" || "$DEPLOY_AFTER_RELEASE" == "true" ]]; then
-  scripts/check-hrms-github-env.sh "$DEPLOY_ENVIRONMENT"
+  scripts/check-hrms-github-env.sh "$DEPLOY_ENVIRONMENT" deploy
   printf 'Dispatching Deploy Image workflow: environment=%s app=hrms-web image_tag=%s ref=%s\n' \
     "$DEPLOY_ENVIRONMENT" "$TAG" "$REF"
   gh workflow run deploy-image.yml \

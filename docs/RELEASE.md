@@ -76,7 +76,7 @@ The helper builds `apps/hrms-web` with the HRMS UAT app URL, includes the requir
 Once the GitHub environment secrets are present, validate and dispatch the official standalone HRMS workflows with:
 
 ```bash
-scripts/check-hrms-github-env.sh uat-hrms
+scripts/check-hrms-github-env.sh uat-hrms release
 TAG=v0.1.0 RELEASE_ENVIRONMENT=uat-hrms scripts/release-hrms-web.sh
 ```
 
