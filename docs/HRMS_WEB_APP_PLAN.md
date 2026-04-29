@@ -386,9 +386,11 @@ Acceptance criteria for Phase 5 closure:
 
 ### Phase 6: Mobile Expansion
 
+Status: Started on 2026-04-29 with read-only company announcements in `apps/hrms-mobile`.
+
 After HRMS web launch, extend `apps/hrms-mobile` with the next employee-first flows:
 
-1. announcements
+1. announcements - shipped as a read-only mobile feed with category filters
 2. appraisal self review
 3. appraisal acknowledgement
 4. approval notifications

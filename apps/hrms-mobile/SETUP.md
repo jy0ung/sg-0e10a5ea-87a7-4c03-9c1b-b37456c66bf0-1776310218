@@ -88,6 +88,7 @@ The app registers the custom URL scheme `com.flc.hrms://app/`.
 |-----|-------------|
 | `com.flc.hrms://app/leave/history` | Leave History screen |
 | `com.flc.hrms://app/attendance` | Attendance screen |
+| `com.flc.hrms://app/announcements` | Announcements screen |
 | `com.flc.hrms://app/payslip` | Payslip screen |
 
 Configure the scheme in:

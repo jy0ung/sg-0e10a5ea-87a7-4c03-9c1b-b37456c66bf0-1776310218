@@ -8,7 +8,7 @@
  * No React hooks, no audit logging dependency — thin, testable wrappers.
  */
 import { supabase } from '@flc/supabase';
-import type { LeaveRequest, AttendanceRecord, LeaveType } from '@flc/types';
+import type { Announcement, LeaveRequest, AttendanceRecord, LeaveType } from '@flc/types';
 import type { CreateLeaveRequestFormData } from '@flc/hrms-schemas';
 
 const untypedSupabase = supabase as any;
@@ -207,6 +207,43 @@ export async function getLeaveTypes(companyId: string): Promise<LeaveType[]> {
     active:      r.active,
     createdAt:   r.created_at,
     updatedAt:   r.updated_at,
+  }));
+}
+
+// ─── Announcements ───────────────────────────────────────────────────────────
+
+export async function listAnnouncements(
+  companyId: string,
+  opts?: { limit?: number },
+): Promise<Announcement[]> {
+  let query = supabase
+    .from('announcements')
+    .select('*, profiles(name)')
+    .eq('company_id', companyId)
+    .order('pinned', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (opts?.limit) query = query.limit(opts.limit);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id:          String(row.id),
+    companyId:   String(row.company_id),
+    title:       String(row.title),
+    body:        String(row.body),
+    category:    row.category as Announcement['category'],
+    priority:    row.priority as Announcement['priority'],
+    pinned:      Boolean(row.pinned),
+    publishedAt: row.published_at ? String(row.published_at) : undefined,
+    expiresAt:   row.expires_at ? String(row.expires_at) : undefined,
+    authorId:    row.author_id ? String(row.author_id) : undefined,
+    authorName:  (row.profiles as Record<string, unknown> | null)?.name
+      ? String((row.profiles as Record<string, unknown>).name)
+      : undefined,
+    createdAt:   String(row.created_at),
+    updatedAt:   String(row.updated_at),
   }));
 }
 
