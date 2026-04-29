@@ -1,5 +1,5 @@
 #!/usr/bin/env -S npx tsx
-import { chromium } from 'playwright';
+import { chromium, type Page } from 'playwright';
 
 const DEFAULT_UAT_URL = 'https://uat.protonfookloi.com';
 const DEFAULT_FORBIDDEN_PATTERNS = [
@@ -25,6 +25,30 @@ const loginEmail = readEnv('UAT_LOGIN_EMAIL');
 const loginPassword = readEnv('UAT_LOGIN_PASSWORD');
 const loginRequired = ['1', 'true'].includes((readEnv('UAT_LOGIN_REQUIRED') ?? '').toLowerCase());
 const maxFetchAttempts = parsePositiveInteger(readEnv('UAT_VERIFY_FETCH_ATTEMPTS'), 3);
+const appMode = readEnv('UAT_APP') ?? 'main';
+
+const MOCK_USER = {
+  id: '00000000-0000-0000-0000-000000000001',
+  aud: 'authenticated',
+  role: 'authenticated',
+  email: 'admin@flc.test',
+  email_confirmed_at: '2024-01-01T00:00:00Z',
+  created_at: '2024-01-01T00:00:00Z',
+  updated_at: '2024-01-01T00:00:00Z',
+  app_metadata: { provider: 'email', providers: ['email'] },
+  user_metadata: { name: 'Test Admin' },
+};
+
+const MOCK_PROFILE = {
+  id: MOCK_USER.id,
+  email: MOCK_USER.email,
+  name: 'Test Admin',
+  role: 'super_admin',
+  company_id: '00000000-0000-0000-0000-000000000099',
+  branch_id: null,
+  avatar_url: null,
+  access_scope: 'global',
+};
 
 const results: CheckResult[] = [];
 
@@ -52,6 +76,38 @@ function parsePositiveInteger(rawValue: string | undefined, fallback: number): n
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function toBase64Url(value: string): string {
+  return Buffer.from(value)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function fakeBearerToken(): string {
+  const header = toBase64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payload = toBase64Url(JSON.stringify({
+    sub: MOCK_USER.id,
+    aud: 'authenticated',
+    exp: 9999999999,
+    iat: 1700000000,
+    role: 'authenticated',
+    email: MOCK_USER.email,
+  }));
+  return `${header}.${payload}.fakesignature`;
+}
+
+function buildFakeSession() {
+  return {
+    access_token: fakeBearerToken(),
+    token_type: 'bearer',
+    expires_in: 9999999,
+    expires_at: 9999999999,
+    refresh_token: 'fake-refresh-token',
+    user: MOCK_USER,
+  };
 }
 
 async function fetchText(url: URL): Promise<string> {
@@ -96,11 +152,11 @@ async function checkHealth() {
 }
 
 function resolveAssetUrl(html: string): URL {
-  const match = html.match(/\/(assets\/index-[^"']+\.js)/);
+  const match = html.match(/<script[^>]+src=["']([^"']*assets\/index-[^"']+\.js)["']/);
   if (!match?.[1]) {
     throw new Error('Could not find hashed Vite index asset in HTML');
   }
-  return new URL(`/${match[1]}`, targetUrl.origin);
+  return new URL(match[1], targetUrl);
 }
 
 async function checkBundleSupabaseConfig() {
@@ -169,9 +225,102 @@ async function checkLoginFlow() {
   }
 }
 
+async function setupHrmsBrowserMocks(page: Page) {
+  const supabaseOrigin = expectedSupabaseUrl.origin;
+  const fakeSession = buildFakeSession();
+
+  await page.context().addInitScript(
+    ({ session, user }) => {
+      localStorage.setItem('flc.auth.session', JSON.stringify(session));
+      localStorage.setItem('flc.auth.session-user', JSON.stringify({ user }));
+    },
+    { session: fakeSession, user: MOCK_USER },
+  );
+
+  await page.route(`${supabaseOrigin}/auth/v1/logout*`, (route) => route.fulfill({ status: 204, body: '' }));
+  await page.route(`${supabaseOrigin}/auth/v1/token*`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(fakeSession),
+  }));
+  await page.route(`${supabaseOrigin}/auth/v1/user`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(MOCK_USER),
+  }));
+  await page.route(`${supabaseOrigin}/realtime/**`, (route) => route.abort());
+  await page.route(`${supabaseOrigin}/rest/v1/**`, (route) => {
+    if (route.request().method() === 'GET') {
+      const accept = route.request().headers().accept ?? '';
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: accept.includes('pgrst.object') ? 'null' : '[]',
+      });
+      return;
+    }
+    route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+  });
+  await page.route(`${supabaseOrigin}/rest/v1/profiles*`, (route) => {
+    const accept = route.request().headers().accept ?? '';
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: accept.includes('pgrst.object') ? JSON.stringify(MOCK_PROFILE) : JSON.stringify([MOCK_PROFILE]),
+    });
+  });
+  await page.route(`${supabaseOrigin}/rest/v1/module_settings*`, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify([{
+      id: 'module-setting-hrms',
+      company_id: MOCK_PROFILE.company_id,
+      module_id: 'hrms',
+      is_active: true,
+      updated_at: '2026-04-29T00:00:00.000Z',
+      updated_by: MOCK_PROFILE.id,
+    }]),
+  }));
+}
+
+async function checkHrmsWebShell() {
+  const name = 'HRMS web shell smoke';
+  if (appMode !== 'hrms-web') {
+    addResult(name, true, `skipped for app mode ${JSON.stringify(appMode)}`);
+    return;
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+
+  try {
+    await setupHrmsBrowserMocks(page);
+
+    await page.goto(new URL('/', targetUrl).toString(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.waitForURL((url) => url.pathname.endsWith('/leave'), { timeout: 20_000 });
+    await page.getByText('FLC HRMS').first().waitFor({ state: 'visible', timeout: 10_000 });
+    await page.getByText('HRMS-only access').waitFor({ state: 'visible', timeout: 10_000 });
+
+    await page.goto(new URL('/admin', targetUrl).toString(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.waitForURL((url) => url.pathname.endsWith('/settings'), { timeout: 20_000 });
+    await page.getByText('FLC HRMS').first().waitFor({ state: 'visible', timeout: 10_000 });
+
+    await page.goto(new URL('/leave-calendar?view=team#month', targetUrl).toString(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.waitForURL((url) => url.pathname.endsWith('/leave/calendar') && url.search === '?view=team' && url.hash === '#month', { timeout: 20_000 });
+    await page.getByText('FLC HRMS').first().waitFor({ state: 'visible', timeout: 10_000 });
+
+    addResult(name, true, `validated ${targetUrl.origin}`);
+  } catch (error) {
+    fail(name, error);
+  } finally {
+    await browser.close();
+  }
+}
+
 await checkHealth();
 await checkBundleSupabaseConfig();
 await checkLoginFlow();
+await checkHrmsWebShell();
 
 const failed = results.filter((result) => !result.ok);
 if (failed.length > 0) {

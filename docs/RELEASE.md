@@ -71,6 +71,11 @@ verification job.
 `UAT_LOGIN_EMAIL` and `UAT_LOGIN_PASSWORD` as UAT environment secrets to include
 the real browser login check in that automated deploy gate.
 
+For standalone HRMS deployments, set `UAT_APP=hrms-web` or deploy with
+`app=hrms-web`. The verifier then installs Chromium in CI and runs an additional
+mocked-auth browser smoke covering the HRMS shell, `/admin -> /settings`, and
+`/leave-calendar -> /leave/calendar` query/hash preservation.
+
 `uat-synthetic.yml` also runs the same verifier hourly and on manual dispatch.
 It fails on health, bundle configuration, or required-login regressions without
 needing a deploy event. Set `UAT_VERIFY_FETCH_ATTEMPTS` if the synthetic check

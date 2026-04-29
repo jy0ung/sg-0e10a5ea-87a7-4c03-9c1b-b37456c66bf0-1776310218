@@ -196,19 +196,21 @@ jobs:
       - name: Install Playwright Chromium for login verification
         if: ${{ startsWith(steps.env.outputs.value, 'uat') }}
         env:
+          UAT_APP: ${{ github.event.inputs.app || 'main' }}
           UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
           UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
         run: |
           set -euo pipefail
-          if [[ -n "${UAT_LOGIN_EMAIL:-}" && -n "${UAT_LOGIN_PASSWORD:-}" ]]; then
+          if [[ "${UAT_APP:-main}" == "hrms-web" || ( -n "${UAT_LOGIN_EMAIL:-}" && -n "${UAT_LOGIN_PASSWORD:-}" ) ]]; then
             npx playwright install --with-deps chromium
           else
-            echo "Skipping browser install; UAT login credentials are not configured."
+            echo "Skipping browser install; no browser verification is required for this deploy."
           fi
 
       - name: Verify UAT deployment
         if: ${{ startsWith(steps.env.outputs.value, 'uat') }}
         env:
+          UAT_APP: ${{ github.event.inputs.app || 'main' }}
           UAT_URL: ${{ secrets.UAT_URL || 'https://uat.protonfookloi.com' }}
           UAT_EXPECTED_SUPABASE_URL: ${{ secrets.UAT_EXPECTED_SUPABASE_URL || secrets.UAT_URL || 'https://uat.protonfookloi.com' }}
           UAT_HEALTH_URL: ${{ secrets.UAT_HEALTH_URL }}
