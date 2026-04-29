@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,26 @@ import { Loader2, CheckCircle } from 'lucide-react';
 import { resetPasswordSchema, type ResetPasswordFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+
+const invalidResetLinkMessage = 'Invalid or expired reset link. Request a new password reset email and try again.';
+
+function decodeJwtPayload(accessToken: string) {
+  const [, payload] = accessToken.split('.');
+  if (!payload) return null;
+
+  try {
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + (4 - normalized.length % 4) % 4, '=');
+    return JSON.parse(globalThis.atob(padded)) as { amr?: Array<{ method?: string }> };
+  } catch {
+    return null;
+  }
+}
+
+function isRecoverySession(session: Session | null) {
+  const payload = session?.access_token ? decodeJwtPayload(session.access_token) : null;
+  return Array.isArray(payload?.amr) && payload.amr.some((entry) => entry.method === 'recovery');
+}
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -43,11 +64,47 @@ export default function ResetPasswordPage() {
       const hasRecoveryCallback = type === 'recovery' && !!(accessToken || tokenHash || code);
 
       if (!hasRecoveryCallback) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (isRecoverySession(session)) {
+          if (isMounted) {
+            setIsRecovery(true);
+            setError('');
+            setInitializing(false);
+          }
+          return;
+        }
+
         if (isMounted) {
-          setError('Invalid or expired reset link. Request a new password reset email and try again.');
+          setError(invalidResetLinkMessage);
           setInitializing(false);
         }
         return;
+      }
+
+      if (code) {
+        const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (codeError) {
+          if (isMounted) {
+            setError(invalidResetLinkMessage);
+            setInitializing(false);
+          }
+          return;
+        }
+      }
+
+      if (tokenHash) {
+        const { error: tokenError } = await supabase.auth.verifyOtp({
+          type: 'recovery',
+          token_hash: tokenHash,
+        });
+
+        if (tokenError) {
+          if (isMounted) {
+            setError(invalidResetLinkMessage);
+            setInitializing(false);
+          }
+          return;
+        }
       }
 
       if (accessToken && refreshToken) {
@@ -58,7 +115,7 @@ export default function ResetPasswordPage() {
 
         if (sessionError) {
           if (isMounted) {
-            setError('Invalid or expired reset link. Request a new password reset email and try again.');
+            setError(invalidResetLinkMessage);
             setInitializing(false);
           }
           return;

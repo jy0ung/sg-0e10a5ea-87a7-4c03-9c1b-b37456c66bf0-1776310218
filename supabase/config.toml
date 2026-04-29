@@ -29,12 +29,13 @@ additional_redirect_urls = [
 	"https://hrms.protonfookloi.com/forgot-password",
 	"https://hrms.protonfookloi.com/reset-password",
 ]
-
-[auth.email]
-# Phase 0 hotfix: self-signup is disabled platform-wide.
+# Phase 0 hotfix: public self-signup is disabled platform-wide.
 # New users must be onboarded via the `invite-user` edge function, which
 # requires an authenticated admin caller and provisions `profiles.company_id`
 # server-side. Email confirmations are enabled so invited users verify
 # their address before first login.
 enable_signup = false
+
+[auth.email]
+enable_signup = true
 enable_confirmations = true
