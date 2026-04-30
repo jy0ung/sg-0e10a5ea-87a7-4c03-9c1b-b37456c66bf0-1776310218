@@ -20,13 +20,14 @@ import { BranchPeriodFilter } from '@/components/shared/BranchPeriodFilter';
 import { getAutoAgingDashboardSummary, searchVehicles } from '@/services/vehicleService';
 import { getDashboardPeriodRange, getDashboardScopeSummary, loadDashboardFilterState, saveDashboardFilterState } from '@/lib/dashboardFilters';
 import { AUTO_AGING_BG_DATE_PERIOD_LABEL, getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
+import { computeKpiSummaries } from '@/utils/kpi-computation';
 
 function toServerValue(value: string): string | null {
   return value === 'all' ? null : value;
 }
 
 export default function AutoAgingDashboard() {
-  const { lastRefresh, reloadFromDb } = useData();
+  const { lastRefresh, reloadFromDb, vehicles: contextVehiclesRaw, slas: slasRaw } = useData();
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -76,16 +77,28 @@ export default function AutoAgingDashboard() {
     staleTime: 15_000,
   });
 
-  const branches = summaryQuery.data?.availableBranches ?? [];
-  const models = summaryQuery.data?.availableModels ?? [];
+  const contextVehicles = contextVehiclesRaw ?? [];
+  const slas = slasRaw ?? [];
   const filtered = vehicleRowsQuery.data?.rows ?? [];
   const filteredVehicleCount = vehicleRowsQuery.data?.totalCount ?? 0;
+  const fallbackBranches = useMemo(
+    () => Array.from(new Set(contextVehicles.map(vehicle => vehicle.branch_code).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [contextVehicles],
+  );
+  const fallbackModels = useMemo(
+    () => Array.from(new Set(contextVehicles.map(vehicle => vehicle.model).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [contextVehicles],
+  );
+  const fallbackKpiSummaries = useMemo(() => computeKpiSummaries(filtered, slas), [filtered, slas]);
+
+  const branches = summaryQuery.data?.availableBranches ?? fallbackBranches;
+  const models = summaryQuery.data?.availableModels ?? fallbackModels;
   const filteredQualityIssues = summaryQuery.data?.qualityIssueSample ?? [];
   const filteredQualityIssueCount = summaryQuery.data?.qualityIssueCount ?? 0;
-  const filteredKpiSummaries = summaryQuery.data?.kpiSummaries ?? [];
+  const filteredKpiSummaries = summaryQuery.data?.kpiSummaries ?? fallbackKpiSummaries;
   const hasImportedData = branches.length > 0 || models.length > 0 || filteredVehicleCount > 0 || filteredQualityIssueCount > 0;
   const isLoading = (summaryQuery.isLoading || vehicleRowsQuery.isLoading) && !summaryQuery.data && !vehicleRowsQuery.data;
-  const loadError = summaryQuery.error ?? vehicleRowsQuery.error ?? null;
+  const loadError = vehicleRowsQuery.error ?? (!summaryQuery.data && summaryQuery.error ? summaryQuery.error : null);
   const sampleLimitApplied = filteredVehicleCount > filtered.length;
 
   useEffect(() => {
