@@ -24,6 +24,7 @@ export interface TicketRecord {
   company_id: string;
   subject: string;
   category: TicketCategory;
+  subcategory: string | null;
   priority: TicketPriority;
   status: TicketStatus;
   description: string;
@@ -49,6 +50,7 @@ export interface CompanyTicketRecord extends RequestTicketRecord {
 export interface CreateTicketInput {
   subject: string;
   category: TicketCategory;
+  subcategory?: string | null;
   priority: TicketPriority;
   description: string;
 }
@@ -112,6 +114,7 @@ function mapTicket(row: TicketRow): TicketRecord {
     company_id: row.company_id,
     subject: row.subject,
     category: row.category,
+    subcategory: row.subcategory,
     priority: row.priority,
     status: row.status,
     description: row.description,
@@ -267,7 +270,7 @@ export async function listMyTickets(userId: string, companyId: string): Promise<
   try {
     const { data, error } = await ticketsTable()
       .select(
-        'id, subject, category, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
+        'id, subject, category, subcategory, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
       )
       .eq('submitted_by', userId)
       .eq('company_id', companyId)
@@ -293,7 +296,7 @@ export async function listCompanyTickets(companyId: string): Promise<TicketServi
   try {
     const { data, error } = await ticketsTable()
       .select(
-        'id, subject, category, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
+        'id, subject, category, subcategory, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
       )
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
@@ -374,6 +377,7 @@ export async function createTicket(
   try {
     const { error } = await ticketsTable().insert({
       ...input,
+      subcategory: input.subcategory?.trim() ? input.subcategory.trim() : null,
       company_id: context.companyId,
       submitted_by: context.userId,
       status: 'open',
@@ -387,7 +391,7 @@ export async function createTicket(
     const error = err instanceof Error ? err : new Error('Failed to create ticket');
     loggingService.error(
       'Failed to create ticket',
-      { error: error.message, category: input.category, priority: input.priority },
+      { error: error.message, category: input.category, subcategory: input.subcategory, priority: input.priority },
       'TicketService',
     );
     return { data: null, error };
@@ -415,7 +419,7 @@ export async function updateTicket(
   try {
     const { data: currentData, error: currentError } = await ticketsTable()
       .select(
-        'id, subject, category, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
+        'id, subject, category, subcategory, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
       )
       .eq('company_id', context.companyId)
       .eq('id', ticketId)
@@ -428,7 +432,7 @@ export async function updateTicket(
       .eq('company_id', context.companyId)
       .eq('id', ticketId)
       .select(
-        'id, subject, category, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
+        'id, subject, category, subcategory, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
       )
       .single();
 

@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
+import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
+import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
 import {
   listMyTickets,
   listTicketActivity,
@@ -35,6 +37,7 @@ function formatTicketLabel(value: string) {
 export default function MyTickets() {
   const { user } = useAuth();
   const { categories } = useRequestCategories(user?.company_id, true);
+  const { subcategories } = useRequestSubcategories(user?.company_id, { includeInactive: true });
   const [tickets, setTickets] = useState<RequestTicketRecord[]>([]);
   const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
   const [loading, setLoading] = useState(true);
@@ -145,6 +148,7 @@ export default function MyTickets() {
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground capitalize">
                   Category: {getRequestCategoryLabel(ticket.category, categories)}
+                  {ticket.subcategory ? ` / ${getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories)}` : ''}
                 </p>
 
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">

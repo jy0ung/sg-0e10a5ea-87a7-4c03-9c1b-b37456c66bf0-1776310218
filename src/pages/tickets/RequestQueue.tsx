@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
 import { Textarea } from '@/components/ui/textarea';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
+import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import {
   Select,
   SelectContent,
@@ -27,6 +28,7 @@ import {
 import { listProfiles, type ProfileRow } from '@/services/profileService';
 import { ADMIN_ONLY } from '@/config/routeRoles';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
+import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
 
 type StatusFilter = 'all' | TicketStatus;
 
@@ -53,6 +55,7 @@ function formatTicketLabel(value: string) {
 export default function RequestQueue() {
   const { user } = useAuth();
   const { categories } = useRequestCategories(user?.company_id, true);
+  const { subcategories } = useRequestSubcategories(user?.company_id, { includeInactive: true });
   const [tickets, setTickets] = useState<CompanyTicketRecord[]>([]);
   const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
   const [assignees, setAssignees] = useState<ProfileRow[]>([]);
@@ -328,6 +331,11 @@ export default function RequestQueue() {
                   <div className="flex flex-wrap gap-2">
                     <Badge variant={statusVariant[ticket.status]}>{formatTicketLabel(ticket.status)}</Badge>
                     <Badge variant="outline">{getRequestCategoryLabel(ticket.category, categories)}</Badge>
+                    {ticket.subcategory && (
+                      <Badge variant="outline">
+                        {getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories)}
+                      </Badge>
+                    )}
                     <Badge variant="secondary">{ticket.priority} priority</Badge>
                   </div>
                 </div>

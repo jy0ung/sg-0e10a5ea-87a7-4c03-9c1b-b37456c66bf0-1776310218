@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,11 +18,13 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
+import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { createTicket } from '@/services/ticketService';
 
 const ticketSchema = z.object({
   subject: z.string().min(5, 'Subject must be at least 5 characters'),
   category: z.string().min(1, 'Category is required'),
+  subcategory: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high']),
   description: z.string().min(20, 'Description must be at least 20 characters'),
 });
@@ -38,6 +40,7 @@ const PRIORITIES: { value: TicketFormData['priority']; label: string }[] = [
 export default function NewTicket() {
   const { user } = useAuth();
   const { categories, loading: categoriesLoading, error: categoriesError } = useRequestCategories(user?.company_id);
+  const { subcategories, loading: subcategoriesLoading } = useRequestSubcategories(user?.company_id);
   const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<TicketFormData>({
@@ -45,6 +48,7 @@ export default function NewTicket() {
     defaultValues: {
       subject: '',
       category: '',
+      subcategory: '',
       priority: 'medium',
       description: '',
     },
@@ -63,6 +67,30 @@ export default function NewTicket() {
     }
   }, [categories, form]);
 
+  const selectedCategoryKey = form.watch('category');
+  const selectedSubcategoryKey = form.watch('subcategory');
+
+  const availableSubcategories = useMemo(
+    () => subcategories.filter((subcategory) => subcategory.category_key === selectedCategoryKey),
+    [selectedCategoryKey, subcategories],
+  );
+
+  useEffect(() => {
+    const nextSubcategory = availableSubcategories[0]?.key ?? '';
+    const currentSubcategory = form.getValues('subcategory');
+
+    if (!nextSubcategory) {
+      if (currentSubcategory) {
+        form.setValue('subcategory', '', { shouldValidate: true });
+      }
+      return;
+    }
+
+    if (!currentSubcategory || !availableSubcategories.some((subcategory) => subcategory.key === currentSubcategory)) {
+      form.setValue('subcategory', nextSubcategory, { shouldValidate: true });
+    }
+  }, [availableSubcategories, form]);
+
   const handleSubmit = async (data: TicketFormData) => {
     if (!user) return;
     if (!categories.some((category) => category.key === data.category && category.is_active)) {
@@ -72,10 +100,42 @@ export default function NewTicket() {
       return;
     }
 
+    const matchingSubcategories = subcategories.filter(
+      (subcategory) => subcategory.category_key === data.category && subcategory.is_active,
+    );
+
+    if (matchingSubcategories.length > 0 && !data.subcategory) {
+      form.setError('subcategory', {
+        type: 'manual',
+        message: 'Subcategory is required when this category has subcategories.',
+      });
+      toast.error('Unable to submit request', {
+        description: 'Please choose a subcategory for the selected category.',
+      });
+      return;
+    }
+
+    if (
+      data.subcategory
+      && !matchingSubcategories.some((subcategory) => subcategory.key === data.subcategory)
+    ) {
+      form.setError('subcategory', {
+        type: 'manual',
+        message: 'This subcategory is no longer available.',
+      });
+      toast.error('Unable to submit request', {
+        description: 'This subcategory is no longer available. Please choose another one.',
+      });
+      return;
+    }
+
+    form.clearErrors('subcategory');
+
     setSubmitting(true);
     const { error } = await createTicket({
       subject: data.subject,
       category: data.category,
+      subcategory: matchingSubcategories.length > 0 ? data.subcategory ?? null : null,
       priority: data.priority,
       description: data.description,
     }, {
@@ -87,12 +147,18 @@ export default function NewTicket() {
         description: error.message || 'An unexpected error occurred.',
       });
     } else {
+      const firstCategoryKey = categories[0]?.key ?? '';
+      const firstSubcategoryKey = subcategories.find(
+        (subcategory) => subcategory.category_key === firstCategoryKey,
+      )?.key ?? '';
+
       toast.success('Request submitted successfully', {
         description: 'Your internal request has been recorded and will be reviewed shortly.',
       });
       form.reset({
         subject: '',
-        category: categories[0]?.key ?? '',
+        category: firstCategoryKey,
+        subcategory: firstSubcategoryKey,
         priority: 'medium',
         description: '',
       });
@@ -100,8 +166,10 @@ export default function NewTicket() {
     setSubmitting(false);
   };
 
-  const selectedCategory = categories.find((category) => category.key === form.watch('category')) ?? null;
+  const selectedCategory = categories.find((category) => category.key === selectedCategoryKey) ?? null;
+  const selectedSubcategory = availableSubcategories.find((subcategory) => subcategory.key === selectedSubcategoryKey) ?? null;
   const categorySelectionDisabled = categoriesLoading || categories.length === 0;
+  const requiresSubcategory = availableSubcategories.length > 0;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -152,7 +220,7 @@ export default function NewTicket() {
               <div className="space-y-2">
                 <Label htmlFor="category">Category <span className="text-destructive">*</span></Label>
                 <Select
-                  value={form.watch('category')}
+                  value={selectedCategoryKey}
                   onValueChange={(v) => form.setValue('category', v as TicketFormData['category'], { shouldValidate: true })}
                   disabled={categorySelectionDisabled}
                 >
@@ -188,6 +256,38 @@ export default function NewTicket() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="subcategory">
+                Subcategory
+                {requiresSubcategory && <span className="text-destructive"> *</span>}
+              </Label>
+              <Select
+                value={selectedSubcategoryKey}
+                onValueChange={(v) => form.setValue('subcategory', v, { shouldValidate: true })}
+                disabled={subcategoriesLoading || availableSubcategories.length === 0}
+              >
+                <SelectTrigger id="subcategory" className={form.formState.errors.subcategory ? 'border-destructive' : ''}>
+                  <SelectValue placeholder={availableSubcategories.length === 0 ? 'No subcategories for this category' : 'Select subcategory'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableSubcategories.map(({ key, label }) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.subcategory && (
+                <p className="text-destructive text-xs">{form.formState.errors.subcategory.message}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {subcategoriesLoading
+                  ? 'Loading available subcategories...'
+                  : selectedSubcategory?.description
+                    ?? (availableSubcategories.length > 0
+                      ? 'Choose the most specific request type for this category.'
+                      : 'This category does not currently use subcategories.')}
+              </p>
+            </div>
+
             {/* Description */}
             <div className="space-y-2">
               <Label htmlFor="description">Description <span className="text-destructive">*</span></Label>
@@ -209,7 +309,7 @@ export default function NewTicket() {
             <Button
               type="submit"
               className="w-full"
-              disabled={submitting || !form.formState.isValid || categorySelectionDisabled}
+              disabled={submitting || !form.formState.isValid || categorySelectionDisabled || (requiresSubcategory && !selectedSubcategoryKey)}
             >
               {submitting ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>

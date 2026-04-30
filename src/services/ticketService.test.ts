@@ -50,6 +50,7 @@ describe('ticketService', () => {
     const result = await createTicket({
       subject: 'Need help with order',
       category: 'operations_support',
+      subcategory: 'stock_transfer',
       priority: 'medium',
       description: 'Please help me follow up on this order request.',
     }, {
@@ -61,6 +62,7 @@ describe('ticketService', () => {
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({
       company_id: 'company-1',
       submitted_by: 'user-1',
+      subcategory: 'stock_transfer',
       status: 'open',
       assigned_to: null,
       resolution_note: null,
@@ -75,6 +77,7 @@ describe('ticketService', () => {
         company_id: 'company-1',
         subject: 'Need help with order',
         category: 'operations_support',
+        subcategory: null,
         priority: 'medium',
         status: 'open',
         description: 'Please help me follow up on this order request.',
@@ -98,6 +101,7 @@ describe('ticketService', () => {
         company_id: 'company-1',
         subject: 'Need help with order',
         category: 'operations_support',
+        subcategory: null,
         priority: 'medium',
         status: 'open',
         description: 'Please help me follow up on this order request.',
