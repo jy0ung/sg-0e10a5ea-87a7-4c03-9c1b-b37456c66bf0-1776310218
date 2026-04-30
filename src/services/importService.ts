@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeSupportedDateValue } from "@/lib/dateParsing";
+import { normalizeImportNumericText } from '@/lib/importNumeric';
 import { publishCanonical } from "@/lib/import-parser";
 import { loadBranchMappingLookup, loadPaymentMappingLookup } from "./mappingService";
 import { loggingService } from "./loggingService";
@@ -211,6 +212,7 @@ export async function validateAndInsertVehicles(
     }
 
     const sanitizeDate = (value: unknown) => normalizeSupportedDateValue(value) ?? null;
+    const sanitizeNumericText = (value: unknown) => normalizeImportNumericText(value) ?? null;
     const [branchLookup, paymentLookup] = await Promise.all([
       loadBranchMappingLookup(companyId),
       loadPaymentMappingLookup(companyId),
@@ -249,7 +251,7 @@ export async function validateAndInsertVehicles(
       import_batch_id: batchId,
       source_row_id: vehicle.source_row_id,
       variant: vehicle.variant || null,
-      dealer_transfer_price: vehicle.dealer_transfer_price || null,
+      dealer_transfer_price: sanitizeNumericText(vehicle.dealer_transfer_price),
       full_payment_type: vehicle.full_payment_type || null,
       shipment_name: vehicle.shipment_name || null,
       lou: vehicle.lou || null,
@@ -322,6 +324,7 @@ export async function commitImportBatch(
 
   try {
     const sanitizeDate = (value: unknown) => normalizeSupportedDateValue(value) ?? null;
+    const sanitizeNumericText = (value: unknown) => normalizeImportNumericText(value) ?? null;
     const [branchLookup, paymentLookup] = await Promise.all([
       loadBranchMappingLookup(companyId),
       loadPaymentMappingLookup(companyId),
@@ -359,7 +362,7 @@ export async function commitImportBatch(
       import_batch_id: batchId,
       source_row_id: vehicle.source_row_id,
       variant: vehicle.variant || null,
-      dealer_transfer_price: vehicle.dealer_transfer_price || null,
+      dealer_transfer_price: sanitizeNumericText(vehicle.dealer_transfer_price),
       full_payment_type: vehicle.full_payment_type || null,
       shipment_name: vehicle.shipment_name || null,
       lou: vehicle.lou || null,

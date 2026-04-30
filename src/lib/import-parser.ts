@@ -1,5 +1,6 @@
 import { VehicleRaw, DataQualityIssue, VehicleCanonical } from '@/types';
 import { normalizeSupportedDateValue, parseSupportedDateString } from '@/lib/dateParsing';
+import { normalizeImportNumericText } from '@/lib/importNumeric';
 import { loggingService } from '@/services/loggingService';
 import { deriveVehicleStage } from '@/utils/vehicleStage';
 import { loadExcelJS } from '@/lib/exceljs-loader';
@@ -419,7 +420,7 @@ export function publishCanonical(
         source_row_id: best.id,
         variant: best.variant,
         color: best.color,
-        dealer_transfer_price: best.dealer_transfer_price,
+        dealer_transfer_price: normalizeImportNumericText(best.dealer_transfer_price),
         full_payment_type: best.full_payment_type,
         shipment_name: best.shipment_name,
         lou: best.lou,

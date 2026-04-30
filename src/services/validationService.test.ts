@@ -281,6 +281,56 @@ describe('ValidationService', () => {
       expect(result.errors.some(e => e.code === 'INVALID_NUMBER')).toBe(true);
     });
 
+    it('should treat slash dealer transfer price as empty instead of invalid', async () => {
+      const row = {
+        chassis_no: 'ABC123456789',
+        branch_code: 'B001',
+        model: 'Corolla',
+        customer_name: 'John Doe',
+        salesman_name: 'Jane Smith',
+        payment_method: 'Cash',
+        dealer_transfer_price: '/',
+      };
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'vehicles') {
+          return createMockQueryBuilder({ data: null, error: null });
+        }
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: [{ id: 'b1', code: 'B001' }], error: null });
+        }
+        return createMockQueryBuilder({ data: [], error: null });
+      });
+
+      const result = await validateVehicleRow(row, 'company-123', 1);
+      expect(result.errors.some(e => e.code === 'INVALID_NUMBER')).toBe(false);
+    });
+
+    it('should accept comma-formatted dealer transfer price values', async () => {
+      const row = {
+        chassis_no: 'ABC123456789',
+        branch_code: 'B001',
+        model: 'Corolla',
+        customer_name: 'John Doe',
+        salesman_name: 'Jane Smith',
+        payment_method: 'Cash',
+        dealer_transfer_price: '45,308',
+      };
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'vehicles') {
+          return createMockQueryBuilder({ data: null, error: null });
+        }
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: [{ id: 'b1', code: 'B001' }], error: null });
+        }
+        return createMockQueryBuilder({ data: [], error: null });
+      });
+
+      const result = await validateVehicleRow(row, 'company-123', 1);
+      expect(result.errors.some(e => e.code === 'INVALID_NUMBER')).toBe(false);
+    });
+
     it('should warn for unusual payment methods', async () => {
       const row = {
         chassis_no: 'ABC123456789',

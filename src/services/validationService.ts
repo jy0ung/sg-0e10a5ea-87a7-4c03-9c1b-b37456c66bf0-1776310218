@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { parseSupportedDateString } from "@/lib/dateParsing";
+import { parseImportNumericText } from '@/lib/importNumeric';
 import { loggingService } from "./loggingService";
 import { performanceService } from "./performanceService";
 import type { ValidationError } from "@/types";
@@ -153,8 +154,8 @@ export function validateVehicleRowSync(
 
   // Numeric field
   if (row.dealer_transfer_price) {
-    const price = parseFloat(String(row.dealer_transfer_price));
-    if (isNaN(price)) {
+    const price = parseImportNumericText(row.dealer_transfer_price);
+    if (price.kind === 'invalid') {
       errors.push({ field: 'dealer_transfer_price', message: `Row ${rowNumber}: Dealer transfer price must be a valid number`, code: 'INVALID_NUMBER', severity: 'error', rowNumber });
     }
   }
