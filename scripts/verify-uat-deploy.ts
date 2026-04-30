@@ -23,9 +23,10 @@ const forbiddenPatterns = (readEnv('UAT_FORBIDDEN_SUPABASE_PATTERNS') ?? DEFAULT
   .filter(Boolean);
 const loginEmail = readEnv('UAT_LOGIN_EMAIL');
 const loginPassword = readEnv('UAT_LOGIN_PASSWORD');
-const loginRequired = ['1', 'true'].includes((readEnv('UAT_LOGIN_REQUIRED') ?? '').toLowerCase());
 const maxFetchAttempts = parsePositiveInteger(readEnv('UAT_VERIFY_FETCH_ATTEMPTS'), 3);
 const appMode = readEnv('UAT_APP') ?? 'main';
+const runningInGitHubActions = readEnv('GITHUB_ACTIONS') === 'true';
+const loginRequired = parseLoginRequired(readEnv('UAT_LOGIN_REQUIRED'), appMode, runningInGitHubActions);
 
 const MOCK_USER = {
   id: '00000000-0000-0000-0000-000000000001',
@@ -72,6 +73,14 @@ function parsePositiveInteger(rawValue: string | undefined, fallback: number): n
 
   const value = Number.parseInt(rawValue, 10);
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function parseLoginRequired(rawValue: string | undefined, mode: string, runningInCi: boolean): boolean {
+  if (!rawValue) {
+    return mode === 'main' && runningInCi;
+  }
+
+  return ['1', 'true'].includes(rawValue.toLowerCase());
 }
 
 function wait(ms: number): Promise<void> {
