@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { TicketCheck, ClipboardList, ArrowLeft, HeadphonesIcon, Menu, X, ListTodo } from 'lucide-react';
+import { TicketCheck, ClipboardList, ArrowLeft, HeadphonesIcon, Menu, X, ListTodo, Settings2 } from 'lucide-react';
 import { ADMIN_ONLY } from '@/config/routeRoles';
 import { canAccessMainApp } from '@/lib/portalAccess';
 import { cn } from '@/lib/utils';
@@ -11,14 +11,17 @@ const baseNavItems = [
   { label: 'My Requests', href: '/portal/tickets', icon: ClipboardList },
 ];
 
-const requestQueueNavItem = { label: 'Request Queue', href: '/portal/queue', icon: ListTodo };
+const adminNavItems = [
+  { label: 'Request Queue', href: '/portal/queue', icon: ListTodo },
+  { label: 'Request Setup', href: '/portal/setup', icon: Settings2 },
+];
 const requestQueueRoles = new Set(ADMIN_ONLY);
 
 export default function CustomerServiceLayout() {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navItems = requestQueueRoles.has(user?.role ?? '')
-    ? [...baseNavItems, requestQueueNavItem]
+    ? [...baseNavItems, ...adminNavItems]
     : baseNavItems;
 
   return (

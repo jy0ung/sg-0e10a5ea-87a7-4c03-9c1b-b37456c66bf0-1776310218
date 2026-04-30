@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
+import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import {
   listMyTickets,
@@ -33,6 +34,7 @@ function formatTicketLabel(value: string) {
 
 export default function MyTickets() {
   const { user } = useAuth();
+  const { categories } = useRequestCategories(user?.company_id, true);
   const [tickets, setTickets] = useState<RequestTicketRecord[]>([]);
   const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
   const [loading, setLoading] = useState(true);
@@ -142,7 +144,7 @@ export default function MyTickets() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground capitalize">
-                  Category: {getRequestCategoryLabel(ticket.category)}
+                  Category: {getRequestCategoryLabel(ticket.category, categories)}
                 </p>
 
                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">

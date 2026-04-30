@@ -44,6 +44,7 @@ const CustomerServiceLayout = lazy(() => import("./components/layout/CustomerSer
 const MyTickets = lazy(() => import("./pages/tickets/MyTickets"));
 const NewTicket = lazy(() => import("./pages/tickets/NewTicket"));
 const RequestQueue = lazy(() => import("./pages/tickets/RequestQueue"));
+const RequestSetup = lazy(() => import("./pages/tickets/RequestSetup"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
@@ -229,6 +230,7 @@ const router = createBrowserRouter([
       { path: "tickets", element: <S><R scope="My Tickets"><MyTickets /></R></S> },
       { path: "tickets/new", element: <S><R scope="New Ticket"><NewTicket /></R></S> },
       { path: "queue", element: <RequireRole roles={ADMIN_ONLY}><S><R scope="Request Queue"><RequestQueue /></R></S></RequireRole> },
+      { path: "setup", element: <RequireRole roles={ADMIN_ONLY}><S><R scope="Request Setup"><RequestSetup /></R></S></RequireRole> },
     ],
   },
   {
