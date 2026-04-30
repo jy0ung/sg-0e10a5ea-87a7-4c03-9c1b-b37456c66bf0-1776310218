@@ -70,12 +70,12 @@ export default function NewTicket() {
       companyId: user.company_id,
     });
     if (error) {
-      toast.error('Failed to submit ticket', {
+      toast.error('Failed to submit request', {
         description: error.message || 'An unexpected error occurred.',
       });
     } else {
-      toast.success('Ticket submitted successfully', {
-        description: 'Your ticket has been raised and will be reviewed shortly.',
+      toast.success('Request submitted successfully', {
+        description: 'Your internal request has been recorded and will be reviewed shortly.',
       });
       form.reset();
     }
@@ -85,17 +85,17 @@ export default function NewTicket() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Raise a Ticket</h1>
+        <h1 className="text-2xl font-bold text-foreground">Create Internal Request</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Fill in the details below to submit a support request.
+          Fill in the details below to submit an internal request.
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Ticket Details</CardTitle>
+          <CardTitle className="text-lg">Request Details</CardTitle>
           <CardDescription>
-            Provide as much detail as possible so we can assist you efficiently.
+            Provide as much detail as possible so the assigned team can respond quickly.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -177,7 +177,7 @@ export default function NewTicket() {
               {submitting ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
               ) : (
-                'Submit Ticket'
+                'Submit Request'
               )}
             </Button>
           </form>

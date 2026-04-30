@@ -3,12 +3,12 @@ import "@/i18n";
 
 import React, { lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Navigate, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
-import { AuthProvider, ProtectedRoute } from "@/contexts/AuthContext";
+import { AuthProvider, ProtectedRoute, useAuth } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { ModuleAccessProvider } from "@/contexts/ModuleAccessContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -23,6 +23,7 @@ import { SalesProvider } from "./contexts/SalesContext";
 import { errorTrackingService } from "@/services/errorTrackingService";
 import { env } from "@/config/env";
 import { createAppQueryClient } from "@/lib/queryClient";
+import { isPortalOnlyUser, resolveAuthenticatedHomePath } from '@/lib/portalAccess';
 import {
   ADMIN_ONLY,
   ADMIN_AND_DIRECTOR,
@@ -105,6 +106,13 @@ function R({ scope, children }: { scope: string; children: React.ReactNode }) {
 }
 
 function ProtectedAppShell({ redirectTo = "/login" }: { redirectTo?: string | ((pathname: string) => string) }) {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  if (isPortalOnlyUser(user)) {
+    return <Navigate to={resolveAuthenticatedHomePath(user)} state={{ from: location }} replace />;
+  }
+
   return (
     <ProtectedRoute redirectTo={redirectTo}>
       <ModuleAccessProvider>

@@ -32,7 +32,7 @@ export default function LandingPage() {
         </h1>
         <p className="mt-4 max-w-xl text-lg text-muted-foreground">
           Your unified business system for vehicle sales, inventory, and operations.
-          Need help? Access the customer service portal to raise and track support tickets.
+          Need something actioned internally? Access the Internal Requests portal to submit and track requests.
         </p>
 
         {/* Primary CTA */}
@@ -42,7 +42,7 @@ export default function LandingPage() {
               to="/login"
               state={{ from: { pathname: '/portal/tickets/new' } }}
             >
-              Customer Service Portal
+              Internal Requests Portal
               <ArrowRight className="h-5 w-5" />
             </Link>
           </Button>
@@ -58,9 +58,9 @@ export default function LandingPage() {
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                 <TicketCheck className="h-5 w-5 text-primary" />
               </div>
-              <CardTitle className="text-base">Raise a Ticket</CardTitle>
+              <CardTitle className="text-base">Create a Request</CardTitle>
               <CardDescription>
-                Submit support requests for sales inquiries, technical issues, or service requests.
+                Submit internal requests for operational support, technical issues, or service coordination.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -69,9 +69,9 @@ export default function LandingPage() {
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                 <ClipboardList className="h-5 w-5 text-primary" />
               </div>
-              <CardTitle className="text-base">Track Your Tickets</CardTitle>
+              <CardTitle className="text-base">Track Your Requests</CardTitle>
               <CardDescription>
-                View the status of all tickets you've submitted and follow up on open items.
+                View the status of every internal request you've submitted and follow up on open items.
               </CardDescription>
             </CardHeader>
           </Card>

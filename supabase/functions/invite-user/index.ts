@@ -8,6 +8,7 @@ interface InvitePayload {
   company_id: string;
   access_scope?: string;
   employee_id?: string | null;
+  portal_access_only?: boolean;
 }
 
 function isMissingEmployeeLinkColumnError(message: string | null | undefined): boolean {
@@ -71,7 +72,7 @@ Deno.serve(async (req: Request) => {
 
     // Parse request body
     const body: InvitePayload = await req.json();
-    const { email, name, role, company_id, access_scope, employee_id } = body;
+    const { email, name, role, company_id, access_scope, employee_id, portal_access_only } = body;
 
     if (!email || !name || !role || !company_id) {
       return new Response(
@@ -147,6 +148,7 @@ Deno.serve(async (req: Request) => {
         company_id,
         access_scope: finalScope,
         status: 'active',
+        portal_access_only: portal_access_only ?? false,
         updated_at: new Date().toISOString(),
         ...(employee_id ? { employee_id } : {}),
       };

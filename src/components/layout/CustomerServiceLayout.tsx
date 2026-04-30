@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { TicketCheck, ClipboardList, ArrowLeft, HeadphonesIcon, Menu, X } from 'lucide-react';
+import { canAccessMainApp } from '@/lib/portalAccess';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { label: 'Raise a Ticket', href: '/portal/tickets/new', icon: TicketCheck },
-  { label: 'My Tickets', href: '/portal/tickets', icon: ClipboardList },
+  { label: 'New Request', href: '/portal/tickets/new', icon: TicketCheck },
+  { label: 'My Requests', href: '/portal/tickets', icon: ClipboardList },
 ];
 
 export default function CustomerServiceLayout() {
@@ -37,7 +38,7 @@ export default function CustomerServiceLayout() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <HeadphonesIcon className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="font-semibold text-sm text-foreground">Customer Service</span>
+          <span className="font-semibold text-sm text-foreground">Internal Requests</span>
           <button
             type="button"
             aria-label="Close navigation menu"
@@ -71,15 +72,17 @@ export default function CustomerServiceLayout() {
         </nav>
 
         {/* Back to app link */}
-        <div className="border-t border-border px-3 py-4">
-          <Link
-            to="/"
-            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4 shrink-0" />
-            Back to App
-          </Link>
-        </div>
+        {canAccessMainApp(user) && (
+          <div className="border-t border-border px-3 py-4">
+            <Link
+              to="/"
+              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4 shrink-0" />
+              Back to App
+            </Link>
+          </div>
+        )}
       </aside>
 
       {/* Main content */}
@@ -93,7 +96,7 @@ export default function CustomerServiceLayout() {
             >
               <Menu className="h-5 w-5" />
             </button>
-            <h1 className="text-sm font-semibold text-foreground">Customer Service Portal</h1>
+            <h1 className="text-sm font-semibold text-foreground">Internal Requests</h1>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
@@ -74,6 +75,7 @@ export default function UserManagement() {
       access_scope: 'company',
       branch_id: null,
       employee_id: null,
+      portal_access_only: false,
     },
     mode: 'onChange',
   });
@@ -87,6 +89,7 @@ export default function UserManagement() {
       name: '',
       role: 'analyst',
       employee_id: null,
+      portal_access_only: false,
     },
     mode: 'onChange',
   });
@@ -139,6 +142,7 @@ export default function UserManagement() {
       access_scope: p.access_scope as UserUpdateFormData['access_scope'],
       branch_id: p.branch_id,
       employee_id: p.employee_id ?? null,
+      portal_access_only: p.portal_access_only,
     });
   };
 
@@ -179,6 +183,7 @@ export default function UserManagement() {
       access_scope: data.access_scope,
       branch_id: data.branch_id,
       employee_id: data.employee_id,
+      portal_access_only: data.portal_access_only ?? false,
     }, {
       actorId: user?.id,
       companyId: editUser.company_id ?? user?.company_id,
@@ -195,6 +200,7 @@ export default function UserManagement() {
         access_scope: data.access_scope,
         branch_id: data.branch_id,
         employee_id: data.employee_id ?? null,
+        portal_access_only: data.portal_access_only ?? false,
       } : p));
       setEditUser(null);
     }
@@ -226,6 +232,7 @@ export default function UserManagement() {
       role: data.role,
       companyId: user?.company_id || '',
       employeeId: data.employee_id,
+      portalAccessOnly: data.portal_access_only ?? false,
     });
     setInviting(false);
     if (error) {
@@ -234,7 +241,7 @@ export default function UserManagement() {
     }
     toast.success(`Invitation sent to ${data.email}`);
     setSignupUrl(getSignupUrl());
-    inviteForm.reset();
+    inviteForm.reset({ email: '', name: '', role: 'analyst', employee_id: null, portal_access_only: false });
     const refreshed = await listProfiles();
     if (!refreshed.error) setProfiles(refreshed.data);
   };
@@ -435,10 +442,17 @@ export default function UserManagement() {
                 <td className="px-4 py-3 text-muted-foreground text-xs">{p.email}</td>
                 <td className="px-4 py-3 text-muted-foreground text-xs">{getEmployeeLabel(p)}</td>
                 <td className="px-4 py-3">
-                  <span className="flex items-center gap-1 text-foreground capitalize">
-                    <Shield className="h-3 w-3 text-primary" />
-                    {p.role.replace(/_/g, ' ')}
-                  </span>
+                  <div className="space-y-1">
+                    <span className="flex items-center gap-1 text-foreground capitalize">
+                      <Shield className="h-3 w-3 text-primary" />
+                      {p.role.replace(/_/g, ' ')}
+                    </span>
+                    {p.portal_access_only && (
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-primary">
+                        Internal Requests only
+                      </p>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge status={p.access_scope} />
@@ -506,6 +520,22 @@ export default function UserManagement() {
               </p>
             </div>
 
+            <div className="rounded-lg border border-border bg-secondary/30 p-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="portal-access-only">Internal Requests Only</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Restrict this user to the Internal Requests portal and block access to the main application shell.
+                  </p>
+                </div>
+                <Switch
+                  id="portal-access-only"
+                  checked={editForm.watch('portal_access_only') ?? false}
+                  onCheckedChange={(checked) => editForm.setValue('portal_access_only', checked, { shouldDirty: true, shouldValidate: true })}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>Branch Assignment</Label>
               <Select value={editBranch} onValueChange={(v) => {
@@ -548,6 +578,11 @@ export default function UserManagement() {
                 {editForm.watch('access_scope') === 'branch' && `Can see all data in branch ${editBranch === 'none' ? '(unassigned)' : editBranch} within company ${editUser?.company_id}.`}
                 {editForm.watch('access_scope') === 'self' && `Can only see records assigned to this user within company ${editUser?.company_id}.`}
               </p>
+              {editForm.watch('portal_access_only') && (
+                <p className="text-primary">
+                  Main app navigation will be hidden and protected routes will redirect this user to the Internal Requests portal.
+                </p>
+              )}
             </div>
 
             <Button onClick={editForm.handleSubmit(handleSave)} disabled={saving || !editForm.formState.isValid} className="w-full">
@@ -666,11 +701,32 @@ export default function UserManagement() {
                   </Select>
                 </div>
 
+                <div className="rounded-lg border border-border bg-secondary/30 p-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="invite-portal-access-only">Internal Requests Only</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Send this user directly into the Internal Requests portal without main app access.
+                      </p>
+                    </div>
+                    <Switch
+                      id="invite-portal-access-only"
+                      checked={inviteForm.watch('portal_access_only') ?? false}
+                      onCheckedChange={(checked) => inviteForm.setValue('portal_access_only', checked, { shouldDirty: true, shouldValidate: true })}
+                    />
+                  </div>
+                </div>
+
                 <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
                   <p className="font-medium text-foreground">What happens next?</p>
                   <p className="text-muted-foreground">
                     An invitation email will be sent to the user with a link to set up their account and password on the sign-up page.
                   </p>
+                  {inviteForm.watch('portal_access_only') && (
+                    <p className="text-primary">
+                      After sign-in, this user will land in the Internal Requests portal instead of the main app.
+                    </p>
+                  )}
                 </div>
 
                 <Button type="submit" className="w-full" disabled={inviting || !inviteForm.formState.isValid}>

@@ -61,9 +61,9 @@ export default function MyTickets() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">My Tickets</h1>
+        <h1 className="text-2xl font-bold text-foreground">My Requests</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Review the support requests you have already submitted.
+          Review the internal requests you have already submitted.
         </p>
       </div>
 
@@ -93,9 +93,9 @@ export default function MyTickets() {
           <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
             <Ticket className="h-8 w-8 text-muted-foreground" />
             <div className="space-y-1">
-              <p className="font-medium text-foreground">No tickets yet</p>
+              <p className="font-medium text-foreground">No requests yet</p>
               <p className="text-sm text-muted-foreground">
-                Submit a new support request from the Raise a Ticket page.
+                Submit a new internal request from the New Request page.
               </p>
             </div>
           </CardContent>

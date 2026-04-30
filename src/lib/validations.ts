@@ -38,6 +38,7 @@ export const inviteUserSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater']),
   employee_id: z.string().nullable().optional(),
+  portal_access_only: z.boolean().optional(),
 });
 
 export type InviteSignupFormData = z.infer<typeof inviteSignupSchema>;
@@ -87,6 +88,7 @@ export const userUpdateSchema = z.object({
   access_scope: z.enum(['self', 'branch', 'company', 'global']),
   branch_id: z.string().nullable().optional(),
   employee_id: z.string().nullable().optional(),
+  portal_access_only: z.boolean().optional(),
 });
 
 // Settings schemas

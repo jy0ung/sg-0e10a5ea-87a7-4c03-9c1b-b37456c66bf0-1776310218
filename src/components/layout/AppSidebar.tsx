@@ -48,7 +48,7 @@ const navItems: NavItem[] = [
   { label: 'My Dashboard', path: '/', icon: LayoutDashboard, section: 'Platform' },
   { label: 'Module Directory', path: '/modules', icon: Grid3X3, section: 'Platform' },
   { label: 'Notifications', path: '/notifications', icon: Bell, section: 'Platform' },
-  { label: 'Customer Service', path: '/portal/tickets/new', icon: HeadphonesIcon, section: 'Platform' },
+  { label: 'Internal Requests', path: '/portal/tickets/new', icon: HeadphonesIcon, section: 'Platform' },
 
   { label: 'Auto Aging Overview', path: '/auto-aging', icon: Timer, section: 'Auto Aging', group: 'Overview' },
   { label: 'Vehicle Explorer', path: '/auto-aging/vehicles', icon: Car, section: 'Auto Aging', group: 'Overview' },

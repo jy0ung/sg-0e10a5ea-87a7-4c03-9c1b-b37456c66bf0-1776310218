@@ -21,6 +21,7 @@ export interface ProfileRow {
   access_scope: AccessScope;
   status: 'active' | 'inactive' | 'resigned' | 'pending';
   created_at: string;
+  portal_access_only: boolean;
 }
 
 export interface ListProfilesResult {
@@ -37,7 +38,7 @@ export interface CompanyOption {
 export async function listProfiles(companyId?: string): Promise<ListProfilesResult> {
   let q = supabase
     .from('profiles')
-    .select('id, email, name, role, company_id, branch_id, employee_id, access_scope, status, created_at')
+    .select('id, email, name, role, company_id, branch_id, employee_id, access_scope, status, created_at, portal_access_only')
     .order('created_at', { ascending: true });
   if (companyId) q = q.eq('company_id', companyId);
   const { data, error } = await q;
@@ -63,6 +64,7 @@ export interface UpdateProfileInput {
   employee_id?: string | null;
   company_id?: string;
   status?: 'active' | 'inactive' | 'resigned' | 'pending';
+  portal_access_only?: boolean;
 }
 
 export interface UpdateProfileContext {
@@ -94,6 +96,7 @@ export async function updateProfile(
   if (input.employee_id !== undefined)  patch.employee_id  = input.employee_id;
   if (input.company_id !== undefined)   patch.company_id   = input.company_id;
   if (input.status !== undefined)       patch.status       = input.status;
+  if (input.portal_access_only !== undefined) patch.portal_access_only = input.portal_access_only;
 
   let query = supabase.from('profiles').update(patch).eq('id', input.id);
   if (context.companyId) {
@@ -119,6 +122,7 @@ export async function inviteUser(payload: {
   role: AppRole;
   companyId: string;
   employeeId?: string | null;
+  portalAccessOnly?: boolean;
 }): Promise<{ error: string | null }> {
   const { data, error } = await supabase.functions.invoke('invite-user', {
     body: {
@@ -127,6 +131,7 @@ export async function inviteUser(payload: {
       role: payload.role,
       company_id: payload.companyId,
       employee_id: payload.employeeId ?? null,
+      portal_access_only: payload.portalAccessOnly ?? false,
     },
   });
   if (error) return { error: error.message };

@@ -22,6 +22,8 @@ interface Profile {
   status?: 'active' | 'inactive' | 'resigned' | 'pending';
   employee_id?: string | null;
   employeeId?: string | null;
+  portal_access_only?: boolean;
+  portalAccessOnly?: boolean;
 }
 
 function rowToProfile(row: Record<string, unknown>): Profile {
@@ -30,6 +32,7 @@ function rowToProfile(row: Record<string, unknown>): Profile {
   const avatarUrl = row.avatar_url ? String(row.avatar_url) : null;
   const accessScope = (row.access_scope as AccessScope) ?? 'self';
   const employeeId = row.employee_id ? String(row.employee_id) : null;
+  const portalAccessOnly = row.portal_access_only === true;
 
   return {
     id: String(row.id ?? ''),
@@ -47,6 +50,8 @@ function rowToProfile(row: Record<string, unknown>): Profile {
     status: row.status as Profile['status'],
     employee_id: employeeId,
     employeeId,
+    portal_access_only: portalAccessOnly,
+    portalAccessOnly,
   };
 }
 
