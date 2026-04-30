@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { TicketCheck, ClipboardList, ArrowLeft, HeadphonesIcon, Menu, X, ListTodo } from 'lucide-react';
+import { ADMIN_ONLY } from '@/config/routeRoles';
 import { canAccessMainApp } from '@/lib/portalAccess';
 import { cn } from '@/lib/utils';
 
@@ -11,7 +12,7 @@ const baseNavItems = [
 ];
 
 const requestQueueNavItem = { label: 'Request Queue', href: '/portal/queue', icon: ListTodo };
-const requestQueueRoles = new Set(['company_admin', 'super_admin', 'portal_admin']);
+const requestQueueRoles = new Set(ADMIN_ONLY);
 
 export default function CustomerServiceLayout() {
   const { user } = useAuth();

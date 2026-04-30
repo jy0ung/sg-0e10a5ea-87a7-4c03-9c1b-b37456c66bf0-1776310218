@@ -18,23 +18,16 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { createTicket } from '@/services/ticketService';
+import { REQUEST_CATEGORY_OPTIONS, REQUEST_CATEGORY_VALUES } from '@/lib/requestCategories';
 
 const ticketSchema = z.object({
   subject: z.string().min(5, 'Subject must be at least 5 characters'),
-  category: z.enum(['sales_inquiry', 'technical_issue', 'service_request', 'general', 'other']),
+  category: z.enum(REQUEST_CATEGORY_VALUES),
   priority: z.enum(['low', 'medium', 'high']),
   description: z.string().min(20, 'Description must be at least 20 characters'),
 });
 
 type TicketFormData = z.infer<typeof ticketSchema>;
-
-const CATEGORIES: { value: TicketFormData['category']; label: string }[] = [
-  { value: 'sales_inquiry', label: 'Sales Inquiry' },
-  { value: 'technical_issue', label: 'Technical Issue' },
-  { value: 'service_request', label: 'Service Request' },
-  { value: 'general', label: 'General' },
-  { value: 'other', label: 'Other' },
-];
 
 const PRIORITIES: { value: TicketFormData['priority']; label: string }[] = [
   { value: 'low', label: 'Low' },
@@ -50,7 +43,7 @@ export default function NewTicket() {
     resolver: zodResolver(ticketSchema),
     defaultValues: {
       subject: '',
-      category: 'general',
+      category: 'operations_support',
       priority: 'medium',
       description: '',
     },
@@ -126,11 +119,14 @@ export default function NewTicket() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map(({ value, label }) => (
+                    {REQUEST_CATEGORY_OPTIONS.map(({ value, label }) => (
                       <SelectItem key={value} value={value}>{label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  {REQUEST_CATEGORY_OPTIONS.find((option) => option.value === form.watch('category'))?.description}
+                </p>
               </div>
 
               <div className="space-y-2">

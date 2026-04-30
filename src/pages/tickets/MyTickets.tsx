@@ -5,16 +5,23 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { listMyTickets, type TicketRecord } from '@/services/ticketService';
+import { TicketActivityList } from '@/components/tickets/TicketActivityList';
+import { getRequestCategoryLabel } from '@/lib/requestCategories';
+import {
+  listMyTickets,
+  listTicketActivity,
+  type RequestTicketRecord,
+  type TicketActivityRecord,
+} from '@/services/ticketService';
 
-const statusVariant: Record<TicketRecord['status'], 'default' | 'secondary' | 'outline'> = {
+const statusVariant: Record<RequestTicketRecord['status'], 'default' | 'secondary' | 'outline'> = {
   open: 'default',
   in_progress: 'secondary',
   resolved: 'outline',
   closed: 'outline',
 };
 
-const priorityVariant: Record<TicketRecord['priority'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const priorityVariant: Record<RequestTicketRecord['priority'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
   low: 'outline',
   medium: 'secondary',
   high: 'destructive',
@@ -26,7 +33,8 @@ function formatTicketLabel(value: string) {
 
 export default function MyTickets() {
   const { user } = useAuth();
-  const [tickets, setTickets] = useState<TicketRecord[]>([]);
+  const [tickets, setTickets] = useState<RequestTicketRecord[]>([]);
+  const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +58,15 @@ export default function MyTickets() {
       if (fetchError) {
         setError(fetchError.message || 'Unable to load requests.');
       } else {
-        setTickets(data ?? []);
+        const nextTickets = data ?? [];
+        setTickets(nextTickets);
+
+        const { data: activityData } = await listTicketActivity(
+          nextTickets.map((ticket) => ticket.id),
+          user.company_id,
+        );
+        if (cancelled) return;
+        setActivitiesByTicket(activityData ?? {});
       }
       setLoading(false);
     };
@@ -126,9 +142,33 @@ export default function MyTickets() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground capitalize">
-                  Category: {formatTicketLabel(ticket.category)}
+                  Category: {getRequestCategoryLabel(ticket.category)}
                 </p>
+
+                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                  <span>
+                    {ticket.assigned_to_name ? `Assigned to ${ticket.assigned_to_name}` : 'Awaiting assignment'}
+                  </span>
+                  {ticket.assigned_at && (
+                    <span>Assigned {formatDistanceToNow(new Date(ticket.assigned_at), { addSuffix: true })}</span>
+                  )}
+                  {ticket.resolved_at && (
+                    <span>Resolved {formatDistanceToNow(new Date(ticket.resolved_at), { addSuffix: true })}</span>
+                  )}
+                </div>
+
                 <p className="text-sm text-foreground leading-6">{ticket.description}</p>
+
+                {ticket.resolution_note && (
+                  <div className="rounded-lg border border-border bg-secondary/30 px-4 py-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Resolution note
+                    </p>
+                    <p className="mt-2 text-sm text-foreground leading-6">{ticket.resolution_note}</p>
+                  </div>
+                )}
+
+                <TicketActivityList activities={activitiesByTicket[ticket.id] ?? []} />
               </CardContent>
             </Card>
           ))}
