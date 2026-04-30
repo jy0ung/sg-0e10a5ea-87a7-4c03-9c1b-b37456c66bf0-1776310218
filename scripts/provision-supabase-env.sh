@@ -12,7 +12,8 @@
 #      handle_new_user trigger).
 #   6. Bootstraps the first super_admin by running scripts/bootstrap-admin.ts
 #      with the service-role key.
-#   7. Sets the SITE_URL secret on the remote project so the invite-user
+#   7. Runs import RPC contract smoke tests against the target database.
+#   8. Sets the SITE_URL secret on the remote project so the invite-user
 #      edge function emits correct links.
 #
 # Secrets (NEVER paste on the CLI — load via an env file):
@@ -40,7 +41,7 @@
 #
 # Exit codes:
 #   0 ok / 1 misuse / 2 missing tool / 3 missing secret / 4 push failed /
-#   5 verify failed / 6 bootstrap failed
+#   5 verify failed / 6 bootstrap failed / 7 RPC smoke failed
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -165,7 +166,12 @@ ADMIN_PASSWORD="${ADMIN_PASSWORD:-}" \
 COMPANY_NAME="$COMPANY_NAME" \
 $PKG_RUN tsx "$REPO_ROOT/scripts/bootstrap-admin.ts" || die "bootstrap-admin failed" 6
 
-# ─── 8. Set SITE_URL edge-function secret ────────────────────────────────────
+# ─── 8. Smoke fragile import RPCs ────────────────────────────────────────────
+log "Running import RPC contract smoke tests"
+SUPABASE_DB_URL="$POOLER_URL" \
+  bash "$REPO_ROOT/scripts/verify-import-rpc-contracts.sh" || die "import RPC smoke failed" 7
+
+# ─── 9. Set SITE_URL edge-function secret ────────────────────────────────────
 log "Setting SITE_URL edge-function secret"
 supabase secrets set \
   --project-ref "$SUPABASE_PROJECT_REF" \
