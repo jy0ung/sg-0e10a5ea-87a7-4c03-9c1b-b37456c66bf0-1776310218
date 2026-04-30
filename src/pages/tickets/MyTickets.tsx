@@ -14,11 +14,15 @@ const statusVariant: Record<TicketRecord['status'], 'default' | 'secondary' | 'o
   closed: 'outline',
 };
 
-const priorityVariant: Record<TicketRecord['priority'], 'default' | 'secondary' | 'destructive'> = {
+const priorityVariant: Record<TicketRecord['priority'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
   low: 'outline',
   medium: 'secondary',
   high: 'destructive',
 };
+
+function formatTicketLabel(value: string) {
+  return value.replace(/_/g, ' ');
+}
 
 export default function MyTickets() {
   const { user } = useAuth();
@@ -44,7 +48,7 @@ export default function MyTickets() {
       const { data, error: fetchError } = await listMyTickets(user.id, user.company_id);
       if (cancelled) return;
       if (fetchError) {
-        setError(fetchError.message || 'Unable to load tickets.');
+        setError(fetchError.message || 'Unable to load requests.');
       } else {
         setTickets(data ?? []);
       }
@@ -71,7 +75,7 @@ export default function MyTickets() {
         <Card>
           <CardContent className="flex items-center justify-center gap-3 py-12 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Loading your tickets...</span>
+            <span>Loading your requests...</span>
           </CardContent>
         </Card>
       ) : error ? (
@@ -79,7 +83,7 @@ export default function MyTickets() {
           <CardContent className="flex flex-col items-center justify-center gap-4 py-12 text-center">
             <AlertCircle className="h-8 w-8 text-destructive" />
             <div className="space-y-1">
-              <p className="font-medium text-foreground">Unable to load tickets</p>
+              <p className="font-medium text-foreground">Unable to load requests</p>
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
             <Button onClick={() => window.location.reload()} variant="outline" className="gap-2">
@@ -113,7 +117,7 @@ export default function MyTickets() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Badge variant={statusVariant[ticket.status]}>
-                    {ticket.status.replace('_', ' ')}
+                    {formatTicketLabel(ticket.status)}
                   </Badge>
                   <Badge variant={priorityVariant[ticket.priority]}>
                     {ticket.priority} priority
@@ -122,7 +126,7 @@ export default function MyTickets() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground capitalize">
-                  Category: {ticket.category.replace('_', ' ')}
+                  Category: {formatTicketLabel(ticket.category)}
                 </p>
                 <p className="text-sm text-foreground leading-6">{ticket.description}</p>
               </CardContent>

@@ -1,18 +1,24 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { TicketCheck, ClipboardList, ArrowLeft, HeadphonesIcon, Menu, X } from 'lucide-react';
+import { TicketCheck, ClipboardList, ArrowLeft, HeadphonesIcon, Menu, X, ListTodo } from 'lucide-react';
 import { canAccessMainApp } from '@/lib/portalAccess';
 import { cn } from '@/lib/utils';
 
-const navItems = [
+const baseNavItems = [
   { label: 'New Request', href: '/portal/tickets/new', icon: TicketCheck },
   { label: 'My Requests', href: '/portal/tickets', icon: ClipboardList },
 ];
 
+const requestQueueNavItem = { label: 'Request Queue', href: '/portal/queue', icon: ListTodo };
+const requestQueueRoles = new Set(['company_admin', 'super_admin', 'portal_admin']);
+
 export default function CustomerServiceLayout() {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const navItems = requestQueueRoles.has(user?.role ?? '')
+    ? [...baseNavItems, requestQueueNavItem]
+    : baseNavItems;
 
   return (
     <div className="h-screen flex w-full bg-background overflow-hidden">
