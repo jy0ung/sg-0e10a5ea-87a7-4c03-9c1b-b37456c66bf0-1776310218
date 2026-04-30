@@ -15,6 +15,7 @@ import { getAuditLog, type AuditLogWithProfile } from '@/services/auditService';
 import { AuditDiffTable } from '@/components/shared/AuditDiffTable';
 import { useColumnPermissions, canViewField, canEditField } from '@/hooks/useColumnPermissions';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
+import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 /** Lifecycle milestones in chronological order (BG → Disbursement). */
 const LIFECYCLE_MILESTONES: Array<{
@@ -22,13 +23,13 @@ const LIFECYCLE_MILESTONES: Array<{
   label: string;
   kpiField?: keyof VehicleCanonical;
 }> = [
-  { key: 'bg_date', label: 'BG Date' },
-  { key: 'shipment_etd_pkg', label: 'Shipment ETD', kpiField: 'bg_to_shipment_etd' },
-  { key: 'shipment_eta_kk_twu_sdk', label: 'Shipment ETA' },
-  { key: 'date_received_by_outlet', label: 'Outlet Received', kpiField: 'etd_to_outlet' },
-  { key: 'reg_date', label: 'Registration', kpiField: 'outlet_to_reg' },
-  { key: 'delivery_date', label: 'Delivery', kpiField: 'reg_to_delivery' },
-  { key: 'disb_date', label: 'Disbursement', kpiField: 'delivery_to_disb' },
+  { key: 'bg_date', label: getAutoAgingFieldLabel('bg_date', 'BG DATE') },
+  { key: 'shipment_etd_pkg', label: getAutoAgingFieldLabel('shipment_etd_pkg', 'SHIPMENT ETD PKG'), kpiField: 'bg_to_shipment_etd' },
+  { key: 'shipment_eta_kk_twu_sdk', label: getAutoAgingFieldLabel('shipment_eta_kk_twu_sdk', 'DATE SHIPMENT ETA KK/TWU/SDK') },
+  { key: 'date_received_by_outlet', label: getAutoAgingFieldLabel('date_received_by_outlet', 'RECEIVED BY OUTLET'), kpiField: 'etd_to_outlet' },
+  { key: 'reg_date', label: getAutoAgingFieldLabel('reg_date', 'REG DATE'), kpiField: 'outlet_to_reg' },
+  { key: 'delivery_date', label: getAutoAgingFieldLabel('delivery_date', 'DELIVERY DATE'), kpiField: 'reg_to_delivery' },
+  { key: 'disb_date', label: getAutoAgingFieldLabel('disb_date', 'DISB. DATE'), kpiField: 'delivery_to_disb' },
 ];
 
 const INFO_FIELDS: Array<{
@@ -37,17 +38,17 @@ const INFO_FIELDS: Array<{
   type: 'text' | 'date' | 'number' | 'textarea';
   readonly?: boolean;
 }> = [
-  { key: 'customer_name', label: 'Customer', type: 'text' },
-  { key: 'salesman_name', label: 'Salesman', type: 'text' },
-  { key: 'branch_code', label: 'Branch', type: 'text' },
-  { key: 'payment_method', label: 'Payment', type: 'text' },
-  { key: 'model', label: 'Model', type: 'text', readonly: true },
-  { key: 'variant', label: 'Variant', type: 'text' },
-  { key: 'color', label: 'Color', type: 'text' },
-  { key: 'reg_no', label: 'Reg No', type: 'text' },
-  { key: 'invoice_no', label: 'Invoice No', type: 'text' },
-  { key: 'shipment_name', label: 'Shipment', type: 'text' },
-  { key: 'remark', label: 'Remark', type: 'textarea' },
+  { key: 'customer_name', label: getAutoAgingFieldLabel('customer_name', 'CUST NAME'), type: 'text' },
+  { key: 'salesman_name', label: getAutoAgingFieldLabel('salesman_name', 'SA NAME'), type: 'text' },
+  { key: 'branch_code', label: getAutoAgingFieldLabel('branch_code', 'BRCH K1'), type: 'text' },
+  { key: 'payment_method', label: getAutoAgingFieldLabel('payment_method', 'PAYMENT METHOD'), type: 'text' },
+  { key: 'model', label: getAutoAgingFieldLabel('model', 'MODEL'), type: 'text', readonly: true },
+  { key: 'variant', label: getAutoAgingFieldLabel('variant', 'VAR'), type: 'text' },
+  { key: 'color', label: getAutoAgingFieldLabel('color', 'COLOR'), type: 'text' },
+  { key: 'reg_no', label: getAutoAgingFieldLabel('reg_no', 'REG NO'), type: 'text' },
+  { key: 'invoice_no', label: getAutoAgingFieldLabel('invoice_no', 'INV No.'), type: 'text' },
+  { key: 'shipment_name', label: getAutoAgingFieldLabel('shipment_name', 'SHIPMENT NAME'), type: 'text' },
+  { key: 'remark', label: getAutoAgingFieldLabel('remark', 'REMARK'), type: 'textarea' },
 ];
 
 interface VehicleDetailPanelProps {

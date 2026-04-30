@@ -12,6 +12,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { format, isValid, parseISO } from 'date-fns';
+import { AUTO_AGING_BG_DATE_RANGE_LABEL } from '@/config/autoAgingFieldLabels';
 
 interface KpiDashboardProps {
   kpiSummaries: KpiSummary[];
@@ -233,7 +234,7 @@ function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFil
               <div className="space-y-4 animate-in slide-in-from-top-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Date Range (BG Date)</p>
+                    <p className="text-xs font-medium text-muted-foreground">{AUTO_AGING_BG_DATE_RANGE_LABEL}</p>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button

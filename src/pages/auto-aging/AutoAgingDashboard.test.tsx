@@ -112,7 +112,7 @@ describe('AutoAgingDashboard', () => {
         kpiSummaries: [
           {
             kpiId: 'bg_to_delivery',
-            label: 'BG Date to Delivery Date',
+            label: 'BG DATE to DELIVERY DATE',
             shortLabel: 'BG → Delivery',
             validCount: 51,
             invalidCount: 0,
@@ -156,7 +156,7 @@ describe('AutoAgingDashboard', () => {
     fireEvent.click(screen.getByText('BG → Delivery'));
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('BG Date to Delivery Date — Vehicle Details')).toBeInTheDocument();
+    expect(within(dialog).getByText('BG DATE to DELIVERY DATE — Vehicle Details')).toBeInTheDocument();
     expect(within(dialog).getByText('Showing 50 of 51 vehicles.')).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'View all →' }));

@@ -107,7 +107,7 @@ export default function SalesOrders() {
     await reloadSales();
     setLinkOpen(false);
     setChassisNo('');
-    toast({ title: 'Vehicle BG entry created', description: `Chassis: ${chassisNo}` });
+    toast({ title: 'Inventory entry created', description: `Chassis: ${chassisNo}` });
   };
 
   return (
@@ -167,10 +167,10 @@ export default function SalesOrders() {
                   <td className="py-2 text-right">
                     {!o.vehicleId && (o.status === 'confirmed' || o.status === 'booked') && (
                       <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => { setLinkOrder(o); setLinkOpen(true); }}>
-                        <Link2 className="h-3 w-3 mr-1" />Create BG
+                        <Link2 className="h-3 w-3 mr-1" />Create Inventory
                       </Button>
                     )}
-                    {o.vehicleId && <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-600">BG Linked</Badge>}
+                    {o.vehicleId && <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-600">Inventory Linked</Badge>}
                   </td>
                 </tr>
               ))}
@@ -235,15 +235,15 @@ export default function SalesOrders() {
       {/* Link BG Dialog */}
       <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Create Auto Aging BG Entry</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground">Order: {linkOrder?.orderNo} — {linkOrder?.model}</p>
+          <DialogHeader><DialogTitle>Create Inventory Tracking Entry</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Order: {linkOrder?.orderNo} — {linkOrder?.model}. This creates the inventory tracking row used by Auto Aging and the consolidated inventory report.</p>
           <div className="space-y-2 py-2">
             <label htmlFor="sales-order-bg-chassis-no" className="text-xs font-medium text-muted-foreground">Chassis Number *</label>
             <Input id="sales-order-bg-chassis-no" className="h-8 text-sm font-mono" placeholder="e.g. PM00A1234" value={chassisNo} onChange={e => setChassisNo(e.target.value)} />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLinkOpen(false)}>Cancel</Button>
-            <Button onClick={handleLinkVehicle} disabled={creating}>{creating ? 'Creating…' : 'Create BG Entry'}</Button>
+            <Button onClick={handleLinkVehicle} disabled={creating}>{creating ? 'Creating…' : 'Create Inventory Entry'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

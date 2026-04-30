@@ -17,6 +17,7 @@ import { createImportBatch, commitImportBatch } from '@/services/importService';
 import { resolveNamesToIds } from '@/services/hrmsService';
 import type { ImportBatchInsert, VehicleRaw, ValidationError } from '@/types';
 import { loggingService } from '@/services/loggingService';
+import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 type Step = 'upload' | 'validating' | 'review' | 'publishing' | 'done';
 
@@ -44,6 +45,7 @@ export default function ImportCenter() {
   // Hard blockers: rows that genuinely cannot be published
   const HARD_BLOCKER_CODES = ['DUPLICATE_CHASSIS', 'CHASSIS_TOO_SHORT'];
   const HARD_BLOCKER_FIELDS = ['chassis_no']; // for REQUIRED_FIELD_MISSING
+  const INCOMPLETE_WARNING_CODES = ['OPTIONAL_FIELD_MISSING'];
 
   const hardBlockers = serverErrors.filter(
     e => e.severity === 'error' && (
@@ -64,10 +66,12 @@ export default function ImportCenter() {
 
   // Real/external-data errors: salesman, customer, dates, numbers — mark as incomplete
   const incompleteErrors = serverErrors.filter(
-    e => e.severity === 'error' &&
+    e => INCOMPLETE_WARNING_CODES.includes(e.code) || (
+      e.severity === 'error' &&
       !HARD_BLOCKER_CODES.includes(e.code) &&
       !(e.code === 'REQUIRED_FIELD_MISSING' && HARD_BLOCKER_FIELDS.includes(e.field)) &&
       e.code !== 'INVALID_BRANCH_CODE'
+    )
   );
 
   // Count rows affected by incomplete data (deduplicate by row number)
@@ -184,7 +188,7 @@ export default function ImportCenter() {
       setBatchId(id);
       setRawRows(rows);
       setValidationIssues(issues);
-      setServerErrors(validationResult.isValid ? validationResult.warnings : validationResult.errors);
+      setServerErrors([...validationResult.errors, ...validationResult.warnings]);
       addImportBatch({ ...batch, id });
       setStep('review');
     } catch (error) {
@@ -304,13 +308,13 @@ export default function ImportCenter() {
   if (incompleteRowNums.length > 0) labelParts.push(`${incompleteRowNums.length} incomplete`);
   const publishLabel = labelParts.length > 0
     ? `Publish ${publishableRowCount} row${publishableRowCount !== 1 ? 's' : ''} (${labelParts.join(', ')})`
-    : 'Publish Canonical Data';
+    : 'Publish Inventory Data';
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Import Center"
-        description="Upload and process vehicle data workbooks"
+        description="Upload and process consolidated inventory report workbooks"
         breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Import Center' }]}
       />
 
@@ -356,11 +360,11 @@ export default function ImportCenter() {
                 event.currentTarget.value = '';
               }}
               className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-              aria-label="Choose Excel workbook to import"
+              aria-label="Choose consolidated inventory workbook to import"
             />
             <Upload className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-foreground font-medium mb-1">Tap to choose a workbook</p>
-            <p className="text-sm text-muted-foreground mb-4">Supports .xlsx and .xls files with a "Combine Data" sheet</p>
+            <p className="text-sm text-muted-foreground mb-4">Supports .xlsx and .xls consolidated inventory workbooks, including multi-sheet replacements.</p>
             <span
               className="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow"
             >
@@ -395,13 +399,14 @@ export default function ImportCenter() {
           <div className="mt-6 inline-block text-left space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground mb-2">Each row is checked for:</p>
             {[
-              'Required fields — chassis no, branch, model, customer, salesman, payment method',
+              `Required fields — ${getAutoAgingFieldLabel('chassis_no', 'CHASSIS NO.')}, ${getAutoAgingFieldLabel('branch_code', 'BRCH K1')}, ${getAutoAgingFieldLabel('model', 'MODEL')}, ${getAutoAgingFieldLabel('payment_method', 'PAYMENT METHOD')}`,
+              `Incomplete fields — ${getAutoAgingFieldLabel('customer_name', 'CUST NAME')} and ${getAutoAgingFieldLabel('salesman_name', 'SA NAME')} are flagged as pending, not blocked`,
               'Chassis number format (min 5 chars) & duplicate check against existing vehicles',
-              'Branch code — must exist in your company\'s branch records',
+              `${getAutoAgingFieldLabel('branch_code', 'BRCH K1')} — must exist in your company's branch records`,
               'Date fields — valid format across 9 date columns',
-              'Date order — e.g. shipment ETD must not precede BG date',
+              `Date order — e.g. ${getAutoAgingFieldLabel('shipment_etd_pkg', 'SHIPMENT ETD PKG')} must not precede ${getAutoAgingFieldLabel('bg_date', 'BG DATE')}`,
               'Transfer price — must be a valid number',
-              'Payment method — flags unusual values as warnings',
+              `${getAutoAgingFieldLabel('payment_method', 'PAYMENT METHOD')} — flags unusual values as warnings`,
             ].map((check, i) => (
               <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
                 <div className="w-1.5 h-1.5 rounded-full bg-primary/40 flex-shrink-0 mt-1" />
@@ -552,7 +557,7 @@ export default function ImportCenter() {
               <div className="mb-4">
                 <h4 className="text-sm font-semibold text-foreground mb-2">Warnings</h4>
                 <div className="space-y-1 max-h-32 overflow-y-auto p-3 rounded-md bg-secondary/30">
-                  {serverErrors.filter(e => e.severity === 'warning').map((error, idx) => (
+                  {serverErrors.filter(e => e.severity === 'warning' && !INCOMPLETE_WARNING_CODES.includes(e.code)).map((error, idx) => (
                     <div key={idx} className="flex items-start gap-2 p-2 rounded bg-secondary/50 text-xs">
                       <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0 mt-0.5" />
                       <span className="text-foreground">{error.message}</span>

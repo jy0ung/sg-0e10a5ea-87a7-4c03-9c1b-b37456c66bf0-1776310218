@@ -14,6 +14,7 @@ import {
 } from '@/services/reportService';
 import { preloadExcelJS } from '@/lib/exceljs-loader';
 import { Download, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 type ReportType = 'aging_summary' | 'sla_compliance' | 'salesman_performance' | 'vehicle_full';
 
@@ -128,11 +129,11 @@ export default function ReportCenter() {
 
           {/* Date Range */}
           <div className="space-y-2">
-            <label htmlFor="auto-aging-report-date-from" className="text-xs font-medium text-muted-foreground">BG Date From</label>
+            <label htmlFor="auto-aging-report-date-from" className="text-xs font-medium text-muted-foreground">{getAutoAgingFieldLabel('bg_date', 'BG DATE')} From</label>
             <Input id="auto-aging-report-date-from" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 text-sm" />
           </div>
           <div className="space-y-2">
-            <label htmlFor="auto-aging-report-date-to" className="text-xs font-medium text-muted-foreground">BG Date To</label>
+            <label htmlFor="auto-aging-report-date-to" className="text-xs font-medium text-muted-foreground">{getAutoAgingFieldLabel('bg_date', 'BG DATE')} To</label>
             <Input id="auto-aging-report-date-to" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 text-sm" />
           </div>
         </div>

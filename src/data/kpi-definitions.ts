@@ -3,7 +3,7 @@ import { KpiDefinition } from '@/types';
 export const KPI_DEFINITIONS: KpiDefinition[] = [
   {
     id: 'bg_to_delivery',
-    label: 'BG Date to Delivery Date',
+    label: 'BG DATE to DELIVERY DATE',
     shortLabel: 'BG → Delivery',
     fromField: 'bg_date',
     toField: 'delivery_date',
@@ -12,7 +12,7 @@ export const KPI_DEFINITIONS: KpiDefinition[] = [
   },
   {
     id: 'bg_to_shipment_etd',
-    label: 'BG Date to Shipment ETD PKG',
+    label: 'BG DATE to SHIPMENT ETD PKG',
     shortLabel: 'BG → ETD',
     fromField: 'bg_date',
     toField: 'shipment_etd_pkg',
@@ -21,7 +21,7 @@ export const KPI_DEFINITIONS: KpiDefinition[] = [
   },
   {
     id: 'etd_to_outlet',
-    label: 'Shipment ETD PKG to Date Received by Outlet',
+    label: 'SHIPMENT ETD PKG to RECEIVED BY OUTLET',
     shortLabel: 'ETD → Outlet',
     fromField: 'shipment_etd_pkg',
     toField: 'date_received_by_outlet',
@@ -30,7 +30,7 @@ export const KPI_DEFINITIONS: KpiDefinition[] = [
   },
   {
     id: 'outlet_to_reg',
-    label: 'Date Received by Outlet to Registration Date',
+    label: 'RECEIVED BY OUTLET to REG DATE',
     shortLabel: 'Outlet → Reg',
     fromField: 'date_received_by_outlet',
     toField: 'reg_date',
@@ -39,7 +39,7 @@ export const KPI_DEFINITIONS: KpiDefinition[] = [
   },
   {
     id: 'reg_to_delivery',
-    label: 'Registration Date to Delivery Date',
+    label: 'REG DATE to DELIVERY DATE',
     shortLabel: 'Reg → Delivery',
     fromField: 'reg_date',
     toField: 'delivery_date',
@@ -48,7 +48,7 @@ export const KPI_DEFINITIONS: KpiDefinition[] = [
   },
   {
     id: 'bg_to_disb',
-    label: 'BG Date to Disb. Date',
+    label: 'BG DATE to DISB. DATE',
     shortLabel: 'BG → Disb',
     fromField: 'bg_date',
     toField: 'disb_date',
@@ -57,7 +57,7 @@ export const KPI_DEFINITIONS: KpiDefinition[] = [
   },
   {
     id: 'delivery_to_disb',
-    label: 'Delivery Date to Disb. Date',
+    label: 'DELIVERY DATE to DISB. DATE',
     shortLabel: 'Delivery → Disb',
     fromField: 'delivery_date',
     toField: 'disb_date',

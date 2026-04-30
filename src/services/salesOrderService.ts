@@ -152,7 +152,7 @@ export async function moveSalesOrderStage(companyId: string, id: string, dealSta
 }
 
 /**
- * Creates a vehicle (BG entry) in Auto Aging from a confirmed Sales Order.
+ * Creates an inventory-tracking vehicle row in Auto Aging from a confirmed Sales Order.
  * Sets bg_date = bookingDate, links the vehicle back to the sales order.
  */
 export async function createVehicleFromSalesOrder(
@@ -206,7 +206,7 @@ export async function createVehicleFromSalesOrder(
   // 4. Audit log
   await logVehicleEdit(userId, vehicleId, {
     source: { before: null, after: `Sales Order ${order.orderNo}` },
-    remark: { before: null, after: `BG entry created from Sales Order ${order.orderNo}` },
+    remark: { before: null, after: `Inventory entry created from Sales Order ${order.orderNo}` },
   });
   if (userId) void logUserAction(userId, 'update', 'sales_order', orderId, { component: 'SalesOrderService' });
 

@@ -1,4 +1,5 @@
 import type { KpiSummary, SalesOrder, VehicleCanonical, Customer } from '@/types';
+import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 // ============================================================================
 // Custom KPI Formula engine
@@ -89,15 +90,15 @@ export interface CustomKpiFieldDefinition {
 
 export const CUSTOM_KPI_FIELD_CATALOG: Record<CustomKpiSource, CustomKpiFieldDefinition[]> = {
   vehicles: [
-    { key: 'branch_code', label: 'Branch', kind: 'string' },
-    { key: 'model', label: 'Model', kind: 'string' },
-    { key: 'payment_method', label: 'Payment method', kind: 'string' },
-    { key: 'salesman_name', label: 'Salesman', kind: 'string' },
+    { key: 'branch_code', label: getAutoAgingFieldLabel('branch_code', 'BRCH K1'), kind: 'string' },
+    { key: 'model', label: getAutoAgingFieldLabel('model', 'MODEL'), kind: 'string' },
+    { key: 'payment_method', label: getAutoAgingFieldLabel('payment_method', 'PAYMENT METHOD'), kind: 'string' },
+    { key: 'salesman_name', label: getAutoAgingFieldLabel('salesman_name', 'SA NAME'), kind: 'string' },
     { key: 'is_d2d', label: 'Is D2D', kind: 'boolean' },
-    { key: 'bg_date', label: 'BG date', kind: 'date' },
-    { key: 'delivery_date', label: 'Delivery date', kind: 'date' },
-    { key: 'reg_date', label: 'Registration date', kind: 'date' },
-    { key: 'disb_date', label: 'Disbursement date', kind: 'date' },
+    { key: 'bg_date', label: getAutoAgingFieldLabel('bg_date', 'BG DATE'), kind: 'date' },
+    { key: 'delivery_date', label: getAutoAgingFieldLabel('delivery_date', 'DELIVERY DATE'), kind: 'date' },
+    { key: 'reg_date', label: getAutoAgingFieldLabel('reg_date', 'REG DATE'), kind: 'date' },
+    { key: 'disb_date', label: getAutoAgingFieldLabel('disb_date', 'DISB. DATE'), kind: 'date' },
     { key: 'bg_to_delivery', label: 'BG → Delivery (days)', kind: 'number' },
     { key: 'bg_to_shipment_etd', label: 'BG → Shipment ETD (days)', kind: 'number' },
     { key: 'etd_to_outlet', label: 'ETD → Outlet (days)', kind: 'number' },

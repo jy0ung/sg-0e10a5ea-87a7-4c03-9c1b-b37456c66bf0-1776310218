@@ -10,6 +10,7 @@ import {
 } from '@/services/inventoryService';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { Search, ArrowRight, Plus, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 const AUDIT_PAGE_SIZE = 50;
 
@@ -124,10 +125,10 @@ export default function ChassisMovement() {
       {vehicle && (
         <div className="glass-panel p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           {[
-            { label: 'Chassis No', value: vehicle.chassisNo },
-            { label: 'Model', value: vehicle.model },
-            { label: 'Branch', value: vehicle.branchCode },
-            { label: 'BG Date', value: vehicle.bgDate },
+            { label: getAutoAgingFieldLabel('chassis_no', 'CHASSIS NO.'), value: vehicle.chassisNo },
+            { label: getAutoAgingFieldLabel('model', 'MODEL'), value: vehicle.model },
+            { label: getAutoAgingFieldLabel('branch_code', 'BRCH K1'), value: vehicle.branchCode },
+            { label: getAutoAgingFieldLabel('bg_date', 'BG DATE'), value: vehicle.bgDate },
           ].map(f => (
             <div key={f.label}>
               <p className="text-xs text-muted-foreground">{f.label}</p>

@@ -19,6 +19,7 @@ import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { BranchPeriodFilter } from '@/components/shared/BranchPeriodFilter';
 import { getAutoAgingDashboardSummary, searchVehicles } from '@/services/vehicleService';
 import { getDashboardPeriodRange, getDashboardScopeSummary, loadDashboardFilterState, saveDashboardFilterState } from '@/lib/dashboardFilters';
+import { AUTO_AGING_BG_DATE_PERIOD_LABEL, getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 function toServerValue(value: string): string | null {
   return value === 'all' ? null : value;
@@ -129,12 +130,12 @@ export default function AutoAgingDashboard() {
   };
 
   const processStages = [
-    { label: 'BG Date', short: 'BG' },
-    { label: 'Shipment ETD', short: 'ETD' },
-    { label: 'Outlet Received', short: 'OUT' },
-    { label: 'Registration', short: 'REG' },
-    { label: 'Delivery', short: 'DEL' },
-    { label: 'Disbursement', short: 'DISB' },
+    { label: getAutoAgingFieldLabel('bg_date', 'BG DATE'), short: 'BG' },
+    { label: getAutoAgingFieldLabel('shipment_etd_pkg', 'SHIPMENT ETD PKG'), short: 'ETD' },
+    { label: getAutoAgingFieldLabel('date_received_by_outlet', 'RECEIVED BY OUTLET'), short: 'OUT' },
+    { label: getAutoAgingFieldLabel('reg_date', 'REG DATE'), short: 'REG' },
+    { label: getAutoAgingFieldLabel('delivery_date', 'DELIVERY DATE'), short: 'DEL' },
+    { label: getAutoAgingFieldLabel('disb_date', 'DISB. DATE'), short: 'DISB' },
   ];
 
   const segmentKpiIds = ['bg_to_shipment_etd', 'etd_to_outlet', 'outlet_to_reg', 'reg_to_delivery', 'delivery_to_disb'];
@@ -206,7 +207,7 @@ export default function AutoAgingDashboard() {
         <div className="glass-panel p-12 text-center">
           <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No Data Imported Yet</h3>
-          <p className="text-sm text-muted-foreground mb-6">Upload your Excel workbook to start analyzing vehicle aging across milestones.</p>
+          <p className="text-sm text-muted-foreground mb-6">Upload your consolidated inventory report workbook to start analyzing vehicle aging across milestones.</p>
           <Button onClick={() => navigate('/auto-aging/import')} className="bg-primary text-primary-foreground">
             <Upload className="h-4 w-4 mr-2" />Go to Import Center
           </Button>
@@ -232,7 +233,7 @@ export default function AutoAgingDashboard() {
               onBranchChange={(value) => setDashboardFilter(prev => ({ ...prev, branch: value }))}
               onPeriodChange={(value) => setDashboardFilter(prev => ({ ...prev, period: value }))}
               onModelChange={(value) => setDashboardFilter(prev => ({ ...prev, model: value }))}
-              periodLabel="Date period (BG date)"
+              periodLabel={AUTO_AGING_BG_DATE_PERIOD_LABEL}
             />
           }
         />
@@ -241,7 +242,7 @@ export default function AutoAgingDashboard() {
           <div>
             <h3 className="text-lg font-semibold text-foreground mb-2">No Vehicles Match the Current Filters</h3>
             <p className="text-sm text-muted-foreground">
-              Adjust the branch, model, or BG-date period filters to load overview metrics for a broader slice.
+              Adjust the branch, model, or BG DATE period filters to load overview metrics for a broader slice.
             </p>
           </div>
           <Button variant="outline" onClick={() => setDashboardFilter({ branch: 'all', period: 'all_time', model: 'all' })}>
@@ -269,7 +270,7 @@ export default function AutoAgingDashboard() {
               onBranchChange={(value) => setDashboardFilter(prev => ({ ...prev, branch: value }))}
               onPeriodChange={(value) => setDashboardFilter(prev => ({ ...prev, period: value }))}
               onModelChange={(value) => setDashboardFilter(prev => ({ ...prev, model: value }))}
-              periodLabel="Date period (BG date)"
+              periodLabel={AUTO_AGING_BG_DATE_PERIOD_LABEL}
             />
             <div className="text-right mr-2">
               <p className="text-[10px] text-muted-foreground">Last refresh</p>
@@ -424,9 +425,9 @@ export default function AutoAgingDashboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Chassis</th>
-                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Branch</th>
-                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Model</th>
+                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">{getAutoAgingFieldLabel('chassis_no', 'CHASSIS NO.')}</th>
+                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">{getAutoAgingFieldLabel('branch_code', 'BRCH K1')}</th>
+                  <th className="px-3 py-2 text-xs text-muted-foreground font-medium">{getAutoAgingFieldLabel('model', 'MODEL')}</th>
                   <th className="px-3 py-2 text-xs text-muted-foreground font-medium">BG→Del</th>
                   <th className="px-3 py-2 text-xs text-muted-foreground font-medium">ETD→Out</th>
                   <th className="px-3 py-2 text-xs text-muted-foreground font-medium">Reg→Del</th>
@@ -474,10 +475,10 @@ export default function AutoAgingDashboard() {
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-card z-10">
                     <tr className="border-b border-border">
-                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Chassis No</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Model</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Branch</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Customer</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{getAutoAgingFieldLabel('chassis_no', 'CHASSIS NO.')}</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{getAutoAgingFieldLabel('model', 'MODEL')}</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{getAutoAgingFieldLabel('branch_code', 'BRCH K1')}</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">{getAutoAgingFieldLabel('customer_name', 'CUST NAME')}</th>
                       <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground">Days</th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
                     </tr>

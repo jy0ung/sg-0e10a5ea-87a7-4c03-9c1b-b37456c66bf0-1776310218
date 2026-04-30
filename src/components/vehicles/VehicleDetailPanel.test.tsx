@@ -208,27 +208,27 @@ describe('VehicleDetailPanel', () => {
     await renderPanel({ vehicle: makeVehicle(), open: true, onClose });
     // Milestone Timeline heading is always visible
     expect(screen.getByText(/Milestone Timeline/i)).toBeInTheDocument();
-    // BG Date and Disbursement are always rendered
-    expect(screen.getByText('BG Date')).toBeInTheDocument();
-    expect(screen.getByText('Disbursement')).toBeInTheDocument();
+    // BG DATE and DISB. DATE are always rendered
+    expect(screen.getByText('BG DATE')).toBeInTheDocument();
+    expect(screen.getByText('DISB. DATE')).toBeInTheDocument();
   });
 
   it('renders all 7 lifecycle milestones', async () => {
     await renderPanel({ vehicle: makeVehicle(), open: true, onClose });
-    expect(screen.getByText('BG Date')).toBeInTheDocument();
-    expect(screen.getByText('Shipment ETD')).toBeInTheDocument();
-    expect(screen.getByText('Shipment ETA')).toBeInTheDocument();
-    expect(screen.getByText('Outlet Received')).toBeInTheDocument();
-    expect(screen.getByText('Registration')).toBeInTheDocument();
-    expect(screen.getByText('Delivery')).toBeInTheDocument();
-    expect(screen.getByText('Disbursement')).toBeInTheDocument();
+    expect(screen.getByText('BG DATE')).toBeInTheDocument();
+    expect(screen.getByText('SHIPMENT ETD PKG')).toBeInTheDocument();
+    expect(screen.getByText('DATE SHIPMENT ETA KK/TWU/SDK')).toBeInTheDocument();
+    expect(screen.getByText('RECEIVED BY OUTLET')).toBeInTheDocument();
+    expect(screen.getByText('REG DATE')).toBeInTheDocument();
+    expect(screen.getByText('DELIVERY DATE')).toBeInTheDocument();
+    expect(screen.getByText('DISB. DATE')).toBeInTheDocument();
   });
 
-  it('shows "BG Date" above "Disbursement" in the DOM (chronological top-to-bottom)', async () => {
+  it('shows "BG DATE" above "DISB. DATE" in the DOM (chronological top-to-bottom)', async () => {
     await renderPanel({ vehicle: makeVehicle(), open: true, onClose });
-    const bgEl = screen.getByText('BG Date');
-    const disbEl = screen.getByText('Disbursement');
-    // BG Date should come before Disbursement in the DOM
+    const bgEl = screen.getByText('BG DATE');
+    const disbEl = screen.getByText('DISB. DATE');
+    // BG DATE should come before DISB. DATE in the DOM
     expect(
       bgEl.compareDocumentPosition(disbEl) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();

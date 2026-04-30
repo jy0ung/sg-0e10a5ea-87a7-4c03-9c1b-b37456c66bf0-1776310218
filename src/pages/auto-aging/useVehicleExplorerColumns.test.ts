@@ -17,13 +17,15 @@ describe('useVehicleExplorerColumns', () => {
 
     expect(byKey('row_no')?.label).toBe('NO.');
     expect(byKey('chassis_no')?.label).toBe('CHASSIS NO.');
-    expect(byKey('branch_code')?.label).toBe('BRCH');
+    expect(byKey('branch_code')?.label).toBe('BRCH K1');
     expect(byKey('variant')?.label).toBe('VAR');
     expect(byKey('customer_name')?.label).toBe('CUST NAME');
     expect(byKey('salesman_name')?.label).toBe('SA NAME');
     expect(byKey('bg_date')?.label).toBe('BG DATE');
     expect(byKey('disb_date')?.label).toBe('DISB. DATE');
-    expect(byKey('invoice_no')?.label).toBe('INV NO.');
+    expect(byKey('shipment_eta_kk_twu_sdk')?.label).toBe('DATE SHIPMENT ETA KK/TWU/SDK');
+    expect(byKey('date_received_by_outlet')?.label).toBe('RECEIVED BY OUTLET');
+    expect(byKey('invoice_no')?.label).toBe('INV No.');
     expect(byKey('dealer_transfer_price')?.label).toBe('DTP (DEALER TRANSFER PRICE)');
     expect(byKey('commission_paid')?.label).toBe('COMM PAYOUT');
   });

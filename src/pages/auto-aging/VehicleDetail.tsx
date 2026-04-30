@@ -10,6 +10,7 @@ import { VehicleEditDialog } from '@/components/vehicles/VehicleEditDialog';
 import { forecastVehicleMilestones, getVehicleRisk } from '@/utils/forecasting';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp } from 'lucide-react';
+import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 export default function VehicleDetail() {
   const { chassisNo } = useParams<{ chassisNo: string }>();
@@ -30,12 +31,12 @@ export default function VehicleDetail() {
   const issues = qualityIssues.filter(q => q.chassisNo === chassisNo);
 
   const milestones = [
-    { label: 'BG Date', date: vehicle.bg_date },
-    { label: 'Shipment ETD', date: vehicle.shipment_etd_pkg },
-    { label: 'Outlet Received', date: vehicle.date_received_by_outlet },
-    { label: 'Registration', date: vehicle.reg_date },
-    { label: 'Delivery', date: vehicle.delivery_date },
-    { label: 'Disbursement', date: vehicle.disb_date },
+    { label: getAutoAgingFieldLabel('bg_date', 'BG DATE'), date: vehicle.bg_date },
+    { label: getAutoAgingFieldLabel('shipment_etd_pkg', 'SHIPMENT ETD PKG'), date: vehicle.shipment_etd_pkg },
+    { label: getAutoAgingFieldLabel('date_received_by_outlet', 'RECEIVED BY OUTLET'), date: vehicle.date_received_by_outlet },
+    { label: getAutoAgingFieldLabel('reg_date', 'REG DATE'), date: vehicle.reg_date },
+    { label: getAutoAgingFieldLabel('delivery_date', 'DELIVERY DATE'), date: vehicle.delivery_date },
+    { label: getAutoAgingFieldLabel('disb_date', 'DISB. DATE'), date: vehicle.disb_date },
   ];
 
   const kpiValues = KPI_DEFINITIONS.map(k => ({
@@ -76,14 +77,14 @@ export default function VehicleDetail() {
           <h3 className="text-sm font-semibold text-foreground mb-4">Vehicle Information</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             {[
-              ['Chassis No.', vehicle.chassis_no],
-              ['Model', vehicle.model],
-              ['Branch', vehicle.branch_code],
-              ['Payment', vehicle.payment_method],
-              ['Salesman', vehicle.salesman_name],
-              ['Customer', vehicle.customer_name],
-              ['D2D/Transfer', vehicle.is_d2d ? 'Yes' : 'No'],
-              ['Remarks', vehicle.remark || '—'],
+              [getAutoAgingFieldLabel('chassis_no', 'CHASSIS NO.'), vehicle.chassis_no],
+              [getAutoAgingFieldLabel('model', 'MODEL'), vehicle.model],
+              [getAutoAgingFieldLabel('branch_code', 'BRCH K1'), vehicle.branch_code],
+              [getAutoAgingFieldLabel('payment_method', 'PAYMENT METHOD'), vehicle.payment_method],
+              [getAutoAgingFieldLabel('salesman_name', 'SA NAME'), vehicle.salesman_name],
+              [getAutoAgingFieldLabel('customer_name', 'CUST NAME'), vehicle.customer_name],
+              [getAutoAgingFieldLabel('is_d2d', 'D2D'), vehicle.is_d2d ? 'Yes' : 'No'],
+              [getAutoAgingFieldLabel('remark', 'REMARK'), vehicle.remark || '—'],
             ].map(([label, value]) => (
               <div key={label as string}>
                 <p className="text-xs text-muted-foreground">{label}</p>

@@ -31,35 +31,35 @@ interface PermissionEditorProps {
 }
 
 const EXCEL_COLUMNS = [
-  { key: 'chassis_no', label: 'Chassis No' },
-  { key: 'row_no', label: 'Row No' },
-  { key: 'model', label: 'Model' },
-  { key: 'variant', label: 'Variant' },
-  { key: 'branch_code', label: 'Branch' },
-  { key: 'customer_name', label: 'Customer' },
-  { key: 'salesman_name', label: 'Salesman' },
-  { key: 'bg_date', label: 'BG Date' },
-  { key: 'etd_pkg', label: 'ETD (PKG)' },
-  { key: 'eta_kk', label: 'ETA (KK)' },
-  { key: 'eta_twu', label: 'ETA (TWU)' },
-  { key: 'eta_sdk', label: 'ETA (SDK)' },
-  { key: 'outlet_recv_date', label: 'Outlet Recv' },
-  { key: 'reg_date', label: 'Reg Date' },
-  { key: 'delivery_date', label: 'Delivery Date' },
-  { key: 'disb_date', label: 'Disb Date' },
-  { key: 'payment_method', label: 'Payment Method' },
-  { key: 'lou_amount', label: 'LOU Amount' },
-  { key: 'contra_sola', label: 'Contra/SOLA' },
-  { key: 'full_payment_date', label: 'Full Payment Date' },
-  { key: 'vaa_date', label: 'VAA Date' },
-  { key: 'reg_no', label: 'Reg No' },
-  { key: 'invoice_no', label: 'Invoice No' },
+  { key: 'chassis_no', label: 'CHASSIS NO.' },
+  { key: 'branch_code', label: 'BRCH K1' },
+  { key: 'vaa_date', label: 'VAA DATE' },
+  { key: 'model', label: 'MODEL' },
+  { key: 'variant', label: 'VAR' },
+  { key: 'color', label: 'COLOR' },
+  { key: 'dealer_transfer_price', label: 'DTP (DEALER TRANSFER PRICE)' },
+  { key: 'payment_method', label: 'PAYMENT METHOD' },
+  { key: 'bg_date', label: 'BG DATE' },
+  { key: 'full_payment_type', label: 'FULL PAYMENT TYPE' },
+  { key: 'full_payment_date', label: 'FULL PAYMENT DATE' },
+  { key: 'shipment_name', label: 'SHIPMENT NAME' },
+  { key: 'shipment_etd_pkg', label: 'SHIPMENT ETD PKG' },
+  { key: 'shipment_eta_kk_twu_sdk', label: 'DATE SHIPMENT ETA KK/TWU/SDK' },
+  { key: 'date_received_by_outlet', label: 'RECEIVED BY OUTLET' },
+  { key: 'salesman_name', label: 'SA NAME' },
+  { key: 'customer_name', label: 'CUST NAME' },
+  { key: 'lou', label: 'LOU' },
+  { key: 'contra_sola', label: 'CONTRA SOLA' },
+  { key: 'reg_no', label: 'REG NO' },
+  { key: 'reg_date', label: 'REG DATE' },
+  { key: 'invoice_no', label: 'INV No.' },
   { key: 'obr', label: 'OBR' },
-  { key: 'dealer_transfer_price', label: 'Dealer Transfer Price' },
-  { key: 'full_payment_type', label: 'Full Payment Type' },
-  { key: 'shipment_name', label: 'Shipment Name' },
-  { key: 'd2d', label: 'D2D' },
-  { key: 'remark', label: 'Remark' },
+  { key: 'delivery_date', label: 'DELIVERY DATE' },
+  { key: 'disb_date', label: 'DISB. DATE' },
+  { key: 'commission_paid', label: 'COMM PAYOUT' },
+  { key: 'commission_remark', label: 'COMM REMARK' },
+  { key: 'is_d2d', label: 'D2D' },
+  { key: 'remark', label: 'REMARK' },
 ];
 
 type PermissionLevel = 'none' | 'view' | 'edit';
@@ -68,10 +68,10 @@ const PERMISSION_TEMPLATES = {
   full: EXCEL_COLUMNS.map(c => ({ column_name: c.key, permission_level: 'edit' as const })),
   readonly: EXCEL_COLUMNS.map(c => ({ column_name: c.key, permission_level: 'view' as const })),
   sales: EXCEL_COLUMNS
-    .filter(c => ['chassis_no', 'model', 'variant', 'branch_code', 'customer_name', 'salesman_name', 'delivery_date', 'remark'].includes(c.key))
+    .filter(c => ['chassis_no', 'branch_code', 'model', 'variant', 'color', 'customer_name', 'salesman_name', 'bg_date', 'delivery_date', 'lou', 'is_d2d', 'remark'].includes(c.key))
     .map(c => ({ column_name: c.key, permission_level: 'view' as const })),
   accounts: EXCEL_COLUMNS
-    .filter(c => ['chassis_no', 'dealer_transfer_price', 'payment_method', 'lou_amount', 'contra_sola', 'full_payment_date', 'full_payment_type', 'invoice_no', 'obr'].includes(c.key))
+    .filter(c => ['chassis_no', 'branch_code', 'dealer_transfer_price', 'payment_method', 'full_payment_type', 'full_payment_date', 'lou', 'contra_sola', 'invoice_no', 'obr', 'delivery_date', 'disb_date', 'commission_paid', 'commission_remark'].includes(c.key))
     .map(c => ({ column_name: c.key, permission_level: 'view' as const })),
 };
 

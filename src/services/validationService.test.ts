@@ -84,16 +84,41 @@ describe('ValidationService', () => {
       const row = {
         chassis_no: 'ABC123456789',
         branch_code: 'B001',
-        // Missing model, customer_name, salesman_name, payment_method
+        // Missing model and payment_method; customer_name and salesman_name are warnings.
       };
 
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.isValid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.errors.some(e => e.field === 'model')).toBe(true);
-      expect(result.errors.some(e => e.field === 'customer_name')).toBe(true);
-      expect(result.errors.some(e => e.field === 'salesman_name')).toBe(true);
       expect(result.errors.some(e => e.field === 'payment_method')).toBe(true);
+      expect(result.warnings.some(e => e.field === 'customer_name' && e.code === 'OPTIONAL_FIELD_MISSING')).toBe(true);
+      expect(result.warnings.some(e => e.field === 'salesman_name' && e.code === 'OPTIONAL_FIELD_MISSING')).toBe(true);
+    });
+
+    it('should warn instead of erroring when customer and salesman names are missing', async () => {
+      const row = {
+        chassis_no: 'ABC123456789',
+        branch_code: 'B001',
+        model: 'Corolla',
+        payment_method: 'Cash',
+      };
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'vehicles') {
+          return createMockQueryBuilder({ data: null, error: null });
+        }
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: [{ id: 'b1', code: 'B001' }], error: null });
+        }
+        return createMockQueryBuilder({ data: [], error: null });
+      });
+
+      const result = await validateVehicleRow(row, 'company-123', 1);
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(result.warnings.some(e => e.field === 'customer_name' && e.code === 'OPTIONAL_FIELD_MISSING')).toBe(true);
+      expect(result.warnings.some(e => e.field === 'salesman_name' && e.code === 'OPTIONAL_FIELD_MISSING')).toBe(true);
     });
 
     it('should fail when chassis_no is too short', async () => {
@@ -272,6 +297,31 @@ describe('ValidationService', () => {
 
       const result = await validateVehicleRow(row, 'company-123', 1);
       expect(result.warnings.some(e => e.code === 'UNUSUAL_PAYMENT_METHOD')).toBe(true);
+    });
+
+    it('should accept replacement workbook payment methods without warning', async () => {
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'vehicles') {
+          return createMockQueryBuilder({ data: null, error: null });
+        }
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: [{ id: 'b1', code: 'B001' }], error: null });
+        }
+        return createMockQueryBuilder({ data: [], error: null });
+      });
+
+      for (const paymentMethod of ['PAS (BG)', 'TT', 'FLOOR STOCK']) {
+        const row = {
+          chassis_no: 'ABC123456789',
+          branch_code: 'B001',
+          model: 'Corolla',
+          payment_method: paymentMethod,
+        };
+
+        const result = await validateVehicleRow(row, 'company-123', 1);
+        expect(result.errors).toHaveLength(0);
+        expect(result.warnings.some(e => e.code === 'UNUSUAL_PAYMENT_METHOD')).toBe(false);
+      }
     });
 
     it('should handle various date formats correctly', async () => {

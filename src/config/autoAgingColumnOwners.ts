@@ -35,7 +35,7 @@ export interface AutoAgingColumnOwnerDefinition {
 export const AUTO_AGING_COLUMN_OWNERS: AutoAgingColumnOwnerDefinition[] = [
   {
     owner: 'stock_in',
-    label: 'Stock In',
+    label: 'STOCK IN',
     description: 'Physical receipt of the unit at the outlet.',
     columns: [
       'branch_code',
@@ -49,19 +49,19 @@ export const AUTO_AGING_COLUMN_OWNERS: AutoAgingColumnOwnerDefinition[] = [
   },
   {
     owner: 'deposit_payment',
-    label: 'Deposit Payment',
+    label: 'DEPOSIT PAYMENT',
     description: 'Customer deposit / booking milestone.',
     columns: ['payment_method', 'bg_date'],
   },
   {
     owner: 'full_payment',
-    label: 'Full Payment',
+    label: 'FULL PAYMENT',
     description: 'Cash settlement details (non-loan cases).',
     columns: ['full_payment_type', 'full_payment_date'],
   },
   {
     owner: 'outlet_admin',
-    label: 'Outlet Admin',
+    label: 'OUTLET ADMIN',
     description:
       'Shipment receipt, registration, invoicing, delivery, disbursement and commission payout.',
     columns: [
@@ -83,7 +83,7 @@ export const AUTO_AGING_COLUMN_OWNERS: AutoAgingColumnOwnerDefinition[] = [
   },
   {
     owner: 'sales_manager',
-    label: 'Sales Manager',
+    label: 'SALES MANAGER',
     description: 'Customer-facing contracting details.',
     columns: ['salesman_name', 'customer_name', 'lou'],
   },

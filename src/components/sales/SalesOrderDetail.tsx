@@ -11,6 +11,7 @@ import { useSales } from '@/contexts/SalesContext';
 import { createVehicleFromSalesOrder } from '@/services/salesOrderService';
 import { SalesOrder, Invoice } from '@/types';
 import { Link2, CheckCircle, Receipt, History } from 'lucide-react';
+import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 interface SalesOrderDetailProps {
   order: SalesOrder;
@@ -53,7 +54,7 @@ export function SalesOrderDetail({ order, invoices, onClose }: SalesOrderDetailP
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await reloadSales();
     setLinkOpen(false);
-    toast({ title: 'BG entry created', description: `Chassis: ${chassisNo}` });
+    toast({ title: 'Inventory entry created', description: `Chassis: ${chassisNo}` });
   };
 
   return (
@@ -70,7 +71,7 @@ export function SalesOrderDetail({ order, invoices, onClose }: SalesOrderDetailP
         <TabsList className="h-8 text-xs">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="invoice">Invoices ({orderInvoices.length})</TabsTrigger>
-          <TabsTrigger value="vehicle">Auto Aging</TabsTrigger>
+          <TabsTrigger value="vehicle">Inventory Tracking</TabsTrigger>
         </TabsList>
 
         {/* Overview */}
@@ -127,22 +128,22 @@ export function SalesOrderDetail({ order, invoices, onClose }: SalesOrderDetailP
             <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm space-y-1">
               <div className="flex items-center gap-2 text-emerald-600 font-medium">
                 <CheckCircle className="h-4 w-4" />
-                BG Entry Created
+                Inventory Entry Created
               </div>
               <p className="text-xs text-muted-foreground">Chassis: <span className="font-mono font-medium text-foreground">{order.chassisNo}</span></p>
-              <p className="text-xs text-muted-foreground">BG Date: {order.bookingDate}</p>
+              <p className="text-xs text-muted-foreground">{getAutoAgingFieldLabel('bg_date', 'BG DATE')}: {order.bookingDate}</p>
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-border p-6 text-center space-y-3">
               <Link2 className="h-8 w-8 text-muted-foreground mx-auto" />
               <div>
-                <p className="text-sm font-medium">No BG Entry Linked</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Create an Auto Aging BG entry once the chassis number is confirmed.</p>
+                <p className="text-sm font-medium">No Inventory Entry Linked</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Create the inventory tracking entry once the chassis number is confirmed.</p>
               </div>
               {(order.status === 'confirmed' || order.status === 'booked') ? (
                 <Button size="sm" onClick={() => setLinkOpen(true)}>
                   <Link2 className="h-3.5 w-3.5 mr-1.5" />
-                  Create BG Entry
+                  Create Inventory Entry
                 </Button>
               ) : (
                 <p className="text-xs text-muted-foreground">Advance order to <strong>Confirmed</strong> or <strong>Booked</strong> status first.</p>
@@ -155,15 +156,15 @@ export function SalesOrderDetail({ order, invoices, onClose }: SalesOrderDetailP
       {/* Chassis Dialog */}
       <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Create Auto Aging BG Entry</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground">Order: {order.orderNo} — {order.model}<br />BG Date will be set to booking date: <strong>{order.bookingDate}</strong></p>
+          <DialogHeader><DialogTitle>Create Inventory Tracking Entry</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Order: {order.orderNo} — {order.model}<br />Inventory {getAutoAgingFieldLabel('bg_date', 'BG DATE')} will be set from Booking Date: <strong>{order.bookingDate}</strong></p>
           <div className="space-y-2 py-2">
             <label htmlFor="sales-order-chassis-no" className="text-xs font-medium text-muted-foreground">Chassis Number *</label>
             <Input id="sales-order-chassis-no" className="h-8 text-sm font-mono" placeholder="e.g. PM00A1234" value={chassisNo} onChange={e => setChassisNo(e.target.value)} />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLinkOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateBg} disabled={creating}>{creating ? 'Creating…' : 'Create BG Entry'}</Button>
+            <Button onClick={handleCreateBg} disabled={creating}>{creating ? 'Creating…' : 'Create Inventory Entry'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

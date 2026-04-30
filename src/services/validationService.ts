@@ -41,10 +41,23 @@ const DATE_FIELD_NAMES = [
 ];
 
 const REQUIRED_FIELDS = [
-  'chassis_no', 'branch_code', 'model', 'customer_name', 'salesman_name', 'payment_method',
+  'chassis_no', 'branch_code', 'model', 'payment_method',
 ];
 
-const VALID_PAYMENT_METHODS = ['cash', 'loan', 'hire purchase', 'hp', 'bank loan', 'leasing'];
+const COMPLETENESS_WARNING_FIELDS = ['customer_name', 'salesman_name'];
+
+const VALID_PAYMENT_METHOD_PATTERNS = [
+  /cash/i,
+  /loan/i,
+  /hire purchase/i,
+  /\bhp\b/i,
+  /bank loan/i,
+  /leasing/i,
+  /\bpas\b/i,
+  /\btt\b/i,
+  /\bcn\b/i,
+  /floor stock/i,
+];
 
 function buildKnownBranchSet(
   branches: BranchRow[] | null | undefined,
@@ -85,6 +98,19 @@ export function validateVehicleRowSync(
     const value = row[field];
     if (!value || (typeof value === 'string' && value.trim() === '')) {
       errors.push({ field, message: `Row ${rowNumber}: ${field} is required`, code: 'REQUIRED_FIELD_MISSING', severity: 'error', rowNumber });
+    }
+  });
+
+  COMPLETENESS_WARNING_FIELDS.forEach(field => {
+    const value = row[field];
+    if (!value || (typeof value === 'string' && value.trim() === '')) {
+      warnings.push({
+        field,
+        message: `Row ${rowNumber}: ${field} is missing and will be published as pending`,
+        code: 'OPTIONAL_FIELD_MISSING',
+        severity: 'warning',
+        rowNumber,
+      });
     }
   });
 
@@ -136,7 +162,7 @@ export function validateVehicleRowSync(
   // Payment method
   if (row.payment_method) {
     const paymentMethod = String(row.payment_method).trim().toLowerCase();
-    if (!VALID_PAYMENT_METHODS.some(vm => paymentMethod.includes(vm))) {
+    if (!VALID_PAYMENT_METHOD_PATTERNS.some(pattern => pattern.test(paymentMethod))) {
       warnings.push({ field: 'payment_method', message: `Row ${rowNumber}: Unusual payment method '${row.payment_method}'`, code: 'UNUSUAL_PAYMENT_METHOD', severity: 'warning', rowNumber });
     }
   }

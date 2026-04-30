@@ -5,6 +5,51 @@ import type { VehicleRaw, DataQualityIssue } from "@/types";
 
 describe("import-parser", () => {
   describe("parseWorkbook", () => {
+    const replacementHeaders = [
+      "NO",
+      "BRCH K1",
+      "VAA\nDATE",
+      "MODEL",
+      "VAR",
+      "COLOR",
+      "CHASSIS NO.",
+      "DTP\n(Dealer Transfer Price)",
+      "PAYMENT\nMETHOD",
+      "BG\nDATE",
+      "FULL PAYMENT TYPE",
+      "FULL PAYMENT DATE",
+      "SHIPMENT\nNAME",
+      "SHIPMENT\nETD PKG",
+      "DATE SHIPMENT\nETA KK/TWU/SDK",
+      "RECEIVED BY OUTLET",
+      "AGING",
+      "Aging PYT as at Today",
+      "SA\nNAME",
+      "CUST\nNAME",
+      "PENDING LOAN",
+      "LOU",
+      "CONTRA\nSOLA",
+      "REG\nNO",
+      "REG\nDATE",
+      "INV No.",
+      "OBR",
+      "DELIVERY\nDATE",
+      "INVOICE DATE",
+      "DISB.\nDATE",
+      "AGING REG-DELIVER",
+      "AGING DELIVER-DISB",
+      "REMARK",
+      "COMM PAYOUT",
+    ];
+
+    const replacementOwnerRow = replacementHeaders.map(() => "");
+    replacementOwnerRow[1] = "(STOCK IN MS LEONG)";
+    replacementOwnerRow[8] = "(DEPOSIT PAYMENT) SHENNY";
+    replacementOwnerRow[10] = "(FULL PAYMENT) SHENNY";
+    replacementOwnerRow[12] = "(OUTLET ADMIN) ANN";
+    replacementOwnerRow[18] = "(SALES MANAGER) UMAR & ROSALIE";
+    replacementOwnerRow[23] = "(OUTLET ADMIN) VEE";
+
     const createMockWorkbook = async (data: Record<string, unknown>[]): Promise<ArrayBuffer> => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Combine Data");
@@ -13,6 +58,159 @@ describe("import-parser", () => {
         worksheet.addRow(headers);
         data.forEach(row => worksheet.addRow(headers.map(header => row[header] ?? "")));
       }
+      return workbook.xlsx.writeBuffer();
+    };
+
+    const addReplacementSheet = (
+      workbook: ExcelJS.Workbook,
+      name: string,
+      rows: Array<Record<string, unknown>>,
+      sectionLabel?: string,
+    ) => {
+      const worksheet = workbook.addWorksheet(name);
+      worksheet.addRow(replacementOwnerRow);
+      worksheet.addRow(replacementHeaders);
+      if (sectionLabel) {
+        worksheet.addRow([sectionLabel]);
+      }
+
+      rows.forEach((row, index) => {
+        worksheet.addRow([
+          row["NO"] ?? index + 1,
+          row["BRCH K1"] ?? "",
+          row["VAA DATE"] ?? "",
+          row["MODEL"] ?? "",
+          row["VAR"] ?? "",
+          row["COLOR"] ?? "",
+          row["CHASSIS NO."] ?? "",
+          row["DTP"] ?? "",
+          row["PAYMENT METHOD"] ?? "",
+          row["BG DATE"] ?? "",
+          row["FULL PAYMENT TYPE"] ?? "",
+          row["FULL PAYMENT DATE"] ?? "",
+          row["SHIPMENT NAME"] ?? "",
+          row["SHIPMENT ETD PKG"] ?? "",
+          row["DATE SHIPMENT ETA KK/TWU/SDK"] ?? "",
+          row["RECEIVED BY OUTLET"] ?? "",
+          row["AGING"] ?? "",
+          row["Aging PYT as at Today"] ?? "",
+          row["SA NAME"] ?? "",
+          row["CUST NAME"] ?? "",
+          row["PENDING LOAN"] ?? "",
+          row["LOU"] ?? "",
+          row["CONTRA SOLA"] ?? "",
+          row["REG NO"] ?? "",
+          row["REG DATE"] ?? "",
+          row["INV NO"] ?? "",
+          row["OBR"] ?? "",
+          row["DELIVERY DATE"] ?? "",
+          row["INVOICE DATE"] ?? "",
+          row["DISB DATE"] ?? "",
+          row["AGING REG-DELIVER"] ?? "",
+          row["AGING DELIVER-DISB"] ?? "",
+          row["REMARK"] ?? "",
+          row["COMM PAYOUT"] ?? "",
+        ]);
+      });
+    };
+
+    const createReplacementWorkbook = async (): Promise<ArrayBuffer> => {
+      const workbook = new ExcelJS.Workbook();
+
+      addReplacementSheet(
+        workbook,
+        "Pending Deliver & Loan Disburse",
+        [
+          {
+            "BRCH K1": "FLAGSHIP",
+            "VAA DATE": "2026-01-20",
+            "MODEL": "SAGA",
+            "VAR": "SAGA 1.5 EXECUTIVE",
+            "COLOR": "METALLIC SPACE GREY",
+            "CHASSIS NO.": "PD-001",
+            "DTP": 45308,
+            "PAYMENT METHOD": "FLOOR STOCK",
+            "BG DATE": "2026-01-21",
+            "FULL PAYMENT TYPE": "FULL PAYMENT MBB FS",
+            "FULL PAYMENT DATE": "2026-01-21",
+            "SHIPMENT NAME": "MTT BINTANGOR 26BG036E",
+            "SHIPMENT ETD PKG": "2026-01-30",
+            "DATE SHIPMENT ETA KK/TWU/SDK": "2026-02-04",
+            "RECEIVED BY OUTLET": "2026-03-03",
+            "SA NAME": "LISA LAU (TR)",
+            "CUST NAME": "JESSON JEFFRY",
+            "LOU": "PBB",
+            "REG NO": "SJQ5447",
+            "REG DATE": "2026-02-28",
+            "INV NO": "INV/KK4S/26/02/082",
+            "OBR": "YES",
+            "DELIVERY DATE": "2026-03-31",
+            "REMARK": "Customer follow-up",
+            "COMM PAYOUT": "YES",
+          },
+        ],
+      );
+
+      addReplacementSheet(
+        workbook,
+        "Pending Register & Free Stock",
+        [
+          {
+            "BRCH K1": "FLAGSHIP",
+            "VAA DATE": "2025-07-08",
+            "MODEL": "PERSONA",
+            "VAR": "PERSONA 1.6 CVT EXECUTIVE",
+            "CHASSIS NO.": "PR-001",
+            "DTP": 53168,
+            "PAYMENT METHOD": "PAS (BG)",
+            "BG DATE": "2025-11-28",
+            "FULL PAYMENT TYPE": "FULL PAYMENT TT",
+            "FULL PAYMENT DATE": "2025-11-30",
+            "SHIPMENT NAME": "FURI DANUM 172 72107W",
+            "SHIPMENT ETD PKG": "2025-12-03",
+            "DATE SHIPMENT ETA KK/TWU/SDK": "2025-12-10",
+            "RECEIVED BY OUTLET": "2025-12-20",
+            "SA NAME": "FRANKY (TR)",
+            "CUST NAME": "EZRA EILAN LABO",
+            "REMARK": "D2D FROM LDU 3S",
+            "COMM PAYOUT": "Comm not paid",
+          },
+        ],
+        "PENDING REGISTER & FREE STOCK",
+      );
+
+      addReplacementSheet(
+        workbook,
+        "Test Drive Unit",
+        [
+          {
+            "BRCH K1": "FLAGSHIP",
+            "VAA DATE": "2026-01-13",
+            "MODEL": "X70",
+            "VAR": "X70 1.5 TGDi PREMIUM MC3",
+            "CHASSIS NO.": "TD-001",
+            "DTP": 116440.4,
+            "PAYMENT METHOD": "TT",
+            "BG DATE": "2026-01-14",
+            "FULL PAYMENT TYPE": "FULL PAYMENT TT",
+            "FULL PAYMENT DATE": "2026-01-14",
+            "SHIPMENT NAME": "GIGA GRAND VISON V.267",
+            "SHIPMENT ETD PKG": "2026-01-19",
+            "DATE SHIPMENT ETA KK/TWU/SDK": "2026-01-25",
+            "RECEIVED BY OUTLET": "2026-01-31",
+            "SA NAME": "OFFICE",
+            "CUST NAME": "TEST DRIVE X70 MC3",
+            "REMARK": "PRE REG",
+            "COMM PAYOUT": "Paid 15/04",
+          },
+        ],
+        "FOOK LOI TEST DRIVE UNIT AND PRE-REGISTER UNIT",
+      );
+
+      const misc = workbook.addWorksheet("MISC");
+      misc.addRow(["", "BRANCH", "", "BANK", "", "", "MODEL", "VARIANTS"]);
+      misc.addRow([1, "FLAGSHIP", 1, "AFFIN", "AFFIN BANK", 1, "SAGA", "SAGA 1.5 STANDARD"]);
+
       return workbook.xlsx.writeBuffer();
     };
 
@@ -242,6 +440,26 @@ describe("import-parser", () => {
       expect(a?.commission_remark).toBe("Comm not paid");
       expect(b?.commission_paid).toBe(true);
       expect(b?.commission_remark).toBe("Paid 15/04");
+    });
+
+    it("parses the replacement workbook across multiple data sheets", async () => {
+      const result = await parseWorkbook(await createReplacementWorkbook());
+
+      expect(result.rows).toHaveLength(3);
+      expect(result.missingColumns).toEqual([]);
+      expect(result.issues.some(issue => issue.issueType === "missing")).toBe(false);
+
+      const pendingDeliver = result.rows.find(row => row.chassis_no === "PD-001");
+      const pendingRegister = result.rows.find(row => row.chassis_no === "PR-001");
+      const testDrive = result.rows.find(row => row.chassis_no === "TD-001");
+
+      expect(pendingDeliver?.branch_code).toBe("FLAGSHIP");
+      expect(pendingDeliver?.shipment_eta_kk_twu_sdk).toBe("2026-02-04");
+      expect(pendingDeliver?.date_received_by_outlet).toBe("2026-03-03");
+      expect(pendingRegister?.is_d2d).toBe(true);
+      expect(pendingRegister?.commission_paid).toBe(false);
+      expect(testDrive?.commission_paid).toBe(true);
+      expect(testDrive?.commission_remark).toBe("Paid 15/04");
     });
   });
 

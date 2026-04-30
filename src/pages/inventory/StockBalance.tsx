@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useData } from '@/contexts/DataContext';
 import { Search, Package, Loader2 } from 'lucide-react';
+import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 const STATUS_BADGE: Record<string, string> = {
   in_stock:    'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
@@ -105,13 +106,13 @@ export default function StockBalance() {
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="pb-2 pr-4 font-medium">Status</th>
-                <th className="pb-2 pr-4 font-medium">Chassis No</th>
-                <th className="pb-2 pr-4 font-medium">Model</th>
+                <th className="pb-2 pr-4 font-medium">{getAutoAgingFieldLabel('chassis_no', 'CHASSIS NO.')}</th>
+                <th className="pb-2 pr-4 font-medium">{getAutoAgingFieldLabel('model', 'MODEL')}</th>
                 <th className="pb-2 pr-4 font-medium">Colour/Variant</th>
                 <th className="pb-2 pr-4 font-medium">Plate No</th>
-                <th className="pb-2 pr-4 font-medium">Branch</th>
-                <th className="pb-2 pr-4 font-medium">BG Date</th>
-                <th className="pb-2 font-medium">Salesman</th>
+                <th className="pb-2 pr-4 font-medium">{getAutoAgingFieldLabel('branch_code', 'BRCH K1')}</th>
+                <th className="pb-2 pr-4 font-medium">{getAutoAgingFieldLabel('bg_date', 'BG DATE')}</th>
+                <th className="pb-2 font-medium">{getAutoAgingFieldLabel('salesman_name', 'SA NAME')}</th>
               </tr>
             </thead>
             <tbody>
