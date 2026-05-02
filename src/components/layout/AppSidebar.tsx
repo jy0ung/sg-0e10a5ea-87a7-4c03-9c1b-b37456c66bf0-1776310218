@@ -8,6 +8,7 @@ import {
   ShoppingCart, Users, KanbanSquare, Receipt, Target, TrendingUp,
   Package, ArrowLeftRight, Truck, UserCheck, GitBranch, Database,
   TrendingDown, Landmark, Search, HeadphonesIcon, Briefcase,
+  Calendar, Clock, CreditCard, Star, Megaphone, Settings2, GitMerge,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';

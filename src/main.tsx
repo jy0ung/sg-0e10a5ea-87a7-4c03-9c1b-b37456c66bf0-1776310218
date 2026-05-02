@@ -100,6 +100,15 @@ const VerifyOR = lazy(() => import("./pages/sales/VerifyOR"));
 const ReportsCenter = lazy(() => import("./pages/reports/ReportsCenter"));
 const ChassisFilter = lazy(() => import("./pages/inventory/ChassisFilter"));
 const RolePermissionsPage = lazy(() => import('./pages/admin/RolePermissions'));
+const EmployeeDirectory = lazy(() => import('./pages/hrms/EmployeeDirectory'));
+const LeaveManagement = lazy(() => import('./pages/hrms/LeaveManagement'));
+const LeaveCalendar = lazy(() => import('./pages/hrms/LeaveCalendar'));
+const AttendanceLog = lazy(() => import('./pages/hrms/AttendanceLog'));
+const PayrollSummary = lazy(() => import('./pages/hrms/PayrollSummary'));
+const PerformanceAppraisals = lazy(() => import('./pages/hrms/PerformanceAppraisals'));
+const HrmsAnnouncements = lazy(() => import('./pages/hrms/Announcements'));
+const HrmsAdmin = lazy(() => import('./pages/hrms/HrmsAdmin'));
+const ApprovalFlows = lazy(() => import('./pages/hrms/ApprovalFlows'));
 
 // Shorthand Suspense wrapper used on every route element
 function S({ children }: { children: React.ReactNode }) {
