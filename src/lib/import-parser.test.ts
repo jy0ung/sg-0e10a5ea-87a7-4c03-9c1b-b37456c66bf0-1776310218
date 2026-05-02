@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { parseWorkbook, publishCanonical } from "./import-parser";
-import type { VehicleRaw, DataQualityIssue } from "@/types";
+import type { VehicleRaw } from "@/types";
 
 describe("import-parser", () => {
   describe("parseWorkbook", () => {
@@ -511,7 +511,7 @@ describe("import-parser", () => {
     ];
 
     it("creates canonical vehicles correctly", () => {
-      const { canonical, issues } = publishCanonical(mockRawRows);
+      const { canonical } = publishCanonical(mockRawRows);
       
       expect(canonical).toHaveLength(2);
       expect(canonical[0].chassis_no).toBe("CH001");

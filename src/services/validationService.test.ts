@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validateVehicleRow, validateImportBatch, validateSlaPolicy, validateQualityIssue, validateVehicleImportBatch } from './validationService';
-import { supabase } from '@/integrations/supabase/client';
 
 // Type-safe chainable mock for Supabase
 const createMockQueryBuilder = (resolvedValue: { data: unknown; error: unknown } = { data: null, error: null }) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const builder: Record<string, any> = {};
   builder.select = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
@@ -13,7 +11,6 @@ const createMockQueryBuilder = (resolvedValue: { data: unknown; error: unknown }
   builder.maybeSingle = vi.fn().mockResolvedValue(resolvedValue);
   builder.single = vi.fn().mockResolvedValue(resolvedValue);
   builder.order = vi.fn(() => Promise.resolve(resolvedValue));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   builder.then = (resolve: any) => Promise.resolve(resolvedValue).then(resolve);
   return builder;
 };

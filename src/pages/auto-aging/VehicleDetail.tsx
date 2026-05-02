@@ -4,12 +4,11 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Pencil } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Pencil, TrendingUp } from 'lucide-react';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { VehicleEditDialog } from '@/components/vehicles/VehicleEditDialog';
 import { forecastVehicleMilestones, getVehicleRisk } from '@/utils/forecasting';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp } from 'lucide-react';
 import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 export default function VehicleDetail() {

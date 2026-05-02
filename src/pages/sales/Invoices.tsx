@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
 import { createInvoice, recordPayment } from '@/services/invoiceService';
-import { Invoice, InvoicePaymentStatus, InvoiceType } from '@/types';
+import { Invoice, InvoicePaymentStatus } from '@/types';
 import { Plus, CreditCard } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 
@@ -19,12 +18,6 @@ const STATUS_BADGE: Record<InvoicePaymentStatus, string> = {
   unpaid: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
   partial: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
   paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
-};
-
-const TYPE_LABELS: Record<InvoiceType, string> = {
-  customer_sales: 'Customer Sales',
-  dealer_sales: 'Dealer Sales',
-  purchase: 'Purchase',
 };
 
 function InvoiceTable({ invoices, onPay }: { invoices: Invoice[]; onPay: (inv: Invoice) => void }) {
@@ -65,7 +58,7 @@ function InvoiceTable({ invoices, onPay }: { invoices: Invoice[]; onPay: (inv: I
 }
 
 export default function Invoices() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const companyId = useCompanyId();
   const { invoices, customers, salesOrders, reloadSales, loading } = useSales();
   const { toast } = useToast();

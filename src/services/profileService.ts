@@ -156,3 +156,14 @@ export async function changePassword(
   if (updateError) return { error: updateError.message, code: 'update_failed' };
   return { error: null };
 }
+
+/** Update the authenticated user's own profile name (used during invite sign-up). */
+export async function updateOwnProfileName(userId: string, name: string): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ name, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select('id')
+    .single();
+  return { error: error?.message ?? null };
+}

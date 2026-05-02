@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { listEmployeeDirectory, listLeaveRequests } from '@/services/hrmsService';
+import { listLeaveRequests } from '@/services/hrmsService';
 import type { LeaveRequest, Employee } from '@/types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 

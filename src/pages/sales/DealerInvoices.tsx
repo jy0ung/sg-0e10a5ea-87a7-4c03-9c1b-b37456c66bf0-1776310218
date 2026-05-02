@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { getDealerInvoices, upsertDealerInvoice, deleteDealerInvoice } from '@/services/masterDataService';
 import { DealerInvoice } from '@/types';
-import { Plus, Pencil, Trash2, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { dealerInvoiceSchema } from '@/lib/validations';
 import { PageErrorState } from '@/components/shared/PageState';
@@ -28,7 +28,7 @@ const STATUS_COLORS: Record<string, 'default' | 'secondary' | 'destructive' | 'o
 };
 
 export default function DealerInvoices() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const companyId = useCompanyId();
   const { toast } = useToast();
   const queryClient = useQueryClient();

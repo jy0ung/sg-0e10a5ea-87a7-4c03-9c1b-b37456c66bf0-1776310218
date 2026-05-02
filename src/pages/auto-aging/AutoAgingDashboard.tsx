@@ -77,9 +77,9 @@ export default function AutoAgingDashboard() {
     staleTime: 15_000,
   });
 
-  const contextVehicles = contextVehiclesRaw ?? [];
-  const slas = slasRaw ?? [];
-  const filtered = vehicleRowsQuery.data?.rows ?? [];
+  const contextVehicles = useMemo(() => contextVehiclesRaw ?? [], [contextVehiclesRaw]);
+  const slas = useMemo(() => slasRaw ?? [], [slasRaw]);
+  const filtered = useMemo(() => vehicleRowsQuery.data?.rows ?? [], [vehicleRowsQuery.data?.rows]);
   const filteredVehicleCount = vehicleRowsQuery.data?.totalCount ?? 0;
   const fallbackBranches = useMemo(
     () => Array.from(new Set(contextVehicles.map(vehicle => vehicle.branch_code).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
@@ -141,17 +141,6 @@ export default function AutoAgingDashboard() {
     setDetailKpiId(kpiId);
     setVehicleDetailsOpen(true);
   };
-
-  const processStages = [
-    { label: getAutoAgingFieldLabel('bg_date', 'BG DATE'), short: 'BG' },
-    { label: getAutoAgingFieldLabel('shipment_etd_pkg', 'SHIPMENT ETD PKG'), short: 'ETD' },
-    { label: getAutoAgingFieldLabel('date_received_by_outlet', 'RECEIVED BY OUTLET'), short: 'OUT' },
-    { label: getAutoAgingFieldLabel('reg_date', 'REG DATE'), short: 'REG' },
-    { label: getAutoAgingFieldLabel('delivery_date', 'DELIVERY DATE'), short: 'DEL' },
-    { label: getAutoAgingFieldLabel('disb_date', 'DISB. DATE'), short: 'DISB' },
-  ];
-
-  const segmentKpiIds = ['bg_to_shipment_etd', 'etd_to_outlet', 'outlet_to_reg', 'reg_to_delivery', 'delivery_to_disb'];
 
   const branchHeatmap = useMemo(() => {
     const groups = new Map<string, { bgToDelivery: number[]; etdToOutlet: number[]; regToDelivery: number[] }>();

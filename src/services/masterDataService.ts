@@ -148,7 +148,6 @@ export async function deleteVehicleColour(companyId: string, id: string): Promis
 }
 
 // ===== Generic helpers =====
-type SimpleStatus = { id: string; status: string; [k: string]: unknown };
 
 function mkSimple<T>(tbl: string, map: (r: Record<string,unknown>) => T) {
   return {

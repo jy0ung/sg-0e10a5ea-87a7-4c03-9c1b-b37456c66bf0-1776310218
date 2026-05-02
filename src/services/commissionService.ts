@@ -209,7 +209,7 @@ export async function computeAndSaveCommissions(
 
   if (records.length === 0) return { created: 0, error: null };
 
-  const { error } = await supabase
+  const { error: _error } = await supabase
     .from('commission_records')
     .upsert(records as Parameters<typeof supabase.from>[0] extends string ? never : never, {
       onConflict: 'vehicle_id,rule_id',

@@ -30,7 +30,7 @@ const ACTION_COLOR: Record<string, string> = {
 };
 
 export default function ChassisMovement() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const companyId = useCompanyId();
 
   const [query, setQuery] = useState('');
@@ -165,7 +165,7 @@ export default function ChassisMovement() {
             {/* Vertical line */}
             <div className="absolute left-2 top-2 bottom-2 w-px bg-border" />
 
-            {events.map((ev, idx) => {
+            {events.map((ev, _idx) => {
               const Icon = ACTION_ICON[ev.action] ?? ArrowRight;
               const color = ACTION_COLOR[ev.action] ?? 'text-muted-foreground';
               return (

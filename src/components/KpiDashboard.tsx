@@ -3,8 +3,7 @@ import { KpiSummary, VehicleCanonical, KpiDashboardFilters } from '@/types';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend, ComposedChart, Line, LabelList } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, AlertCircle, CheckCircle2, Filter, Calendar, ChevronDown, X } from 'lucide-react';
-import { computeKpiSummaries } from '@/utils/kpi-computation';
+import { TrendingUp, AlertCircle, CheckCircle2, Filter, Calendar, ChevronDown } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -97,19 +96,6 @@ function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFil
     });
   }, [selectedSegment, filteredVehicles, kpiSummaries]);
 
-  // Compute filtered KPI summaries
-  const filteredKpiSummaries = useMemo(() => {
-    const hasActiveFilters = filters.branches.length > 0 || filters.models.length > 0 ||
-      filters.paymentMethods.length > 0 || filters.dateRange.from || filters.dateRange.to;
-    if (!hasActiveFilters) return kpiSummaries;
-
-    // Reconstruct SLA policies from existing summaries and recompute against filtered vehicles
-    const slas = kpiSummaries.map(k => ({
-      id: k.kpiId, kpiId: k.kpiId, label: k.label, slaDays: k.slaDays, companyId: '',
-    }));
-    return computeKpiSummaries(filteredVehicles, slas);
-  }, [kpiSummaries, filteredVehicles, filters]);
-
   const toggleFilter = (type: keyof KpiDashboardFilters, value: string) => {
     setFilters(prev => {
       const currentArray = prev[type] as string[];
@@ -133,16 +119,6 @@ function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFil
   const activeFilterCount = filters.branches.length + filters.models.length + filters.paymentMethods.length + 
     (filters.dateRange.from || filters.dateRange.to ? 1 : 0) + 
     (filters.overdueOnly ? 1 : 0);
-
-  const chartColors = [
-    'hsl(var(--primary))',
-    'hsl(199, 89%, 48%)',
-    'hsl(142, 71%, 45%)',
-    'hsl(38, 92%, 50%)',
-    'hsl(280, 65%, 60%)',
-    'hsl(350, 80%, 55%)',
-    'hsl(175, 70%, 40%)',
-  ];
 
   const getComplianceColor = (compliance: number) => {
     if (compliance >= 90) return 'text-success';
@@ -346,7 +322,7 @@ function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFil
 
       {/* Overall Compliance Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {sortedKpis.slice(0, 3).map((kpi, idx) => {
+        {sortedKpis.slice(0, 3).map((kpi, _idx) => {
           const compliance = kpi.validCount > 0 ? Math.round(((kpi.validCount - kpi.overdueCount) / kpi.validCount) * 100) : 100;
           const isBreaching = kpi.median > kpi.slaDays;
           

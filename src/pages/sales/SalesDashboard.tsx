@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSales } from '@/contexts/SalesContext';
 import { useData } from '@/contexts/DataContext';

@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import { parseSupportedDateString } from "@/lib/dateParsing";
 import { parseImportNumericText } from '@/lib/importNumeric';
 import { loggingService } from "./loggingService";
 import { performanceService } from "./performanceService";

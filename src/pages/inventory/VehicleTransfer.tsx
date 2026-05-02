@@ -15,14 +15,11 @@ import {
   createVehicleTransfer,
   updateVehicleTransferStatus,
   type TransferStatus,
-  type VehicleTransferRecord,
 } from '@/services/inventoryService';
 import { vehicleTransferSchema } from '@/lib/validations';
 import { Search, Plus, ArrowRight } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-
-type Transfer = VehicleTransferRecord;
 
 const STATUS_BADGE: Record<TransferStatus, string> = {
   pending:    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',

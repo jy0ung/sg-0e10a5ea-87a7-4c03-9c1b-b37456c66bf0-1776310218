@@ -11,7 +11,7 @@ import { useSales } from '@/contexts/SalesContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { createSalesOrder, createVehicleFromSalesOrder } from '@/services/salesOrderService';
 import { SalesOrder, SalesOrderStatus } from '@/types';
-import { Plus, Search, Link2, ChevronRight } from 'lucide-react';
+import { Plus, Search, Link2 } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { salesOrderSchema } from '@/lib/validations';
 

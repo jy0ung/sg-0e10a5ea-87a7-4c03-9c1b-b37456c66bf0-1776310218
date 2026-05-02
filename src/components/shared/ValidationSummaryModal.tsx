@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertTriangle, AlertCircle, Download, Search, SortAsc, X, Filter, ArrowUpDown } from 'lucide-react';
+import { AlertTriangle, AlertCircle, Download, X, Filter, ArrowUpDown } from 'lucide-react';
 import type { ValidationError } from '@/types';
 
 interface ValidationSummaryModalProps {

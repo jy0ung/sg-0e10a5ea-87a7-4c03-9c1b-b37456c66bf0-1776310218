@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
@@ -283,7 +284,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // Branch-scoped users only see their branch's vehicles.
   const branchId = user?.access_scope === 'branch' ? (user.branch_id ?? null) : null;
   const routeLoadMode = getDataLoadMode(location.pathname);
-  const activeDataQueryKey = [...dataQueryKey(companyId, branchId), routeLoadMode] as const;
+  const activeDataQueryKey = useMemo(
+    () => [...dataQueryKey(companyId, branchId), routeLoadMode] as const,
+    [companyId, branchId, routeLoadMode],
+  );
 
   // React Query is the single source of truth — no local useState mirrors.
   const { data, isLoading, dataUpdatedAt } = useQuery({
@@ -311,12 +315,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     staleTime: 60_000,
   });
 
-  // Derive all context values directly from query data.
-  const vehicles = data?.vehicles ?? [];
-  const importBatches = data?.batches ?? [];
-  const qualityIssues = data?.issues ?? [];
-  const slas = data?.slas ?? [];
-  const loadErrors = data?.errors ?? [];
+  // Derive all context values directly from query data (wrapped in useMemo to
+  // avoid new array references on every render when the underlying data is stable).
+  const vehicles = useMemo(() => data?.vehicles ?? [], [data]);
+  const importBatches = useMemo(() => data?.batches ?? [], [data]);
+  const qualityIssues = useMemo(() => data?.issues ?? [], [data]);
+  const slas = useMemo(() => data?.slas ?? [], [data]);
+  const loadErrors = useMemo(() => data?.errors ?? [], [data]);
   const kpiSummaries = useMemo(() => computeKpiSummaries(vehicles, slas), [vehicles, slas]);
   const lastRefresh = dataUpdatedAt ? new Date(dataUpdatedAt).toISOString() : new Date().toISOString();
 
@@ -446,7 +451,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       loggingService.error('Unexpected error adding import batch', { error: err }, 'DataContext');
     }
-  }, [companyId, queryClient, branchId, activeDataQueryKey]);
+  }, [companyId, queryClient, activeDataQueryKey]);
 
   const updateImportBatch = useCallback(async (id: string, updates: Partial<ImportBatch>) => {
     try {
@@ -475,7 +480,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       loggingService.error('Unexpected error updating import batch', { error: err }, 'DataContext');
     }
-  }, [queryClient, companyId, branchId, activeDataQueryKey]);
+  }, [queryClient, companyId, activeDataQueryKey]);
 
   const addQualityIssues = useCallback(async (issues: DataQualityIssue[]) => {
     if (issues.length === 0) return;
@@ -507,7 +512,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       loggingService.error('Unexpected error adding quality issues', { error: err }, 'DataContext');
     }
-  }, [companyId, queryClient, branchId, activeDataQueryKey]);
+  }, [companyId, queryClient, activeDataQueryKey]);
 
   const updateSla = useCallback(async (id: string, slaDays: number) => {
     try {
@@ -525,7 +530,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       loggingService.error('Unexpected error updating SLA', { error: err }, 'DataContext');
     }
-  }, [queryClient, companyId, branchId, activeDataQueryKey]);
+  }, [queryClient, companyId, activeDataQueryKey]);
 
   const refreshKpis = useCallback(() => {
     // KPIs are auto-derived via useMemo; this function triggers a cache touch

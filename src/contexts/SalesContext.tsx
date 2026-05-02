@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useCallback, useEffect, useMemo, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Customer, DealStage, SalesOrder, Invoice, SalesmanTarget } from '@/types';

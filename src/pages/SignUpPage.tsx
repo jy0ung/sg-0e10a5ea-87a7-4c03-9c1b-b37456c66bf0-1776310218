@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { updateOwnProfileName } from '@/services/profileService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -152,12 +153,7 @@ export default function SignUpPage() {
       return;
     }
 
-    const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ name: data.name, updated_at: new Date().toISOString() })
-        .eq('id', user.id)
-        .select('id')
-        .single();
+    const { error: profileError } = await updateOwnProfileName(user.id, data.name);
 
     if (profileError) {
       setError(`Your password was saved, but we could not update your profile name: ${profileError.message}`);

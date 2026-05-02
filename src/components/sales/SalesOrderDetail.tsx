@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,7 +9,7 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
 import { createVehicleFromSalesOrder } from '@/services/salesOrderService';
 import { SalesOrder, Invoice } from '@/types';
-import { Link2, CheckCircle, Receipt, History } from 'lucide-react';
+import { Link2, CheckCircle } from 'lucide-react';
 import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 interface SalesOrderDetailProps {
@@ -35,7 +34,7 @@ const PAY_COLORS: Record<string, string> = {
   cancelled: 'bg-secondary text-secondary-foreground',
 };
 
-export function SalesOrderDetail({ order, invoices, onClose }: SalesOrderDetailProps) {
+export function SalesOrderDetail({ order, invoices, onClose: _onClose }: SalesOrderDetailProps) {
   const { user } = useAuth();
   const companyId = useCompanyId();
   const { reloadSales } = useSales();

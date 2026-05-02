@@ -17,7 +17,7 @@ type Vehicle = ChassisFilterRow;
 const CHIP_CLASS = 'inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs px-2 py-0.5 font-medium';
 
 export default function ChassisFilter() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const companyId = useCompanyId();
 
   const [filters, setFilters] = useState({

@@ -9,9 +9,8 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { useCompanyId } from '@/hooks/useCompanyId';
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCircle, Info, PlusCircle } from 'lucide-react';
-import { parseWorkbook, publishCanonical } from '@/lib/import-parser';
+import { parseWorkbook, publishCanonical, normalizeVehicleRawCell, normalizeVehicleRawRow } from '@/lib/import-parser';
 import { splitImportRowsForPublish } from '@/lib/import-review';
 import { loadBranchMappingLookup, loadPaymentMappingLookup, createBranchMapping } from '@/services/mappingService';
 import { validateVehicleImportBatch } from '@/services/validationService';
@@ -19,7 +18,6 @@ import { createImportBatch, insertImportReviewRows, validateAndInsertVehicles } 
 import { resolveNamesToIds } from '@/services/hrmsService';
 import type { DataQualityIssue, ImportBatchInsert, ImportStatus, VehicleRaw, ValidationError } from '@/types';
 import { loggingService } from '@/services/loggingService';
-import { normalizeVehicleRawCell, normalizeVehicleRawRow } from '@/lib/import-parser';
 
 type Step = 'upload' | 'validating' | 'review' | 'publishing' | 'done';
 
@@ -468,7 +466,7 @@ export default function ImportCenter() {
   const publishableIncompleteCount = publishableIncompleteRows.length;
   const queuedReviewCount = blockedRowNums.size + publishableIncompleteCount;
 
-  const hasHardErrors = hardBlockers.length > 0 || blockingValidationIssues.length > 0 || missingCols.length > 0;
+  const _hasHardErrors = hardBlockers.length > 0 || blockingValidationIssues.length > 0 || missingCols.length > 0;
   const hasPendingReviewChanges = previewValidationRevision > 0;
   const isPreviewValidating = previewValidationState === 'validating';
 
@@ -823,7 +821,7 @@ export default function ImportCenter() {
     updateImportBatch(batchId, { status: 'publish_in_progress' });
 
     try {
-      let insertedVehicleCount = 0;
+      let _insertedVehicleCount = 0;
 
       if (cleanRows.length > 0) {
         const result = await validateAndInsertVehicles(
@@ -837,7 +835,7 @@ export default function ImportCenter() {
           throw new Error(`Validation or insert failed: ${result.error.message}`);
         }
 
-        insertedVehicleCount = result.inserted;
+        _insertedVehicleCount = result.inserted;
       }
 
       const reviewInsertResult = await insertImportReviewRows(reviewRows);

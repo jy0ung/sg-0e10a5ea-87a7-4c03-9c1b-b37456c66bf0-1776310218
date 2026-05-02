@@ -10,12 +10,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
 import { computeSalesmanActuals, upsertSalesmanTarget, deleteSalesmanTarget } from '@/services/salesTargetService';
-import { SalesmanPerformance, SalesmanTarget } from '@/types';
-import { Target, Plus, Pencil, Trash2 } from 'lucide-react';
+import { SalesmanTarget } from '@/types';
+import { Target, Plus, Trash2 } from 'lucide-react';
 import { PageErrorState } from '@/components/shared/PageState';
 
 export default function SalesmanPerformancePage() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const companyId = useCompanyId();
   const { salesmanTargets } = useSales();
   const { toast } = useToast();
@@ -24,7 +24,7 @@ export default function SalesmanPerformancePage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [targetOpen, setTargetOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<SalesmanTarget | null>(null);
+  const [_editTarget, setEditTarget] = useState<SalesmanTarget | null>(null);
   const [form, setForm] = useState({ salesmanId: '', salesmanName: '', branchCode: '', targetUnits: '', targetRevenue: '' });
 
   const { data: performance = [], isFetching: loading, isError, error, refetch } = useQuery({

@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/contexts/SalesContext';
 import { Invoice } from '@/types';
@@ -26,7 +25,7 @@ const BUCKET_STYLE: Record<AgingBucket, string> = {
 };
 
 export default function OutstandingCollection() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const { invoices, loading } = useSales();
 
   const [bucketFilter, setBucketFilter] = useState<'all' | AgingBucket>('all');

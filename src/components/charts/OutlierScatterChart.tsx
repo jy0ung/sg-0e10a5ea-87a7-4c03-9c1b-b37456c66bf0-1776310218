@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ZAxis, Cell, ReferenceLine } from 'recharts';
 import { VehicleCanonical } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,11 +29,11 @@ export function OutlierScatterChart({ vehicles, onVehicleClick }: Props) {
     };
   }, [scatterData]);
 
-  const getStatus = (d: { bgToDelivery: number; etdToOutlet: number }) => {
+  const getStatus = useCallback((d: { bgToDelivery: number; etdToOutlet: number }) => {
     if (d.bgToDelivery > p90BgDel || d.etdToOutlet > p90EtdOut) return 'outlier';
     if (d.bgToDelivery > p90BgDel * 0.75 || d.etdToOutlet > p90EtdOut * 0.75) return 'at-risk';
     return 'normal';
-  };
+  }, [p90BgDel, p90EtdOut]);
 
   const getColor = (d: { bgToDelivery: number; etdToOutlet: number }) => {
     const status = getStatus(d);
@@ -51,7 +51,7 @@ export function OutlierScatterChart({ vehicles, onVehicleClick }: Props) {
       },
       { normal: 0, 'at-risk': 0, outlier: 0 },
     );
-  }, [scatterData, p90BgDel, p90EtdOut]);
+  }, [scatterData, getStatus]);
 
   return (
     <Card className="glass-panel">

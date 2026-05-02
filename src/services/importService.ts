@@ -205,7 +205,7 @@ export async function validateAndInsertVehicles(
   vehicles: Record<string, unknown>[],
   batchId: string,
   companyId: string,
-  userId: string
+  _userId: string
 ): Promise<{
   inserted: number;
   errors: ValidationError[];

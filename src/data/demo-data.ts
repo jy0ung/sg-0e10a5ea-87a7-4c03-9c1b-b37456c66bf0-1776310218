@@ -1,6 +1,5 @@
 import { VehicleCanonical, ImportBatch, DataQualityIssue, Notification, AuditLog, Branch, Company, User, SlaPolicy, PlatformModule } from '@/types';
 import { KPI_DEFINITIONS } from './kpi-definitions';
-import { computeKpiSummaries } from '@/utils/kpi-computation';
 
 export const demoVehicles: VehicleCanonical[] = [];
 

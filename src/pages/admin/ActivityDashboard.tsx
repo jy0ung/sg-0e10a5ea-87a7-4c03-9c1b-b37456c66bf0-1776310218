@@ -25,7 +25,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
-import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { Line, LineChart, Pie, PieChart, Cell, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 const COLORS = {
   create: '#22c55e',
@@ -42,7 +42,7 @@ export default function ActivityDashboard() {
   const [logs, setLogs] = useState<AuditLogWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('today');
-  const [actionFilter, setActionFilter] = useState<string>('all');
+  const [actionFilter] = useState<string>('all');
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -61,7 +61,7 @@ export default function ActivityDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [timeRange, actionFilter]);
+  }, [timeRange, actionFilter, toast]);
 
   useEffect(() => {
     loadLogs();

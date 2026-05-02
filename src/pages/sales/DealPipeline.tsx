@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { useSales } from '@/contexts/SalesContext';
-import { SalesOrder, DealStage } from '@/types';
+import { SalesOrder } from '@/types';
 import { GripVertical, Loader2 } from 'lucide-react';
 
 export default function DealPipeline() {

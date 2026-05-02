@@ -7,15 +7,12 @@ import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle, Us
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from 'sonner';
-import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE } from '@/types';
-import type { Employee } from '@/types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE, type Employee, type BranchRecord } from '@/types';
 import { getBranches } from '@/services/masterDataService';
-import type { BranchRecord } from '@/types';
 import { PermissionEditor } from '@/components/admin/PermissionEditor';
 import { userUpdateSchema, inviteUserSchema, type UserUpdateFormData, type InviteUserFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
@@ -41,7 +38,7 @@ const SCOPES: { value: AccessScope; label: string }[] = [
   { value: 'global', label: 'Global — all companies' },
 ];
 
-function scopeLabel(scope: string): string {
+function _scopeLabel(scope: string): string {
   return SCOPES.find(s => s.value === scope)?.label || scope;
 }
 

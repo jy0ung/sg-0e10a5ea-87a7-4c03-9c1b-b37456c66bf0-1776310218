@@ -56,7 +56,6 @@ function parseEnv(): AppEnv {
       'Invalid environment configuration.\n' +
       issues +
       '\n\nCopy .env.example to .env.local and fill in the required values.';
-    // eslint-disable-next-line no-console
     console.error(message);
     throw new Error(message);
   }
