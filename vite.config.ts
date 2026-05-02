@@ -14,6 +14,17 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    // In GitHub Codespaces, proxy Supabase traffic through the Vite dev server so
+    // only port 3000 needs to be publicly forwarded (port 54321 stays internal).
+    proxy: process.env.CODESPACES
+      ? {
+          '/__supabase': {
+            target: 'http://127.0.0.1:54321',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/__supabase/, ''),
+          },
+        }
+      : undefined,
   },
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   plugins: [

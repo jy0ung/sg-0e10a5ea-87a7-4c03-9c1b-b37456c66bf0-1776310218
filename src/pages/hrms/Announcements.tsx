@@ -84,7 +84,7 @@ export default function Announcements() {
   }
 
   async function handleDelete(id: string) {
-    const { error } = await deleteAnnouncement(id, user?.id);
+    const { error } = await deleteAnnouncement(id, user!.companyId, user?.id);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: 'Announcement deleted' });
     setDeleting(null);

@@ -56,8 +56,12 @@ export async function createAnnouncement(
   return { error: error?.message ?? null };
 }
 
-export async function deleteAnnouncement(id: string, actorId?: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('announcements').delete().eq('id', id);
+export async function deleteAnnouncement(id: string, companyId: string, actorId?: string): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('announcements')
+    .delete()
+    .eq('id', id)
+    .eq('company_id', companyId);
   if (!error && actorId) {
     void logUserAction(actorId, 'delete', 'announcement', id);
   }

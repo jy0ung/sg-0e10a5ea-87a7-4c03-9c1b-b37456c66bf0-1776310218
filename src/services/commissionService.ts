@@ -3,6 +3,24 @@ import type { CommissionRule, CommissionRecord } from '@/types';
 import { loggingService } from './loggingService';
 import { performanceService } from './performanceService';
 
+// commission_records is not yet in the generated Supabase schema types.
+// Keep the escape hatch isolated here so the rest of the file stays typed.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function commissionRecordsTable(): any {
+  return supabase.from('commission_records');
+}
+
+interface CommissionRecordInsert {
+  vehicle_id: string;
+  chassis_no: string;
+  salesman_name: string;
+  rule_id: string;
+  status: 'pending';
+  amount: number;
+  period: string;
+  company_id: string;
+}
+
 // ─── Commission Rules ─────────────────────────────────────────────────────────
 
 export async function getCommissionRules(companyId: string): Promise<{ data: CommissionRule[]; error: Error | null }> {
@@ -181,7 +199,7 @@ export async function computeAndSaveCommissions(
     return d.getFullYear() === year && d.getMonth() + 1 === month;
   });
 
-  const records: Array<Record<string, unknown>> = [];
+  const records: CommissionRecordInsert[] = [];
 
   for (const vehicle of periodVehicles) {
     for (const rule of rules) {
@@ -209,21 +227,15 @@ export async function computeAndSaveCommissions(
 
   if (records.length === 0) return { created: 0, error: null };
 
-  const { error: _error } = await supabase
-    .from('commission_records')
-    .upsert(records as Parameters<typeof supabase.from>[0] extends string ? never : never, {
+  const { error: upsertError } = await commissionRecordsTable()
+    .upsert(records, {
       onConflict: 'vehicle_id,rule_id',
       ignoreDuplicates: true,
     });
 
-  // upsert type workaround: insert without conflict handling
-  const { error: insertError } = await supabase
-    .from('commission_records')
-    .insert(records as Parameters<typeof supabase.from>[0] extends string ? never : never);
-
-  if (insertError && !insertError.message.includes('duplicate')) {
-    loggingService.error('Failed to save commission records', { error: insertError }, 'CommissionService');
-    return { created: 0, error: new Error(insertError.message) };
+  if (upsertError) {
+    loggingService.error('Failed to save commission records', { error: upsertError }, 'CommissionService');
+    return { created: 0, error: new Error(upsertError.message) };
   }
 
   return { created: records.length, error: null };

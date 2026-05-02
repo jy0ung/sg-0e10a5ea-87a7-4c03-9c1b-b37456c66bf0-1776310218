@@ -3,6 +3,7 @@ import { type RequestCategoryValue } from '@/lib/requestCategories';
 import { logUserAction } from './auditService';
 import { loggingService } from './loggingService';
 import { createNotifications, type CreateNotificationInput } from './notificationService';
+import { evaluateRoutingRules } from './requestRoutingService';
 
 /**
  * Ticket service — the only module allowed to talk to the `tickets` table.
@@ -28,6 +29,7 @@ export interface TicketRecord {
   priority: TicketPriority;
   status: TicketStatus;
   description: string;
+  vso_number: string | null;
   submitted_by: string;
   assigned_to: string | null;
   assigned_at: string | null;
@@ -53,6 +55,7 @@ export interface CreateTicketInput {
   subcategory?: string | null;
   priority: TicketPriority;
   description: string;
+  vso_number?: string | null;
 }
 
 export interface UpdateTicketInput {
@@ -340,6 +343,7 @@ export async function listTicketActivity(
     const { data, error } = await ticketActivityTable()
       .select('id, ticket_id, company_id, actor_id, event_type, message, metadata, created_at')
       .in('ticket_id', ticketIds)
+      .eq('company_id', companyId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -372,21 +376,47 @@ export async function listTicketActivity(
 
 export async function createTicket(
   input: CreateTicketInput,
-  context: { userId: string; companyId: string },
-): Promise<TicketServiceResult<true>> {
+  context: { userId: string; companyId: string; submitterRole?: string | null },
+): Promise<TicketServiceResult<{ id: string }>> {
   try {
-    const { error } = await ticketsTable().insert({
-      ...input,
+    // Evaluate auto-routing rules before insert
+    const autoAssignTo = await evaluateRoutingRules(context.companyId, {
+      category: input.category,
       subcategory: input.subcategory?.trim() ? input.subcategory.trim() : null,
-      company_id: context.companyId,
-      submitted_by: context.userId,
-      status: 'open',
-      assigned_to: null,
-      resolution_note: null,
+      priority: input.priority,
+      submitterRole: context.submitterRole ?? null,
     });
+
+    const { data, error } = await ticketsTable()
+      .insert({
+        ...input,
+        subcategory: input.subcategory?.trim() ? input.subcategory.trim() : null,
+        vso_number: input.vso_number?.trim() ? input.vso_number.trim() : null,
+        company_id: context.companyId,
+        submitted_by: context.userId,
+        status: 'open',
+        assigned_to: autoAssignTo,
+        assigned_at: autoAssignTo ? new Date().toISOString() : null,
+        resolution_note: null,
+      })
+      .select('id')
+      .single();
     if (error) throw error;
-    void logUserAction(context.userId, 'create', 'ticket', undefined, { component: 'TicketService' });
-    return { data: true, error: null };
+
+    const ticketId = (data as { id: string }).id;
+    void logUserAction(context.userId, 'create', 'ticket', ticketId, { component: 'TicketService' });
+
+    // Notify auto-assigned user if different from submitter
+    if (autoAssignTo && autoAssignTo !== context.userId) {
+      void createNotifications([{
+        userId: autoAssignTo,
+        title: 'Request assigned to you',
+        message: `You have been automatically assigned "${input.subject}".`,
+        type: 'info',
+      }]);
+    }
+
+    return { data: { id: ticketId }, error: null };
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to create ticket');
     loggingService.error(
@@ -426,6 +456,24 @@ export async function updateTicket(
       .single();
 
     if (currentError) throw currentError;
+
+    const current = mapTicket(currentData as TicketRow);
+
+    // Stamp assigned_at whenever the assignee changes
+    if (input.assigned_to !== undefined) {
+      patch.assigned_at = input.assigned_to ? new Date().toISOString() : null;
+    }
+
+    // Stamp resolved_at on first resolution; clear it if the ticket is re-opened
+    if (input.status) {
+      const isNowResolved = input.status === 'resolved' || input.status === 'closed';
+      const wasResolved = current.status === 'resolved' || current.status === 'closed';
+      if (isNowResolved && !wasResolved) {
+        patch.resolved_at = new Date().toISOString();
+      } else if (!isNowResolved && wasResolved) {
+        patch.resolved_at = null;
+      }
+    }
 
     const { data, error } = await ticketsTable()
       .update(patch)

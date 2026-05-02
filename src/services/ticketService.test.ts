@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { supabase } from '@/integrations/supabase/client';
-import { createTicket, listMyTickets, updateTicket } from './ticketService';
+import { createTicket, listMyTickets, listTicketActivity, updateTicket } from './ticketService';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
+import { evaluateRoutingRules } from './requestRoutingService';
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -22,6 +23,10 @@ vi.mock('./loggingService', () => ({
   loggingService: {
     error: vi.fn(),
   },
+}));
+
+vi.mock('./requestRoutingService', () => ({
+  evaluateRoutingRules: vi.fn().mockResolvedValue(null),
 }));
 
 describe('ticketService', () => {
@@ -44,7 +49,9 @@ describe('ticketService', () => {
   });
 
   it('derives ticket owner and company from authenticated context', async () => {
-    const insert = vi.fn().mockResolvedValue({ data: null, error: null });
+    const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-1' }, error: null });
+    const select = vi.fn(() => ({ single }));
+    const insert = vi.fn(() => ({ select }));
     vi.mocked(supabase.from).mockReturnValue({ insert } as never);
 
     const result = await createTicket({
@@ -67,7 +74,7 @@ describe('ticketService', () => {
       assigned_to: null,
       resolution_note: null,
     }));
-    expect(logUserAction).toHaveBeenCalledWith('user-1', 'create', 'ticket', undefined, { component: 'TicketService' });
+    expect(logUserAction).toHaveBeenCalledWith('user-1', 'create', 'ticket', 'ticket-1', { component: 'TicketService' });
   });
 
   it('scopes ticket updates to the current company and persists assignment metadata', async () => {
@@ -136,6 +143,7 @@ describe('ticketService', () => {
     expect(result.error).toBeNull();
     expect(update).toHaveBeenCalledWith({
       assigned_to: 'user-2',
+      assigned_at: expect.any(String),
       resolution_note: 'Following up with the outlet.',
     });
     expect(currentCompanyEq).toHaveBeenCalledWith('company_id', 'company-1');
@@ -153,7 +161,60 @@ describe('ticketService', () => {
     expect(logUserAction).toHaveBeenCalledWith('user-1', 'update', 'ticket', 'ticket-1', {
       component: 'TicketService',
       assigned_to: 'user-2',
+      assigned_at: expect.any(String),
       resolution_note: 'Following up with the outlet.',
     });
+  });
+
+  it('scopes ticket activity queries to the current company to prevent cross-tenant data leaks', async () => {
+    const order = vi.fn().mockResolvedValue({ data: [], error: null });
+    const companyEq = vi.fn(() => ({ order }));
+    const inFn = vi.fn(() => ({ eq: companyEq }));
+    const select = vi.fn(() => ({ in: inFn }));
+    vi.mocked(supabase.from).mockReturnValue({ select } as never);
+
+    const result = await listTicketActivity(['ticket-1', 'ticket-2'], 'company-1');
+
+    expect(result.error).toBeNull();
+    expect(inFn).toHaveBeenCalledWith('ticket_id', ['ticket-1', 'ticket-2']);
+    expect(companyEq).toHaveBeenCalledWith('company_id', 'company-1');
+  });
+
+  it('auto-assigns the ticket when a routing rule matches the submission context', async () => {
+    vi.mocked(evaluateRoutingRules).mockResolvedValueOnce('agent-7');
+
+    const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-2' }, error: null });
+    const select = vi.fn(() => ({ single }));
+    const insert = vi.fn(() => ({ select }));
+    vi.mocked(supabase.from).mockReturnValue({ insert } as never);
+
+    const result = await createTicket({
+      subject: 'VIN Transfer needed',
+      category: 'operations_support',
+      subcategory: null,
+      priority: 'high',
+      description: 'Please process the VIN transfer.',
+    }, {
+      userId: 'user-3',
+      companyId: 'company-1',
+      submitterRole: 'sales_advisor',
+    });
+
+    expect(result.error).toBeNull();
+    expect(evaluateRoutingRules).toHaveBeenCalledWith('company-1', {
+      category: 'operations_support',
+      subcategory: null,
+      priority: 'high',
+      submitterRole: 'sales_advisor',
+    });
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      assigned_to: 'agent-7',
+      assigned_at: expect.any(String),
+    }));
+    expect(createNotifications).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ userId: 'agent-7', title: 'Request assigned to you' }),
+      ]),
+    );
   });
 });

@@ -400,11 +400,12 @@ export async function getPendingApprovalsForUser(
 /**
  * Cancel an in-flight approval request (e.g. when the requester cancels the underlying leave).
  */
-export async function cancelApprovalRequest(entityId: string): Promise<{ error: string | null }> {
+export async function cancelApprovalRequest(entityId: string, companyId: string): Promise<{ error: string | null }> {
   const { error } = await supabase
     .from('approval_requests')
     .update({ status: 'cancelled' })
     .eq('entity_id', entityId)
+    .eq('company_id', companyId)
     .eq('status', 'pending');
   return { error: error?.message ?? null };
 }

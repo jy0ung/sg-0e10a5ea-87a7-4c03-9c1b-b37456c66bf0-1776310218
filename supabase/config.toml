@@ -1,8 +1,10 @@
 project_id = "rbmsbppvpgcrmtkdfahy"
 
 [auth]
-site_url = "http://192.168.1.241:3000"
+site_url = "https://probable-halibut-459w4wrgr9w3q7r6-3000.app.github.dev"
 additional_redirect_urls = [
+	"https://probable-halibut-459w4wrgr9w3q7r6-3000.app.github.dev/signup",
+	"https://probable-halibut-459w4wrgr9w3q7r6-3000.app.github.dev/reset-password",
 	"http://192.168.1.241:3000/signup",
 	"http://192.168.1.241:3000/reset-password",
 	"http://192.168.1.241:3000/hrms/signup",

@@ -15,52 +15,6 @@ create table if not exists public.request_categories (
 create index if not exists idx_request_categories_company_sort
   on public.request_categories (company_id, sort_order, label);
 
-insert into public.request_categories (company_id, category_key, label, description, is_active, sort_order)
-select
-  companies.id,
-  seed.category_key,
-  seed.label,
-  seed.description,
-  true,
-  seed.sort_order
-from public.companies
-cross join (
-  values
-    ('operations_support', 'Operations Support', 'Outlet operations, inventory coordination, or internal process support.', 10),
-    ('technical_support', 'Technical Support', 'System issues, broken workflows, or troubleshooting requests.', 20),
-    ('access_request', 'System Access', 'New access, permission changes, or account provisioning help.', 30),
-    ('finance_request', 'Finance Request', 'Billing, payment follow-up, or finance-team coordination.', 40),
-    ('hr_request', 'HR Request', 'HR policy questions, employee records, or people operations support.', 50),
-    ('service_coordination', 'Service Coordination', 'Cross-team coordination for branch, customer, or service execution.', 60),
-    ('other', 'Other', 'Anything that does not fit the standard internal request lanes.', 70)
-) as seed(category_key, label, description, sort_order)
-on conflict (company_id, category_key) do nothing;
-
-create or replace function public.seed_request_categories_for_company()
-returns trigger
-language plpgsql
-as $$
-begin
-  insert into public.request_categories (company_id, category_key, label, description, is_active, sort_order)
-  values
-    (new.id, 'operations_support', 'Operations Support', 'Outlet operations, inventory coordination, or internal process support.', true, 10),
-    (new.id, 'technical_support', 'Technical Support', 'System issues, broken workflows, or troubleshooting requests.', true, 20),
-    (new.id, 'access_request', 'System Access', 'New access, permission changes, or account provisioning help.', true, 30),
-    (new.id, 'finance_request', 'Finance Request', 'Billing, payment follow-up, or finance-team coordination.', true, 40),
-    (new.id, 'hr_request', 'HR Request', 'HR policy questions, employee records, or people operations support.', true, 50),
-    (new.id, 'service_coordination', 'Service Coordination', 'Cross-team coordination for branch, customer, or service execution.', true, 60),
-    (new.id, 'other', 'Other', 'Anything that does not fit the standard internal request lanes.', true, 70)
-  on conflict (company_id, category_key) do nothing;
-
-  return new;
-end;
-$$;
-
-drop trigger if exists companies_seed_request_categories on public.companies;
-create trigger companies_seed_request_categories
-  after insert on public.companies
-  for each row execute function public.seed_request_categories_for_company();
-
 create or replace function public.request_categories_set_updated_at()
 returns trigger
 language plpgsql

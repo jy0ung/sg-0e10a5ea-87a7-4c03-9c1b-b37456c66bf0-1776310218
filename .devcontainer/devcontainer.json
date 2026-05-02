@@ -1,0 +1,32 @@
+{
+  "name": "FLC UBS Dev",
+  "forwardPorts": [3000, 54321, 54322, 54323, 54324],
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+  "portsAttributes": {
+    "3000": {
+      "label": "App (Vite)",
+      "onAutoForward": "notify",
+      "visibility": "public"
+    },
+    "54321": {
+      "label": "Supabase API",
+      "onAutoForward": "silent",
+      "visibility": "public"
+    },
+    "54322": {
+      "label": "Supabase DB",
+      "onAutoForward": "silent",
+      "visibility": "private"
+    },
+    "54323": {
+      "label": "Supabase Studio",
+      "onAutoForward": "notify",
+      "visibility": "private"
+    },
+    "54324": {
+      "label": "Supabase Inbucket",
+      "onAutoForward": "silent",
+      "visibility": "private"
+    }
+  }
+}

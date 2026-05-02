@@ -121,6 +121,14 @@ export default function RequestQueue() {
     );
   }, [tickets]);
 
+  const refreshTicketActivity = useCallback(async (ticketId: string) => {
+    if (!user) return;
+    const { data: updatedActivity } = await listTicketActivity([ticketId], user.company_id);
+    if (updatedActivity) {
+      setActivitiesByTicket((current) => ({ ...current, ...updatedActivity }));
+    }
+  }, [user]);
+
   const handleStatusChange = async (ticketId: string, status: TicketStatus) => {
     if (!user) return;
 
@@ -153,6 +161,7 @@ export default function RequestQueue() {
       };
     }));
     setSavingTicketId(null);
+    void refreshTicketActivity(ticketId);
   };
 
   const handleAssignmentChange = async (ticketId: string, value: string) => {
@@ -190,6 +199,7 @@ export default function RequestQueue() {
       };
     }));
     setSavingTicketId(null);
+    void refreshTicketActivity(ticketId);
   };
 
   const handleResolutionNoteSave = async (ticketId: string) => {
@@ -221,6 +231,7 @@ export default function RequestQueue() {
     }));
     setNoteDrafts((current) => ({ ...current, [ticketId]: data.resolution_note ?? '' }));
     setSavingTicketId(null);
+    void refreshTicketActivity(ticketId);
   };
 
   return (
