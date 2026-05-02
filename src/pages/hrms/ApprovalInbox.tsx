@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { Calendar, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, Eye, Inbox, Star, XCircle } from 'lucide-react';
@@ -16,6 +17,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import {
   listAppraisals,
   listLeaveRequests,
@@ -25,7 +27,7 @@ import {
   reviewPayrollRunFinalisation,
 } from '@/services/hrmsService';
 import { HRMS_MANAGER_ROLES, HRMS_PAYROLL_ROLES } from '@/config/hrmsConfig';
-import type { Appraisal, ApprovalDecision, LeaveRequest, PayrollRun } from '@/types';
+import type { ApprovalDecision } from '@/types';
 import {
   buildApprovalInboxItems,
   filterApprovalInboxItems,
@@ -61,49 +63,66 @@ export default function ApprovalInbox() {
   const canOpenPayrollPage = HRMS_PAYROLL_ROLES.includes(user?.role as typeof HRMS_PAYROLL_ROLES[number]);
   const canOpenAppraisalPage = HRMS_MANAGER_ROLES.includes(user?.role as typeof HRMS_MANAGER_ROLES[number]);
 
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
-  const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
-  const [appraisals, setAppraisals] = useState<Appraisal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  const { data: inboxData, isPending: loading } = useQuery({
+    queryKey: ['approval-inbox', user?.companyId],
+    queryFn: async () => {
+      const [leaveResult, payrollResult, appraisalResult] = await Promise.all([
+        listLeaveRequests(user!.companyId, { includeApprovalHistory: true }),
+        listPayrollRuns(user!.companyId, { includeApprovalHistory: true }),
+        listAppraisals(user!.companyId, { includeApprovalHistory: true }),
+      ]);
+      if (leaveResult.error) toast({ title: 'Error', description: leaveResult.error, variant: 'destructive' });
+      if (payrollResult.error) toast({ title: 'Error', description: payrollResult.error, variant: 'destructive' });
+      if (appraisalResult.error) toast({ title: 'Error', description: appraisalResult.error, variant: 'destructive' });
+      return { leaveRequests: leaveResult.data, payrollRuns: payrollResult.data, appraisals: appraisalResult.data };
+    },
+    enabled: !!user?.companyId,
+  });
+
   const [filter, setFilter] = useState<ApprovalInboxFilter>('all');
   const [reviewTarget, setReviewTarget] = useState<ApprovalInboxReviewState>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
 
-  const load = useCallback(async () => {
-    if (!user?.companyId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const [leaveResult, payrollResult, appraisalResult] = await Promise.all([
-      listLeaveRequests(user.companyId, { includeApprovalHistory: true }),
-      listPayrollRuns(user.companyId, { includeApprovalHistory: true }),
-      listAppraisals(user.companyId, { includeApprovalHistory: true }),
-    ]);
-    setLeaveRequests(leaveResult.data);
-    setPayrollRuns(payrollResult.data);
-    setAppraisals(appraisalResult.data);
-    setLoading(false);
-
-    if (leaveResult.error) {
-      toast({ title: 'Error', description: leaveResult.error, variant: 'destructive' });
-    }
-    if (payrollResult.error) {
-      toast({ title: 'Error', description: payrollResult.error, variant: 'destructive' });
-    }
-    if (appraisalResult.error) {
-      toast({ title: 'Error', description: appraisalResult.error, variant: 'destructive' });
-    }
-  }, [toast, user]);
-
+  // Real-time: reload inbox when any approval-related table changes for this company
+  // Note: leaveRequests/payrollRuns/appraisals are derived from inboxData — use inboxData as dep
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!user?.companyId) return;
+
+    const channel = supabase
+      .channel(`approval-inbox:${user.companyId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leave_requests', filter: `company_id=eq.${user.companyId}` },
+        () => void queryClient.invalidateQueries({ queryKey: ['approval-inbox', user.companyId] }),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'payroll_runs', filter: `company_id=eq.${user.companyId}` },
+        () => void queryClient.invalidateQueries({ queryKey: ['approval-inbox', user.companyId] }),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'appraisals', filter: `company_id=eq.${user.companyId}` },
+        () => void queryClient.invalidateQueries({ queryKey: ['approval-inbox', user.companyId] }),
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.companyId, queryClient]);
 
   const items = useMemo(
-    () => buildApprovalInboxItems(leaveRequests, payrollRuns, appraisals, user),
-    [appraisals, leaveRequests, payrollRuns, user],
+    () => buildApprovalInboxItems(
+      inboxData?.leaveRequests ?? [],
+      inboxData?.payrollRuns ?? [],
+      inboxData?.appraisals ?? [],
+      user,
+    ),
+    [inboxData, user],
   );
   const filteredItems = useMemo(() => filterApprovalInboxItems(items, filter), [items, filter]);
 
@@ -139,7 +158,7 @@ export default function ApprovalInbox() {
     notifyApprovalInboxChanged();
     setReviewTarget(null);
     setReviewNote('');
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['approval-inbox', user?.companyId] });
   }
 
   return (

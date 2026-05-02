@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,8 +83,6 @@ export default function ApprovalFlows() {
   const companyId = useCompanyId();
   const { toast } = useToast();
 
-  const [flows, setFlows] = useState<ApprovalFlow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [entityFilter, setEntityFilter] = useState<FlowEntityType | 'all'>('all');
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -96,26 +95,21 @@ export default function ApprovalFlows() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [stepErrors, setStepErrors] = useState<Record<number, Record<string, string>>>({});
 
-  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees-for-select', companyId],
+    queryFn: async () => { const { data } = await listEmployeesForSelect(companyId); return data; },
+    enabled: isAuthorized && !!companyId,
+  });
 
   // NOTE: auth guard is intentionally placed AFTER all hooks to satisfy React Rules of Hooks
   const isAuthorized = !!user && (HRMS_ADMIN_ROLES as string[]).includes(user.role);
 
-  const load = useCallback(async () => {
-    if (!isAuthorized) return;
-    setLoading(true);
-    const { data, error } = await listApprovalFlows(companyId);
-    if (!error) setFlows(data);
-    setLoading(false);
-  }, [companyId, isAuthorized]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  // Pre-load employees for specific_user picker
-  useEffect(() => {
-    if (!isAuthorized) return;
-    listEmployeesForSelect(companyId).then(({ data }) => setEmployees(data));
-  }, [companyId, isAuthorized]);
+  const queryClient = useQueryClient();
+  const { data: flows = [], isPending: loading } = useQuery({
+    queryKey: ['approval-flows', companyId],
+    queryFn: async () => { const { data } = await listApprovalFlows(companyId); return data; },
+    enabled: isAuthorized && !!companyId,
+  });
 
   if (!isAuthorized) {
     return <UnauthorizedAccess />;
@@ -227,13 +221,13 @@ export default function ApprovalFlows() {
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: editTarget ? 'Flow updated' : 'Flow created' });
     setDialogOpen(false);
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['approval-flows', companyId] });
   }
 
   async function handleToggleActive(flow: ApprovalFlow) {
-    setFlows(prev => prev.map(f => f.id === flow.id ? { ...f, isActive: !f.isActive } : f));
     const { error } = await toggleApprovalFlowActive(companyId, flow.id, !flow.isActive, user.id);
-    if (error) { void load(); toast({ title: 'Error', description: error, variant: 'destructive' }); }
+    if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); }
+    void queryClient.invalidateQueries({ queryKey: ['approval-flows', companyId] });
   }
 
   async function handleDelete() {
@@ -242,7 +236,7 @@ export default function ApprovalFlows() {
     if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
     else toast({ title: 'Flow deleted' });
     setDeleteTarget(null);
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['approval-flows', companyId] });
   }
 
   // ── Stats ───────────────────────────────────────────────────────────────────

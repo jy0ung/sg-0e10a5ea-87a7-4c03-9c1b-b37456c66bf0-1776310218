@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColumnPermissions, canViewField, canEditField } from './useColumnPermissions';
 import {
-  loadRolePermissions,
+  DEFAULT_ROLE_SECTIONS,
   type SectionName,
 } from '@/config/rolePermissions';
+import { fetchRoleSections, type RoleSectionsMatrix } from '@/services/roleSectionService';
 import type { AppRole } from '@/types';
 
 /**
@@ -13,12 +15,8 @@ import type { AppRole } from '@/types';
  *
  * Collapses three previously-independent gates:
  *   1. Role-based route access  (RequireRole + inline role arrays)
- *   2. Section visibility        (rolePermissions localStorage matrix)
+ *   2. Section visibility        (role_sections DB table)
  *   3. Column-level view/edit    (useColumnPermissions → permissionService)
- *
- * Phase 2 wires this to the existing sources of truth. Phase 2 step 15 will
- * migrate the localStorage matrix into a DB-backed `role_sections` table; the
- * hook's shape stays the same so callers don't change.
  */
 
 export interface UnifiedPermissions {
@@ -44,15 +42,27 @@ export interface UnifiedPermissions {
   isLoading: boolean;
 }
 
+/** React Query hook that loads the role→section matrix from the DB. */
+export function useRoleSectionMatrix(): RoleSectionsMatrix {
+  const { user } = useAuth();
+  const companyId = user?.company_id ?? '';
+
+  const { data } = useQuery({
+    queryKey: ['role_sections', companyId],
+    queryFn: () => fetchRoleSections(companyId).then((r) => r.data),
+    enabled: !!companyId,
+    staleTime: 5 * 60 * 1000, // 5 min — permissions change rarely
+  });
+
+  return data ?? { ...DEFAULT_ROLE_SECTIONS };
+}
+
 export function usePermissions(): UnifiedPermissions {
   const { user } = useAuth();
   const { permissions: colPerms, isLoading } = useColumnPermissions();
 
   const role = (user?.role ?? null) as AppRole | null;
-
-  // Section matrix is stored in localStorage today; loaded once per render.
-  // Phase 2 step 15 replaces this with a React Query hook against `role_sections`.
-  const sectionMatrix = useMemo(() => loadRolePermissions(), []);
+  const sectionMatrix = useRoleSectionMatrix();
 
   return useMemo<UnifiedPermissions>(() => {
     const hasRole = (allowed: readonly AppRole[]): boolean =>

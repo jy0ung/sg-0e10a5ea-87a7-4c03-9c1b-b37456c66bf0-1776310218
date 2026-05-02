@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,22 +26,17 @@ export default function Dealers() {
   const companyId = useCompanyId();
   const { toast } = useToast();
 
-  const [dealers, setDealers] = useState<Dealer[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: dealers = [], isPending: loading } = useQuery({
+    queryKey: ['dealers', companyId],
+    queryFn: async () => { const { data } = await getDealers(companyId); return data; },
+    enabled: !!companyId,
+  });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(empty);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Dealer | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data } = await getDealers(companyId);
-    setDealers(data);
-    setLoading(false);
-  }, [companyId]);
-
-  useEffect(() => { load(); }, [load]);
 
   if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
 
@@ -66,7 +62,7 @@ export default function Dealers() {
     });
     setSaving(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['dealers', companyId] });
     setDialogOpen(false);
     toast({ title: editId ? 'Dealer updated' : 'Dealer created' });
   };
@@ -75,7 +71,7 @@ export default function Dealers() {
     if (!deleteTarget) return;
     const { error } = await deleteDealer(companyId, deleteTarget.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['dealers', companyId] });
     setDeleteTarget(null);
     toast({ title: 'Dealer deleted' });
   };

@@ -1,4 +1,5 @@
 import { loggingService } from "./loggingService";
+import { errorTrackingService } from "./errorTrackingService";
 
 interface PerformanceMetric {
   name: string;
@@ -30,6 +31,7 @@ class PerformanceService {
     });
 
     loggingService.logPerformance(`Query: ${queryName}`, duration, "ms");
+    errorTrackingService.logMetric(`query.${queryName}`, duration);
     
     if (duration > 1000) {
       loggingService.warn(`Slow query detected: ${queryName}`, { duration: duration.toFixed(2) }, "Performance");
@@ -47,6 +49,7 @@ class PerformanceService {
     });
 
     loggingService.logPerformance(`Render: ${componentName}`, duration, "ms");
+    errorTrackingService.logMetric(`render.${componentName}`, duration);
     
     if (duration > 100) {
       loggingService.warn(`Slow render detected: ${componentName}`, { duration: duration.toFixed(2) }, "Performance");

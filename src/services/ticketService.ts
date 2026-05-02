@@ -80,7 +80,7 @@ export interface TicketActivityRecord {
   created_at: string | null;
 }
 
-interface TicketRow extends TicketRecord {}
+type TicketRow = TicketRecord;
 
 interface ProfileLookupRow {
   id: string;

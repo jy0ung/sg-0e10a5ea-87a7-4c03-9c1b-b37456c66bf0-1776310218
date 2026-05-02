@@ -174,21 +174,32 @@ Deno.serve(async (req: Request) => {
   const fcmTokens = tokens.filter((t) => t.platform === 'android').map((t) => t.token);
   if (fcmTokens.length > 0) {
     const fcmKey = Deno.env.get('FCM_SERVER_KEY');
-    if (fcmKey) {
+    if (!fcmKey) {
+      console.warn('[push] FCM_SERVER_KEY not set — skipping Android notifications');
+    } else {
       const fcmPayload = {
         registration_ids: fcmTokens,
         notification: { title, body: msgBody },
         data: path ? { path } : undefined,
       };
-      const fcmRes = await fetch('https://fcm.googleapis.com/fcm/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'Authorization': `key=${fcmKey}`,
-        },
-        body: JSON.stringify(fcmPayload),
-      });
-      results.push({ token: 'fcm_batch', ok: fcmRes.ok });
+      try {
+        const fcmRes = await fetch('https://fcm.googleapis.com/fcm/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `key=${fcmKey}`,
+          },
+          body: JSON.stringify(fcmPayload),
+        });
+        if (!fcmRes.ok) {
+          // Log status only — never log the key or response body (may echo key errors)
+          console.error(`[push] FCM responded with HTTP ${fcmRes.status}`);
+        }
+        results.push({ token: 'fcm_batch', ok: fcmRes.ok });
+      } catch (fcmErr) {
+        console.error('[push] FCM fetch failed:', (fcmErr as Error).message);
+        results.push({ token: 'fcm_batch', ok: false, error: 'FCM request failed' });
+      }
     }
   }
 

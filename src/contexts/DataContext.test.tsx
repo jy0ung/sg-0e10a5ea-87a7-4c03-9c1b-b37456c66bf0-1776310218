@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -204,14 +203,15 @@ describe('DataContext', () => {
     });
 
     it('addImportBatch inserts batch to database', async () => {
-      const insertMock = vi.fn().mockResolvedValue({ error: null });
+      const upsertMock = vi.fn().mockResolvedValue({ error: null });
       
       vi.mocked(supabase.from).mockImplementation(() => {
         const builder: any = {};
         builder.select = vi.fn(() => builder);
         builder.eq = vi.fn(() => builder);
         builder.order = vi.fn(() => Promise.resolve({ data: [], error: null }));
-        builder.insert = insertMock;
+        builder.insert = vi.fn().mockResolvedValue({ error: null });
+        builder.upsert = upsertMock;
         builder.then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
         return builder;
       });
@@ -241,7 +241,7 @@ describe('DataContext', () => {
         await result.current.addImportBatch(batch);
       });
 
-      expect(insertMock).toHaveBeenCalled();
+      expect(upsertMock).toHaveBeenCalled();
       await waitFor(() => {
         expect(result.current.importBatches).toHaveLength(1);
       });

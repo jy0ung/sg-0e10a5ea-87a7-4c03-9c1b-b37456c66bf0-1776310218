@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <title>You're offline — FLC</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #0f172a;
+        color: #f8fafc;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        padding: 2rem;
+        text-align: center;
+      }
+      .icon { font-size: 3rem; line-height: 1; }
+      h1 { font-size: 1.5rem; font-weight: 700; }
+      p  { font-size: 0.95rem; color: #94a3b8; max-width: 28rem; line-height: 1.6; }
+      button {
+        margin-top: 0.5rem;
+        padding: 0.625rem 1.5rem;
+        border: 1px solid #334155;
+        border-radius: 0.5rem;
+        background: transparent;
+        color: #f8fafc;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      button:hover { background: #1e293b; }
+    </style>
+  </head>
+  <body>
+    <div class="icon" aria-hidden="true">📡</div>
+    <h1>You're offline</h1>
+    <p>
+      FLC needs an internet connection to load. Check your network and try again.
+    </p>
+    <button onclick="location.reload()">Retry</button>
+  </body>
+</html>

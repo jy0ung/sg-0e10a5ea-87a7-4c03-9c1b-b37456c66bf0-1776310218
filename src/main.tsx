@@ -15,7 +15,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RequireRole } from "@/components/shared/RequireRole";
 import { RequireActiveModule } from "@/components/shared/RequireActiveModule";
 import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
-import { LocationPreservingNavigate } from "@/components/shared/LocationPreservingNavigate";
 import { PageSpinner } from "@/components/shared/PageSpinner";
 import AppLayout from "./components/layout/AppLayout";
 import SalesLayout from "./components/layout/SalesLayout";
@@ -24,6 +23,7 @@ import { errorTrackingService } from "@/services/errorTrackingService";
 import { env } from "@/config/env";
 import { createAppQueryClient } from "@/lib/queryClient";
 import { isPortalOnlyUser, resolveAuthenticatedHomePath } from '@/lib/portalAccess';
+import { onCLS, onINP, onLCP } from 'web-vitals';
 import {
   ADMIN_ONLY,
   ADMIN_AND_DIRECTOR,
@@ -37,6 +37,13 @@ errorTrackingService.init({
   release: env.VITE_APP_VERSION,
   tracesSampleRate: env.VITE_SENTRY_TRACES_SAMPLE_RATE,
 });
+
+// Ship Core Web Vitals to Sentry RUM
+const reportWebVital = ({ name, value }: { name: string; value: number }) =>
+  errorTrackingService.logMetric(name, value);
+onCLS(reportWebVital);
+onINP(reportWebVital);
+onLCP(reportWebVital);
 
 // Route-level code splitting — all pages are loaded on demand
 const LandingPage = lazy(() => import("./pages/LandingPage"));
@@ -92,7 +99,6 @@ const DealerInvoices = lazy(() => import("./pages/sales/DealerInvoices"));
 const VerifyOR = lazy(() => import("./pages/sales/VerifyOR"));
 const ReportsCenter = lazy(() => import("./pages/reports/ReportsCenter"));
 const ChassisFilter = lazy(() => import("./pages/inventory/ChassisFilter"));
-const HrmsWorkspaceRedirect = lazy(() => import("./pages/hrms/HrmsWorkspaceRedirect"));
 const RolePermissionsPage = lazy(() => import('./pages/admin/RolePermissions'));
 
 // Shorthand Suspense wrapper used on every route element

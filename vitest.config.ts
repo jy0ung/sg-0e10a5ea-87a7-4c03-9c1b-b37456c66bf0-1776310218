@@ -36,6 +36,7 @@ export default defineConfig({
         "src/lib/**": { lines: 50, functions: 60, branches: 75, statements: 50 },
         "src/contexts/**": { lines: 60, functions: 65, branches: 50, statements: 60 },
         "src/utils/**": { lines: 50, functions: 60, branches: 90, statements: 50 },
+        "src/services/**": { lines: 60, functions: 65, branches: 50, statements: 60 },
       },
     },
   },

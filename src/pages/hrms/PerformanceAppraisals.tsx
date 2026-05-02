@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -90,9 +91,16 @@ export default function PerformanceAppraisals() {
   const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
   const selfServiceEmployeeId = user?.employeeId ?? user?.id;
 
-  const [appraisals, setAppraisals] = useState<Appraisal[]>([]);
-  const [items, setItems] = useState<AppraisalItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: appraisals = [], isPending: loading } = useQuery({
+    queryKey: ['appraisals', user?.companyId],
+    queryFn: async () => {
+      const res = await listAppraisals(user!.companyId, { includeApprovalHistory: true });
+      if (res.error) toast({ title: 'Error', description: res.error, variant: 'destructive' });
+      return res.data;
+    },
+    enabled: !!user?.companyId,
+  });
   const [viewId, setViewId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [reviewingAppraisalId, setReviewingAppraisalId] = useState<string | null>(null);
@@ -118,16 +126,14 @@ export default function PerformanceAppraisals() {
   const [editForm, setEditForm]   = useState<UpdateAppraisalItemInput>({});
   const [savingItem, setSavingItem] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!user?.companyId) return;
-    setLoading(true);
-    const res = await listAppraisals(user.companyId, { includeApprovalHistory: true });
-    setAppraisals(res.data);
-    setLoading(false);
-    if (res.error) toast({ title: 'Error', description: res.error, variant: 'destructive' });
-  }, [user, toast]);
-
-  useEffect(() => { load(); }, [load]);
+  const { data: rawItems = [] } = useQuery({
+    queryKey: ['appraisal-items', viewId],
+    queryFn: async () => { const { data } = await listAppraisalItems(viewId!); return data; },
+    enabled: !!viewId,
+  });
+  const items = isManager || !user?.id
+    ? rawItems
+    : rawItems.filter(item => matchesCurrentEmployee(item.employeeId) || item.reviewerId === user.id);
 
   function matchesCurrentEmployee(subjectId?: string): boolean {
     if (!subjectId || !user?.id) return false;
@@ -177,7 +183,7 @@ export default function PerformanceAppraisals() {
     notifyApprovalInboxChanged();
     setShowCreate(false);
     setForm({ title: '', cycle: 'annual', periodStart: '', periodEnd: '' });
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['appraisals', user?.companyId] });
   }
 
   async function handleReview() {
@@ -191,7 +197,7 @@ export default function PerformanceAppraisals() {
     notifyApprovalInboxChanged();
     setReviewingAppraisalId(null);
     setReviewNote('');
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['appraisals', user?.companyId] });
   }
 
   async function handleResubmit(appraisalId: string) {
@@ -203,17 +209,10 @@ export default function PerformanceAppraisals() {
     }
     toast({ title: 'Appraisal activation resubmitted' });
     notifyApprovalInboxChanged();
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['appraisals', user?.companyId] });
   }
 
-  async function handleView(id: string) {
-    const { data, error } = await listAppraisalItems(id);
-    if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
-    setItems(
-      isManager || !user?.id
-        ? data
-        : data.filter(item => matchesCurrentEmployee(item.employeeId) || item.reviewerId === user.id),
-    );
+  function handleView(id: string) {
     setViewId(id);
   }
 
@@ -301,8 +300,8 @@ export default function PerformanceAppraisals() {
           : 'Appraisal acknowledged',
     });
     resetItemAction();
-    await load();
-    if (viewId) await handleView(viewId);
+    await queryClient.invalidateQueries({ queryKey: ['appraisals', user?.companyId] });
+    void queryClient.invalidateQueries({ queryKey: ['appraisal-items', viewId] });
   }
 
   function openEditItem(item: AppraisalItem) {
@@ -326,7 +325,7 @@ export default function PerformanceAppraisals() {
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: 'Review updated' });
     setEditItem(null);
-    if (viewId) { const { data } = await listAppraisalItems(viewId); setItems(data); }
+    void queryClient.invalidateQueries({ queryKey: ['appraisal-items', viewId] });
   }
 
   async function handleDeleteItem() {
@@ -335,7 +334,7 @@ export default function PerformanceAppraisals() {
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: 'Review removed' });
     setDeleteItem(null);
-    if (viewId) { const { data } = await listAppraisalItems(viewId); setItems(data); }
+    void queryClient.invalidateQueries({ queryKey: ['appraisal-items', viewId] });
   }
 
   const viewingAppraisal = appraisals.find(a => a.id === viewId);

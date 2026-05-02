@@ -6,6 +6,7 @@
     "edit": "Edit",
     "close": "Close",
     "loading": "Loading…",
+    "loadingPage": "Loading page",
     "error": "Something went wrong",
     "empty": "Nothing to show",
     "search": "Search",
@@ -13,7 +14,12 @@
     "actions": "Actions",
     "confirm": "Confirm",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "retry": "Retry"
+  },
+  "page": {
+    "errorTitle": "Unable to load data",
+    "errorDescription": "Retry the request. If the problem persists, sign out and sign back in."
   },
   "nav": {
     "dashboard": "Dashboard",

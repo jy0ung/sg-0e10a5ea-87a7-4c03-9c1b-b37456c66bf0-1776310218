@@ -62,3 +62,32 @@ export async function getImportReviewRows(batchId: string, companyId: string): P
 
   return (data ?? []).map((row) => mapImportReviewRow(row as unknown as Record<string, unknown>));
 }
+
+export async function reviewRow(
+  id: string,
+  status: ImportReviewStatus,
+  opts?: { comment?: string; reviewedBy?: string },
+): Promise<{ error: string | null }> {
+  const payload: Record<string, unknown> = {
+    review_status: status,
+    updated_at: new Date().toISOString(),
+  };
+  if (status === 'resolved' || status === 'discarded') {
+    payload.resolved_at = new Date().toISOString();
+  }
+  if (opts?.reviewedBy) {
+    payload.assigned_to = opts.reviewedBy;
+  }
+
+  const { error } = await supabase
+    .from('import_review_rows')
+    .update(payload)
+    .eq('id', id);
+
+  if (error) {
+    loggingService.error('Failed to review import row', { id, status, error }, 'ImportReviewService');
+    return { error: error.message };
+  }
+
+  return { error: null };
+}

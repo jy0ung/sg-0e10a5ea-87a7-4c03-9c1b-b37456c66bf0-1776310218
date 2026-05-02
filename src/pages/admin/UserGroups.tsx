@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,22 +24,17 @@ export default function UserGroups() {
   const companyId = useCompanyId();
   const { toast } = useToast();
 
-  const [groups, setGroups] = useState<UserGroup[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: groups = [], isPending: loading } = useQuery({
+    queryKey: ['user-groups', companyId],
+    queryFn: async () => { const { data } = await getUserGroups(companyId); return data; },
+    enabled: !!companyId,
+  });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(empty);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserGroup | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data } = await getUserGroups(companyId);
-    setGroups(data);
-    setLoading(false);
-  }, [companyId]);
-
-  useEffect(() => { load(); }, [load]);
 
   if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
 
@@ -55,7 +51,7 @@ export default function UserGroups() {
     const { error } = await upsertUserGroup(companyId, { id: editId ?? undefined, name: form.name.trim(), status: form.status });
     setSaving(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['user-groups', companyId] });
     setDialogOpen(false);
     toast({ title: editId ? 'Group updated' : 'Group created' });
   };
@@ -64,7 +60,7 @@ export default function UserGroups() {
     if (!deleteTarget) return;
     const { error } = await deleteUserGroup(companyId, deleteTarget.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['user-groups', companyId] });
     setDeleteTarget(null);
     toast({ title: 'User group deleted' });
   };

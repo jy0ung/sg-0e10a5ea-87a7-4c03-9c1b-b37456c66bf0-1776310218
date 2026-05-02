@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +18,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { listAttendanceRecords, listEmployeeDirectory, upsertAttendance } from '@/services/hrmsService';
-import type { AttendanceRecord, UpsertAttendanceInput, AttendanceStatus, Employee } from '@/types';
+import type { UpsertAttendanceInput, AttendanceStatus } from '@/types';
 import { Plus, Download } from 'lucide-react';
 import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
 import { upsertAttendanceSchema } from '@/lib/validations';
@@ -42,9 +43,8 @@ export default function AttendanceLog() {
   const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
   const selfServiceEmployeeId = user?.employeeId ?? user?.id;
 
-  const [records, setRecords]     = useState<AttendanceRecord[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const queryClient = useQueryClient();
+
   const [dateFrom, setDateFrom]   = useState(() => {
     const d = new Date(); d.setDate(1);
     return d.toISOString().slice(0, 10);
@@ -56,28 +56,25 @@ export default function AttendanceLog() {
     date: todayIso(), status: 'present',
   });
 
-  const load = useCallback(async () => {
-    if (!user?.companyId || (!isManager && !selfServiceEmployeeId)) return;
-    setLoading(true);
-    const attRes = await listAttendanceRecords(user.companyId, {
-      employeeId: !isManager ? selfServiceEmployeeId : (empFilter === 'all' ? undefined : empFilter),
-      dateFrom,
-      dateTo,
-    });
-    setRecords(attRes.data);
-    setLoading(false);
-    if (attRes.error) toast({ title: 'Error', description: attRes.error, variant: 'destructive' });
-  }, [user, isManager, selfServiceEmployeeId, empFilter, dateFrom, dateTo, toast]);
+  const { data: records = [], isPending: loading } = useQuery({
+    queryKey: ['attendance-records', user?.companyId, isManager ? empFilter : selfServiceEmployeeId, dateFrom, dateTo],
+    queryFn: async () => {
+      const attRes = await listAttendanceRecords(user!.companyId, {
+        employeeId: !isManager ? selfServiceEmployeeId : (empFilter === 'all' ? undefined : empFilter),
+        dateFrom,
+        dateTo,
+      });
+      if (attRes.error) toast({ title: 'Error', description: attRes.error, variant: 'destructive' });
+      return attRes.data;
+    },
+    enabled: !!user?.companyId && (!!(isManager) || !!selfServiceEmployeeId),
+  });
 
-  // Load employee list once on mount (employees rarely change; don't re-fetch on filter changes)
-  useEffect(() => {
-    if (!user?.companyId || !isManager) return;
-    listEmployees(user.companyId).then(res => {
-      if (!res.error) setEmployees(res.data);
-    });
-  }, [user?.companyId, isManager]);
-
-  useEffect(() => { load(); }, [load]);
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees-hrms', user?.companyId],
+    queryFn: async () => { const res = await listEmployeeDirectory(user!.companyId); return res.data; },
+    enabled: !!user?.companyId && isManager,
+  });
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -92,7 +89,7 @@ export default function AttendanceLog() {
     toast({ title: 'Attendance saved' });
     setShowForm(false);
     setForm({ date: todayIso(), status: 'present' });
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['attendance-records', user?.companyId] });
   }
 
   // Summary counts

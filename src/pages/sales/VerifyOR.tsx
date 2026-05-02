@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,8 +30,12 @@ export default function VerifyOR() {
   const companyId = useCompanyId();
   const { toast } = useToast();
 
-  const [receipts, setReceipts] = useState<OfficialReceipt[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: receipts = [], isPending: loading } = useQuery({
+    queryKey: ['official-receipts', companyId],
+    queryFn: async () => { const { data } = await getOfficialReceipts(companyId); return data; },
+    enabled: !!companyId,
+  });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(empty);
@@ -38,15 +43,6 @@ export default function VerifyOR() {
   const [deleteTarget, setDeleteTarget] = useState<OfficialReceipt | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data } = await getOfficialReceipts(companyId);
-    setReceipts(data);
-    setLoading(false);
-  }, [companyId]);
-
-  useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
   const openEdit = (r: OfficialReceipt) => {
@@ -61,7 +57,7 @@ export default function VerifyOR() {
 
   const quickVerify = async (r: OfficialReceipt) => {
     await upsertOfficialReceipt(companyId, { ...r, status: 'Verified', verifiedBy: user?.email ?? 'admin' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['official-receipts', companyId] });
     toast({ title: `OR ${r.orNo} marked as Verified` });
   };
 
@@ -80,7 +76,7 @@ export default function VerifyOR() {
     });
     setSaving(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['official-receipts', companyId] });
     setDialogOpen(false);
     toast({ title: editId ? 'Receipt updated' : 'Receipt created' });
   };
@@ -88,7 +84,7 @@ export default function VerifyOR() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     await deleteOfficialReceipt(companyId, deleteTarget.id);
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['official-receipts', companyId] });
     setDeleteTarget(null);
     toast({ title: 'Official receipt deleted' });
   };

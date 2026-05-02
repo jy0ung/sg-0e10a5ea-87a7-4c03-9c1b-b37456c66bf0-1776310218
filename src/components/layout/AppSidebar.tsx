@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { loadRolePermissions } from '@/config/rolePermissions';
+import { useRoleSectionMatrix } from '@/hooks/usePermissions';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
 
@@ -225,8 +225,8 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
   const location = useLocation();
   const pathname = location.pathname;
 
-  // Role-based section filtering from permission matrix (persisted to localStorage)
-  const rolePermissions = loadRolePermissions();
+  // Role-based section filtering from permission matrix (loaded from DB via role_sections table)
+  const rolePermissions = useRoleSectionMatrix();
   const allowedSections: string[] = user?.role
     ? (rolePermissions[user.role] ?? sectionDefs.map(s => s.name))
     : sectionDefs.map(s => s.name);

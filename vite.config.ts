@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "robots.txt", "icons/pwa-192.png", "icons/pwa-512.png"],
+      includeAssets: ["favicon.ico", "robots.txt", "offline.html", "icons/pwa-192.png", "icons/pwa-512.png"],
       manifest: {
         name: "FLC BI App",
         short_name: "FLC",
@@ -40,6 +40,8 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        navigateFallback: "/offline.html",
+        navigateFallbackDenylist: [/^\/api\//, /^\/supabase\//],
         runtimeCaching: [
           {
             urlPattern: /^\/api\//,

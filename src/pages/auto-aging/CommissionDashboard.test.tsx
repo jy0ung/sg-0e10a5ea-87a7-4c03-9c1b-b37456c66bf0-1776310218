@@ -1,6 +1,7 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import CommissionDashboard from './CommissionDashboard';
 import type { CommissionRecord, CommissionRule, VehicleCanonical } from '@/types';
 
@@ -122,7 +123,8 @@ describe('CommissionDashboard', () => {
   });
 
   it('approves pending commission records and updates the row actions', async () => {
-    render(<CommissionDashboard />);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={qc}><CommissionDashboard /></QueryClientProvider>);
 
     await screen.findByText('CHASSIS-001');
 
@@ -141,7 +143,8 @@ describe('CommissionDashboard', () => {
   });
 
   it('marks approved commission records as paid and removes the action button', async () => {
-    render(<CommissionDashboard />);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={qc}><CommissionDashboard /></QueryClientProvider>);
 
     await screen.findByText('CHASSIS-002');
 

@@ -156,13 +156,11 @@ function normalizeDateCell(raw: unknown): NormalizedCell {
   if (raw === null || raw === undefined) return {};
 
   if (typeof raw === 'number') {
-    try {
-      const parsed = XLSX.SSF.parse_date_code(raw);
-      if (parsed?.y && parsed.m && parsed.d) {
-        return { value: buildUtcDate(parsed.y, parsed.m, parsed.d) };
-      }
-    } catch {
-      return {};
+    // Excel date serial: days since 1899-12-30 (Excel epoch)
+    const excelEpoch = Date.UTC(1899, 11, 30);
+    const date = new Date(excelEpoch + Math.floor(raw) * 86_400_000);
+    if (!isNaN(date.getTime())) {
+      return { value: date.toISOString().split('T')[0] };
     }
     return {};
   }
@@ -286,7 +284,37 @@ export function normalizeVehicleRawRow(row: Partial<VehicleRaw>): VehicleRaw {
 
 export function parseExcelDate(val: unknown): string | undefined {
   const normalized = normalizeDateCell(val);
-  return normalized.value ? String(normalized.value) : undefined;
+  // Only return the value if it is a valid (non-impossible) date.
+  return normalized.value && !normalized.invalid ? String(normalized.value) : undefined;
+}
+
+/**
+ * Parse the value under the variable "COMM PAYOUT (for disbursement on or
+ * before ...)" column. Encodes the informal conventions used on the sheet:
+ *   - blank: nothing known
+ *   - "Comm not paid" / "not paid" / "pending": paid=false, remark=raw
+ *   - "Paid", "Paid 12/4", a date cell: paid=true, remark=raw
+ *   - anything else: remark=raw only (don't assume paid state)
+ */
+function parseCommPayout(val: unknown): { paid?: boolean; remark?: string } {
+  if (val === null || val === undefined || val === '') return {};
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return { paid: true, remark: val.toISOString().slice(0, 10) };
+  }
+  if (typeof val === 'number') {
+    // Excel date serials and numeric confirmations both imply "paid".
+    return { paid: true, remark: String(val) };
+  }
+  const text = String(val).trim();
+  if (!text) return {};
+  const lower = text.toLowerCase();
+  if (/\bnot\s*paid\b|\bunpaid\b|\bpending\b/.test(lower)) {
+    return { paid: false, remark: text };
+  }
+  if (/\bpaid\b|\bdone\b|\byes\b/.test(lower)) {
+    return { paid: true, remark: text };
+  }
+  return { remark: text };
 }
 
 export async function parseWorkbook(file: ArrayBuffer): Promise<{ rows: VehicleRaw[]; issues: DataQualityIssue[]; missingColumns: string[] }> {

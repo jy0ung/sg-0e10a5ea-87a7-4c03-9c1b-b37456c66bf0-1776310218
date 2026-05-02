@@ -16,6 +16,26 @@ function isMissingEmployeeLinkColumnError(message: string | null | undefined): b
   return text.includes('column profiles.employee_id does not exist') || text.includes('employee_id');
 }
 
+// ---------------------------------------------------------------------------
+// In-memory sliding-window rate limiter
+// Max 10 invites per caller per hour. Resets on isolate restart (acceptable).
+// ---------------------------------------------------------------------------
+const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RATE_MAX_CALLS = 10;
+const rateLimitStore = new Map<string, number[]>();
+
+function isRateLimited(callerId: string): boolean {
+  const now = Date.now();
+  const timestamps = (rateLimitStore.get(callerId) ?? []).filter(
+    (t) => now - t < RATE_WINDOW_MS,
+  );
+  if (timestamps.length >= RATE_MAX_CALLS) return true;
+  timestamps.push(now);
+  rateLimitStore.set(callerId, timestamps);
+  return false;
+}
+// ---------------------------------------------------------------------------
+
 Deno.serve(async (req: Request) => {
   const corsHeaders = buildCorsHeaders(req);
 
@@ -48,6 +68,14 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Rate-limit: max 10 invites per authenticated user per hour
+    if (isRateLimited(caller.id)) {
+      return new Response(
+        JSON.stringify({ error: 'Too many invite requests. Please wait before trying again.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '3600' } },
       );
     }
 

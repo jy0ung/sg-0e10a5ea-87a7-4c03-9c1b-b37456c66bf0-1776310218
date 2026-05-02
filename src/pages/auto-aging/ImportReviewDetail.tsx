@@ -5,24 +5,41 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { getImportReviewRows } from '@/services/importReviewService';
+import { useAuth } from '@/contexts/AuthContext';
+import { getImportReviewRows, reviewRow } from '@/services/importReviewService';
 import type { ImportReviewRow } from '@/types';
-import { AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ImportReviewDetail() {
   const navigate = useNavigate();
   const { batchId = '' } = useParams<{ batchId: string }>();
   const companyId = useCompanyId();
   const { importBatches } = useData();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [rows, setRows] = useState<ImportReviewRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   const batch = useMemo(() => importBatches.find((candidate) => candidate.id === batchId) ?? null, [batchId, importBatches]);
+
+  async function loadRows() {
+    if (!batchId || !companyId) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const data = await getImportReviewRows(batchId, companyId);
+    setRows(data);
+    setLoading(false);
+  }
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadRows() {
+    async function load() {
       if (!batchId || !companyId) {
         setRows([]);
         setLoading(false);
@@ -37,11 +54,24 @@ export default function ImportReviewDetail() {
       }
     }
 
-    void loadRows();
+    void load();
     return () => {
       cancelled = true;
     };
   }, [batchId, companyId]);
+
+  async function handleReview(row: ImportReviewRow, status: 'resolved' | 'discarded') {
+    setReviewingId(row.id);
+    const result = await reviewRow(row.id, status, { reviewedBy: user?.id });
+    setReviewingId(null);
+
+    if (result.error) {
+      toast({ title: 'Action failed', description: result.error, variant: 'destructive' });
+    } else {
+      toast({ title: status === 'resolved' ? 'Row accepted' : 'Row discarded' });
+      void loadRows();
+    }
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -96,6 +126,7 @@ export default function ImportReviewDetail() {
                   <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Reason</th>
                   <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Status</th>
                   <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Issues</th>
+                  <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -115,6 +146,36 @@ export default function ImportReviewDetail() {
                           <span className="text-xs text-muted-foreground">No validation issues stored</span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {(row.reviewStatus === 'pending' || row.reviewStatus === 'in_review') ? (
+                        <div className="flex gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-success border-success/40 hover:bg-success/10"
+                            disabled={reviewingId === row.id}
+                            onClick={() => void handleReview(row, 'resolved')}
+                          >
+                            {reviewingId === row.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                            }
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                            disabled={reviewingId === row.id}
+                            onClick={() => void handleReview(row, 'discarded')}
+                          >
+                            <XCircle className="h-3.5 w-3.5 mr-1" />Discard
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground capitalize">{row.reviewStatus}</span>
+                      )}
                     </td>
                   </tr>
                 ))}

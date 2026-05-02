@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +16,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { listAnnouncements, createAnnouncement, deleteAnnouncement } from '@/services/hrmsService';
-import type { Announcement, CreateAnnouncementInput, AnnouncementCategory, AnnouncementPriority } from '@/types';
+import type { CreateAnnouncementInput, AnnouncementCategory, AnnouncementPriority } from '@/types';
 import { Pin, Plus, Trash2, Megaphone } from 'lucide-react';
 import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
 
@@ -51,8 +52,16 @@ export default function Announcements() {
   const { toast } = useToast();
   const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
 
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [loading, setLoading]             = useState(true);
+  const queryClient = useQueryClient();
+  const { data: announcements = [], isPending: loading } = useQuery({
+    queryKey: ['announcements', user?.companyId],
+    queryFn: async () => {
+      const res = await listAnnouncements(user!.companyId);
+      if (res.error) toast({ title: 'Error', description: res.error, variant: 'destructive' });
+      return res.data;
+    },
+    enabled: !!user?.companyId,
+  });
   const [showCreate, setShowCreate]       = useState(false);
   const [deleting, setDeleting]           = useState<string | null>(null);
   const [catFilter, setCatFilter]         = useState<AnnouncementCategory | 'all'>('all');
@@ -60,17 +69,6 @@ export default function Announcements() {
   const [form, setForm] = useState<Partial<CreateAnnouncementInput>>({
     category: 'general', priority: 'normal', pinned: false,
   });
-
-  const load = useCallback(async () => {
-    if (!user?.companyId) return;
-    setLoading(true);
-    const res = await listAnnouncements(user.companyId);
-    setAnnouncements(res.data);
-    setLoading(false);
-    if (res.error) toast({ title: 'Error', description: res.error, variant: 'destructive' });
-  }, [user, toast]);
-
-  useEffect(() => { load(); }, [load]);
 
   const filtered = catFilter === 'all' ? announcements : announcements.filter(a => a.category === catFilter);
 
@@ -82,7 +80,7 @@ export default function Announcements() {
     toast({ title: 'Announcement posted' });
     setShowCreate(false);
     setForm({ category: 'general', priority: 'normal', pinned: false });
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['announcements', user?.companyId] });
   }
 
   async function handleDelete(id: string) {
@@ -90,7 +88,7 @@ export default function Announcements() {
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: 'Announcement deleted' });
     setDeleting(null);
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['announcements', user?.companyId] });
   }
 
   return (

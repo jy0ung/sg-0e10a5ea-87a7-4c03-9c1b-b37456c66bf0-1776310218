@@ -6,9 +6,6 @@ import {
   ALL_SECTIONS,
   DEFAULT_ROLE_SECTIONS,
   ROLE_LABELS,
-  loadRolePermissions,
-  saveRolePermissions,
-  resetRolePermissions,
   type SectionName,
 } from '@/config/rolePermissions';
 import type { AppRole } from '@/types';
@@ -32,12 +29,12 @@ export default function RolePermissionsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [permissions, setPermissions] = useState<Record<AppRole, SectionName[]>>(
-    () => loadRolePermissions()
+    () => ({ ...DEFAULT_ROLE_SECTIONS })
   );
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Hydrate from DB on mount; DB wins over the localStorage snapshot.
+  // Hydrate from DB on mount.
   useEffect(() => {
     if (!user?.company_id) return;
     let cancelled = false;
@@ -87,7 +84,6 @@ export default function RolePermissionsPage() {
         });
         return;
       }
-      saveRolePermissions(permissions);
       setDirty(false);
       toast({ title: 'Permissions saved', description: 'Role permissions updated. Changes apply on next navigation.' });
     } finally {
@@ -96,7 +92,6 @@ export default function RolePermissionsPage() {
   };
 
   const handleReset = () => {
-    resetRolePermissions();
     setPermissions({ ...DEFAULT_ROLE_SECTIONS });
     setDirty(false);
     toast({ title: 'Reset to defaults', description: 'All role permissions restored to defaults.' });

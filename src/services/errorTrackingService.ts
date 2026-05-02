@@ -58,6 +58,7 @@ export class ErrorTrackingService {
       try {
         Sentry.init({
           dsn,
+          integrations: [Sentry.browserTracingIntegration()],
           tracesSampleRate: normalizeSampleRate(config.tracesSampleRate),
           replaysSessionSampleRate: 0,
           replaysOnErrorSampleRate: 0,
@@ -154,6 +155,14 @@ export class ErrorTrackingService {
 
   getBreadcrumbs(): readonly Breadcrumb[] {
     return this.breadcrumbs;
+  }
+
+  /** Send a numeric measurement to Sentry (e.g. Core Web Vitals). */
+  logMetric(name: string, value: number): void {
+    if (this.hasSentry) {
+      Sentry.setMeasurement(name, value, 'millisecond');
+    }
+    loggingService.logPerformance(name, value, 'ms');
   }
 }
 

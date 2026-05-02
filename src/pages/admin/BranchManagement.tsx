@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,22 +20,17 @@ export default function BranchManagement() {
   const companyId = useCompanyId();
   const { toast } = useToast();
 
-  const [branches, setBranches] = useState<BranchRecord[]>([]);
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: branches = [], isPending: loading } = useQuery({
+    queryKey: ['branches', companyId],
+    queryFn: async () => { const { data } = await getBranches(companyId); return data; },
+    enabled: !!companyId,
+  });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(empty);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BranchRecord | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data } = await getBranches(companyId);
-    setBranches(data);
-    setLoading(false);
-  }, [companyId]);
-
-  useEffect(() => { load(); }, [load]);
 
   if (!hasRole(['super_admin', 'company_admin'])) return <UnauthorizedAccess />;
 
@@ -57,7 +53,7 @@ export default function BranchManagement() {
     });
     setSaving(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['branches', companyId] });
     setDialogOpen(false);
     toast({ title: editId ? 'Branch updated' : 'Branch created' });
   };
@@ -66,7 +62,7 @@ export default function BranchManagement() {
     if (!deleteTarget) return;
     const { error } = await deleteBranch(companyId, deleteTarget.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['branches', companyId] });
     setDeleteTarget(null);
     toast({ title: 'Branch deleted' });
   };

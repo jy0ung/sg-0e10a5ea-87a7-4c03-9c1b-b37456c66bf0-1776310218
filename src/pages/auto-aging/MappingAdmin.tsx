@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -150,41 +151,38 @@ export default function MappingAdmin() {
   const companyId = useCompanyId();
   const canEdit = ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'].includes(user?.role ?? '');
 
-  const [branchMappings, setBranchMappings] = useState<BranchMapping[]>([]);
-  const [paymentMappings, setPaymentMappings] = useState<PaymentMethodMapping[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [bRes, pRes] = await Promise.all([
-      getBranchMappings(companyId),
-      getPaymentMethodMappings(companyId),
-    ]);
-    setBranchMappings(bRes.data);
-    setPaymentMappings(pRes.data);
-    setLoading(false);
-  }, [companyId]);
-
-  useEffect(() => { load(); }, [load]);
+  const { data: branchMappings = [], isPending: loadingBranches } = useQuery({
+    queryKey: ['branch-mappings', companyId],
+    queryFn: async () => { const r = await getBranchMappings(companyId); return r.data; },
+    enabled: !!companyId,
+  });
+  const { data: paymentMappings = [], isPending: loadingPayments } = useQuery({
+    queryKey: ['payment-mappings', companyId],
+    queryFn: async () => { const r = await getPaymentMethodMappings(companyId); return r.data; },
+    enabled: !!companyId,
+  });
+  const loading = loadingBranches || loadingPayments;
 
   // Branch mapping handlers
   const handleNewBranch = async (rawValue: string, canonical: string, notes: string) => {
     const { error } = await createBranchMapping({ rawValue, canonicalCode: canonical, notes, companyId });
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Branch mapping added' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['branch-mappings', companyId] });
   };
   const handleUpdateBranch = async (id: string, rawValue: string, canonical: string, notes: string) => {
     const { error } = await updateBranchMapping(companyId, id, { rawValue, canonicalCode: canonical, notes }, user?.id);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Branch mapping updated' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['branch-mappings', companyId] });
   };
   const handleDeleteBranch = async (id: string) => {
     const { error } = await deleteBranchMapping(companyId, id, user?.id);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Branch mapping deleted' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['branch-mappings', companyId] });
   };
 
   // Payment mapping handlers
@@ -192,19 +190,19 @@ export default function MappingAdmin() {
     const { error } = await createPaymentMethodMapping({ rawValue, canonicalValue: canonical, notes, companyId });
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Payment mapping added' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['payment-mappings', companyId] });
   };
   const handleUpdatePayment = async (id: string, rawValue: string, canonical: string, notes: string) => {
     const { error } = await updatePaymentMethodMapping(companyId, id, { rawValue, canonicalValue: canonical, notes }, user?.id);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Payment mapping updated' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['payment-mappings', companyId] });
   };
   const handleDeletePayment = async (id: string) => {
     const { error } = await deletePaymentMethodMapping(companyId, id, user?.id);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Payment mapping deleted' });
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['payment-mappings', companyId] });
   };
 
   return (

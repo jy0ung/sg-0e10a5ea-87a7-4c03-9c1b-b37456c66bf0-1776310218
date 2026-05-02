@@ -6,6 +6,8 @@ const sentryMock = vi.hoisted(() => ({
   captureMessage: vi.fn(),
   init: vi.fn(),
   setUser: vi.fn(),
+  setMeasurement: vi.fn(),
+  browserTracingIntegration: vi.fn().mockReturnValue({}),
 }));
 
 vi.mock('@sentry/react', () => sentryMock);

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +21,7 @@ import {
   createLeaveRequest,
   reviewLeaveRequest,
 } from '@/services/hrmsService';
-import type { LeaveRequest, LeaveType, LeaveStatus, CreateLeaveRequestInput } from '@/types';
+import type { LeaveRequest, LeaveStatus, CreateLeaveRequestInput } from '@/types';
 import { CheckCircle2, XCircle, Clock, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { HRMS_LEAVE_APPROVER_ROLES } from '@/config/hrmsConfig';
@@ -29,9 +30,7 @@ import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
 import {
   getPendingApprovalsForUser,
   submitApprovalDecision,
-  initiateApprovalRequest,
 } from '@/services/approvalEngineService';
-import type { PendingApproval } from '@/types';
 
 const MANAGER_ROLES = HRMS_LEAVE_APPROVER_ROLES;
 const STATUS_COLORS: Record<LeaveStatus, string> = {
@@ -46,6 +45,7 @@ export type LeaveApproverIdentity = {
   role?: string;
 } | null | undefined;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function isRequestAssignedToApprover(
   request: LeaveRequest,
   approver: LeaveApproverIdentity,
@@ -57,6 +57,7 @@ export function isRequestAssignedToApprover(
   return isManager;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function filterLeaveRequestsForView(
   requests: LeaveRequest[],
   filterStatus: LeaveStatus | 'all',
@@ -85,9 +86,27 @@ export default function LeaveManagement() {
   const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
   const selfServiceEmployeeId = user?.employeeId ?? user?.id;
 
-  const [requests, setRequests]     = useState<LeaveRequest[]>([]);
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const queryClient = useQueryClient();
+
+  const { data: leaveData, isPending: loading } = useQuery({
+    queryKey: ['leave-management', user?.companyId, user?.id, isManager, selfServiceEmployeeId],
+    queryFn: async () => {
+      const [reqRes, typeRes, approvalsRes] = await Promise.all([
+        listLeaveRequests(user!.companyId, isManager
+          ? { includeApprovalHistory: true }
+          : { employeeId: selfServiceEmployeeId, includeApprovalHistory: true }),
+        listLeaveTypes(user!.companyId),
+        isManager ? getPendingApprovalsForUser(user!.companyId, user!.id) : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (reqRes.error) toast({ title: 'Error', description: reqRes.error, variant: 'destructive' });
+      return { requests: reqRes.data, leaveTypes: typeRes.data, pendingApprovals: approvalsRes.data };
+    },
+    enabled: !!user?.companyId && (!!(isManager) || !!selfServiceEmployeeId),
+  });
+  const requests       = leaveData?.requests       ?? [];
+  const leaveTypes     = leaveData?.leaveTypes     ?? [];
+  const pendingApprovals = leaveData?.pendingApprovals ?? [];
+
   const [filterStatus, setFilterStatus] = useState<LeaveStatus | 'all'>('all');
   const [viewMode, setViewMode] = useState<'all' | 'my_queue'>('all');
   const [showApply, setShowApply]   = useState(false);
@@ -97,32 +116,12 @@ export default function LeaveManagement() {
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
 
   // Approval engine queue
-  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [approvalsExpanded, setApprovalsExpanded] = useState(true);
   // When a pending approval is being acted on, track the approval_request id
   const [reviewingApprovalId, setReviewingApprovalId] = useState<string | null>(null);
 
   // Apply form
-  const [applyForm, setApplyForm] = useState<Partial<CreateLeaveRequestInput>>({});
-
-  const load = useCallback(async () => {
-    if (!user?.companyId || (!isManager && !selfServiceEmployeeId)) return;
-    setLoading(true);
-    const [reqRes, typeRes, approvalsRes] = await Promise.all([
-      listLeaveRequests(user.companyId, isManager
-        ? { includeApprovalHistory: true }
-        : { employeeId: selfServiceEmployeeId, includeApprovalHistory: true }),
-      listLeaveTypes(user.companyId),
-      isManager ? getPendingApprovalsForUser(user.companyId, user.id) : Promise.resolve({ data: [], error: null }),
-    ]);
-    setRequests(reqRes.data);
-    setLeaveTypes(typeRes.data);
-    setPendingApprovals(approvalsRes.data);
-    setLoading(false);
-    if (reqRes.error) toast({ title: 'Error', description: reqRes.error, variant: 'destructive' });
-  }, [user, isManager, selfServiceEmployeeId, toast]);
-
-  useEffect(() => { load(); }, [load]);
+  const [applyForm, setApplyForm] = useState<Partial<CreateLeaveRequestInput>>({})
 
   function canReviewRequest(request: LeaveRequest): boolean {
     return isRequestAssignedToApprover(request, user, isManager);
@@ -165,7 +164,7 @@ export default function LeaveManagement() {
     toast({ title: 'Leave application submitted' });
     setShowApply(false);
     setApplyForm({});
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['leave-management', user?.companyId] });
   }
 
   async function handleReview() {
@@ -184,7 +183,7 @@ export default function LeaveManagement() {
     setReviewingId(null);
     setReviewingApprovalId(null);
     setReviewNote('');
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['leave-management', user?.companyId] });
   }
 
   return (

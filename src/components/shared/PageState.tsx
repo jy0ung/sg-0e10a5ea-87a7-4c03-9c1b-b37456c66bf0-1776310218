@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertCircle, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from 'react-i18next';
 
 interface EmptyStateProps {
   title: string;
@@ -36,23 +37,26 @@ function getErrorMessage(error: unknown): string | undefined {
 }
 
 export function PageErrorState({
-  title = 'Unable to load data',
-  description = 'Retry the request. If the problem persists, sign out and sign back in.',
+  title,
+  description,
   error,
   onRetry,
 }: PageErrorStateProps) {
+  const { t } = useTranslation();
+  const heading = title ?? t('page.errorTitle');
+  const detail = description ?? t('page.errorDescription');
   const message = getErrorMessage(error);
 
   return (
     <div className="glass-panel p-10 text-center" role="alert">
       <AlertCircle className="mx-auto mb-3 h-10 w-10 text-destructive" aria-hidden />
-      <h3 className="text-base font-semibold text-foreground">{title}</h3>
+      <h3 className="text-base font-semibold text-foreground">{heading}</h3>
       <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-        {message ? `${description} (${message})` : description}
+        {message ? `${detail} (${message})` : detail}
       </p>
       {onRetry && (
         <Button type="button" variant="outline" className="mt-5" onClick={onRetry}>
-          Retry
+          {t('common.retry')}
         </Button>
       )}
     </div>

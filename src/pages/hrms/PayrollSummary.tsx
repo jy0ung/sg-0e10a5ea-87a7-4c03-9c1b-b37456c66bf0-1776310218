@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -46,9 +47,17 @@ export default function PayrollSummary() {
   const { toast } = useToast();
   const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
 
-  const [runs, setRuns]         = useState<PayrollRun[]>([]);
+  const queryClient = useQueryClient();
+  const { data: runs = [], isPending: loading } = useQuery({
+    queryKey: ['payroll-runs', user?.companyId],
+    queryFn: async () => {
+      const res = await listPayrollRuns(user!.companyId, { includeApprovalHistory: true });
+      if (res.error) toast({ title: 'Error', description: res.error, variant: 'destructive' });
+      return res.data;
+    },
+    enabled: !!user?.companyId,
+  });
   const [items, setItems]       = useState<PayrollItem[]>([]);
-  const [loading, setLoading]   = useState(true);
   const [viewRunId, setViewRunId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newYear, setNewYear]   = useState(String(new Date().getFullYear()));
@@ -57,17 +66,6 @@ export default function PayrollSummary() {
   const [reviewAction, setReviewAction] = useState<'approved' | 'rejected'>('approved');
   const [reviewNote, setReviewNote] = useState('');
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
-
-  const load = useCallback(async () => {
-    if (!user?.companyId) return;
-    setLoading(true);
-    const res = await listPayrollRuns(user.companyId, { includeApprovalHistory: true });
-    setRuns(res.data);
-    setLoading(false);
-    if (res.error) toast({ title: 'Error', description: res.error, variant: 'destructive' });
-  }, [user, toast]);
-
-  useEffect(() => { load(); }, [load]);
 
   function canReviewRun(run: PayrollRun): boolean {
     if (!isManager || !user || run.status !== 'draft' || run.approvalInstanceStatus !== 'pending') return false;
@@ -110,14 +108,14 @@ export default function PayrollSummary() {
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: 'Payroll run created' });
     setShowCreate(false);
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['payroll-runs', user?.companyId] });
   }
 
   async function handleStatusChange(runId: string, status: PayrollRunStatus) {
     const { error } = await updatePayrollRunStatus(runId, status, user?.id);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: `Status updated to ${status}` });
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['payroll-runs', user?.companyId] });
   }
 
   async function handleReview() {
@@ -128,7 +126,7 @@ export default function PayrollSummary() {
     notifyApprovalInboxChanged();
     setReviewingRunId(null);
     setReviewNote('');
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['payroll-runs', user?.companyId] });
   }
 
   async function handleResubmit(runId: string) {
@@ -137,7 +135,7 @@ export default function PayrollSummary() {
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: 'Payroll finalisation resubmitted' });
     notifyApprovalInboxChanged();
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['payroll-runs', user?.companyId] });
   }
 
   async function handleView(runId: string) {

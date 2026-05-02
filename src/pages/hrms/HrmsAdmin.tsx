@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -125,9 +126,23 @@ interface DepartmentPanelProps {
 
 function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps) {
   const { toast } = useToast();
-  const [rows, setRows] = useState<Department[]>([]);
-  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: deptData, isPending: loading } = useQuery({
+    queryKey: ['departments-panel', companyId],
+    queryFn: async () => {
+      const [depts, emps] = await Promise.all([
+        listDepartments(companyId),
+        listEmployeeDirectory(companyId),
+      ]);
+      return {
+        rows: depts.error ? [] : depts.data,
+        employees: emps.error ? [] : emps.data.map(e => ({ id: e.id, name: e.name })),
+      };
+    },
+    enabled: !!companyId,
+  });
+  const rows      = deptData?.rows      ?? [];
+  const employees = deptData?.employees ?? [];
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Department | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
@@ -136,19 +151,6 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
     name: '', description: '', headEmployeeId: '', costCentre: '', isActive: true,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [depts, emps] = await Promise.all([
-      listDepartments(companyId),
-      listEmployeeDirectory(companyId),
-    ]);
-    if (!depts.error) setRows(depts.data);
-    if (!emps.error) setEmployees(emps.data.map(e => ({ id: e.id, name: e.name })));
-    setLoading(false);
-  }, [companyId]);
-
-  useEffect(() => { void load(); }, [load]);
 
   function openCreate() {
     setEditTarget(null);
@@ -193,7 +195,7 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: editTarget ? 'Department updated' : 'Department created' });
     setDialogOpen(false);
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['departments-panel', companyId] });
   }
 
   async function handleDelete() {
@@ -202,7 +204,7 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
     if (error) { toast({ title: 'Cannot delete', description: error, variant: 'destructive' }); }
     else toast({ title: 'Department deleted' });
     setDeleteTarget(null);
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['departments-panel', companyId] });
   }
 
   return (
@@ -342,9 +344,20 @@ interface JobTitlesPanelProps {
 
 function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
   const { toast } = useToast();
-  const [rows, setRows] = useState<JobTitle[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: jtData, isPending: loading } = useQuery({
+    queryKey: ['job-titles-panel', companyId],
+    queryFn: async () => {
+      const [titles, depts] = await Promise.all([listJobTitles(companyId), listDepartments(companyId)]);
+      return {
+        rows: titles.error ? [] : titles.data,
+        departments: depts.error ? [] : depts.data.filter(d => d.isActive),
+      };
+    },
+    enabled: !!companyId,
+  });
+  const rows        = jtData?.rows        ?? [];
+  const departments = jtData?.departments ?? [];
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<JobTitle | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<JobTitle | null>(null);
@@ -353,16 +366,6 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
     name: '', departmentId: '', level: '', description: '', isActive: true,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [titles, depts] = await Promise.all([listJobTitles(companyId), listDepartments(companyId)]);
-    if (!titles.error) setRows(titles.data);
-    if (!depts.error) setDepartments(depts.data.filter(d => d.isActive));
-    setLoading(false);
-  }, [companyId]);
-
-  useEffect(() => { void load(); }, [load]);
 
   function openCreate() {
     setEditTarget(null);
@@ -407,7 +410,7 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: editTarget ? 'Job title updated' : 'Job title created' });
     setDialogOpen(false);
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['job-titles-panel', companyId] });
   }
 
   async function handleDelete() {
@@ -416,7 +419,7 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
     if (error) { toast({ title: 'Cannot delete', description: error, variant: 'destructive' }); }
     else toast({ title: 'Job title deleted' });
     setDeleteTarget(null);
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['job-titles-panel', companyId] });
   }
 
   return (
@@ -562,8 +565,12 @@ interface LeaveTypesPanelProps {
 
 function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps) {
   const { toast } = useToast();
-  const [rows, setRows] = useState<LeaveType[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: rows = [], isPending: loading } = useQuery({
+    queryKey: ['leave-types-panel', companyId],
+    queryFn: async () => { const { data } = await listAllLeaveTypes(companyId); return data; },
+    enabled: !!companyId,
+  });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<LeaveType | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LeaveType | null>(null);
@@ -572,15 +579,6 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
     name: '', code: '', daysPerYear: 14, defaultDays: 14, carryForward: true, isPaid: true, active: true,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await listAllLeaveTypes(companyId);
-    if (!error) setRows(data);
-    setLoading(false);
-  }, [companyId]);
-
-  useEffect(() => { void load(); }, [load]);
 
   function openCreate() {
     setEditTarget(null);
@@ -618,12 +616,12 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: editTarget ? 'Leave type updated' : 'Leave type created' });
     setDialogOpen(false);
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['leave-types-panel', companyId] });
   }
 
   async function handleQuickToggle(lt: LeaveType, active: boolean) {
     await updateLeaveType(companyId, lt.id, actorId, { ...lt, active });
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['leave-types-panel', companyId] });
   }
 
   async function handleDelete() {
@@ -632,7 +630,7 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
     if (error) toast({ title: 'Leave type deactivated', description: 'This leave type has existing balances and was deactivated instead of deleted.' });
     else toast({ title: 'Leave type deleted' });
     setDeleteTarget(null);
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['leave-types-panel', companyId] });
   }
 
   return (
@@ -786,9 +784,13 @@ interface HolidaysPanelProps {
 
 function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
   const { toast } = useToast();
-  const [rows, setRows] = useState<PublicHoliday[]>([]);
+  const queryClient = useQueryClient();
+  const { data: rows = [], isPending: loading } = useQuery({
+    queryKey: ['holidays-panel', companyId],
+    queryFn: async () => { const { data } = await listHolidays(companyId); return data; },
+    enabled: !!companyId,
+  });
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear());
-  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<PublicHoliday | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PublicHoliday | null>(null);
@@ -797,15 +799,6 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
     name: '', date: '', holidayType: 'public', isRecurring: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await listHolidays(companyId);
-    if (!error) setRows(data);
-    setLoading(false);
-  }, [companyId]);
-
-  useEffect(() => { void load(); }, [load]);
 
   const displayRows = rows.filter(h => {
     const year = new Date(h.date).getFullYear();
@@ -846,7 +839,7 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: editTarget ? 'Holiday updated' : 'Holiday created' });
     setDialogOpen(false);
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['holidays-panel', companyId] });
   }
 
   async function handleDelete() {
@@ -855,7 +848,7 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
     if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
     else toast({ title: 'Holiday deleted' });
     setDeleteTarget(null);
-    void load();
+    void queryClient.invalidateQueries({ queryKey: ['holidays-panel', companyId] });
   }
 
   const currentYear = new Date().getFullYear();

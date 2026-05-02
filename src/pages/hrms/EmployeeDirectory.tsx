@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,9 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { Search, Plus, Users, UserCheck, UserMinus, Pencil } from 'lucide-react';
-import { AppRole, Employee, EmployeeStatus, Department, JobTitle } from '@/types';
+import { AppRole, Employee, EmployeeStatus } from '@/types';
 import { getBranches } from '@/services/masterDataService';
-import type { BranchRecord } from '@/types';
 import { listDepartments, listJobTitles } from '@/services/hrmsAdminService';
 import {
   listEmployeeDirectory,
@@ -62,8 +62,6 @@ const NONE_SELECT_VALUE = '__none__';
 // Roles that can manage employees (add/edit/deactivate) — sourced from hrmsConfig
 const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 const UNASSIGNED_MANAGER = '__unassigned__';
-const NO_DEPARTMENT = '__none_department__';
-const NO_JOB_TITLE = '__none_job_title__';
 
 // ─── Form state ───────────────────────────────────────────────────────────────
 
@@ -95,11 +93,32 @@ export default function EmployeeDirectory() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [employees, setEmployees]   = useState<Employee[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [branches, setBranches]     = useState<BranchRecord[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [jobTitles, setJobTitles]   = useState<JobTitle[]>([]);
+  const queryClient = useQueryClient();
+
+  const { data: empData, isPending: loading } = useQuery({
+    queryKey: ['employee-directory', user?.companyId],
+    queryFn: async () => {
+      const [empResult, branchResult, deptResult, jtResult] = await Promise.all([
+        listEmployeeDirectory(user!.companyId),
+        getBranches(user!.companyId),
+        listDepartments(user!.companyId),
+        listJobTitles(user!.companyId),
+      ]);
+      if (empResult.error) toast({ title: 'Failed to load employees', description: empResult.error, variant: 'destructive' });
+      return {
+        employees: empResult.error ? [] : empResult.data,
+        branches: branchResult.error ? [] : branchResult.data,
+        departments: deptResult.error ? [] : deptResult.data,
+        jobTitles: jtResult.error ? [] : jtResult.data,
+      };
+    },
+    enabled: !!user?.companyId,
+  });
+  const employees   = empData?.employees   ?? [];
+  const branches    = empData?.branches    ?? [];
+  const departments = empData?.departments ?? [];
+  const jobTitles   = empData?.jobTitles   ?? [];
+
 
   // Filters
   const [search, setSearch]           = useState('');
@@ -132,26 +151,6 @@ export default function EmployeeDirectory() {
     if (contact.length <= 4) return '••••';
     return contact.slice(0, -4).replace(/[0-9]/g, '•') + contact.slice(-4);
   }
-
-  // ── Load ──
-  const load = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    const [empResult, branchResult, deptResult, jtResult] = await Promise.all([
-      listEmployeeDirectory(user.companyId),
-      getBranches(user.companyId),
-      listDepartments(user.companyId),
-      listJobTitles(user.companyId),
-    ]);
-    if (empResult.error) toast({ title: 'Failed to load employees', description: empResult.error, variant: 'destructive' });
-    else setEmployees(empResult.data);
-    if (!branchResult.error) setBranches(branchResult.data);
-    if (!deptResult.error) setDepartments(deptResult.data);
-    if (!jtResult.error) setJobTitles(jtResult.data);
-    setLoading(false);
-  }, [user, toast]);
-
-  useEffect(() => { load(); }, [load]);
 
   // ── Derived ──
   const employeeById = new Map(employees.map(employee => [employee.id, employee]));
@@ -209,7 +208,7 @@ export default function EmployeeDirectory() {
     toast({ title: 'Employee created', description: `${form.staffCode.toUpperCase()} — ${form.name}` });
     setForm(EMPTY_CREATE_FORM);
     setAddOpen(false);
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['employee-directory', user?.companyId] });
   };
 
   // ── Open edit ──
@@ -261,19 +260,17 @@ export default function EmployeeDirectory() {
     toast({ title: 'Employee updated', description: editForm.name });
     setEditTarget(null);
     setEditForm(null);
-    load();
+    void queryClient.invalidateQueries({ queryKey: ['employee-directory', user?.companyId] });
   };
 
   // ── Quick status toggle ──
   const toggleStatus = async (emp: Employee) => {
     const next: EmployeeStatus = emp.status === 'active' ? 'inactive' : 'active';
-    // Optimistic update
-    setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, status: next } : e));
     const { error } = await updateEmployee(emp.id, { status: next }, user?.id, user.companyId);
     if (error) {
-      setEmployees(prev => prev.map(e => e.id === emp.id ? { ...e, status: emp.status } : e));
       toast({ title: 'Failed to update status', description: error, variant: 'destructive' });
     }
+    void queryClient.invalidateQueries({ queryKey: ['employee-directory', user?.companyId] });
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────────
@@ -672,7 +669,7 @@ export default function EmployeeDirectory() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Direct Manager</label>
+                <span className="text-xs font-medium text-muted-foreground">Direct Manager</span>
                 <Select
                   value={editForm.managerId || NONE_SELECT_VALUE}
                   onValueChange={v => setEditForm(f => f ? {

@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,9 +38,8 @@ export default function CommissionDashboard() {
   const companyId = useCompanyId();
   const canManage = ['super_admin', 'company_admin', 'director', 'general_manager'].includes(user?.role ?? '');
 
-  const [rules, setRules] = useState<CommissionRule[]>([]);
-  const [records, setRecords] = useState<CommissionRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [periodFilter, setPeriodFilter] = useState(PERIODS[0]);
   const [salesmanFilter, setSalesmanFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -48,21 +48,20 @@ export default function CommissionDashboard() {
   const [deleteRuleId, setDeleteRuleId] = useState<string | null>(null);
   const [ruleForm, setRuleForm] = useState<Partial<CommissionRule>>({});
 
+  const { data: rules = [], isPending: loadingRules } = useQuery({
+    queryKey: ['commission-rules', companyId],
+    queryFn: async () => { const r = await getCommissionRules(companyId); return r.data; },
+    enabled: !!companyId,
+  });
+  const { data: records = [], isPending: loadingRecords } = useQuery({
+    queryKey: ['commission-records', companyId, periodFilter],
+    queryFn: async () => { const r = await getCommissionRecords(companyId, { period: periodFilter }); return r.data; },
+    enabled: !!companyId,
+  });
+  const loading = loadingRules || loadingRecords;
+
   const salesmen = [...new Set(vehicles.map(v => v.salesman_name))].sort();
   const branches = [...new Set(vehicles.map(v => v.branch_code))].sort();
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const [rRes, recRes] = await Promise.all([
-      getCommissionRules(companyId),
-      getCommissionRecords(companyId, { period: periodFilter }),
-    ]);
-    setRules(rRes.data);
-    setRecords(recRes.data);
-    setLoading(false);
-  }, [companyId, periodFilter]);
-
-  useEffect(() => { load(); }, [load]);
 
   const filteredRecords = records.filter(r => {
     if (salesmanFilter !== 'all' && r.salesmanName !== salesmanFilter) return false;
@@ -97,7 +96,7 @@ export default function CommissionDashboard() {
       toast({ title: 'Rule created' });
     }
     setRuleDialogOpen(false);
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['commission-rules', companyId] });
   };
 
   const handleDeleteRule = async () => {
@@ -106,13 +105,13 @@ export default function CommissionDashboard() {
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     toast({ title: 'Rule deleted' });
     setDeleteRuleId(null);
-    await load();
+    await queryClient.invalidateQueries({ queryKey: ['commission-rules', companyId] });
   };
 
   const handleStatusChange = async (recordId: string, status: CommissionRecord['status']) => {
     const { error } = await updateCommissionRecordStatus(companyId, recordId, status);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
-    setRecords(prev => prev.map(r => r.id === recordId ? { ...r, status } : r));
+    void queryClient.invalidateQueries({ queryKey: ['commission-records', companyId, periodFilter] });
   };
 
   return (
