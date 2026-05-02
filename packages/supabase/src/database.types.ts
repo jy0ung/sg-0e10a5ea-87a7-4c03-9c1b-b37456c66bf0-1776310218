@@ -944,7 +944,10 @@ export type Database = {
           error_rows: number | null
           file_name: string
           id: string
+          published_rows: number | null
           published_at: string | null
+          review_completed_at: string | null
+          review_rows: number | null
           status: string
           total_rows: number | null
           updated_at: string | null
@@ -959,7 +962,10 @@ export type Database = {
           error_rows?: number | null
           file_name: string
           id?: string
+          published_rows?: number | null
           published_at?: string | null
+          review_completed_at?: string | null
+          review_rows?: number | null
           status?: string
           total_rows?: number | null
           updated_at?: string | null
@@ -974,7 +980,10 @@ export type Database = {
           error_rows?: number | null
           file_name?: string
           id?: string
+          published_rows?: number | null
           published_at?: string | null
+          review_completed_at?: string | null
+          review_rows?: number | null
           status?: string
           total_rows?: number | null
           updated_at?: string | null
@@ -988,6 +997,95 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_review_rows: {
+        Row: {
+          assigned_to: string | null
+          branch_code: string | null
+          chassis_no: string | null
+          company_id: string
+          created_at: string
+          id: string
+          import_batch_id: string
+          normalized_payload: Json | null
+          raw_payload: Json
+          resolved_at: string | null
+          resolved_vehicle_id: string | null
+          review_reason: 'incomplete' | 'blocking' | 'mixed'
+          review_status: 'pending' | 'in_review' | 'resolved' | 'discarded'
+          row_number: number
+          source_row_id: string | null
+          updated_at: string
+          validation_errors: Json
+        }
+        Insert: {
+          assigned_to?: string | null
+          branch_code?: string | null
+          chassis_no?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          import_batch_id: string
+          normalized_payload?: Json | null
+          raw_payload?: Json
+          resolved_at?: string | null
+          resolved_vehicle_id?: string | null
+          review_reason: 'incomplete' | 'blocking' | 'mixed'
+          review_status?: 'pending' | 'in_review' | 'resolved' | 'discarded'
+          row_number: number
+          source_row_id?: string | null
+          updated_at?: string
+          validation_errors?: Json
+        }
+        Update: {
+          assigned_to?: string | null
+          branch_code?: string | null
+          chassis_no?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          import_batch_id?: string
+          normalized_payload?: Json | null
+          raw_payload?: Json
+          resolved_at?: string | null
+          resolved_vehicle_id?: string | null
+          review_reason?: 'incomplete' | 'blocking' | 'mixed'
+          review_status?: 'pending' | 'in_review' | 'resolved' | 'discarded'
+          row_number?: number
+          source_row_id?: string | null
+          updated_at?: string
+          validation_errors?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_review_rows_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_review_rows_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_review_rows_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_review_rows_resolved_vehicle_id_fkey"
+            columns: ["resolved_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
         ]

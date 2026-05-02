@@ -80,6 +80,16 @@ test.describe("Auto Aging module", () => {
     await expect(page.locator("text=/import/i").first()).toBeVisible({ timeout: 8000 });
   });
 
+  test("Review Queue (/auto-aging/review)", async ({ page }) => {
+    await assertPageLoaded(page, "/auto-aging/review");
+    await expect(page.locator("text=/review queue|review work/i").first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test("Review Detail (/auto-aging/review/import-batch-1)", async ({ page }) => {
+    await assertPageLoaded(page, "/auto-aging/review/import-batch-1");
+    await expect(page.locator("text=/review batch|queued rows|no queued rows/i").first()).toBeVisible({ timeout: 8000 });
+  });
+
   test("Data Quality (/auto-aging/quality)", async ({ page }) => {
     await assertPageLoaded(page, "/auto-aging/quality");
     await expect(page.locator("text=/quality|data/i").first()).toBeVisible({ timeout: 8000 });

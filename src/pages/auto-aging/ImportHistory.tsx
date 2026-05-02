@@ -1,9 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
 
 export default function ImportHistory() {
+  const navigate = useNavigate();
   const { importBatches } = useData();
 
   return (
@@ -25,11 +27,20 @@ export default function ImportHistory() {
               <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Rows</th>
               <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Valid</th>
               <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Errors</th>
+              <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Published</th>
+              <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Queued</th>
             </tr>
           </thead>
           <tbody>
-            {importBatches.map(b => (
-              <tr key={b.id} className="data-table-row">
+            {importBatches.map(b => {
+              const hasQueuedRows = (b.reviewRows ?? 0) > 0;
+
+              return (
+              <tr
+                key={b.id}
+                className={`data-table-row ${hasQueuedRows ? 'cursor-pointer' : ''}`}
+                onClick={hasQueuedRows ? () => navigate(`/auto-aging/review/${b.id}`) : undefined}
+              >
                 <td className="px-4 py-3 text-primary text-xs font-medium">{b.fileName}</td>
                 <td className="px-4 py-3 text-foreground">{b.uploadedBy}</td>
                 <td className="px-4 py-3 text-foreground text-xs">{new Date(b.uploadedAt).toLocaleString()}</td>
@@ -37,8 +48,10 @@ export default function ImportHistory() {
                 <td className="px-4 py-3 text-foreground tabular-nums">{b.totalRows}</td>
                 <td className="px-4 py-3 text-success tabular-nums">{b.validRows}</td>
                 <td className="px-4 py-3 text-destructive tabular-nums">{b.errorRows}</td>
+                <td className="px-4 py-3 text-success tabular-nums">{b.publishedRows ?? 0}</td>
+                <td className="px-4 py-3 text-amber-500 tabular-nums">{b.reviewRows ?? 0}</td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

@@ -23,10 +23,10 @@ export const DEFAULT_ROLE_SECTIONS: Record<AppRole, SectionName[]> = {
   director: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'Reports', 'HRMS', 'Admin'],
   general_manager: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'Reports', 'HRMS', 'Admin'],
   manager: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Reports', 'HRMS', 'Admin'],
-  sales: ['Platform', 'Sales', 'Admin'],
+  sales: ['Platform', 'Sales', 'HRMS', 'Admin'],
   accounts: ['Platform', 'Sales', 'Purchasing', 'Reports', 'HRMS', 'Admin'],
-  analyst: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Reports', 'Admin'],
-  creator_updater: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'Admin'],
+  analyst: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Reports', 'HRMS', 'Admin'],
+  creator_updater: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'HRMS', 'Admin'],
 };
 
 const LS_KEY = 'flc_role_section_permissions';

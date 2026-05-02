@@ -9,6 +9,7 @@ import { logVehicleEdit } from "./auditService";
 import { resolveNamesToIds } from "./hrmsService";
 import { validateImportBatch } from "./validationService";
 import type { ImportBatch, ImportBatchInsert, ValidationError, VehicleRaw } from "@/types";
+import type { ImportReviewRowInsertInput } from "@/lib/import-review";
 
 export async function createImportBatch(
   batch: ImportBatchInsert,
@@ -50,6 +51,9 @@ export async function createImportBatch(
         valid_rows: batch.validRows,
         error_rows: batch.errorRows,
         duplicate_rows: batch.duplicateRows,
+        published_rows: batch.publishedRows ?? 0,
+        review_rows: batch.reviewRows ?? 0,
+        review_completed_at: batch.reviewCompletedAt ?? null,
         company_id: batch.companyId,
       })
       .select()
@@ -108,6 +112,10 @@ export async function updateImportBatch(
     if (updates.totalRows !== undefined) dbUpdates.total_rows = updates.totalRows;
     if (updates.validRows !== undefined) dbUpdates.valid_rows = updates.validRows;
     if (updates.errorRows !== undefined) dbUpdates.error_rows = updates.errorRows;
+    if (updates.duplicateRows !== undefined) dbUpdates.duplicate_rows = updates.duplicateRows;
+    if (updates.publishedRows !== undefined) dbUpdates.published_rows = updates.publishedRows;
+    if (updates.reviewRows !== undefined) dbUpdates.review_rows = updates.reviewRows;
+    if (updates.reviewCompletedAt) dbUpdates.review_completed_at = updates.reviewCompletedAt;
 
     const { data, error } = await supabase
       .from("import_batches")
@@ -435,5 +443,50 @@ export async function commitImportBatch(
       "ImportService",
     );
     return { inserted: 0, qualityIssuesInserted: 0, error: error as Error };
+  }
+}
+
+export async function insertImportReviewRows(
+  rows: ImportReviewRowInsertInput[]
+): Promise<{ inserted: number; error: Error | null }> {
+  const queryId = `import-review-insert-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
+  try {
+    if (rows.length === 0) {
+      return { inserted: 0, error: null };
+    }
+
+    const dbRows = rows.map(row => ({
+      import_batch_id: row.importBatchId,
+      company_id: row.companyId,
+      row_number: row.rowNumber,
+      source_row_id: row.sourceRowId ?? null,
+      chassis_no: row.chassisNo ?? null,
+      branch_code: row.branchCode ?? null,
+      raw_payload: row.rawPayload,
+      normalized_payload: row.normalizedPayload ?? null,
+      validation_errors: row.validationErrors,
+      review_reason: row.reviewReason,
+    }));
+
+    const CHUNK_SIZE = 500;
+    for (let idx = 0; idx < dbRows.length; idx += CHUNK_SIZE) {
+      const chunk = dbRows.slice(idx, idx + CHUNK_SIZE);
+      const { error } = await supabase.from('import_review_rows').insert(chunk);
+      if (error) {
+        loggingService.error('Failed to insert import review rows', { chunk: chunk.length, error }, 'ImportService');
+        return { inserted: idx, error };
+      }
+    }
+
+    performanceService.endQueryTimer(queryId, 'insert_import_review_rows');
+    loggingService.info('Import review rows inserted', { inserted: dbRows.length }, 'ImportService');
+
+    return { inserted: dbRows.length, error: null };
+  } catch (error) {
+    performanceService.endQueryTimer(queryId, 'insert_import_review_rows');
+    loggingService.error('Unexpected error inserting import review rows', { error }, 'ImportService');
+    return { inserted: 0, error: error as Error };
   }
 }

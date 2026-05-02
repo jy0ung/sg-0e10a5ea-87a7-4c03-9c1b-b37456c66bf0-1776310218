@@ -201,7 +201,7 @@ describe('ValidationService', () => {
       expect(result.errors.some(e => e.code === 'INVALID_BRANCH_CODE')).toBe(false);
     });
 
-    it('should fail for invalid date formats', async () => {
+    it('should fail for impossible calendar dates', async () => {
       const row = {
         chassis_no: 'ABC123456789',
         branch_code: 'B001',
@@ -209,7 +209,7 @@ describe('ValidationService', () => {
         customer_name: 'John Doe',
         salesman_name: 'Jane Smith',
         payment_method: 'Cash',
-        bg_date: 'invalid-date',
+        bg_date: '31/02/2026',
       };
 
       const mockQueryBuilder = createMockQueryBuilder();
@@ -488,6 +488,36 @@ describe('ValidationService', () => {
       const result = await validateImportBatch(batch);
       expect(result.isValid).toBe(false);
       expect(result.errors.some(e => e.code === 'INVALID_NUMBER')).toBe(true);
+    });
+
+    it('should fail when batch rows contain impossible dates', async () => {
+      const rows = [
+        {
+          chassis_no: 'ABC123456789',
+          branch_code: 'B001',
+          model: 'Corolla',
+          customer_name: 'John Doe',
+          salesman_name: 'Jane Smith',
+          payment_method: 'Cash',
+          bg_date: '31/02/2026',
+        },
+      ];
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'vehicles') {
+          return createMockQueryBuilder({ data: [], error: null });
+        }
+
+        if (table === 'branches') {
+          return createMockQueryBuilder({ data: [{ code: 'B001' }], error: null });
+        }
+
+        return createMockQueryBuilder({ data: null, error: null });
+      });
+
+      const result = await validateVehicleImportBatch(rows, 'company-123');
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some(e => e.code === 'INVALID_DATE_FORMAT')).toBe(true);
     });
   });
 

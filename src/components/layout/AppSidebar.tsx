@@ -14,6 +14,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { loadRolePermissions } from '@/config/rolePermissions';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
+import {
+  HRMS_ADMIN_ROLES,
+  HRMS_MANAGER_ROLES,
+  HRMS_PAYROLL_ROLES,
+  HRMS_SELF_SERVICE_ROLES,
+} from '@/config/hrmsConfig';
 
 interface NavItem {
   label: string;
@@ -53,6 +59,7 @@ const navItems: NavItem[] = [
   { label: 'Auto Aging Overview', path: '/auto-aging', icon: Timer, section: 'Auto Aging', group: 'Overview' },
   { label: 'Vehicle Explorer', path: '/auto-aging/vehicles', icon: Car, section: 'Auto Aging', group: 'Overview' },
   { label: 'Import Center', path: '/auto-aging/import', icon: Upload, section: 'Auto Aging', group: 'Data Pipeline', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'creator_updater'] },
+  { label: 'Review Queue', path: '/auto-aging/review', icon: Search, section: 'Auto Aging', group: 'Data Pipeline', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'creator_updater'] },
   { label: 'Import History', path: '/auto-aging/history', icon: History, section: 'Auto Aging', group: 'Data Pipeline' },
   { label: 'Data Quality', path: '/auto-aging/quality', icon: AlertTriangle, section: 'Auto Aging', group: 'Controls' },
   { label: 'SLA Policies', path: '/auto-aging/sla', icon: Gauge, section: 'Auto Aging', group: 'Controls', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
@@ -81,7 +88,15 @@ const navItems: NavItem[] = [
 
   { label: 'Business Reports', path: '/reports', icon: BarChart3, section: 'Reports', group: 'Workspace' },
 
-  { label: 'Open HRMS Workspace', path: '/hrms/', icon: Briefcase, section: 'HRMS', group: 'Workspace', external: true },
+  { label: 'Employee Directory', path: '/hrms/employees', icon: Users, section: 'HRMS', group: 'Staff', roles: HRMS_MANAGER_ROLES },
+  { label: 'Leave Management', path: '/hrms/leave', icon: Calendar, section: 'HRMS', group: 'Leave', roles: HRMS_SELF_SERVICE_ROLES },
+  { label: 'Leave Calendar', path: '/hrms/leave-calendar', icon: Calendar, section: 'HRMS', group: 'Leave', roles: HRMS_SELF_SERVICE_ROLES },
+  { label: 'Attendance Log', path: '/hrms/attendance', icon: Clock, section: 'HRMS', group: 'Attendance', roles: HRMS_SELF_SERVICE_ROLES },
+  { label: 'Payroll Summary', path: '/hrms/payroll', icon: CreditCard, section: 'HRMS', group: 'Payroll', roles: HRMS_PAYROLL_ROLES },
+  { label: 'Performance Appraisals', path: '/hrms/appraisals', icon: Star, section: 'HRMS', group: 'Performance', roles: HRMS_SELF_SERVICE_ROLES },
+  { label: 'Announcements', path: '/hrms/announcements', icon: Megaphone, section: 'HRMS', group: 'Communications', roles: HRMS_SELF_SERVICE_ROLES },
+  { label: 'HRMS Settings', path: '/hrms/admin', icon: Settings2, section: 'HRMS', group: 'Administration', roles: HRMS_ADMIN_ROLES },
+  { label: 'Approval Flows', path: '/hrms/approval-flows', icon: GitMerge, section: 'HRMS', group: 'Administration', roles: HRMS_ADMIN_ROLES },
 
   { label: 'Activity Overview', path: '/admin/activity', icon: BarChart3, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin'] },
   { label: 'Audit Log', path: '/admin/audit', icon: FileText, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },

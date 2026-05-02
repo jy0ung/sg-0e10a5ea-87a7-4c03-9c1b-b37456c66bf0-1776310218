@@ -90,6 +90,9 @@ function mapDbBatch(row: Record<string, unknown>): ImportBatch {
     validRows: Number(row.valid_rows || 0),
     errorRows: Number(row.error_rows || 0),
     duplicateRows: Number(row.duplicate_rows || 0),
+    publishedRows: typeof row.published_rows === 'number' ? row.published_rows : undefined,
+    reviewRows: typeof row.review_rows === 'number' ? row.review_rows : undefined,
+    reviewCompletedAt: row.review_completed_at ? String(row.review_completed_at) : undefined,
     publishedAt: row.published_at ? String(row.published_at) : undefined,
   };
 }
@@ -414,7 +417,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const addImportBatch = useCallback(async (b: ImportBatch) => {
     try {
-      const { error } = await supabase.from('import_batches').insert({
+      const { error } = await supabase.from('import_batches').upsert({
+        id: b.id,
         file_name: b.fileName,
         uploaded_by: b.uploadedBy,
         uploaded_at: b.uploadedAt,
@@ -423,15 +427,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         valid_rows: b.validRows,
         error_rows: b.errorRows,
         duplicate_rows: b.duplicateRows,
+        published_rows: b.publishedRows ?? 0,
+        review_rows: b.reviewRows ?? 0,
+        review_completed_at: b.reviewCompletedAt ?? null,
         company_id: companyId,
-      });
+      }, { onConflict: 'id' });
       
       if (error) {
         loggingService.error('Import batch insert error', { error, batch: b }, 'DataContext');
       } else {
         queryClient.setQueryData<DataQueryResult>(activeDataQueryKey, prev => {
           const base = prev ?? emptyData;
-          return { ...base, batches: [b, ...base.batches] };
+          const remainingBatches = base.batches.filter(existingBatch => existingBatch.id !== b.id);
+          return { ...base, batches: [b, ...remainingBatches] };
         });
         loggingService.info('Import batch added', { batchId: b.id }, 'DataContext');
       }
@@ -448,6 +456,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (updates.totalRows !== undefined) dbUpdates.total_rows = updates.totalRows;
       if (updates.validRows !== undefined) dbUpdates.valid_rows = updates.validRows;
       if (updates.errorRows !== undefined) dbUpdates.error_rows = updates.errorRows;
+      if (updates.duplicateRows !== undefined) dbUpdates.duplicate_rows = updates.duplicateRows;
+      if (updates.publishedRows !== undefined) dbUpdates.published_rows = updates.publishedRows;
+      if (updates.reviewRows !== undefined) dbUpdates.review_rows = updates.reviewRows;
+      if (updates.reviewCompletedAt) dbUpdates.review_completed_at = updates.reviewCompletedAt;
 
       const { error } = await supabase.from('import_batches').update(dbUpdates).eq('company_id', companyId).eq('id', id);
       

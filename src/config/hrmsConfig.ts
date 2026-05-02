@@ -4,6 +4,15 @@ import type { AppRole } from '@/types';
  * Canonical HRMS role sets — import from here instead of duplicating in every page.
  */
 
+/**
+ * Self-service HRMS access for all staff roles.
+ * These users can request leave, view calendars, inspect attendance, see appraisals, and read announcements.
+ */
+export const HRMS_SELF_SERVICE_ROLES: AppRole[] = [
+  'super_admin', 'company_admin', 'director', 'general_manager', 'manager',
+  'sales', 'accounts', 'analyst', 'creator_updater',
+];
+
 /** Can manage employees, attendance, appraisals, announcements, and view leave calendar. */
 export const HRMS_MANAGER_ROLES: AppRole[] = [
   'super_admin', 'company_admin', 'director', 'general_manager', 'manager',
@@ -24,10 +33,8 @@ export const HRMS_APPROVAL_INBOX_ROLES: AppRole[] = [
   'super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'accounts',
 ];
 
-/** Can access any HRMS route (applies leave, views calendar). */
-export const HRMS_ACCESS_ROLES: AppRole[] = [
-  'super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'accounts',
-];
+/** Legacy alias for HRMS self-service access. Use HRMS_SELF_SERVICE_ROLES in new code. */
+export const HRMS_ACCESS_ROLES: AppRole[] = HRMS_SELF_SERVICE_ROLES;
 
 /** Can participate in appraisal cycles through self review, manager review, or acknowledgement. */
 export const HRMS_APPRAISAL_PARTICIPANT_ROLES: AppRole[] = [

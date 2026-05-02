@@ -6,7 +6,7 @@ import { performanceService } from "./performanceService";
 import type { ValidationError } from "@/types";
 
 // Allowed values for enum fields
-const ALLOWED_STATUSES = ['uploaded', 'validated', 'failed', 'publish_in_progress', 'published'] as const;
+const ALLOWED_STATUSES = ['uploaded', 'validated', 'failed', 'publish_in_progress', 'published', 'published_with_review', 'review_pending', 'review_in_progress', 'review_complete'] as const;
 type ImportBatchStatus = typeof ALLOWED_STATUSES[number];
 
 const ALLOWED_SEVERITIES = ['info', 'warning', 'error'] as const;
@@ -79,6 +79,19 @@ function buildKnownBranchSet(
   });
 
   return knownBranchSet;
+}
+
+function buildUtcDate(year: number, month: number, day: number): Date | null {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
 }
 
 /**
@@ -437,7 +450,44 @@ export function validateQualityIssue(
  * Helper function to parse date strings
  */
 function parseDate(value: string): Date | null {
-  return parseSupportedDateString(value);
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    return buildUtcDate(year, month, day);
+  }
+
+  // Try DD.MM.YYYY or DD.MM.YY
+  const dotMatch = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+  if (dotMatch) {
+    const day = Number(dotMatch[1]);
+    const month = Number(dotMatch[2]);
+    let year = Number(dotMatch[3]);
+    if (year < 100) {
+      year += year > 50 ? 1900 : 2000;
+    }
+    return buildUtcDate(year, month, day);
+  }
+
+  // Try DD/MM/YYYY or DD/MM/YY
+  const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (slashMatch) {
+    const day = Number(slashMatch[1]);
+    const month = Number(slashMatch[2]);
+    let year = Number(slashMatch[3]);
+    if (year < 100) {
+      year += year > 50 ? 1900 : 2000;
+    }
+    return buildUtcDate(year, month, day);
+  }
+
+  return null;
 }
 
 /**

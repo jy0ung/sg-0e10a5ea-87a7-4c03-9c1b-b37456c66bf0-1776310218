@@ -57,6 +57,8 @@ const STATUS_BADGE: Record<EmployeeStatus, string> = {
   resigned: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 };
 
+const NONE_SELECT_VALUE = '__none__';
+
 // Roles that can manage employees (add/edit/deactivate) — sourced from hrmsConfig
 const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 const UNASSIGNED_MANAGER = '__unassigned__';
@@ -631,16 +633,16 @@ export default function EmployeeDirectory() {
                 <div className="space-y-1">
                   <label htmlFor="employee-edit-department" className="text-xs font-medium text-muted-foreground">Department</label>
                   <Select
-                    value={editForm.departmentId || NO_DEPARTMENT}
+                    value={editForm.departmentId || NONE_SELECT_VALUE}
                     onValueChange={v => setEditForm(f => f ? {
                       ...f,
-                      departmentId: v === NO_DEPARTMENT ? '' : v,
+                      departmentId: v === NONE_SELECT_VALUE ? '' : v,
                       jobTitleId: '',
                     } : f)}
                   >
                     <SelectTrigger id="employee-edit-department" className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={NO_DEPARTMENT}>None</SelectItem>
+                      <SelectItem value={NONE_SELECT_VALUE}>None</SelectItem>
                       {departments.filter(d => d.isActive).map(d => (
                         <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                       ))}
@@ -650,12 +652,15 @@ export default function EmployeeDirectory() {
                 <div className="space-y-1">
                   <label htmlFor="employee-edit-job-title" className="text-xs font-medium text-muted-foreground">Job Title</label>
                   <Select
-                    value={editForm.jobTitleId || NO_JOB_TITLE}
-                    onValueChange={v => setEditForm(f => f ? { ...f, jobTitleId: v === NO_JOB_TITLE ? '' : v } : f)}
+                    value={editForm.jobTitleId || NONE_SELECT_VALUE}
+                    onValueChange={v => setEditForm(f => f ? {
+                      ...f,
+                      jobTitleId: v === NONE_SELECT_VALUE ? '' : v,
+                    } : f)}
                   >
                     <SelectTrigger id="employee-edit-job-title" className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={NO_JOB_TITLE}>None</SelectItem>
+                      <SelectItem value={NONE_SELECT_VALUE}>None</SelectItem>
                       {jobTitles
                         .filter(jt => jt.isActive && (!editForm.departmentId || jt.departmentId === editForm.departmentId || !jt.departmentId))
                         .map(jt => (
@@ -669,12 +674,15 @@ export default function EmployeeDirectory() {
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Direct Manager</label>
                 <Select
-                  value={editForm.managerId}
-                  onValueChange={v => setEditForm(f => f ? { ...f, managerId: v } : f)}
+                  value={editForm.managerId || NONE_SELECT_VALUE}
+                  onValueChange={v => setEditForm(f => f ? {
+                    ...f,
+                    managerId: v === NONE_SELECT_VALUE ? '' : v,
+                  } : f)}
                 >
                   <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value={NONE_SELECT_VALUE}>None</SelectItem>
                     {employees
                       .filter(e => e.status === 'active' && e.id !== editTarget?.id)
                       .sort((a, b) => a.name.localeCompare(b.name))

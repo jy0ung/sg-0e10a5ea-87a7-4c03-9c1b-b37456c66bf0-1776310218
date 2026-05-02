@@ -8,9 +8,13 @@ interface StatusBadgeProps {
 
 const statusStyles: Record<string, string> = {
   published: 'bg-success/15 text-success',
+  published_with_review: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
   active: 'bg-success/15 text-success',
   validated: 'bg-info/15 text-info',
   validating: 'bg-info/15 text-info',
+  review_pending: 'bg-warning/15 text-warning',
+  review_in_progress: 'bg-primary/15 text-primary',
+  review_complete: 'bg-success/15 text-success',
   uploaded: 'bg-muted text-muted-foreground',
   failed: 'bg-destructive/15 text-destructive',
   error: 'bg-destructive/15 text-destructive',

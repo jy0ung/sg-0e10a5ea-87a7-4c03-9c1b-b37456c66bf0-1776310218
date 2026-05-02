@@ -13,18 +13,19 @@ test.beforeEach(async ({ page }) => {
   await page.locator("nav, aside").first().waitFor({ state: "visible", timeout: 10000 });
 });
 
-const navLinks: Array<{ label: string | RegExp; expectedPath: RegExp }> = [
+const navLinks: Array<{ label: string | RegExp; expectedPath: RegExp; startPath?: string }> = [
   { label: /module.?directory/i, expectedPath: /\/modules$/ },
   { label: /notification/i, expectedPath: /\/notifications$/ },
-  { label: /aging.?dashboard/i, expectedPath: /\/auto-aging$/ },
-  { label: /vehicle.?explorer/i, expectedPath: /\/auto-aging\/vehicles$/ },
-  { label: /import.?center/i, expectedPath: /\/auto-aging\/import$/ },
-  { label: /data.?quality/i, expectedPath: /\/auto-aging\/quality$/ },
-  { label: /sla.?polic/i, expectedPath: /\/auto-aging\/sla$/ },
-  { label: /mapping/i, expectedPath: /\/auto-aging\/mappings$/ },
-  { label: /import.?history/i, expectedPath: /\/auto-aging\/history$/ },
-  { label: /commission/i, expectedPath: /\/auto-aging\/commissions$/ },
-  { label: /report/i, expectedPath: /\/reports$/ },
+  { label: /auto.?aging.?overview/i, expectedPath: /\/auto-aging$/, startPath: '/auto-aging' },
+  { label: /vehicle.?explorer/i, expectedPath: /\/auto-aging\/vehicles$/, startPath: '/auto-aging' },
+  { label: /import.?center/i, expectedPath: /\/auto-aging\/import$/, startPath: '/auto-aging' },
+  { label: /review.?queue/i, expectedPath: /\/auto-aging\/review$/, startPath: '/auto-aging' },
+  { label: /data.?quality/i, expectedPath: /\/auto-aging\/quality$/, startPath: '/auto-aging' },
+  { label: /sla.?polic/i, expectedPath: /\/auto-aging\/sla$/, startPath: '/auto-aging' },
+  { label: /^mappings$/i, expectedPath: /\/auto-aging\/mappings$/, startPath: '/auto-aging' },
+  { label: /import.?history/i, expectedPath: /\/auto-aging\/history$/, startPath: '/auto-aging' },
+  { label: /^commissions$/i, expectedPath: /\/auto-aging\/commissions$/, startPath: '/auto-aging' },
+  { label: /aging.?reports/i, expectedPath: /\/auto-aging\/reports$/, startPath: '/auto-aging' },
   { label: /sales.?dashboard/i, expectedPath: /\/sales$/ },
   { label: /deal.?pipeline/i, expectedPath: /\/sales\/pipeline$/ },
   { label: /sales.?order/i, expectedPath: /\/sales\/orders$/ },
@@ -37,10 +38,34 @@ const navLinks: Array<{ label: string | RegExp; expectedPath: RegExp }> = [
   { label: /setting/i, expectedPath: /\/admin\/settings$/ },
 ];
 
-for (const { label, expectedPath } of navLinks) {
+for (const { label, expectedPath, startPath } of navLinks) {
   test(`Sidebar link "${label}" navigates correctly`, async ({ page }) => {
-    // Check visibility first — don't wait for missing elements.
-    const link = page.locator(`a`).filter({ hasText: label }).first();
+    if (startPath) {
+      await page.goto(startPath);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    }
+
+    const matchingLinks = page.locator('a').filter({ hasText: label });
+    const totalMatches = await matchingLinks.count();
+
+    let targetIndex = -1;
+    for (let index = 0; index < totalMatches; index += 1) {
+      const candidate = matchingLinks.nth(index);
+      const visible = await candidate.isVisible().catch(() => false);
+      if (!visible) continue;
+
+      const href = (await candidate.getAttribute('href')) ?? '';
+      if (expectedPath.test(href)) {
+        targetIndex = index;
+        break;
+      }
+
+      if (targetIndex === -1) {
+        targetIndex = index;
+      }
+    }
+
+    const link = targetIndex >= 0 ? matchingLinks.nth(targetIndex) : matchingLinks.first();
     const visible = await link.isVisible().catch(() => false);
     if (!visible) {
       test.skip(true, `Sidebar link "${label}" not visible (possibly hidden by role filter)`);

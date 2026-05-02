@@ -137,14 +137,14 @@ export default function Announcements() {
       ) : (
         <div className="space-y-3">
           {filtered.map(ann => (
-            <Card key={ann.id} className={ann.pinned ? 'border-primary/50 shadow-sm' : ''}>
+            <Card key={ann.id} data-pinned={ann.pinned ? 'true' : 'false'} className={ann.pinned ? 'border-primary/50 shadow-sm' : ''}>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">{CATEGORY_ICONS[ann.category]}</span>
                     <div>
                       <CardTitle className="text-base flex items-center gap-1.5">
-                        {ann.pinned && <Pin className="h-3.5 w-3.5 text-primary" />}
+                        {ann.pinned && <Pin aria-label="Pinned announcement" className="h-3.5 w-3.5 text-primary" />}
                         {ann.title}
                       </CardTitle>
                       <p className="text-xs text-muted-foreground">

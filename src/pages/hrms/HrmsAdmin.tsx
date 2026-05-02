@@ -283,7 +283,10 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
               <Label className="text-xs text-muted-foreground">Department Head</Label>
               <Select
                 value={form.headEmployeeId || NONE_SELECT_VALUE}
-                onValueChange={v => setForm(f => ({ ...f, headEmployeeId: v === NONE_SELECT_VALUE ? '' : v }))}
+                onValueChange={v => setForm(f => ({
+                  ...f,
+                  headEmployeeId: v === NONE_SELECT_VALUE ? '' : v,
+                }))}
               >
                 <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select employee (optional)" /></SelectTrigger>
                 <SelectContent>
@@ -487,7 +490,10 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
               <Label className="text-xs text-muted-foreground">Department</Label>
               <Select
                 value={form.departmentId || NONE_SELECT_VALUE}
-                onValueChange={v => setForm(f => ({ ...f, departmentId: v === NONE_SELECT_VALUE ? '' : v }))}
+                onValueChange={v => setForm(f => ({
+                  ...f,
+                  departmentId: v === NONE_SELECT_VALUE ? '' : v,
+                }))}
               >
                 <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select department (optional)" /></SelectTrigger>
                 <SelectContent>
@@ -500,7 +506,10 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
               <Label className="text-xs text-muted-foreground">Level</Label>
               <Select
                 value={form.level || NONE_SELECT_VALUE}
-                onValueChange={v => setForm(f => ({ ...f, level: v === NONE_SELECT_VALUE ? '' : v as JobTitleLevel }))}
+                onValueChange={v => setForm(f => ({
+                  ...f,
+                  level: v === NONE_SELECT_VALUE ? '' : v as JobTitleLevel | '',
+                }))}
               >
                 <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select level (optional)" /></SelectTrigger>
                 <SelectContent>

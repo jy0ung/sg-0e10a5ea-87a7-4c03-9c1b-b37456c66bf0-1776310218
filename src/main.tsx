@@ -17,6 +17,12 @@ import { RequireActiveModule } from "@/components/shared/RequireActiveModule";
 import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 import { LocationPreservingNavigate } from "@/components/shared/LocationPreservingNavigate";
 import { PageSpinner } from "@/components/shared/PageSpinner";
+import {
+  HRMS_ADMIN_ROLES,
+  HRMS_MANAGER_ROLES,
+  HRMS_PAYROLL_ROLES,
+  HRMS_SELF_SERVICE_ROLES,
+} from "@/config/hrmsConfig";
 import AppLayout from "./components/layout/AppLayout";
 import SalesLayout from "./components/layout/SalesLayout";
 import { SalesProvider } from "./contexts/SalesContext";
@@ -57,6 +63,8 @@ const Notifications = lazy(() => import("./pages/Notifications"));
 const AutoAgingDashboard = lazy(() => import("./pages/auto-aging/AutoAgingDashboard"));
 const VehicleExplorer = lazy(() => import("./pages/auto-aging/VehicleExplorer"));
 const ImportCenter = lazy(() => import("./pages/auto-aging/ImportCenter"));
+const ImportReviewQueue = lazy(() => import("./pages/auto-aging/ImportReviewQueue"));
+const ImportReviewDetail = lazy(() => import("./pages/auto-aging/ImportReviewDetail"));
 const DataQuality = lazy(() => import("./pages/auto-aging/DataQuality"));
 const SLAAdmin = lazy(() => import("./pages/auto-aging/SLAAdmin"));
 const MappingAdmin = lazy(() => import("./pages/auto-aging/MappingAdmin"));
@@ -163,6 +171,8 @@ const router = createBrowserRouter([
       { path: "auto-aging/vehicles", element: withModuleAccess('auto-aging', <R scope="Vehicle Explorer"><S><VehicleExplorer /></S></R>) },
       { path: "auto-aging/vehicles/:chassisNo", element: withModuleAccess('auto-aging', <R scope="Vehicle Detail"><S><VehicleDetail /></S></R>) },
       { path: "auto-aging/import", element: withModuleAccess('auto-aging', <RequireRole roles={MANAGER_AND_UP}><R scope="Import Center"><S><ImportCenter /></S></R></RequireRole>) },
+      { path: "auto-aging/review", element: withModuleAccess('auto-aging', <RequireRole roles={MANAGER_AND_UP}><R scope="Import Review Queue"><S><ImportReviewQueue /></S></R></RequireRole>) },
+      { path: "auto-aging/review/:batchId", element: withModuleAccess('auto-aging', <RequireRole roles={MANAGER_AND_UP}><R scope="Import Review Detail"><S><ImportReviewDetail /></S></R></RequireRole>) },
       { path: "auto-aging/quality", element: withModuleAccess('auto-aging', <R scope="Data Quality"><S><DataQuality /></S></R>) },
       { path: "auto-aging/sla", element: withModuleAccess('auto-aging', <RequireRole roles={EXECUTIVE}><R scope="SLA Admin"><S><SLAAdmin /></S></R></RequireRole>) },
       { path: "auto-aging/mappings", element: withModuleAccess('auto-aging', <RequireRole roles={EXECUTIVE}><R scope="Mapping Admin"><S><MappingAdmin /></S></R></RequireRole>) },
@@ -202,10 +212,15 @@ const router = createBrowserRouter([
       { path: 'admin/role-permissions', element: <RequireRole roles={ADMIN_ONLY}><R scope="Role Permissions"><S><RolePermissionsPage /></S></R></RequireRole> },
       { path: "reports", element: withModuleAccess('reports', <R scope="Reports"><S><ReportsCenter /></S></R>) },
       { path: "inventory/chassis-filter", element: withModuleAccess('inventory', <R scope="Chassis Filter"><S><ChassisFilter /></S></R>) },
-      { path: "hrms", element: withModuleAccess('hrms', <R scope="HRMS Workspace"><S><HrmsWorkspaceRedirect /></S></R>) },
-      { path: "hrms/admin", element: <LocationPreservingNavigate to="/hrms/settings" /> },
-      { path: "hrms/leave-calendar", element: <LocationPreservingNavigate to="/hrms/leave/calendar" /> },
-      { path: "hrms/*", element: withModuleAccess('hrms', <R scope="HRMS Workspace"><S><HrmsWorkspaceRedirect /></S></R>) },
+      { path: "hrms/employees", element: withModuleAccess('hrms', <RequireRole roles={HRMS_MANAGER_ROLES}><R scope="Employee Directory"><S><EmployeeDirectory /></S></R></RequireRole>) },
+      { path: "hrms/leave", element: withModuleAccess('hrms', <RequireRole roles={HRMS_SELF_SERVICE_ROLES}><R scope="Leave Management"><S><LeaveManagement /></S></R></RequireRole>) },
+      { path: "hrms/leave-calendar", element: withModuleAccess('hrms', <RequireRole roles={HRMS_SELF_SERVICE_ROLES}><R scope="Leave Calendar"><S><LeaveCalendar /></S></R></RequireRole>) },
+      { path: "hrms/attendance", element: withModuleAccess('hrms', <RequireRole roles={HRMS_SELF_SERVICE_ROLES}><R scope="Attendance Log"><S><AttendanceLog /></S></R></RequireRole>) },
+      { path: "hrms/payroll", element: withModuleAccess('hrms', <RequireRole roles={HRMS_PAYROLL_ROLES}><R scope="Payroll Summary"><S><PayrollSummary /></S></R></RequireRole>) },
+      { path: "hrms/appraisals", element: withModuleAccess('hrms', <RequireRole roles={HRMS_SELF_SERVICE_ROLES}><R scope="Performance Appraisals"><S><PerformanceAppraisals /></S></R></RequireRole>) },
+      { path: "hrms/announcements", element: withModuleAccess('hrms', <RequireRole roles={HRMS_SELF_SERVICE_ROLES}><R scope="Announcements"><S><HrmsAnnouncements /></S></R></RequireRole>) },
+      { path: "hrms/admin", element: withModuleAccess('hrms', <RequireRole roles={HRMS_ADMIN_ROLES}><R scope="HRMS Settings"><S><HrmsAdmin /></S></R></RequireRole>) },
+      { path: "hrms/approval-flows", element: withModuleAccess('hrms', <RequireRole roles={HRMS_ADMIN_ROLES}><R scope="Approval Flows"><S><ApprovalFlows /></S></R></RequireRole>) },
     ],
   },
   {
