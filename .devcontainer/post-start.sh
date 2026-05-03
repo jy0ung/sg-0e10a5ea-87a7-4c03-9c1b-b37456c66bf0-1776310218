@@ -7,10 +7,11 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
 
 if [[ -n "${CODESPACE_NAME:-}" && -n "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}" ]]; then
-  APP_URL="https://${CODESPACE_NAME}-3000.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
-  # Route Supabase through the Vite proxy (/__supabase) so only port 3000 needs to be public
-  SUPABASE_URL="${APP_URL}/__supabase"
-  echo "Codespaces detected — setting VITE_SUPABASE_URL=$SUPABASE_URL"
+  # Use a relative path so the URL resolves correctly regardless of whether the app is
+  # accessed via http://localhost:3000 or the Codespaces forwarded domain. The Supabase
+  # client (packages/supabase/src/client.ts) prepends window.location.origin at runtime.
+  SUPABASE_URL="/__supabase"
+  echo "Codespaces detected — setting VITE_SUPABASE_URL=$SUPABASE_URL (relative proxy path)"
 
   # Update or insert VITE_SUPABASE_URL in .env
   if grep -q "^VITE_SUPABASE_URL=" "$ENV_FILE" 2>/dev/null; then
