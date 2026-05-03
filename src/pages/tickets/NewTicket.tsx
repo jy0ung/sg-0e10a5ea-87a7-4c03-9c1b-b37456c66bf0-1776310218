@@ -34,12 +34,12 @@ import { useAttachmentSettings } from '@/hooks/useAttachmentSettings';
 import { ROLE_LABELS } from '@/config/rolePermissions';
 import { createTicket } from '@/services/ticketService';
 import { uploadTicketAttachment } from '@/services/ticketAttachmentService';
+import { resolveBranchCode } from '@/services/branchService';
 import type { AppRole } from '@/types';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const ticketSchema = z.object({
-  subject: z.string().min(5, 'Subject must be at least 5 characters'),
   category: z.string().min(1, 'Category is required'),
   subcategory: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high']),
@@ -173,6 +173,7 @@ export default function NewTicket() {
   const { settings: attachmentSettings } = useAttachmentSettings(user?.company_id);
 
   const [submitting, setSubmitting] = useState(false);
+  const [branchCode, setBranchCode] = useState<string | null>(null);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
@@ -181,10 +182,15 @@ export default function NewTicket() {
 
   const roleContext = ROLE_CONTEXT[user?.role as AppRole] ?? DEFAULT_ROLE_CONTEXT;
 
+  useEffect(() => {
+    if (user?.branch_id) {
+      resolveBranchCode(user.branch_id).then(setBranchCode);
+    }
+  }, [user?.branch_id]);
+
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
     defaultValues: {
-      subject: '',
       category: '',
       subcategory: '',
       priority: 'medium',
@@ -352,7 +358,7 @@ export default function NewTicket() {
 
     const { data: ticketResult, error: ticketError } = await createTicket(
       {
-        subject: data.subject,
+        subject: data.vso_number?.trim() || selectedCategory?.label || 'Internal Request',
         category: data.category,
         subcategory: matchingSubcategories.length > 0 ? (data.subcategory ?? null) : null,
         priority: data.priority,
@@ -397,7 +403,6 @@ export default function NewTicket() {
     setAttachedFiles([]);
     setFileErrors([]);
     form.reset({
-      subject: '',
       category: firstCategoryKey,
       subcategory: firstSubcategoryKey,
       priority: 'medium',
@@ -419,7 +424,6 @@ export default function NewTicket() {
 
   const applyTemplate = (template: (typeof templates)[number]) => {
     setActiveTemplateId(template.id);
-    form.setValue('subject', template.subject, { shouldValidate: true });
     form.setValue('category', template.category_key, { shouldValidate: true });
     form.setValue('subcategory', template.subcategory_key ?? '', { shouldValidate: true });
     form.setValue('priority', template.priority as TicketFormData['priority'], {
@@ -434,7 +438,6 @@ export default function NewTicket() {
     const firstSubcategoryKey =
       subcategories.find((s) => s.category_key === firstCategoryKey)?.key ?? '';
     form.reset({
-      subject: '',
       category: firstCategoryKey,
       subcategory: firstSubcategoryKey,
       priority: 'medium',
@@ -686,23 +689,17 @@ export default function NewTicket() {
               </p>
             </div>
 
-            {/* Request title */}
-            <div className="space-y-2">
-              <Label htmlFor="subject">
-                Request title <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="subject"
-                placeholder="Brief, clear summary of what you need"
-                {...form.register('subject')}
-                className={form.formState.errors.subject ? 'border-destructive' : ''}
-              />
-              {form.formState.errors.subject && (
-                <p className="text-destructive text-xs">
-                  {form.formState.errors.subject.message}
-                </p>
-              )}
-            </div>
+            {/* Branch (read-only, derived from user profile) */}
+            {branchCode && (
+              <div className="space-y-2">
+                <Label>Branch</Label>
+                <Input
+                  value={branchCode}
+                  readOnly
+                  className="bg-muted/50 cursor-default select-none"
+                />
+              </div>
+            )}
 
             {/* Description + contextual tips */}
             <div className="space-y-2">
