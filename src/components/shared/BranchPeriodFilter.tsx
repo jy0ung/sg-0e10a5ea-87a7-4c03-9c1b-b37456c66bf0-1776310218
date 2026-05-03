@@ -53,7 +53,7 @@ export function BranchPeriodFilter({
           {activeCount > 0 && <Badge variant="secondary">{activeCount}</Badge>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 sm:w-96 space-y-4">
+      <PopoverContent align="end" className="w-80 max-w-[calc(100vw-16px)] sm:w-96 space-y-4">
         <div className="space-y-1">
           <h3 className="text-sm font-semibold text-foreground">Advanced Filter</h3>
           <p className="text-xs text-muted-foreground">{summary}</p>

@@ -23,9 +23,10 @@ export function OutlierScatterChart({ vehicles, onVehicleClick }: Props) {
   const { p90BgDel, p90EtdOut } = useMemo(() => {
     const bgDels = scatterData.map(d => d.bgToDelivery).sort((a, b) => a - b);
     const etdOuts = scatterData.map(d => d.etdToOutlet).sort((a, b) => a - b);
+    const p90Idx = (arr: number[]) => Math.max(0, Math.ceil(arr.length * 0.9) - 1);
     return {
-      p90BgDel: bgDels[Math.floor(bgDels.length * 0.9)] ?? 60,
-      p90EtdOut: etdOuts[Math.floor(etdOuts.length * 0.9)] ?? 25,
+      p90BgDel: bgDels[p90Idx(bgDels)] ?? 60,
+      p90EtdOut: etdOuts[p90Idx(etdOuts)] ?? 25,
     };
   }, [scatterData]);
 
@@ -64,9 +65,9 @@ export function OutlierScatterChart({ vehicles, onVehicleClick }: Props) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
-            <span className="rounded-full bg-info/12 px-2.5 py-1 font-medium text-info">Normal {statusSummary.normal}</span>
-            <span className="rounded-full bg-warning/12 px-2.5 py-1 font-medium text-warning">At Risk {statusSummary['at-risk']}</span>
-            <span className="rounded-full bg-destructive/12 px-2.5 py-1 font-medium text-destructive">Outlier {statusSummary.outlier}</span>
+            <span className="rounded-full px-2.5 py-1 font-medium text-info" style={{ background: 'color-mix(in srgb, hsl(var(--info)) 12%, transparent)' }}>Normal {statusSummary.normal}</span>
+            <span className="rounded-full px-2.5 py-1 font-medium text-warning" style={{ background: 'color-mix(in srgb, hsl(var(--warning)) 12%, transparent)' }}>At Risk {statusSummary['at-risk']}</span>
+            <span className="rounded-full px-2.5 py-1 font-medium text-destructive" style={{ background: 'color-mix(in srgb, hsl(var(--destructive)) 12%, transparent)' }}>Outlier {statusSummary.outlier}</span>
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground">P90 thresholds: BG→Delivery {p90BgDel}d • ETD→Outlet {p90EtdOut}d</p>

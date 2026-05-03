@@ -19,8 +19,8 @@ export interface StagePipelineCardProps {
 
 const STAGE_COLOURS: Record<VehicleStage, string> = {
   pending_register_free_stock: 'hsl(var(--muted-foreground))',
-  pending_deliver_loan_disburse: 'hsl(var(--warning, 38 92% 50%))',
-  complete: 'hsl(var(--success, 142 71% 45%))',
+  pending_deliver_loan_disburse: 'hsl(var(--warning))',
+  complete: 'hsl(var(--success))',
 };
 
 export function StagePipelineCard({ vehicles, onStageClick }: StagePipelineCardProps) {
@@ -43,6 +43,15 @@ export function StagePipelineCard({ vehicles, onStageClick }: StagePipelineCardP
   }, [vehicles]);
 
   const total = data.reduce((sum, d) => sum + d.value, 0);
+
+  if (total === 0) {
+    return (
+      <div className="glass-panel p-5 h-full flex flex-col items-center justify-center gap-2 text-center">
+        <h3 className="text-sm font-semibold text-foreground">Pipeline by Stage</h3>
+        <p className="text-xs text-muted-foreground">No vehicles to display.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="glass-panel p-5 h-full flex flex-col">

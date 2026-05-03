@@ -16,15 +16,13 @@ export function KpiTrendChart({ vehicles, selectedKpiId = 'bg_to_delivery' }: Kp
     if (!kpiDef) return [];
 
     const field = kpiDef.computedField;
-    
-    // Group by month based on bg_date
+
+    // Group by month based on bg_date — no fixed window, use all vehicles passed in
     const monthlyData = new Map<string, number[]>();
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
     vehicles.forEach(v => {
       const bgDate = v.bg_date ? new Date(v.bg_date) : null;
-      if (!bgDate || bgDate < sixMonthsAgo) return;
+      if (!bgDate) return;
 
       const value = v[field as keyof VehicleCanonical] as number | null | undefined;
       if (value === null || value === undefined || value < 0) return;
@@ -35,23 +33,41 @@ export function KpiTrendChart({ vehicles, selectedKpiId = 'bg_to_delivery' }: Kp
       monthlyData.set(monthKey, arr);
     });
 
-    // Generate last 6 months keys
+    if (monthlyData.size === 0) return [];
+
+    // Derive the month range from the actual data so we respect the active period filter
+    const sortedKeys = [...monthlyData.keys()].sort();
+    const firstMonth = sortedKeys[0];
+    const lastMonth = sortedKeys[sortedKeys.length - 1];
+
+    // Build a contiguous list of months between first and last
     const months: string[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      months.push(d.toISOString().slice(0, 7));
+    const cursor = new Date(firstMonth + '-01');
+    const end = new Date(lastMonth + '-01');
+    while (cursor <= end) {
+      months.push(cursor.toISOString().slice(0, 7));
+      cursor.setMonth(cursor.getMonth() + 1);
     }
 
     return months.map(month => {
-      const values = monthlyData.get(month) || [];
+      const values = monthlyData.get(month);
+      if (!values || values.length === 0) {
+        return {
+          month,
+          label: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+          median: null,
+          average: null,
+          count: 0,
+        };
+      }
       const sorted = [...values].sort((a, b) => a - b);
-      const median = sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : 0;
-      const avg = sorted.length > 0 ? Math.round(sorted.reduce((s, v) => s + v, 0) / sorted.length) : 0;
-      
+      const midIdx = Math.ceil(sorted.length / 2) - 1;
+      const median = sorted[midIdx];
+      const avg = Math.round(sorted.reduce((s, val) => s + val, 0) / sorted.length);
+
       return {
         month,
-        label: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short' }),
+        label: new Date(month + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
         median,
         average: avg,
         count: values.length,
@@ -64,6 +80,23 @@ export function KpiTrendChart({ vehicles, selectedKpiId = 'bg_to_delivery' }: Kp
     () => [...trendData].reverse().find(point => point.count > 0) ?? null,
     [trendData],
   );
+  const allEmpty = trendData.length === 0 || trendData.every(p => p.count === 0);
+
+  if (allEmpty) {
+    return (
+      <Card className="glass-panel">
+        <CardHeader className="border-b border-border/60 pb-4">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            {selectedKpi?.shortLabel} — Trend
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-40">
+          <p className="text-sm text-muted-foreground">No data available for the selected period.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="glass-panel">
@@ -72,7 +105,7 @@ export function KpiTrendChart({ vehicles, selectedKpiId = 'bg_to_delivery' }: Kp
           <div className="space-y-1">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" />
-              {selectedKpi?.shortLabel} — 6 Month Trend
+              {selectedKpi?.shortLabel} — Trend
             </CardTitle>
             <p className="text-xs text-muted-foreground">
               Monthly median versus average cycle time for the selected KPI across the last six months.
@@ -130,6 +163,7 @@ export function KpiTrendChart({ vehicles, selectedKpiId = 'bg_to_delivery' }: Kp
               stroke="hsl(var(--primary))" 
               strokeWidth={2.5}
               dot={false}
+              connectNulls={false}
               activeDot={{ r: 5, fill: 'hsl(var(--primary))', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
               name="Median"
             />
@@ -140,6 +174,7 @@ export function KpiTrendChart({ vehicles, selectedKpiId = 'bg_to_delivery' }: Kp
               strokeWidth={2.5}
               strokeDasharray="6 4"
               dot={false}
+              connectNulls={false}
               activeDot={{ r: 5, fill: 'hsl(var(--info))', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
               name="Average"
             />

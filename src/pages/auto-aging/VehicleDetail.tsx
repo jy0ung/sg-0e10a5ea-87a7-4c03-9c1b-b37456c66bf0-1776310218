@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Pencil, TrendingUp } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, Pencil, TrendingUp } from 'lucide-react';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { VehicleEditDialog } from '@/components/vehicles/VehicleEditDialog';
 import { forecastVehicleMilestones, getVehicleRisk } from '@/utils/forecasting';
@@ -13,11 +13,20 @@ import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 export default function VehicleDetail() {
   const { chassisNo } = useParams<{ chassisNo: string }>();
-  const { vehicles, qualityIssues, kpiSummaries, reloadFromDb } = useData();
+  const { vehicles, qualityIssues, kpiSummaries, slas, loading, reloadFromDb } = useData();
   const navigate = useNavigate();
   const [editOpen, setEditOpen] = useState(false);
 
   const vehicle = vehicles.find(v => v.chassis_no === chassisNo);
+
+  if (loading && !vehicle) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
   if (!vehicle) {
     return (
       <div className="space-y-4 animate-fade-in">
@@ -38,11 +47,14 @@ export default function VehicleDetail() {
     { label: getAutoAgingFieldLabel('disb_date', 'DISB. DATE'), date: vehicle.disb_date },
   ];
 
-  const kpiValues = KPI_DEFINITIONS.map(k => ({
-    label: k.shortLabel,
-    value: vehicle[k.computedField] as number | null,
-    sla: k.slaDefault,
-  }));
+  const kpiValues = KPI_DEFINITIONS.map(k => {
+    const liveSlaDays = slas.find(s => s.kpiId === k.id)?.slaDays ?? k.slaDefault;
+    return {
+      label: k.shortLabel,
+      value: vehicle[k.computedField] as number | null,
+      sla: liveSlaDays,
+    };
+  });
 
   const forecasts = forecastVehicleMilestones(vehicle, kpiSummaries);
   const risk = getVehicleRisk(vehicle, kpiSummaries);
@@ -121,9 +133,13 @@ export default function VehicleDetail() {
             <div key={k.label} className="p-3 rounded-lg bg-secondary/50 border border-border/50">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{k.label}</p>
               {k.value != null ? (
-                <p className={`text-xl font-bold tabular-nums ${k.value < 0 ? 'text-destructive' : k.value > k.sla ? 'text-warning' : 'text-foreground'}`}>
-                  {k.value}<span className="text-xs text-muted-foreground ml-0.5">d</span>
-                </p>
+                k.value < 0 ? (
+                  <p className="text-sm font-medium text-muted-foreground italic">Pending</p>
+                ) : (
+                  <p className={`text-xl font-bold tabular-nums ${k.value > k.sla ? 'text-warning' : 'text-foreground'}`}>
+                    {k.value}<span className="text-xs text-muted-foreground ml-0.5">d</span>
+                  </p>
+                )
               ) : (
                 <p className="text-xl font-bold text-muted-foreground">—</p>
               )}
@@ -148,12 +164,18 @@ export default function VehicleDetail() {
           </div>
         </div>
       )}
-      {/* Risk badge */}
-      <div className="flex items-center gap-2">
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${riskColors[risk]}`}>
-          <TrendingUp className="h-3 w-3" />
-          {riskLabels[risk]}
-        </span>
+      {/* Overall Risk — contextual banner between KPI and Timeline */}
+      <div className="glass-panel p-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Overall Risk</p>
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${riskColors[risk]}`}>
+            <TrendingUp className="h-3 w-3" />
+            {riskLabels[risk]}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground max-w-sm text-right">
+          Derived from KPI days vs. configured SLA thresholds. SLA values are maintained in SLA Policies.
+        </p>
       </div>
 
       {/* Predicted Timeline */}

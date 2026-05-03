@@ -119,22 +119,27 @@ export default function AutoAgingDashboard() {
 
   const scopeSummary = getDashboardScopeSummary(dashboardFilter);
 
-  // Get vehicles for a specific KPI
-  const getKpiVehicles = (kpiId: string) => {
-    const kpiDef = KPI_DEFINITIONS.find(k => k.id === kpiId);
-    if (!kpiDef) return [];
-    const kpiSummary = filteredKpiSummaries.find(k => k.kpiId === kpiId);
-    if (!kpiSummary) return [];
-    
-    return filtered.filter(v => {
-      const val = v[kpiDef.computedField as keyof typeof v] as number | null | undefined;
-      return val !== null && val !== undefined && val >= 0;
-    }).sort((a, b) => {
-      const valA = a[kpiDef.computedField as keyof typeof a] as number;
-      const valB = b[kpiDef.computedField as keyof typeof b] as number;
-      return valB - valA; // Sort descending
-    });
-  };
+  // Memoised per-KPI vehicle list — sorted descending by the KPI value
+  const kpiVehiclesMap = useMemo(() => {
+    const map: Record<string, typeof filtered> = {};
+    for (const kpiDef of KPI_DEFINITIONS) {
+      const kpiSummary = filteredKpiSummaries.find(k => k.kpiId === kpiDef.id);
+      if (!kpiSummary) { map[kpiDef.id] = []; continue; }
+      map[kpiDef.id] = filtered
+        .filter(v => {
+          const val = v[kpiDef.computedField as keyof typeof v] as number | null | undefined;
+          return val !== null && val !== undefined && val >= 0;
+        })
+        .sort((a, b) => {
+          const valA = a[kpiDef.computedField as keyof typeof a] as number;
+          const valB = b[kpiDef.computedField as keyof typeof b] as number;
+          return valB - valA;
+        });
+    }
+    return map;
+  }, [filtered, filteredKpiSummaries]);
+
+  const getKpiVehicles = (kpiId: string) => kpiVehiclesMap[kpiId] ?? [];
 
   const handleKpiCardClick = (kpiId: string) => {
     setSelectedKpiId(kpiId);
@@ -281,10 +286,19 @@ export default function AutoAgingDashboard() {
             <Button variant="outline" size="sm" onClick={() => void handleRefresh()}>
               <RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh
             </Button>
-            <Button variant="outline" size="sm"><Download className="h-3.5 w-3.5 mr-1" />Export</Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/auto-aging/reports')}>
+              <Download className="h-3.5 w-3.5 mr-1" />Export
+            </Button>
           </div>
         }
       />
+
+      {summaryQuery.error && summaryQuery.data === undefined && (
+        <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/5 px-4 py-2.5 text-xs text-warning">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          Summary data could not be refreshed — charts show the last cached result.
+        </div>
+      )}
 
       <div className="glass-panel px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">{scopeSummary}</p>
@@ -366,7 +380,7 @@ export default function AutoAgingDashboard() {
         </div>
         <div className="grid md:grid-cols-3 gap-4">
           <div className="md:col-span-2 glass-panel p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-4">Branch Comparison — Average Days</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-4">Branch Comparison — Avg Days (BG → Delivery)</h3>
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={branchHeatmap} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -374,8 +388,8 @@ export default function AutoAgingDashboard() {
                 <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} />
                 <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px', fontSize: '12px', color: 'hsl(var(--foreground))' }} />
                 <Bar dataKey="bgToDelivery" name="BG→Delivery" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="etdToOutlet" name="ETD→Outlet" fill="hsl(199, 89%, 48%)" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="regToDelivery" name="Reg→Delivery" fill="hsl(142, 71%, 45%)" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="etdToOutlet" name="ETD→Outlet" fill="hsl(var(--chart-2, 199 89% 48%))" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="regToDelivery" name="Reg→Delivery" fill="hsl(var(--success))" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -401,9 +415,9 @@ export default function AutoAgingDashboard() {
                 </div>
               ))}
               {filteredQualityIssueCount > filteredQualityIssues.length && (
-                <button onClick={() => navigate('/auto-aging/quality')} className="w-full text-xs text-primary hover:underline py-2">
+                <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => navigate('/auto-aging/quality')}>
                   View all {filteredQualityIssueCount} issues →
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -421,7 +435,7 @@ export default function AutoAgingDashboard() {
         <div className="glass-panel p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground">Slowest Vehicles (BG → Delivery)</h3>
-            <button onClick={() => navigate('/auto-aging/vehicles')} className="text-xs text-primary hover:underline">View All →</button>
+            <Button variant="ghost" size="sm" className="text-xs h-auto py-1" onClick={() => navigate('/auto-aging/vehicles')}>View All →</Button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -446,10 +460,18 @@ export default function AutoAgingDashboard() {
                       <td className="px-3 py-2 font-mono text-xs text-foreground">{v.chassis_no}</td>
                       <td className="px-3 py-2 text-foreground">{v.branch_code}</td>
                       <td className="px-3 py-2 text-foreground">{v.model}</td>
-                      <td className="px-3 py-2"><span className={(v.bg_to_delivery ?? 0) > 45 ? 'text-destructive font-semibold' : 'text-foreground'}>{v.bg_to_delivery}d</span></td>
-                      <td className="px-3 py-2 text-foreground">{v.etd_to_outlet != null ? `${v.etd_to_outlet}d` : '—'}</td>
-                      <td className="px-3 py-2 text-foreground">{v.reg_to_delivery != null ? `${v.reg_to_delivery}d` : '—'}</td>
-                      <td className="px-3 py-2"><StatusBadge status={(v.bg_to_delivery ?? 0) > 45 ? 'warning' : 'active'} /></td>
+                      {(() => {
+                        const bgSlaDays = filteredKpiSummaries.find(k => k.kpiId === 'bg_to_delivery')?.slaDays ?? 45;
+                        const bgOverdue = (v.bg_to_delivery ?? 0) > bgSlaDays;
+                        return (
+                          <>
+                            <td className="px-3 py-2"><span className={bgOverdue ? 'text-destructive font-semibold' : 'text-foreground'}>{v.bg_to_delivery}d</span></td>
+                            <td className="px-3 py-2 text-foreground">{v.etd_to_outlet != null ? `${v.etd_to_outlet}d` : '—'}</td>
+                            <td className="px-3 py-2 text-foreground">{v.reg_to_delivery != null ? `${v.reg_to_delivery}d` : '—'}</td>
+                            <td className="px-3 py-2"><StatusBadge status={bgOverdue ? 'warning' : 'active'} /></td>
+                          </>
+                        );
+                      })()}
                     </tr>
                   ))}
               </tbody>
@@ -518,13 +540,8 @@ export default function AutoAgingDashboard() {
                 </table>
                 {getKpiVehicles(detailKpiId).length > 50 && (
                   <div className="text-center py-4 text-sm text-muted-foreground">
-                    Showing 50 of {getKpiVehicles(detailKpiId).length} vehicles. 
-                    <button 
-                      onClick={() => navigate('/auto-aging/vehicles')}
-                      className="text-primary hover:underline ml-2"
-                    >
-                      View all →
-                    </button>
+                    Showing 50 of {getKpiVehicles(detailKpiId).length} vehicles.
+                    <Button variant="link" size="sm" className="text-xs ml-1 h-auto py-0" onClick={() => navigate('/auto-aging/vehicles')}>View all →</Button>
                   </div>
                 )}
               </>

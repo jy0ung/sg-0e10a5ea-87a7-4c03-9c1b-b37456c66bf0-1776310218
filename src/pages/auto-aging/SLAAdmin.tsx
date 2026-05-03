@@ -3,16 +3,27 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Save } from 'lucide-react';
+import { Save, Loader2 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function SLAAdmin() {
   const { slas, updateSla } = useData();
+  const { toast } = useToast();
   const [edits, setEdits] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
 
-  const handleSave = (id: string) => {
-    if (edits[id] !== undefined) {
-      updateSla(id, edits[id]);
+  const handleSave = async (id: string) => {
+    const value = edits[id];
+    if (value === undefined || value < 1) return;
+    setSaving(prev => ({ ...prev, [id]: true }));
+    try {
+      await updateSla(id, value);
       setEdits(prev => { const n = { ...prev }; delete n[id]; return n; });
+      toast({ title: 'SLA updated', description: 'Policy saved successfully.', variant: 'default' });
+    } catch {
+      toast({ title: 'Save failed', description: 'Unable to update SLA policy. Please try again.', variant: 'destructive' });
+    } finally {
+      setSaving(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -35,25 +46,51 @@ export default function SLAAdmin() {
             </tr>
           </thead>
           <tbody>
-            {slas.map(sla => (
-              <tr key={sla.id} className="data-table-row">
-                <td className="px-4 py-3 text-foreground font-medium">{sla.label}</td>
-                <td className="px-4 py-3 text-foreground tabular-nums">{sla.slaDays} days</td>
-                <td className="px-4 py-3">
-                  <Input
-                    type="number"
-                    className="w-24 h-8 bg-secondary text-sm"
-                    value={edits[sla.id] ?? sla.slaDays}
-                    onChange={e => setEdits(prev => ({ ...prev, [sla.id]: parseInt(e.target.value) || 0 }))}
-                  />
-                </td>
-                <td className="px-4 py-3">
-                  <Button size="sm" variant="outline" onClick={() => handleSave(sla.id)} disabled={edits[sla.id] === undefined}>
-                    <Save className="h-3 w-3 mr-1" />Save
-                  </Button>
+            {slas.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  No SLA policies configured. Contact your administrator.
                 </td>
               </tr>
-            ))}
+            ) : (
+              slas.map(sla => {
+                const editVal = edits[sla.id];
+                const isDirty = editVal !== undefined && editVal !== sla.slaDays;
+                const isInvalid = isDirty && editVal < 1;
+                const isSaving = saving[sla.id] ?? false;
+                return (
+                  <tr key={sla.id} className="data-table-row">
+                    <td className="px-4 py-3 text-foreground font-medium">{sla.label}</td>
+                    <td className="px-4 py-3 text-foreground tabular-nums">{sla.slaDays} days</td>
+                    <td className="px-4 py-3">
+                      <Input
+                        type="number"
+                        min={1}
+                        className={`w-24 h-8 bg-secondary text-sm ${isInvalid ? 'border-destructive ring-destructive/30' : ''}`}
+                        value={editVal ?? sla.slaDays}
+                        onChange={e => {
+                          const parsed = parseInt(e.target.value, 10);
+                          setEdits(prev => ({ ...prev, [sla.id]: isNaN(parsed) ? 0 : parsed }));
+                        }}
+                        disabled={isSaving}
+                      />
+                      {isInvalid && <p className="text-xs text-destructive mt-1">Minimum 1 day</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleSave(sla.id)}
+                        disabled={!isDirty || isInvalid || isSaving}
+                      >
+                        {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />}
+                        Save
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -117,6 +117,19 @@ export default function VehicleExplorer() {
   }, []);
 
   const [filters, setFilters] = useState<VehicleFilterState>(initialFilters);
+  // Debounce the search term so every keystroke doesn't fire a server query
+  const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleFiltersChange = (next: VehicleFilterState) => {
+    setFilters(next);
+    if (next.search !== filters.search) {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      debounceTimer.current = setTimeout(() => setDebouncedSearch(next.search), 350);
+    } else {
+      setDebouncedSearch(next.search);
+    }
+  };
   const [sortField, setSortField] = useState<string>('chassis_no');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
@@ -132,7 +145,7 @@ export default function VehicleExplorer() {
     queryKey: [
       'vehicle-explorer-search',
       user?.company_id,
-      filters.search,
+      debouncedSearch,
       filters.branch,
       filters.model,
       filters.payment,
@@ -147,7 +160,7 @@ export default function VehicleExplorer() {
       model: toServerValue(filters.model),
       payment: toServerValue(filters.payment),
       stage: toServerValue(filters.stage),
-      search: filters.search.trim() || null,
+      search: debouncedSearch.trim() || null,
       limit: filters.pageSize,
       offset: serverOffset,
       sortColumn: normalizeServerSortField(sortField),
@@ -394,7 +407,7 @@ export default function VehicleExplorer() {
 
       <VehicleExplorerFilters
         state={filters}
-        onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
+        onChange={(next) => handleFiltersChange({ ...filters, ...next })}
         branches={branches}
         models={models}
         payments={payments}
