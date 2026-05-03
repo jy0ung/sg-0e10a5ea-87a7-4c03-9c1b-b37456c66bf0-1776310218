@@ -29,11 +29,26 @@ const envSchema = z.object({
 
 export type AppEnv = z.infer<typeof envSchema>;
 
+function resolveSupabaseUrl(raw: string | undefined): string | undefined {
+  if (!raw) return raw;
+  // Relative proxy path (e.g. "/__supabase") — resolve against the current origin
+  // so the absolute URL is available for validation and for the Supabase client.
+  if (raw.startsWith('/')) {
+    const origin =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : 'http://localhost:3000';
+    return `${origin}${raw}`;
+  }
+  return raw;
+}
+
 function parseEnv(): AppEnv {
   const raw = {
-    VITE_SUPABASE_URL:
+    VITE_SUPABASE_URL: resolveSupabaseUrl(
       import.meta.env.VITE_SUPABASE_URL ??
-      import.meta.env.NEXT_PUBLIC_SUPABASE_URL,
+      import.meta.env.NEXT_PUBLIC_SUPABASE_URL
+    ),
     VITE_SUPABASE_ANON_KEY:
       import.meta.env.VITE_SUPABASE_ANON_KEY ??
       import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
