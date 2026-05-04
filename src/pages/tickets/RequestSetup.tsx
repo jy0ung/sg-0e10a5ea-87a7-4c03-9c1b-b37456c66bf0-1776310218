@@ -1147,26 +1147,6 @@ export default function RequestSetup() {
 
           {/* ── Templates tab ─────────────────────────────────────────── */}
           <TabsContent value="templates" className="space-y-6">
-            {/* Add template header */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Templates</p>
-                <p className="text-sm text-muted-foreground">
-                  Pre-build request starters so employees can submit common requests in seconds.
-                </p>
-              </div>
-              {!isAddingTemplate && (
-                <Button
-                  type="button"
-                  onClick={() => setIsAddingTemplate(true)}
-                  className="gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Template
-                </Button>
-              )}
-            </div>
-
             {/* Create template form */}
             {isAddingTemplate && (
               <div className="rounded-xl border border-dashed border-border/70 bg-secondary/20 p-4 space-y-4">
@@ -1319,14 +1299,18 @@ export default function RequestSetup() {
                 <Button variant="outline" onClick={() => void reloadTemplates()}>Retry</Button>
               </div>
             ) : templates.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border py-16 text-center">
-                <div className="space-y-1">
-                  <p className="font-medium text-foreground">No templates yet</p>
-                  <p className="text-sm text-muted-foreground">
-                    Click <span className="font-medium">Add Template</span> to create the first one.
-                  </p>
+              !isAddingTemplate ? (
+                <div className="flex items-center justify-center py-16">
+                  <Button
+                    type="button"
+                    onClick={() => setIsAddingTemplate(true)}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Template
+                  </Button>
                 </div>
-              </div>
+              ) : null
             ) : (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1554,22 +1538,6 @@ export default function RequestSetup() {
 
           {/* ── Routing tab ──────────────────────────────────────────────── */}
           <TabsContent value="routing" className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Auto-routing Rules</p>
-                <p className="text-sm text-muted-foreground">
-                  Rules are evaluated in order — the first active match wins. Leave a condition blank to match any value.
-                </p>
-              </div>
-              {!isAddingRule && (
-                <Button type="button" onClick={() => setIsAddingRule(true)} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add Rule
-                </Button>
-              )}
-            </div>
-
             {/* Create rule form */}
             {isAddingRule && (
               <div className="rounded-xl border border-dashed border-border/70 bg-secondary/20 p-4 space-y-4">
@@ -1735,21 +1703,38 @@ export default function RequestSetup() {
                 <Button variant="outline" onClick={() => void reloadRoutingRules()}>Retry</Button>
               </div>
             ) : routingRules.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border py-16 text-center">
-                <Route className="h-10 w-10 text-muted-foreground/40" />
-                <div className="space-y-1">
-                  <p className="font-medium text-foreground">No routing rules yet</p>
-                  <p className="text-sm text-muted-foreground">
-                    Click <span className="font-medium">Add Rule</span> to automatically assign incoming requests.
-                  </p>
+              !isAddingRule ? (
+                <div className="flex items-center justify-center py-16">
+                  <Button
+                    type="button"
+                    onClick={() => setIsAddingRule(true)}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Rule
+                  </Button>
                 </div>
-              </div>
+              ) : null
             ) : (
               <div className="space-y-4">
-                <Badge variant="outline">
-                  {routingRules.length} {routingRules.length === 1 ? 'rule' : 'rules'} ·{' '}
-                  {routingRules.filter((r) => r.is_active).length} active
-                </Badge>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <Badge variant="outline">
+                    {routingRules.length} {routingRules.length === 1 ? 'rule' : 'rules'} ·{' '}
+                    {routingRules.filter((r) => r.is_active).length} active
+                  </Badge>
+                  {!isAddingRule && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAddingRule(true)}
+                      className="gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Rule
+                    </Button>
+                  )}
+                </div>
 
                 {routingRules.map((rule, rIdx) => {
                   const isRuleBusy = busyRuleId === rule.id;
