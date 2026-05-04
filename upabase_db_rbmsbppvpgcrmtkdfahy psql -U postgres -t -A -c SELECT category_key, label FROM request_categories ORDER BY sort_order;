@@ -1,0 +1,39 @@
+     category_key     |        label         | is_active | sort_order 
+----------------------+----------------------+-----------+------------
+ operations_support   | Operations Support   | t         |         10
+ operations_support   | Operations Support   | t         |         10
+ operations_support   | Operations Support   | t         |         10
+ operations_support   | Operations Support   | t         |         10
+ operations_support   | Operations Support   | t         |         10
+ technical_support    | Technical Support    | t         |         20
+ technical_support    | Technical Support    | t         |         20
+ technical_support    | Technical Support    | t         |         20
+ technical_support    | Technical Support    | t         |         20
+ technical_support    | Technical Support    | t         |         20
+ access_request       | System Access        | t         |         30
+ access_request       | System Access        | t         |         30
+ access_request       | System Access        | t         |         30
+ access_request       | System Access        | t         |         30
+ access_request       | System Access        | t         |         30
+ finance_request      | Finance Request      | t         |         40
+ finance_request      | Finance Request      | t         |         40
+ finance_request      | Finance Request      | t         |         40
+ finance_request      | Finance Request      | t         |         40
+ finance_request      | Finance Request      | t         |         40
+ hr_request           | HR Request           | t         |         50
+ hr_request           | HR Request           | t         |         50
+ hr_request           | HR Request           | t         |         50
+ hr_request           | HR Request           | t         |         50
+ hr_request           | HR Request           | t         |         50
+ service_coordination | Service Coordination | t         |         60
+ service_coordination | Service Coordination | t         |         60
+ service_coordination | Service Coordination | t         |         60
+ service_coordination | Service Coordination | t         |         60
+ service_coordination | Service Coordination | t         |         60
+ other                | Other                | t         |         70
+ other                | Other                | t         |         70
+ other                | Other                | t         |         70
+ other                | Other                | t         |         70
+ other                | Other                | t         |         70
+(35 rows)
+
