@@ -242,7 +242,6 @@ export default function ImportCenter() {
   const { addImportBatch, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, vehicles, user } = useData();
   const companyId = useCompanyId();
   const { toast } = useToast();
-  const companyId = useCompanyId();
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');
   const [rawRows, setRawRows] = useState<VehicleRaw[]>([]);
