@@ -2000,6 +2000,8 @@ export async function acknowledgeAppraisalItem(
     appraisalId: item.appraisalId,
   });
   return { error: null };
+}
+
 export async function createAppraisalItem(
   appraisalId: string,
   companyId: string,

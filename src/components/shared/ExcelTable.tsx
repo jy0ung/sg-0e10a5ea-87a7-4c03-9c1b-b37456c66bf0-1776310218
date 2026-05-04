@@ -456,7 +456,7 @@ export function ExcelTable<T>({
             </div>
           )}
         </div>
-      )}
+      </div>
 
       <div className="glass-panel overflow-hidden">
         <div className="overflow-x-auto">

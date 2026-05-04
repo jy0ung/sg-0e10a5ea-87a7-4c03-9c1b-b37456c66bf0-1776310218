@@ -306,40 +306,127 @@ export async function parseWorkbook(file: ArrayBuffer): Promise<{ rows: VehicleR
     const mappedDbColumns = new Set<keyof VehicleRaw>();
     let parsedSheetCount = 0;
 
-      Object.entries(columnMapping).forEach(([excelCol, dbColumn]) => {
-        const val = row[excelCol];
-        const normalized = normalizeVehicleRawCell(dbColumn, val);
-        if (DATE_FIELDS.has(dbColumn) && normalized.invalid && normalized.value) {
-          issues.push({
-            id: `iss-${idx}-${dbColumn}`,
-            chassisNo: String(vehicle.chassis_no ?? ''),
-            field: dbColumn,
-            issueType: 'format_error',
-            message: `Row ${idx + 1}: ${dbColumn} has invalid date format`,
-            severity: 'error',
-            importBatchId: batchId,
-            rowNumber: idx + 1,
-          });
-        }
-        (vehicle as Record<string, unknown>)[dbColumn] = normalized.value;
+    for (const [sheetIndex, ws] of wb.worksheets.entries()) {
+      // Pull each worksheet as a 2D grid so we can locate the header row.
+      const grid: unknown[][] = [];
+      ws.eachRow({ includeEmpty: true }, (row) => {
+        const values = row.values as unknown[];
+        grid.push(values.slice(1).map(value => value ?? ''));
       });
 
-      if (!vehicle.chassis_no) {
-        issues.push({ 
-          id: `iss-${idx}-chassis`, 
-          chassisNo: '', 
-          field: 'chassis_no', 
-          issueType: 'missing', 
-          message: `Row ${idx + 1}: Missing chassis number`, 
-          severity: 'error', 
-          importBatchId: batchId,
-          rowNumber: idx + 1,
-        });
+      if (grid.length === 0) {
+        continue;
       }
 
-      const normalizedRow = normalizeVehicleRawRow(vehicle);
-      rows.push(normalizedRow);
-    });
+      let headerRowIdx = 0;
+      let bestHits = -1;
+      const scanLimit = Math.min(10, grid.length);
+      for (let i = 0; i < scanLimit; i++) {
+        const row = grid[i] ?? [];
+        let hits = 0;
+        for (const cell of row) {
+          const norm = normalizeHeader(cell);
+          if (HEADER_ALIAS_MAP[norm] || COMM_PAYOUT_HEADER.test(norm)) hits++;
+        }
+        if (hits > bestHits) {
+          bestHits = hits;
+          headerRowIdx = i;
+        }
+      }
+
+      if (bestHits < MIN_HEADER_HITS) {
+        continue;
+      }
+
+      const headerCells = (grid[headerRowIdx] ?? []).map(c => normalizeHeader(c));
+      const columnMapping = new Map<number, keyof VehicleRaw | 'COMM_PAYOUT'>();
+      headerCells.forEach((norm, colIdx) => {
+        if (!norm || IGNORED_HEADERS.has(norm)) return;
+        if (COMM_PAYOUT_HEADER.test(norm)) {
+          columnMapping.set(colIdx, 'COMM_PAYOUT');
+          return;
+        }
+        const key = HEADER_ALIAS_MAP[norm];
+        if (key) columnMapping.set(colIdx, key);
+      });
+
+      const sheetMappedColumns = new Set(
+        Array.from(columnMapping.values()).filter((value): value is keyof VehicleRaw => value !== 'COMM_PAYOUT'),
+      );
+      if (sheetMappedColumns.size === 0 && !Array.from(columnMapping.values()).includes('COMM_PAYOUT')) {
+        continue;
+      }
+
+      parsedSheetCount++;
+      sheetMappedColumns.forEach(column => mappedDbColumns.add(column));
+
+      const chassisColIdx = Array.from(columnMapping.entries())
+        .find(([, value]) => value === 'chassis_no')?.[0];
+
+      for (let rIdx = headerRowIdx + 1; rIdx < grid.length; rIdx++) {
+        const row = grid[rIdx] ?? [];
+        const rowNumber = rIdx + 1;
+
+        const hasAnyValue = row.some(c => c !== '' && c !== null && c !== undefined);
+        if (!hasAnyValue) continue;
+
+        const chassisVal = chassisColIdx !== undefined ? row[chassisColIdx] : undefined;
+        const hasChassis = chassisVal !== undefined && String(chassisVal).trim() !== '';
+        if (!hasChassis) {
+          const looksLikeSection = row.some(c => {
+            if (c === '' || c === null || c === undefined) return false;
+            return SECTION_LABEL_REGEX.test(String(c));
+          });
+          if (looksLikeSection) continue;
+        }
+
+        const vehicle: Partial<VehicleRaw> = {
+          id: `raw-${sheetIndex}-${rIdx}`,
+          import_batch_id: batchId,
+          row_number: rowNumber,
+        };
+
+        columnMapping.forEach((dbColumn, colIdx) => {
+          const val = row[colIdx];
+          if (dbColumn === 'COMM_PAYOUT') {
+            const parsed = parseCommPayout(val);
+            if (parsed.remark !== undefined) vehicle.commission_remark = parsed.remark;
+            if (parsed.paid !== undefined) vehicle.commission_paid = parsed.paid;
+            return;
+          }
+          if (DATE_FIELDS.has(dbColumn)) {
+            (vehicle as Record<string, unknown>)[dbColumn] = parseExcelDate(val);
+          } else {
+            (vehicle as Record<string, unknown>)[dbColumn] = val !== undefined && val !== null && val !== ''
+              ? String(val).trim()
+              : undefined;
+          }
+        });
+
+        if (!vehicle.chassis_no) {
+          issues.push({
+            id: `iss-${sheetIndex}-${rIdx}-chassis`,
+            chassisNo: '',
+            field: 'chassis_no',
+            issueType: 'missing',
+            message: `Sheet ${ws.name} row ${rowNumber}: Missing chassis number`,
+            severity: 'error',
+            importBatchId: batchId,
+          });
+        }
+
+        vehicle.is_d2d = vehicle.remark?.toLowerCase().includes('d2d')
+          || vehicle.remark?.toLowerCase().includes('transfer')
+          || false;
+        rows.push(vehicle as VehicleRaw);
+      }
+    }
+
+    if (parsedSheetCount === 0) {
+      return { rows: [], issues: [], missingColumns: ['No supported data sheets found in workbook'] };
+    }
+
+    const missingColumns = REQUIRED_DB_COLUMNS.filter(rc => !mappedDbColumns.has(rc));
 
     const chassisCount = new Map<string, number>();
     rows.forEach(r => {
@@ -350,17 +437,14 @@ export async function parseWorkbook(file: ArrayBuffer): Promise<{ rows: VehicleR
 
     chassisCount.forEach((count, chassis) => {
       if (count > 1) {
-        rows.filter(r => r.chassis_no === chassis).forEach(duplicateRow => {
-          issues.push({ 
-            id: `iss-dup-${chassis}-${duplicateRow.row_number}`, 
-            chassisNo: chassis, 
-            field: 'chassis_no', 
-            issueType: 'duplicate', 
-            message: `Chassis ${chassis} appears ${count} times`, 
-            severity: 'warning', 
-            importBatchId: batchId,
-            rowNumber: duplicateRow.row_number,
-          });
+        issues.push({
+          id: `iss-dup-${chassis}`,
+          chassisNo: chassis,
+          field: 'chassis_no',
+          issueType: 'duplicate',
+          message: `Chassis ${chassis} appears ${count} times`,
+          severity: 'warning',
+          importBatchId: batchId,
         });
       }
     });
