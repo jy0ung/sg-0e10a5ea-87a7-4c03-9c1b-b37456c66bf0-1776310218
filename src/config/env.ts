@@ -57,7 +57,7 @@ function parseEnv(): AppEnv {
     VITE_SENTRY_DSN: import.meta.env.VITE_SENTRY_DSN,
     VITE_SENTRY_TRACES_SAMPLE_RATE: import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE || undefined,
     VITE_APP_ENV: import.meta.env.VITE_APP_ENV,
-    VITE_APP_URL: import.meta.env.VITE_APP_URL,
+    VITE_APP_URL: import.meta.env.VITE_APP_URL || undefined,
     VITE_HRMS_APP_URL: import.meta.env.VITE_HRMS_APP_URL || undefined,
     VITE_APP_VERSION: import.meta.env.VITE_APP_VERSION || undefined,
   };
