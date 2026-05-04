@@ -17,12 +17,6 @@ import { RequireActiveModule } from "@/components/shared/RequireActiveModule";
 import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 import { LocationPreservingNavigate } from "@/components/shared/LocationPreservingNavigate";
 import { PageSpinner } from "@/components/shared/PageSpinner";
-import {
-  HRMS_ADMIN_ROLES,
-  HRMS_MANAGER_ROLES,
-  HRMS_PAYROLL_ROLES,
-  HRMS_SELF_SERVICE_ROLES,
-} from "@/config/hrmsConfig";
 import AppLayout from "./components/layout/AppLayout";
 import SalesLayout from "./components/layout/SalesLayout";
 import { SalesProvider } from "./contexts/SalesContext";
@@ -212,15 +206,10 @@ const router = createBrowserRouter([
       { path: 'admin/role-permissions', element: <RequireRole roles={ADMIN_ONLY}><R scope="Role Permissions"><S><RolePermissionsPage /></S></R></RequireRole> },
       { path: "reports", element: withModuleAccess('reports', <R scope="Reports"><S><ReportsCenter /></S></R>) },
       { path: "inventory/chassis-filter", element: withModuleAccess('inventory', <R scope="Chassis Filter"><S><ChassisFilter /></S></R>) },
-      { path: "hrms/employees", element: withModuleAccess('hrms', <RequireRole roles={HRMS_MANAGER_ROLES}><R scope="Employee Directory"><S><EmployeeDirectory /></S></R></RequireRole>) },
-      { path: "hrms/leave", element: withModuleAccess('hrms', <RequireRole roles={HRMS_SELF_SERVICE_ROLES}><R scope="Leave Management"><S><LeaveManagement /></S></R></RequireRole>) },
-      { path: "hrms/leave-calendar", element: withModuleAccess('hrms', <RequireRole roles={HRMS_SELF_SERVICE_ROLES}><R scope="Leave Calendar"><S><LeaveCalendar /></S></R></RequireRole>) },
-      { path: "hrms/attendance", element: withModuleAccess('hrms', <RequireRole roles={HRMS_SELF_SERVICE_ROLES}><R scope="Attendance Log"><S><AttendanceLog /></S></R></RequireRole>) },
-      { path: "hrms/payroll", element: withModuleAccess('hrms', <RequireRole roles={HRMS_PAYROLL_ROLES}><R scope="Payroll Summary"><S><PayrollSummary /></S></R></RequireRole>) },
-      { path: "hrms/appraisals", element: withModuleAccess('hrms', <RequireRole roles={HRMS_SELF_SERVICE_ROLES}><R scope="Performance Appraisals"><S><PerformanceAppraisals /></S></R></RequireRole>) },
-      { path: "hrms/announcements", element: withModuleAccess('hrms', <RequireRole roles={HRMS_SELF_SERVICE_ROLES}><R scope="Announcements"><S><HrmsAnnouncements /></S></R></RequireRole>) },
-      { path: "hrms/admin", element: withModuleAccess('hrms', <RequireRole roles={HRMS_ADMIN_ROLES}><R scope="HRMS Settings"><S><HrmsAdmin /></S></R></RequireRole>) },
-      { path: "hrms/approval-flows", element: withModuleAccess('hrms', <RequireRole roles={HRMS_ADMIN_ROLES}><R scope="Approval Flows"><S><ApprovalFlows /></S></R></RequireRole>) },
+      { path: "hrms", element: withModuleAccess('hrms', <R scope="HRMS Workspace"><S><HrmsWorkspaceRedirect /></S></R>) },
+      { path: "hrms/admin", element: <LocationPreservingNavigate to="/hrms/settings" /> },
+      { path: "hrms/leave-calendar", element: <LocationPreservingNavigate to="/hrms/leave/calendar" /> },
+      { path: "hrms/*", element: withModuleAccess('hrms', <R scope="HRMS Workspace"><S><HrmsWorkspaceRedirect /></S></R>) },
     ],
   },
   {
