@@ -421,6 +421,10 @@ export default function NewTicket() {
   const categorySelectionDisabled = categoriesLoading || categories.length === 0;
   const requiresSubcategory = availableSubcategories.length > 0;
   const activeTemplate = templates.find((t) => t.id === activeTemplateId) ?? null;
+  const categoryTemplates = useMemo(
+    () => templates.filter((t) => t.category_key === selectedCategoryKey && t.is_active),
+    [templates, selectedCategoryKey],
+  );
 
   const applyTemplate = (template: (typeof templates)[number]) => {
     setActiveTemplateId(template.id);
@@ -474,7 +478,7 @@ export default function NewTicket() {
       </div>
 
       {/* Template picker */}
-      {templates.length > 0 && (
+      {categoryTemplates.length > 0 && selectedCategoryKey && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -493,7 +497,7 @@ export default function NewTicket() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {templates.map((t) => (
+            {categoryTemplates.map((t) => (
               <button
                 key={t.id}
                 type="button"
