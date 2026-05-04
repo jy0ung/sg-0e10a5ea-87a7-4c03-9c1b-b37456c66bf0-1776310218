@@ -801,25 +801,6 @@ export default function RequestSetup() {
             </TabsList>
 
             <TabsContent value="categories" className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-foreground">Categories</p>
-              <p className="text-sm text-muted-foreground">
-                Add, edit, sort, and archive the categories requesters see when submitting a new request.
-              </p>
-            </div>
-            {!isAddingCategory && (
-              <Button
-                type="button"
-                onClick={() => setIsAddingCategory(true)}
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Category
-              </Button>
-            )}
-          </div>
-
           {isAddingCategory && (
             <div className="rounded-xl border border-dashed border-border/70 bg-secondary/20 p-4 space-y-4">
               <div className="flex items-center justify-between gap-3">
@@ -889,14 +870,18 @@ export default function RequestSetup() {
               </Button>
             </div>
           ) : categories.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border py-16 text-center">
-              <div className="space-y-1">
-                <p className="font-medium text-foreground">No categories yet</p>
-                <p className="text-sm text-muted-foreground">
-                  Click <span className="font-medium">Add Category</span> to create the first one and enable request submission.
-                </p>
+            !isAddingCategory ? (
+              <div className="flex items-center justify-center py-16">
+                <Button
+                  type="button"
+                  onClick={() => setIsAddingCategory(true)}
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Category
+                </Button>
               </div>
-            </div>
+            ) : null
           ) : (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">

@@ -52,6 +52,26 @@ const NOTIFY_ROLES = new Set([
   'manager',
 ]);
 
+// ---------------------------------------------------------------------------
+// In-memory sliding-window rate limiter (non-service-role callers only)
+// Max 20 push-notification requests per caller per minute.
+// ---------------------------------------------------------------------------
+const RATE_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_MAX_CALLS = 20;
+const rateLimitStore = new Map<string, number[]>();
+
+function isRateLimited(callerId: string): boolean {
+  const now = Date.now();
+  const timestamps = (rateLimitStore.get(callerId) ?? []).filter(
+    (t) => now - t < RATE_WINDOW_MS,
+  );
+  if (timestamps.length >= RATE_MAX_CALLS) return true;
+  timestamps.push(now);
+  rateLimitStore.set(callerId, timestamps);
+  return false;
+}
+// ---------------------------------------------------------------------------
+
 Deno.serve(async (req: Request) => {
   const corsHeaders = buildCorsHeaders(req);
   const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
@@ -125,6 +145,14 @@ Deno.serve(async (req: Request) => {
     if (!callerProfile || !NOTIFY_ROLES.has(callerProfile.role)) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
+        headers: jsonHeaders,
+      });
+    }
+
+    // Rate limit user JWT callers — DB webhooks (service role) are exempt
+    if (isRateLimited(caller.id)) {
+      return new Response(JSON.stringify({ error: 'Too many requests' }), {
+        status: 429,
         headers: jsonHeaders,
       });
     }

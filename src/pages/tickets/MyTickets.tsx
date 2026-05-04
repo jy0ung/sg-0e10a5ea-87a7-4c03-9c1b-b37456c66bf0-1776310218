@@ -132,10 +132,11 @@ export default function MyTickets() {
               <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
                   <CardTitle className="text-lg">
-                    {ticket.vso_number ?? '—'}
+                    {ticket.subject}
                   </CardTitle>
                   <CardDescription>
                     {user?.name} · {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}
+                    {ticket.vso_number && <> · VSO {ticket.vso_number}</>}
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-2">

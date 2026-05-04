@@ -20,6 +20,26 @@ import { buildCorsHeaders } from '../_shared/cors.ts';
 
 const MAX_CARRY_DEFAULT = 5;
 
+// ---------------------------------------------------------------------------
+// In-memory sliding-window rate limiter
+// Max 5 rollovers per caller per 24 hours. Resets on isolate restart.
+// ---------------------------------------------------------------------------
+const RATE_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+const RATE_MAX_CALLS = 5;
+const rateLimitStore = new Map<string, number[]>();
+
+function isRateLimited(callerId: string): boolean {
+  const now = Date.now();
+  const timestamps = (rateLimitStore.get(callerId) ?? []).filter(
+    (t) => now - t < RATE_WINDOW_MS,
+  );
+  if (timestamps.length >= RATE_MAX_CALLS) return true;
+  timestamps.push(now);
+  rateLimitStore.set(callerId, timestamps);
+  return false;
+}
+// ---------------------------------------------------------------------------
+
 interface RolloverPayload {
   company_id: string;
   from_year: number;
@@ -75,6 +95,14 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: 'Only administrators can run leave rollovers' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Rate limit: 5 rollovers per caller per 24 hours
+    if (isRateLimited(caller.id)) {
+      return new Response(
+        JSON.stringify({ error: 'Too many requests — rollover is limited to 5 times per 24 hours per user' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 

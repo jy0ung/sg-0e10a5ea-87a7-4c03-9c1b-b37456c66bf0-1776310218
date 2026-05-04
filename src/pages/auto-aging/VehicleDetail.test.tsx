@@ -63,6 +63,8 @@ describe('VehicleDetail', () => {
       vehicles: [vehicle],
       qualityIssues: [],
       kpiSummaries: [],
+      slas: [],
+      loading: false,
       reloadFromDb: vi.fn(),
     });
   });

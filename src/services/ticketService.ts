@@ -121,6 +121,7 @@ function mapTicket(row: TicketRow): TicketRecord {
     priority: row.priority,
     status: row.status,
     description: row.description,
+    vso_number: row.vso_number ?? null,
     submitted_by: row.submitted_by,
     assigned_to: row.assigned_to,
     assigned_at: row.assigned_at,
@@ -273,7 +274,7 @@ export async function listMyTickets(userId: string, companyId: string): Promise<
   try {
     const { data, error } = await ticketsTable()
       .select(
-        'id, subject, category, subcategory, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
+        'id, subject, category, subcategory, priority, status, description, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
       )
       .eq('submitted_by', userId)
       .eq('company_id', companyId)
@@ -299,7 +300,7 @@ export async function listCompanyTickets(companyId: string): Promise<TicketServi
   try {
     const { data, error } = await ticketsTable()
       .select(
-        'id, subject, category, subcategory, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
+        'id, subject, category, subcategory, priority, status, description, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
       )
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });

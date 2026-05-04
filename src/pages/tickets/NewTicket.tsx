@@ -398,7 +398,7 @@ export default function NewTicket() {
     toast.success('Request submitted', {
       description: 'Your request has been recorded and will be reviewed shortly.',
     });
-    navigate('/tickets');
+    navigate('/portal/tickets');
     setActiveTemplateId(null);
     setAttachedFiles([]);
     setFileErrors([]);
