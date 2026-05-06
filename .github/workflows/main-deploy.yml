@@ -109,7 +109,7 @@ jobs:
           echo "build_output_dir=$build_output_dir" >> "$GITHUB_OUTPUT"
           echo "build_hrms_web=$build_hrms_web" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
