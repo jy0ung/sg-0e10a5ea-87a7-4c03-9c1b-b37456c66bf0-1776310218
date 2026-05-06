@@ -233,8 +233,8 @@ jobs:
       - name: Copy deploy script through the tunnel
         shell: bash
         env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           scp scripts/deploy-image.sh deploy-target:/tmp/deploy-image.sh
@@ -242,8 +242,8 @@ jobs:
       - name: Run deploy on host through the tunnel
         shell: bash
         env:
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           CONTAINER_NAME: ${{ secrets.DEPLOY_CONTAINER_NAME }}
           HOST_PORT: ${{ secrets.DEPLOY_HOST_PORT }}
           GHCR_USERNAME: ${{ secrets.GHCR_READ_USERNAME }}
