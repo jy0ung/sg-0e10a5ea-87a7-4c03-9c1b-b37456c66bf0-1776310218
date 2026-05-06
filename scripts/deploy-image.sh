@@ -76,7 +76,8 @@ begin
    limit 1;
 
   if actor_id is null or actor_company is null then
-    raise exception 'Need at least one public.profiles row with company_id to smoke RPC contracts';
+    raise notice 'Skipping RPC contract smoke because no public.profiles row with company_id exists yet';
+    return;
   end if;
 
   perform set_config('request.jwt.claim.sub', actor_id::text, true);
