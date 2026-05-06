@@ -197,6 +197,7 @@ log "Starting staging container on 127.0.0.1:$STAGING_PORT"
 docker run -d \
   --name "$STAGING_NAME" \
   --restart unless-stopped \
+  --add-host host.docker.internal:host-gateway \
   -p "127.0.0.1:${STAGING_PORT}:8080" \
   "$IMAGE" >/dev/null
 
@@ -268,6 +269,7 @@ docker rm "$STAGING_NAME" >/dev/null
 docker run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
+  --add-host host.docker.internal:host-gateway \
   -p "127.0.0.1:${HOST_PORT}:8080" \
   "$IMAGE" >/dev/null
 

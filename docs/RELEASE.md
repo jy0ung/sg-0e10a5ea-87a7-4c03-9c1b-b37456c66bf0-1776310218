@@ -20,6 +20,16 @@ lint  →  typecheck  →  unit  →  build-web  →  build-mobile  →  e2e
 - Changesets-driven semver bumps per merged PR.
 - Tags trigger a Docker image build and publish (see `docs/HOSTING.md`).
 
+## Main Branch Deploy
+
+- Pushes to `main` trigger `.github/workflows/main-deploy.yml` after CI passes.
+- The workflow builds the `main-with-hrms` image target by default, tags it as `sha-<shortsha>` and `latest`, then deploys it to the production host through the existing SSH + Cloudflare Access path.
+- The deploy step still uses the repo's health-gated container swap script, so a bad image does not replace the live container.
+- `workflow_dispatch` can be used to redeploy an existing published image tag without rebuilding from source.
+- Production environments must provide `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_URL`, `SUPABASE_INTERNAL_URL`, and the existing SSH / Cloudflare Access deploy secrets. For an all-in-one host, set `SUPABASE_INTERNAL_URL` to `http://host.docker.internal:54321` so the app container can reach the local Supabase stack through Docker's host-gateway alias.
+- Optional production browser-login secrets (`UAT_LOGIN_EMAIL` and `UAT_LOGIN_PASSWORD`) can be added later; when present, `main-deploy.yml` installs Chromium and exercises the real login flow instead of skipping it.
+- See `docs/DEPLOY.md` for the all-in-one host bootstrap, local Supabase service, and Cloudflare Access SSH setup.
+
 ## Docker Build Targets
 
 The release workflow supports three image targets:

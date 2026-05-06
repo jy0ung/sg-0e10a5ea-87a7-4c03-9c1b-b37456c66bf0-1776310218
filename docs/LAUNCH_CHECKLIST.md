@@ -11,6 +11,8 @@ One-time gate before first production cutover. Every box must be checked.
 - [ ] Production `.env` populated (rotated keys, never reused from staging)
 - [ ] DNS + TLS cert for `app.<domain>` and `api.<domain>`
 - [ ] Docker image published to GHCR via `release.yml`
+- [ ] Push-to-main production deploy workflow enabled and verified (`main-deploy.yml`)
+- [ ] Production host bootstrapped via `scripts/setup-production-host.sh`
 - [ ] Nginx/reverse proxy routes `/` to the static bundle with HSTS +
       CSP headers
 - [x] UAT deploy verification passes with `npm run verify:uat`
