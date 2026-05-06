@@ -45,6 +45,7 @@ APP_URL="${APP_URL:-https://${SERVER_HOST}}"
 SUPABASE_INTERNAL_URL="${SUPABASE_INTERNAL_URL:-http://host.docker.internal:54321}"
 ENABLE_SUPABASE_SERVICE="${ENABLE_SUPABASE_SERVICE:-1}"
 START_SUPABASE_SERVICE="${START_SUPABASE_SERVICE:-1}"
+DOCKER_DATA_ROOT="${DOCKER_DATA_ROOT:-/srv/docker}"
 APP_USER="${SUDO_USER:-${USER:-}}"
 
 if [[ -z "$APP_USER" ]]; then
@@ -117,10 +118,31 @@ install_node() {
   sudo apt-get install -y nodejs
 }
 
+configure_docker_daemon() {
+  log "Configuring Docker data root at ${DOCKER_DATA_ROOT}"
+
+  sudo install -d -m 0711 "$DOCKER_DATA_ROOT"
+  sudo install -d -m 0755 /etc/docker
+
+  local tmp_json
+  tmp_json="$(mktemp)"
+
+  if [[ -f /etc/docker/daemon.json ]]; then
+    sudo cat /etc/docker/daemon.json | jq --arg data_root "$DOCKER_DATA_ROOT" '. + {"data-root": $data_root}' >"$tmp_json"
+  else
+    jq -n --arg data_root "$DOCKER_DATA_ROOT" '{"data-root": $data_root}' >"$tmp_json"
+  fi
+
+  sudo install -m 0644 "$tmp_json" /etc/docker/daemon.json
+  rm -f "$tmp_json"
+}
+
 install_docker() {
+  local docker_installed=0
+
   if command -v docker >/dev/null 2>&1; then
+    docker_installed=1
     log "Docker is already installed"
-    sudo systemctl enable --now docker
   else
     log "Installing Docker Engine"
     sudo install -m 0755 -d /etc/apt/keyrings
@@ -131,7 +153,15 @@ install_docker() {
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
     sudo apt-get update
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-    sudo systemctl enable --now docker
+  fi
+
+  configure_docker_daemon
+
+  sudo systemctl enable docker
+  if sudo systemctl is-active --quiet docker; then
+    sudo systemctl restart docker
+  else
+    sudo systemctl start docker
   fi
 
   if ! id -nG "$APP_USER" | tr ' ' '\n' | grep -qx docker; then
@@ -193,10 +223,8 @@ configure_supabase_config() {
   fi
 
   log "Updating supabase/config.toml for ${APP_URL}"
-  sed -i \
-    -e "s|^site_url = \".*\"|site_url = \"${APP_URL}\"|" \
-    -e "s|^additional_redirect_urls = \[.*\]|additional_redirect_urls = [\"${APP_URL}/signup\", \"${APP_URL}/reset-password\", \"${APP_URL}/hrms/reset-password\"]|" \
-    supabase/config.toml
+  perl -0pi -e 's{^site_url = ".*?"$}{site_url = "'"${APP_URL}"'"}m;' supabase/config.toml
+  perl -0pi -e 's{^additional_redirect_urls = \[(?:.|\n)*?^\]}{additional_redirect_urls = [\n  "'"${APP_URL}/signup"'",\n  "'"${APP_URL}/reset-password"'",\n  "'"${APP_URL}/hrms/signup"'",\n  "'"${APP_URL}/hrms/forgot-password"'",\n  "'"${APP_URL}/hrms/reset-password"'"\n]}ms' supabase/config.toml
 }
 
 install_workspace_dependencies() {

@@ -88,6 +88,16 @@ CREATE TABLE IF NOT EXISTS public.approval_decisions (
   created_at   timestamptz NOT NULL DEFAULT now(),
   UNIQUE (instance_id, step_id, approver_id)
 );
+
+ALTER TABLE public.approval_decisions
+  ADD COLUMN IF NOT EXISTS instance_id uuid REFERENCES public.approval_instances(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS step_order int,
+  ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_approval_decisions_instance_step_approver
+  ON public.approval_decisions (instance_id, step_id, approver_id)
+  WHERE instance_id IS NOT NULL;
+
 ALTER TABLE public.approval_decisions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Auth read approval_decisions" ON public.approval_decisions
