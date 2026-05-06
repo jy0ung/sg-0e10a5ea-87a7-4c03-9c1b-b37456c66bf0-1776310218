@@ -51,7 +51,11 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        navigateFallback: "/offline.html",
+        // Navigations must boot the SPA so client-side redirects (such as the
+        // main-app HRMS launcher) can run. Using offline.html here causes any
+        // same-origin routed navigation under SW control to render the offline
+        // shell instead of index.html.
+        navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//, /^\/supabase\//],
         runtimeCaching: [
           {

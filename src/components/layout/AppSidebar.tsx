@@ -8,11 +8,11 @@ import {
   ShoppingCart, Users, KanbanSquare, Receipt, Target, TrendingUp,
   Package, ArrowLeftRight, Truck, UserCheck, GitBranch, Database,
   TrendingDown, Landmark, Search, HeadphonesIcon, Briefcase,
-  Calendar, Clock, CreditCard, Star, Megaphone, Settings2, GitMerge,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRoleSectionMatrix } from '@/hooks/usePermissions';
+import { getDedicatedHrmsWorkspacePath, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
 
@@ -126,6 +126,10 @@ function isItemActive(path: string, pathname: string): boolean {
   return pathname === normalizedPath || pathname.startsWith(`${normalizedPath}/`);
 }
 
+function resolveNavigationHref(path: string): string {
+  return isHrmsWorkspacePath(path) ? getDedicatedHrmsWorkspacePath(path) : path;
+}
+
 interface NavItemLinkProps {
   item: NavItem;
   collapsed: boolean;
@@ -185,9 +189,10 @@ const NavItemLink = React.memo(function NavItemLink({ item, collapsed, pathname,
       )}
     </>
   );
+  const href = item.external ? resolveNavigationHref(item.path) : item.path;
   const link = item.external ? (
     <a
-      href={item.path}
+      href={href}
       onClick={onNavigate}
       className={linkClassName}
     >
@@ -336,7 +341,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
                   // Other sections: clickable link header; shows active state when focused here
                   sectionExternal ? (
                     <a
-                      href={sectionPath!}
+                      href={resolveNavigationHref(sectionPath!)}
                       onClick={onNavigate}
                       className={cn(
                         "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-widest mb-0.5 transition-colors",
