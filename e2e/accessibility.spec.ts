@@ -2,7 +2,19 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { setupAuthMocks } from "./helpers/auth-mock";
 
+async function waitForCssAnimations(page: import("@playwright/test").Page) {
+  await page
+    .waitForFunction(
+      () => document.getAnimations().every((animation) => animation.playState === "finished"),
+      undefined,
+      { timeout: 1_000 },
+    )
+    .catch(() => page.waitForTimeout(500));
+}
+
 async function expectNoSeriousA11yViolations(page: import("@playwright/test").Page) {
+  await waitForCssAnimations(page);
+
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa"])
     .analyze();
