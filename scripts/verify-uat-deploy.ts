@@ -17,6 +17,7 @@ type CheckResult = {
 const targetUrl = normalizeUrl(readEnv('UAT_URL') ?? DEFAULT_UAT_URL);
 const expectedSupabaseUrl = normalizeUrl(readEnv('UAT_EXPECTED_SUPABASE_URL') ?? targetUrl.origin);
 const healthUrl = normalizeUrl(readEnv('UAT_HEALTH_URL') ?? `${targetUrl.origin}/healthz`);
+const expectedHrmsAppUrl = readEnv('UAT_EXPECTED_HRMS_APP_URL');
 const forbiddenPatterns = (readEnv('UAT_FORBIDDEN_SUPABASE_PATTERNS') ?? DEFAULT_FORBIDDEN_PATTERNS.join(','))
   .split(',')
   .map((pattern) => pattern.trim())
@@ -292,6 +293,32 @@ async function setupHrmsBrowserMocks(page: Page) {
   }));
 }
 
+async function checkBundleHrmsAppUrl() {
+  const name = 'bundle HRMS app URL';
+  if (appMode !== 'main') {
+    addResult(name, true, `skipped for app mode ${JSON.stringify(appMode)}`);
+    return;
+  }
+  if (!expectedHrmsAppUrl) {
+    // Fail: for main-app deployments this must always be set.
+    addResult(name, false, 'UAT_EXPECTED_HRMS_APP_URL is not set — HRMS module button will use offline fallback');
+    return;
+  }
+  try {
+    const html = await fetchText(targetUrl);
+    const assetUrl = resolveAssetUrl(html);
+    const bundle = await fetchText(assetUrl);
+    const hrmsHost = new URL(expectedHrmsAppUrl).host;
+    if (bundle.includes(hrmsHost)) {
+      addResult(name, true, `${assetUrl.pathname} contains ${hrmsHost}`);
+    } else {
+      addResult(name, false, `${assetUrl.pathname} does not contain ${hrmsHost} — HRMS redirect will fail`);
+    }
+  } catch (error) {
+    fail(name, error);
+  }
+}
+
 async function checkHrmsWebShell() {
   const name = 'HRMS web shell smoke';
   if (appMode !== 'hrms-web') {
@@ -328,6 +355,7 @@ async function checkHrmsWebShell() {
 
 await checkHealth();
 await checkBundleSupabaseConfig();
+await checkBundleHrmsAppUrl();
 await checkLoginFlow();
 await checkHrmsWebShell();
 

@@ -48,6 +48,20 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_HRMS_APP_URL=$VITE_HRMS_APP_URL \
     VITE_APP_VERSION=$VITE_APP_VERSION
 
+# Guard: main-app builds (no BUILD_WORKSPACE) in production/staging MUST have
+# VITE_HRMS_APP_URL set, otherwise the HRMS module button falls back to the
+# local /hrms/ path and the service-worker serves the offline page instead.
+RUN if [ -z "$BUILD_WORKSPACE" ] \
+    && { [ "$VITE_APP_ENV" = "production" ] || [ "$VITE_APP_ENV" = "staging" ]; } \
+    && [ -z "$VITE_HRMS_APP_URL" ]; then \
+      echo "" >&2; \
+      echo "ERROR: VITE_HRMS_APP_URL is required for production/staging main-app builds." >&2; \
+      echo "       Without it the HRMS module button will show the offline error page." >&2; \
+      echo "       Pass --build-arg VITE_HRMS_APP_URL=https://hrms.<domain>" >&2; \
+      echo "" >&2; \
+      exit 1; \
+    fi
+
 RUN if [ -n "$BUILD_WORKSPACE" ]; then npm run build --workspace "$BUILD_WORKSPACE"; else npm run build; fi \
     && rm -rf /app/.deploy-dist \
     && mkdir -p /app/.deploy-dist \
