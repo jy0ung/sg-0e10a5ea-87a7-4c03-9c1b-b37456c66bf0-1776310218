@@ -265,6 +265,7 @@ jobs:
           UAT_APP: main
           UAT_URL: ${{ secrets.VITE_APP_URL }}
           UAT_EXPECTED_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          UAT_EXPECTED_HRMS_APP_URL: ${{ secrets.VITE_HRMS_APP_URL }}
           UAT_HEALTH_URL: ${{ format('{0}/healthz', secrets.VITE_APP_URL) }}
           UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
           UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
