@@ -176,7 +176,7 @@ export default function PurchaseInvoices() {
             <Input className="pl-8 h-8 text-sm" placeholder="Invoice no, supplier, chassis…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <Select value={statusFilter} onValueChange={setStatus}>
-            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-36 text-xs" aria-label="Purchase invoice status filter"><SelectValue placeholder="All Statuses" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>

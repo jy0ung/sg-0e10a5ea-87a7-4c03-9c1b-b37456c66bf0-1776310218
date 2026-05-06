@@ -160,7 +160,7 @@ export default function VehicleTransfer() {
             <Input className="pl-8 h-8 text-sm" placeholder="Chassis, model, branch…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <Select value={statusFilter} onValueChange={setStatus}>
-            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+            <SelectTrigger className="h-8 w-36 text-xs" aria-label="Transfer status filter"><SelectValue placeholder="All Statuses" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
