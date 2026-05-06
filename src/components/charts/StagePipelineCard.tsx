@@ -1,11 +1,10 @@
 import React, { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import type { VehicleCanonical } from '@/types';
+import type { VehicleCanonical, VehicleStage } from '@/types';
 import {
   VEHICLE_STAGES,
   VEHICLE_STAGE_LABELS,
   deriveVehicleStage,
-  type VehicleStage,
 } from '@/utils/vehicleStage';
 
 /**

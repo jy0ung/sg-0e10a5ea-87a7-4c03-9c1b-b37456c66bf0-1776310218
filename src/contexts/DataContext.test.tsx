@@ -230,7 +230,7 @@ describe('DataContext', () => {
         fileName: 'test.xlsx',
         uploadedBy: 'user1',
         uploadedAt: new Date().toISOString(),
-        status: 'pending' as const,
+        status: 'uploaded' as const,
         totalRows: 10,
         validRows: 8,
         errorRows: 2,
@@ -261,7 +261,7 @@ describe('DataContext', () => {
       
       const { result } = renderHook(() => useData(), { wrapper });
       
-      await result.current.updateImportBatch('b1', { status: 'completed' });
+      await result.current.updateImportBatch('b1', { status: 'published' });
 
       expect(updateMock).toHaveBeenCalled();
     });

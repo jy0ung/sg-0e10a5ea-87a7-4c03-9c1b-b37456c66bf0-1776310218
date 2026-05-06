@@ -18,12 +18,12 @@ function mapTarget(row: Record<string, unknown>): SalesmanTarget {
 }
 
 export async function getSalesmanTargets(companyId: string, year?: number, month?: number): Promise<{ data: SalesmanTarget[]; error: Error | null }> {
-  const timerId = performanceService.startQueryTimer('getSalesmanTargets');
+  performanceService.startQueryTimer('getSalesmanTargets');
   let query = supabase.from('salesman_targets').select('*').eq('company_id', companyId);
   if (year !== undefined) query = query.eq('period_year', year);
   if (month !== undefined) query = query.eq('period_month', month);
   const { data, error } = await query.order('period_year', { ascending: false }).order('period_month', { ascending: false });
-  performanceService.endQueryTimer(timerId);
+  performanceService.endQueryTimer('getSalesmanTargets', 'getSalesmanTargets');
   if (error) { loggingService.error('getSalesmanTargets failed', { error }); return { data: [], error: new Error(error.message) }; }
   return { data: (data ?? []).map(r => mapTarget(r as Record<string, unknown>)), error: null };
 }

@@ -108,7 +108,7 @@ class LoggingService {
         const { error } = await supabase.from("application_logs").insert({
           level: entry.level,
           message: entry.message,
-          context: entry.context || null,
+          context: (entry.context || null) as import('@/integrations/supabase/types').Json,
           user_id: entry.userId,
           component: entry.component || null,
           created_at: entry.timestamp,

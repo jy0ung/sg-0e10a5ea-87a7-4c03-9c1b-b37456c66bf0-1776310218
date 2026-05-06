@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -18,32 +17,60 @@ export type Database = {
       approval_decisions: {
         Row: {
           id: string
-          approval_request_id: string
+          instance_id: string
           step_id: string
+          step_order: number
           approver_id: string
           decision: 'approved' | 'rejected'
           note: string | null
           decided_at: string
+          created_at: string
         }
         Insert: {
           id?: string
-          approval_request_id: string
+          instance_id: string
           step_id: string
+          step_order?: number
           approver_id: string
           decision: 'approved' | 'rejected'
           note?: string | null
           decided_at?: string
+          created_at?: string
         }
         Update: {
           id?: string
-          approval_request_id?: string
+          instance_id?: string
           step_id?: string
+          step_order?: number
           approver_id?: string
           decision?: 'approved' | 'rejected'
           note?: string | null
           decided_at?: string
+          created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "approval_decisions_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "approval_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_decisions_approver_id_fkey"
+            columns: ["approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_decisions_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "approval_steps"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       approval_requests: {
         Row: {
@@ -78,6 +105,145 @@ export type Database = {
           flow_id?: string
           requester_id?: string
           current_step_order?: number
+          status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      approval_flows: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          description: string | null
+          entity_type: 'leave_request' | 'payroll_run' | 'appraisal' | 'general'
+          is_active: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          name: string
+          description?: string | null
+          entity_type?: 'leave_request' | 'payroll_run' | 'appraisal' | 'general'
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          name?: string
+          description?: string | null
+          entity_type?: 'leave_request' | 'payroll_run' | 'appraisal' | 'general'
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      approval_steps: {
+        Row: {
+          id: string
+          flow_id: string
+          step_order: number
+          name: string
+          approver_type: 'role' | 'specific_user' | 'direct_manager'
+          approver_role: string | null
+          approver_user_id: string | null
+          allow_self_approval: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          flow_id: string
+          step_order: number
+          name: string
+          approver_type: 'role' | 'specific_user' | 'direct_manager'
+          approver_role?: string | null
+          approver_user_id?: string | null
+          allow_self_approval?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          flow_id?: string
+          step_order?: number
+          name?: string
+          approver_type?: 'role' | 'specific_user' | 'direct_manager'
+          approver_role?: string | null
+          approver_user_id?: string | null
+          allow_self_approval?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_steps_approver_user_id_fkey"
+            columns: ["approver_user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_steps_flow_id_fkey"
+            columns: ["flow_id"]
+            referencedRelation: "approval_flows"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      approval_instances: {
+        Row: {
+          id: string
+          company_id: string
+          flow_id: string
+          entity_type: 'leave_request' | 'payroll_run' | 'appraisal' | 'general'
+          entity_id: string
+          requester_id: string
+          current_step_id: string | null
+          current_step_order: number | null
+          current_step_name: string | null
+          current_approver_role: string | null
+          current_approver_user_id: string | null
+          status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          flow_id: string
+          entity_type: 'leave_request' | 'payroll_run' | 'appraisal' | 'general'
+          entity_id: string
+          requester_id: string
+          current_step_id?: string | null
+          current_step_order?: number | null
+          current_step_name?: string | null
+          current_approver_role?: string | null
+          current_approver_user_id?: string | null
+          status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          flow_id?: string
+          entity_type?: 'leave_request' | 'payroll_run' | 'appraisal' | 'general'
+          entity_id?: string
+          requester_id?: string
+          current_step_id?: string | null
+          current_step_order?: number | null
+          current_step_name?: string | null
+          current_approver_role?: string | null
+          current_approver_user_id?: string | null
           status?: 'pending' | 'approved' | 'rejected' | 'cancelled'
           created_at?: string
           updated_at?: string
@@ -171,6 +337,8 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
+          or_series: string | null
+          vdo_series: string | null
           updated_at: string | null
         }
         Insert: {
@@ -179,6 +347,8 @@ export type Database = {
           created_at?: string | null
           id: string
           name: string
+          or_series?: string | null
+          vdo_series?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -187,6 +357,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           name?: string
+          or_series?: string | null
+          vdo_series?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -415,6 +587,7 @@ export type Database = {
       appraisal_items: {
         Row: {
           appraisal_id: string
+          company_id: string | null
           areas_to_improve: string | null
           created_at: string
           employee_comments: string | null
@@ -431,6 +604,7 @@ export type Database = {
         }
         Insert: {
           appraisal_id: string
+          company_id?: string | null
           areas_to_improve?: string | null
           created_at?: string
           employee_comments?: string | null
@@ -447,6 +621,7 @@ export type Database = {
         }
         Update: {
           appraisal_id?: string
+          company_id?: string | null
           areas_to_improve?: string | null
           created_at?: string
           employee_comments?: string | null
@@ -554,6 +729,7 @@ export type Database = {
       }
       leave_balances: {
         Row: {
+          company_id: string | null
           created_at: string
           employee_id: string
           entitled_days: number
@@ -564,6 +740,7 @@ export type Database = {
           year: number
         }
         Insert: {
+          company_id?: string | null
           created_at?: string
           employee_id: string
           entitled_days?: number
@@ -574,6 +751,7 @@ export type Database = {
           year: number
         }
         Update: {
+          company_id?: string | null
           created_at?: string
           employee_id?: string
           entitled_days?: number
@@ -1115,6 +1293,7 @@ export type Database = {
           staff_code: string | null
           status: string
           updated_at: string | null
+          portal_access_only: boolean | null
         }
         Insert: {
           access_scope?: string | null
@@ -1140,6 +1319,7 @@ export type Database = {
           staff_code?: string | null
           status?: string
           updated_at?: string | null
+          portal_access_only?: boolean | null
         }
         Update: {
           access_scope?: string | null
@@ -1165,6 +1345,7 @@ export type Database = {
           staff_code?: string | null
           status?: string
           updated_at?: string | null
+          portal_access_only?: boolean | null
         }
         Relationships: [
           {
@@ -1204,6 +1385,7 @@ export type Database = {
           received_date: string | null
           remark: string | null
           created_at: string
+          is_deleted: boolean | null
         }
         Insert: {
           id?: string
@@ -1218,6 +1400,7 @@ export type Database = {
           received_date?: string | null
           remark?: string | null
           created_at?: string
+          is_deleted?: boolean | null
         }
         Update: {
           id?: string
@@ -1232,6 +1415,7 @@ export type Database = {
           received_date?: string | null
           remark?: string | null
           created_at?: string
+          is_deleted?: boolean | null
         }
         Relationships: [
           {
@@ -1427,6 +1611,16 @@ export type Database = {
           updated_at: string | null
           vaa_date: string | null
           variant: string | null
+          plate_no: string | null
+          is_deleted: boolean | null
+          commission_paid: boolean | null
+          commission_remark: string | null
+          stage_override: string | null
+          engine_no: string | null
+          colour: string | null
+          status: string | null
+          branch_id: string | null
+          owner_name: string | null
         }
         Insert: {
           bg_date?: string | null
@@ -1469,6 +1663,16 @@ export type Database = {
           updated_at?: string | null
           vaa_date?: string | null
           variant?: string | null
+          plate_no?: string | null
+          is_deleted?: boolean | null
+          commission_paid?: boolean | null
+          commission_remark?: string | null
+          stage_override?: string | null
+          engine_no?: string | null
+          colour?: string | null
+          status?: string | null
+          branch_id?: string | null
+          owner_name?: string | null
         }
         Update: {
           bg_date?: string | null
@@ -1511,6 +1715,16 @@ export type Database = {
           updated_at?: string | null
           vaa_date?: string | null
           variant?: string | null
+          plate_no?: string | null
+          is_deleted?: boolean | null
+          commission_paid?: boolean | null
+          commission_remark?: string | null
+          stage_override?: string | null
+          engine_no?: string | null
+          colour?: string | null
+          status?: string | null
+          branch_id?: string | null
+          owner_name?: string | null
         }
         Relationships: [
           {
@@ -1536,12 +1750,227 @@ export type Database = {
           },
         ]
       }
+      additional_items: {
+        Row: { id: string; company_id: string; item_code: string | null; description: string; unit_price: number; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; item_code?: string | null; description: string; unit_price?: number; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; item_code?: string | null; description?: string; unit_price?: number; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      commission_rules: {
+        Row: { id: string; company_id: string; salesman_name: string | null; branch_code: string | null; rule_name: string; threshold_days: number | null; amount: number; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; salesman_name?: string | null; branch_code?: string | null; rule_name: string; threshold_days?: number | null; amount: number; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; salesman_name?: string | null; branch_code?: string | null; rule_name?: string; threshold_days?: number | null; amount?: number; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      commission_records: {
+        Row: { id: string; company_id: string; vehicle_id: string | null; chassis_no: string; salesman_name: string; rule_id: string | null; status: string; amount: number; period: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; vehicle_id?: string | null; chassis_no: string; salesman_name: string; rule_id?: string | null; status?: string; amount: number; period: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; vehicle_id?: string | null; chassis_no?: string; salesman_name?: string; rule_id?: string | null; status?: string; amount?: number; period?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: [
+          {
+            foreignKeyName: "commission_records_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "commission_rules"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      customers: {
+        Row: { id: string; company_id: string; name: string; email: string | null; phone: string | null; address: string | null; nric: string | null; ic_no: string | null; is_deleted: boolean | null; deleted_at: string | null; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; name: string; email?: string | null; phone?: string | null; address?: string | null; nric?: string | null; ic_no?: string | null; is_deleted?: boolean | null; deleted_at?: string | null; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; name?: string; email?: string | null; phone?: string | null; address?: string | null; nric?: string | null; ic_no?: string | null; is_deleted?: boolean | null; deleted_at?: string | null; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      banks: {
+        Row: { id: string; company_id: string; name: string; account_no: string | null; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; name: string; account_no?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; name?: string; account_no?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      deal_stages: {
+        Row: { id: string; company_id: string; name: string; stage_order: number; color: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; name: string; stage_order?: number; color?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; name?: string; stage_order?: number; color?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      dealer_invoices: {
+        Row: { id: string; company_id: string; invoice_no: string; branch: string | null; dealer_name: string | null; car_model: string | null; car_colour: string | null; chassis_no: string | null; sales_price: number | null; invoice_date: string | null; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; invoice_no: string; branch?: string | null; dealer_name?: string | null; car_model?: string | null; car_colour?: string | null; chassis_no?: string | null; sales_price?: number | null; invoice_date?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; invoice_no?: string; branch?: string | null; dealer_name?: string | null; car_model?: string | null; car_colour?: string | null; chassis_no?: string | null; sales_price?: number | null; invoice_date?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      dealers: {
+        Row: { id: string; company_id: string; name: string; acc_code: string | null; company_reg_no: string | null; company_address: string | null; mailing_address: string | null; attn: string | null; contact_no: string | null; email: string | null; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; name: string; acc_code?: string | null; company_reg_no?: string | null; company_address?: string | null; mailing_address?: string | null; attn?: string | null; contact_no?: string | null; email?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; name?: string; acc_code?: string | null; company_reg_no?: string | null; company_address?: string | null; mailing_address?: string | null; attn?: string | null; contact_no?: string | null; email?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      departments: {
+        Row: { id: string; company_id: string; name: string; description: string | null; head_employee_id: string | null; cost_centre: string | null; is_active: boolean; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; name: string; description?: string | null; head_employee_id?: string | null; cost_centre?: string | null; is_active?: boolean; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; name?: string; description?: string | null; head_employee_id?: string | null; cost_centre?: string | null; is_active?: boolean; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      finance_companies: {
+        Row: { id: string; company_id: string; code: string; name: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; code: string; name: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; code?: string; name?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      handling_fees: {
+        Row: { id: string; company_id: string; item_code: string | null; description: string; price: number; billing: string | null; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; item_code?: string | null; description: string; price?: number; billing?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; item_code?: string | null; description?: string; price?: number; billing?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      inspection_fees: {
+        Row: { id: string; company_id: string; item_code: string | null; description: string; price: number; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; item_code?: string | null; description: string; price?: number; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; item_code?: string | null; description?: string; price?: number; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      insurance_companies: {
+        Row: { id: string; company_id: string; code: string; name: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; code: string; name: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; code?: string; name?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      job_titles: {
+        Row: { id: string; company_id: string; name: string; department_id: string | null; level: string | null; description: string | null; is_active: boolean; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; name: string; department_id?: string | null; level?: string | null; description?: string | null; is_active?: boolean; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; name?: string; department_id?: string | null; level?: string | null; description?: string | null; is_active?: boolean; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      official_receipts: {
+        Row: { id: string; company_id: string; receipt_no: string; receipt_date: string | null; branch: string | null; amount: number | null; attachment_url: string | null; verified_by: string | null; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; receipt_no: string; receipt_date?: string | null; branch?: string | null; amount?: number | null; attachment_url?: string | null; verified_by?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; receipt_no?: string; receipt_date?: string | null; branch?: string | null; amount?: number | null; attachment_url?: string | null; verified_by?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      payment_types: {
+        Row: { id: string; company_id: string; name: string; billing: string | null; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; name: string; billing?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; name?: string; billing?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      public_holidays: {
+        Row: { id: string; company_id: string; name: string; date: string; holiday_type: string | null; is_recurring: boolean; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; name: string; date: string; holiday_type?: string | null; is_recurring?: boolean; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; name?: string; date?: string; holiday_type?: string | null; is_recurring?: boolean; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      registration_fees: {
+        Row: { id: string; company_id: string; description: string; price: number; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; description: string; price?: number; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; description?: string; price?: number; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      road_tax_fees: {
+        Row: { id: string; company_id: string; description: string; price: number; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; description: string; price?: number; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; description?: string; price?: number; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      suppliers: {
+        Row: { id: string; company_id: string; name: string; code: string | null; company_reg_no: string | null; company_address: string | null; mailing_address: string | null; attn: string | null; contact_no: string | null; email: string | null; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; name: string; code?: string | null; company_reg_no?: string | null; company_address?: string | null; mailing_address?: string | null; attn?: string | null; contact_no?: string | null; email?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; name?: string; code?: string | null; company_reg_no?: string | null; company_address?: string | null; mailing_address?: string | null; attn?: string | null; contact_no?: string | null; email?: string | null; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      tin_types: {
+        Row: { id: string; company_id: string; code: string; name: string; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; code: string; name: string; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; code?: string; name?: string; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      user_groups: {
+        Row: { id: string; company_id: string; name: string; status: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; name: string; status?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; name?: string; status?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      vehicle_colours: {
+        Row: { id: string; company_id: string; code: string; name: string; hex: string | null; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; code: string; name: string; hex?: string | null; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; code?: string; name?: string; hex?: string | null; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      vehicle_models: {
+        Row: { id: string; company_id: string; code: string; name: string; base_price: number | null; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; code: string; name: string; base_price?: number | null; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; code?: string; name?: string; base_price?: number | null; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      branch_mappings: {
+        Row: { id: string; company_id: string; raw_value: string; canonical_code: string; notes: string | null; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; raw_value: string; canonical_code: string; notes?: string | null; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; raw_value?: string; canonical_code?: string; notes?: string | null; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      payment_method_mappings: {
+        Row: { id: string; company_id: string; raw_value: string; canonical_value: string; notes: string | null; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; raw_value: string; canonical_value: string; notes?: string | null; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; raw_value?: string; canonical_value?: string; notes?: string | null; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      invoices: {
+        Row: { id: string; company_id: string; invoice_no: string; sales_order_id: string | null; customer_id: string | null; customer_name: string | null; invoice_date: string | null; due_date: string | null; subtotal: number; tax_amount: number | null; discount_amount: number | null; total_amount: number; paid_amount: number | null; payment_status: string; notes: string | null; invoice_type: string; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; invoice_no: string; sales_order_id?: string | null; customer_id?: string | null; customer_name?: string | null; invoice_date?: string | null; due_date?: string | null; subtotal: number; tax_amount?: number | null; discount_amount?: number | null; total_amount: number; paid_amount?: number | null; payment_status?: string; notes?: string | null; invoice_type?: string; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; invoice_no?: string; sales_order_id?: string | null; customer_id?: string | null; customer_name?: string | null; invoice_date?: string | null; due_date?: string | null; subtotal?: number; tax_amount?: number | null; discount_amount?: number | null; total_amount?: number; paid_amount?: number | null; payment_status?: string; notes?: string | null; invoice_type?: string; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      sales_orders: {
+        Row: { id: string; company_id: string; order_no: string; customer_id: string; customer_name: string | null; branch_code: string; salesman_id: string | null; salesman_name: string | null; model: string; variant: string | null; colour: string | null; booking_date: string; delivery_date: string | null; booking_amount: number | null; total_price: number | null; status: string; deal_stage_id: string | null; chassis_no: string | null; vehicle_id: string | null; notes: string | null; is_deleted: boolean; vso_no: string | null; deposit_amount: number | null; bank_loan_amount: number | null; outstanding_amount: number | null; finance_company: string | null; insurance_company: string | null; plate_no: string | null; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; order_no: string; customer_id: string; customer_name?: string | null; branch_code: string; salesman_id?: string | null; salesman_name?: string | null; model: string; variant?: string | null; colour?: string | null; booking_date: string; delivery_date?: string | null; booking_amount?: number | null; total_price?: number | null; status?: string; deal_stage_id?: string | null; chassis_no?: string | null; vehicle_id?: string | null; notes?: string | null; is_deleted?: boolean; vso_no?: string | null; deposit_amount?: number | null; bank_loan_amount?: number | null; outstanding_amount?: number | null; finance_company?: string | null; insurance_company?: string | null; plate_no?: string | null; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; order_no?: string; customer_id?: string; customer_name?: string | null; branch_code?: string; salesman_id?: string | null; salesman_name?: string | null; model?: string; variant?: string | null; colour?: string | null; booking_date?: string; delivery_date?: string | null; booking_amount?: number | null; total_price?: number | null; status?: string; deal_stage_id?: string | null; chassis_no?: string | null; vehicle_id?: string | null; notes?: string | null; is_deleted?: boolean; vso_no?: string | null; deposit_amount?: number | null; bank_loan_amount?: number | null; outstanding_amount?: number | null; finance_company?: string | null; insurance_company?: string | null; plate_no?: string | null; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      salesman_targets: {
+        Row: { id: string; company_id: string; salesman_name: string; branch_code: string; period_year: number; period_month: number; target_units: number; target_revenue: number; created_at: string | null; updated_at: string | null }
+        Insert: { id?: string; company_id: string; salesman_name: string; branch_code: string; period_year: number; period_month: number; target_units?: number; target_revenue?: number; created_at?: string | null; updated_at?: string | null }
+        Update: { id?: string; company_id?: string; salesman_name?: string; branch_code?: string; period_year?: number; period_month?: number; target_units?: number; target_revenue?: number; created_at?: string | null; updated_at?: string | null }
+        Relationships: []
+      }
+      request_categories: {
+        Row: { id: string; company_id: string; category_key: string; label: string; description: string | null; is_active: boolean; sort_order: number; created_at: string; updated_at: string; updated_by: string | null }
+        Insert: { id?: string; company_id: string; category_key: string; label: string; description?: string | null; is_active?: boolean; sort_order?: number; created_at?: string; updated_at?: string; updated_by?: string | null }
+        Update: { id?: string; company_id?: string; category_key?: string; label?: string; description?: string | null; is_active?: boolean; sort_order?: number; created_at?: string; updated_at?: string; updated_by?: string | null }
+        Relationships: []
+      }
+      request_attachment_settings: {
+        Row: { id: string; company_id: string; max_file_size_mb: number; max_files_per_ticket: number; updated_by: string | null; updated_at: string | null; created_at: string | null }
+        Insert: { id?: string; company_id: string; max_file_size_mb?: number; max_files_per_ticket?: number; updated_by?: string | null; updated_at?: string | null; created_at?: string | null }
+        Update: { id?: string; company_id?: string; max_file_size_mb?: number; max_files_per_ticket?: number; updated_by?: string | null; updated_at?: string | null; created_at?: string | null }
+        Relationships: []
+      }
+      ticket_attachments: {
+        Row: { id: string; ticket_id: string; company_id: string; file_name: string; file_path: string; file_size: number; mime_type: string; uploaded_by: string; created_at: string | null }
+        Insert: { id?: string; ticket_id: string; company_id: string; file_name: string; file_path: string; file_size: number; mime_type: string; uploaded_by: string; created_at?: string | null }
+        Update: { id?: string; ticket_id?: string; company_id?: string; file_name?: string; file_path?: string; file_size?: number; mime_type?: string; uploaded_by?: string; created_at?: string | null }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      commit_import_batch: {
+        Args: { p_batch_id: string; p_vehicles: unknown; p_quality_issues: unknown; p_valid_rows: number; p_error_rows: number }
+        Returns: unknown
+      }
+      search_vehicles: {
+        Args: { p_branch?: string | null; p_model?: string | null; p_payment?: string | null; p_stage?: string | null; p_search?: string | null; p_company_id?: string | null; p_limit?: number | null; p_offset?: number | null }
+        Returns: unknown
+      }
+      vehicle_kpi_summary: {
+        Args: { p_company_id?: string | null; p_branch?: string | null; p_period_start?: string | null; p_period_end?: string | null }
+        Returns: unknown
+      }
+      auto_aging_dashboard_summary: {
+        Args: { p_company_id?: string | null; p_branch?: string | null; p_model?: string | null; p_from?: string | null; p_to?: string | null }
+        Returns: unknown
+      }
     }
     Enums: {
       [_ in never]: never

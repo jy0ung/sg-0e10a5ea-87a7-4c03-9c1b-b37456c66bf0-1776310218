@@ -23,7 +23,7 @@
     "skipLibCheck": true,
     "strict": false,
     "target": "ES2020",
-    "types": ["vite/client"],
+    "types": ["vite/client", "@testing-library/jest-dom"],
     "useDefineForClassFields": true
   },
   "include": ["src"]

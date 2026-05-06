@@ -32,11 +32,11 @@ export interface AttachmentServiceResult<T> {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function settingsTable() {
-  return supabase.from('request_attachment_settings' as never);
+  return supabase.from('request_attachment_settings');
 }
 
 function attachmentsTable() {
-  return supabase.from('ticket_attachments' as never);
+  return supabase.from('ticket_attachments');
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────

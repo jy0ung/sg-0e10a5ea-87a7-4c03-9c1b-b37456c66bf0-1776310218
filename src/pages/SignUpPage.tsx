@@ -156,7 +156,7 @@ export default function SignUpPage() {
     const { error: profileError } = await updateOwnProfileName(user.id, data.name);
 
     if (profileError) {
-      setError(`Your password was saved, but we could not update your profile name: ${profileError.message}`);
+      setError(`Your password was saved, but we could not update your profile name: ${profileError}`);
       setLoading(false);
       return;
     }

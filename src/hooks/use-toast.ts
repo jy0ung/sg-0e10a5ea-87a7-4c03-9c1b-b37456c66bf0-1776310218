@@ -42,6 +42,6 @@ export function useToast() {
   return {
     toast,
     dismiss: (toastId?: string | number) => sonnerToast.dismiss(toastId),
-    toasts: [] as Array<never>,
+    toasts: [] as Array<Record<string, unknown>>,
   };
 }

@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
 import { createInvoice, recordPayment } from '@/services/invoiceService';
-import { Invoice, InvoicePaymentStatus } from '@/types';
+import { Invoice, InvoicePaymentStatus, InvoiceType } from '@/types';
 import { Plus, CreditCard } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 

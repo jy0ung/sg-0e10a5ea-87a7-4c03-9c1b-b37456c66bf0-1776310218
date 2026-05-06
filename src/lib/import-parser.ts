@@ -268,7 +268,7 @@ export function normalizeVehicleRawRow(row: Partial<VehicleRaw>): VehicleRaw {
     remark: normalizedRemark ? String(normalizedRemark) : undefined,
     vaa_date: String(normalizeVehicleRawCell('vaa_date', row.vaa_date).value ?? '') || undefined,
     full_payment_date: String(normalizeVehicleRawCell('full_payment_date', row.full_payment_date).value ?? '') || undefined,
-    is_d2d: Boolean(normalizedRemark && (normalizedRemark.toLowerCase().includes('d2d') || normalizedRemark.toLowerCase().includes('transfer'))),
+    is_d2d: Boolean(normalizedRemark && typeof normalizedRemark === 'string' && (normalizedRemark.toLowerCase().includes('d2d') || normalizedRemark.toLowerCase().includes('transfer'))),
     source_row_no: normalizeVehicleRawCell('source_row_no', row.source_row_no).value ? String(normalizeVehicleRawCell('source_row_no', row.source_row_no).value) : undefined,
     variant: normalizeVehicleRawCell('variant', row.variant).value ? String(normalizeVehicleRawCell('variant', row.variant).value) : undefined,
     dealer_transfer_price: normalizeVehicleRawCell('dealer_transfer_price', row.dealer_transfer_price).value ? String(normalizeVehicleRawCell('dealer_transfer_price', row.dealer_transfer_price).value) : undefined,

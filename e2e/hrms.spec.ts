@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { setupAuthMocks } from "./helpers/auth-mock";
+import { setupAuthMocks, MOCK_PROFILE, SUPABASE_URL } from "./helpers/auth-mock";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HRMS MODULE – End-to-end flow tests

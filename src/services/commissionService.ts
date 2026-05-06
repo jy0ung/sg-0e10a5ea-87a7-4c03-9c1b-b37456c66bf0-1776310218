@@ -3,8 +3,7 @@ import type { CommissionRule, CommissionRecord } from '@/types';
 import { loggingService } from './loggingService';
 import { performanceService } from './performanceService';
 
-// commission_records is not yet in the generated Supabase schema types.
-// Keep the escape hatch isolated here so the rest of the file stays typed.
+// commission_records is now in the generated Supabase schema types.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function commissionRecordsTable(): any {
   return supabase.from('commission_records');
@@ -101,7 +100,7 @@ export async function updateCommissionRule(
   if (updates.thresholdDays !== undefined) dbUpdates.threshold_days = updates.thresholdDays ?? null;
   if (updates.amount !== undefined) dbUpdates.amount = updates.amount;
 
-  const { error } = await supabase.from('commission_rules').update(dbUpdates).eq('company_id', companyId).eq('id', id);
+  const { error } = await supabase.from('commission_rules').update(dbUpdates as never).eq('company_id', companyId).eq('id', id);
   if (error) {
     loggingService.error('Failed to update commission rule', { error }, 'CommissionService');
     return { error: new Error(error.message) };
@@ -110,7 +109,7 @@ export async function updateCommissionRule(
 }
 
 export async function deleteCommissionRule(companyId: string, id: string): Promise<{ error: Error | null }> {
-  const { error } = await supabase.from('commission_rules').delete().eq('company_id', companyId).eq('id', id);
+  const { error } = await supabase.from('commission_rules').delete().eq('id', id).eq('company_id', companyId);
   if (error) {
     loggingService.error('Failed to delete commission rule', { error }, 'CommissionService');
     return { error: new Error(error.message) };

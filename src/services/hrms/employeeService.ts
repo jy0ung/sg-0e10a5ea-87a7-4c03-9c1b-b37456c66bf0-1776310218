@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
+import { inviteUser } from '@/services/profileService';
 import { Employee, EmployeeStatus, AppRole } from '@/types';
 import { DIRECTORY_EMPLOYEE_SELECT, rowToDirectoryEmployee } from './shared';
 
@@ -80,6 +81,19 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
 
   if (error) return { error: error.message };
 
+  // Auto-invite the employee to set up their HRMS profile (portal access only by default).
+  if (input.email && !input.email.endsWith('@company.local')) {
+    const inviteResult = await inviteUser({
+      email:           input.email,
+      name:            input.name,
+      role:            input.role,
+      companyId:       input.companyId,
+      employeeId:      input.id,
+      portalAccessOnly: true,
+    });
+    if (inviteResult.error) return { error: `Employee created but invite failed: ${inviteResult.error}` };
+  }
+
   const assignment = await syncSalesAdvisorAssignment(input.id, input.companyId, input.role);
   if (assignment.error) return assignment;
 
@@ -103,7 +117,6 @@ export interface UpdateEmployeeInput {
   status?: EmployeeStatus;
   departmentId?: string | null;
   jobTitleId?: string | null;
-  managerId?: string | null;
 }
 
 export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string, companyId?: string): Promise<{ error: string | null }> {
@@ -121,7 +134,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.departmentId !== undefined) payload.department_id       = input.departmentId;
   if (input.jobTitleId   !== undefined) payload.job_title_id        = input.jobTitleId;
 
-  let updateQuery = supabase.from('employees').update(payload).eq('id', id);
+  let updateQuery = supabase.from('employees').update(payload as never).eq('id', id);
   if (companyId) updateQuery = updateQuery.eq('company_id', companyId);
   const { error } = await updateQuery;
   if (error) return { error: error.message };
@@ -141,7 +154,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   }
 
   if (actorId) {
-    void logUserAction(actorId, 'update', 'employee', id, { changes: payload });
+    void logUserAction(actorId, 'update', 'employee', id, { changes: payload as unknown as import('@/integrations/supabase/types').Json });
   }
   return { error: null };
 }

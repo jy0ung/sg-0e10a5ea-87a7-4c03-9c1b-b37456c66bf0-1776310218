@@ -167,7 +167,7 @@ export async function updateRequestCategory(
 
   const { data, error } = await supabase
     .from('request_categories')
-    .update(patch)
+    .update(patch as never)
     .eq('id', categoryId)
     .eq('company_id', context.companyId)
     .select('id, company_id, category_key, label, description, is_active, sort_order, created_at, updated_at, updated_by')

@@ -5,6 +5,7 @@ import { TicketCheck, ClipboardList, ArrowLeft, HeadphonesIcon, Menu, X, ListTod
 import { ADMIN_ONLY } from '@/config/routeRoles';
 import { canAccessMainApp } from '@/lib/portalAccess';
 import { cn } from '@/lib/utils';
+import type { AppRole } from '@/types';
 
 const baseNavItems = [
   { label: 'New Request', href: '/portal/tickets/new', icon: TicketCheck },
@@ -20,7 +21,7 @@ const requestQueueRoles = new Set(ADMIN_ONLY);
 export default function CustomerServiceLayout() {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const navItems = requestQueueRoles.has(user?.role ?? '')
+  const navItems = requestQueueRoles.has((user?.role ?? '') as AppRole)
     ? [...baseNavItems, ...adminNavItems]
     : baseNavItems;
 

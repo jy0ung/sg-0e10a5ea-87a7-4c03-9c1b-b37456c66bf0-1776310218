@@ -3,7 +3,7 @@ import { logUserAction } from '@/services/auditService';
 import { createLeaveRequest as createSharedLeaveRequest } from '@flc/hrms-services';
 import {
   LeaveType, LeaveBalance, LeaveRequest, CreateLeaveRequestInput,
-  LeaveStatus, ApprovalDecision,
+  LeaveStatus, ApprovalDecision, AppRole,
 } from '@/types';
 import { HRMS_LEAVE_APPROVER_ROLES } from '@/config/hrmsConfig';
 import {

@@ -22,7 +22,7 @@ export default function SalesDashboard() {
   const mtdOrders = salesOrders.filter(o => o.bookingDate >= startOfMonth);
   const mtdRevenue = mtdOrders.reduce((s, o) => s + (o.totalPrice ?? 0), 0);
   const mtdDelivered = mtdOrders.filter(o => o.status === 'delivered').length;
-  const totalOutstanding = invoices.filter(i => i.paymentStatus !== 'paid' && i.paymentStatus !== 'cancelled').reduce((s, i) => s + (i.totalAmount - (i.paidAmount ?? 0)), 0);
+  const totalOutstanding = invoices.filter(i => i.paymentStatus !== 'paid').reduce((s, i) => s + (i.totalAmount - (i.paidAmount ?? 0)), 0);
 
   const vehiclesLinked = salesOrders.filter(o => o.vehicleId).length;
 

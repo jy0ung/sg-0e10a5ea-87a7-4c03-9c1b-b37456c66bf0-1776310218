@@ -5,18 +5,21 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ExcelTable, type TableColumn } from '@/components/shared/ExcelTable';
 import { ValidationSummaryModal } from '@/components/shared/ValidationSummaryModal';
 import { useData } from '@/contexts/DataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCircle, Info, PlusCircle } from 'lucide-react';
 import { parseWorkbook, publishCanonical, normalizeVehicleRawCell, normalizeVehicleRawRow } from '@/lib/import-parser';
+import { preloadExcelJS } from '@/lib/exceljs-loader';
+import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 import { splitImportRowsForPublish } from '@/lib/import-review';
 import { loadBranchMappingLookup, loadPaymentMappingLookup, createBranchMapping } from '@/services/mappingService';
 import { validateVehicleImportBatch } from '@/services/validationService';
 import { createImportBatch, insertImportReviewRows, validateAndInsertVehicles } from '@/services/importService';
 import { resolveNamesToIds } from '@/services/hrmsService';
-import type { DataQualityIssue, ImportBatchInsert, ImportStatus, VehicleRaw, ValidationError } from '@/types';
+import type { DataQualityIssue, ImportBatch, ImportBatchInsert, ImportStatus, VehicleRaw, ValidationError } from '@/types';
 import { loggingService } from '@/services/loggingService';
 
 type Step = 'upload' | 'validating' | 'review' | 'publishing' | 'done';
@@ -237,7 +240,8 @@ function buildPreviewIssues(rows: VehicleRaw[], batchId: string): DataQualityIss
 
 export default function ImportCenter() {
   const navigate = useNavigate();
-  const { addImportBatch, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, vehicles, user } = useData();
+  const { addImportBatch, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, vehicles } = useData();
+  const { user } = useAuth();
   const companyId = useCompanyId();
   const { toast } = useToast();
   const [step, setStep] = useState<Step>('upload');
@@ -482,7 +486,7 @@ export default function ImportCenter() {
 
     try {
       const validationResult = await validateVehicleImportBatch(
-        rowsToValidate,
+        rowsToValidate as unknown as Record<string, unknown>[],
         companyId,
         (processed, total) => setValidationProgress({ processed, total })
       );
@@ -726,13 +730,13 @@ export default function ImportCenter() {
     try {
       // Parse the workbook
       const buffer = await file.arrayBuffer();
-      const { rows, missingColumns } = parseWorkbook(buffer);
+      const { rows, missingColumns } = await parseWorkbook(buffer);
 
       setMissingCols(missingColumns);
 
       // Server-side validation
       const validationResult = await validateVehicleImportBatch(
-        rows,
+        rows as unknown as Record<string, unknown>[],
         companyId,
         (processed, total) => setValidationProgress({ processed, total })
       );
@@ -769,7 +773,7 @@ export default function ImportCenter() {
       setServerErrors(validationResult.isValid ? validationResult.warnings : validationResult.errors);
       setPreviewValidationRevision(0);
       setPreviewValidationState('ready');
-      addImportBatch({ ...batch, id, duplicateRows: previewIssues.filter(issue => issue.issueType === 'duplicate').length });
+      addImportBatch({ ...batch, id, status: batch.status as ImportStatus, duplicateRows: previewIssues.filter(issue => issue.issueType === 'duplicate').length } as ImportBatch);
       setLastPublishSummary(null);
       setStep('review');
     } catch (error) {
@@ -825,7 +829,7 @@ export default function ImportCenter() {
 
       if (cleanRows.length > 0) {
         const result = await validateAndInsertVehicles(
-          cleanRows,
+          cleanRows as unknown as Record<string, unknown>[],
           batchId,
           companyId,
           user?.id || 'system-user'
@@ -1460,7 +1464,7 @@ export default function ImportCenter() {
             <div className="flex gap-2 flex-wrap">
               <Button
                 onClick={handlePublish}
-                disabled={missingCols.length > 0 || isPreviewValidating || step === 'publishing'}
+                disabled={missingCols.length > 0 || isPreviewValidating || (step as string) === 'publishing'}
               >
                 <CheckCircle className="h-4 w-4 mr-1" />{publishLabel}
               </Button>

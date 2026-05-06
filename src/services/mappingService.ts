@@ -77,7 +77,7 @@ export async function updateBranchMapping(
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
   dbUpdates.updated_at = new Date().toISOString();
 
-  const { error } = await supabase.from('branch_mappings').update(dbUpdates).eq('company_id', companyId).eq('id', id);
+  const { error } = await supabase.from('branch_mappings').update(dbUpdates as never).eq('company_id', companyId).eq('id', id);
   if (error) {
     loggingService.error('Failed to update branch mapping', { error }, 'MappingService');
     return { error: new Error(error.message) };
@@ -166,7 +166,7 @@ export async function updatePaymentMethodMapping(
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
   dbUpdates.updated_at = new Date().toISOString();
 
-  const { error } = await supabase.from('payment_method_mappings').update(dbUpdates).eq('company_id', companyId).eq('id', id);
+  const { error } = await supabase.from('payment_method_mappings').update(dbUpdates as never).eq('company_id', companyId).eq('id', id);
   if (error) {
     loggingService.error('Failed to update payment method mapping', { error }, 'MappingService');
     return { error: new Error(error.message) };

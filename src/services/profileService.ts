@@ -98,7 +98,7 @@ export async function updateProfile(
   if (input.status !== undefined)       patch.status       = input.status;
   if (input.portal_access_only !== undefined) patch.portal_access_only = input.portal_access_only;
 
-  let query = supabase.from('profiles').update(patch).eq('id', input.id);
+  let query = supabase.from('profiles').update(patch as never).eq('id', input.id);
   if (context.companyId) {
     query = input.company_id !== undefined && context.allowCompanyAssignment
       ? query.or(`company_id.eq.${context.companyId},company_id.is.null`)
@@ -165,5 +165,21 @@ export async function updateOwnProfileName(userId: string, name: string): Promis
     .eq('id', userId)
     .select('id')
     .single();
+  return { error: error?.message ?? null };
+}
+
+/**
+ * Grant or revoke main-app access for a user.
+ * portalAccessOnly = true  → HRMS access only (default for new employees)
+ * portalAccessOnly = false → full main app + HRMS access
+ */
+export async function setPortalAccess(
+  userId: string,
+  portalAccessOnly: boolean,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ portal_access_only: portalAccessOnly, updated_at: new Date().toISOString() })
+    .eq('id', userId);
   return { error: error?.message ?? null };
 }

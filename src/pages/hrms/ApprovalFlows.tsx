@@ -95,14 +95,13 @@ export default function ApprovalFlows() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [stepErrors, setStepErrors] = useState<Record<number, Record<string, string>>>({});
 
+  const isAuthorized = !!user && (HRMS_ADMIN_ROLES as string[]).includes(user.role);
+
   const { data: employees = [] } = useQuery({
     queryKey: ['employees-for-select', companyId],
     queryFn: async () => { const { data } = await listEmployeesForSelect(companyId); return data; },
     enabled: isAuthorized && !!companyId,
   });
-
-  // NOTE: auth guard is intentionally placed AFTER all hooks to satisfy React Rules of Hooks
-  const isAuthorized = !!user && (HRMS_ADMIN_ROLES as string[]).includes(user.role);
 
   const queryClient = useQueryClient();
   const { data: flows = [], isPending: loading } = useQuery({

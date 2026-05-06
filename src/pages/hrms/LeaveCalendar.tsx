@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { listLeaveRequests } from '@/services/hrmsService';
+import { listLeaveRequests, listEmployeeDirectory } from '@/services/hrmsService';
 import type { LeaveRequest, Employee } from '@/types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -42,7 +42,7 @@ export default function LeaveCalendar() {
   // One-time: load employee list for the filter dropdown
   useEffect(() => {
     if (!user?.companyId) return;
-    listEmployees(user.companyId).then(res => { if (!res.error) setEmployees(res.data); });
+    listEmployeeDirectory(user.companyId).then(res => { if (!res.error) setEmployees(res.data); });
   }, [user?.companyId]);
 
   // Reload leave requests whenever the viewed month changes

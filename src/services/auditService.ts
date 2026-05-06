@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Tables, Json } from "@/integrations/supabase/types";
 import { performanceService } from "./performanceService";
 import { loggingService } from "./loggingService";
 
@@ -48,7 +48,8 @@ export interface UserActionMetadata {
   duration?: number;
   itemCount?: number;
   searchQuery?: string;
-  filterParams?: Record<string, unknown>;
+  filterParams?: Record<string, Json>;
+  [key: string]: Json | undefined;
 }
 
 export async function logUserAction(
@@ -90,7 +91,7 @@ export async function logVehicleEdit(
   userId: string,
   vehicleId: string,
   changes: Record<string, AuditChange<unknown>>,
-  metadata?: {
+  _metadata?: {
     ipAddress?: string;
     userAgent?: string;
   }
@@ -113,10 +114,9 @@ export async function logVehicleEdit(
     action: "update",
     entity_type: "vehicle",
     entity_id: vehicleId,
-    changes: changes as Record<string, unknown>,
+    changes: changes as unknown as Json,
     table_name: "vehicles",
-    ...metadata,
-  });
+  } as never);
 
   performanceService.endQueryTimer(queryId, "log_vehicle_edit");
 
@@ -148,7 +148,7 @@ export async function getAuditLog(
     loggingService.error("Failed to get audit log", { vehicleId, error }, "AuditService");
   }
 
-  return { data, error: error || null };
+  return { data: data as unknown as AuditLogWithProfile[] | null, error: error || null };
 }
 
 export async function getUserAuditLogs(
@@ -283,14 +283,14 @@ export async function getAllAuditLogs(
     loggingService.error("Failed to get all audit logs", { filters, error }, "AuditService");
   }
 
-  return { data, error: error || null, count };
+  return { data: data as unknown as AuditLogWithProfile[] | null, error: error || null, count };
 }
 
 export async function logPermissionChange(
   userId: string,
   targetUserId: string,
   changes: Record<string, AuditChange<unknown>>,
-  metadata?: {
+  _metadata?: {
     ipAddress?: string;
     userAgent?: string;
   }
@@ -303,10 +303,9 @@ export async function logPermissionChange(
     action: "permission_change",
     entity_type: "user",
     entity_id: targetUserId,
-    changes: changes,
+    changes: changes as unknown as Json,
     table_name: "profiles",
-    ...metadata,
-  });
+  } as never);
 
   performanceService.endQueryTimer(queryId, "log_permission_change");
 

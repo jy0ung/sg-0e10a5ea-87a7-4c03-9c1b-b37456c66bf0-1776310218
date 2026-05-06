@@ -150,20 +150,22 @@ export async function deleteVehicleColour(companyId: string, id: string): Promis
 // ===== Generic helpers =====
 
 function mkSimple<T>(tbl: string, map: (r: Record<string,unknown>) => T) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tb = () => (supabase as any).from(tbl);
   return {
     getAll: async (cid: string): Promise<{ data: T[]; error: Error|null }> => {
-      const { data, error } = await supabase.from(tbl).select('*').eq('company_id', cid).order('created_at');
+      const { data, error } = await tb().select('*').eq('company_id', cid).order('created_at');
       if (error) return { data: [], error: new Error(error.message) };
-      return { data: (data ?? []).map(r => map(r as Record<string,unknown>)), error: null };
+      return { data: (data ?? []).map((r: Record<string,unknown>) => map(r)), error: null };
     },
     upsert: async (cid: string, fields: Partial<T> & { id?: string }): Promise<{ error: Error|null }> => {
       const { id, ...rest } = fields as Record<string,unknown> & { id?: string };
       const row: Record<string,unknown> = { company_id: cid, ...Object.fromEntries(Object.entries(rest).map(([k,v]) => [k.replace(/([A-Z])/g,'_$1').toLowerCase(), v])), updated_at: new Date().toISOString() };
-      const { error } = id ? await (supabase.from(tbl) as ReturnType<typeof supabase.from>).update(row).eq('company_id', cid).eq('id', id) : await (supabase.from(tbl) as ReturnType<typeof supabase.from>).insert({ ...row, id: crypto.randomUUID() });
+      const { error } = id ? await tb().update(row).eq('company_id', cid).eq('id', id) : await tb().insert({ ...row, id: crypto.randomUUID() });
       return { error: error ? new Error(error.message) : null };
     },
     del: async (cid: string, id: string): Promise<{ error: Error|null }> => {
-      const { error } = await supabase.from(tbl).delete().eq('company_id', cid).eq('id', id);
+      const { error } = await tb().delete().eq('company_id', cid).eq('id', id);
       return { error: error ? new Error(error.message) : null };
     },
   };

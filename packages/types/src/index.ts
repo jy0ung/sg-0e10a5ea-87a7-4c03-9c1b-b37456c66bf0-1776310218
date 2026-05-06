@@ -61,7 +61,6 @@ export interface Employee {
   departmentName?: string;
   jobTitleId?: string;
   jobTitleName?: string;
-  managerId?: string;
   managerName?: string;
 }
 
@@ -386,17 +385,6 @@ export interface PendingApproval {
   createdAt: string;
 }
 
-export interface ApprovalDecision {
-  id: string;
-  approvalRequestId: string;
-  stepId: string;
-  approverId: string;
-  approverName?: string;
-  decision: 'approved' | 'rejected';
-  note?: string;
-  decidedAt: string;
-}
-
 // ===== HRMS — Approval Flows =====
 export type ApproverType = 'role' | 'specific_user' | 'direct_manager';
 export type FlowEntityType = 'leave_request' | 'payroll_run' | 'appraisal' | 'general';
@@ -604,9 +592,9 @@ export interface VehicleCanonical {
   remark?: string;
   vaa_date?: string;
   full_payment_date?: string;
-  is_d2d: boolean;
-  import_batch_id: string;
-  source_row_id: string;
+  is_d2d?: boolean;
+  import_batch_id?: string | null;
+  source_row_id?: string | null;
   // Optional fields
   variant?: string;
   color?: string;
@@ -683,9 +671,10 @@ export interface DataQualityIssue {
 export interface SlaPolicy {
   id: string;
   kpiId: string;
-  label: string;
+  label?: string;
   slaDays: number;
-  companyId: string;
+  companyId?: string;
+  isActive?: boolean;
 }
 
 // ===== Notification =====
@@ -762,6 +751,7 @@ export interface Customer {
   id: string;
   name: string;
   icNo?: string;
+  nric?: string;
   phone?: string;
   email?: string;
   address?: string;

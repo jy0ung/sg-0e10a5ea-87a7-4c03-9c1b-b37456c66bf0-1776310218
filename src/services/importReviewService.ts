@@ -22,7 +22,7 @@ function mapValidationErrors(raw: unknown): ValidationError[] {
         rowNumber: typeof value.rowNumber === 'number' ? value.rowNumber : undefined,
       } satisfies ValidationError;
     })
-    .filter((value): value is ValidationError => Boolean(value));
+    .filter((value): value is NonNullable<typeof value> => value !== null);
 }
 
 function mapImportReviewRow(row: Record<string, unknown>): ImportReviewRow {
@@ -81,7 +81,7 @@ export async function reviewRow(
 
   const { error } = await supabase
     .from('import_review_rows')
-    .update(payload)
+    .update(payload as never)
     .eq('id', id);
 
   if (error) {

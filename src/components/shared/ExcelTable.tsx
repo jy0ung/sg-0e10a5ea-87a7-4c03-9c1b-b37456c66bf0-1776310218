@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { SortAsc, SortDesc, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { SortAsc, SortDesc, ChevronLeft, ChevronRight, AlertCircle, Check, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export type ColumnType = 'text' | 'number' | 'date' | 'select' | 'textarea';
@@ -17,7 +17,7 @@ export interface TableColumn<T = unknown> {
   editable?: boolean;
   type?: ColumnType;
   options?: string[];
-  format?: (value: unknown, rowIndex: number) => string;
+  format?: (value: unknown, rowIndex?: number) => string;
   validate?: (value: unknown) => string | null;
   onSave?: (rowId: string, value: unknown) => Partial<T>;
 }

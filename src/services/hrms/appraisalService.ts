@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
 import {
-  Appraisal, AppraisalItem, AppraisalStatus, AppraisalCycle, UpdateAppraisalItemInput,
+  Appraisal, AppraisalItem, AppraisalStatus, AppraisalCycle, UpdateAppraisalItemInput, ApprovalDecision,
 } from '@/types';
 import {
   AppraisalItemRecord,
@@ -683,9 +683,9 @@ export async function updateAppraisalItem(
   if (input.reviewerId       !== undefined) payload.reviewer_id       = input.reviewerId;
   if (input.status           !== undefined) payload.status            = input.status;
   if (input.reviewedAt       !== undefined) payload.reviewed_at       = input.reviewedAt;
-  const { error } = await supabase.from('appraisal_items').update(payload).eq('id', id);
+  const { error } = await supabase.from('appraisal_items').update(payload as never).eq('id', id);
   if (!error && actorId) {
-    void logUserAction(actorId, 'update', 'appraisal_item', id, { changes: payload });
+    void logUserAction(actorId, 'update', 'appraisal_item', id);
   }
   return { error: error?.message ?? null };
 }

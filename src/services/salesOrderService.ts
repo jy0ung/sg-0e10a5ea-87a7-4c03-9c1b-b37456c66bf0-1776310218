@@ -46,7 +46,7 @@ function mapOrder(row: Record<string, unknown>): SalesOrder {
 }
 
 export async function getSalesOrders(companyId: string, branchCode?: string | null): Promise<{ data: SalesOrder[]; error: Error | null }> {
-  const timerId = performanceService.startQueryTimer('getSalesOrders');
+  performanceService.startQueryTimer('getSalesOrders');
   let q = supabase
     .from('sales_orders')
     .select('*')
@@ -54,7 +54,7 @@ export async function getSalesOrders(companyId: string, branchCode?: string | nu
     .eq('is_deleted', false);
   if (branchCode) q = q.eq('branch_code', branchCode);
   const { data, error } = await q.order('booking_date', { ascending: false });
-  performanceService.endQueryTimer(timerId);
+  performanceService.endQueryTimer('getSalesOrders', 'getSalesOrders');
   if (error) { loggingService.error('getSalesOrders failed', { error }); return { data: [], error: new Error(error.message) }; }
   return { data: (data ?? []).map(r => mapOrder(r as Record<string, unknown>)), error: null };
 }
@@ -129,7 +129,7 @@ export async function updateSalesOrder(companyId: string, id: string, fields: Pa
 
   const { data, error } = await supabase
     .from('sales_orders')
-    .update(updates)
+    .update(updates as never)
     .eq('company_id', companyId)
     .eq('id', id)
     .select()
@@ -188,7 +188,7 @@ export async function createVehicleFromSalesOrder(
       customer_name: order.customerName ?? null,
       bg_date: order.bookingDate,
       is_deleted: false,
-    })
+    } as never)
     .select('id')
     .single();
   if (vehicleErr || !vehicleRow) return { vehicleId: null, error: new Error(vehicleErr?.message ?? 'Vehicle insert failed') };
@@ -217,7 +217,7 @@ export async function deleteSalesOrder(companyId: string, id: string, actorId?: 
   if (!companyId) return { error: missingCompanyError() };
   const { error } = await supabase
     .from('sales_orders')
-    .update({ is_deleted: true, deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .update({ is_deleted: true, updated_at: new Date().toISOString() } as never)
     .eq('company_id', companyId)
     .eq('id', id);
   if (error) return { error: new Error(error.message) };

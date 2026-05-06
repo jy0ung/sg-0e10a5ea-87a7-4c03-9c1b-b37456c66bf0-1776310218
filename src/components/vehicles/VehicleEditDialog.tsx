@@ -64,8 +64,8 @@ export function VehicleEditDialog({ vehicle, open, onOpenChange, onSaved }: Vehi
     mode: 'onChange',
   });
 
-  const handleSubmit = (data: VehicleFormData) => {
-    onSaved(data);
+  const handleSubmit = (_data: VehicleFormData) => {
+    onSaved();
   };
 
   return (

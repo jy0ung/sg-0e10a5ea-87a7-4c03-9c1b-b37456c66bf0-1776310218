@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
-import { listProfiles, updateProfile, inviteUser, listCompanyOptions, type ProfileRow, type CompanyOption } from '@/services/profileService';
+import { listProfiles, updateProfile, inviteUser, listCompanyOptions, setPortalAccess, type ProfileRow, type CompanyOption } from '@/services/profileService';
 import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +59,7 @@ export default function UserManagement() {
   const [copied, setCopied] = useState(false);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [activating, setActivating] = useState<string>('');
+  const [grantingAccess, setGrantingAccess] = useState<string>('');
   const [employeesByCompany, setEmployeesByCompany] = useState<Record<string, Employee[]>>({});
   const [pendingSelections, setPendingSelections] = useState<
     Record<string, { role: AppRole; company_id: string; employee_id: string | null }>
@@ -304,6 +305,19 @@ export default function UserManagement() {
     });
   };
 
+  const handleGrantMainAppAccess = async (p: ProfileRow, grant: boolean) => {
+    setGrantingAccess(p.id);
+    const { error } = await setPortalAccess(p.id, !grant);
+    setGrantingAccess('');
+    if (error) {
+      toast.error((grant ? 'Failed to grant access: ' : 'Failed to revoke access: ') + error);
+      return;
+    }
+    toast.success(grant ? `Main app access granted to ${p.name || p.email}` : `Main app access revoked for ${p.name || p.email}`);
+    const refreshed = await listProfiles();
+    if (!refreshed.error) setProfiles(refreshed.data);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -445,8 +459,8 @@ export default function UserManagement() {
                       {p.role.replace(/_/g, ' ')}
                     </span>
                     {p.portal_access_only && (
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-primary">
-                        Internal Requests only
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-amber-500">
+                        HRMS &amp; Internal Requests only
                       </p>
                     )}
                   </div>
@@ -461,6 +475,34 @@ export default function UserManagement() {
                     <Button variant="ghost" size="sm" onClick={() => openPermissions(p)}>
                       <Settings className="h-3.5 w-3.5 mr-1" />Permissions
                     </Button>
+                    {p.portal_access_only && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs border-green-600 text-green-700 hover:bg-green-50"
+                        onClick={() => handleGrantMainAppAccess(p, true)}
+                        disabled={grantingAccess === p.id}
+                      >
+                        {grantingAccess === p.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <><UserCheck className="h-3 w-3 mr-1" />Grant Full Access</>
+                        }
+                      </Button>
+                    )}
+                    {!p.portal_access_only && p.role !== 'super_admin' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-muted-foreground hover:text-destructive"
+                        onClick={() => handleGrantMainAppAccess(p, false)}
+                        disabled={grantingAccess === p.id}
+                      >
+                        {grantingAccess === p.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : 'Revoke Full Access'
+                        }
+                      </Button>
+                    )}
                   </td>
                 )}
               </tr>

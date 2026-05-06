@@ -11,6 +11,7 @@ import { supabase } from '@flc/supabase';
 import type { Announcement, AppraisalCycle, AppraisalItem, AppraisalStatus, LeaveRequest, AttendanceRecord, LeaveType, Notification } from '@flc/types';
 import type { CreateLeaveRequestFormData } from '@flc/hrms-schemas';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const untypedSupabase = supabase as any;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -259,15 +260,17 @@ export async function getLeaveTypes(companyId: string): Promise<LeaveType[]> {
     .order('name');
   if (error) throw new Error(error.message);
   return (data ?? []).map(r => ({
-    id:          r.id,
-    companyId:   r.company_id,
-    name:        r.name,
-    code:        r.code,
-    daysPerYear: r.days_per_year,
-    isPaid:      r.is_paid,
-    active:      r.active,
-    createdAt:   r.created_at,
-    updatedAt:   r.updated_at,
+    id:           r.id,
+    companyId:    r.company_id,
+    name:         r.name,
+    code:         r.code,
+    daysPerYear:  r.days_per_year,
+    defaultDays:  r.days_per_year,
+    carryForward: true,
+    isPaid:       r.is_paid,
+    active:       r.active,
+    createdAt:    r.created_at,
+    updatedAt:    r.updated_at,
   }));
 }
 

@@ -15,7 +15,7 @@ import { Target, Plus, Trash2 } from 'lucide-react';
 import { PageErrorState } from '@/components/shared/PageState';
 
 export default function SalesmanPerformancePage() {
-  const { user: _user } = useAuth();
+  const { user } = useAuth();
   const companyId = useCompanyId();
   const { salesmanTargets } = useSales();
   const { toast } = useToast();

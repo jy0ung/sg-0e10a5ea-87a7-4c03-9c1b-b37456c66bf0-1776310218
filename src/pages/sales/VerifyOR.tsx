@@ -15,10 +15,10 @@ import { OfficialReceipt } from '@/types';
 import { Plus, Pencil, Trash2, CheckCircle, Clock } from 'lucide-react';
 
 type FormState = {
-  orNo: string; branchId: string; receiptDate: string;
-  amount: string; attachment: string; verifiedBy: string; status: string;
+  receiptNo: string; branch: string; receiptDate: string;
+  amount: string; attachmentUrl: string; verifiedBy: string; status: string;
 };
-const empty: FormState = { orNo: '', branchId: '', receiptDate: '', amount: '', attachment: '', verifiedBy: '', status: 'Pending' };
+const empty: FormState = { receiptNo: '', branch: '', receiptDate: '', amount: '', attachmentUrl: '', verifiedBy: '', status: 'Pending' };
 
 const STATUS_ICON: Record<string, React.ReactElement> = {
   Verified: <CheckCircle className="h-3 w-3 mr-1 inline" />,
@@ -48,8 +48,8 @@ export default function VerifyOR() {
   const openEdit = (r: OfficialReceipt) => {
     setEditId(r.id);
     setForm({
-      orNo: r.orNo, branchId: r.branchId ?? '', receiptDate: r.receiptDate ?? '',
-      amount: String(r.amount ?? ''), attachment: r.attachment ?? '',
+      receiptNo: r.receiptNo, branch: r.branch ?? '', receiptDate: r.receiptDate ?? '',
+      amount: String(r.amount ?? ''), attachmentUrl: r.attachmentUrl ?? '',
       verifiedBy: r.verifiedBy ?? '', status: r.status,
     });
     setDialogOpen(true);
@@ -58,19 +58,19 @@ export default function VerifyOR() {
   const quickVerify = async (r: OfficialReceipt) => {
     await upsertOfficialReceipt(companyId, { ...r, status: 'Verified', verifiedBy: user?.email ?? 'admin' });
     await queryClient.invalidateQueries({ queryKey: ['official-receipts', companyId] });
-    toast({ title: `OR ${r.orNo} marked as Verified` });
+    toast({ title: `OR ${r.receiptNo} marked as Verified` });
   };
 
   const handleSave = async () => {
-    if (!form.orNo.trim()) return toast({ title: 'OR No is required', variant: 'destructive' });
+    if (!form.receiptNo.trim()) return toast({ title: 'OR No is required', variant: 'destructive' });
     setSaving(true);
     const { error } = await upsertOfficialReceipt(companyId, {
       id: editId ?? undefined,
-      orNo: form.orNo.trim(),
-      branchId: form.branchId.trim() || undefined,
+      receiptNo: form.receiptNo.trim(),
+      branch: form.branch.trim() || undefined,
       receiptDate: form.receiptDate || undefined,
       amount: parseFloat(form.amount) || undefined,
-      attachment: form.attachment.trim() || undefined,
+      attachmentUrl: form.attachmentUrl.trim() || undefined,
       verifiedBy: form.verifiedBy.trim() || undefined,
       status: form.status,
     });
@@ -96,7 +96,7 @@ export default function VerifyOR() {
   const filtered = receipts.filter(r => {
     if (statusFilter !== 'All' && r.status !== statusFilter) return false;
     if (!search) return true;
-    return [r.orNo, r.verifiedBy ?? '', r.branchId ?? ''].some(v => v.toLowerCase().includes(search.toLowerCase()));
+    return [r.receiptNo, r.verifiedBy ?? '', r.branch ?? ''].some(v => v.toLowerCase().includes(search.toLowerCase()));
   });
 
   return (
@@ -146,7 +146,7 @@ export default function VerifyOR() {
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No receipts found.</td></tr>
               ) : filtered.map(r => (
                 <tr key={r.id} className="border-t hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-mono font-semibold text-xs">{r.orNo}</td>
+                  <td className="px-4 py-3 font-mono font-semibold text-xs">{r.receiptNo}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{r.receiptDate ?? '—'}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{r.amount != null ? Number(r.amount).toLocaleString('en-MY', { minimumFractionDigits: 2 }) : '—'}</td>
                   <td className="px-4 py-3">{r.verifiedBy ?? '—'}</td>
@@ -178,10 +178,10 @@ export default function VerifyOR() {
           <DialogHeader><DialogTitle>{editId ? 'Edit Official Receipt' : 'Add Official Receipt'}</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
             {([
-              ['orNo', 'OR No *', 'e.g. OR-2024-001'],
+              ['receiptNo', 'OR No *', 'e.g. OR-2024-001'],
               ['receiptDate', 'Date', 'YYYY-MM-DD'],
               ['amount', 'Amount (RM)', 'e.g. 5000'],
-              ['attachment', 'Attachment', 'filename or URL'],
+              ['attachmentUrl', 'Attachment', 'filename or URL'],
               ['verifiedBy', 'Verified By', 'name or email'],
               ['status', 'Status', 'Pending / Verified'],
             ] as [keyof FormState, string, string][]).map(([k, label, hint]) => (
@@ -202,7 +202,7 @@ export default function VerifyOR() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Official Receipt</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure you want to delete OR <strong>{deleteTarget?.orNo}</strong>?</AlertDialogDescription>
+            <AlertDialogDescription>Are you sure you want to delete OR <strong>{deleteTarget?.receiptNo}</strong>?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

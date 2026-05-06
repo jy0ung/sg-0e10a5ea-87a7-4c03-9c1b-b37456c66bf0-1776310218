@@ -25,14 +25,14 @@ function mapCustomer(row: Record<string, unknown>): Customer {
 }
 
 export async function getCustomers(companyId: string): Promise<{ data: Customer[]; error: Error | null }> {
-  const timerId = performanceService.startQueryTimer('getCustomers');
+  performanceService.startQueryTimer('getCustomers');
   const { data, error } = await supabase
     .from('customers')
     .select('*')
     .eq('company_id', companyId)
     .eq('is_deleted', false)
-    .order('name');
-  performanceService.endQueryTimer(timerId);
+    .order('name', { ascending: true });
+  performanceService.endQueryTimer('getCustomers', 'getCustomers');
   if (error) { loggingService.error('getCustomers failed', { error }); return { data: [], error: new Error(error.message) }; }
   return { data: (data ?? []).map(mapCustomer), error: null };
 }

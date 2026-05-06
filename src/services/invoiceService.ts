@@ -27,13 +27,13 @@ function mapInvoice(row: Record<string, unknown>): Invoice {
 }
 
 export async function getInvoices(companyId: string): Promise<{ data: Invoice[]; error: Error | null }> {
-  const timerId = performanceService.startQueryTimer('getInvoices');
+  performanceService.startQueryTimer('getInvoices');
   const { data, error } = await supabase
     .from('invoices')
     .select('*')
     .eq('company_id', companyId)
     .order('invoice_date', { ascending: false });
-  performanceService.endQueryTimer(timerId);
+  performanceService.endQueryTimer('getInvoices', 'getInvoices');
   if (error) { loggingService.error('getInvoices failed', { error }); return { data: [], error: new Error(error.message) }; }
   return { data: (data ?? []).map(r => mapInvoice(r as Record<string, unknown>)), error: null };
 }
@@ -90,7 +90,7 @@ export async function updateInvoice(companyId: string, id: string, fields: Parti
   if (fields.notes !== undefined) updates.notes = fields.notes;
   if (fields.paymentStatus !== undefined) updates.payment_status = fields.paymentStatus;
 
-  const { data, error } = await supabase.from('invoices').update(updates).eq('company_id', companyId).eq('id', id).select().single();
+  const { data, error } = await supabase.from('invoices').update(updates as never).eq('company_id', companyId).eq('id', id).select().single();
   if (error) return { data: null, error: new Error(error.message) };
   return { data: mapInvoice(data as Record<string, unknown>), error: null };
 }

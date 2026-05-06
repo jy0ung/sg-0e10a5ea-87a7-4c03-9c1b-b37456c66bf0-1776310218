@@ -105,7 +105,7 @@ export default function SalesAdvisors() {
     const newStatus: SAStatus = advisor.status === 'active' ? 'inactive' : 'active';
     // Optimistic update
     setAdvisors(prev => prev.map(a => a.id !== id ? a : { ...a, status: newStatus }));
-    const { error } = await updateSalesAdvisorStatus(companyId, id, newStatus);
+    const { error } = await updateSalesAdvisorStatus(user!.company_id, id, newStatus);
     if (error) {
       // Revert on failure
       setAdvisors(prev => prev.map(a => a.id !== id ? a : { ...a, status: advisor.status }));

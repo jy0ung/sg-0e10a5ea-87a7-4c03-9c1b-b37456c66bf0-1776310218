@@ -225,7 +225,7 @@ async function queryTable(
   const { data, count } = await q
     .order(dateCol, { ascending: false })
     .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
-  return { data: (data ?? []) as ReportRow[], count: count ?? 0 };
+  return { data: (data ?? []) as unknown as ReportRow[], count: count ?? 0 };
 }
 
 async function fetchAllPages(

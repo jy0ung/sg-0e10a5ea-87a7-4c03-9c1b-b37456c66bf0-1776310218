@@ -32,7 +32,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     errorTrackingService.captureException(error, {
       component: 'RouteErrorBoundary',
       action: 'componentDidCatch',
@@ -45,7 +45,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
 
   reset = () => this.setState({ hasError: false, error: null });
 
-  render() {
+  override render() {
     if (!this.state.hasError) return this.props.children;
 
     return (

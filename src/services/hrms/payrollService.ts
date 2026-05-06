@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
-import { PayrollRun, PayrollItem, PayrollRunStatus } from '@/types';
+import { PayrollRun, PayrollItem, PayrollRunStatus, ApprovalDecision } from '@/types';
 import {
   rowToApprovalDecision, rowToApprovalInstance, rowToApprovalStep,
   resolveStepRouting, bootstrapApprovalInstanceForEntity, resolveStoredEmployeeIdentities,

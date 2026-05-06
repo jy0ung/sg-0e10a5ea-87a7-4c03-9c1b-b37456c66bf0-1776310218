@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { Download, FileText, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { REPORT_PAGE_SIZE, type ReportConfig, type ReportRow, REPORTS } from '@/services/reportService';
 
 function ReportTab({ config, companyId }: { config: ReportConfig; companyId: string }) {
@@ -145,7 +145,6 @@ export default function ReportsCenter() {
         title="Business Reports"
         description="Generate and export cross-module operational reports for inventory, sales, purchasing, and transfers."
         breadcrumbs={[{ label: 'FLC BI' }, { label: 'Business Reports' }]}
-        icon={<FileText className="h-6 w-6" />}
       />
       <Tabs defaultValue="stock">
         <TabsList className="flex-wrap h-auto gap-1">

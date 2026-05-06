@@ -38,6 +38,7 @@ const ROLE_LABEL: Record<AppRole, string> = {
   sales:           'Sales Advisor',
   accounts:        'Accounts',
   analyst:         'Analyst',
+  creator_updater: 'Creator/Updater',
 };
 
 const ROLE_BADGE: Record<AppRole, string> = {
@@ -49,6 +50,7 @@ const ROLE_BADGE: Record<AppRole, string> = {
   sales:           'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
   accounts:        'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   analyst:         'bg-secondary text-secondary-foreground',
+  creator_updater: 'bg-secondary text-secondary-foreground',
 };
 
 const STATUS_BADGE: Record<EmployeeStatus, string> = {
@@ -84,7 +86,6 @@ type EditForm = {
   status: EmployeeStatus;
   departmentId: string;
   jobTitleId: string;
-  managerId: string;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -188,7 +189,7 @@ export default function EmployeeDirectory() {
     setSaving(true);
     const input: CreateEmployeeInput = {
       id:        crypto.randomUUID(),
-      email:     form.email || `${form.staffCode.toLowerCase()}@company.local`,
+      email:     result.data.email,
       name:      form.name,
       role:      form.role,
       companyId: user.companyId,
@@ -205,7 +206,7 @@ export default function EmployeeDirectory() {
       toast({ title: 'Failed to create employee', description: error, variant: 'destructive' });
       return;
     }
-    toast({ title: 'Employee created', description: `${form.staffCode.toUpperCase()} — ${form.name}` });
+    toast({ title: 'Employee created — invite sent', description: `${form.staffCode.toUpperCase()} — ${form.name} will receive an email to access HRMS and Internal Requests.` });
     setForm(EMPTY_CREATE_FORM);
     setAddOpen(false);
     void queryClient.invalidateQueries({ queryKey: ['employee-directory', user?.companyId] });
@@ -228,7 +229,6 @@ export default function EmployeeDirectory() {
       status:       emp.status,
       departmentId: emp.departmentId ?? '',
       jobTitleId:   emp.jobTitleId ?? '',
-      managerId:    emp.managerId ?? '',
     });
   };
 
@@ -249,7 +249,6 @@ export default function EmployeeDirectory() {
       status:       editForm.status,
       departmentId: editForm.departmentId || null,
       jobTitleId:   editForm.jobTitleId || null,
-      managerId:    editForm.managerId || null,
     };
     const { error } = await updateEmployee(editTarget.id, input, user?.id, user.companyId);
     setEditSaving(false);
@@ -562,7 +561,9 @@ export default function EmployeeDirectory() {
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="employee-add-email" className="text-xs font-medium text-muted-foreground">Email</label>
+              <label htmlFor="employee-add-email" className="text-xs font-medium text-muted-foreground">
+                Work Email <span className="text-destructive">*</span>
+              </label>
               <Input
                 id="employee-add-email"
                 type="email"
@@ -571,6 +572,7 @@ export default function EmployeeDirectory() {
                 value={form.email}
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
               />
+              <p className="text-[11px] text-muted-foreground">An invite will be sent to this address. The employee will have access to HRMS and Internal Requests by default. An admin can grant full app access later.</p>
             </div>
           </div>
           <DialogFooter className="mt-4">

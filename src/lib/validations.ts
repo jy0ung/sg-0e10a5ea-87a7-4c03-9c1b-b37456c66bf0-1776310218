@@ -189,7 +189,7 @@ export type PurchaseInvoiceFormData = z.infer<typeof purchaseInvoiceSchema>;
 export const createEmployeeSchema = z.object({
   staffCode: z.string().min(1, 'Staff code is required').max(20, 'Staff code too long'),
   name:      z.string().min(2, 'Name must be at least 2 characters').max(100),
-  email:     z.string().email('Invalid email address').optional().or(z.literal('')),
+  email:     z.string().email('A valid email is required — an invite will be sent to this address').min(1, 'Email is required'),
   role:      z.enum(['super_admin','company_admin','director','general_manager','manager','sales','accounts','analyst','creator_updater'], {
     errorMap: () => ({ message: 'Select a valid role' }),
   }),
@@ -229,11 +229,11 @@ export const dealerInvoiceSchema = z.object({
   invoiceNo:  z.string().min(1, 'Invoice No is required'),
   dealerName: z.string().min(1, 'Dealer Name is required'),
   carModel:   z.string().optional(),
-  colour:     z.string().optional(),
+  carColour:  z.string().optional(),
   chassisNo:  z.string().optional(),
   salesPrice: z.number().positive().optional(),
   invoiceDate: z.string().optional(),
-  branchId:   z.string().optional(),
+  branch:     z.string().optional(),
   status:     z.string().min(1, 'Status is required'),
 });
 export type DealerInvoiceFormData = z.infer<typeof dealerInvoiceSchema>;

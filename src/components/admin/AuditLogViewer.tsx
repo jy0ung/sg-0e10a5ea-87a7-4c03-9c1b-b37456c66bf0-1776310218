@@ -205,7 +205,7 @@ export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerP
                     {isExpanded && (
                       <tr>
                         <td colSpan={6} className="px-4 py-2 bg-secondary/20">
-                          {renderChanges(log.changes)}
+                          {renderChanges((log.changes ?? {}) as Record<string, { before: unknown; after: unknown }>)}
                           {log.ip_address && (
                             <div className="text-xs text-muted-foreground mt-2">
                               IP: {log.ip_address} • User Agent: {log.user_agent?.slice(0, 50)}...

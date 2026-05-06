@@ -98,7 +98,7 @@ export function ValidationSummaryModal({
     return severity === 'error' ? (
       <Badge variant="destructive" className="text-xs">Error</Badge>
     ) : (
-      <Badge variant="warning" className="text-xs bg-warning/15 text-warning border-warning/20">Warning</Badge>
+      <Badge variant="outline" className="text-xs bg-warning/15 text-warning border-warning/20">Warning</Badge>
     );
   };
 

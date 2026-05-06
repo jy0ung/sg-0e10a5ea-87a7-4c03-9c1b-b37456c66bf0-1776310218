@@ -117,7 +117,7 @@ export async function setUserColumnPermissions(
   if (auditContext.actorId) {
     void logPermissionChange(auditContext.actorId, userId, {
       column_permissions: {
-        before: serializePermissions(previousPermissions),
+        before: serializePermissions(previousPermissions as unknown as { column_name: string; permission_level: PermissionLevel }[]),
         after: serializePermissions(permissions),
       },
       table_name: {
@@ -190,7 +190,7 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
   // Get column permissions
   const columnPerms = await getUserColumnPermissions(userId, 'vehicles');
   const columnMap = new Map<string, PermissionLevel>(
-    columnPerms.map(p => [p.column_name, p.permission_level])
+    columnPerms.map(p => [p.column_name, p.permission_level as unknown as PermissionLevel])
   );
 
   // Super admins and company admins have full access

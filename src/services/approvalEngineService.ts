@@ -192,7 +192,7 @@ export async function submitApprovalDecision(
   const { error: decisionErr } = await supabase
     .from('approval_decisions')
     .insert({
-      approval_request_id: approvalRequestId,
+      instance_id:         approvalRequestId,
       step_id:             String(currentStep.id),
       approver_id:         approverId,
       decision,

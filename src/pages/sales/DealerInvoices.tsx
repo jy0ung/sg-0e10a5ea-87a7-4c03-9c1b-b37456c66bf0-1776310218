@@ -18,10 +18,10 @@ import { dealerInvoiceSchema } from '@/lib/validations';
 import { PageErrorState } from '@/components/shared/PageState';
 
 type FormState = {
-  invoiceNo: string; branchId: string; dealerName: string; carModel: string;
-  colour: string; chassisNo: string; salesPrice: string; invoiceDate: string; status: string;
+  invoiceNo: string; branch: string; dealerName: string; carModel: string;
+  carColour: string; chassisNo: string; salesPrice: string; invoiceDate: string; status: string;
 };
-const empty: FormState = { invoiceNo: '', branchId: '', dealerName: '', carModel: '', colour: '', chassisNo: '', salesPrice: '', invoiceDate: '', status: 'Pending' };
+const empty: FormState = { invoiceNo: '', branch: '', dealerName: '', carModel: '', carColour: '', chassisNo: '', salesPrice: '', invoiceDate: '', status: 'Pending' };
 
 const STATUS_COLORS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   Pending: 'outline', Issued: 'default', Cancelled: 'destructive',
@@ -53,9 +53,9 @@ export default function DealerInvoices() {
   const openEdit = (inv: DealerInvoice) => {
     setEditId(inv.id);
     setForm({
-      invoiceNo: inv.invoiceNo, branchId: inv.branchId ?? '',
+      invoiceNo: inv.invoiceNo, branch: inv.branch ?? '',
       dealerName: inv.dealerName, carModel: inv.carModel,
-      colour: inv.colour ?? '', chassisNo: inv.chassisNo ?? '',
+      carColour: inv.carColour ?? '', chassisNo: inv.chassisNo ?? '',
       salesPrice: String(inv.salesPrice ?? ''), invoiceDate: inv.invoiceDate ?? '', status: inv.status,
     });
     setDialogOpen(true);
@@ -66,11 +66,11 @@ export default function DealerInvoices() {
       invoiceNo:   form.invoiceNo,
       dealerName:  form.dealerName,
       carModel:    form.carModel || undefined,
-      colour:      form.colour || undefined,
+      carColour:   form.carColour || undefined,
       chassisNo:   form.chassisNo || undefined,
       salesPrice:  form.salesPrice ? parseFloat(form.salesPrice) : undefined,
       invoiceDate: form.invoiceDate || undefined,
-      branchId:    form.branchId || undefined,
+      branch:      form.branch || undefined,
       status:      form.status,
     });
     if (!parsed.success) {
@@ -81,10 +81,10 @@ export default function DealerInvoices() {
     const { error } = await upsertDealerInvoice(companyId, {
       id: editId ?? undefined,
       invoiceNo: form.invoiceNo.trim(),
-      branchId: form.branchId.trim() || undefined,
+      branch: form.branch.trim() || undefined,
       dealerName: form.dealerName.trim(),
       carModel: form.carModel.trim(),
-      colour: form.colour.trim() || undefined,
+      carColour: form.carColour.trim() || undefined,
       chassisNo: form.chassisNo.trim() || undefined,
       salesPrice: parseFloat(form.salesPrice) || undefined,
       invoiceDate: form.invoiceDate || undefined,
@@ -148,7 +148,7 @@ export default function DealerInvoices() {
                   <td className="px-4 py-3 font-mono font-semibold text-xs">{inv.invoiceNo}</td>
                   <td className="px-4 py-3">{inv.dealerName}</td>
                   <td className="px-4 py-3">{inv.carModel}</td>
-                  <td className="px-4 py-3">{inv.colour ?? '—'}</td>
+                  <td className="px-4 py-3">{inv.carColour ?? '—'}</td>
                   <td className="px-4 py-3 font-mono text-xs">{inv.chassisNo ?? '—'}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{inv.salesPrice != null ? Number(inv.salesPrice).toLocaleString('en-MY', { minimumFractionDigits: 2 }) : '—'}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{inv.invoiceDate ?? '—'}</td>
@@ -176,7 +176,7 @@ export default function DealerInvoices() {
               ['invoiceNo', 'Invoice No *', 'e.g. DI-2024-001'],
               ['dealerName', 'Dealer Name *', 'e.g. Best Motors Sdn Bhd'],
               ['carModel', 'Car Model', 'e.g. Proton X70'],
-              ['colour', 'Colour', 'e.g. White'],
+              ['carColour', 'Colour', 'e.g. White'],
               ['chassisNo', 'Chassis No', 'e.g. PM00012345'],
               ['salesPrice', 'Sales Price (RM)', 'e.g. 98000'],
               ['invoiceDate', 'Invoice Date', 'YYYY-MM-DD'],

@@ -76,7 +76,7 @@ export async function createImportBatch(
       totalRows: batch.totalRows,
     }, "ImportService");
 
-    return { data, error: null };
+    return { data: data as unknown as ImportBatch, error: null };
   } catch (error) {
     performanceService.endQueryTimer(queryId, "create_import_batch");
     loggingService.error("Unexpected error creating import batch", { batch, error }, "ImportService");
@@ -119,7 +119,7 @@ export async function updateImportBatch(
 
     const { data, error } = await supabase
       .from("import_batches")
-      .update(dbUpdates)
+      .update(dbUpdates as never)
       .eq("company_id", companyId)
       .eq("id", id)
       .select()
@@ -146,7 +146,7 @@ export async function updateImportBatch(
       loggingService.info("Import batch updated", { id, changes }, "ImportService");
     }
 
-    return { data, error: null };
+    return { data: data as unknown as ImportBatch, error: null };
   } catch (error) {
     performanceService.endQueryTimer(queryId, "update_import_batch");
     loggingService.error("Unexpected error updating import batch", { id, error }, "ImportService");
@@ -232,7 +232,7 @@ export async function validateAndInsertVehicles(
     )];
     const nameToIdMap = await resolveNamesToIds(companyId, allNames);
     const { canonical } = publishCanonical(
-      vehicles as VehicleRaw[],
+      vehicles as unknown as VehicleRaw[],
       branchLookup,
       paymentLookup,
       nameToIdMap,
@@ -473,7 +473,7 @@ export async function insertImportReviewRows(
     const CHUNK_SIZE = 500;
     for (let idx = 0; idx < dbRows.length; idx += CHUNK_SIZE) {
       const chunk = dbRows.slice(idx, idx + CHUNK_SIZE);
-      const { error } = await supabase.from('import_review_rows').insert(chunk);
+      const { error } = await supabase.from('import_review_rows').insert(chunk as never);
       if (error) {
         loggingService.error('Failed to insert import review rows', { chunk: chunk.length, error }, 'ImportService');
         return { inserted: idx, error };
