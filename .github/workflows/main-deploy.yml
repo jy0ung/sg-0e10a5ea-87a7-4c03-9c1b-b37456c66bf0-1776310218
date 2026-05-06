@@ -121,12 +121,12 @@ jobs:
         id: login
         shell: bash
         env:
-          UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
-          UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
+          PROD_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
+          PROD_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
         run: |
           set -euo pipefail
 
-          if [[ -n "${UAT_LOGIN_EMAIL:-}" && -n "${UAT_LOGIN_PASSWORD:-}" ]]; then
+          if [[ -n "${PROD_LOGIN_EMAIL:-}" && -n "${PROD_LOGIN_PASSWORD:-}" ]]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
@@ -262,16 +262,26 @@ jobs:
       - name: Verify production deployment
         shell: bash
         env:
-          UAT_APP: main
-          UAT_URL: ${{ secrets.VITE_APP_URL }}
-          UAT_EXPECTED_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          UAT_EXPECTED_HRMS_APP_URL: ${{ secrets.VITE_HRMS_APP_URL }}
-          UAT_HEALTH_URL: ${{ format('{0}/healthz', secrets.VITE_APP_URL) }}
-          UAT_LOGIN_EMAIL: ${{ secrets.UAT_LOGIN_EMAIL }}
-          UAT_LOGIN_PASSWORD: ${{ secrets.UAT_LOGIN_PASSWORD }}
-          UAT_LOGIN_REQUIRED: '0'
-          UAT_VERIFY_FETCH_ATTEMPTS: '3'
-        run: npm run verify:uat
+          PROD_APP: main
+          PROD_URL: ${{ secrets.VITE_APP_URL }}
+          PROD_EXPECTED_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          PROD_EXPECTED_HRMS_APP_URL: ${{ secrets.VITE_HRMS_APP_URL }}
+          PROD_HEALTH_URL: ${{ format('{0}/healthz', secrets.VITE_APP_URL) }}
+          PROD_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
+          PROD_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
+          PROD_LOGIN_REQUIRED: '0'
+          PROD_VERIFY_FETCH_ATTEMPTS: '3'
+        run: npm run verify:production
+
+      - name: Smoke production modules
+        if: steps.login.outputs.enabled == 'true'
+        shell: bash
+        env:
+          PROD_URL: ${{ secrets.VITE_APP_URL }}
+          PROD_HRMS_URL: ${{ secrets.VITE_HRMS_APP_URL }}
+          PROD_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
+          PROD_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
+        run: npm run smoke:production
 
       - name: Summary
         if: always()
@@ -285,4 +295,5 @@ jobs:
             echo "- Container: \`${{ secrets.DEPLOY_CONTAINER_NAME }}\`"
             echo "- Host: \`${{ secrets.SSH_HOST }}\`"
             echo "- Build target: \`${{ steps.mode.outputs.build_target }}\`"
+            echo "- Credentialed module smoke: \`${{ steps.login.outputs.enabled }}\`"
           } >> "$GITHUB_STEP_SUMMARY"

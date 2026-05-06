@@ -73,14 +73,17 @@ environment secrets:
 2. CI runs on the branch.
 3. `main-deploy.yml` builds the image, stages it on the host, health-checks it,
    and swaps the live container only if the new container is healthy.
-4. Optional login verification runs when `UAT_LOGIN_EMAIL` and
-   `UAT_LOGIN_PASSWORD` are present.
+4. Optional login verification runs when `PROD_LOGIN_EMAIL` and
+  `PROD_LOGIN_PASSWORD` are present.
+5. Optional module smoke testing runs with those same credentials and checks the
+  production main app, HRMS launcher, and standalone HRMS workspace.
 
 Required production secrets for the main-deploy workflow:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_APP_URL`
+- `VITE_HRMS_APP_URL`
 - `SUPABASE_INTERNAL_URL` set to `http://host.docker.internal:54321` for the
   all-in-one host
 - `SSH_HOST`
@@ -89,6 +92,34 @@ Required production secrets for the main-deploy workflow:
 - `SSH_KNOWN_HOSTS`
 - `CF_ACCESS_CLIENT_ID`
 - `CF_ACCESS_CLIENT_SECRET`
+- `DEPLOY_CONTAINER_NAME`
+- `DEPLOY_HOST_PORT`
+- `GHCR_READ_USERNAME`
+- `GHCR_READ_TOKEN`
+
+Optional production verification secrets:
+
+- `PROD_LOGIN_EMAIL`
+- `PROD_LOGIN_PASSWORD`
+
+Manual production verification from the host or a trusted admin machine:
+
+```bash
+PROD_URL=https://ubs.protonfookloi.com \
+PROD_EXPECTED_SUPABASE_URL=https://ubs.protonfookloi.com \
+PROD_EXPECTED_HRMS_APP_URL=https://hrms.protonfookloi.com \
+npm run verify:production
+```
+
+Credentialed module smoke test:
+
+```bash
+PROD_URL=https://ubs.protonfookloi.com \
+PROD_HRMS_URL=https://hrms.protonfookloi.com \
+PROD_LOGIN_EMAIL=<admin-email> \
+PROD_LOGIN_PASSWORD=<admin-password> \
+npm run smoke:production
+```
 
 ## Rollback
 

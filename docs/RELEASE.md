@@ -1,196 +1,98 @@
-# Release Flow
+# Production Deployment Flow
+
+This repo now uses one production deployment path. UAT and HRMS-UAT deployment workflows have been retired so production does not drift from a parallel release process.
 
 ## Branches
 
-- `main` — protected; every merge must pass CI (lint, typecheck, unit, build, e2e).
-- feature branches — created from `main`, merged via PR.
+- `main` is the deploy branch.
+- Feature branches merge into `main` after CI passes.
 
-## CI gates (GitHub Actions)
+## CI Gates
 
-```
-lint  →  typecheck  →  unit  →  build-web  →  build-mobile  →  e2e
-                                                ↘  npm audit / CodeQL (parallel)
-```
+Pushes to `main` run the CI workflow before deployment. The production deploy workflow only runs after a successful CI result.
 
-- Coverage is uploaded to the CI artifacts store.
-- Playwright uses a managed `webServer` block so e2e is self-contained.
+## Production Deploy
 
-## Versioning
+Pushes to `main` trigger `.github/workflows/main-deploy.yml` after CI passes. The workflow:
 
-- Changesets-driven semver bumps per merged PR.
-- Tags trigger a Docker image build and publish (see `docs/HOSTING.md`).
+1. Resolves the source SHA from the successful CI run.
+2. Builds the `main-with-hrms` image by default.
+3. Publishes `sha-<shortsha>` and `latest` tags to GHCR.
+4. Copies `scripts/deploy-image.sh` to the production host through Cloudflare Access SSH.
+5. Swaps the live container only after the new container passes health checks.
+6. Runs `npm run verify:production` against the public production URL.
+7. Runs `npm run smoke:production` when `PROD_LOGIN_EMAIL` and `PROD_LOGIN_PASSWORD` are configured.
 
-## Main Branch Deploy
+Manual redeploys are available from the Production Deploy workflow:
 
-- Pushes to `main` trigger `.github/workflows/main-deploy.yml` after CI passes.
-- The workflow builds the `main-with-hrms` image target by default, tags it as `sha-<shortsha>` and `latest`, then deploys it to the production host through the existing SSH + Cloudflare Access path.
-- The deploy step still uses the repo's health-gated container swap script, so a bad image does not replace the live container.
-- `workflow_dispatch` can be used to redeploy an existing published image tag without rebuilding from source.
-- Production environments must provide `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_URL`, `SUPABASE_INTERNAL_URL`, and the existing SSH / Cloudflare Access deploy secrets. For an all-in-one host, set `SUPABASE_INTERNAL_URL` to `http://host.docker.internal:54321` so the app container can reach the local Supabase stack through Docker's host-gateway alias.
-- Optional production browser-login secrets (`UAT_LOGIN_EMAIL` and `UAT_LOGIN_PASSWORD`) can be added later; when present, `main-deploy.yml` installs Chromium and exercises the real login flow instead of skipping it.
-- See `docs/DEPLOY.md` for the all-in-one host bootstrap, local Supabase service, and Cloudflare Access SSH setup.
+- leave `image_tag` empty to rebuild from `main`
+- set `image_tag` to deploy an existing published image tag
+- use `build_target=main-with-hrms` for the current production architecture
 
-## Docker Build Targets
+## Production Image Layout
 
-The release workflow supports three image targets:
+The current `main-with-hrms` image serves:
 
-| Target | Image | Output |
-| ------ | ----- | ------ |
-| `main-with-hrms` | `ghcr.io/<owner>/<repo>:<tag>` | Root app plus HRMS web mounted at `/hrms/`. This is the default for tag releases and current UAT. |
-| `main` | `ghcr.io/<owner>/<repo>:<tag>` | Root app only. |
-| `hrms-web` | `ghcr.io/<owner>/<repo>-hrms-web:<tag>` | Standalone `apps/hrms-web` app for an HRMS subdomain. |
+- main UBS app at `/`
+- compatibility HRMS workspace at `/hrms/`
+- root HRMS workspace when the request Host is `hrms.protonfookloi.com`
 
-Use the manual Release workflow with `build_target=hrms-web` to publish a standalone HRMS image. Select the Release workflow `environment` that owns the browser build secrets, such as `uat-hrms` or `production-hrms`. Use the Deploy Image workflow with `app=hrms-web` and the matching deploy environment to deploy that image to a separate container/port/domain.
+The production app is expected to build with `VITE_HRMS_APP_URL=https://hrms.protonfookloi.com` so the HRMS module launcher opens the HRMS workspace hostname.
 
-The Vite public environment is baked into each static image at build time. Publish separate HRMS images for UAT and production when their browser origins or Supabase projects differ; do not promote a UAT-built HRMS image to production or a production-built HRMS image back to UAT.
+## Required Production Secrets
 
-Release workflow tags use the git-style `v` prefix, such as `v0.1.0`. The Docker metadata action publishes semver image tags without that prefix, such as `0.1.0`, plus `0.1`, `latest`, and a `sha-...` tag.
+The `production` GitHub environment must define:
 
-Standalone HRMS UAT release values:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_APP_URL`
+- `VITE_HRMS_APP_URL`
+- `SUPABASE_INTERNAL_URL`
+- `SSH_HOST`
+- `SSH_USER`
+- `SSH_PRIVATE_KEY`
+- `SSH_KNOWN_HOSTS`
+- `CF_ACCESS_CLIENT_ID`
+- `CF_ACCESS_CLIENT_SECRET`
+- `DEPLOY_CONTAINER_NAME`
+- `DEPLOY_HOST_PORT`
+- `GHCR_READ_USERNAME`
+- `GHCR_READ_TOKEN`
 
-| Secret / input | Value |
-| -------------- | ----- |
-| Release `environment` | `uat-hrms` |
-| Release `build_target` | `hrms-web` |
-| Release `VITE_SUPABASE_URL` | `https://uat.protonfookloi.com` |
-| Release `VITE_SUPABASE_ANON_KEY` | UAT anon/publishable key |
-| Release `VITE_APP_URL` | `https://hrms-uat.protonfookloi.com` |
-| Deploy `environment` | `uat-hrms` |
-| Deploy `app` | `hrms-web` |
-| Deploy `DEPLOY_CONTAINER_NAME` | `flc-bi-hrms-uat` |
-| Deploy `DEPLOY_HOST_PORT` | `8082` |
-| Deploy `UAT_URL` | `https://hrms-uat.protonfookloi.com` |
-| Deploy `UAT_EXPECTED_SUPABASE_URL` | `https://uat.protonfookloi.com` |
-| Deploy `UAT_HEALTH_URL` | `https://hrms-uat.protonfookloi.com/healthz` |
+Optional production verification secrets:
 
-Standalone HRMS production release values:
+- `PROD_LOGIN_EMAIL`
+- `PROD_LOGIN_PASSWORD`
 
-| Secret / input | Value |
-| -------------- | ----- |
-| Release `environment` | `production-hrms` |
-| Release `build_target` | `hrms-web` |
-| Release `VITE_SUPABASE_URL` | Production browser-facing Supabase URL |
-| Release `VITE_SUPABASE_ANON_KEY` | Production anon/publishable key |
-| Release `VITE_APP_URL` | `https://hrms.protonfookloi.com` |
-| Deploy `environment` | `production-hrms` |
-| Deploy `app` | `hrms-web` |
-| Deploy `DEPLOY_CONTAINER_NAME` | Production HRMS container name |
-| Deploy `DEPLOY_HOST_PORT` | Production HRMS host port |
+## Verification
 
-For UAT break/fix validation before publishing a GHCR image, the host can run:
+Run the production verifier locally with:
 
 ```bash
-scripts/deploy-hrms-uat-local.sh
+PROD_URL=https://ubs.protonfookloi.com \
+PROD_EXPECTED_SUPABASE_URL=https://ubs.protonfookloi.com \
+PROD_EXPECTED_HRMS_APP_URL=https://hrms.protonfookloi.com \
+npm run verify:production
 ```
 
-The helper builds `apps/hrms-web` with the HRMS UAT app URL, includes the required Supabase anon key from `.env` unless already exported, promotes the local image through the same health-gated container swap, and runs the standalone HRMS UAT verifier.
+The verifier checks the health endpoint, confirms the production bundle uses the expected browser-facing Supabase URL, confirms the main app bundle contains the expected HRMS workspace URL, and runs optional browser login verification when production login secrets are provided.
 
-Once the GitHub environment secrets are present, validate and dispatch the official standalone HRMS workflows with:
+Run the credentialed module smoke locally with:
 
 ```bash
-scripts/check-hrms-github-env.sh uat-hrms release
-TAG=v0.1.0 RELEASE_ENVIRONMENT=uat-hrms scripts/release-hrms-web.sh
+PROD_URL=https://ubs.protonfookloi.com \
+PROD_HRMS_URL=https://hrms.protonfookloi.com \
+PROD_LOGIN_EMAIL=<admin-email> \
+PROD_LOGIN_PASSWORD=<admin-password> \
+npm run smoke:production
 ```
 
-After the Release workflow succeeds, deploy the published image to HRMS UAT with:
-
-```bash
-TAG=v0.1.0 IMAGE_TAG=0.1.0 RELEASE_ENVIRONMENT=uat-hrms DEPLOY_ENVIRONMENT=uat-hrms DEPLOY_AFTER_RELEASE=1 scripts/release-hrms-web.sh
-```
-
-For production, use the same helper with `RELEASE_ENVIRONMENT=production-hrms` and `DEPLOY_ENVIRONMENT=production-hrms` after production DNS, Supabase auth redirects, and deploy secrets are ready.
-
-## Environments
-
-| Env        | Supabase project          | URL                         |
-| ---------- | ------------------------- | --------------------------- |
-| Local      | `supabase start`          | `http://127.0.0.1:3000`     |
-| Staging    | Separate Supabase project | `https://staging.…`         |
-| Production | Separate Supabase project | `https://app.…`             |
-
-Staging is seeded from `scripts/seed-from-extract.ts` with rotated keys.
+The module smoke logs into the main app, checks the active platform modules, verifies the HRMS module card redirects to `hrms.protonfookloi.com`, logs into HRMS, and checks the standalone HRMS routes.
 
 ## Rollback
 
-1. Revert the merge commit on `main`.
-2. Re-deploy the previous image tag.
-3. If the release ran migrations, run the inverse migration or restore from PITR.
+If a production deploy misbehaves:
 
-## UAT verification
-
-After deploying to UAT, run:
-
-```bash
-npm run verify:uat
-```
-
-The verifier checks `/healthz`, confirms the live Vite bundle uses the public
-same-origin Supabase URL instead of a private LAN/localhost URL, and skips the
-real browser login check unless credentials are supplied. To include login:
-
-```bash
-UAT_LOGIN_EMAIL=<email> UAT_LOGIN_PASSWORD=<password> npm run verify:uat
-```
-
-Set `UAT_LOGIN_REQUIRED=1` in CI if missing login credentials should fail the
-verification job.
-
-`deploy-image.yml` runs this verifier automatically after UAT deployments. Add
-`UAT_LOGIN_EMAIL` and `UAT_LOGIN_PASSWORD` as UAT environment secrets to include
-the real browser login check in that automated deploy gate.
-
-For standalone HRMS deployments, set `UAT_APP=hrms-web` or deploy with
-`app=hrms-web`. The verifier then installs Chromium in CI and runs an additional
-mocked-auth browser smoke covering the HRMS shell, `/admin -> /settings`, and
-`/leave-calendar -> /leave/calendar` query/hash preservation.
-
-`uat-synthetic.yml` also runs the same verifier hourly and on manual dispatch.
-It fails on health, bundle configuration, or required-login regressions without
-needing a deploy event. Set `UAT_VERIFY_FETCH_ATTEMPTS` if the synthetic check
-needs a different retry count than the default three attempts.
-
-For a manual standalone HRMS UAT check after adding `uat-hrms` login secrets,
-dispatch `uat-synthetic.yml` with `environment=uat-hrms` and `app=hrms-web`.
-
-## Phase 1 closure
-
-Phase 1 performance hardening is closed as of 2026-04-27. The release criteria
-are the default validation gates, bundle budget, and UAT deploy verifier:
-
-```bash
-npm run lint
-npm run typecheck
-npm run test
-npm run build:budget
-npm run verify:uat
-```
-
-The remaining UAT follow-up is operational: add `UAT_LOGIN_EMAIL` and
-`UAT_LOGIN_PASSWORD` secrets so the automated verifier exercises a real browser
-login instead of skipping that optional check.
-
-## Backups
-
-- Supabase PITR must be enabled on staging and production.
-- `db-backup.yml` creates nightly encrypted logical dumps once `SUPABASE_DB_URL`
-    and `DB_BACKUP_GPG_PASSPHRASE` are configured in the target environment.
-- A monthly restore-to-staging drill verifies backups and is recorded in
-    `docs/DR_DRILLS.md`.
-
-## Phase 2 production readiness
-
-Phase 2 started on 2026-04-27. The first slice is the observability foundation:
-React error boundaries report through `errorTrackingService`, Sentry metadata is
-driven by the validated env contract, and source maps are generated only for the
-Sentry release upload job. Track the full phase in
-`docs/PHASE2_PRODUCTION_READINESS.md`.
-
-## Launch checklist
-
-- [x] UAT synthetic verification workflow
-- [ ] Production uptime monitoring (StatusCake / BetterUptime)
-- [ ] Sentry alert routes to on-call channel
-- [ ] Error budget defined per module
-- [ ] Load test at ≥100k vehicles / ≥10k orders
-- [x] Incident response runbook linked from README
-- [ ] `npm audit` + `osv-scanner` reports filed as issues
+1. Re-deploy the previous image tag from `main-deploy.yml` with `image_tag`.
+2. If needed, revert the offending commit on `main` and let CI/deploy run.
+3. If database changes caused the issue, restore the host-local Supabase data from backup before re-enabling traffic.

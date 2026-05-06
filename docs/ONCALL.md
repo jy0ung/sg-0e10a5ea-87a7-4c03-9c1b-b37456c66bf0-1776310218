@@ -25,7 +25,7 @@ Keep the live rota in the team calendar or incident tool. Mirror only the role n
 
 | Source | Purpose | Expected route |
 | ------ | ------- | -------------- |
-| UAT synthetic workflow | Early warning for UAT health, bundle config, and login flow | GitHub Actions notification |
+| Production deploy verification | Health, bundle config, login, and module smoke regressions | GitHub Actions notification |
 | Production uptime monitor | Public availability and `/healthz` checks | On-call channel |
 | Sentry | Frontend crash/error spikes and release regressions | On-call channel |
 | Supabase dashboard | Database, auth, storage, and edge-function health | On-call channel |
@@ -34,7 +34,7 @@ Keep the live rota in the team calendar or incident tool. Mirror only the role n
 ## Triage Flow
 
 1. Acknowledge the alert.
-2. Check whether the issue affects production, UAT, staging, or only CI.
+2. Check whether the issue affects production or only CI.
 3. Classify severity using `docs/INCIDENT_RESPONSE.md`.
 4. If production user impact is likely, open an incident thread and name an Incident Commander.
 5. If the alert is noisy or non-actionable, record the reason and tune the threshold after service is stable.

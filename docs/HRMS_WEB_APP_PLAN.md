@@ -328,61 +328,38 @@ Do this incrementally, not as a prerequisite for the first HRMS web launch.
 
 ### Phase 5: Standalone HRMS Rollout
 
-Status: UAT subdomain validated on 2026-04-29 with the official standalone HRMS GHCR image. Production rollout remains gated on production DNS, production Supabase/auth verification, and production deploy secrets.
+Status: Production deployment is consolidated into the `main-with-hrms` image built by `main-deploy.yml`. The separate UAT and standalone HRMS deployment workflows have been retired.
 
-Completed UAT deliverables:
+Current production deliverables:
 
-- standalone HRMS UAT domain deployed at `https://hrms-uat.protonfookloi.com`
-- Cloudflare ingress routes HRMS UAT traffic to the standalone container on `127.0.0.1:8082`
-- Supabase redirect allow-list includes mounted HRMS routes and standalone HRMS UAT/production routes
-- standalone HRMS password-reset email flow verified on the HRMS UAT domain
-- reset link handling fixed for Supabase recovery callbacks that are consumed before the React page reads URL parameters
-- local break/fix deployment path added through `scripts/deploy-hrms-uat-local.sh`
-- official standalone HRMS image published from Release workflow run `25108328607`
-- official standalone HRMS image deployed to HRMS UAT through the local health-gated deploy script
-- standalone HRMS verifier passes against `https://hrms-uat.protonfookloi.com`
+- main app is deployed at `https://ubs.protonfookloi.com`
+- compatibility HRMS route is served at `https://ubs.protonfookloi.com/hrms/`
+- production image includes a root-mounted HRMS bundle for `hrms.protonfookloi.com`
+- main app bundle is built with `VITE_HRMS_APP_URL=https://hrms.protonfookloi.com`
+- production deploy verification is run through `npm run verify:production`
+- cloudflared routes `hrms.protonfookloi.com` to the production nginx container
+- credentialed production smoke passed for the HRMS launcher and standalone HRMS routes
 
-Current UAT evidence:
+Open production item:
 
-- live HRMS UAT container: `flc-bi-hrms-uat`
-- latest validated image: `ghcr.io/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218-hrms-web:0.1.0`
-- latest live break/fix image after settings layout polish: `flc-bi-uat:hrms-settings-layout-04510e3`
-- release run: `25108328607`, `v0.1.0`, digest `sha256:92de21a8433b8dbb1bded9f69e359fd6dbfb4efa5ab3ed3c9a201da75ec84192`
-- public health check: `https://hrms-uat.protonfookloi.com/healthz` returns `ok`
-- verifier: `UAT_APP=hrms-web UAT_URL=https://hrms-uat.protonfookloi.com UAT_EXPECTED_SUPABASE_URL=https://uat.protonfookloi.com UAT_HEALTH_URL=https://hrms-uat.protonfookloi.com/healthz npm run verify:uat` passed
-- credentialed GitHub UAT synthetic run `25111751762` passed on 2026-04-29 with `environment=uat-hrms`, `app=hrms-web`, and `PASS browser login flow - redirected to /`
-- fresh Mailpit reset email redirects to `https://hrms-uat.protonfookloi.com/reset-password` and opens the `Set your new password` form
-
-Gap assessment, 2026-04-29:
-
-| Area | Status | Gap | Required action |
-| ---- | ------ | --- | --------------- |
-| UAT standalone domain | Closed | None for shell, health, bundle config, mocked-auth shell smoke, and reset-link landing on the official `hrms-web:0.1.0` image | Keep `scripts/deploy-hrms-uat-local.sh` for break/fix validation; use GHCR image tags for release candidates |
-| UAT credentialed automation | Closed | `uat-hrms` verifier secrets are configured and workflow run `25111751762` passed credentialed browser login | Keep `UAT_LOGIN_EMAIL`, `UAT_LOGIN_PASSWORD`, and optionally `UAT_LOGIN_REQUIRED=1` current in the `uat-hrms` GitHub environment |
-| Password update acceptance | Partial | Reset link landing is verified; changing the user's real password was not automated to avoid altering a user credential without an explicit acceptance step | Have the user complete one password update in UAT, then log in with the new password and record evidence |
-| Release publication | Closed | `v0.1.0` was published as GHCR image tag `0.1.0` | Use `TAG=v0.1.0` for Release workflow dispatch and `IMAGE_TAG=0.1.0` for deploy workflow dispatch |
-| CI/CD deploy environments | Partial | `uat-hrms` release/verifier secrets are set, but GitHub Deploy workflow still lacks SSH and Cloudflare Access service-token secrets | Add `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET` to `uat-hrms`; add full production equivalents later |
-| Production DNS/ingress | Open | `hrms.protonfookloi.com` is not yet deployed or verified | Add Cloudflare tunnel ingress/DNS for production HRMS and map it to the production HRMS container/upstream |
-| Production Supabase/auth | Open | Production auth allow-list and SMTP/reset email behavior still need live verification | Confirm production Supabase redirect URLs include `https://hrms.protonfookloi.com/reset-password`; send a recovery email and verify redirect acceptance |
-| Production launch evidence | Open | No production health, login, reset, or HRMS workflow evidence exists yet | Run production verifier equivalent plus manual smoke for login, leave, appraisals, approvals, and reset-password |
-| User communications | Open | HRMS subdomain availability and separate-origin sign-in behavior are not yet communicated | Prepare launch note explaining HRMS URL, first-login/reset flow, and main-app coexistence period |
+- verify password reset and invite redirect behavior on the production HRMS hostname
 
 Updated Phase 5 implementation sequence:
 
-1. Complete UAT acceptance by having a real user update their password from the HRMS UAT reset form and log in with the new password.
-2. Add the missing `uat-hrms` SSH/Cloudflare Access deploy secrets so `deploy-image.yml` can deploy and verify the standalone HRMS image without host-local manual deploys.
-3. Configure production HRMS DNS/Cloudflare ingress and production deploy environment secrets when production rollout is approved.
-4. Deploy the `hrms-web` image to `production-hrms` and validate health, bundle config, login, password reset, and representative HRMS workflows.
+1. Activate the `hrms.protonfookloi.com` cloudflared ingress rule on the production host. Done 2026-05-06.
+2. Create/verify the production super admin account. Done 2026-05-06.
+3. Run production module smoke tests from the main app and HRMS workspace. Done 2026-05-06, 57/57 passed.
+4. Verify password reset and invite behavior on the production HRMS hostname.
 5. Send user communications and set a support/rollback window.
 
 Acceptance criteria for Phase 5 closure:
 
-- HRMS users can log in directly to the HRMS UAT and production domains
+- HRMS users can log in directly to the production HRMS domain
 - no main-app navigation appears in HRMS web
-- password reset works end to end on both HRMS UAT and production domains
+- password reset works end to end on the production HRMS domain
 - leave, appraisals, and approvals work end to end in the standalone HRMS app
-- UAT and production deployments use immutable GHCR images, not only local helper-built images
-- UAT/prod verifier evidence is attached or referenced from the release notes
+- production deployments use immutable GHCR images from `main-deploy.yml`
+- production verifier evidence is attached or referenced from the release notes
 
 ### Phase 6: Mobile Expansion
 

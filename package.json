@@ -25,7 +25,8 @@
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "provision:env": "bash scripts/provision-supabase-env.sh",
     "security:edge-functions": "tsx scripts/check-edge-functions.ts",
-    "verify:uat": "tsx scripts/verify-uat-deploy.ts",
+    "verify:production": "tsx scripts/verify-production-deploy.ts",
+    "smoke:production": "tsx scripts/smoke-production-modules.ts",
     "prepare": "husky"
   },
   "dependencies": {

@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npx tsx
 import { chromium, type Page } from 'playwright';
 
-const DEFAULT_UAT_URL = 'https://uat.protonfookloi.com';
+const DEFAULT_PRODUCTION_URL = 'https://ubs.protonfookloi.com';
 const DEFAULT_FORBIDDEN_PATTERNS = [
   'http://127.0.0.1:54321',
   'http://localhost:54321',
@@ -14,20 +14,20 @@ type CheckResult = {
   detail?: string;
 };
 
-const targetUrl = normalizeUrl(readEnv('UAT_URL') ?? DEFAULT_UAT_URL);
-const expectedSupabaseUrl = normalizeUrl(readEnv('UAT_EXPECTED_SUPABASE_URL') ?? targetUrl.origin);
-const healthUrl = normalizeUrl(readEnv('UAT_HEALTH_URL') ?? `${targetUrl.origin}/healthz`);
-const expectedHrmsAppUrl = readEnv('UAT_EXPECTED_HRMS_APP_URL');
-const forbiddenPatterns = (readEnv('UAT_FORBIDDEN_SUPABASE_PATTERNS') ?? DEFAULT_FORBIDDEN_PATTERNS.join(','))
+const targetUrl = normalizeUrl(readEnv('PROD_URL') ?? DEFAULT_PRODUCTION_URL);
+const expectedSupabaseUrl = normalizeUrl(readEnv('PROD_EXPECTED_SUPABASE_URL') ?? targetUrl.origin);
+const healthUrl = normalizeUrl(readEnv('PROD_HEALTH_URL') ?? `${targetUrl.origin}/healthz`);
+const expectedHrmsAppUrl = readEnv('PROD_EXPECTED_HRMS_APP_URL');
+const forbiddenPatterns = (readEnv('PROD_FORBIDDEN_SUPABASE_PATTERNS') ?? DEFAULT_FORBIDDEN_PATTERNS.join(','))
   .split(',')
   .map((pattern) => pattern.trim())
   .filter(Boolean);
-const loginEmail = readEnv('UAT_LOGIN_EMAIL');
-const loginPassword = readEnv('UAT_LOGIN_PASSWORD');
-const maxFetchAttempts = parsePositiveInteger(readEnv('UAT_VERIFY_FETCH_ATTEMPTS'), 3);
-const appMode = readEnv('UAT_APP') ?? 'main';
+const loginEmail = readEnv('PROD_LOGIN_EMAIL');
+const loginPassword = readEnv('PROD_LOGIN_PASSWORD');
+const maxFetchAttempts = parsePositiveInteger(readEnv('PROD_VERIFY_FETCH_ATTEMPTS'), 3);
+const appMode = readEnv('PROD_APP') ?? 'main';
 const runningInGitHubActions = readEnv('GITHUB_ACTIONS') === 'true';
-const loginRequired = parseLoginRequired(readEnv('UAT_LOGIN_REQUIRED'), appMode, runningInGitHubActions);
+const loginRequired = parseLoginRequired(readEnv('PROD_LOGIN_REQUIRED'), appMode, runningInGitHubActions);
 
 const MOCK_USER = {
   id: '00000000-0000-0000-0000-000000000001',
@@ -199,7 +199,7 @@ async function checkBundleSupabaseConfig() {
 async function checkLoginFlow() {
   const name = 'browser login flow';
   if (!loginEmail || !loginPassword) {
-    addResult(name, !loginRequired, loginRequired ? 'missing UAT_LOGIN_EMAIL/UAT_LOGIN_PASSWORD' : 'skipped; no credentials provided');
+    addResult(name, !loginRequired, loginRequired ? 'missing PROD_LOGIN_EMAIL/PROD_LOGIN_PASSWORD' : 'skipped; no credentials provided');
     return;
   }
 
@@ -301,7 +301,7 @@ async function checkBundleHrmsAppUrl() {
   }
   if (!expectedHrmsAppUrl) {
     // Fail: for main-app deployments this must always be set.
-    addResult(name, false, 'UAT_EXPECTED_HRMS_APP_URL is not set — HRMS module button will use offline fallback');
+    addResult(name, false, 'PROD_EXPECTED_HRMS_APP_URL is not set — HRMS module button will use offline fallback');
     return;
   }
   try {
@@ -361,8 +361,8 @@ await checkHrmsWebShell();
 
 const failed = results.filter((result) => !result.ok);
 if (failed.length > 0) {
-  console.error(`UAT verification failed: ${failed.map((result) => result.name).join(', ')}`);
+  console.error(`Production verification failed: ${failed.map((result) => result.name).join(', ')}`);
   process.exit(1);
 }
 
-console.info('UAT verification passed.');
+console.info('Production verification passed.');

@@ -4,18 +4,16 @@ One-time gate before first production cutover. Every box must be checked.
 
 ## Infrastructure
 
-- [ ] Production Supabase project provisioned (separate from staging/local)
-- [ ] Staging Supabase project provisioned and seeded via
-      `scripts/seed-from-extract.ts`
-- [ ] `.env.staging` populated from `.env.staging.example` with rotated keys
-- [ ] Production `.env` populated (rotated keys, never reused from staging)
-- [ ] DNS + TLS cert for `app.<domain>` and `api.<domain>`
-- [ ] Docker image published to GHCR via `release.yml`
-- [ ] Push-to-main production deploy workflow enabled and verified (`main-deploy.yml`)
+- [x] Production Supabase stack provisioned on the all-in-one host
+- [ ] Production `.env` populated with rotated keys
+- [x] DNS + TLS cert for `ubs.protonfookloi.com`
+- [x] DNS + TLS cert for `hrms.protonfookloi.com`
+- [x] Docker image published to GHCR via `main-deploy.yml`
+- [x] Push-to-main production deploy workflow enabled and verified (`main-deploy.yml`)
 - [ ] Production host bootstrapped via `scripts/setup-production-host.sh`
 - [ ] Nginx/reverse proxy routes `/` to the static bundle with HSTS +
       CSP headers
-- [x] UAT deploy verification passes with `npm run verify:uat`
+- [x] Production deploy verification passes with `npm run verify:production`
 
 ## Security
 
@@ -72,13 +70,13 @@ One-time gate before first production cutover. Every box must be checked.
 
 ## Latest Validation Snapshot
 
-2026-04-28 local/UAT validation passed: `npm run lint` (0 errors, 144 existing non-blocking warnings, no `jsx-a11y` warnings reported), `npm run typecheck`, `npm run test` (`291 passed`), `npm run test:coverage` (`291 passed`), `npm run build:budget`, `bash scripts/security-check.sh`, `git diff --check`, `npm run verify:uat`, full Chromium Playwright (`108 passed`, `21 skipped`), focused accessibility smoke (`2 passed`), and local seeded RLS matrix (`npm run test:rls`, `84 passed`). `npm run verify:uat` confirms the UAT health endpoint and deployed bundle Supabase URL; credentialed browser login remains skipped because credentials were not provided. Coverage command passes, but grouped coverage remains below the checklist target: `services` 49.42%, `contexts` 68.20%, `lib` 67.83%.
+2026-05-06 production validation passed through GitHub Actions for commit `70820b7`: CI passed, `main-deploy.yml` built and deployed the production image, and production verification passed against `https://ubs.protonfookloi.com`. Follow-up host validation activated `hrms.protonfookloi.com` cloudflared ingress, verified HRMS public routes, created the production super admin, and passed `npm run smoke:production` across 57/57 module routes.
 
 Phase decision: Phase 2 local engineering readiness is formally closed. Keep this launch checklist open until the remaining unchecked infrastructure, security, observability, reliability, performance, product coverage, and process gates have owner-approved production evidence.
 
 ## Product
 
-- [ ] Every module has a smoke e2e spec in `e2e/`
+- [x] Every active production module has a credentialed smoke route in `scripts/smoke-production-modules.ts`
 - [ ] Vitest coverage ≥ 70 % on `services/`, `contexts/`, `lib/`
 - [x] All pages pass `jsx-a11y` lint (no new errors)
 - [x] i18n scaffold boots; `en` bundle seeded

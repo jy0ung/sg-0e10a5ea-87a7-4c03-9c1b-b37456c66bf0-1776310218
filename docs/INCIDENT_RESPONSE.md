@@ -1,6 +1,6 @@
 # Incident Response Runbook
 
-Scope: production and UAT incidents for the FLC BI web app, Supabase backend, database, auth, and deployment pipeline.
+Scope: production incidents for the FLC BI web app, Supabase backend, database, auth, and deployment pipeline.
 
 ## Severity Levels
 
@@ -25,11 +25,11 @@ One person can hold multiple roles in a small incident, but every active inciden
 2. Declare severity and open an incident thread.
 3. Capture the user-visible symptom, start time, affected environment, and suspected blast radius.
 4. Check:
-   - UAT/production synthetic workflow result
+   - production deploy workflow result
    - `/healthz` endpoint
    - Sentry issue/event trend
    - Supabase dashboard health and auth/API status
-   - latest GitHub Actions deploy/release run
+   - latest GitHub Actions production deploy run
 5. Decide whether to roll back, freeze deploys, or put the app in maintenance mode.
 
 ## Mitigation Paths
@@ -37,8 +37,8 @@ One person can hold multiple roles in a small incident, but every active inciden
 ### Bad Frontend Release
 
 1. Stop further deploys.
-2. Re-deploy the previous known-good image tag with `deploy-image.yml`.
-3. Run `npm run verify:uat` or the equivalent production verifier.
+2. Re-deploy the previous known-good image tag with `main-deploy.yml`.
+3. Run `npm run verify:production`.
 4. Confirm Sentry error rate returns to baseline.
 5. Open a fix-forward PR after service is stable.
 
@@ -67,7 +67,7 @@ One person can hold multiple roles in a small incident, but every active inciden
 ```text
 Status: investigating | mitigating | monitoring | resolved
 Severity: SEV-1 | SEV-2 | SEV-3
-Environment: production | UAT | staging
+Environment: production
 Impact: <who is affected and what is broken>
 Current action: <what we are doing now>
 Next update: <time>

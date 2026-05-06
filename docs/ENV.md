@@ -6,9 +6,9 @@ Required values are loaded at boot and validated by the zod schema in `src/confi
 
 | Variable                | Purpose                                     | Notes                              |
 | ----------------------- | ------------------------------------------- | ---------------------------------- |
-| `VITE_SUPABASE_URL`     | Browser-facing Supabase URL                 | `http://127.0.0.1:54321` locally; for self-hosted UAT behind nginx, use the public app origin so browsers call same-origin proxy paths. |
+| `VITE_SUPABASE_URL`     | Browser-facing Supabase URL                 | `http://127.0.0.1:54321` locally; for self-hosted production behind nginx, use the public app origin so browsers call same-origin proxy paths. |
 | `VITE_SUPABASE_ANON_KEY`| Supabase anon/publishable key               | From `supabase start` output. Required for every web build target, including standalone `apps/hrms-web`; omitting it causes the client to fail boot with missing Supabase env errors. |
-| `VITE_APP_URL`          | Canonical app URL used for auth redirects   | Must match browser origin. `VITE_SITE_URL` still accepted as a legacy fallback. Standalone HRMS builds must set this to the HRMS domain so recovery links redirect to `/reset-password` on `hrms-...`, not a localhost smoke URL. |
+| `VITE_APP_URL`          | Canonical app URL used for auth redirects   | Must match browser origin. `VITE_SITE_URL` still accepted as a legacy fallback. HRMS-hosted builds must set this to the HRMS domain so recovery links redirect to `/reset-password` on the HRMS hostname, not a local smoke URL. |
 
 ## Optional
 
@@ -19,7 +19,7 @@ Required values are loaded at boot and validated by the zod schema in `src/confi
 | `VITE_APP_ENV`                | Environment label sent to Sentry (`development`, `staging`, `production`). |
 | `VITE_HRMS_APP_URL`           | Dedicated HRMS web origin used by the main app launcher. Leave unset to use same-origin `/hrms/`. |
 | `VITE_APP_VERSION`            | Release tag sent to Sentry for source map association. |
-| `SUPABASE_INTERNAL_URL`        | Docker/nginx build arg for the private Supabase upstream behind same-origin proxy routes. Defaults to the current UAT LAN host. |
+| `SUPABASE_INTERNAL_URL`        | Docker/nginx build arg for the private Supabase upstream behind same-origin proxy routes. For the all-in-one production host, use `http://host.docker.internal:54321`. |
 
 ## Source maps
 

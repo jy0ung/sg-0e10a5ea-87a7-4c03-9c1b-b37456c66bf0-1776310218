@@ -38,7 +38,7 @@ Validation snapshot, 2026-04-28:
 - Passed: `npm run test:coverage`, `291 passed`; coverage target remains a launch gap because current grouped coverage is below the checklist target (`services` 49.42%, `contexts` 68.20%, `lib` 67.83%).
 - Passed: `npm run build:budget`.
 - Passed: `bash scripts/security-check.sh`; high+ npm audit gate is clean, OSV is skipped because `osv-scanner` is not installed, and moderate advisories remain for tracked dependency review.
-- Passed: `npm run verify:uat`; health endpoint and bundle Supabase URL checks passed, credentialed browser login skipped because credentials were not provided.
+- Passed: production deploy verification through `main-deploy.yml`; health endpoint, bundle Supabase URL, and HRMS launcher URL checks passed.
 - Passed: `git diff --check`.
 - Passed: full Chromium Playwright project, `108 passed`, `21 skipped`.
 - Passed: local seeded Supabase RLS matrix, `npm run test:rls`, `84 passed`.
@@ -47,8 +47,8 @@ Validation snapshot, 2026-04-28:
 
 Production cutover remains blocked until the following evidence is captured and approved:
 
-- Infrastructure: provision separate staging and production Supabase projects, rotated `.env.staging` and production `.env`, production DNS/TLS, GHCR image release, and reverse-proxy security headers.
-- Credentialed UAT: configure `UAT_LOGIN_EMAIL`, `UAT_LOGIN_PASSWORD`, and `UAT_LOGIN_REQUIRED=1` so UAT verification includes a real browser login.
+- Infrastructure: keep the all-in-one production host, production `.env`, production DNS/TLS, GHCR image publishing, and reverse-proxy security headers verified.
+- Credentialed production: configure `PROD_LOGIN_EMAIL`, `PROD_LOGIN_PASSWORD`, and `PROD_LOGIN_REQUIRED=1` when production verification should include a real browser login.
 - Live RLS and edge-function security: rerun `npm run test:rls` against the seeded live stack, attach the evidence to `docs/SECURITY_SIGNOFF.md`, confirm all edge functions validate JWT and same-company access, pin CORS to production origins, and complete reviewer sign-off.
 - Observability: create/connect the production Sentry project, set `VITE_SENTRY_DSN`, upload source maps in the release job, configure alert routing, and prove a synthetic frontend error arrives within 60 seconds.
 - Reliability: enable production PITR, run the nightly logical dump with production secrets, complete a restore-to-staging drill, configure uptime monitoring, and fill the live on-call rota.
@@ -69,7 +69,7 @@ Scope:
 Exit checks:
 
 ```bash
-npm run verify:uat
+npm run verify:production
 ```
 
 Still requires external setup before production launch:
