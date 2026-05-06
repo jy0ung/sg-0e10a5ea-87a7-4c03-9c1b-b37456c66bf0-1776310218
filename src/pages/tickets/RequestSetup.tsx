@@ -252,7 +252,8 @@ export default function RequestSetup() {
     }
   }, [categories, activeCategoryKey]);
 
-  useEffect(() => {(Object.fromEntries(subcategories.map((subcategory) => [subcategory.id, {
+  useEffect(() => {
+    setSubcategoryDrafts(Object.fromEntries(subcategories.map((subcategory) => [subcategory.id, {
       label: subcategory.label,
       description: subcategory.description,
       is_active: subcategory.is_active,
@@ -296,6 +297,11 @@ export default function RequestSetup() {
   const activeTemplateCount = useMemo(
     () => templates.filter((t) => t.is_active).length,
     [templates],
+  );
+
+  const activeRoutingRuleCount = useMemo(
+    () => routingRules.filter((rule) => rule.is_active).length,
+    [routingRules],
   );
 
   const activeSubcategoriesForKey = useCallback(
@@ -770,12 +776,29 @@ export default function RequestSetup() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Request Setup</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configure request categories and pre-built templates for Internal Requests.
-        </p>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Internal Requests</p>
+          <h1 className="text-2xl font-bold text-foreground">Request Operations Setup</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Shape the requester experience, routing logic, templates, and attachment controls from one workspace.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[360px]">
+          <div className="rounded-lg border border-border bg-card px-3 py-2">
+            <p className="text-lg font-semibold text-foreground">{activeCategoryCount}</p>
+            <p className="text-[11px] text-muted-foreground">Categories</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card px-3 py-2">
+            <p className="text-lg font-semibold text-foreground">{activeTemplateCount}</p>
+            <p className="text-[11px] text-muted-foreground">Templates</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card px-3 py-2">
+            <p className="text-lg font-semibold text-foreground">{activeRoutingRuleCount}</p>
+            <p className="text-[11px] text-muted-foreground">Rules</p>
+          </div>
+        </div>
       </div>
 
       <Card>
@@ -811,9 +834,9 @@ export default function RequestSetup() {
               <TabsTrigger value="routing">
                 <Route className="mr-1.5 h-3.5 w-3.5" />
                 Routing
-                {routingRules.filter((r) => r.is_active).length > 0 && (
+                {activeRoutingRuleCount > 0 && (
                   <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
-                    {routingRules.filter((r) => r.is_active).length}
+                    {activeRoutingRuleCount}
                   </Badge>
                 )}
               </TabsTrigger>

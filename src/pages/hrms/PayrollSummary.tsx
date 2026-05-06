@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +25,19 @@ import {
   listPayrollItems,
 } from '@/services/hrmsService';
 import type { PayrollRun, PayrollItem, PayrollRunStatus } from '@/types';
-import { Plus, Eye, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, RotateCcw, XCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  CreditCard,
+  Eye,
+  Plus,
+  RotateCcw,
+  Users,
+  Wallet,
+  XCircle,
+} from 'lucide-react';
 import { HRMS_PAYROLL_ROLES } from '@/config/hrmsConfig';
 import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
 
@@ -66,6 +78,21 @@ export default function PayrollSummary() {
   const [reviewAction, setReviewAction] = useState<'approved' | 'rejected'>('approved');
   const [reviewNote, setReviewNote] = useState('');
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
+
+  const sortedRuns = useMemo(
+    () => [...runs].sort((left, right) => (
+      right.periodYear - left.periodYear || right.periodMonth - left.periodMonth
+    )),
+    [runs],
+  );
+
+  const latestRun = sortedRuns[0] ?? null;
+  const payrollMetrics = useMemo(() => ({
+    latestHeadcount: latestRun?.totalHeadcount ?? 0,
+    totalNet: runs.reduce((sum, run) => sum + run.totalNet, 0),
+    pendingApprovals: runs.filter((run) => run.approvalInstanceStatus === 'pending').length,
+    paidRuns: runs.filter((run) => run.status === 'paid').length,
+  }), [latestRun, runs]);
 
   function canReviewRun(run: PayrollRun): boolean {
     if (!isManager || !user || run.status !== 'draft' || run.approvalInstanceStatus !== 'pending') return false;
@@ -148,10 +175,10 @@ export default function PayrollSummary() {
   const viewingRun = runs.find(r => r.id === viewRunId);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <PageHeader
-        title="Payroll Summary"
-        description="Manage monthly payroll runs"
+        title="Payroll Workspace"
+        description="Prepare monthly payroll, monitor approval readiness, and track payout status."
         breadcrumbs={[{ label: 'HRMS' }, { label: 'Payroll' }]}
         actions={
           isManager ? (
@@ -162,15 +189,75 @@ export default function PayrollSummary() {
         }
       />
 
+      {!loading && (
+        <div className="grid gap-3 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Latest headcount</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold">{payrollMetrics.latestHeadcount}</p>
+              <p className="text-xs text-muted-foreground">
+                {latestRun ? `${MONTHS[latestRun.periodMonth - 1]} ${latestRun.periodYear}` : 'No run yet'}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Net payroll</CardTitle>
+              <Wallet className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold">RM {fmt(payrollMetrics.totalNet)}</p>
+              <p className="text-xs text-muted-foreground">Across visible runs</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending approval</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold">{payrollMetrics.pendingApprovals}</p>
+              <p className="text-xs text-muted-foreground">Runs waiting for review</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Paid runs</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold">{payrollMetrics.paidRuns}</p>
+              <p className="text-xs text-muted-foreground">Completed payroll cycles</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center h-40">
           <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
         </div>
       ) : runs.length === 0 ? (
-        <Card><CardContent className="flex items-center justify-center h-32 text-muted-foreground">No payroll runs yet.</CardContent></Card>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+            <CreditCard className="h-8 w-8 text-muted-foreground" />
+            <p className="font-medium text-foreground">No payroll runs yet</p>
+            <p className="text-sm text-muted-foreground">Create the first run when salary inputs are ready for review.</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-3">
-          {runs.map(run => (
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Payroll runs</h2>
+              <p className="text-sm text-muted-foreground">Newest cycles first, with approval state and payout actions.</p>
+            </div>
+            <Badge variant="outline">{runs.length} runs</Badge>
+          </div>
+          {sortedRuns.map(run => (
             <Card key={run.id}>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">

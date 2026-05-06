@@ -40,9 +40,13 @@ import type { AppRole } from '@/types';
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const ticketSchema = z.object({
+  subject: z.string().min(6, 'Subject must be at least 6 characters'),
   category: z.string().min(1, 'Category is required'),
   subcategory: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high']),
+  requested_due_date: z.string().optional(),
+  business_impact: z.string().max(240, 'Business impact must be 240 characters or less').optional(),
+  desired_outcome: z.string().max(240, 'Desired outcome must be 240 characters or less').optional(),
   description: z.string().min(20, 'Description must be at least 20 characters'),
   vso_number: z.string().optional(),
 });
@@ -191,9 +195,13 @@ export default function NewTicket() {
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
     defaultValues: {
+      subject: '',
       category: '',
       subcategory: '',
       priority: 'medium',
+      requested_due_date: '',
+      business_impact: '',
+      desired_outcome: '',
       description: '',
       vso_number: '',
     },
@@ -358,11 +366,14 @@ export default function NewTicket() {
 
     const { data: ticketResult, error: ticketError } = await createTicket(
       {
-        subject: data.vso_number?.trim() || selectedCategory?.label || 'Internal Request',
+        subject: data.subject.trim(),
         category: data.category,
         subcategory: matchingSubcategories.length > 0 ? (data.subcategory ?? null) : null,
         priority: data.priority,
         description: data.description,
+        requested_due_date: data.requested_due_date?.trim() || null,
+        business_impact: data.business_impact?.trim() || null,
+        desired_outcome: data.desired_outcome?.trim() || null,
         vso_number: data.vso_number?.trim() || null,
       },
       { userId: user.id, companyId: user.company_id, submitterRole: user.role },
@@ -403,9 +414,13 @@ export default function NewTicket() {
     setAttachedFiles([]);
     setFileErrors([]);
     form.reset({
+      subject: '',
       category: firstCategoryKey,
       subcategory: firstSubcategoryKey,
       priority: 'medium',
+      requested_due_date: '',
+      business_impact: '',
+      desired_outcome: '',
       description: '',
       vso_number: '',
     });
@@ -430,6 +445,7 @@ export default function NewTicket() {
     setActiveTemplateId(template.id);
     form.setValue('category', template.category_key, { shouldValidate: true });
     form.setValue('subcategory', template.subcategory_key ?? '', { shouldValidate: true });
+    form.setValue('subject', template.subject, { shouldValidate: true });
     form.setValue('priority', template.priority as TicketFormData['priority'], {
       shouldValidate: true,
     });
@@ -442,9 +458,13 @@ export default function NewTicket() {
     const firstSubcategoryKey =
       subcategories.find((s) => s.category_key === firstCategoryKey)?.key ?? '';
     form.reset({
+      subject: '',
       category: firstCategoryKey,
       subcategory: firstSubcategoryKey,
       priority: 'medium',
+      requested_due_date: '',
+      business_impact: '',
+      desired_outcome: '',
       description: '',
       vso_number: '',
     });
@@ -537,6 +557,26 @@ export default function NewTicket() {
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
+
+            <div className="space-y-2">
+              <Label htmlFor="subject">
+                Request title <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="subject"
+                placeholder="e.g. Urgent invoice correction for customer delivery"
+                {...form.register('subject')}
+                className={form.formState.errors.subject ? 'border-destructive' : ''}
+              />
+              {form.formState.errors.subject && (
+                <p className="text-destructive text-xs">
+                  {form.formState.errors.subject.message}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Use a short, action-oriented title so the queue is easy to scan.
+              </p>
+            </div>
 
             {/* Classification: category + priority */}
             <div className="space-y-3">
@@ -704,6 +744,48 @@ export default function NewTicket() {
                 />
               </div>
             )}
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="requested_due_date">Needed by</Label>
+                <Input
+                  id="requested_due_date"
+                  type="date"
+                  {...form.register('requested_due_date')}
+                />
+                <p className="text-xs text-muted-foreground">Optional target date for planning.</p>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="desired_outcome">Desired outcome</Label>
+                <Input
+                  id="desired_outcome"
+                  placeholder="What should be true when this request is done?"
+                  {...form.register('desired_outcome')}
+                  className={form.formState.errors.desired_outcome ? 'border-destructive' : ''}
+                />
+                {form.formState.errors.desired_outcome && (
+                  <p className="text-destructive text-xs">
+                    {form.formState.errors.desired_outcome.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="business_impact">Business impact</Label>
+              <Textarea
+                id="business_impact"
+                placeholder="Describe who is affected, the branch/customer involved, and what is blocked."
+                rows={3}
+                {...form.register('business_impact')}
+                className={form.formState.errors.business_impact ? 'border-destructive' : ''}
+              />
+              {form.formState.errors.business_impact && (
+                <p className="text-destructive text-xs">
+                  {form.formState.errors.business_impact.message}
+                </p>
+              )}
+            </div>
 
             {/* Description + contextual tips */}
             <div className="space-y-2">

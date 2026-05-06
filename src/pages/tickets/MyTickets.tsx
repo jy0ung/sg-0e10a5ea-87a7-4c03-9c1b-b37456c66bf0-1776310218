@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { AlertCircle, Loader2, RefreshCcw, Ticket } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Loader2, RefreshCcw, Ticket } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,14 @@ const priorityVariant: Record<RequestTicketRecord['priority'], 'default' | 'seco
 
 function formatTicketLabel(value: string) {
   return value.replace(/_/g, ' ');
+}
+
+function formatDueDate(value: string) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString('en-MY', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 export default function MyTickets() {
@@ -158,6 +166,12 @@ export default function MyTickets() {
                   <span>
                     {ticket.assigned_to_name ? `Assigned to ${ticket.assigned_to_name}` : 'Awaiting assignment'}
                   </span>
+                  {ticket.requested_due_date && (
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      Needed by {formatDueDate(ticket.requested_due_date)}
+                    </span>
+                  )}
                   {ticket.assigned_at && (
                     <span>Assigned {formatDistanceToNow(new Date(ticket.assigned_at), { addSuffix: true })}</span>
                   )}
@@ -167,6 +181,28 @@ export default function MyTickets() {
                 </div>
 
                 <p className="text-sm text-foreground leading-6">{ticket.description}</p>
+
+                {(ticket.desired_outcome || ticket.business_impact) && (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {ticket.desired_outcome && (
+                      <div className="rounded-lg border border-border px-4 py-3">
+                        <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Desired outcome
+                        </p>
+                        <p className="mt-2 text-sm text-foreground leading-6">{ticket.desired_outcome}</p>
+                      </div>
+                    )}
+                    {ticket.business_impact && (
+                      <div className="rounded-lg border border-border px-4 py-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Business impact
+                        </p>
+                        <p className="mt-2 text-sm text-foreground leading-6">{ticket.business_impact}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {ticket.resolution_note && (
                   <div className="rounded-lg border border-border bg-secondary/30 px-4 py-3">

@@ -29,6 +29,9 @@ export interface TicketRecord {
   priority: TicketPriority;
   status: TicketStatus;
   description: string;
+  requested_due_date: string | null;
+  business_impact: string | null;
+  desired_outcome: string | null;
   vso_number: string | null;
   submitted_by: string;
   assigned_to: string | null;
@@ -55,6 +58,9 @@ export interface CreateTicketInput {
   subcategory?: string | null;
   priority: TicketPriority;
   description: string;
+  requested_due_date?: string | null;
+  business_impact?: string | null;
+  desired_outcome?: string | null;
   vso_number?: string | null;
 }
 
@@ -111,6 +117,38 @@ interface TicketActivityInsert {
   metadata: Record<string, unknown>;
 }
 
+const LEGACY_TICKET_SELECT =
+  'id, subject, category, subcategory, priority, status, description, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
+
+const TICKET_SELECT =
+  'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
+
+const operationalTicketFields = ['requested_due_date', 'business_impact', 'desired_outcome'];
+
+function isMissingOperationalTicketFieldError(error: unknown) {
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as { message?: unknown }).message ?? '')
+      : String(error ?? '');
+
+  return operationalTicketFields.some((field) => message.includes(field));
+}
+
+function appendOperationalContextToDescription(
+  description: string,
+  input: Pick<CreateTicketInput, 'requested_due_date' | 'business_impact' | 'desired_outcome'>,
+) {
+  const details = [
+    input.requested_due_date?.trim() ? `Needed by: ${input.requested_due_date.trim()}` : '',
+    input.desired_outcome?.trim() ? `Desired outcome: ${input.desired_outcome.trim()}` : '',
+    input.business_impact?.trim() ? `Business impact: ${input.business_impact.trim()}` : '',
+  ].filter(Boolean);
+
+  if (details.length === 0) return description;
+  return `${description.trim()}\n\nOperational context:\n${details.join('\n')}`;
+}
+
 function mapTicket(row: TicketRow): TicketRecord {
   return {
     id: row.id,
@@ -121,6 +159,9 @@ function mapTicket(row: TicketRow): TicketRecord {
     priority: row.priority,
     status: row.status,
     description: row.description,
+    requested_due_date: row.requested_due_date ?? null,
+    business_impact: row.business_impact ?? null,
+    desired_outcome: row.desired_outcome ?? null,
     vso_number: row.vso_number ?? null,
     submitted_by: row.submitted_by,
     assigned_to: row.assigned_to,
@@ -272,13 +313,21 @@ function buildTicketNotifications(
 
 export async function listMyTickets(userId: string, companyId: string): Promise<TicketServiceResult<RequestTicketRecord[]>> {
   try {
-    const { data, error } = await ticketsTable()
-      .select(
-        'id, subject, category, subcategory, priority, status, description, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
-      )
+    let { data, error } = await ticketsTable()
+      .select(TICKET_SELECT)
       .eq('submitted_by', userId)
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
+
+    if (error && isMissingOperationalTicketFieldError(error)) {
+      const legacyResult = await ticketsTable()
+        .select(LEGACY_TICKET_SELECT)
+        .eq('submitted_by', userId)
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+      data = legacyResult.data;
+      error = legacyResult.error;
+    }
 
     if (error) throw error;
 
@@ -298,12 +347,19 @@ export async function listMyTickets(userId: string, companyId: string): Promise<
 
 export async function listCompanyTickets(companyId: string): Promise<TicketServiceResult<CompanyTicketRecord[]>> {
   try {
-    const { data, error } = await ticketsTable()
-      .select(
-        'id, subject, category, subcategory, priority, status, description, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
-      )
+    let { data, error } = await ticketsTable()
+      .select(TICKET_SELECT)
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
+
+    if (error && isMissingOperationalTicketFieldError(error)) {
+      const legacyResult = await ticketsTable()
+        .select(LEGACY_TICKET_SELECT)
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+      data = legacyResult.data;
+      error = legacyResult.error;
+    }
 
     if (error) throw error;
 
@@ -388,20 +444,47 @@ export async function createTicket(
       submitterRole: context.submitterRole ?? null,
     });
 
-    const { data, error } = await ticketsTable()
-      .insert({
-        ...input,
-        subcategory: input.subcategory?.trim() ? input.subcategory.trim() : null,
-        vso_number: input.vso_number?.trim() ? input.vso_number.trim() : null,
-        company_id: context.companyId,
-        submitted_by: context.userId,
-        status: 'open',
-        assigned_to: autoAssignTo,
-        assigned_at: autoAssignTo ? new Date().toISOString() : null,
-        resolution_note: null,
-      })
+    const insertPayload = {
+      subject: input.subject.trim(),
+      category: input.category,
+      subcategory: input.subcategory?.trim() ? input.subcategory.trim() : null,
+      priority: input.priority,
+      description: input.description,
+      requested_due_date: input.requested_due_date?.trim() ? input.requested_due_date.trim() : null,
+      business_impact: input.business_impact?.trim() ? input.business_impact.trim() : null,
+      desired_outcome: input.desired_outcome?.trim() ? input.desired_outcome.trim() : null,
+      vso_number: input.vso_number?.trim() ? input.vso_number.trim() : null,
+      company_id: context.companyId,
+      submitted_by: context.userId,
+      status: 'open',
+      assigned_to: autoAssignTo,
+      assigned_at: autoAssignTo ? new Date().toISOString() : null,
+      resolution_note: null,
+    };
+
+    let { data, error } = await ticketsTable()
+      .insert(insertPayload)
       .select('id')
       .single();
+
+    if (error && isMissingOperationalTicketFieldError(error)) {
+      const {
+        requested_due_date: _requestedDueDate,
+        business_impact: _businessImpact,
+        desired_outcome: _desiredOutcome,
+        ...legacyPayload
+      } = insertPayload;
+      const legacyResult = await ticketsTable()
+        .insert({
+          ...legacyPayload,
+          description: appendOperationalContextToDescription(input.description, input),
+        })
+        .select('id')
+        .single();
+      data = legacyResult.data;
+      error = legacyResult.error;
+    }
+
     if (error) throw error;
 
     const ticketId = (data as { id: string }).id;
@@ -448,13 +531,22 @@ export async function updateTicket(
   }
 
   try {
-    const { data: currentData, error: currentError } = await ticketsTable()
-      .select(
-        'id, subject, category, subcategory, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
-      )
+    let { data: currentData, error: currentError } = await ticketsTable()
+      .select(TICKET_SELECT)
       .eq('company_id', context.companyId)
       .eq('id', ticketId)
       .single();
+
+    const useLegacyTicketSelect = Boolean(currentError && isMissingOperationalTicketFieldError(currentError));
+    if (useLegacyTicketSelect) {
+      const legacyResult = await ticketsTable()
+        .select(LEGACY_TICKET_SELECT)
+        .eq('company_id', context.companyId)
+        .eq('id', ticketId)
+        .single();
+      currentData = legacyResult.data;
+      currentError = legacyResult.error;
+    }
 
     if (currentError) throw currentError;
 
@@ -480,9 +572,7 @@ export async function updateTicket(
       .update(patch)
       .eq('company_id', context.companyId)
       .eq('id', ticketId)
-      .select(
-        'id, subject, category, subcategory, priority, status, description, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note',
-      )
+      .select(useLegacyTicketSelect ? LEGACY_TICKET_SELECT : TICKET_SELECT)
       .single();
 
     if (error) throw error;
