@@ -9,8 +9,11 @@ name: Provision Supabase Environment
 #   • Sets SITE_URL / APP_URL edge-function secrets
 #
 # Triggers:
-#   • push to main  → auto-apply against the "staging" environment
 #   • workflow_dispatch → manual target selection (staging|production)
+#
+# This repo's live production environment currently uses a host-local Supabase
+# stack on the deployment server. Keep this workflow manual so the optional
+# linked-project provisioning path does not fail on ordinary app pushes.
 #
 # GitHub Environments are used as the approval gate: "production" should be
 # configured with required reviewers + wait timer in repo settings so a human
@@ -27,13 +30,6 @@ name: Provision Supabase Environment
 #   COMPANY_NAME
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'supabase/migrations/**'
-      - 'scripts/bootstrap-admin.ts'
-      - 'scripts/provision-supabase-env.sh'
-      - '.github/workflows/provision-supabase.yml'
   workflow_dispatch:
     inputs:
       environment:
