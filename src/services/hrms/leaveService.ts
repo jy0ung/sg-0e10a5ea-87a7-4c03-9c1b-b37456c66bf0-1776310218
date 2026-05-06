@@ -61,7 +61,7 @@ export async function listLeaveRequests(
 ): Promise<{ data: LeaveRequest[]; error: string | null }> {
   let q = supabase
     .from('leave_requests')
-    .select('*, employee:profiles!leave_requests_employee_id_fkey(name), leave_types(name)')
+    .select('*, employee:employees!leave_requests_employee_id_fkey(name), leave_types(name)')
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
   if (opts?.employeeId) q = q.eq('employee_id', opts.employeeId);

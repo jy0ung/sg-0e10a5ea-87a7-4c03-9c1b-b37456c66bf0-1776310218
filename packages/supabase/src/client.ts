@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
+import { createSharedAuthStorage } from './authStorage';
 
 /**
  * Shared Supabase browser client.
@@ -45,6 +46,7 @@ export const supabase = createClient<Database>(
       // Namespaced storage key so multiple FLC apps on the same origin
       // (admin, mobile, customer portal) don't clobber each other's session.
       storageKey: 'flc.auth.session',
+      storage: createSharedAuthStorage(),
     },
     global: {
       headers: {

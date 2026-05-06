@@ -26,19 +26,35 @@ export async function getBranches(companyId: string): Promise<{ data: BranchReco
   return { data: (data ?? []).map(r => mapBranch(r as Record<string, unknown>)), error: null };
 }
 
+function isMissingBranchSeriesColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const message = error.message ?? '';
+  return error.code === 'PGRST204'
+    && (message.includes("'or_series'") || message.includes("'vdo_series'"));
+}
+
 export async function upsertBranch(companyId: string, fields: Omit<BranchRecord, 'id' | 'companyId' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<{ error: Error | null }> {
-  const row = {
+  const baseRow = {
     company_id: companyId,
     code: fields.code,
     name: fields.name,
-    or_series: fields.orSeries ?? null,
-    vdo_series: fields.vdoSeries ?? null,
     updated_at: new Date().toISOString(),
   };
-  const q = fields.id
-    ? supabase.from('branches').update(row).eq('company_id', companyId).eq('id', fields.id)
-    : supabase.from('branches').insert({ ...row, id: crypto.randomUUID() });
-  const { error } = await q;
+  const row = {
+    ...baseRow,
+    or_series: fields.orSeries ?? null,
+    vdo_series: fields.vdoSeries ?? null,
+  };
+  const insertId = fields.id ?? crypto.randomUUID();
+  const runMutation = (payload: typeof baseRow | typeof row) => fields.id
+    ? supabase.from('branches').update(payload).eq('company_id', companyId).eq('id', fields.id)
+    : supabase.from('branches').insert({ ...payload, id: insertId });
+
+  let { error } = await runMutation(row);
+  if (isMissingBranchSeriesColumn(error)) {
+    const retry = await runMutation(baseRow);
+    error = retry.error;
+  }
   return { error: error ? new Error(error.message) : null };
 }
 

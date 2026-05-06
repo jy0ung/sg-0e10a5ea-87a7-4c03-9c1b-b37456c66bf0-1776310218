@@ -22,7 +22,7 @@ function getBasePath() {
 }
 
 // Dynamic URL Helper
-const getURL = () => {
+const getConfiguredURL = () => {
   let url = import.meta.env.VITE_APP_URL ??
            import.meta.env.VITE_VERCEL_URL ??
            import.meta.env.NEXT_PUBLIC_VERCEL_URL ??
@@ -42,6 +42,18 @@ const getURL = () => {
   url = url.endsWith('/') ? url : `${url}/`
   
   return url
+}
+
+function getCurrentOrigin() {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+
+  return new URL(getConfiguredURL()).origin;
+}
+
+export function getResetPasswordRedirectUrl() {
+  return new URL(`${getBasePath()}${RESET_PASSWORD_PATH}`, `${getCurrentOrigin()}/`).toString();
 }
 
 export const authService = {
@@ -121,7 +133,7 @@ export const authService = {
   async resetPassword(email: string): Promise<{ error: AuthError | null }> {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${getURL()}${getBasePath()}${RESET_PASSWORD_PATH}`,
+        redirectTo: getResetPasswordRedirectUrl(),
       });
 
       if (error) {

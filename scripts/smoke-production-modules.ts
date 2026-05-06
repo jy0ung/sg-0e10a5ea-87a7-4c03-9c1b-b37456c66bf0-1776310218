@@ -250,11 +250,15 @@ async function checkHrmsModuleRedirect(page: Page): Promise<RouteResult> {
     await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => undefined);
     await page.getByRole('button', { name: /HRMS/i }).click({ timeout: 12_000 });
     await page.waitForURL((url) => url.origin === hrmsUrl.origin, { timeout: routeTimeoutMs });
+    await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => undefined);
     finalUrl = page.url();
 
     const currentUrl = new URL(finalUrl);
     if (currentUrl.origin !== hrmsUrl.origin) {
       addUniqueIssue(issues, { type: 'redirect', detail: `expected ${hrmsUrl.origin}, got ${currentUrl.origin}` });
+    }
+    if (isAuthBlockedUrl(currentUrl)) {
+      addUniqueIssue(issues, { type: 'auth', detail: `HRMS launch landed on ${currentUrl.pathname}` });
     }
   } catch (error) {
     addUniqueIssue(issues, { type: 'exception', detail: error instanceof Error ? error.message : String(error) });

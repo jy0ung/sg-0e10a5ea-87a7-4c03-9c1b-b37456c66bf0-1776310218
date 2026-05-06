@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { listProfiles, updateProfile, inviteUser, listCompanyOptions, setPortalAccess, type ProfileRow, type CompanyOption } from '@/services/profileService';
-import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle, UserCheck } from 'lucide-react';
+import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle, UserCheck, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,6 +19,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { listEmployeeDirectory } from '@/services/hrmsService';
+import { authService } from '@/services/authService';
 
 const ROLES: { value: AppRole; label: string }[] = [
   { value: 'super_admin', label: 'Super Admin' },
@@ -60,6 +61,7 @@ export default function UserManagement() {
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [activating, setActivating] = useState<string>('');
   const [grantingAccess, setGrantingAccess] = useState<string>('');
+  const [resettingPassword, setResettingPassword] = useState<string>('');
   const [employeesByCompany, setEmployeesByCompany] = useState<Record<string, Employee[]>>({});
   const [pendingSelections, setPendingSelections] = useState<
     Record<string, { role: AppRole; company_id: string; employee_id: string | null }>
@@ -318,6 +320,17 @@ export default function UserManagement() {
     if (!refreshed.error) setProfiles(refreshed.data);
   };
 
+  const handleSendPasswordReset = async (p: ProfileRow) => {
+    setResettingPassword(p.id);
+    const { error } = await authService.resetPassword(p.email);
+    setResettingPassword('');
+    if (error) {
+      toast.error('Failed to send password reset: ' + error.message);
+      return;
+    }
+    toast.success(`Password reset email sent to ${p.email}`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -472,6 +485,18 @@ export default function UserManagement() {
                 {canManage && (
                   <td className="px-4 py-3 flex items-center gap-2">
                     <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>Edit</Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSendPasswordReset(p)}
+                      disabled={resettingPassword === p.id}
+                    >
+                      {resettingPassword === p.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                        : <KeyRound className="h-3.5 w-3.5 mr-1" />
+                      }
+                      Reset Password
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => openPermissions(p)}>
                       <Settings className="h-3.5 w-3.5 mr-1" />Permissions
                     </Button>
