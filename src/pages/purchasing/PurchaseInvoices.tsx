@@ -161,11 +161,11 @@ export default function PurchaseInvoices() {
         </div>
         <div className="glass-panel p-4">
           <p className="text-xs text-muted-foreground mb-1">Pending Receipt</p>
-          <p className="text-2xl font-bold text-warning">{invoices.filter(i => i.status === 'pending').length}</p>
+          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{invoices.filter(i => i.status === 'pending').length}</p>
         </div>
         <div className="glass-panel p-4">
           <p className="text-xs text-muted-foreground mb-1">Pending Amount</p>
-          <p className="text-2xl font-bold text-warning">{fmt(pendingAmount)}</p>
+          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{fmt(pendingAmount)}</p>
         </div>
       </div>
 
