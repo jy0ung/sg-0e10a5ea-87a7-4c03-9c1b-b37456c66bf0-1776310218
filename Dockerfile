@@ -9,7 +9,8 @@
 # Build args:
 #   BUILD_WORKSPACE, BUILD_OUTPUT_DIR — optional single workspace build target
 #   and dist directory. Defaults keep the root app behavior.
-#   BUILD_HRMS_WEB — when true, build the root app at `/` and HRMS web at `/hrms/`.
+#   BUILD_HRMS_WEB — when true, build the root app at `/`, HRMS web at `/hrms/`,
+#   and a root-mounted HRMS web bundle for hrms.protonfookloi.com.
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_APP_ENV, VITE_SENTRY_DSN,
 #   VITE_APP_URL, VITE_HRMS_APP_URL, VITE_APP_VERSION — inlined into the client bundle. Only public values.
 # ============================================================================
@@ -69,7 +70,10 @@ RUN if [ -n "$BUILD_WORKSPACE" ]; then npm run build --workspace "$BUILD_WORKSPA
         && if [ "$BUILD_HRMS_WEB" = "true" ]; then \
             VITE_BASE_PATH=/hrms/ npm run build --workspace apps/hrms-web \
             && mkdir -p /app/.deploy-dist/hrms \
-            && cp -a apps/hrms-web/dist/. /app/.deploy-dist/hrms/; \
+            && cp -a apps/hrms-web/dist/. /app/.deploy-dist/hrms/ \
+            && VITE_BASE_PATH=/ VITE_SUPABASE_URL="${VITE_HRMS_APP_URL:-$VITE_SUPABASE_URL}" npm run build --workspace apps/hrms-web \
+            && mkdir -p /app/.deploy-dist/hrms-root \
+            && cp -a apps/hrms-web/dist/. /app/.deploy-dist/hrms-root/; \
         fi
 
 # ---------------------------------------------------------------------------
