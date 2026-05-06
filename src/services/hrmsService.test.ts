@@ -64,6 +64,9 @@ vi.mock('@/integrations/supabase/client', () => {
   return {
     supabase: {
       from: (table: string) => makeProxy(table),
+      functions: {
+        invoke: vi.fn().mockResolvedValue({ data: null, error: null }),
+      },
     },
   };
 });
@@ -1710,6 +1713,7 @@ describe('createEmployeeSchema', () => {
     const result = createEmployeeSchema.safeParse({
       staffCode: 'E001',
       name: 'Alice',
+      email: 'alice@company.com',
       role: 'sales',
       joinDate: '2024-01-01',
       ic: '900101-14-1234',
