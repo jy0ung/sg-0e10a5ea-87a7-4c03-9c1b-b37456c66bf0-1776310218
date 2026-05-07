@@ -82,6 +82,21 @@ Self-service sign-up is disabled in the app. If you do not have a local auth use
 
 Use the app's **Forgot Password** link only after the auth user already exists. If email delivery is enabled for your local stack, open Mailpit at `http://127.0.0.1:54324` to retrieve invite or password reset emails.
 
+If you want those emails to reach real recipients instead of the local inbox, put your Resend API key in the repo root `.env` file as `RESEND_API_KEY=...`, then enable a custom SMTP block in [supabase/config.toml](supabase/config.toml) and restart `supabase start` after editing it. A Resend example is:
+
+```toml
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "no-reply@yourdomain.com"
+sender_name = "Your App Name"
+```
+
+Keep `auth.email.enable_signup = true` so email login, invites, and password recovery continue to work.
+
 ## Ubuntu Test Server
 
 To turn a fresh Ubuntu host into the LAN test server, run the bootstrap script from the repo root and pass the server IP or hostname:

@@ -2,33 +2,38 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { HeadphonesIcon, TicketCheck, ClipboardList, ArrowRight } from 'lucide-react';
+import { TicketCheck, ClipboardList, ArrowRight } from 'lucide-react';
+import { brandAssets, brandName } from '@/config/brand';
+import { getDedicatedHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
 
 export default function LandingPage() {
+  const hrmsLoginUrl = getDedicatedHrmsWorkspacePath('/hrms/login');
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-base">F</span>
-            </div>
-            <span className="text-lg font-bold text-foreground">Fook Loi Group UBS</span>
+          <div className="flex min-w-0 items-center gap-3">
+            <img src={brandAssets.compactLogo} alt="Fook Loi Group" className="h-10 w-10 shrink-0 rounded-md object-contain" />
+            <span className="truncate text-lg font-bold text-foreground">{brandName}</span>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/login">Staff Sign In</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/login">UBS</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a href={hrmsLoginUrl}>HRMS</a>
+            </Button>
+          </div>
         </div>
       </header>
 
       {/* Hero */}
       <section className="flex-1 flex flex-col items-center justify-center px-6 py-20 text-center">
-        <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-          <HeadphonesIcon className="h-8 w-8 text-primary" />
-        </div>
+        <img src={brandAssets.fullLogo} alt="Fook Loi Group" className="mb-8 h-auto max-h-28 w-full max-w-xl object-contain" />
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-          Welcome to Fook Loi Group UBS
+          Welcome to {brandName}
         </h1>
         <p className="mt-4 max-w-xl text-lg text-muted-foreground">
           Your unified business system for vehicle sales, inventory, and operations.
@@ -80,7 +85,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-6 text-center text-sm text-muted-foreground">
-        &copy; {new Date().getFullYear()} Fook Loi Group UBS. All rights reserved.
+        &copy; {new Date().getFullYear()} {brandName}. All rights reserved.
       </footer>
     </div>
   );

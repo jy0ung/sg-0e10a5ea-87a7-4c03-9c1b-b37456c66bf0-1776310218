@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
@@ -7,16 +7,20 @@ import { VitePWA } from "vite-plugin-pwa";
 const buildSourceMaps = process.env.BUILD_SOURCEMAP === "true";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const viteEnv = loadEnv(mode, process.cwd(), ["VITE_"]);
+  const shouldProxySupabase = Boolean(
+    process.env.CODESPACES || viteEnv.VITE_SUPABASE_URL?.startsWith('/'),
+  );
+
+  return {
   server: {
     host: "::",
     port: 3000,
     hmr: {
       overlay: false,
     },
-    // In GitHub Codespaces, proxy Supabase traffic through the Vite dev server so
-    // only port 3000 needs to be publicly forwarded (port 54321 stays internal).
-    proxy: process.env.CODESPACES
+    proxy: shouldProxySupabase
       ? {
           '/__supabase': {
             target: 'http://127.0.0.1:54321',
@@ -32,7 +36,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "robots.txt", "offline.html", "icons/pwa-192.png", "icons/pwa-512.png"],
+      includeAssets: ["favicon.ico", "robots.txt", "offline.html", "icons/logo.png", "icons/Fook Loi Corp (Sabah) Sdn. Bhd. Logo.png", "icons/Fook Loi Logo_with white bg.png"],
       manifest: {
         name: "FLC BI App",
         short_name: "FLC",
@@ -44,9 +48,8 @@ export default defineConfig(({ mode }) => ({
         scope: "/",
         start_url: "/",
         icons: [
-          { src: "/icons/pwa-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icons/pwa-512.png", sizes: "512x512", type: "image/png" },
-          { src: "/icons/pwa-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "/icons/logo.png", sizes: "3000x3000", type: "image/png" },
+          { src: "/icons/logo.png", sizes: "3000x3000", type: "image/png", purpose: "maskable" },
         ],
       },
       workbox: {
@@ -124,4 +127,5 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-}));
+  };
+});

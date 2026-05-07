@@ -9,6 +9,7 @@ import { Loader2, CheckCircle } from 'lucide-react';
 import { resetPasswordSchema, type ResetPasswordFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { brandAssets, brandName } from '@/config/brand';
 
 const invalidResetLinkMessage = 'Invalid or expired reset link. Request a new password reset email and try again.';
 
@@ -187,10 +188,8 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-md p-8 glass-panel gold-glow animate-fade-in">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-2">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">F</span>
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">Fook Loi Group UBS</h1>
+            <img src={brandAssets.compactLogo} alt="Fook Loi Group" className="h-11 w-11 rounded-md object-contain" />
+            <h1 className="text-2xl font-bold text-foreground">{brandName}</h1>
           </div>
           <p className="text-muted-foreground text-sm">Set your new password</p>
         </div>

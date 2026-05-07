@@ -32,6 +32,7 @@ import { useRoutingRules } from '@/hooks/useRoutingRules';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useRequestTemplates } from '@/hooks/useRequestTemplates';
+import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import {
   createRequestCategory,
   moveRequestCategory,
@@ -60,6 +61,14 @@ import {
   updateRoutingRule,
   type RequestRoutingRule,
 } from '@/services/requestRoutingService';
+import {
+  createRequestFormField,
+  deleteRequestFormField,
+  updateRequestFormField,
+  type RequestFieldDataSource,
+  type RequestFormFieldRecord,
+  type RequestFormFieldType,
+} from '@/services/requestFormFieldService';
 
 interface CategoryDraft {
   label: string;
@@ -126,6 +135,27 @@ interface RoutingRuleDraft {
   assign_to_user_id: string;
 }
 
+interface FormFieldDraft {
+  label: string;
+  field_type: RequestFormFieldType;
+  data_source: RequestFieldDataSource | null;
+  placeholder: string;
+  help_text: string;
+  is_required: boolean;
+  is_active: boolean;
+}
+
+function hasFormFieldChanges(field: RequestFormFieldRecord, draft: FormFieldDraft | undefined) {
+  if (!draft) return false;
+  return draft.label !== field.label
+    || draft.field_type !== field.field_type
+    || draft.data_source !== field.data_source
+    || draft.placeholder !== field.placeholder
+    || draft.help_text !== field.help_text
+    || draft.is_required !== field.is_required
+    || draft.is_active !== field.is_active;
+}
+
 function hasRuleChanges(rule: RequestRoutingRule, draft: RoutingRuleDraft | undefined) {
   if (!draft) return false;
   return (
@@ -143,6 +173,31 @@ const PRIORITY_OPTIONS: { value: TemplatePriority; label: string }[] = [
   { value: 'medium', label: 'Medium' },
   { value: 'high', label: 'High' },
 ];
+
+const ANY_SELECT_VALUE = '__any__';
+const NONE_SELECT_VALUE = '__none__';
+
+const FIELD_TYPE_OPTIONS: { value: RequestFormFieldType; label: string }[] = [
+  { value: 'text', label: 'Short text' },
+  { value: 'textarea', label: 'Long text' },
+  { value: 'number', label: 'Number' },
+  { value: 'date', label: 'Date' },
+  { value: 'database_select', label: 'Database dropdown' },
+];
+
+const DATA_SOURCE_OPTIONS: { value: RequestFieldDataSource; label: string }[] = [
+  { value: 'branches', label: 'Branches' },
+  { value: 'employees', label: 'Employees' },
+  { value: 'vehicles', label: 'Vehicles' },
+];
+
+function selectValue(value: string | null | undefined) {
+  return value || ANY_SELECT_VALUE;
+}
+
+function optionalSelectValue(value: string) {
+  return value === ANY_SELECT_VALUE || value === NONE_SELECT_VALUE ? '' : value;
+}
 
 export default function RequestSetup() {
   const { user } = useAuth();
@@ -207,6 +262,23 @@ export default function RequestSetup() {
   const [templateDrafts, setTemplateDrafts] = useState<Record<string, TemplateDraft>>({});
   const [busyTemplateId, setBusyTemplateId] = useState<string | null>(null);
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── Form builder state ───────────────────────────────────────────────────
+  const { fields: formFields, loading: formFieldsLoading, error: formFieldsError, reload: reloadFormFields } =
+    useRequestFormFields(user?.company_id, { includeInactive: true });
+  const [isAddingField, setIsAddingField] = useState(false);
+  const [fieldCreateCategoryKey, setFieldCreateCategoryKey] = useState('');
+  const [fieldCreateLabel, setFieldCreateLabel] = useState('');
+  const [fieldCreateType, setFieldCreateType] = useState<RequestFormFieldType>('text');
+  const [fieldCreateSource, setFieldCreateSource] = useState<RequestFieldDataSource>('branches');
+  const [fieldCreatePlaceholder, setFieldCreatePlaceholder] = useState('');
+  const [fieldCreateHelpText, setFieldCreateHelpText] = useState('');
+  const [fieldCreateRequired, setFieldCreateRequired] = useState(false);
+  const [creatingField, setCreatingField] = useState(false);
+  const [busyFieldId, setBusyFieldId] = useState<string | null>(null);
+  const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
+  const [fieldDrafts, setFieldDrafts] = useState<Record<string, FormFieldDraft>>({});
   // ─────────────────────────────────────────────────────────────────────────
 
   // ── Routing rules state ───────────────────────────────────────────────────
@@ -280,6 +352,25 @@ export default function RequestSetup() {
     );
   }, [templates]);
 
+  useEffect(() => {
+    setFieldDrafts(
+      Object.fromEntries(
+        formFields.map((field) => [
+          field.id,
+          {
+            label: field.label,
+            field_type: field.field_type,
+            data_source: field.data_source,
+            placeholder: field.placeholder,
+            help_text: field.help_text,
+            is_required: field.is_required,
+            is_active: field.is_active,
+          },
+        ]),
+      ),
+    );
+  }, [formFields]);
+
   const activeCategoryCount = useMemo(
     () => categories.filter((category) => category.is_active).length,
     [categories],
@@ -297,6 +388,20 @@ export default function RequestSetup() {
   const activeTemplateCount = useMemo(
     () => templates.filter((t) => t.is_active).length,
     [templates],
+  );
+
+  const activeFormFieldCount = useMemo(
+    () => formFields.filter((field) => field.is_active).length,
+    [formFields],
+  );
+
+  const formFieldsByCategory = useMemo(
+    () => formFields.reduce<Record<string, RequestFormFieldRecord[]>>((grouped, field) => {
+      grouped[field.category_key] ??= [];
+      grouped[field.category_key].push(field);
+      return grouped;
+    }, {}),
+    [formFields],
   );
 
   const activeRoutingRuleCount = useMemo(
@@ -650,6 +755,106 @@ export default function RequestSetup() {
     setBusyTemplateId(null);
   };
 
+  // ── Form builder handlers ────────────────────────────────────────────────
+
+  const resetFieldCreateForm = () => {
+    setFieldCreateCategoryKey('');
+    setFieldCreateLabel('');
+    setFieldCreateType('text');
+    setFieldCreateSource('branches');
+    setFieldCreatePlaceholder('');
+    setFieldCreateHelpText('');
+    setFieldCreateRequired(false);
+  };
+
+  const updateFieldDraft = (field: RequestFormFieldRecord, patch: Partial<FormFieldDraft>) => {
+    setFieldDrafts((current) => ({
+      ...current,
+      [field.id]: {
+        label: field.label,
+        field_type: field.field_type,
+        data_source: field.data_source,
+        placeholder: field.placeholder,
+        help_text: field.help_text,
+        is_required: field.is_required,
+        is_active: field.is_active,
+        ...current[field.id],
+        ...patch,
+      },
+    }));
+  };
+
+  const handleCreateField = async () => {
+    if (!user || !fieldCreateCategoryKey || !fieldCreateLabel.trim()) return;
+    setCreatingField(true);
+    const result = await createRequestFormField(
+      {
+        category_key: fieldCreateCategoryKey,
+        label: fieldCreateLabel,
+        field_type: fieldCreateType,
+        data_source: fieldCreateType === 'database_select' ? fieldCreateSource : null,
+        placeholder: fieldCreatePlaceholder,
+        help_text: fieldCreateHelpText,
+        is_required: fieldCreateRequired,
+      },
+      { actorId: user.id, companyId: user.company_id },
+    );
+    if (result.error) {
+      toast.error('Unable to create form field', { description: result.error });
+    } else {
+      toast.success('Form field created');
+      setIsAddingField(false);
+      resetFieldCreateForm();
+      await reloadFormFields();
+    }
+    setCreatingField(false);
+  };
+
+  const handleSaveField = async (field: RequestFormFieldRecord) => {
+    if (!user) return;
+    const draft = fieldDrafts[field.id];
+    if (!draft || !hasFormFieldChanges(field, draft)) return;
+    setBusyFieldId(field.id);
+    const result = await updateRequestFormField(
+      field.id,
+      {
+        label: draft.label,
+        field_type: draft.field_type,
+        data_source: draft.field_type === 'database_select' ? draft.data_source ?? 'branches' : null,
+        placeholder: draft.placeholder,
+        help_text: draft.help_text,
+        is_required: draft.is_required,
+        is_active: draft.is_active,
+      },
+      { actorId: user.id, companyId: user.company_id },
+    );
+    if (result.error) {
+      toast.error('Unable to save form field', { description: result.error });
+    } else {
+      toast.success('Form field saved');
+      setExpandedFieldId(null);
+      await reloadFormFields();
+    }
+    setBusyFieldId(null);
+  };
+
+  const handleDeleteField = async (field: RequestFormFieldRecord) => {
+    if (!user) return;
+    setBusyFieldId(field.id);
+    const result = await deleteRequestFormField(field.id, {
+      actorId: user.id,
+      companyId: user.company_id,
+    });
+    if (result.error) {
+      toast.error('Unable to delete form field', { description: result.error });
+    } else {
+      toast.success('Form field deleted', { description: `"${field.label}" has been removed.` });
+      setExpandedFieldId(null);
+      await reloadFormFields();
+    }
+    setBusyFieldId(null);
+  };
+
   // ── Routing rule handlers ─────────────────────────────────────────────────
 
   const activeProfiles = profiles.filter((p) => p.status === 'active' && !p.portal_access_only);
@@ -785,7 +990,7 @@ export default function RequestSetup() {
             Shape the requester experience, routing logic, templates, and attachment controls from one workspace.
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[360px]">
+        <div className="grid grid-cols-4 gap-2 text-center sm:min-w-[460px]">
           <div className="rounded-lg border border-border bg-card px-3 py-2">
             <p className="text-lg font-semibold text-foreground">{activeCategoryCount}</p>
             <p className="text-[11px] text-muted-foreground">Categories</p>
@@ -793,6 +998,10 @@ export default function RequestSetup() {
           <div className="rounded-lg border border-border bg-card px-3 py-2">
             <p className="text-lg font-semibold text-foreground">{activeTemplateCount}</p>
             <p className="text-[11px] text-muted-foreground">Templates</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card px-3 py-2">
+            <p className="text-lg font-semibold text-foreground">{activeFormFieldCount}</p>
+            <p className="text-[11px] text-muted-foreground">Fields</p>
           </div>
           <div className="rounded-lg border border-border bg-card px-3 py-2">
             <p className="text-lg font-semibold text-foreground">{activeRoutingRuleCount}</p>
@@ -824,6 +1033,14 @@ export default function RequestSetup() {
                 {activeTemplateCount > 0 && (
                   <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
                     {activeTemplateCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="forms">
+                Form Builder
+                {activeFormFieldCount > 0 && (
+                  <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
+                    {activeFormFieldCount}
                   </Badge>
                 )}
               </TabsTrigger>
@@ -1204,15 +1421,15 @@ export default function RequestSetup() {
                   <div className="space-y-2">
                     <Label htmlFor="template-create-subcategory">Subcategory</Label>
                     <Select
-                      value={templateCreateSubcategoryKey}
-                      onValueChange={setTemplateCreateSubcategoryKey}
+                      value={templateCreateSubcategoryKey || NONE_SELECT_VALUE}
+                      onValueChange={(value) => setTemplateCreateSubcategoryKey(optionalSelectValue(value))}
                       disabled={creatingTemplate || !templateCreateCategoryKey || activeSubcategoriesForKey(templateCreateCategoryKey).length === 0}
                     >
                       <SelectTrigger id="template-create-subcategory">
                         <SelectValue placeholder="Optional" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value={NONE_SELECT_VALUE}>None</SelectItem>
                         {activeSubcategoriesForKey(templateCreateCategoryKey).map((s) => (
                           <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
                         ))}
@@ -1445,15 +1662,15 @@ export default function RequestSetup() {
                             <div className="space-y-2">
                               <Label htmlFor={`template-subcat-${template.id}`}>Subcategory</Label>
                               <Select
-                                value={draft.subcategory_key}
-                                onValueChange={(v) => updateTemplateDraft(template, { subcategory_key: v })}
+                                value={draft.subcategory_key || NONE_SELECT_VALUE}
+                                onValueChange={(value) => updateTemplateDraft(template, { subcategory_key: optionalSelectValue(value) })}
                                 disabled={isBusy || draftSubcategories.length === 0}
                               >
                                 <SelectTrigger id={`template-subcat-${template.id}`}>
                                   <SelectValue placeholder="None" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">None</SelectItem>
+                                  <SelectItem value={NONE_SELECT_VALUE}>None</SelectItem>
                                   {draftSubcategories.map((s) => (
                                     <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
                                   ))}
@@ -1532,6 +1749,306 @@ export default function RequestSetup() {
             )}
           </TabsContent>
 
+          {/* ── Form builder tab ──────────────────────────────────────────── */}
+          <TabsContent value="forms" className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Custom Request Fields</p>
+                <p className="text-sm text-muted-foreground">
+                  Add per-category fields requesters must complete before submission.
+                </p>
+              </div>
+              {!isAddingField && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsAddingField(true)} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Field
+                </Button>
+              )}
+            </div>
+
+            {isAddingField && (
+              <div className="rounded-xl border border-dashed border-border/70 bg-secondary/20 p-4 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-foreground">New custom field</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => { setIsAddingField(false); resetFieldCreateForm(); }}
+                    disabled={creatingField}
+                    aria-label="Cancel"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="field-create-category">Category <span className="text-destructive">*</span></Label>
+                    <Select value={fieldCreateCategoryKey} onValueChange={setFieldCreateCategoryKey} disabled={creatingField}>
+                      <SelectTrigger id="field-create-category"><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectContent>
+                        {categories.filter((category) => category.is_active).map((category) => (
+                          <SelectItem key={category.key} value={category.key}>{category.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="field-create-label">Label <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="field-create-label"
+                      placeholder="e.g. Vehicle"
+                      value={fieldCreateLabel}
+                      onChange={(event) => setFieldCreateLabel(event.target.value)}
+                      disabled={creatingField}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="field-create-type">Type</Label>
+                    <Select value={fieldCreateType} onValueChange={(value) => setFieldCreateType(value as RequestFormFieldType)} disabled={creatingField}>
+                      <SelectTrigger id="field-create-type"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {FIELD_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {fieldCreateType === 'database_select' && (
+                  <div className="space-y-2 max-w-xs">
+                    <Label htmlFor="field-create-source">Database source</Label>
+                    <Select value={fieldCreateSource} onValueChange={(value) => setFieldCreateSource(value as RequestFieldDataSource)} disabled={creatingField}>
+                      <SelectTrigger id="field-create-source"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {DATA_SOURCE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="field-create-placeholder">Placeholder</Label>
+                    <Input
+                      id="field-create-placeholder"
+                      value={fieldCreatePlaceholder}
+                      onChange={(event) => setFieldCreatePlaceholder(event.target.value)}
+                      disabled={creatingField}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="field-create-help">Help text</Label>
+                    <Input
+                      id="field-create-help"
+                      value={fieldCreateHelpText}
+                      onChange={(event) => setFieldCreateHelpText(event.target.value)}
+                      disabled={creatingField}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Required before submit</p>
+                    <p className="text-xs text-muted-foreground">Requesters cannot submit until this field has a value.</p>
+                  </div>
+                  <Switch checked={fieldCreateRequired} onCheckedChange={setFieldCreateRequired} disabled={creatingField} />
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={() => void handleCreateField()}
+                  disabled={creatingField || !fieldCreateCategoryKey || !fieldCreateLabel.trim()}
+                  className="gap-2"
+                >
+                  {creatingField ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  Add field
+                </Button>
+              </div>
+            )}
+
+            {formFieldsLoading ? (
+              <div className="flex items-center justify-center gap-3 rounded-xl border border-border py-12 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Loading form fields...</span>
+              </div>
+            ) : formFieldsError ? (
+              <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border py-12 text-center">
+                <AlertCircle className="h-8 w-8 text-destructive" />
+                <div className="space-y-1">
+                  <p className="font-medium text-foreground">Unable to load form fields</p>
+                  <p className="text-sm text-muted-foreground">{formFieldsError}</p>
+                </div>
+                <Button variant="outline" onClick={() => void reloadFormFields()}>Retry</Button>
+              </div>
+            ) : formFields.length === 0 ? (
+              !isAddingField ? (
+                <div className="flex items-center justify-center py-16">
+                  <Button type="button" onClick={() => setIsAddingField(true)} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add Field
+                  </Button>
+                </div>
+              ) : null
+            ) : (
+              <div className="space-y-5">
+                {categories.map((category) => {
+                  const categoryFields = formFieldsByCategory[category.key] ?? [];
+                  if (categoryFields.length === 0) return null;
+
+                  return (
+                    <div key={category.key} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">{category.label}</p>
+                        <Badge variant="outline">{categoryFields.length}</Badge>
+                      </div>
+                      {categoryFields.map((field) => {
+                        const draft = fieldDrafts[field.id];
+                        const isExpanded = expandedFieldId === field.id;
+                        const isBusy = busyFieldId === field.id;
+                        const isDirty = hasFormFieldChanges(field, draft);
+
+                        return (
+                          <div key={field.id} className="rounded-xl border border-border bg-background p-4 space-y-4">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-base font-semibold text-foreground">{field.label}</p>
+                                  <Badge variant={field.is_active ? 'secondary' : 'outline'}>
+                                    {field.is_active ? 'Active' : 'Archived'}
+                                  </Badge>
+                                  <Badge variant="outline">{FIELD_TYPE_OPTIONS.find((option) => option.value === field.field_type)?.label ?? field.field_type}</Badge>
+                                  {field.is_required && <Badge variant="outline">Required</Badge>}
+                                </div>
+                                {field.data_source && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Source: {DATA_SOURCE_OPTIONS.find((option) => option.value === field.data_source)?.label ?? field.data_source}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Button type="button" variant="outline" onClick={() => setExpandedFieldId(isExpanded ? null : field.id)} disabled={isBusy}>
+                                  {isExpanded ? 'Collapse' : 'Edit'}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  aria-label={`Delete ${field.label}`}
+                                  onClick={() => void handleDeleteField(field)}
+                                  disabled={isBusy}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                </Button>
+                              </div>
+                            </div>
+
+                            {isExpanded && draft && (
+                              <div className="space-y-4 rounded-xl border border-dashed border-border/70 bg-secondary/10 p-4">
+                                <div className="grid gap-4 md:grid-cols-3">
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`field-label-${field.id}`}>Label</Label>
+                                    <Input
+                                      id={`field-label-${field.id}`}
+                                      value={draft.label}
+                                      onChange={(event) => updateFieldDraft(field, { label: event.target.value })}
+                                      disabled={isBusy}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`field-type-${field.id}`}>Type</Label>
+                                    <Select
+                                      value={draft.field_type}
+                                      onValueChange={(value) => updateFieldDraft(field, { field_type: value as RequestFormFieldType })}
+                                      disabled={isBusy}
+                                    >
+                                      <SelectTrigger id={`field-type-${field.id}`}><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        {FIELD_TYPE_OPTIONS.map((option) => (
+                                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  {draft.field_type === 'database_select' && (
+                                    <div className="space-y-2">
+                                      <Label htmlFor={`field-source-${field.id}`}>Database source</Label>
+                                      <Select
+                                        value={draft.data_source ?? 'branches'}
+                                        onValueChange={(value) => updateFieldDraft(field, { data_source: value as RequestFieldDataSource })}
+                                        disabled={isBusy}
+                                      >
+                                        <SelectTrigger id={`field-source-${field.id}`}><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          {DATA_SOURCE_OPTIONS.map((option) => (
+                                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`field-placeholder-${field.id}`}>Placeholder</Label>
+                                    <Input
+                                      id={`field-placeholder-${field.id}`}
+                                      value={draft.placeholder}
+                                      onChange={(event) => updateFieldDraft(field, { placeholder: event.target.value })}
+                                      disabled={isBusy}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`field-help-${field.id}`}>Help text</Label>
+                                    <Input
+                                      id={`field-help-${field.id}`}
+                                      value={draft.help_text}
+                                      onChange={(event) => updateFieldDraft(field, { help_text: event.target.value })}
+                                      disabled={isBusy}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="grid gap-3 md:grid-cols-2">
+                                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+                                    <div>
+                                      <p className="text-sm font-medium text-foreground">Required</p>
+                                      <p className="text-xs text-muted-foreground">Block submission when empty.</p>
+                                    </div>
+                                    <Switch checked={draft.is_required} onCheckedChange={(checked) => updateFieldDraft(field, { is_required: checked })} disabled={isBusy} />
+                                  </div>
+                                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+                                    <div>
+                                      <p className="text-sm font-medium text-foreground">Available</p>
+                                      <p className="text-xs text-muted-foreground">Hide without deleting historical values.</p>
+                                    </div>
+                                    <Switch checked={draft.is_active} onCheckedChange={(checked) => updateFieldDraft(field, { is_active: checked })} disabled={isBusy} />
+                                  </div>
+                                </div>
+
+                                <Button type="button" onClick={() => void handleSaveField(field)} disabled={isBusy || !isDirty} className="gap-2">
+                                  {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                  Save changes
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+
           {/* ── Routing tab ──────────────────────────────────────────────── */}
           <TabsContent value="routing" className="space-y-6">
             {/* Create rule form */}
@@ -1566,15 +2083,15 @@ export default function RequestSetup() {
                   <div className="space-y-2">
                     <Label htmlFor="rule-create-category">Category condition</Label>
                     <Select
-                      value={ruleCreateCategory}
-                      onValueChange={(v) => { setRuleCreateCategory(v); setRuleCreateSubcategory(''); }}
+                      value={selectValue(ruleCreateCategory)}
+                      onValueChange={(value) => { setRuleCreateCategory(optionalSelectValue(value)); setRuleCreateSubcategory(''); }}
                       disabled={creatingRule}
                     >
                       <SelectTrigger id="rule-create-category">
                         <SelectValue placeholder="Any category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Any category</SelectItem>
+                        <SelectItem value={ANY_SELECT_VALUE}>Any category</SelectItem>
                         {categories.filter((c) => c.is_active).map((c) => (
                           <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
                         ))}
@@ -1584,15 +2101,15 @@ export default function RequestSetup() {
                   <div className="space-y-2">
                     <Label htmlFor="rule-create-subcategory">Subcategory condition</Label>
                     <Select
-                      value={ruleCreateSubcategory}
-                      onValueChange={setRuleCreateSubcategory}
+                      value={selectValue(ruleCreateSubcategory)}
+                      onValueChange={(value) => setRuleCreateSubcategory(optionalSelectValue(value))}
                       disabled={creatingRule || !ruleCreateCategory}
                     >
                       <SelectTrigger id="rule-create-subcategory">
                         <SelectValue placeholder="Any subcategory" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Any subcategory</SelectItem>
+                        <SelectItem value={ANY_SELECT_VALUE}>Any subcategory</SelectItem>
                         {activeSubcategoriesForKey(ruleCreateCategory).map((s) => (
                           <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
                         ))}
@@ -1605,15 +2122,15 @@ export default function RequestSetup() {
                   <div className="space-y-2">
                     <Label htmlFor="rule-create-role">Submitter role condition</Label>
                     <Select
-                      value={ruleCreateRole}
-                      onValueChange={setRuleCreateRole}
+                      value={selectValue(ruleCreateRole)}
+                      onValueChange={(value) => setRuleCreateRole(optionalSelectValue(value))}
                       disabled={creatingRule}
                     >
                       <SelectTrigger id="rule-create-role">
                         <SelectValue placeholder="Any role" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Any role</SelectItem>
+                        <SelectItem value={ANY_SELECT_VALUE}>Any role</SelectItem>
                         {(Object.entries(ROLE_LABELS) as [string, string][]).map(([key, label]) => (
                           <SelectItem key={key} value={key}>{label}</SelectItem>
                         ))}
@@ -1623,15 +2140,15 @@ export default function RequestSetup() {
                   <div className="space-y-2">
                     <Label htmlFor="rule-create-priority">Priority condition</Label>
                     <Select
-                      value={ruleCreatePriority}
-                      onValueChange={setRuleCreatePriority}
+                      value={selectValue(ruleCreatePriority)}
+                      onValueChange={(value) => setRuleCreatePriority(optionalSelectValue(value))}
                       disabled={creatingRule}
                     >
                       <SelectTrigger id="rule-create-priority">
                         <SelectValue placeholder="Any priority" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Any priority</SelectItem>
+                        <SelectItem value={ANY_SELECT_VALUE}>Any priority</SelectItem>
                         {PRIORITY_OPTIONS.map((p) => (
                           <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
                         ))}
@@ -1863,15 +2380,15 @@ export default function RequestSetup() {
                             <div className="space-y-2">
                               <Label htmlFor={`rule-cat-${rule.id}`}>Category condition</Label>
                               <Select
-                                value={draft.match_category}
-                                onValueChange={(v) => updateRuleDraft(rule, { match_category: v, match_subcategory: '' })}
+                                value={selectValue(draft.match_category)}
+                                onValueChange={(value) => updateRuleDraft(rule, { match_category: optionalSelectValue(value), match_subcategory: '' })}
                                 disabled={isRuleBusy}
                               >
                                 <SelectTrigger id={`rule-cat-${rule.id}`}>
                                   <SelectValue placeholder="Any category" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">Any category</SelectItem>
+                                  <SelectItem value={ANY_SELECT_VALUE}>Any category</SelectItem>
                                   {categories.filter((c) => c.is_active).map((c) => (
                                     <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
                                   ))}
@@ -1881,15 +2398,15 @@ export default function RequestSetup() {
                             <div className="space-y-2">
                               <Label htmlFor={`rule-subcat-${rule.id}`}>Subcategory condition</Label>
                               <Select
-                                value={draft.match_subcategory}
-                                onValueChange={(v) => updateRuleDraft(rule, { match_subcategory: v })}
+                                value={selectValue(draft.match_subcategory)}
+                                onValueChange={(value) => updateRuleDraft(rule, { match_subcategory: optionalSelectValue(value) })}
                                 disabled={isRuleBusy || !draft.match_category}
                               >
                                 <SelectTrigger id={`rule-subcat-${rule.id}`}>
                                   <SelectValue placeholder="Any subcategory" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">Any subcategory</SelectItem>
+                                  <SelectItem value={ANY_SELECT_VALUE}>Any subcategory</SelectItem>
                                   {activeSubcategoriesForKey(draft.match_category).map((s) => (
                                     <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
                                   ))}
@@ -1902,15 +2419,15 @@ export default function RequestSetup() {
                             <div className="space-y-2">
                               <Label htmlFor={`rule-role-${rule.id}`}>Submitter role condition</Label>
                               <Select
-                                value={draft.match_submitter_role}
-                                onValueChange={(v) => updateRuleDraft(rule, { match_submitter_role: v })}
+                                value={selectValue(draft.match_submitter_role)}
+                                onValueChange={(value) => updateRuleDraft(rule, { match_submitter_role: optionalSelectValue(value) })}
                                 disabled={isRuleBusy}
                               >
                                 <SelectTrigger id={`rule-role-${rule.id}`}>
                                   <SelectValue placeholder="Any role" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">Any role</SelectItem>
+                                  <SelectItem value={ANY_SELECT_VALUE}>Any role</SelectItem>
                                   {(Object.entries(ROLE_LABELS) as [string, string][]).map(([key, label]) => (
                                     <SelectItem key={key} value={key}>{label}</SelectItem>
                                   ))}
@@ -1920,15 +2437,15 @@ export default function RequestSetup() {
                             <div className="space-y-2">
                               <Label htmlFor={`rule-priority-${rule.id}`}>Priority condition</Label>
                               <Select
-                                value={draft.match_priority}
-                                onValueChange={(v) => updateRuleDraft(rule, { match_priority: v })}
+                                value={selectValue(draft.match_priority)}
+                                onValueChange={(value) => updateRuleDraft(rule, { match_priority: optionalSelectValue(value) })}
                                 disabled={isRuleBusy}
                               >
                                 <SelectTrigger id={`rule-priority-${rule.id}`}>
                                   <SelectValue placeholder="Any priority" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">Any priority</SelectItem>
+                                  <SelectItem value={ANY_SELECT_VALUE}>Any priority</SelectItem>
                                   {PRIORITY_OPTIONS.map((p) => (
                                     <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
                                   ))}

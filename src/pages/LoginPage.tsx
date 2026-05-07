@@ -8,6 +8,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { loginSchema, type LoginFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { brandAssets, brandName } from '@/config/brand';
 
 function friendlyAuthError(raw: string): string {
   const msg = raw.toLowerCase();
@@ -59,10 +60,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md p-8 glass-panel gold-glow animate-fade-in">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-2">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">F</span>
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">Fook Loi Group UBS</h1>
+            <img src={brandAssets.compactLogo} alt="Fook Loi Group" className="h-11 w-11 rounded-md object-contain" />
+            <h1 className="text-2xl font-bold text-foreground">{brandName}</h1>
           </div>
           <p className="text-muted-foreground text-sm">Unified Business System</p>
         </div>

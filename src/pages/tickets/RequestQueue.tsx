@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
 import { Textarea } from '@/components/ui/textarea';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
+import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import {
   Select,
@@ -99,10 +100,24 @@ function isOverdue(ticket: CompanyTicketRecord) {
   return new Date(`${ticket.requested_due_date}T00:00:00`) < today;
 }
 
+function customFieldEntries(
+  ticket: CompanyTicketRecord,
+  labelMap: Record<string, string>,
+) {
+  return Object.entries(ticket.custom_fields ?? {})
+    .filter(([, value]) => value !== null && value !== undefined && String(value).trim().length > 0)
+    .map(([key, value]) => ({
+      key,
+      label: labelMap[`${ticket.category}:${key}`] ?? formatTicketLabel(key),
+      value: typeof value === 'string' ? value : JSON.stringify(value),
+    }));
+}
+
 export default function RequestQueue() {
   const { user } = useAuth();
   const { categories } = useRequestCategories(user?.company_id, true);
   const { subcategories } = useRequestSubcategories(user?.company_id, { includeInactive: true });
+  const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
   const [tickets, setTickets] = useState<CompanyTicketRecord[]>([]);
   const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
   const [assignees, setAssignees] = useState<ProfileRow[]>([]);
@@ -114,6 +129,11 @@ export default function RequestQueue() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+
+  const customFieldLabelMap = useMemo(
+    () => Object.fromEntries(formFields.map((field) => [`${field.category_key}:${field.key}`, field.label])),
+    [formFields],
+  );
 
   const loadTickets = useCallback(async () => {
     if (!user) return;
@@ -168,6 +188,7 @@ export default function RequestQueue() {
         ticket.description,
         ticket.desired_outcome,
         ticket.business_impact,
+        ...Object.values(ticket.custom_fields ?? {}).map((value) => String(value)),
         ticket.vso_number,
         ticket.submitted_by_name,
         ticket.submitted_by_email,
@@ -355,11 +376,11 @@ export default function RequestQueue() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto max-w-7xl space-y-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Internal Requests</p>
-          <h1 className="text-2xl font-bold text-foreground">Request Workbench</h1>
+          <h1 className="text-xl font-bold text-foreground">Request Workbench</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Triage demand, assign accountable owners, and close the loop with requester-visible outcomes.
           </p>
@@ -373,48 +394,48 @@ export default function RequestQueue() {
 
       <div className="grid gap-3 md:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
             <CardDescription>Active work</CardDescription>
             <ClipboardList className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{queueMetrics.active}</p>
+          <CardContent className="px-3 pb-3">
+            <p className="text-xl font-semibold">{queueMetrics.active}</p>
             <p className="text-xs text-muted-foreground">Open and in progress</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
             <CardDescription>Unassigned</CardDescription>
             <Inbox className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{queueMetrics.unassigned}</p>
+          <CardContent className="px-3 pb-3">
+            <p className="text-xl font-semibold">{queueMetrics.unassigned}</p>
             <p className="text-xs text-muted-foreground">Needs an owner</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
             <CardDescription>Overdue</CardDescription>
             <Clock3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{queueMetrics.overdue}</p>
+          <CardContent className="px-3 pb-3">
+            <p className="text-xl font-semibold">{queueMetrics.overdue}</p>
             <p className="text-xs text-muted-foreground">Past requested date</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
             <CardDescription>High priority</CardDescription>
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{queueMetrics.highPriority}</p>
+          <CardContent className="px-3 pb-3">
+            <p className="text-xl font-semibold">{queueMetrics.highPriority}</p>
             <p className="text-xs text-muted-foreground">Active escalations</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3 lg:flex-row lg:items-center">
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-2 lg:flex-row lg:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -482,9 +503,9 @@ export default function RequestQueue() {
           </CardContent>
         </Card>
       ) : selectedTicket ? (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.3fr)]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.3fr)]">
           <section className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Queue</h2>
                 <p className="text-xs text-muted-foreground">{filteredTickets.length} requests in view</p>
@@ -492,7 +513,7 @@ export default function RequestQueue() {
               <Badge variant="outline">{counts.open} open</Badge>
             </div>
 
-            <div className="max-h-[720px] overflow-y-auto">
+            <div className="max-h-[calc(100vh-19rem)] overflow-y-auto">
               {filteredTickets.map((ticket) => {
                 const selected = ticket.id === selectedTicket.id;
                 const categoryLabel = getRequestCategoryLabel(ticket.category, categories);
@@ -505,7 +526,7 @@ export default function RequestQueue() {
                     key={ticket.id}
                     type="button"
                     onClick={() => setSelectedTicketId(ticket.id)}
-                    className={`w-full border-b border-border px-4 py-3 text-left transition-colors last:border-b-0 ${
+                    className={`w-full border-b border-border px-3 py-2.5 text-left transition-colors last:border-b-0 ${
                       selected ? 'bg-primary/5' : 'hover:bg-muted/50'
                     }`}
                   >
@@ -520,7 +541,7 @@ export default function RequestQueue() {
                         {formatTicketLabel(ticket.status)}
                       </Badge>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <Badge variant={priorityVariant[ticket.priority]} className="capitalize">
                         {ticket.priority}
                       </Badge>
@@ -538,7 +559,7 @@ export default function RequestQueue() {
           </section>
 
           <section className="rounded-xl border border-border bg-card">
-            <div className="border-b border-border px-5 py-4">
+            <div className="border-b border-border px-4 py-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap gap-2">
@@ -550,7 +571,7 @@ export default function RequestQueue() {
                     </Badge>
                     {isOverdue(selectedTicket) && <Badge variant="destructive">Overdue</Badge>}
                   </div>
-                  <h2 className="text-xl font-semibold text-foreground">{selectedTicket.subject}</h2>
+                  <h2 className="text-lg font-semibold text-foreground">{selectedTicket.subject}</h2>
                   <p className="text-sm text-muted-foreground">
                     Submitted {formatDistanceToNow(new Date(selectedTicket.created_at), { addSuffix: true })}
                     {selectedTicket.vso_number ? ` · VSO ${selectedTicket.vso_number}` : ''}
@@ -559,7 +580,25 @@ export default function RequestQueue() {
               </div>
             </div>
 
-            <div className="space-y-5 p-5">
+            <div className="space-y-4 p-4">
+              {(() => {
+                const extraFields = customFieldEntries(selectedTicket, customFieldLabelMap);
+
+                return extraFields.length > 0 ? (
+                  <div className="rounded-lg border border-border px-3 py-2.5">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Additional details</p>
+                    <div className="mt-2 grid gap-2 md:grid-cols-2">
+                      {extraFields.map((field) => (
+                        <div key={field.key} className="min-w-0">
+                          <p className="text-xs text-muted-foreground">{field.label}</p>
+                          <p className="truncate text-sm text-foreground">{field.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="space-y-2">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
@@ -610,7 +649,7 @@ export default function RequestQueue() {
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-lg border border-border px-4 py-3">
+                <div className="rounded-lg border border-border px-3 py-2.5">
                   <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     <UserRound className="h-3.5 w-3.5" />
                     Requester
@@ -618,7 +657,7 @@ export default function RequestQueue() {
                   <p className="mt-2 text-sm font-medium text-foreground">{selectedTicket.submitted_by_name ?? 'Unknown requester'}</p>
                   {selectedTicket.submitted_by_email && <p className="mt-1 truncate text-xs text-muted-foreground">{selectedTicket.submitted_by_email}</p>}
                 </div>
-                <div className="rounded-lg border border-border px-4 py-3">
+                <div className="rounded-lg border border-border px-3 py-2.5">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Category</p>
                   <p className="mt-2 text-sm font-medium text-foreground">{getRequestCategoryLabel(selectedTicket.category, categories)}</p>
                   {selectedTicket.subcategory && (
@@ -627,7 +666,7 @@ export default function RequestQueue() {
                     </p>
                   )}
                 </div>
-                <div className="rounded-lg border border-border px-4 py-3">
+                <div className="rounded-lg border border-border px-3 py-2.5">
                   <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     <CalendarDays className="h-3.5 w-3.5" />
                     Timing
@@ -645,31 +684,31 @@ export default function RequestQueue() {
 
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Request detail</p>
-                <p className="whitespace-pre-line text-sm leading-6 text-foreground">{selectedTicket.description}</p>
+                <p className="whitespace-pre-line text-sm leading-5 text-foreground">{selectedTicket.description}</p>
               </div>
 
               {(selectedTicket.desired_outcome || selectedTicket.business_impact) && (
                 <div className="grid gap-3 md:grid-cols-2">
                   {selectedTicket.desired_outcome && (
-                    <div className="rounded-lg border border-border px-4 py-3">
+                    <div className="rounded-lg border border-border px-3 py-2.5">
                       <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         Desired outcome
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-foreground">{selectedTicket.desired_outcome}</p>
+                      <p className="mt-1 text-sm leading-5 text-foreground">{selectedTicket.desired_outcome}</p>
                     </div>
                   )}
                   {selectedTicket.business_impact && (
-                    <div className="rounded-lg border border-border px-4 py-3">
+                    <div className="rounded-lg border border-border px-3 py-2.5">
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Business impact</p>
-                      <p className="mt-2 text-sm leading-6 text-foreground">{selectedTicket.business_impact}</p>
+                      <p className="mt-1 text-sm leading-5 text-foreground">{selectedTicket.business_impact}</p>
                     </div>
                   )}
                 </div>
               )}
 
               {(selectedTicket.status === 'resolved' || selectedTicket.status === 'closed' || selectedTicket.resolution_note) && (
-                <div className="space-y-2 rounded-lg border border-border bg-secondary/20 px-4 py-4">
+                <div className="space-y-2 rounded-lg border border-border bg-secondary/20 px-3 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resolution note</p>
                     <Button

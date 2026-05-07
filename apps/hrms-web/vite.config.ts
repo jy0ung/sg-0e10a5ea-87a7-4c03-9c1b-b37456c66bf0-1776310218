@@ -7,6 +7,7 @@ const buildSourceMaps = process.env.BUILD_SOURCEMAP === 'true';
 
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
+  publicDir: path.resolve(rootDir, 'public'),
   define: {
     'import.meta.env.VITE_HRMS_WEB_APP': JSON.stringify('true'),
   },

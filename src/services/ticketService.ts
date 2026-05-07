@@ -32,6 +32,7 @@ export interface TicketRecord {
   requested_due_date: string | null;
   business_impact: string | null;
   desired_outcome: string | null;
+  custom_fields: Record<string, unknown>;
   vso_number: string | null;
   submitted_by: string;
   assigned_to: string | null;
@@ -61,6 +62,7 @@ export interface CreateTicketInput {
   requested_due_date?: string | null;
   business_impact?: string | null;
   desired_outcome?: string | null;
+  custom_fields?: Record<string, unknown>;
   vso_number?: string | null;
 }
 
@@ -120,10 +122,13 @@ interface TicketActivityInsert {
 const LEGACY_TICKET_SELECT =
   'id, subject, category, subcategory, priority, status, description, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
 
-const TICKET_SELECT =
+const OPERATIONAL_TICKET_SELECT =
   'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
 
-const operationalTicketFields = ['requested_due_date', 'business_impact', 'desired_outcome'];
+const TICKET_SELECT =
+  'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, custom_fields, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
+
+const operationalTicketFields = ['requested_due_date', 'business_impact', 'desired_outcome', 'custom_fields'];
 
 function isMissingOperationalTicketFieldError(error: unknown) {
   const message = error instanceof Error
@@ -162,6 +167,7 @@ function mapTicket(row: TicketRow): TicketRecord {
     requested_due_date: row.requested_due_date ?? null,
     business_impact: row.business_impact ?? null,
     desired_outcome: row.desired_outcome ?? null,
+    custom_fields: row.custom_fields ?? {},
     vso_number: row.vso_number ?? null,
     submitted_by: row.submitted_by,
     assigned_to: row.assigned_to,
@@ -320,8 +326,9 @@ export async function listMyTickets(userId: string, companyId: string): Promise<
       .order('created_at', { ascending: false });
 
     if (error && isMissingOperationalTicketFieldError(error)) {
+      const legacySelect = String(error.message ?? '').includes('custom_fields') ? OPERATIONAL_TICKET_SELECT : LEGACY_TICKET_SELECT;
       const legacyResult = await ticketsTable()
-        .select(LEGACY_TICKET_SELECT)
+        .select(legacySelect)
         .eq('submitted_by', userId)
         .eq('company_id', companyId)
         .order('created_at', { ascending: false });
@@ -353,8 +360,9 @@ export async function listCompanyTickets(companyId: string): Promise<TicketServi
       .order('created_at', { ascending: false });
 
     if (error && isMissingOperationalTicketFieldError(error)) {
+      const legacySelect = String(error.message ?? '').includes('custom_fields') ? OPERATIONAL_TICKET_SELECT : LEGACY_TICKET_SELECT;
       const legacyResult = await ticketsTable()
-        .select(LEGACY_TICKET_SELECT)
+        .select(legacySelect)
         .eq('company_id', companyId)
         .order('created_at', { ascending: false });
       data = legacyResult.data;
@@ -453,6 +461,7 @@ export async function createTicket(
       requested_due_date: input.requested_due_date?.trim() ? input.requested_due_date.trim() : null,
       business_impact: input.business_impact?.trim() ? input.business_impact.trim() : null,
       desired_outcome: input.desired_outcome?.trim() ? input.desired_outcome.trim() : null,
+      custom_fields: input.custom_fields ?? {},
       vso_number: input.vso_number?.trim() ? input.vso_number.trim() : null,
       company_id: context.companyId,
       submitted_by: context.userId,
@@ -472,6 +481,7 @@ export async function createTicket(
         requested_due_date: _requestedDueDate,
         business_impact: _businessImpact,
         desired_outcome: _desiredOutcome,
+        custom_fields: _customFields,
         ...legacyPayload
       } = insertPayload;
       const legacyResult = await ticketsTable()
@@ -537,10 +547,12 @@ export async function updateTicket(
       .eq('id', ticketId)
       .single();
 
+    const missingCustomFieldsOnly = Boolean(currentError && String(currentError.message ?? '').includes('custom_fields'));
     const useLegacyTicketSelect = Boolean(currentError && isMissingOperationalTicketFieldError(currentError));
+    const fallbackSelect = missingCustomFieldsOnly ? OPERATIONAL_TICKET_SELECT : LEGACY_TICKET_SELECT;
     if (useLegacyTicketSelect) {
       const legacyResult = await ticketsTable()
-        .select(LEGACY_TICKET_SELECT)
+        .select(fallbackSelect)
         .eq('company_id', context.companyId)
         .eq('id', ticketId)
         .single();
@@ -572,7 +584,7 @@ export async function updateTicket(
       .update(patch)
       .eq('company_id', context.companyId)
       .eq('id', ticketId)
-      .select(useLegacyTicketSelect ? LEGACY_TICKET_SELECT : TICKET_SELECT)
+      .select(useLegacyTicketSelect ? fallbackSelect : TICKET_SELECT)
       .single();
 
     if (error) throw error;

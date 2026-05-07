@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AppRole, AccessScope } from '@/types';
@@ -90,6 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const profileRef = useRef<Profile | null>(null);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   const clearSessionArtifacts = useCallback(() => {
     setProfile(null);
@@ -188,13 +193,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, newSession) => {
         setSession(newSession);
         if (newSession?.user) {
-          // Keep loading true while the profile is being fetched so that
-          // ProtectedRoute does not redirect before the profile arrives.
-          setLoading(true);
+          const currentProfile = profileRef.current;
+          const shouldBlockRoute = !currentProfile || currentProfile.id !== newSession.user.id || event === 'SIGNED_IN';
+
+          if (shouldBlockRoute) {
+            // Keep loading true while the profile is being fetched so that
+            // ProtectedRoute does not redirect before the profile arrives.
+            setLoading(true);
+          }
           // Use setTimeout to avoid Supabase client deadlock
           setTimeout(() => {
             fetchProfile(newSession.user.id).finally(() => {
-              setLoading(false);
+              if (shouldBlockRoute) setLoading(false);
             });
           }, 0);
         } else {

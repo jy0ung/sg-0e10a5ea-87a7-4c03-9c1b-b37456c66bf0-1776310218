@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import {
   AlertCircle,
+  Check,
+  ChevronsUpDown,
   FileText,
   Info,
   Loader2,
@@ -15,8 +17,17 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -31,10 +42,17 @@ import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useRequestTemplates } from '@/hooks/useRequestTemplates';
 import { useAttachmentSettings } from '@/hooks/useAttachmentSettings';
+import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { ROLE_LABELS } from '@/config/rolePermissions';
 import { createTicket } from '@/services/ticketService';
 import { uploadTicketAttachment } from '@/services/ticketAttachmentService';
 import { resolveBranchCode } from '@/services/branchService';
+import {
+  listRequestFieldOptions,
+  type DatabaseFieldOption,
+  type RequestFieldDataSource,
+  type RequestFormFieldRecord,
+} from '@/services/requestFormFieldService';
 import type { AppRole } from '@/types';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -44,14 +62,18 @@ const ticketSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   subcategory: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high']),
-  requested_due_date: z.string().optional(),
-  business_impact: z.string().max(240, 'Business impact must be 240 characters or less').optional(),
-  desired_outcome: z.string().max(240, 'Desired outcome must be 240 characters or less').optional(),
   description: z.string().min(20, 'Description must be at least 20 characters'),
-  vso_number: z.string().optional(),
 });
 
 type TicketFormData = z.infer<typeof ticketSchema>;
+
+const DEFAULT_TICKET_FORM_VALUES: TicketFormData = {
+  subject: '',
+  category: '',
+  subcategory: '',
+  priority: 'medium',
+  description: '',
+};
 
 // ── Priority options ──────────────────────────────────────────────────────────
 
@@ -92,8 +114,6 @@ interface RoleContext {
   pageTitle: string;
   pageSubtitle: string;
   descriptionPlaceholder: string;
-  tips: string[];
-  requiresVso: boolean;
 }
 
 const ROLE_CONTEXT: Partial<Record<AppRole, RoleContext>> = {
@@ -103,13 +123,6 @@ const ROLE_CONTEXT: Partial<Record<AppRole, RoleContext>> = {
       'Raise a request to the support team for sales, documentation, or customer coordination.',
     descriptionPlaceholder:
       'Describe your request in detail. Include customer name, vehicle model, booking or sales order number, and any other relevant information.',
-    tips: [
-      'Customer name and contact number',
-      'Vehicle model and VIN or plate number (if applicable)',
-      'Booking number or Sales Order reference',
-      'Expected timeline or reason for urgency',
-    ],
-    requiresVso: true,
   },
   accounts: {
     pageTitle: 'Accounts Support Request',
@@ -117,13 +130,6 @@ const ROLE_CONTEXT: Partial<Record<AppRole, RoleContext>> = {
       'Raise a request to the support team for invoicing, payments, or finance coordination.',
     descriptionPlaceholder:
       'Describe your request in detail. Include the invoice number, payment reference, transaction amount, and any other relevant information.',
-    tips: [
-      'Invoice or receipt number',
-      'Payment reference or transaction ID',
-      'Amount and date of transaction',
-      'Name of the customer or vendor involved',
-    ],
-    requiresVso: false,
   },
 };
 
@@ -133,13 +139,6 @@ const DEFAULT_ROLE_CONTEXT: RoleContext = {
     'Submit an internal request to the support team for review and resolution.',
   descriptionPlaceholder:
     'Describe your request clearly. Provide as much context as possible so the assigned team can respond quickly.',
-  tips: [
-    'A clear description of the issue or request',
-    'Any relevant reference numbers',
-    'The expected outcome or action needed',
-    'Any relevant deadlines or urgency reason',
-  ],
-  requiresVso: false,
 };
 
 // ── Attachment helpers ────────────────────────────────────────────────────────
@@ -164,6 +163,87 @@ const ACCEPTED_TYPES = [
   'text/csv',
 ];
 
+function DatabaseFieldSelect({
+  companyId,
+  field,
+  value,
+  onChange,
+}: {
+  companyId?: string;
+  field: RequestFormFieldRecord;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState<DatabaseFieldOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const selectedOption = options.find((option) => option.value === value) ?? null;
+
+  useEffect(() => {
+    const dataSource = field.data_source;
+    if (!companyId || !dataSource) {
+      setOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    listRequestFieldOptions(companyId, dataSource as RequestFieldDataSource).then((result) => {
+      if (cancelled) return;
+      setOptions(result.data);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, field.data_source]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-10 w-full justify-between font-normal"
+        >
+          <span className="truncate text-left">
+            {selectedOption?.label ?? (field.placeholder || 'Search and select')}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Type to search..." />
+          <CommandList>
+            <CommandEmpty>{loading ? 'Loading...' : 'No matches found.'}</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={`${option.label} ${option.description}`}
+                  onSelect={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn('mr-2 h-4 w-4', value === option.value ? 'opacity-100' : 'opacity-0')} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm">{option.label}</p>
+                    {option.description && <p className="truncate text-xs text-muted-foreground">{option.description}</p>}
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function NewTicket() {
@@ -182,7 +262,10 @@ export default function NewTicket() {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const draftRestoredRef = useRef(false);
+  const skipDraftSaveRef = useRef(false);
 
   const roleContext = ROLE_CONTEXT[user?.role as AppRole] ?? DEFAULT_ROLE_CONTEXT;
 
@@ -194,19 +277,58 @@ export default function NewTicket() {
 
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
-    defaultValues: {
-      subject: '',
-      category: '',
-      subcategory: '',
-      priority: 'medium',
-      requested_due_date: '',
-      business_impact: '',
-      desired_outcome: '',
-      description: '',
-      vso_number: '',
-    },
+    defaultValues: DEFAULT_TICKET_FORM_VALUES,
     mode: 'onChange',
   });
+
+  const userId = user?.id;
+  const userCompanyId = user?.company_id;
+  const draftKey = useMemo(
+    () => userId && userCompanyId ? `flc.internal-request-draft:${userCompanyId}:${userId}` : null,
+    [userCompanyId, userId],
+  );
+
+  useEffect(() => {
+    if (!draftKey || draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+
+    try {
+      const rawDraft = window.localStorage.getItem(draftKey);
+      if (!rawDraft) return;
+      const parsed = JSON.parse(rawDraft) as {
+        values?: Partial<TicketFormData>;
+        customFieldValues?: Record<string, string>;
+        activeTemplateId?: string | null;
+      };
+      if (parsed.values) {
+        form.reset({ ...DEFAULT_TICKET_FORM_VALUES, ...parsed.values });
+      }
+      setCustomFieldValues(parsed.customFieldValues ?? {});
+      setActiveTemplateId(parsed.activeTemplateId ?? null);
+    } catch {
+      window.localStorage.removeItem(draftKey);
+    }
+  }, [draftKey, form]);
+
+  useEffect(() => {
+    if (!draftKey || !draftRestoredRef.current) return;
+
+    const persistDraft = (values: Partial<TicketFormData>) => {
+      if (skipDraftSaveRef.current) return;
+      try {
+        window.localStorage.setItem(
+          draftKey,
+          JSON.stringify({ values, customFieldValues, activeTemplateId, updatedAt: new Date().toISOString() }),
+        );
+      } catch {
+        // Ignore storage quota/private-mode errors; the live form state still works.
+      }
+    };
+
+    persistDraft(form.getValues());
+    const subscription = form.watch((values) => persistDraft(values));
+    return () => subscription.unsubscribe();
+  }, [activeTemplateId, customFieldValues, draftKey, form]);
 
   // Auto-select first category once loaded
   useEffect(() => {
@@ -222,6 +344,9 @@ export default function NewTicket() {
   }, [categories, form]);
 
   const selectedCategoryKey = form.watch('category');
+  const { fields: customFields } = useRequestFormFields(user?.company_id, {
+    categoryKey: selectedCategoryKey || undefined,
+  });
   const selectedSubcategoryKey = form.watch('subcategory');
   const selectedPriority = form.watch('priority');
   const descriptionValue = form.watch('description') ?? '';
@@ -315,11 +440,12 @@ export default function NewTicket() {
   const handleSubmit = async (data: TicketFormData) => {
     if (!user) return;
 
-    // VSO required for sales role
-    if (roleContext.requiresVso && !data.vso_number?.trim()) {
-      form.setError('vso_number', {
-        type: 'manual',
-        message: 'VSO number is required for Sales requests.',
+    const missingRequiredField = customFields.find((field) =>
+      field.is_required && !customFieldValues[field.key]?.trim(),
+    );
+    if (missingRequiredField) {
+      toast.error('Unable to submit request', {
+        description: `${missingRequiredField.label} is required.`,
       });
       return;
     }
@@ -371,10 +497,15 @@ export default function NewTicket() {
         subcategory: matchingSubcategories.length > 0 ? (data.subcategory ?? null) : null,
         priority: data.priority,
         description: data.description,
-        requested_due_date: data.requested_due_date?.trim() || null,
-        business_impact: data.business_impact?.trim() || null,
-        desired_outcome: data.desired_outcome?.trim() || null,
-        vso_number: data.vso_number?.trim() || null,
+        requested_due_date: null,
+        business_impact: null,
+        desired_outcome: null,
+        custom_fields: Object.fromEntries(
+          customFields
+            .map((field) => [field.key, customFieldValues[field.key]?.trim() ?? ''])
+            .filter(([, value]) => Boolean(value)),
+        ),
+        vso_number: null,
       },
       { userId: user.id, companyId: user.company_id, submitterRole: user.role },
     );
@@ -406,24 +537,21 @@ export default function NewTicket() {
     const firstSubcategoryKey =
       subcategories.find((s) => s.category_key === firstCategoryKey)?.key ?? '';
 
-    toast.success('Request submitted', {
-      description: 'Your request has been recorded and will be reviewed shortly.',
-    });
-    navigate('/portal/tickets');
+    skipDraftSaveRef.current = true;
     setActiveTemplateId(null);
     setAttachedFiles([]);
     setFileErrors([]);
     form.reset({
-      subject: '',
+      ...DEFAULT_TICKET_FORM_VALUES,
       category: firstCategoryKey,
       subcategory: firstSubcategoryKey,
-      priority: 'medium',
-      requested_due_date: '',
-      business_impact: '',
-      desired_outcome: '',
-      description: '',
-      vso_number: '',
     });
+    setCustomFieldValues({});
+    if (draftKey) window.localStorage.removeItem(draftKey);
+    toast.success('Request submitted', {
+      description: 'Your request has been recorded and will be reviewed shortly.',
+    });
+    navigate('/portal/tickets');
     setSubmitting(false);
   };
 
@@ -458,25 +586,20 @@ export default function NewTicket() {
     const firstSubcategoryKey =
       subcategories.find((s) => s.category_key === firstCategoryKey)?.key ?? '';
     form.reset({
-      subject: '',
+      ...DEFAULT_TICKET_FORM_VALUES,
       category: firstCategoryKey,
       subcategory: firstSubcategoryKey,
-      priority: 'medium',
-      requested_due_date: '',
-      business_impact: '',
-      desired_outcome: '',
-      description: '',
-      vso_number: '',
     });
+    setCustomFieldValues({});
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="mx-auto max-w-5xl space-y-3">
 
       {/* Identity strip */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card/70 px-3 py-2">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary select-none">
             {user?.name?.[0]?.toUpperCase() ?? '?'}
@@ -493,13 +616,13 @@ export default function NewTicket() {
 
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">{roleContext.pageTitle}</h1>
+        <h1 className="text-xl font-bold text-foreground">{roleContext.pageTitle}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{roleContext.pageSubtitle}</p>
       </div>
 
       {/* Template picker */}
       {categoryTemplates.length > 0 && selectedCategoryKey && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div className="rounded-lg border border-border bg-card p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground" />
@@ -541,7 +664,7 @@ export default function NewTicket() {
 
       {/* Categories not ready banner */}
       {(categoriesError || (!categoriesLoading && categories.length === 0)) && (
-        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
           <div className="space-y-1">
             <p className="font-medium text-foreground">Request categories are not ready</p>
@@ -555,35 +678,42 @@ export default function NewTicket() {
 
       {/* Main form card */}
       <Card>
-        <CardContent className="pt-6">
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
+        <CardContent className="p-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
 
-            <div className="space-y-2">
-              <Label htmlFor="subject">
-                Request title <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="subject"
-                placeholder="e.g. Urgent invoice correction for customer delivery"
-                {...form.register('subject')}
-                className={form.formState.errors.subject ? 'border-destructive' : ''}
-              />
-              {form.formState.errors.subject && (
-                <p className="text-destructive text-xs">
-                  {form.formState.errors.subject.message}
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Use a short, action-oriented title so the queue is easy to scan.
-              </p>
+            <div className="grid gap-3 md:grid-cols-[1fr_12rem]">
+              <div className="space-y-1.5">
+                <Label htmlFor="subject">
+                  Request title <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="subject"
+                  placeholder="e.g. Urgent invoice correction for customer delivery"
+                  {...form.register('subject')}
+                  className={form.formState.errors.subject ? 'border-destructive' : ''}
+                />
+                {form.formState.errors.subject && (
+                  <p className="text-destructive text-xs">
+                    {form.formState.errors.subject.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Branch</Label>
+                <Input
+                  value={branchCode ?? 'Unassigned'}
+                  readOnly
+                  className="bg-muted/50 cursor-default select-none"
+                />
+              </div>
             </div>
 
             {/* Classification: category + priority */}
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto]">
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
 
                 {/* Category */}
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="category">
                     Category <span className="text-destructive">*</span>
                   </Label>
@@ -622,7 +752,7 @@ export default function NewTicket() {
                 </div>
 
                 {/* Priority — visual button group */}
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label>
                     Priority <span className="text-destructive">*</span>
                   </Label>
@@ -636,7 +766,7 @@ export default function NewTicket() {
                           form.setValue('priority', p.value, { shouldValidate: true })
                         }
                         className={cn(
-                          'flex-1 px-5 py-2.5 text-xs font-semibold transition-colors whitespace-nowrap',
+                          'flex-1 px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap',
                           idx < PRIORITY_OPTIONS.length - 1 ? 'border-r border-border' : '',
                           selectedPriority === p.value
                             ? p.activeClasses
@@ -655,7 +785,7 @@ export default function NewTicket() {
 
               {/* Category description callout */}
               {selectedCategory?.description && !categoriesLoading && (
-                <div className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2.5">
+                <div className="flex items-start gap-2 rounded-md bg-muted/60 px-3 py-2">
                   <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <p className="text-xs text-muted-foreground">{selectedCategory.description}</p>
                 </div>
@@ -665,7 +795,7 @@ export default function NewTicket() {
             {/* Subcategory */}
             {(availableSubcategories.length > 0 ||
               (subcategoriesLoading && selectedCategoryKey)) && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label htmlFor="subcategory">
                   Subcategory
                   {requiresSubcategory && <span className="text-destructive"> *</span>}
@@ -706,89 +836,56 @@ export default function NewTicket() {
               </div>
             )}
 
-            {/* VSO number */}
-            <div className="space-y-2">
-              <Label htmlFor="vso_number">
-                VSO Number
-                {roleContext.requiresVso && <span className="text-destructive"> *</span>}
-                {!roleContext.requiresVso && (
-                  <span className="ml-1 text-xs font-normal text-muted-foreground">
-                    (optional)
-                  </span>
-                )}
-              </Label>
-              <Input
-                id="vso_number"
-                placeholder="e.g. VSO-2026-00123"
-                {...form.register('vso_number')}
-                className={form.formState.errors.vso_number ? 'border-destructive' : ''}
-              />
-              {form.formState.errors.vso_number && (
-                <p className="text-destructive text-xs">
-                  {form.formState.errors.vso_number.message}
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Vehicle Sales Order number from the DMS or sales order form.
-              </p>
-            </div>
+            {customFields.length > 0 && (
+              <div className="grid gap-3 md:grid-cols-2">
+                {customFields.map((field) => {
+                  const value = customFieldValues[field.key] ?? '';
+                  const updateValue = (nextValue: string) => {
+                    setCustomFieldValues((current) => ({ ...current, [field.key]: nextValue }));
+                  };
 
-            {/* Branch (read-only, derived from user profile) */}
-            {branchCode && (
-              <div className="space-y-2">
-                <Label>Branch</Label>
-                <Input
-                  value={branchCode}
-                  readOnly
-                  className="bg-muted/50 cursor-default select-none"
-                />
+                  return (
+                    <div
+                      key={field.id}
+                      className={cn('space-y-1.5', field.field_type === 'textarea' && 'md:col-span-2')}
+                    >
+                      <Label htmlFor={`custom-field-${field.key}`}>
+                        {field.label}
+                        {field.is_required && <span className="text-destructive"> *</span>}
+                      </Label>
+                      {field.field_type === 'textarea' ? (
+                        <Textarea
+                          id={`custom-field-${field.key}`}
+                          value={value}
+                          onChange={(event) => updateValue(event.target.value)}
+                          placeholder={field.placeholder}
+                          rows={3}
+                        />
+                      ) : field.field_type === 'database_select' ? (
+                        <DatabaseFieldSelect
+                          companyId={user?.company_id}
+                          field={field}
+                          value={value}
+                          onChange={updateValue}
+                        />
+                      ) : (
+                        <Input
+                          id={`custom-field-${field.key}`}
+                          type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
+                          value={value}
+                          onChange={(event) => updateValue(event.target.value)}
+                          placeholder={field.placeholder}
+                        />
+                      )}
+                      {field.help_text && <p className="text-xs text-muted-foreground">{field.help_text}</p>}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="requested_due_date">Needed by</Label>
-                <Input
-                  id="requested_due_date"
-                  type="date"
-                  {...form.register('requested_due_date')}
-                />
-                <p className="text-xs text-muted-foreground">Optional target date for planning.</p>
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="desired_outcome">Desired outcome</Label>
-                <Input
-                  id="desired_outcome"
-                  placeholder="What should be true when this request is done?"
-                  {...form.register('desired_outcome')}
-                  className={form.formState.errors.desired_outcome ? 'border-destructive' : ''}
-                />
-                {form.formState.errors.desired_outcome && (
-                  <p className="text-destructive text-xs">
-                    {form.formState.errors.desired_outcome.message}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="business_impact">Business impact</Label>
-              <Textarea
-                id="business_impact"
-                placeholder="Describe who is affected, the branch/customer involved, and what is blocked."
-                rows={3}
-                {...form.register('business_impact')}
-                className={form.formState.errors.business_impact ? 'border-destructive' : ''}
-              />
-              {form.formState.errors.business_impact && (
-                <p className="text-destructive text-xs">
-                  {form.formState.errors.business_impact.message}
-                </p>
-              )}
-            </div>
-
-            {/* Description + contextual tips */}
-            <div className="space-y-2">
+            {/* Description */}
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="description">
                   Description <span className="text-destructive">*</span>
@@ -807,7 +904,7 @@ export default function NewTicket() {
               <Textarea
                 id="description"
                 placeholder={roleContext.descriptionPlaceholder}
-                rows={6}
+                rows={8}
                 {...form.register('description')}
                 className={form.formState.errors.description ? 'border-destructive' : ''}
               />
@@ -817,25 +914,10 @@ export default function NewTicket() {
                 </p>
               )}
 
-              {/* Role-specific guidance */}
-              <div className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 space-y-1.5">
-                <p className="text-xs font-medium text-foreground">Helpful to include:</p>
-                <ul className="space-y-1">
-                  {roleContext.tips.map((tip) => (
-                    <li
-                      key={tip}
-                      className="flex items-baseline gap-2 text-xs text-muted-foreground"
-                    >
-                      <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />
-                      {tip}
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
 
             {/* Attachments */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <Label>
                   Attachments
@@ -863,7 +945,7 @@ export default function NewTicket() {
                   if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click();
                 }}
                 className={cn(
-                  'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors',
+                  'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-3 text-center transition-colors',
                   dragOver
                     ? 'border-primary bg-primary/5'
                     : 'border-border bg-muted/30 hover:bg-muted/60',
@@ -943,7 +1025,7 @@ export default function NewTicket() {
                 !form.formState.isValid ||
                 categorySelectionDisabled ||
                 (requiresSubcategory && !selectedSubcategoryKey) ||
-                (roleContext.requiresVso && !form.watch('vso_number')?.trim())
+                customFields.some((field) => field.is_required && !customFieldValues[field.key]?.trim())
               }
             >
               {submitting ? (

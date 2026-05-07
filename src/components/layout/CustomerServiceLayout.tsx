@@ -40,13 +40,13 @@ export default function CustomerServiceLayout() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-border bg-card transition-transform duration-200 lg:static lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-30 flex w-56 flex-col border-r border-border bg-card transition-transform duration-200 lg:static lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         {/* Sidebar header */}
-        <div className="flex h-14 items-center gap-3 border-b border-border px-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+        <div className="flex h-12 items-center gap-2 border-b border-border px-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
             <HeadphonesIcon className="h-4 w-4 text-primary-foreground" />
           </div>
           <span className="font-semibold text-sm text-foreground">Internal Requests</span>
@@ -61,7 +61,7 @@ export default function CustomerServiceLayout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
           {navItems.map(({ label, href, icon: Icon }) => (
             <NavLink
               key={href}
@@ -69,7 +69,7 @@ export default function CustomerServiceLayout() {
               end
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
                   isActive
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -84,10 +84,10 @@ export default function CustomerServiceLayout() {
 
         {/* Back to app link */}
         {canAccessMainApp(user) && (
-          <div className="border-t border-border px-3 py-4">
+          <div className="border-t border-border px-2 py-3">
             <Link
               to="/"
-              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4 shrink-0" />
               Back to App
@@ -99,7 +99,7 @@ export default function CustomerServiceLayout() {
       {/* Main content */}
       <div className="flex flex-1 flex-col min-w-0 h-screen">
         {/* Top bar */}
-        <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-card/50 backdrop-blur-sm flex-shrink-0 z-10">
+        <header className="h-12 border-b border-border flex items-center justify-between px-4 bg-card/50 backdrop-blur-sm flex-shrink-0 z-10">
           <div className="flex items-center gap-3">
             <button
               className="text-muted-foreground hover:text-foreground lg:hidden"
@@ -125,7 +125,7 @@ export default function CustomerServiceLayout() {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-3 lg:p-4">
           <Outlet />
         </main>
       </div>

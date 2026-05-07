@@ -11,8 +11,16 @@ Examples:
 
 Environment overrides:
   APP_URL                   Public browser origin for the app. Defaults to https://<hostname>
+  HRMS_APP_URL              Public browser origin for the standalone HRMS app.
+                            Defaults to <APP_URL>/hrms.
   SUPABASE_INTERNAL_URL     Upstream URL the app container should reach. Defaults to
                             http://host.docker.internal:54321 for an all-in-one host.
+  SYSTEMD_ENV_FILE          Secure env file read by the Supabase systemd service.
+                            Defaults to /etc/flc-bi/supabase.env.
+  AUTH_SMTP_HOST, AUTH_SMTP_PORT, AUTH_SMTP_USER, AUTH_SMTP_PASS,
+  AUTH_SMTP_ADMIN_EMAIL, AUTH_SMTP_SENDER_NAME
+                            If all are set, the script will configure a production
+                            SMTP relay for Supabase Auth during bootstrap.
   ENABLE_SUPABASE_SERVICE   Set to 1 to install and enable a systemd oneshot that runs
                             `supabase start` from the repo root on boot. Defaults to 1.
   START_SUPABASE_SERVICE    Set to 1 to start the Supabase service immediately. Defaults to 1.
@@ -42,7 +50,10 @@ SERVER_HOST="${SERVER_HOST#https://}"
 SERVER_HOST="${SERVER_HOST%/}"
 ROOT_DIR="${2:-$(pwd)}"
 APP_URL="${APP_URL:-https://${SERVER_HOST}}"
+HRMS_APP_URL="${HRMS_APP_URL:-${APP_URL%/}/hrms}"
 SUPABASE_INTERNAL_URL="${SUPABASE_INTERNAL_URL:-http://host.docker.internal:54321}"
+SYSTEMD_ENV_FILE="${SYSTEMD_ENV_FILE:-/etc/flc-bi/supabase.env}"
+AUTH_SMTP_PORT="${AUTH_SMTP_PORT:-587}"
 ENABLE_SUPABASE_SERVICE="${ENABLE_SUPABASE_SERVICE:-1}"
 START_SUPABASE_SERVICE="${START_SUPABASE_SERVICE:-1}"
 DOCKER_DATA_ROOT="${DOCKER_DATA_ROOT:-/srv/docker}"
@@ -223,8 +234,77 @@ configure_supabase_config() {
   fi
 
   log "Updating supabase/config.toml for ${APP_URL}"
-  perl -0pi -e 's{^site_url = ".*?"$}{site_url = "'"${APP_URL}"'"}m;' supabase/config.toml
-  perl -0pi -e 's{^additional_redirect_urls = \[(?:.|\n)*?^\]}{additional_redirect_urls = [\n  "'"${APP_URL}/signup"'",\n  "'"${APP_URL}/reset-password"'",\n  "'"${APP_URL}/hrms/signup"'",\n  "'"${APP_URL}/hrms/forgot-password"'",\n  "'"${APP_URL}/hrms/reset-password"'"\n]}ms' supabase/config.toml
+  local redirect_urls
+
+  if [[ "$HRMS_APP_URL" == "${APP_URL%/}/hrms" ]]; then
+    redirect_urls=$(cat <<EOF
+additional_redirect_urls = [
+  "${APP_URL}/signup",
+  "${APP_URL}/reset-password",
+  "${APP_URL}/hrms/signup",
+  "${APP_URL}/hrms/forgot-password",
+  "${APP_URL}/hrms/reset-password"
+]
+EOF
+)
+  else
+    redirect_urls=$(cat <<EOF
+additional_redirect_urls = [
+  "${APP_URL}/signup",
+  "${APP_URL}/reset-password",
+  "${APP_URL}/hrms/signup",
+  "${APP_URL}/hrms/forgot-password",
+  "${APP_URL}/hrms/reset-password",
+  "${HRMS_APP_URL}/signup",
+  "${HRMS_APP_URL}/forgot-password",
+  "${HRMS_APP_URL}/reset-password"
+]
+EOF
+)
+  fi
+
+  SITE_URL_VALUE="$APP_URL" perl -0pi -e 's{^site_url = ".*?"$}{site_url = "$ENV{SITE_URL_VALUE}"}m;' supabase/config.toml
+  REDIRECTS_TOML="$redirect_urls" perl -0pi -e 's{^additional_redirect_urls = \[(?:.|\n)*?^\]}{$ENV{REDIRECTS_TOML}}ms' supabase/config.toml
+}
+
+configure_auth_smtp_if_requested() {
+  local smtp_vars=(
+    AUTH_SMTP_HOST
+    AUTH_SMTP_USER
+    AUTH_SMTP_PASS
+    AUTH_SMTP_ADMIN_EMAIL
+    AUTH_SMTP_SENDER_NAME
+  )
+  local provided=0
+  local var_name
+
+  for var_name in "${smtp_vars[@]}"; do
+    if [[ -n "${!var_name:-}" ]]; then
+      provided=$((provided + 1))
+    fi
+  done
+
+  if [[ "$provided" -eq 0 ]]; then
+    log "Skipping Supabase auth SMTP relay bootstrap"
+    return
+  fi
+
+  if [[ "$provided" -ne "${#smtp_vars[@]}" ]]; then
+    die "Set all AUTH_SMTP_* values before enabling Supabase auth SMTP relay bootstrap."
+  fi
+
+  log "Configuring Supabase auth SMTP relay"
+  APP_URL="$APP_URL" \
+  HRMS_APP_URL="$HRMS_APP_URL" \
+  AUTH_SMTP_HOST="$AUTH_SMTP_HOST" \
+  AUTH_SMTP_PORT="$AUTH_SMTP_PORT" \
+  AUTH_SMTP_USER="$AUTH_SMTP_USER" \
+  AUTH_SMTP_PASS="$AUTH_SMTP_PASS" \
+  AUTH_SMTP_ADMIN_EMAIL="$AUTH_SMTP_ADMIN_EMAIL" \
+  AUTH_SMTP_SENDER_NAME="$AUTH_SMTP_SENDER_NAME" \
+  SYSTEMD_ENV_FILE="$SYSTEMD_ENV_FILE" \
+  RESTART_SUPABASE_SERVICE=0 \
+  ./scripts/configure-supabase-auth-smtp.sh "$ROOT_DIR"
 }
 
 install_workspace_dependencies() {
@@ -265,6 +345,7 @@ RemainAfterExit=yes
 User=$APP_USER
 Group=$APP_USER
 SupplementaryGroups=docker
+EnvironmentFile=-$SYSTEMD_ENV_FILE
 ExecStart=/usr/local/bin/flc-bi-supabase-up
 ExecStop=/usr/local/bin/flc-bi-supabase-down
 TimeoutStartSec=0
@@ -306,17 +387,21 @@ Next steps:
   2. Confirm the local stack is reachable:
        sudo systemctl status flc-bi-supabase.service
        supabase status
-  3. Make sure the production deploy secret uses the host gateway path:
+    3. If SMTP relay is enabled, keep the auth secret in:
+      ${SYSTEMD_ENV_FILE}
+    4. Make sure the production deploy secret uses the host gateway path:
        SUPABASE_INTERNAL_URL=http://host.docker.internal:54321
-  4. If you want Cloudflare Access SSH, run:
+    5. If you want Cloudflare Access SSH, run:
        TUNNEL_NAME=... SSH_ACCESS_HOSTNAME=... DEPLOY_USER=... DEPLOY_PUBKEY=... \
         sudo ./scripts/configure-cloudflare-access-ssh.sh
-  5. Provision the database and first admin using the existing repo scripts once the local stack is healthy.
-  6. Push to main and let .github/workflows/main-deploy.yml deploy the web app.
+    6. Provision the database and first admin using the existing repo scripts once the local stack is healthy.
+    7. Push to main and let .github/workflows/main-deploy.yml deploy the web app.
 
 Host values:
   App URL: ${APP_URL}
+    HRMS App URL: ${HRMS_APP_URL}
   Supabase internal URL for the app container: ${SUPABASE_INTERNAL_URL}
+    Supabase systemd env file: ${SYSTEMD_ENV_FILE}
   Repo root: ${ROOT_DIR}
 EOF
 }
@@ -328,6 +413,7 @@ install_docker
 install_cloudflared
 install_supabase_cli
 configure_supabase_config
+configure_auth_smtp_if_requested
 install_workspace_dependencies
 install_supabase_service
 configure_cloudflare_ssh_if_requested

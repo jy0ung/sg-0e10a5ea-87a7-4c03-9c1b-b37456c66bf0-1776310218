@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { AlertCircle, CalendarDays, CheckCircle2, Loader2, RefreshCcw, Ticket } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
+import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
@@ -42,14 +43,33 @@ function formatDueDate(value: string) {
   });
 }
 
+function customFieldEntries(
+  ticket: RequestTicketRecord,
+  labelMap: Record<string, string>,
+) {
+  return Object.entries(ticket.custom_fields ?? {})
+    .filter(([, value]) => value !== null && value !== undefined && String(value).trim().length > 0)
+    .map(([key, value]) => ({
+      key,
+      label: labelMap[`${ticket.category}:${key}`] ?? formatTicketLabel(key),
+      value: typeof value === 'string' ? value : JSON.stringify(value),
+    }));
+}
+
 export default function MyTickets() {
   const { user } = useAuth();
   const { categories } = useRequestCategories(user?.company_id, true);
   const { subcategories } = useRequestSubcategories(user?.company_id, { includeInactive: true });
+  const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
   const [tickets, setTickets] = useState<RequestTicketRecord[]>([]);
   const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const customFieldLabelMap = useMemo(
+    () => Object.fromEntries(formFields.map((field) => [`${field.category_key}:${field.key}`, field.label])),
+    [formFields],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -92,9 +112,9 @@ export default function MyTickets() {
   }, [user]);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">My Requests</h1>
+        <h1 className="text-xl font-bold text-foreground">My Requests</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Review the internal requests you have already submitted.
         </p>
@@ -134,10 +154,13 @@ export default function MyTickets() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {tickets.map((ticket) => (
+        <div className="space-y-3">
+          {tickets.map((ticket) => {
+            const extraFields = customFieldEntries(ticket, customFieldLabelMap);
+
+            return (
             <Card key={ticket.id}>
-              <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <CardHeader className="gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
                   <CardTitle className="text-lg">
                     {ticket.subject}
@@ -156,7 +179,7 @@ export default function MyTickets() {
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2 px-4 pb-4">
                 <p className="text-sm text-muted-foreground capitalize">
                   Category: {getRequestCategoryLabel(ticket.category, categories)}
                   {ticket.subcategory ? ` / ${getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories)}` : ''}
@@ -180,43 +203,60 @@ export default function MyTickets() {
                   )}
                 </div>
 
-                <p className="text-sm text-foreground leading-6">{ticket.description}</p>
+                <p className="whitespace-pre-line text-sm leading-5 text-foreground">{ticket.description}</p>
 
                 {(ticket.desired_outcome || ticket.business_impact) && (
                   <div className="grid gap-3 md:grid-cols-2">
                     {ticket.desired_outcome && (
-                      <div className="rounded-lg border border-border px-4 py-3">
+                      <div className="rounded-lg border border-border px-3 py-2">
                         <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Desired outcome
                         </p>
-                        <p className="mt-2 text-sm text-foreground leading-6">{ticket.desired_outcome}</p>
+                        <p className="mt-1 text-sm leading-5 text-foreground">{ticket.desired_outcome}</p>
                       </div>
                     )}
                     {ticket.business_impact && (
-                      <div className="rounded-lg border border-border px-4 py-3">
+                      <div className="rounded-lg border border-border px-3 py-2">
                         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                           Business impact
                         </p>
-                        <p className="mt-2 text-sm text-foreground leading-6">{ticket.business_impact}</p>
+                        <p className="mt-1 text-sm leading-5 text-foreground">{ticket.business_impact}</p>
                       </div>
                     )}
                   </div>
                 )}
 
+                {extraFields.length > 0 && (
+                  <div className="rounded-lg border border-border px-3 py-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Additional details
+                    </p>
+                    <div className="mt-2 grid gap-2 md:grid-cols-2">
+                      {extraFields.map((field) => (
+                        <div key={field.key} className="min-w-0">
+                          <p className="text-xs text-muted-foreground">{field.label}</p>
+                          <p className="truncate text-sm text-foreground">{field.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {ticket.resolution_note && (
-                  <div className="rounded-lg border border-border bg-secondary/30 px-4 py-3">
+                  <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Resolution note
                     </p>
-                    <p className="mt-2 text-sm text-foreground leading-6">{ticket.resolution_note}</p>
+                    <p className="mt-1 text-sm leading-5 text-foreground">{ticket.resolution_note}</p>
                   </div>
                 )}
 
                 <TicketActivityList activities={activitiesByTicket[ticket.id] ?? []} />
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

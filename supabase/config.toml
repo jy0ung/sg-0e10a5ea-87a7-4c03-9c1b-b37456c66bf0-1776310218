@@ -41,3 +41,16 @@ enable_signup = false
 [auth.email]
 enable_signup = true
 enable_confirmations = true
+# Use a production-ready SMTP server when you want auth emails to reach real users.
+# Keep this block commented in git so local development continues to use Mailpit.
+# Configure the live server with scripts/configure-supabase-auth-smtp.sh.
+# BEGIN managed auth SMTP relay
+# [auth.email.smtp]
+# enabled = true
+# host = "smtp.resend.com"
+# port = 587
+# user = "resend"
+# pass = "env(AUTH_SMTP_PASS)"
+# admin_email = "noreply@example.com"
+# sender_name = "UBS"
+# END managed auth SMTP relay

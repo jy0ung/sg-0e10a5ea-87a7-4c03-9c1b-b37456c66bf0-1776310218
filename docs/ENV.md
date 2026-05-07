@@ -43,6 +43,23 @@ Set via `supabase secrets set` — never via client env:
 - `RESEND_API_KEY` (or SMTP equivalents)
 - `PUSH_NOTIFICATION_KEY`
 
+## Self-hosted auth SMTP relay
+
+Production auth email for invites and password resets is sent by self-hosted Supabase Auth, not by the frontend app. Keep Mailpit for local development and configure the live server with `scripts/configure-supabase-auth-smtp.sh`.
+
+Recommended production-only variables for that script:
+
+- `APP_URL` — main app origin, for example `https://ubs.protonfookloi.com`
+- `HRMS_APP_URL` — standalone HRMS origin, for example `https://hrms.protonfookloi.com`
+- `AUTH_SMTP_HOST` — relay hostname such as `smtp.resend.com`
+- `AUTH_SMTP_PORT` — relay port, usually `465` or `587`
+- `AUTH_SMTP_USER` — relay username
+- `AUTH_SMTP_PASS` — relay password or API key; stored in `/etc/flc-bi/supabase.env`, never in tracked repo files
+- `AUTH_SMTP_ADMIN_EMAIL` — visible sender address, ideally a verified no-reply mailbox on your domain
+- `AUTH_SMTP_SENDER_NAME` — visible sender name, for example `UBS`
+
+The script updates [supabase/config.toml](supabase/config.toml) auth URLs and the managed `[auth.email.smtp]` block, writes the SMTP secret to the systemd env file, and restarts `flc-bi-supabase.service` when requested.
+
 ## Supabase auth config
 
 `supabase/config.toml` now follows the current Supabase CLI schema:

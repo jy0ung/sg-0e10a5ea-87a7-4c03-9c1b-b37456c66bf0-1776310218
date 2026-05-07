@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, Briefcase, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loginSchema, type LoginFormData } from '@/lib/validations';
+import { brandAssets } from '@/config/brand';
 
 function friendlyAuthError(raw: string): string {
   const message = raw.toLowerCase();
@@ -59,9 +60,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-md border border-border bg-card p-8 text-card-foreground shadow-sm animate-fade-in">
         <div className="mb-8 text-center">
           <div className="mb-3 inline-flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Briefcase className="h-5 w-5" />
-            </div>
+            <img src={brandAssets.compactLogo} alt="Fook Loi Group" className="h-11 w-11 rounded-md object-contain" />
             <h1 className="text-2xl font-bold text-foreground">FLC HRMS</h1>
           </div>
           <p className="text-sm text-muted-foreground">Human resources workspace</p>
