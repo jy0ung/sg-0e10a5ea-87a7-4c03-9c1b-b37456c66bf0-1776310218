@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { resolveInviteSiteUrl } from '../_shared/publicSiteUrl.ts';
 
 interface InvitePayload {
   email: string;
@@ -79,8 +80,30 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const forwardedHost = req.headers.get('x-forwarded-host');
+    const forwardedProto = req.headers.get('x-forwarded-proto') || 'https';
+    const forwardedOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : null;
+
+    // Prefer configured public URLs, but ignore loopback/internal values when
+    // the request clearly came from a public browser origin.
+    const siteUrl = resolveInviteSiteUrl({
+      envSiteUrls: [
+        Deno.env.get('APP_URL'),
+        Deno.env.get('SITE_URL'),
+        Deno.env.get('VITE_APP_URL'),
+        Deno.env.get('VITE_SITE_URL'),
+      ],
+      requestOrigin: req.headers.get('origin') || forwardedOrigin,
+    });
+
     // Create admin client with service role key (bypasses RLS)
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Use the public/proxied auth base for invite emails so GoTrue does not
+    // stamp internal loopback hosts into the action link.
+    const inviteClient = createClient(siteUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
@@ -125,19 +148,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Determine the signup redirect URL
-    // Use the site URL from env or the request origin
-    const siteUrl = Deno.env.get('APP_URL')
-      || Deno.env.get('SITE_URL')
-      || Deno.env.get('VITE_APP_URL')
-      || Deno.env.get('VITE_SITE_URL')
-      || req.headers.get('origin')
-      || 'http://localhost:3000';
-
     const redirectTo = `${siteUrl.replace(/\/$/, '')}/signup`;
 
     // Invite the user via Supabase Admin API
-    const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+    const { data: inviteData, error: inviteError } = await inviteClient.auth.admin.inviteUserByEmail(
       email,
       {
         data: { name, role, company_id },
