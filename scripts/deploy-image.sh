@@ -41,6 +41,7 @@ STAGING_NAME="${CONTAINER_NAME}-staging"
 STAGING_PORT="$(( HOST_PORT + 1 ))"
 
 log() { printf '\033[1;34m[deploy]\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m[deploy]\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31m[deploy]\033[0m %s\n' "$*" >&2; exit 1; }
 
 run_inline_rpc_smoke() {
@@ -175,10 +176,13 @@ SQL
 
 command -v docker >/dev/null || die "docker not installed"
 
-# Login only if creds are present (public images don't need this).
+# Login only if creds are present. Public GHCR images can be pulled anonymously,
+# so a stale optional token should not block the deploy.
 if [[ -n "${GHCR_TOKEN:-}" && -n "${GHCR_USERNAME:-}" ]]; then
   log "Logging in to ghcr.io"
-  echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin >/dev/null
+  if ! echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin >/dev/null; then
+    warn "GHCR login failed; continuing without registry credentials"
+  fi
 fi
 
 if [[ "$SKIP_PULL" == "1" || "$SKIP_PULL" == "true" ]]; then
