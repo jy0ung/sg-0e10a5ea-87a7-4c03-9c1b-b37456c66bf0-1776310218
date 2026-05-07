@@ -141,6 +141,18 @@ export async function inviteUser(payload: {
   return { error: null };
 }
 
+/** Delete an invited user that has never signed in so they can be re-invited. */
+export async function deleteInvitedUser(userId: string): Promise<{ error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('delete-user', {
+    body: { user_id: userId },
+  });
+  if (error) return { error: error.message };
+  if (data && typeof data === 'object' && 'error' in data && data.error) {
+    return { error: String(data.error) };
+  }
+  return { error: null };
+}
+
 /** Re-authenticate then update password (Settings → Change Password). */
 export async function changePassword(
   email: string,

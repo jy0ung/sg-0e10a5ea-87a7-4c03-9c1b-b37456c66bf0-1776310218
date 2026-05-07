@@ -54,7 +54,7 @@ vi.mock('./auditService', () => ({
   logUserAction: vi.fn().mockResolvedValue({ error: null }),
 }));
 
-import { inviteUser, listProfiles, updateProfile } from './profileService';
+import { deleteInvitedUser, inviteUser, listProfiles, updateProfile } from './profileService';
 
 beforeEach(() => {
   queuedResults.length = 0;
@@ -122,5 +122,27 @@ describe('inviteUser', () => {
       name: 'invite-user',
       body: expect.objectContaining({ employee_id: 'emp-1' }),
     });
+  });
+});
+
+describe('deleteInvitedUser', () => {
+  it('calls the delete-user function with the target user id', async () => {
+    queueResolves({ data: { ok: true }, error: null });
+
+    const result = await deleteInvitedUser('user-1');
+
+    expect(result.error).toBeNull();
+    expect(functionInvocations[0]).toMatchObject({
+      name: 'delete-user',
+      body: { user_id: 'user-1' },
+    });
+  });
+
+  it('surfaces function response errors', async () => {
+    queueResolves({ data: { error: 'This user has already signed in.' }, error: null });
+
+    const result = await deleteInvitedUser('user-1');
+
+    expect(result.error).toBe('This user has already signed in.');
   });
 });

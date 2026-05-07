@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
-import { listProfiles, updateProfile, inviteUser, listCompanyOptions, setPortalAccess, type ProfileRow, type CompanyOption } from '@/services/profileService';
-import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle, UserCheck, KeyRound } from 'lucide-react';
+import { listProfiles, updateProfile, inviteUser, deleteInvitedUser, listCompanyOptions, setPortalAccess, type ProfileRow, type CompanyOption } from '@/services/profileService';
+import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle, UserCheck, KeyRound, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -62,6 +62,7 @@ export default function UserManagement() {
   const [activating, setActivating] = useState<string>('');
   const [grantingAccess, setGrantingAccess] = useState<string>('');
   const [resettingPassword, setResettingPassword] = useState<string>('');
+  const [deletingUser, setDeletingUser] = useState<string>('');
   const [employeesByCompany, setEmployeesByCompany] = useState<Record<string, Employee[]>>({});
   const [pendingSelections, setPendingSelections] = useState<
     Record<string, { role: AppRole; company_id: string; employee_id: string | null }>
@@ -331,6 +332,29 @@ export default function UserManagement() {
     toast.success(`Password reset email sent to ${p.email}`);
   };
 
+  const handleDeleteInvitedUser = async (p: ProfileRow) => {
+    if (p.id === user?.id) {
+      toast.error('You cannot delete your own account.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${p.email}? This is only for invited users who never signed in. Existing active users should be deactivated instead.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingUser(p.id);
+    const { error } = await deleteInvitedUser(p.id);
+    setDeletingUser('');
+    if (error) {
+      toast.error('Failed to delete user: ' + error);
+      return;
+    }
+    toast.success(`${p.email} deleted. You can invite the user again.`);
+    const refreshed = await listProfiles();
+    if (!refreshed.error) setProfiles(refreshed.data);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -419,13 +443,24 @@ export default function UserManagement() {
                       </Select>
                     </td>
                     <td className="px-4 py-2 text-right">
-                      <Button
-                        size="sm"
-                        onClick={() => handleActivate(p)}
-                        disabled={activating === p.id || !sel.company_id}
-                      >
-                        {activating === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Activate'}
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleActivate(p)}
+                          disabled={activating === p.id || !sel.company_id}
+                        >
+                          {activating === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Activate'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteInvitedUser(p)}
+                          disabled={deletingUser === p.id || p.id === user?.id}
+                        >
+                          {deletingUser === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -496,6 +531,18 @@ export default function UserManagement() {
                         : <KeyRound className="h-3.5 w-3.5 mr-1" />
                       }
                       Reset Password
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteInvitedUser(p)}
+                      disabled={deletingUser === p.id || p.id === user?.id}
+                    >
+                      {deletingUser === p.id
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : <><Trash2 className="h-3 w-3 mr-1" />Delete</>
+                      }
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => openPermissions(p)}>
                       <Settings className="h-3.5 w-3.5 mr-1" />Permissions
