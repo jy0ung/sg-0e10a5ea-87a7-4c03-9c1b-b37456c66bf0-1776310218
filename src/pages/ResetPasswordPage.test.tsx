@@ -73,6 +73,13 @@ describe('ResetPasswordPage', () => {
     expect(mockExchangeCodeForSession).toHaveBeenCalledWith('recovery-code');
   });
 
+  it('exchanges a bare PKCE code callback returned by GoTrue verify', async () => {
+    renderPage('/reset-password?code=recovery-code');
+
+    expect(await screen.findByText('Set your new password')).toBeInTheDocument();
+    expect(mockExchangeCodeForSession).toHaveBeenCalledWith('recovery-code');
+  });
+
   it('verifies a recovery token hash callback before showing the reset form', async () => {
     renderPage('/reset-password?type=recovery&token_hash=recovery-token');
 

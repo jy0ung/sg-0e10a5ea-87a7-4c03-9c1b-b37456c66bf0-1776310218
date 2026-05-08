@@ -62,7 +62,12 @@ export default function ResetPasswordPage() {
 
     const initializeRecovery = async () => {
       const { type, accessToken, refreshToken, tokenHash, code } = getCallbackParams();
-      const hasRecoveryCallback = type === 'recovery' && !!(accessToken || tokenHash || code);
+      // Supabase PKCE email links verify at /auth/v1/verify and then redirect
+      // back with ?code=...; that redirect does not always preserve type.
+      // Since this page is only for password recovery, a bare code/token_hash
+      // here is treated as a recovery callback.
+      const isRecoveryCallback = type === 'recovery' || (!type && !!(code || tokenHash || (accessToken && refreshToken)));
+      const hasRecoveryCallback = isRecoveryCallback && !!(accessToken || tokenHash || code);
 
       if (!hasRecoveryCallback) {
         const { data: { session } } = await supabase.auth.getSession();

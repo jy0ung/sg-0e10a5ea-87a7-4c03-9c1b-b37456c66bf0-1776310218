@@ -44,8 +44,12 @@ export default function SignUpPage() {
 
     const initializeInvite = async () => {
       const { type, accessToken, refreshToken, tokenHash, code } = getCallbackParams();
+      // Supabase PKCE invite links first verify at /auth/v1/verify and then
+      // redirect here with ?code=...; the returned URL may not include type.
+      // On /signup, a bare code/token_hash is therefore treated as an invite.
+      const callbackType = type || ((code || tokenHash) ? 'invite' : null);
       const isInviteCallback =
-        (type === 'invite' || type === 'signup' || type === 'magiclink') &&
+        (callbackType === 'invite' || callbackType === 'signup' || callbackType === 'magiclink') &&
         !!(accessToken || tokenHash || code);
 
       if (!isInviteCallback) {
@@ -78,6 +82,19 @@ export default function SignUpPage() {
       if (code) {
         const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
         if (codeError && isMounted) {
+          setError('Invalid or expired invitation link. Please ask your administrator to resend the invitation.');
+          setInitializing(false);
+          return;
+        }
+      }
+
+      if (tokenHash && callbackType) {
+        const { error: tokenError } = await supabase.auth.verifyOtp({
+          type: callbackType as 'invite' | 'signup' | 'magiclink',
+          token_hash: tokenHash,
+        });
+
+        if (tokenError && isMounted) {
           setError('Invalid or expired invitation link. Please ask your administrator to resend the invitation.');
           setInitializing(false);
           return;

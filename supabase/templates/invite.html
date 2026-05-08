@@ -11,15 +11,15 @@
           An administrator has invited you to join FLC BI. Click the button below to set up your account and password.
         </p>
         <div style="text-align: center; margin: 24px 0;">
-          <a href="{{ .SiteURL }}/signup#type=invite&access_token={{ .Token }}&token_hash={{ .TokenHash }}" 
+          <a href="{{ .ConfirmationURL }}"
              style="display: inline-block; background: #c8a951; color: #1a1a2e; font-weight: 600; font-size: 14px; padding: 12px 32px; border-radius: 8px; text-decoration: none;">
             Complete Sign Up
           </a>
         </div>
         <p style="color: #9ca3af; font-size: 12px; line-height: 1.5; margin: 16px 0 0;">
           If the button doesn't work, copy and paste this link into your browser:<br>
-          <a href="{{ .SiteURL }}/signup#type=invite&access_token={{ .Token }}&token_hash={{ .TokenHash }}" style="color: #c8a951; word-break: break-all;">
-            {{ .SiteURL }}/signup#type=invite&access_token={{ .Token }}&token_hash={{ .TokenHash }}
+          <a href="{{ .ConfirmationURL }}" style="color: #c8a951; word-break: break-all;">
+            {{ .ConfirmationURL }}
           </a>
         </p>
         <p style="color: #9ca3af; font-size: 12px; margin: 16px 0 0;">
