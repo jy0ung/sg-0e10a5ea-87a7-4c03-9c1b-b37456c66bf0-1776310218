@@ -42,7 +42,10 @@ export const supabase = createClient<Database>(
       flowType: 'pkce',
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: true,
+      // Auth callback routes exchange invite/recovery tokens explicitly.
+      // Global URL detection can race those pages and consume PKCE codes before
+      // the route-specific UX knows which flow is being completed.
+      detectSessionInUrl: false,
       // Namespaced storage key so multiple FLC apps on the same origin
       // (admin, mobile, customer portal) don't clobber each other's session.
       storageKey: 'flc.auth.session',

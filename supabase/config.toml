@@ -30,6 +30,10 @@ email_sent = 30
 enable_signup = true
 enable_confirmations = true
 
+[auth.email.template.recovery]
+subject = "Reset your FLC BI password"
+content_path = "./supabase/templates/recovery.html"
+
 # Use a production-ready SMTP server when you want auth emails to reach real users.
 # Keep this block commented in git so local development continues to use Mailpit.
 # Configure the live server with scripts/configure-supabase-auth-smtp.sh.
