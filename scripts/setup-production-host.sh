@@ -11,8 +11,13 @@ Examples:
 
 Environment overrides:
   APP_URL                   Public browser origin for the app. Defaults to https://<hostname>
+  AUTH_EXTERNAL_URL         Public Supabase Auth API base URL used in email
+                           action links. Defaults to <APP_URL>/auth/v1.
+  SUPABASE_API_EXTERNAL_URL Public Supabase API origin. Defaults to <APP_URL>.
   HRMS_APP_URL              Public browser origin for the standalone HRMS app.
                             Defaults to <APP_URL>/hrms.
+  AUTH_RATE_LIMIT_EMAIL_SENT Auth emails per hour allowed by GoTrue when SMTP
+                            is configured. Defaults to 30.
   SUPABASE_INTERNAL_URL     Upstream URL the app container should reach. Defaults to
                             http://host.docker.internal:54321 for an all-in-one host.
   SYSTEMD_ENV_FILE          Secure env file read by the Supabase systemd service.
@@ -50,6 +55,11 @@ SERVER_HOST="${SERVER_HOST#https://}"
 SERVER_HOST="${SERVER_HOST%/}"
 ROOT_DIR="${2:-$(pwd)}"
 APP_URL="${APP_URL:-https://${SERVER_HOST}}"
+AUTH_EXTERNAL_URL="${AUTH_EXTERNAL_URL:-${APP_URL%/}/auth/v1}"
+AUTH_EXTERNAL_URL="${AUTH_EXTERNAL_URL%/}"
+SUPABASE_API_EXTERNAL_URL="${SUPABASE_API_EXTERNAL_URL:-${APP_URL%/}}"
+SUPABASE_API_EXTERNAL_URL="${SUPABASE_API_EXTERNAL_URL%/}"
+AUTH_RATE_LIMIT_EMAIL_SENT="${AUTH_RATE_LIMIT_EMAIL_SENT:-30}"
 HRMS_APP_URL="${HRMS_APP_URL:-${APP_URL%/}/hrms}"
 SUPABASE_INTERNAL_URL="${SUPABASE_INTERNAL_URL:-http://host.docker.internal:54321}"
 SYSTEMD_ENV_FILE="${SYSTEMD_ENV_FILE:-/etc/flc-bi/supabase.env}"
@@ -263,8 +273,54 @@ EOF
 )
   fi
 
+  SUPABASE_API_EXTERNAL_URL_VALUE="$SUPABASE_API_EXTERNAL_URL" perl -0pi -e '
+    my $value = $ENV{SUPABASE_API_EXTERNAL_URL_VALUE};
+    s{^(\[api\]\n(?:(?!^\[).)*?^external_url = ").*?("$)}{$1$value$2}ms
+      or s{^(\[api\]\n)}{$1external_url = "$value"\n}m
+      or s{^(project_id = ".*?"\n)}{$1\n[api]\nexternal_url = "$value"\n}m;
+  ' supabase/config.toml
+  if ! awk -v expected="$SUPABASE_API_EXTERNAL_URL" '
+    /^\[api\]$/ { in_api = 1; next }
+    /^\[/ { in_api = 0 }
+    in_api && $0 == "external_url = \"" expected "\"" { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' supabase/config.toml; then
+    die "Unable to set api.external_url in supabase/config.toml"
+  fi
   SITE_URL_VALUE="$APP_URL" perl -0pi -e 's{^site_url = ".*?"$}{site_url = "$ENV{SITE_URL_VALUE}"}m;' supabase/config.toml
+  AUTH_EXTERNAL_URL_VALUE="$AUTH_EXTERNAL_URL" perl -0pi -e '
+    my $value = $ENV{AUTH_EXTERNAL_URL_VALUE};
+    s{^(\[auth\]\n(?:(?!^\[).)*?^external_url = ").*?("$)}{$1$value$2}ms
+      or s{^(\[auth\]\n(?:(?!^\[).)*?^site_url = ".*?"\n)}{$1external_url = "$value"\n}ms;
+  ' supabase/config.toml
+  if ! awk -v expected="$AUTH_EXTERNAL_URL" '
+    /^\[auth\]$/ { in_auth = 1; next }
+    /^\[/ { in_auth = 0 }
+    in_auth && $0 == "external_url = \"" expected "\"" { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' supabase/config.toml; then
+    die "Unable to set auth.external_url in supabase/config.toml"
+  fi
   REDIRECTS_TOML="$redirect_urls" perl -0pi -e 's{^additional_redirect_urls = \[(?:.|\n)*?^\]}{$ENV{REDIRECTS_TOML}}ms' supabase/config.toml
+
+  if [[ ! "$AUTH_RATE_LIMIT_EMAIL_SENT" =~ ^[0-9]+$ || "$AUTH_RATE_LIMIT_EMAIL_SENT" -lt 1 ]]; then
+    die "AUTH_RATE_LIMIT_EMAIL_SENT must be a positive integer"
+  fi
+  AUTH_RATE_LIMIT_EMAIL_SENT_VALUE="$AUTH_RATE_LIMIT_EMAIL_SENT" perl -0pi -e '
+    my $value = $ENV{AUTH_RATE_LIMIT_EMAIL_SENT_VALUE};
+    s{^(\[auth\.rate_limit\]\n(?:(?!^\[).)*?^email_sent = )\d+}{$1$value}ms
+      or s{^(\[auth\.rate_limit\]\n)}{$1email_sent = $value\n}m
+      or s{^(\[auth\.email\]\n)}{[auth.rate_limit]\nemail_sent = $value\n\n$1}m
+      or die "Unable to locate [auth.email] to insert [auth.rate_limit]\n";
+  ' supabase/config.toml
+  if ! awk -v expected="$AUTH_RATE_LIMIT_EMAIL_SENT" '
+    /^\[auth\.rate_limit\]$/ { in_rate_limit = 1; next }
+    /^\[/ { in_rate_limit = 0 }
+    in_rate_limit && $0 == "email_sent = " expected { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' supabase/config.toml; then
+    die "Unable to set auth.rate_limit.email_sent in supabase/config.toml"
+  fi
 }
 
 configure_auth_smtp_if_requested() {
@@ -295,7 +351,10 @@ configure_auth_smtp_if_requested() {
 
   log "Configuring Supabase auth SMTP relay"
   APP_URL="$APP_URL" \
+  AUTH_EXTERNAL_URL="$AUTH_EXTERNAL_URL" \
+  SUPABASE_API_EXTERNAL_URL="$SUPABASE_API_EXTERNAL_URL" \
   HRMS_APP_URL="$HRMS_APP_URL" \
+  AUTH_RATE_LIMIT_EMAIL_SENT="$AUTH_RATE_LIMIT_EMAIL_SENT" \
   AUTH_SMTP_HOST="$AUTH_SMTP_HOST" \
   AUTH_SMTP_PORT="$AUTH_SMTP_PORT" \
   AUTH_SMTP_USER="$AUTH_SMTP_USER" \
@@ -399,6 +458,9 @@ Next steps:
 
 Host values:
   App URL: ${APP_URL}
+    Supabase API external URL: ${SUPABASE_API_EXTERNAL_URL}
+    Supabase Auth external URL: ${AUTH_EXTERNAL_URL}
+    Supabase Auth email rate limit: ${AUTH_RATE_LIMIT_EMAIL_SENT}/hour
     HRMS App URL: ${HRMS_APP_URL}
   Supabase internal URL for the app container: ${SUPABASE_INTERNAL_URL}
     Supabase systemd env file: ${SYSTEMD_ENV_FILE}

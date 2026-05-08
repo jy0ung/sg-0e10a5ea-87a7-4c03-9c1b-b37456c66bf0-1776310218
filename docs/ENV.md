@@ -50,7 +50,10 @@ Production auth email for invites and password resets is sent by self-hosted Sup
 Recommended production-only variables for that script:
 
 - `APP_URL` — main app origin, for example `https://ubs.protonfookloi.com`
+- `SUPABASE_API_EXTERNAL_URL` — public Supabase API origin used by the CLI when deriving service URLs, for example `https://ubs.protonfookloi.com`. Defaults to `<APP_URL>`.
+- `AUTH_EXTERNAL_URL` — public Supabase Auth API base used inside email action links, for example `https://ubs.protonfookloi.com/auth/v1`. Defaults to `<APP_URL>/auth/v1`.
 - `HRMS_APP_URL` — standalone HRMS origin, for example `https://hrms.protonfookloi.com`
+- `AUTH_RATE_LIMIT_EMAIL_SENT` — Supabase Auth email-send rate limit per hour. Defaults to `30` for production SMTP; keep this aligned with your provider quota and abuse posture.
 - `AUTH_SMTP_HOST` — relay hostname such as `smtp.resend.com`
 - `AUTH_SMTP_PORT` — relay port, usually `465` or `587`
 - `AUTH_SMTP_USER` — relay username
@@ -58,13 +61,14 @@ Recommended production-only variables for that script:
 - `AUTH_SMTP_ADMIN_EMAIL` — visible sender address, ideally a verified no-reply mailbox on your domain
 - `AUTH_SMTP_SENDER_NAME` — visible sender name, for example `UBS`
 
-The script updates [supabase/config.toml](supabase/config.toml) auth URLs and the managed `[auth.email.smtp]` block, writes the SMTP secret to the systemd env file, and restarts `flc-bi-supabase.service` when requested.
+The script updates [supabase/config.toml](supabase/config.toml) auth URLs, `[api].external_url`, `[auth].external_url`, `[auth.rate_limit].email_sent`, and the managed `[auth.email.smtp]` block, writes the SMTP secret to the systemd env file, and restarts `flc-bi-supabase.service` when requested.
 
 ## Supabase auth config
 
 `supabase/config.toml` now follows the current Supabase CLI schema:
 
 - keep public self-signup disabled at `[auth].enable_signup = false`
+- set `[auth.rate_limit].email_sent` above the default `2` once production SMTP is configured, otherwise password resets/invites will still hit GoTrue's email throttle even when Resend has quota
 - keep email auth enabled at `[auth.email].enable_signup = true` so email login and password recovery still work
 
 Disabling signup under `[auth.email]` turns off the email provider entirely and breaks password reset.

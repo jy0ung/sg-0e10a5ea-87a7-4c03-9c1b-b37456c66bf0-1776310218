@@ -1,35 +1,20 @@
 project_id = "rbmsbppvpgcrmtkdfahy"
 
+[api]
+external_url = "https://ubs.protonfookloi.com"
+
 [auth]
-site_url = "https://probable-halibut-459w4wrgr9w3q7r6-3000.app.github.dev"
+site_url = "https://ubs.protonfookloi.com"
+external_url = "https://ubs.protonfookloi.com/auth/v1"
 additional_redirect_urls = [
-	"https://probable-halibut-459w4wrgr9w3q7r6-3000.app.github.dev/signup",
-	"https://probable-halibut-459w4wrgr9w3q7r6-3000.app.github.dev/reset-password",
-	"http://192.168.1.241:3000/signup",
-	"http://192.168.1.241:3000/reset-password",
-	"http://192.168.1.241:3000/hrms/signup",
-	"http://192.168.1.241:3000/hrms/forgot-password",
-	"http://192.168.1.241:3000/hrms/reset-password",
-	"http://localhost:3000/signup",
-	"http://localhost:3000/reset-password",
-	"http://localhost:3000/hrms/signup",
-	"http://localhost:3000/hrms/forgot-password",
-	"http://localhost:3000/hrms/reset-password",
-	"http://localhost:3001/signup",
-	"http://localhost:3001/forgot-password",
-	"http://localhost:3001/reset-password",
-	"https://uat.protonfookloi.com/hrms/signup",
-	"https://uat.protonfookloi.com/hrms/forgot-password",
-	"https://uat.protonfookloi.com/hrms/reset-password",
-	"https://hrms-uat.protonfookloi.com/signup",
-	"https://hrms-uat.protonfookloi.com/forgot-password",
-	"https://hrms-uat.protonfookloi.com/reset-password",
-	"https://protonfookloi.com/hrms/signup",
-	"https://protonfookloi.com/hrms/forgot-password",
-	"https://protonfookloi.com/hrms/reset-password",
-	"https://hrms.protonfookloi.com/signup",
-	"https://hrms.protonfookloi.com/forgot-password",
-	"https://hrms.protonfookloi.com/reset-password",
+  "https://ubs.protonfookloi.com/signup",
+  "https://ubs.protonfookloi.com/reset-password",
+  "https://ubs.protonfookloi.com/hrms/signup",
+  "https://ubs.protonfookloi.com/hrms/forgot-password",
+  "https://ubs.protonfookloi.com/hrms/reset-password",
+  "https://hrms.protonfookloi.com/signup",
+  "https://hrms.protonfookloi.com/forgot-password",
+  "https://hrms.protonfookloi.com/reset-password"
 ]
 # Phase 0 hotfix: public self-signup is disabled platform-wide.
 # New users must be onboarded via the `invite-user` edge function, which
@@ -38,19 +23,23 @@ additional_redirect_urls = [
 # their address before first login.
 enable_signup = false
 
+[auth.rate_limit]
+email_sent = 30
+
 [auth.email]
 enable_signup = true
 enable_confirmations = true
+
 # Use a production-ready SMTP server when you want auth emails to reach real users.
 # Keep this block commented in git so local development continues to use Mailpit.
 # Configure the live server with scripts/configure-supabase-auth-smtp.sh.
 # BEGIN managed auth SMTP relay
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.resend.com"
-# port = 587
-# user = "resend"
-# pass = "env(AUTH_SMTP_PASS)"
-# admin_email = "noreply@example.com"
-# sender_name = "UBS"
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 587
+user = "resend"
+pass = "env(AUTH_SMTP_PASS)"
+admin_email = "flsys@protonfookloi.com"
+sender_name = "FOOK LOI SYSTEM"
 # END managed auth SMTP relay

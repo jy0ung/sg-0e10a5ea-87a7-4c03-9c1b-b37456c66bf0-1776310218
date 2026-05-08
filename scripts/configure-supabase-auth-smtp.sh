@@ -15,7 +15,12 @@ Examples:
 Environment:
   APP_URL                    Public main app origin. Defaults to the current
                              site_url in supabase/config.toml.
+  AUTH_EXTERNAL_URL          Public Supabase Auth API base URL used in email
+                             action links. Defaults to <APP_URL>/auth/v1.
+  SUPABASE_API_EXTERNAL_URL  Public Supabase API origin. Defaults to <APP_URL>.
   HRMS_APP_URL               Public HRMS origin. Defaults to <APP_URL>/hrms.
+  AUTH_RATE_LIMIT_EMAIL_SENT Auth emails per hour allowed by GoTrue. Defaults
+                             to 30 when production SMTP is configured.
   AUTH_SMTP_HOST             SMTP relay hostname, e.g. smtp.resend.com.
   AUTH_SMTP_PORT             SMTP relay port. Defaults to 587.
   AUTH_SMTP_USER             SMTP username.
@@ -82,6 +87,7 @@ SYSTEMD_ENV_FILE="${SYSTEMD_ENV_FILE:-/etc/flc-bi/supabase.env}"
 SUPABASE_SERVICE_FILE="${SUPABASE_SERVICE_FILE:-/etc/systemd/system/flc-bi-supabase.service}"
 SUDO_BIN="${SUDO_BIN-sudo}"
 AUTH_SMTP_PORT="${AUTH_SMTP_PORT:-587}"
+AUTH_RATE_LIMIT_EMAIL_SENT="${AUTH_RATE_LIMIT_EMAIL_SENT:-30}"
 RESTART_SUPABASE_SERVICE="${RESTART_SUPABASE_SERVICE:-1}"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
@@ -90,18 +96,34 @@ fi
 
 current_site_url="$(sed -n 's/^site_url = "\(.*\)"$/\1/p' "$CONFIG_FILE" | head -n 1)"
 APP_URL="${APP_URL:-$current_site_url}"
+AUTH_EXTERNAL_URL="${AUTH_EXTERNAL_URL:-${APP_URL%/}/auth/v1}"
+AUTH_EXTERNAL_URL="${AUTH_EXTERNAL_URL%/}"
+SUPABASE_API_EXTERNAL_URL="${SUPABASE_API_EXTERNAL_URL:-${APP_URL%/}}"
+SUPABASE_API_EXTERNAL_URL="${SUPABASE_API_EXTERNAL_URL%/}"
 HRMS_APP_URL="${HRMS_APP_URL:-${APP_URL%/}/hrms}"
 
 prompt_for_secret AUTH_SMTP_PASS "SMTP password/API key"
 
-for required_var in APP_URL AUTH_SMTP_HOST AUTH_SMTP_USER AUTH_SMTP_PASS AUTH_SMTP_ADMIN_EMAIL AUTH_SMTP_SENDER_NAME; do
+for required_var in APP_URL AUTH_EXTERNAL_URL SUPABASE_API_EXTERNAL_URL AUTH_SMTP_HOST AUTH_SMTP_USER AUTH_SMTP_PASS AUTH_SMTP_ADMIN_EMAIL AUTH_SMTP_SENDER_NAME; do
   if [[ -z "${!required_var:-}" ]]; then
     die "${required_var} is required"
   fi
 done
 
+if [[ ! "$AUTH_EXTERNAL_URL" =~ ^https?:// ]]; then
+  die "AUTH_EXTERNAL_URL must start with http:// or https://"
+fi
+
+if [[ ! "$SUPABASE_API_EXTERNAL_URL" =~ ^https?:// ]]; then
+  die "SUPABASE_API_EXTERNAL_URL must start with http:// or https://"
+fi
+
 if [[ ! "$AUTH_SMTP_PORT" =~ ^[0-9]+$ ]]; then
   die "AUTH_SMTP_PORT must be numeric"
+fi
+
+if [[ ! "$AUTH_RATE_LIMIT_EMAIL_SENT" =~ ^[0-9]+$ || "$AUTH_RATE_LIMIT_EMAIL_SENT" -lt 1 ]]; then
+  die "AUTH_RATE_LIMIT_EMAIL_SENT must be a positive integer"
 fi
 
 build_redirects_toml() {
@@ -147,8 +169,52 @@ EOF
 }
 
 log "Updating auth URLs in supabase/config.toml"
+SUPABASE_API_EXTERNAL_URL_VALUE="$SUPABASE_API_EXTERNAL_URL" perl -0pi -e '
+  my $value = $ENV{SUPABASE_API_EXTERNAL_URL_VALUE};
+  s{^(\[api\]\n(?:(?!^\[).)*?^external_url = ").*?("$)}{$1$value$2}ms
+    or s{^(\[api\]\n)}{$1external_url = "$value"\n}m
+    or s{^(project_id = ".*?"\n)}{$1\n[api]\nexternal_url = "$value"\n}m;
+' "$CONFIG_FILE"
+if ! awk -v expected="$SUPABASE_API_EXTERNAL_URL" '
+  /^\[api\]$/ { in_api = 1; next }
+  /^\[/ { in_api = 0 }
+  in_api && $0 == "external_url = \"" expected "\"" { found = 1 }
+  END { exit found ? 0 : 1 }
+' "$CONFIG_FILE"; then
+  die "Unable to set api.external_url in ${CONFIG_FILE}"
+fi
 SITE_URL_VALUE="$APP_URL" perl -0pi -e 's{^site_url = ".*?"$}{site_url = "$ENV{SITE_URL_VALUE}"}m;' "$CONFIG_FILE"
+AUTH_EXTERNAL_URL_VALUE="$AUTH_EXTERNAL_URL" perl -0pi -e '
+  my $value = $ENV{AUTH_EXTERNAL_URL_VALUE};
+  s{^(\[auth\]\n(?:(?!^\[).)*?^external_url = ").*?("$)}{$1$value$2}ms
+    or s{^(\[auth\]\n(?:(?!^\[).)*?^site_url = ".*?"\n)}{$1external_url = "$value"\n}ms;
+' "$CONFIG_FILE"
+if ! awk -v expected="$AUTH_EXTERNAL_URL" '
+  /^\[auth\]$/ { in_auth = 1; next }
+  /^\[/ { in_auth = 0 }
+  in_auth && $0 == "external_url = \"" expected "\"" { found = 1 }
+  END { exit found ? 0 : 1 }
+' "$CONFIG_FILE"; then
+  die "Unable to set auth.external_url in ${CONFIG_FILE}"
+fi
 REDIRECTS_TOML="$(build_redirects_toml)" perl -0pi -e 's{^additional_redirect_urls = \[(?:.|\n)*?^\]}{$ENV{REDIRECTS_TOML}}ms' "$CONFIG_FILE"
+
+log "Setting Supabase Auth email rate limit"
+AUTH_RATE_LIMIT_EMAIL_SENT_VALUE="$AUTH_RATE_LIMIT_EMAIL_SENT" perl -0pi -e '
+  my $value = $ENV{AUTH_RATE_LIMIT_EMAIL_SENT_VALUE};
+  s{^(\[auth\.rate_limit\]\n(?:(?!^\[).)*?^email_sent = )\d+}{$1$value}ms
+    or s{^(\[auth\.rate_limit\]\n)}{$1email_sent = $value\n}m
+    or s{^(\[auth\.email\]\n)}{[auth.rate_limit]\nemail_sent = $value\n\n$1}m
+    or die "Unable to locate [auth.email] to insert [auth.rate_limit]\n";
+' "$CONFIG_FILE"
+if ! awk -v expected="$AUTH_RATE_LIMIT_EMAIL_SENT" '
+  /^\[auth\.rate_limit\]$/ { in_rate_limit = 1; next }
+  /^\[/ { in_rate_limit = 0 }
+  in_rate_limit && $0 == "email_sent = " expected { found = 1 }
+  END { exit found ? 0 : 1 }
+' "$CONFIG_FILE"; then
+  die "Unable to set auth.rate_limit.email_sent in ${CONFIG_FILE}"
+fi
 
 if ! grep -q '^# BEGIN managed auth SMTP relay$' "$CONFIG_FILE"; then
   die "supabase/config.toml is missing the managed auth SMTP relay markers"
@@ -211,7 +277,10 @@ Supabase auth SMTP relay configured.
 
 Applied values:
   App URL: ${APP_URL}
+  Supabase API external URL: ${SUPABASE_API_EXTERNAL_URL}
+  Auth external URL: ${AUTH_EXTERNAL_URL}
   HRMS App URL: ${HRMS_APP_URL}
+  Auth email rate limit: ${AUTH_RATE_LIMIT_EMAIL_SENT}/hour
   SMTP host: ${AUTH_SMTP_HOST}:${AUTH_SMTP_PORT}
   SMTP user: ${AUTH_SMTP_USER}
   From address: ${AUTH_SMTP_ADMIN_EMAIL}
