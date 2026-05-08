@@ -198,6 +198,11 @@ async function checkBundleSupabaseConfig() {
 
 async function checkLoginFlow() {
   const name = 'browser login flow';
+  if (!loginRequired) {
+    addResult(name, true, 'skipped; PROD_LOGIN_REQUIRED is not enabled');
+    return;
+  }
+
   if (!loginEmail || !loginPassword) {
     addResult(name, !loginRequired, loginRequired ? 'missing PROD_LOGIN_EMAIL/PROD_LOGIN_PASSWORD' : 'skipped; no credentials provided');
     return;

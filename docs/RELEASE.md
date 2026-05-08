@@ -75,7 +75,19 @@ PROD_EXPECTED_HRMS_APP_URL=https://hrms.protonfookloi.com \
 npm run verify:production
 ```
 
-The verifier checks the health endpoint, confirms the production bundle uses the expected browser-facing Supabase URL, confirms the main app bundle contains the expected HRMS workspace URL, and runs optional browser login verification when production login secrets are provided.
+The verifier checks the health endpoint, confirms the production bundle uses the expected browser-facing Supabase URL, confirms the main app bundle contains the expected HRMS workspace URL, and runs optional browser login verification only when `PROD_LOGIN_REQUIRED=1` is set alongside production login credentials.
+
+To include the real browser login check in the verifier, run:
+
+```bash
+PROD_URL=https://ubs.protonfookloi.com \
+PROD_EXPECTED_SUPABASE_URL=https://ubs.protonfookloi.com \
+PROD_EXPECTED_HRMS_APP_URL=https://hrms.protonfookloi.com \
+PROD_LOGIN_EMAIL=<admin-email> \
+PROD_LOGIN_PASSWORD=<admin-password> \
+PROD_LOGIN_REQUIRED=1 \
+npm run verify:production
+```
 
 Run the credentialed module smoke locally with:
 

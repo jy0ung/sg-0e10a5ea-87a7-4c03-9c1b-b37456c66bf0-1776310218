@@ -111,6 +111,8 @@ PROD_EXPECTED_HRMS_APP_URL=https://hrms.protonfookloi.com \
 npm run verify:production
 ```
 
+Add `PROD_LOGIN_EMAIL`, `PROD_LOGIN_PASSWORD`, and `PROD_LOGIN_REQUIRED=1` only when the verifier should include a real browser login check.
+
 Credentialed module smoke test:
 
 ```bash
