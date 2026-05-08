@@ -387,7 +387,7 @@ export interface PendingApproval {
 
 // ===== HRMS — Approval Flows =====
 export type ApproverType = 'role' | 'specific_user' | 'direct_manager';
-export type FlowEntityType = 'leave_request' | 'payroll_run' | 'appraisal' | 'general';
+export type FlowEntityType = 'leave_request' | 'payroll_run' | 'appraisal' | 'internal_request' | 'general';
 export type ApprovalInstanceStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 export type ApprovalDecisionStatus = 'approved' | 'rejected';
 

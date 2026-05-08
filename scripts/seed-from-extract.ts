@@ -34,7 +34,9 @@ const SUPABASE_URL  = process.env.SUPABASE_URL  ?? "http://127.0.0.1:54321";
 // SUPABASE_SERVICE_ROLE_KEY in the environment (see .env.example) — the seed
 // script refuses to run otherwise to avoid leaking data into the wrong project.
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!SERVICE_KEY) {
+const DRY_RUN       = process.argv.includes("--dry-run");
+
+if (!SERVICE_KEY && !DRY_RUN) {
   console.error(
     "seed-from-extract: SUPABASE_SERVICE_ROLE_KEY is not set. Export it in your shell or .env before running.",
   );
@@ -45,7 +47,6 @@ const EXTRACT_DIR   = path.resolve(__dirname, "../test-results/extract");
 const CHUNK_SIZE    = 50;
 const CHUNK_DELAY   = 120; // ms between insert chunks
 
-const DRY_RUN       = process.argv.includes("--dry-run");
 const ONLY_FLAG     = process.argv.indexOf("--only");
 const ONLY_TABLES   = ONLY_FLAG !== -1 ? process.argv.slice(ONLY_FLAG + 1) : [];
 
@@ -53,9 +54,11 @@ const ONLY_TABLES   = ONLY_FLAG !== -1 ? process.argv.slice(ONLY_FLAG + 1) : [];
 // Supabase client — service role, no RLS restrictions
 // ─────────────────────────────────────────────────────────────────────────────
 
-const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+const supabase = SERVICE_KEY
+  ? createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+  : null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Column mapping
@@ -77,6 +80,8 @@ const toDate = (v: string): string | null => {
   // Handle dd/mm/yyyy → yyyy-mm-dd
   const dmy = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  const dmyDash = v.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dmyDash) return `${dmyDash[3]}-${dmyDash[2].padStart(2, "0")}-${dmyDash[1].padStart(2, "0")}`;
   // Already ISO-ish
   if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
   return v || null;
@@ -140,14 +145,19 @@ const CUSTOMERS_MAP: ColMap = {
   "customer name":  "name",
   "ic no":          "ic_no",
   "ic number":      "ic_no",
+  "ic / company registration no.": "ic_no",
   "nric":           "ic_no",
   "phone":          "phone",
   "contact no":     "phone",
+  "contact no.":    "phone",
   "contact number": "phone",
   "email":          "email",
+  "emailaddress":   "email",
   "address":        "address",
+  "address 1":      "address",
   "notes":          "notes",
   "remark":         "notes",
+  "status":         "notes",
 };
 
 /** Sales Orders */
@@ -182,10 +192,13 @@ const SALES_ORDERS_MAP: ColMap = {
 /** Invoices */
 const INVOICES_MAP: ColMap = {
   "invoice no":       "invoice_no",
+  "inv no.":          "invoice_no",
   "invoice number":   "invoice_no",
   "invoice date":     ["invoice_date", toDate],
   "date":             ["invoice_date", toDate],
+  "amount due to/from customer": ["amount", toNum],
   "amount":           ["amount", toNum],
+  "otr price":         ["total_amount", toNum],
   "total":            ["total_amount", toNum],
   "total amount":     ["total_amount", toNum],
   "tax":              ["tax_amount", toNum],
@@ -195,20 +208,42 @@ const INVOICES_MAP: ColMap = {
   "due date":         ["due_date", toDate],
   "order no":         "sales_order_ref",
   "customer":         "customer_name",
+  "customer name":    "customer_name",
+};
+
+/** Purchase Invoices */
+const PURCHASE_INVOICES_MAP: ColMap = {
+  "invoice no":       "invoice_no",
+  "invoice no. (cbu)": "invoice_no",
+  "supplier":         "supplier",
+  "supplier name":    "supplier",
+  "chassis no":       "chassis_no",
+  "chassis no.":      "chassis_no",
+  "model":            "model",
+  "invoice date":     ["invoice_date", toDate],
+  "amount":           ["amount", toNum],
+  "amount (rm)":      ["amount", toNum],
+  "status":           ["status", toStatus],
+  "remark":           "remark",
 };
 
 /** Dealer Invoices */
 const DEALER_INVOICES_MAP: ColMap = {
   "invoice no":     "invoice_no",
-  "branch":         "branch_id",
+  "branch":         "branch",
   "dealer":         "dealer_name",
   "dealer name":    "dealer_name",
+  "dealername":     "dealer_name",
   "model":          "car_model",
   "car model":      "car_model",
-  "colour":         "colour",
+  "carmodel":       "car_model",
+  "colour":         "car_colour",
+  "carcolour":      "car_colour",
   "chassis no":     "chassis_no",
+  "chassisno.":     "chassis_no",
   "chassis number": "chassis_no",
   "sales price":    ["sales_price", toNum],
+  "salesprice":     ["sales_price", toNum],
   "price":          ["sales_price", toNum],
   "date":           ["invoice_date", toDate],
   "invoice date":   ["invoice_date", toDate],
@@ -217,12 +252,12 @@ const DEALER_INVOICES_MAP: ColMap = {
 
 /** Official Receipts */
 const OFFICIAL_RECEIPTS_MAP: ColMap = {
-  "or no":        "or_no",
-  "receipt no":   "or_no",
+  "or no":        "receipt_no",
+  "receipt no":   "receipt_no",
   "date":         ["receipt_date", toDate],
   "amount":       ["amount", toNum],
-  "branch":       "branch_id",
-  "attachment":   "attachment",
+  "branch":       "branch",
+  "attachment":   "attachment_url",
   "verified by":  "verified_by",
   "status":       ["status", toStatus],
 };
@@ -246,7 +281,9 @@ const STAFF_MAP: ColMap = {
   "staff name": "name",
   "username":   "username",
   "email":      "email",
+  "emailaddress": "email",
   "role":       "role",
+  "group":      "role",
   "branch":     "branch_code",
   "status":     ["status", toStatus],
 };
@@ -278,8 +315,10 @@ const MODELS_MAP: ColMap = {
   "model code":  "code",
   "name":        "name",
   "model name":  "name",
+  "model":       "name",
   "base price":  ["base_price", toNum],
   "price":       ["base_price", toNum],
+  "amount":      ["base_price", toNum],
 };
 
 /** Vehicle Colours */
@@ -288,6 +327,8 @@ const COLOURS_MAP: ColMap = {
   "colour code":  "code",
   "name":         "name",
   "colour name":  "name",
+  "color":        "name",
+  "colour":       "name",
 };
 
 /** Payment Types */
@@ -365,8 +406,9 @@ const SEED_TARGETS: SeedTarget[] = [
   { extractFile: "customers",          table: "customers",          colMap: CUSTOMERS_MAP,       uniqueKey: undefined,    addCompanyId: true },
   { extractFile: "sales-orders",       table: "sales_orders",       colMap: SALES_ORDERS_MAP,    uniqueKey: undefined,    addCompanyId: true },
   { extractFile: "invoices",           table: "invoices",           colMap: INVOICES_MAP,        uniqueKey: "invoice_no", addCompanyId: true },
+  { extractFile: "purchase-invoices",  table: "purchase_invoices",  colMap: PURCHASE_INVOICES_MAP, uniqueKey: "invoice_no", addCompanyId: true },
   { extractFile: "dealer-invoices",    table: "dealer_invoices",    colMap: DEALER_INVOICES_MAP, uniqueKey: "invoice_no", addCompanyId: true },
-  { extractFile: "official-receipts",  table: "official_receipts",  colMap: OFFICIAL_RECEIPTS_MAP, uniqueKey: "or_no",   addCompanyId: true },
+  { extractFile: "official-receipts",  table: "official_receipts",  colMap: OFFICIAL_RECEIPTS_MAP, uniqueKey: "receipt_no", addCompanyId: true },
   { extractFile: "commission-records", table: "commission_records", colMap: COMMISSION_RECORDS_MAP, uniqueKey: undefined, addCompanyId: true },
   // Staff last (creates profiles; passwords must be reset separately)
   { extractFile: "staff",              table: "profiles",           colMap: STAFF_MAP,           uniqueKey: "email",      addCompanyId: true },
@@ -412,6 +454,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function hasMappedBusinessField(row: Record<string, unknown>): boolean {
+  return Object.keys(row).some(key => key !== "raw_data" && key !== "company_id");
+}
+
 /** Insert rows in chunks, respecting CHUNK_DELAY between chunks. */
 async function insertChunked(
   table: string,
@@ -425,10 +471,14 @@ async function insertChunked(
 
     if (dryRun) {
       if (i === 0) {
-        console.log(`    [dry-run] Sample row:`, JSON.stringify(chunk[0], null, 2));
+        console.info(`    [dry-run] Sample row:`, JSON.stringify(chunk[0], null, 2));
       }
       inserted += chunk.length;
     } else {
+      if (!supabase) {
+        throw new Error("Supabase client is unavailable outside dry-run mode");
+      }
+
       const { error, data } = await supabase
         .from(table as "vehicles")
         .insert(chunk as never[])
@@ -467,13 +517,13 @@ interface SeedResult {
 }
 
 async function main() {
-  console.log("\n════════════════════════════════════════════════════");
-  console.log("  Proton CRM → Supabase Seed Script");
-  console.log(`  Mode: ${DRY_RUN ? "DRY RUN (no writes)" : "LIVE"}`);
-  console.log(`  Target DB: ${SUPABASE_URL}`);
-  console.log(`  Company ID: ${COMPANY_ID}`);
-  if (ONLY_TABLES.length > 0) console.log(`  Only tables: ${ONLY_TABLES.join(", ")}`);
-  console.log("════════════════════════════════════════════════════\n");
+  console.info("\n════════════════════════════════════════════════════");
+  console.info("  Proton CRM → Supabase Seed Script");
+  console.info(`  Mode: ${DRY_RUN ? "DRY RUN (no writes)" : "LIVE"}`);
+  console.info(`  Target DB: ${SUPABASE_URL}`);
+  console.info(`  Company ID: ${COMPANY_ID}`);
+  if (ONLY_TABLES.length > 0) console.info(`  Only tables: ${ONLY_TABLES.join(", ")}`);
+  console.info("════════════════════════════════════════════════════\n");
 
   const results: SeedResult[] = [];
 
@@ -485,7 +535,7 @@ async function main() {
     const filePath = path.join(EXTRACT_DIR, `${target.extractFile}.json`);
 
     if (!fs.existsSync(filePath)) {
-      console.log(`⚠  ${target.extractFile}: no extract file found — skipping`);
+      console.info(`⚠  ${target.extractFile}: no extract file found — skipping`);
       results.push({ name: target.extractFile, extracted: 0, inserted: 0, skipped: 0, errors: 0, status: "no_file" });
       continue;
     }
@@ -500,12 +550,12 @@ async function main() {
     }
 
     if (rawRows.length === 0) {
-      console.log(`⚠  ${target.extractFile}: 0 rows in extract — skipping`);
+      console.info(`⚠  ${target.extractFile}: 0 rows in extract — skipping`);
       results.push({ name: target.extractFile, extracted: 0, inserted: 0, skipped: 0, errors: 0, status: "empty" });
       continue;
     }
 
-    console.log(`\n[${target.table}]  (${rawRows.length} rows extracted)`);
+    console.info(`\n[${target.table}]  (${rawRows.length} rows extracted)`);
 
     // Map columns
     const dbRows = rawRows.map(raw => {
@@ -513,27 +563,27 @@ async function main() {
       if (target.addCompanyId) mapped["company_id"] = COMPANY_ID;
       if (target.transform) return target.transform(mapped);
       return mapped;
-    }).filter(row => Object.keys(row).length > 1); // drop rows that mapped to nothing
+    }).filter(hasMappedBusinessField); // drop rows that mapped to nothing
 
-    console.log(`  Mapped ${dbRows.length} / ${rawRows.length} rows`);
+    console.info(`  Mapped ${dbRows.length} / ${rawRows.length} rows`);
 
     const { inserted, skipped, errors } = await insertChunked(target.table, dbRows, DRY_RUN);
-    console.log(`  ✓ inserted: ${inserted}  skipped: ${skipped}  errors: ${errors}`);
+    console.info(`  ✓ inserted: ${inserted}  skipped: ${skipped}  errors: ${errors}`);
 
     results.push({ name: target.extractFile, extracted: rawRows.length, inserted, skipped, errors, status: errors > 0 ? "error" : "ok" });
   }
 
   // ── Final summary ──────────────────────────────────────────────────────────
-  console.log("\n════════════════════════════════════════════════════");
-  console.log(`  Seed Summary${DRY_RUN ? " (DRY RUN)" : ""}`);
-  console.log("════════════════════════════════════════════════════");
-  console.log("  Table                    Extracted  Inserted  Skipped  Errors");
-  console.log("  ─────────────────────────────────────────────────────────────");
+  console.info("\n════════════════════════════════════════════════════");
+  console.info(`  Seed Summary${DRY_RUN ? " (DRY RUN)" : ""}`);
+  console.info("════════════════════════════════════════════════════");
+  console.info("  Table                    Extracted  Inserted  Skipped  Errors");
+  console.info("  ─────────────────────────────────────────────────────────────");
 
   let totalExtracted = 0, totalInserted = 0, totalSkipped = 0, totalErrors = 0;
   for (const r of results) {
     const icon = r.status === "ok" ? "✓" : r.status === "no_file" ? "·" : "⚠";
-    console.log(
+    console.info(
       `  ${icon}  ${r.name.padEnd(23)} ${String(r.extracted).padStart(9)} ${String(r.inserted).padStart(9)} ${String(r.skipped).padStart(8)} ${String(r.errors).padStart(7)}`
     );
     totalExtracted += r.extracted;
@@ -541,20 +591,20 @@ async function main() {
     totalSkipped   += r.skipped;
     totalErrors    += r.errors;
   }
-  console.log("  ─────────────────────────────────────────────────────────────");
-  console.log(
+  console.info("  ─────────────────────────────────────────────────────────────");
+  console.info(
     `     ${"TOTAL".padEnd(23)} ${String(totalExtracted).padStart(9)} ${String(totalInserted).padStart(9)} ${String(totalSkipped).padStart(8)} ${String(totalErrors).padStart(7)}`
   );
-  console.log("════════════════════════════════════════════════════\n");
+  console.info("════════════════════════════════════════════════════\n");
 
   if (DRY_RUN) {
-    console.log("  Dry run complete — no data was written.\n");
-    console.log("  To run live:  npx tsx scripts/seed-from-extract.ts\n");
+    console.info("  Dry run complete — no data was written.\n");
+    console.info("  To run live:  npx tsx scripts/seed-from-extract.ts\n");
   } else if (totalErrors > 0) {
     console.warn("  ⚠  Some rows had errors. Review the column map and retry with --only <table>.\n");
     process.exit(1);
   } else {
-    console.log("  Seed complete.\n");
+    console.info("  Seed complete.\n");
   }
 }
 

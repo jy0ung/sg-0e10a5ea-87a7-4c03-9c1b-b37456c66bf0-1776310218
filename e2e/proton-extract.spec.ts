@@ -12,10 +12,12 @@
  *  - customers.json
  *  - sales-orders.json
  *  - invoices.json
+ *  - purchase-invoices.json
  *  - dealer-invoices.json
  *  - official-receipts.json
  *  - commission-records.json
  *  - staff.json
+ *  - sales-advisors.json
  *  - branches.json
  *  - finance-companies.json
  *  - insurance-companies.json
@@ -75,7 +77,16 @@ interface Target {
   tabText?: string;
   /** Fallback URL(s) to try if the primary 404s */
   fallbacks?: string[];
+  /** Optional per-target pagination safety cap. */
+  maxPages?: number;
 }
+
+const EXTRACT_ONLY = new Set(
+  (process.env.EXTRACT_ONLY ?? "")
+    .split(",")
+    .map(name => name.trim())
+    .filter(Boolean),
+);
 
 const TARGETS: Target[] = [
   // ── Vehicles / Stock ────────────────────────────────────────────────────
@@ -87,20 +98,27 @@ const TARGETS: Target[] = [
   // ── Customers ───────────────────────────────────────────────────────────
   {
     name:     "customers",
-    url:      "customer.php",
-    fallbacks: ["customers.php", "prospect.php"],
+    url:      "viewCustomerInfo.php",
+    fallbacks: ["customer.php", "customers.php", "prospect.php"],
+    maxPages: 250,
   },
   // ── Sales Orders ────────────────────────────────────────────────────────
   {
     name:     "sales-orders",
-    url:      "viewSalesOrder.php",
-    fallbacks: ["salesOrder.php", "booking.php", "so.php"],
+    url:      "viewSalesBooking.php",
+    fallbacks: ["viewSalesOrder.php", "salesOrder.php", "booking.php", "so.php"],
   },
   // ── Invoices ────────────────────────────────────────────────────────────
   {
     name:     "invoices",
-    url:      "viewInvoice.php",
-    fallbacks: ["invoice.php", "invoices.php"],
+    url:      "invoiceReport.php",
+    fallbacks: ["viewInvoice.php", "invoice.php", "invoices.php"],
+  },
+  // ── Purchase Invoices ──────────────────────────────────────────────────
+  {
+    name:     "purchase-invoices",
+    url:      "invoiceList.php",
+    fallbacks: ["purchaseInvoice.php", "purchaseInvoices.php"],
   },
   // ── Dealer Invoices ─────────────────────────────────────────────────────
   {
@@ -123,8 +141,14 @@ const TARGETS: Target[] = [
   // ── Staff / Users ───────────────────────────────────────────────────────
   {
     name:     "staff",
-    url:      "staffList.php",
-    fallbacks: ["staff.php", "user.php", "users.php"],
+    url:      "viewStaff.php",
+    fallbacks: ["staffList.php", "staff.php", "user.php", "users.php"],
+  },
+  // ── Sales Advisors ─────────────────────────────────────────────────────
+  {
+    name:     "sales-advisors",
+    url:      "viewSalesAdvisor.php",
+    fallbacks: ["salesAdvisor.php", "viewSalesman.php", "salesman.php"],
   },
   // ── Branches ────────────────────────────────────────────────────────────
   {
@@ -141,20 +165,20 @@ const TARGETS: Target[] = [
   // ── Insurance Companies ─────────────────────────────────────────────────
   {
     name:     "insurance-companies",
-    url:      "viewInsurance.php",
-    fallbacks: ["insurance.php", "insuranceCompany.php"],
+    url:      "viewInsuranceCompany.php",
+    fallbacks: ["viewInsurance.php", "insurance.php", "insuranceCompany.php"],
   },
   // ── Vehicle Models ──────────────────────────────────────────────────────
   {
     name:     "vehicle-models",
-    url:      "viewModel.php",
-    fallbacks: ["model.php", "vehicleModel.php"],
+    url:      "viewVehicleModel.php",
+    fallbacks: ["viewModel.php", "model.php", "vehicleModel.php"],
   },
   // ── Vehicle Colours ─────────────────────────────────────────────────────
   {
     name:     "vehicle-colours",
-    url:      "viewColour.php",
-    fallbacks: ["colour.php", "color.php"],
+    url:      "viewVehicleColor.php",
+    fallbacks: ["viewColour.php", "colour.php", "color.php"],
   },
   // ── Payment Types ───────────────────────────────────────────────────────
   {
@@ -204,8 +228,9 @@ function writeExtract(name: string, rows: Record<string, string>[]) {
     try { existing = JSON.parse(fs.readFileSync(outPath, "utf8")); } catch { /* fresh file */ }
   }
   const merged = [...existing, ...rows];
-  fs.writeFileSync(outPath, JSON.stringify(merged, null, 2), "utf8");
-  console.log(`  ✓ ${name}: wrote ${rows.length} rows (total ${merged.length} in file)`);
+  const deduped = Array.from(new Map(merged.map(row => [JSON.stringify(row), row])).values());
+  fs.writeFileSync(outPath, JSON.stringify(deduped, null, 2), "utf8");
+  console.log(`  ✓ ${name}: wrote ${rows.length} rows (total ${deduped.length} in file)`);
 }
 
 /**
@@ -233,8 +258,9 @@ async function extractTableRows(page: Page): Promise<Record<string, string>[]> {
         const obj: Record<string, string> = {};
         cells.forEach((cell, idx) => {
           const key = headers[idx] ?? `col_${idx}`;
-          obj[key] = cell.textContent?.trim() ?? "";
+          obj[key] = cell.textContent?.replace(/\s+/g, " ").trim() ?? "";
         });
+        if (Object.values(obj).some(value => /no data available in table/i.test(value))) return;
         results.push(obj);
       });
     });
@@ -257,13 +283,25 @@ async function tryMaxPageSize(page: Page): Promise<void> {
       const nums = options.map(o => parseInt(o.replace(/[^0-9]/g, ""), 10)).filter(n => !isNaN(n));
       if (nums.length > 0) {
         const max = Math.max(...nums);
-        await lengthSelect.selectOption({ value: String(max) });
+        await lengthSelect.selectOption({ label: String(max) }).catch(async () => {
+          await lengthSelect.selectOption({ value: String(max) });
+        });
+        await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
         await page.waitForTimeout(1_000);
       }
     }
   } catch {
     // Not a DataTables page — ignore
   }
+}
+
+async function waitForTableRows(page: Page): Promise<void> {
+  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+  await page
+    .locator("table tbody tr")
+    .first()
+    .waitFor({ state: "attached", timeout: 15_000 })
+    .catch(() => undefined);
 }
 
 /**
@@ -324,6 +362,7 @@ async function extractTarget(page: Page, target: Target): Promise<number> {
 
       landed = true;
       console.log(`  → ${slug} (${response.status()})`);
+      await waitForTableRows(page);
       break;
     } catch (err) {
       console.log(`  ✗ Error loading ${slug}: ${(err as Error).message}`);
@@ -345,12 +384,14 @@ async function extractTarget(page: Page, target: Target): Promise<number> {
 
   // Set page size to maximum
   await tryMaxPageSize(page);
+  await waitForTableRows(page);
 
   // Paginate and collect all rows
   const allRows: Record<string, string>[] = [];
   let pageNum = 0;
 
-  for (let i = 0; i < MAX_PAGES; i++) {
+  const maxPages = target.maxPages ?? MAX_PAGES;
+  for (let i = 0; i < maxPages; i++) {
     const rows = await extractTableRows(page);
     allRows.push(...rows);
     pageNum++;
@@ -402,7 +443,7 @@ test.describe("Proton CRM — Data Extraction", () => {
 
   // ── Step 2: Extract all data pages ─────────────────────────────────────
   test("Step 2 — Extract table data from all pages", async ({ browser }) => {
-    test.setTimeout(600_000); // up to 10 minutes — we're being polite
+    test.setTimeout(1_800_000); // up to 30 minutes — we're being polite
 
     const context = await browser.newContext({
       storageState: AUTH_STATE_PATH,
@@ -411,7 +452,11 @@ test.describe("Proton CRM — Data Extraction", () => {
 
     summary = [];
 
-    for (const target of TARGETS) {
+    const targets = EXTRACT_ONLY.size > 0
+      ? TARGETS.filter(target => EXTRACT_ONLY.has(target.name))
+      : TARGETS;
+
+    for (const target of targets) {
       console.log(`\n[${target.name}]`);
       const rows = await extractTarget(page, target);
       summary.push({

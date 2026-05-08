@@ -1,41 +1,37 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
   AlertCircle,
-  CalendarDays,
-  CheckCircle2,
-  ClipboardList,
-  Clock3,
+  ChevronDown,
+  ChevronUp,
   Download,
-  Inbox,
   Loader2,
-  MessageSquare,
-  Paperclip,
   RefreshCcw,
-  Search,
-  Send,
   ShieldCheck,
-  UserRound,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { TicketActivityList } from '@/components/tickets/TicketActivityList';
-import { TicketAttachmentList } from '@/components/tickets/TicketAttachmentList';
+import { Card, CardContent } from '@/components/ui/card';
+import { RequestDetailPanel } from '@/components/tickets/RequestDetailPanel';
+import { RequestQueueFilters, type PriorityFilter, type SlaFilter, type StatusFilter } from '@/components/tickets/RequestQueueFilters';
+import { RequestQueueList } from '@/components/tickets/RequestQueueList';
+import { RequestQueueMetricGrid } from '@/components/tickets/RequestQueueMetricGrid';
 import { Textarea } from '@/components/ui/textarea';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Drawer,
+  DrawerContent,
+} from '@/components/ui/drawer';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   addTicketComment,
   listCompanyTickets,
@@ -46,27 +42,23 @@ import {
   type TicketStatus,
   updateTicket,
 } from '@/services/ticketService';
+import { reviewInternalRequestApproval } from '@/services/requestApprovalService';
 import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
 import { listProfiles, type ProfileRow } from '@/services/profileService';
 import { ADMIN_ONLY } from '@/config/routeRoles';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
+import { formatSlaState, getTicketSlaSummary } from '@/lib/ticketSla';
 
-type StatusFilter = 'all' | TicketStatus;
-type PriorityFilter = 'all' | TicketPriority;
-
-const statusVariant: Record<TicketStatus, 'default' | 'secondary' | 'outline'> = {
-  open: 'default',
-  in_progress: 'secondary',
-  resolved: 'outline',
-  closed: 'outline',
-};
+type ApprovalReviewTarget = { ticketId: string; decision: 'approved' | 'rejected' } | null;
 
 const statusOptions: Array<{ value: TicketStatus; label: string }> = [
   { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In Progress' },
+  { value: 'awaiting_requester', label: 'Awaiting Requester' },
   { value: 'resolved', label: 'Resolved' },
   { value: 'closed', label: 'Closed' },
+  { value: 'cancelled', label: 'Cancelled' },
 ];
 
 const priorityOptions: Array<{ value: TicketPriority; label: string }> = [
@@ -75,49 +67,38 @@ const priorityOptions: Array<{ value: TicketPriority; label: string }> = [
   { value: 'high', label: 'High' },
 ];
 
-const priorityVariant: Record<TicketPriority, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  low: 'outline',
-  medium: 'secondary',
-  high: 'destructive',
-};
-
 const requestOwnerRoles = new Set(ADMIN_ONLY);
+
+function useIsLargeScreen() {
+  const [isLargeScreen, setIsLargeScreen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia('(min-width: 1024px)').matches;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const handleChange = () => setIsLargeScreen(mediaQuery.matches);
+    handleChange();
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  return isLargeScreen;
+}
 
 function formatTicketLabel(value: string) {
   return value.replace(/_/g, ' ');
 }
 
-
-function formatDueDate(value: string) {
-  return new Date(`${value}T00:00:00`).toLocaleDateString('en-MY', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
 function isOpenStatus(status: TicketStatus) {
-  return status === 'open' || status === 'in_progress';
+  return status === 'open' || status === 'in_progress' || status === 'awaiting_requester';
 }
 
-function isOverdue(ticket: CompanyTicketRecord) {
-  if (!ticket.requested_due_date || !isOpenStatus(ticket.status)) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return new Date(`${ticket.requested_due_date}T00:00:00`) < today;
-}
-
-function customFieldEntries(
-  ticket: CompanyTicketRecord,
-  labelMap: Record<string, string>,
-) {
-  return Object.entries(ticket.custom_fields ?? {})
-    .filter(([, value]) => value !== null && value !== undefined && String(value).trim().length > 0)
-    .map(([key, value]) => ({
-      key,
-      label: labelMap[`${ticket.category}:${key}`] ?? formatTicketLabel(key),
-      value: typeof value === 'string' ? value : JSON.stringify(value),
-    }));
+function isApprovalAssignedToUser(ticket: CompanyTicketRecord, user: { id?: string; role?: string } | null | undefined) {
+  if (!user || ticket.approval_status !== 'pending') return false;
+  return ticket.current_approver_user_id === user.id || ticket.current_approver_role === user.role;
 }
 
 function csvCell(value: unknown): string {
@@ -138,6 +119,7 @@ function downloadCsv(filename: string, rows: string[][]) {
 
 export default function RequestQueue() {
   const { user } = useAuth();
+  const isLargeScreen = useIsLargeScreen();
   const { categories } = useRequestCategories(user?.company_id, true);
   const { subcategories } = useRequestSubcategories(user?.company_id, { includeInactive: true });
   const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
@@ -149,9 +131,17 @@ export default function RequestQueue() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
+  const [slaFilter, setSlaFilter] = useState<SlaFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
+  const [metricsExpanded, setMetricsExpanded] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.localStorage.getItem('requestQueue.metricsExpanded') !== 'false';
+  });
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<ApprovalReviewTarget>(null);
+  const [reviewNote, setReviewNote] = useState('');
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
 
@@ -206,11 +196,21 @@ export default function RequestQueue() {
     void loadTickets();
   }, [loadTickets]);
 
+  useEffect(() => {
+    if (isLargeScreen) setDetailDrawerOpen(false);
+  }, [isLargeScreen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('requestQueue.metricsExpanded', String(metricsExpanded));
+  }, [metricsExpanded]);
+
   const filteredTickets = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
     return tickets.filter((ticket) => {
       if (statusFilter !== 'all' && ticket.status !== statusFilter) return false;
       if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;
+      if (slaFilter !== 'all' && getTicketSlaSummary(ticket).overall !== slaFilter) return false;
       if (!normalizedSearch) return true;
 
       const haystack = [
@@ -229,7 +229,7 @@ export default function RequestQueue() {
 
       return haystack.includes(normalizedSearch);
     });
-  }, [categories, priorityFilter, searchTerm, statusFilter, subcategories, tickets]);
+  }, [categories, priorityFilter, searchTerm, slaFilter, statusFilter, subcategories, tickets]);
 
   const selectedTicket = useMemo(() => {
     return filteredTickets.find((ticket) => ticket.id === selectedTicketId) ?? filteredTickets[0] ?? null;
@@ -251,15 +251,16 @@ export default function RequestQueue() {
         summary[ticket.status] += 1;
         return summary;
       },
-      { all: tickets.length, open: 0, in_progress: 0, resolved: 0, closed: 0 },
+      { all: tickets.length, open: 0, in_progress: 0, awaiting_requester: 0, resolved: 0, closed: 0, cancelled: 0 },
     );
   }, [tickets]);
 
   const queueMetrics = useMemo(() => ({
     unassigned: tickets.filter((ticket) => isOpenStatus(ticket.status) && !ticket.assigned_to).length,
-    overdue: tickets.filter(isOverdue).length,
-    highPriority: tickets.filter((ticket) => isOpenStatus(ticket.status) && ticket.priority === 'high').length,
+    slaBreached: tickets.filter((ticket) => getTicketSlaSummary(ticket).overall === 'breached').length,
+    slaAtRisk: tickets.filter((ticket) => getTicketSlaSummary(ticket).overall === 'at_risk').length,
     active: tickets.filter((ticket) => isOpenStatus(ticket.status)).length,
+    awaitingApproval: tickets.filter((ticket) => ticket.approval_status === 'pending').length,
   }), [tickets]);
 
   const refreshTicketActivity = useCallback(async (ticketId: string) => {
@@ -430,14 +431,39 @@ export default function RequestQueue() {
     void refreshTicketActivity(ticketId);
   };
 
+  const handleApprovalReview = async () => {
+    if (!user || !reviewTarget) return;
+
+    setSavingTicketId(reviewTarget.ticketId);
+    setError(null);
+    const { error: reviewError } = await reviewInternalRequestApproval(
+      reviewTarget.ticketId,
+      reviewTarget.decision,
+      reviewNote,
+      { userId: user.id, companyId: user.company_id },
+    );
+    setSavingTicketId(null);
+
+    if (reviewError) {
+      setError(reviewError);
+      return;
+    }
+
+    toast.success(reviewTarget.decision === 'approved' ? 'Request approval recorded' : 'Request rejected');
+    setReviewTarget(null);
+    setReviewNote('');
+    await loadTickets();
+  };
+
   const handleExportCsv = () => {
     const rows = [
-      ['ID', 'Subject', 'Status', 'Priority', 'Category', 'Subcategory', 'Requester', 'Owner', 'Due date', 'Created at'],
+      ['ID', 'Subject', 'Status', 'Priority', 'SLA', 'Category', 'Subcategory', 'Requester', 'Owner', 'Requested due date', 'Created at'],
       ...filteredTickets.map((ticket) => [
         ticket.id,
         ticket.subject,
         formatTicketLabel(ticket.status),
         ticket.priority,
+        formatSlaState(getTicketSlaSummary(ticket).overall),
         getRequestCategoryLabel(ticket.category, categories),
         ticket.subcategory ? getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories) : '',
         ticket.submitted_by_name ?? ticket.submitted_by_email ?? '',
@@ -450,18 +476,60 @@ export default function RequestQueue() {
     downloadCsv(`internal-requests-${new Date().toISOString().slice(0, 10)}.csv`, rows);
   };
 
+  const renderDetailPanel = (ticket: CompanyTicketRecord, variant: 'pane' | 'drawer' = 'pane') => (
+    <RequestDetailPanel
+      ticket={ticket}
+      categories={categories}
+      subcategories={subcategories}
+      assignees={assignees}
+      activities={activitiesByTicket[ticket.id] ?? []}
+      attachments={attachmentsByTicket[ticket.id] ?? []}
+      customFieldLabelMap={customFieldLabelMap}
+      statusOptions={statusOptions}
+      priorityOptions={priorityOptions}
+      saving={savingTicketId === ticket.id}
+      noteDraft={noteDrafts[ticket.id] ?? ''}
+      commentDraft={commentDrafts[ticket.id] ?? ''}
+      canReviewApproval={isApprovalAssignedToUser(ticket, user)}
+      variant={variant}
+      onStatusChange={(ticketId, status) => void handleStatusChange(ticketId, status)}
+      onPriorityChange={(ticketId, priority) => void handlePriorityChange(ticketId, priority)}
+      onAssignmentChange={(ticketId, value) => void handleAssignmentChange(ticketId, value)}
+      onResolutionNoteChange={(ticketId, value) => setNoteDrafts((current) => ({
+        ...current,
+        [ticketId]: value,
+      }))}
+      onResolutionNoteSave={(ticketId) => void handleResolutionNoteSave(ticketId)}
+      onCommentChange={(ticketId, value) => setCommentDrafts((current) => ({
+        ...current,
+        [ticketId]: value,
+      }))}
+      onAddComment={(ticketId) => void handleAddComment(ticketId)}
+      onReviewApproval={(ticketId, decision) => setReviewTarget({ ticketId, decision })}
+    />
+  );
+
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Internal Requests</p>
           <h1 className="text-xl font-bold text-foreground">Request Workbench</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 hidden text-sm text-muted-foreground lg:block">
             Triage demand, assign accountable owners, and close the loop with requester-visible outcomes.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setMetricsExpanded((current) => !current)}
+            className="gap-2"
+            aria-expanded={metricsExpanded}
+          >
+            {metricsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            Summary
+          </Button>
           <Button variant="outline" onClick={handleExportCsv} className="gap-2" disabled={loading || filteredTickets.length === 0}>
             <Download className="h-4 w-4" />
             Export CSV
@@ -473,84 +541,21 @@ export default function RequestQueue() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
-            <CardDescription>Active work</CardDescription>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <p className="text-xl font-semibold">{queueMetrics.active}</p>
-            <p className="text-xs text-muted-foreground">Open and in progress</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
-            <CardDescription>Unassigned</CardDescription>
-            <Inbox className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <p className="text-xl font-semibold">{queueMetrics.unassigned}</p>
-            <p className="text-xs text-muted-foreground">Needs an owner</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
-            <CardDescription>Overdue</CardDescription>
-            <Clock3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <p className="text-xl font-semibold">{queueMetrics.overdue}</p>
-            <p className="text-xs text-muted-foreground">Past requested date</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
-            <CardDescription>High priority</CardDescription>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <p className="text-xl font-semibold">{queueMetrics.highPriority}</p>
-            <p className="text-xs text-muted-foreground">Active escalations</p>
-          </CardContent>
-        </Card>
-      </div>
+      {metricsExpanded && <RequestQueueMetricGrid metrics={queueMetrics} />}
 
-      <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-2 lg:flex-row lg:items-center">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search title, requester, owner, impact, VSO, category..."
-            className="pl-9"
-          />
-        </div>
-        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
-          <SelectTrigger className="lg:w-[190px]">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All statuses ({counts.all})</SelectItem>
-            {statusOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label} ({counts[option.value]})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={priorityFilter} onValueChange={(value) => setPriorityFilter(value as PriorityFilter)}>
-          <SelectTrigger className="lg:w-[170px]">
-            <SelectValue placeholder="Priority" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All priorities</SelectItem>
-            {priorityOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <RequestQueueFilters
+        searchTerm={searchTerm}
+        statusFilter={statusFilter}
+        priorityFilter={priorityFilter}
+        slaFilter={slaFilter}
+        counts={counts}
+        statusOptions={statusOptions}
+        priorityOptions={priorityOptions}
+        onSearchChange={setSearchTerm}
+        onStatusChange={setStatusFilter}
+        onPriorityChange={setPriorityFilter}
+        onSlaChange={setSlaFilter}
+      />
 
       {loading ? (
         <Card>
@@ -585,278 +590,70 @@ export default function RequestQueue() {
         </Card>
       ) : selectedTicket ? (
         <div className="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.3fr)]">
-          <section className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="flex items-center justify-between border-b border-border px-3 py-2">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Queue</h2>
-                <p className="text-xs text-muted-foreground">{filteredTickets.length} requests in view</p>
-              </div>
-              <Badge variant="outline">{counts.open} open</Badge>
-            </div>
+          <RequestQueueList
+            tickets={filteredTickets}
+            selectedTicketId={selectedTicket.id}
+            openCount={counts.open}
+            categories={categories}
+            subcategories={subcategories}
+            attachmentsByTicket={attachmentsByTicket}
+            onSelectTicket={(ticketId) => {
+              setSelectedTicketId(ticketId);
+              if (!isLargeScreen) setDetailDrawerOpen(true);
+            }}
+          />
 
-            <div className="max-h-[calc(100vh-19rem)] overflow-y-auto">
-              {filteredTickets.map((ticket) => {
-                const selected = ticket.id === selectedTicket.id;
-                const categoryLabel = getRequestCategoryLabel(ticket.category, categories);
-                const subcategoryLabel = ticket.subcategory
-                  ? getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories)
-                  : null;
-
-                return (
-                  <button
-                    key={ticket.id}
-                    type="button"
-                    onClick={() => setSelectedTicketId(ticket.id)}
-                    className={`w-full border-b border-border px-3 py-2.5 text-left transition-colors last:border-b-0 ${
-                      selected ? 'bg-primary/5' : 'hover:bg-muted/50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-1">
-                        <p className="truncate text-sm font-medium text-foreground">{ticket.subject}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {ticket.submitted_by_name ?? 'Unknown requester'} · {categoryLabel}{subcategoryLabel ? ` / ${subcategoryLabel}` : ''}
-                        </p>
-                      </div>
-                      <Badge variant={statusVariant[ticket.status]} className="shrink-0 capitalize">
-                        {formatTicketLabel(ticket.status)}
-                      </Badge>
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <Badge variant={priorityVariant[ticket.priority]} className="capitalize">
-                        {ticket.priority}
-                      </Badge>
-                      <span>{ticket.assigned_to_name ?? 'Unassigned'}</span>
-                      {ticket.requested_due_date && (
-                        <span className={isOverdue(ticket) ? 'font-medium text-destructive' : ''}>
-                          Needed {formatDueDate(ticket.requested_due_date)}
-                        </span>
-                      )}
-                      {(attachmentsByTicket[ticket.id]?.length ?? 0) > 0 && (
-                        <span className="inline-flex items-center gap-1">
-                          <Paperclip className="h-3.5 w-3.5" />
-                          {attachmentsByTicket[ticket.id]?.length}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-border bg-card">
-            <div className="border-b border-border px-4 py-3">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="min-w-0 space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant={statusVariant[selectedTicket.status]} className="capitalize">
-                      {formatTicketLabel(selectedTicket.status)}
-                    </Badge>
-                    <Badge variant={priorityVariant[selectedTicket.priority]} className="capitalize">
-                      {selectedTicket.priority} priority
-                    </Badge>
-                    {isOverdue(selectedTicket) && <Badge variant="destructive">Overdue</Badge>}
-                  </div>
-                  <h2 className="text-lg font-semibold text-foreground">{selectedTicket.subject}</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Submitted {formatDistanceToNow(new Date(selectedTicket.created_at), { addSuffix: true })}
-                    {selectedTicket.vso_number ? ` · VSO ${selectedTicket.vso_number}` : ''}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 p-4">
-              {(() => {
-                const extraFields = customFieldEntries(selectedTicket, customFieldLabelMap);
-
-                return extraFields.length > 0 ? (
-                  <div className="rounded-lg border border-border px-3 py-2.5">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Additional details</p>
-                    <div className="mt-2 grid gap-2 md:grid-cols-2">
-                      {extraFields.map((field) => (
-                        <div key={field.key} className="min-w-0">
-                          <p className="text-xs text-muted-foreground">{field.label}</p>
-                          <p className="truncate text-sm text-foreground">{field.value}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null;
-              })()}
-
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
-                  <Select
-                    value={selectedTicket.status}
-                    onValueChange={(value) => void handleStatusChange(selectedTicket.id, value as TicketStatus)}
-                    disabled={savingTicketId === selectedTicket.id}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Set status" /></SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Priority</p>
-                  <Select
-                    value={selectedTicket.priority}
-                    onValueChange={(value) => void handlePriorityChange(selectedTicket.id, value as TicketPriority)}
-                    disabled={savingTicketId === selectedTicket.id}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Set priority" /></SelectTrigger>
-                    <SelectContent>
-                      {priorityOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Owner</p>
-                  <Select
-                    value={selectedTicket.assigned_to ?? 'unassigned'}
-                    onValueChange={(value) => void handleAssignmentChange(selectedTicket.id, value)}
-                    disabled={savingTicketId === selectedTicket.id}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Assign owner" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {assignees.map((assignee) => (
-                        <SelectItem key={assignee.id} value={assignee.id}>{assignee.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-lg border border-border px-3 py-2.5">
-                  <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <UserRound className="h-3.5 w-3.5" />
-                    Requester
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-foreground">{selectedTicket.submitted_by_name ?? 'Unknown requester'}</p>
-                  {selectedTicket.submitted_by_email && <p className="mt-1 truncate text-xs text-muted-foreground">{selectedTicket.submitted_by_email}</p>}
-                </div>
-                <div className="rounded-lg border border-border px-3 py-2.5">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Category</p>
-                  <p className="mt-2 text-sm font-medium text-foreground">{getRequestCategoryLabel(selectedTicket.category, categories)}</p>
-                  {selectedTicket.subcategory && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {getRequestSubcategoryLabel(selectedTicket.subcategory, selectedTicket.category, subcategories)}
-                    </p>
-                  )}
-                </div>
-                <div className="rounded-lg border border-border px-3 py-2.5">
-                  <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    Timing
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-foreground">
-                    {selectedTicket.requested_due_date ? formatDueDate(selectedTicket.requested_due_date) : 'No target date'}
-                  </p>
-                  {selectedTicket.resolved_at && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Resolved {formatDistanceToNow(new Date(selectedTicket.resolved_at), { addSuffix: true })}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Request detail</p>
-                <p className="whitespace-pre-line text-sm leading-5 text-foreground">{selectedTicket.description}</p>
-              </div>
-
-              {(selectedTicket.desired_outcome || selectedTicket.business_impact) && (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {selectedTicket.desired_outcome && (
-                    <div className="rounded-lg border border-border px-3 py-2.5">
-                      <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Desired outcome
-                      </p>
-                      <p className="mt-1 text-sm leading-5 text-foreground">{selectedTicket.desired_outcome}</p>
-                    </div>
-                  )}
-                  {selectedTicket.business_impact && (
-                    <div className="rounded-lg border border-border px-3 py-2.5">
-                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Business impact</p>
-                      <p className="mt-1 text-sm leading-5 text-foreground">{selectedTicket.business_impact}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {(selectedTicket.status === 'resolved' || selectedTicket.status === 'closed' || selectedTicket.resolution_note) && (
-                <div className="space-y-2 rounded-lg border border-border bg-secondary/20 px-3 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resolution note</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleResolutionNoteSave(selectedTicket.id)}
-                      disabled={savingTicketId === selectedTicket.id || (noteDrafts[selectedTicket.id] ?? '') === (selectedTicket.resolution_note ?? '')}
-                    >
-                      Save note
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={noteDrafts[selectedTicket.id] ?? ''}
-                    onChange={(event) => setNoteDrafts((current) => ({
-                      ...current,
-                      [selectedTicket.id]: event.target.value,
-                    }))}
-                    placeholder="Explain the outcome or next step visible to the requester."
-                    rows={3}
-                    disabled={savingTicketId === selectedTicket.id}
-                  />
-                  <p className="text-xs text-muted-foreground">Shown to the requester when their request is resolved or closed.</p>
-                </div>
-              )}
-
-              <TicketAttachmentList attachments={attachmentsByTicket[selectedTicket.id] ?? []} />
-
-              <div className="space-y-2 rounded-lg border border-border px-3 py-3">
-                <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  Discussion
-                </p>
-                <Textarea
-                  value={commentDrafts[selectedTicket.id] ?? ''}
-                  onChange={(event) => setCommentDrafts((current) => ({
-                    ...current,
-                    [selectedTicket.id]: event.target.value,
-                  }))}
-                  placeholder="Ask for clarification, add an update, or document the next step."
-                  rows={3}
-                  disabled={savingTicketId === selectedTicket.id}
-                />
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => void handleAddComment(selectedTicket.id)}
-                    disabled={savingTicketId === selectedTicket.id || !commentDrafts[selectedTicket.id]?.trim()}
-                  >
-                    {savingTicketId === selectedTicket.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    Add comment
-                  </Button>
-                </div>
-              </div>
-
-              <TicketActivityList activities={activitiesByTicket[selectedTicket.id] ?? []} />
-            </div>
+          <section className="hidden rounded-xl border border-border bg-card lg:block">
+            {renderDetailPanel(selectedTicket)}
           </section>
         </div>
       ) : null}
+
+      <Drawer open={!isLargeScreen && detailDrawerOpen && !!selectedTicket} onOpenChange={setDetailDrawerOpen}>
+        <DrawerContent className="max-h-[92vh]">
+          {selectedTicket && (
+            <div className="overflow-y-auto px-4 pb-6 pt-3">
+              {renderDetailPanel(selectedTicket, 'drawer')}
+            </div>
+          )}
+        </DrawerContent>
+      </Drawer>
+
+      <Dialog open={!!reviewTarget} onOpenChange={(open) => {
+        if (!open) {
+          setReviewTarget(null);
+          setReviewNote('');
+        }
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{reviewTarget?.decision === 'approved' ? 'Approve request' : 'Reject request'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {reviewTarget?.decision === 'approved'
+                ? 'Record your approval decision for the current workflow step.'
+                : 'Rejecting this approval will cancel the request and notify the requester.'}
+            </p>
+            <Textarea
+              value={reviewNote}
+              onChange={(event) => setReviewNote(event.target.value)}
+              rows={3}
+              placeholder="Optional approval note"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReviewTarget(null)}>Cancel</Button>
+            <Button
+              onClick={() => void handleApprovalReview()}
+              disabled={!!reviewTarget && savingTicketId === reviewTarget.ticketId}
+              variant={reviewTarget?.decision === 'rejected' ? 'destructive' : 'default'}
+            >
+              {!!reviewTarget && savingTicketId === reviewTarget.ticketId ? 'Saving...' : reviewTarget?.decision === 'approved' ? 'Approve' : 'Reject'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

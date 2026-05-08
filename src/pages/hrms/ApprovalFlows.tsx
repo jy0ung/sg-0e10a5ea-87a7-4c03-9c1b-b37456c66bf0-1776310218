@@ -38,6 +38,7 @@ const ENTITY_TYPE_LABELS: Record<FlowEntityType, string> = {
   leave_request: 'Leave Request',
   payroll_run:   'Payroll Run',
   appraisal:     'Appraisal',
+  internal_request: 'Internal Request',
   general:       'General',
 };
 
@@ -45,6 +46,7 @@ const ENTITY_TYPE_BADGE: Record<FlowEntityType, string> = {
   leave_request: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   payroll_run:   'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   appraisal:     'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  internal_request: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
   general:       'bg-secondary text-secondary-foreground',
 };
 
@@ -272,7 +274,7 @@ export default function ApprovalFlows() {
 
       {/* Filter tabs */}
       <div className="flex gap-2 flex-wrap">
-        {(['all', 'leave_request', 'payroll_run', 'appraisal', 'general'] as const).map(et => (
+        {(['all', 'leave_request', 'payroll_run', 'appraisal', 'internal_request', 'general'] as const).map(et => (
           <Button
             key={et}
             size="sm"

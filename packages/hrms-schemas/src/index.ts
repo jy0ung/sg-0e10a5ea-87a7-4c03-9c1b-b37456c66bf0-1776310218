@@ -105,7 +105,7 @@ export const approvalStepSchema = z.object({
 export const approvalFlowSchema = z.object({
   name:        z.string().min(2, 'Name must be at least 2 characters').max(80),
   description: z.string().max(300).optional(),
-  entityType:  z.enum(['leave_request', 'payroll_run', 'appraisal', 'general']),
+  entityType:  z.enum(['leave_request', 'payroll_run', 'appraisal', 'internal_request', 'general']),
   isActive:    z.boolean().default(true),
 });
 

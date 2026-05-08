@@ -1,12 +1,25 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { AlertCircle, CalendarDays, CheckCircle2, Loader2, MessageSquare, RefreshCcw, Send, Ticket } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Loader2, MessageSquare, RefreshCcw, Send, Ticket, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
 import { TicketAttachmentList } from '@/components/tickets/TicketAttachmentList';
+import { TicketApprovalSummary } from '@/components/tickets/TicketApprovalSummary';
+import { TicketSlaSummary } from '@/components/tickets/TicketSlaSummary';
 import { Textarea } from '@/components/ui/textarea';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
@@ -15,6 +28,7 @@ import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
 import {
   addTicketComment,
+  cancelMyTicket,
   listMyTickets,
   listTicketActivity,
   type RequestTicketRecord,
@@ -22,11 +36,13 @@ import {
 } from '@/services/ticketService';
 import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
 
-const statusVariant: Record<RequestTicketRecord['status'], 'default' | 'secondary' | 'outline'> = {
+const statusVariant: Record<RequestTicketRecord['status'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
   open: 'default',
   in_progress: 'secondary',
+  awaiting_requester: 'outline',
   resolved: 'outline',
   closed: 'outline',
+  cancelled: 'outline',
 };
 
 const priorityVariant: Record<RequestTicketRecord['priority'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -72,6 +88,7 @@ export default function MyTickets() {
   const [error, setError] = useState<string | null>(null);
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [savingCommentId, setSavingCommentId] = useState<string | null>(null);
+  const [cancellingTicketId, setCancellingTicketId] = useState<string | null>(null);
 
   const customFieldLabelMap = useMemo(
     () => Object.fromEntries(formFields.map((field) => [`${field.category_key}:${field.key}`, field.label])),
@@ -106,6 +123,37 @@ export default function MyTickets() {
     }
 
     setCommentDrafts((current) => ({ ...current, [ticketId]: '' }));
+    await refreshTicketActivity(ticketId);
+  };
+
+  const handleCancelTicket = async (ticketId: string) => {
+    if (!user) return;
+    setCancellingTicketId(ticketId);
+    setError(null);
+
+    const { data, error: cancelError } = await cancelMyTicket(
+      ticketId,
+      { reason: 'Cancelled by requester.' },
+      { userId: user.id, companyId: user.company_id },
+    );
+
+    setCancellingTicketId(null);
+    if (cancelError || !data) {
+      setError(cancelError?.message || 'Unable to cancel request.');
+      return;
+    }
+
+    setTickets((current) => current.map((ticket) => (
+      ticket.id === ticketId
+        ? {
+          ...ticket,
+          status: data.status,
+          resolved_at: data.resolved_at,
+          resolution_note: data.resolution_note,
+          updated_at: data.updated_at,
+        }
+        : ticket
+    )));
     await refreshTicketActivity(ticketId);
   };
 
@@ -198,6 +246,7 @@ export default function MyTickets() {
         <div className="space-y-3">
           {tickets.map((ticket) => {
             const extraFields = customFieldEntries(ticket, customFieldLabelMap);
+            const canCancel = ticket.status === 'open' && !ticket.assigned_to;
 
             return (
             <Card key={ticket.id}>
@@ -218,6 +267,41 @@ export default function MyTickets() {
                   <Badge variant={priorityVariant[ticket.priority]}>
                     {ticket.priority} priority
                   </Badge>
+                  <TicketApprovalSummary ticket={ticket} compact />
+                  <TicketSlaSummary ticket={ticket} compact />
+                  {canCancel && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1.5 text-destructive hover:text-destructive"
+                          disabled={cancellingTicketId === ticket.id}
+                        >
+                          {cancellingTicketId === ticket.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                          Cancel
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel request?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This request is still open and unassigned. Cancelling it will close the request and remove it from the active queue.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Keep request</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => void handleCancelTicket(ticket.id)}
+                          >
+                            Cancel request
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-2 px-4 pb-4">
@@ -245,6 +329,10 @@ export default function MyTickets() {
                 </div>
 
                 <p className="whitespace-pre-line text-sm leading-5 text-foreground">{ticket.description}</p>
+
+                <TicketSlaSummary ticket={ticket} />
+
+                <TicketApprovalSummary ticket={ticket} />
 
                 {(ticket.desired_outcome || ticket.business_impact) && (
                   <div className="grid gap-3 md:grid-cols-2">
@@ -295,7 +383,7 @@ export default function MyTickets() {
 
                 <TicketAttachmentList attachments={attachmentsByTicket[ticket.id] ?? []} />
 
-                {ticket.status !== 'closed' && (
+                {ticket.status !== 'closed' && ticket.status !== 'cancelled' && (
                   <div className="space-y-2 rounded-lg border border-border px-3 py-3">
                     <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       <MessageSquare className="h-3.5 w-3.5" />

@@ -40,7 +40,7 @@ export default function CustomerServiceLayout() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-30 flex w-56 flex-col border-r border-border bg-card transition-transform duration-200 lg:static lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-30 flex w-[min(13rem,88vw)] flex-col border-r border-border bg-card transition-transform duration-200 lg:static lg:w-56 lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >

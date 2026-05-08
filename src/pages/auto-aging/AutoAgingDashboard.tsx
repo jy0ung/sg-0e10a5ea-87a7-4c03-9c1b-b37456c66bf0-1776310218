@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -9,11 +9,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Download, Upload, X, Loader2, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { AgingTrendChart } from '@/components/charts/AgingTrendChart';
-import { OutlierScatterChart } from '@/components/charts/OutlierScatterChart';
-import { PaymentPieChart } from '@/components/charts/PaymentPieChart';
-import { StagePipelineCard } from '@/components/charts/StagePipelineCard';
-import { KpiTrendChart } from '@/components/charts/KpiTrendChart';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { BranchPeriodFilter } from '@/components/shared/BranchPeriodFilter';
@@ -21,6 +16,20 @@ import { getAutoAgingDashboardSummary, searchVehicles } from '@/services/vehicle
 import { getDashboardPeriodRange, getDashboardScopeSummary, loadDashboardFilterState, saveDashboardFilterState } from '@/lib/dashboardFilters';
 import { AUTO_AGING_BG_DATE_PERIOD_LABEL, getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 import { computeKpiSummaries } from '@/utils/kpi-computation';
+
+const AgingTrendChart = lazy(() => import('@/components/charts/AgingTrendChart').then((module) => ({ default: module.AgingTrendChart })));
+const OutlierScatterChart = lazy(() => import('@/components/charts/OutlierScatterChart').then((module) => ({ default: module.OutlierScatterChart })));
+const PaymentPieChart = lazy(() => import('@/components/charts/PaymentPieChart').then((module) => ({ default: module.PaymentPieChart })));
+const StagePipelineCard = lazy(() => import('@/components/charts/StagePipelineCard').then((module) => ({ default: module.StagePipelineCard })));
+const KpiTrendChart = lazy(() => import('@/components/charts/KpiTrendChart').then((module) => ({ default: module.KpiTrendChart })));
+
+function ChartSectionFallback({ message = 'Loading chart...' }: { message?: string }) {
+  return (
+    <div className="glass-panel p-5 text-sm text-muted-foreground">
+      {message}
+    </div>
+  );
+}
 
 function toServerValue(value: string): string | null {
   return value === 'all' ? null : value;
@@ -340,7 +349,9 @@ export default function AutoAgingDashboard() {
           <h2 className="text-sm font-semibold text-foreground">Cycle Time Trend</h2>
           <p className="text-[11px] text-muted-foreground">Switch KPI by clicking a card above to explore its trajectory.</p>
         </div>
-        <KpiTrendChart vehicles={filtered} selectedKpiId={selectedKpiId} />
+        <Suspense fallback={<ChartSectionFallback message="Loading KPI trend..." />}>
+          <KpiTrendChart vehicles={filtered} selectedKpiId={selectedKpiId} />
+        </Suspense>
       </section>
 
       {/* ── Section 3: Pipeline snapshot ── two equal columns for a balanced snapshot */}
@@ -350,11 +361,15 @@ export default function AutoAgingDashboard() {
           <p className="text-[11px] text-muted-foreground">Current stage distribution and how aging evolves over time.</p>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          <AgingTrendChart vehicles={filtered} />
-          <StagePipelineCard
-            vehicles={filtered}
-            onStageClick={(stage) => navigate(`/auto-aging/vehicles?stage=${stage}`)}
-          />
+          <Suspense fallback={<ChartSectionFallback message="Loading aging trend..." />}>
+            <AgingTrendChart vehicles={filtered} />
+          </Suspense>
+          <Suspense fallback={<ChartSectionFallback message="Loading stage pipeline..." />}>
+            <StagePipelineCard
+              vehicles={filtered}
+              onStageClick={(stage) => navigate(`/auto-aging/vehicles?stage=${stage}`)}
+            />
+          </Suspense>
         </div>
       </section>
 
@@ -364,12 +379,14 @@ export default function AutoAgingDashboard() {
           <h2 className="text-sm font-semibold text-foreground">Segmentation</h2>
           <p className="text-[11px] text-muted-foreground">How the fleet splits across payment channels. Click a slice to drill into that bucket.</p>
         </div>
-        <PaymentPieChart
-          vehicles={filtered}
-          onSliceClick={(method) =>
-            navigate(`/auto-aging/vehicles?payment=${encodeURIComponent(method)}`)
-          }
-        />
+        <Suspense fallback={<ChartSectionFallback message="Loading payment segmentation..." />}>
+          <PaymentPieChart
+            vehicles={filtered}
+            onSliceClick={(method) =>
+              navigate(`/auto-aging/vehicles?payment=${encodeURIComponent(method)}`)
+            }
+          />
+        </Suspense>
       </section>
 
       {/* ── Section 5: Branch performance + Data quality ── */}
@@ -430,7 +447,9 @@ export default function AutoAgingDashboard() {
           <h2 className="text-sm font-semibold text-foreground">Outliers &amp; Slowest Vehicles</h2>
           <p className="text-[11px] text-muted-foreground">Individual vehicles that are dragging the averages.</p>
         </div>
-        <OutlierScatterChart vehicles={filtered} onVehicleClick={(chassis) => navigate(`/auto-aging/vehicles/${chassis}`)} />
+        <Suspense fallback={<ChartSectionFallback message="Loading outlier analysis..." />}>
+          <OutlierScatterChart vehicles={filtered} onVehicleClick={(chassis) => navigate(`/auto-aging/vehicles/${chassis}`)} />
+        </Suspense>
 
         <div className="glass-panel p-5">
           <div className="flex items-center justify-between mb-4">

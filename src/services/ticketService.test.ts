@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { supabase } from '@/integrations/supabase/client';
-import { addTicketComment, createTicket, listMyTickets, listTicketActivity, updateTicket } from './ticketService';
+import { addTicketComment, cancelMyTicket, createTicket, listMyTickets, listTicketActivity, updateTicket } from './ticketService';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
 import { evaluateRoutingRules } from './requestRoutingService';
@@ -8,6 +8,7 @@ import { evaluateRoutingRules } from './requestRoutingService';
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: vi.fn(),
+    rpc: vi.fn(),
   },
 }));
 
@@ -32,7 +33,26 @@ vi.mock('./requestRoutingService', () => ({
 describe('ticketService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(supabase.from).mockReset();
+    vi.mocked(supabase.rpc).mockReset();
   });
+
+  function mockNoActiveInternalRequestApprovalFlow() {
+    const limit = vi.fn().mockResolvedValue({ data: [], error: null });
+    const order = vi.fn(() => ({ limit }));
+    const activeEq = vi.fn(() => ({ order }));
+    const entityEq = vi.fn(() => ({ eq: activeEq }));
+    const companyEq = vi.fn(() => ({ eq: entityEq }));
+    const select = vi.fn(() => ({ eq: companyEq }));
+    return { select, companyEq, entityEq, activeEq, order, limit };
+  }
+
+  function mockNoInternalRequestApprovalMetadata() {
+    const inFn = vi.fn().mockResolvedValue({ data: [], error: null });
+    const entityEq = vi.fn(() => ({ in: inFn }));
+    const select = vi.fn(() => ({ eq: entityEq }));
+    return { select, entityEq, inFn };
+  }
 
   it('lists only tickets submitted by the current user inside the current company', async () => {
     const order = vi.fn().mockResolvedValue({ data: [], error: null });
@@ -49,10 +69,13 @@ describe('ticketService', () => {
   });
 
   it('derives ticket owner and company from authenticated context', async () => {
+    const approvalFlowSelect = mockNoActiveInternalRequestApprovalFlow();
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-1' }, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
-    vi.mocked(supabase.from).mockReturnValue({ insert } as never);
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
+      .mockImplementationOnce(() => ({ insert }) as never);
 
     const result = await createTicket({
       subject: 'Need help with order',
@@ -91,6 +114,9 @@ describe('ticketService', () => {
         submitted_by: 'user-9',
         assigned_to: null,
         assigned_at: null,
+        first_response_due_at: '2026-04-30T13:00:00.000Z',
+        resolution_due_at: '2026-05-02T09:00:00.000Z',
+        first_responded_at: null,
         resolved_at: null,
         resolution_note: null,
         created_at: '2026-04-30T09:00:00.000Z',
@@ -115,6 +141,9 @@ describe('ticketService', () => {
         submitted_by: 'user-9',
         assigned_to: 'user-2',
         assigned_at: '2026-04-30T10:00:00.000Z',
+        first_response_due_at: '2026-04-30T13:00:00.000Z',
+        resolution_due_at: '2026-05-02T09:00:00.000Z',
+        first_responded_at: '2026-04-30T10:00:00.000Z',
         resolved_at: null,
         resolution_note: 'Following up with the outlet.',
         created_at: '2026-04-30T09:00:00.000Z',
@@ -128,10 +157,12 @@ describe('ticketService', () => {
     const update = vi.fn(() => ({ eq: updatedCompanyEq }));
 
     const activityInsert = vi.fn().mockResolvedValue({ error: null });
+    const approvalMetadataSelect = mockNoInternalRequestApprovalMetadata();
 
     vi.mocked(supabase.from)
       .mockImplementationOnce(() => ({ select: currentSelect }) as never)
       .mockImplementationOnce(() => ({ update }) as never)
+      .mockImplementationOnce(() => ({ select: approvalMetadataSelect.select }) as never)
       .mockImplementationOnce(() => ({ insert: activityInsert }) as never);
 
     const result = await updateTicket(
@@ -144,6 +175,7 @@ describe('ticketService', () => {
     expect(update).toHaveBeenCalledWith({
       assigned_to: 'user-2',
       assigned_at: expect.any(String),
+      first_responded_at: expect.any(String),
       resolution_note: 'Following up with the outlet.',
     });
     expect(currentCompanyEq).toHaveBeenCalledWith('company_id', 'company-1');
@@ -162,6 +194,7 @@ describe('ticketService', () => {
       component: 'TicketService',
       assigned_to: 'user-2',
       assigned_at: expect.any(String),
+      first_responded_at: expect.any(String),
       resolution_note: 'Following up with the outlet.',
     });
   });
@@ -183,10 +216,13 @@ describe('ticketService', () => {
   it('auto-assigns the ticket when a routing rule matches the submission context', async () => {
     vi.mocked(evaluateRoutingRules).mockResolvedValueOnce('agent-7');
 
+    const approvalFlowSelect = mockNoActiveInternalRequestApprovalFlow();
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-2' }, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
-    vi.mocked(supabase.from).mockReturnValue({ insert } as never);
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
+      .mockImplementationOnce(() => ({ insert }) as never);
 
     const result = await createTicket({
       subject: 'VIN Transfer needed',
@@ -282,5 +318,87 @@ describe('ticketService', () => {
       expect.objectContaining({ userId: 'user-2', title: 'New request comment' }),
     ]));
     expect(logUserAction).toHaveBeenCalledWith('admin-1', 'create', 'ticket_comment', 'ticket-1', { component: 'TicketService' });
+  });
+
+  it('cancels an open unassigned requester ticket through the scoped RPC', async () => {
+    const currentSingle = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ticket-1',
+        company_id: 'company-1',
+        subject: 'Need help with order',
+        category: 'operations_support',
+        subcategory: null,
+        priority: 'medium',
+        status: 'open',
+        description: 'Please help me follow up on this order request.',
+        submitted_by: 'user-9',
+        assigned_to: null,
+        assigned_at: null,
+        first_response_due_at: '2026-04-30T13:00:00.000Z',
+        resolution_due_at: '2026-05-02T09:00:00.000Z',
+        first_responded_at: null,
+        resolved_at: null,
+        resolution_note: null,
+        custom_fields: {},
+        created_at: '2026-04-30T09:00:00.000Z',
+        updated_at: '2026-04-30T09:00:00.000Z',
+      },
+      error: null,
+    });
+    const currentIdEq = vi.fn(() => ({ single: currentSingle }));
+    const currentCompanyEq = vi.fn(() => ({ eq: currentIdEq }));
+    const currentSelect = vi.fn(() => ({ eq: currentCompanyEq }));
+
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: {
+        id: 'ticket-1',
+        company_id: 'company-1',
+        subject: 'Need help with order',
+        category: 'operations_support',
+        subcategory: null,
+        priority: 'medium',
+        status: 'cancelled',
+        description: 'Please help me follow up on this order request.',
+        submitted_by: 'user-9',
+        assigned_to: null,
+        assigned_at: null,
+        first_response_due_at: '2026-04-30T13:00:00.000Z',
+        resolution_due_at: '2026-05-02T09:00:00.000Z',
+        first_responded_at: null,
+        resolved_at: '2026-04-30T10:00:00.000Z',
+        resolution_note: 'Cancelled by requester.',
+        custom_fields: {},
+        created_at: '2026-04-30T09:00:00.000Z',
+        updated_at: '2026-04-30T10:00:00.000Z',
+      },
+      error: null,
+    } as never);
+
+    const activityInsert = vi.fn().mockResolvedValue({ error: null });
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: currentSelect }) as never)
+      .mockImplementationOnce(() => ({ insert: activityInsert }) as never);
+
+    const result = await cancelMyTicket(
+      'ticket-1',
+      { reason: 'Cancelled by requester.' },
+      { userId: 'user-9', companyId: 'company-1' },
+    );
+
+    expect(result.error).toBeNull();
+    expect(supabase.rpc).toHaveBeenCalledWith('cancel_own_ticket', {
+      p_ticket_id: 'ticket-1',
+      p_cancellation_note: 'Cancelled by requester.',
+    });
+    expect(activityInsert).toHaveBeenCalledWith(expect.objectContaining({
+      ticket_id: 'ticket-1',
+      event_type: 'status_changed',
+      message: 'Request cancelled by requester.',
+      metadata: { before: 'open', after: 'cancelled', reason: 'Cancelled by requester.' },
+    }));
+    expect(logUserAction).toHaveBeenCalledWith('user-9', 'update', 'ticket', 'ticket-1', {
+      component: 'TicketService',
+      status: 'cancelled',
+    });
   });
 });

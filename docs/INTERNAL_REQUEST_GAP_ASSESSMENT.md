@@ -32,7 +32,7 @@ The current Internal Request module already has a stronger foundation than a bas
 - Audit depth: the activity component only showed three recent events.
 - Queue operations: no export for operational review or external reporting.
 - SLA maturity: overdue exists only as requested-date logic; there are no category-level response/resolution SLA targets.
-- Approval governance: requests do not integrate with the existing approval engine used by HRMS workflows.
+- Approval governance: baseline integration is now present; category/template-specific approval rules and escalation policies remain to be added.
 - Analytics: no trend, backlog, aging, SLA, or category performance dashboard.
 - Self-service lifecycle: requester actions are still limited; cancellation and follow-up uploads remain missing.
 
@@ -54,34 +54,36 @@ The first production-safe slice adds essential visibility and collaboration with
 - Request Queue and My Requests both include discussion composers.
 - Activity history now shows five events by default with an expand control for the full timeline.
 - Request Queue can export the current filtered view to CSV.
+- Category-level response and resolution SLA targets can be configured for new requests.
+- Request Queue and My Requests now show SLA health for first response and resolution targets.
+- Queue filtering/export now includes SLA state so breached, at-risk, and unconfigured work can be managed directly.
+- Requesters can cancel open, unassigned requests through a scoped self-service action.
+- Internal Requests can use the shared approval flow engine via the `internal_request` entity type.
+- Requests created while an active Internal Request approval flow exists automatically receive an approval instance.
+- Request Workbench and My Requests show approval state; assigned approvers can approve/reject from the workbench.
+- Final resolution/closure is blocked while a required approval is pending or rejected.
 - Deactivated account deletion was corrected separately by archiving the auth account/profile instead of hard-deleting historical rows.
 
 ## Next Enterprise Slices
 
-1. SLA Framework
-   - Add response and resolution SLA hours to request categories.
-   - Compute first response due, resolution due, and breach state per ticket.
-   - Add aging buckets and breached/at-risk filters in the queue.
+1. Approval Governance Refinement
+   - Link request categories/templates to specific approval flows instead of using only the company-wide active Internal Request flow.
+   - Add escalation/delegation policies for overdue approval steps.
+   - Add approval history timeline display in the request detail panel.
 
-2. Approval Governance
-   - Link request categories/templates to approval flows.
-   - Create approval requests for configured categories.
-   - Block final resolution until required approvals complete.
-
-3. Queue Scale
+2. Queue Scale
    - Add pagination/server-side filters for large ticket volumes.
    - Add saved views: My Queue, Unassigned, Breached, High Priority, Awaiting Requester.
    - Add bulk assignment, bulk status update, and CSV export from selected rows.
 
-4. Requester Self-Service
-   - Allow cancellation while open and not assigned.
+3. Requester Self-Service
    - Allow follow-up attachments after submission.
    - Add satisfaction rating after resolution.
 
-5. Analytics
+4. Analytics
    - Add dashboards for volume by category, average resolution time, backlog aging, SLA breaches, and owner workload.
 
-6. Notifications
+5. Notifications
    - Extend in-app notifications with email copies for assignment, comments, SLA breach, and closure.
 
 ## Risk Notes

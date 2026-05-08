@@ -8,6 +8,8 @@ export interface RequestCategoryRecord {
   key: string;
   label: string;
   description: string;
+  response_sla_hours: number | null;
+  resolution_sla_hours: number | null;
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -21,6 +23,8 @@ interface RequestCategoryRow {
   category_key: string;
   label: string;
   description: string | null;
+  response_sla_hours?: number | null;
+  resolution_sla_hours?: number | null;
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -36,16 +40,39 @@ export interface RequestCategoryContext {
 export interface CreateRequestCategoryInput {
   label: string;
   description?: string;
+  response_sla_hours?: number | null;
+  resolution_sla_hours?: number | null;
 }
 
 export interface UpdateRequestCategoryInput {
   label?: string;
   description?: string;
+  response_sla_hours?: number | null;
+  resolution_sla_hours?: number | null;
   is_active?: boolean;
 }
 
 export interface ListRequestCategoriesOptions {
   includeInactive?: boolean;
+}
+
+const REQUEST_CATEGORY_SELECT = 'id, company_id, category_key, label, description, response_sla_hours, resolution_sla_hours, is_active, sort_order, created_at, updated_at, updated_by';
+const LEGACY_REQUEST_CATEGORY_SELECT = 'id, company_id, category_key, label, description, is_active, sort_order, created_at, updated_at, updated_by';
+
+function isMissingSlaColumnError(error: unknown) {
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as { message?: unknown }).message ?? '')
+      : String(error ?? '');
+
+  return message.includes('response_sla_hours') || message.includes('resolution_sla_hours');
+}
+
+function normalizeSlaHours(value?: number | null) {
+  if (value === null || value === undefined) return null;
+  if (!Number.isFinite(value)) return null;
+  return Math.floor(value);
 }
 
 function mapRequestCategory(row: RequestCategoryRow): RequestCategoryRecord {
@@ -55,6 +82,8 @@ function mapRequestCategory(row: RequestCategoryRow): RequestCategoryRecord {
     key: row.category_key,
     label: row.label,
     description: row.description ?? '',
+    response_sla_hours: row.response_sla_hours ?? null,
+    resolution_sla_hours: row.resolution_sla_hours ?? null,
     is_active: row.is_active,
     sort_order: row.sort_order,
     created_at: row.created_at,
@@ -70,7 +99,7 @@ function normalizeDescription(description?: string) {
 async function fetchRequestCategories(companyId: string, includeInactive = false) {
   let query = supabase
     .from('request_categories')
-    .select('id, company_id, category_key, label, description, is_active, sort_order, created_at, updated_at, updated_by')
+    .select(REQUEST_CATEGORY_SELECT)
     .eq('company_id', companyId)
     .order('sort_order', { ascending: true })
     .order('label', { ascending: true });
@@ -79,7 +108,23 @@ async function fetchRequestCategories(companyId: string, includeInactive = false
     query = query.eq('is_active', true);
   }
 
-  const { data, error } = await query;
+  let { data, error } = await query;
+  if (error && isMissingSlaColumnError(error)) {
+    let legacyQuery = supabase
+      .from('request_categories')
+      .select(LEGACY_REQUEST_CATEGORY_SELECT)
+      .eq('company_id', companyId)
+      .order('sort_order', { ascending: true })
+      .order('label', { ascending: true });
+
+    if (!includeInactive) {
+      legacyQuery = legacyQuery.eq('is_active', true);
+    }
+
+    const legacyResult = await legacyQuery;
+    data = legacyResult.data;
+    error = legacyResult.error;
+  }
   if (error) return { data: [] as RequestCategoryRecord[], error: error.message };
   return {
     data: ((data ?? []) as RequestCategoryRow[]).map(mapRequestCategory),
@@ -110,18 +155,22 @@ export async function createRequestCategory(
   }
 
   const nextSortOrder = (existingCategories.at(-1)?.sort_order ?? 0) + 10;
+  const insertPayload = {
+    company_id: context.companyId,
+    category_key: normalizedKey,
+    label,
+    description: normalizeDescription(input.description),
+    response_sla_hours: normalizeSlaHours(input.response_sla_hours),
+    resolution_sla_hours: normalizeSlaHours(input.resolution_sla_hours),
+    is_active: true,
+    sort_order: nextSortOrder,
+    updated_by: context.actorId,
+  };
+
   const { data, error } = await supabase
     .from('request_categories')
-    .insert({
-      company_id: context.companyId,
-      category_key: normalizedKey,
-      label,
-      description: normalizeDescription(input.description),
-      is_active: true,
-      sort_order: nextSortOrder,
-      updated_by: context.actorId,
-    })
-    .select('id, company_id, category_key, label, description, is_active, sort_order, created_at, updated_at, updated_by')
+    .insert(insertPayload as never)
+    .select(REQUEST_CATEGORY_SELECT)
     .single();
 
   if (error) return { data: null, error: error.message };
@@ -161,6 +210,12 @@ export async function updateRequestCategory(
   if (input.description !== undefined) {
     patch.description = normalizeDescription(input.description);
   }
+  if (input.response_sla_hours !== undefined) {
+    patch.response_sla_hours = normalizeSlaHours(input.response_sla_hours);
+  }
+  if (input.resolution_sla_hours !== undefined) {
+    patch.resolution_sla_hours = normalizeSlaHours(input.resolution_sla_hours);
+  }
   if (input.is_active !== undefined) {
     patch.is_active = input.is_active;
   }
@@ -170,7 +225,7 @@ export async function updateRequestCategory(
     .update(patch as never)
     .eq('id', categoryId)
     .eq('company_id', context.companyId)
-    .select('id, company_id, category_key, label, description, is_active, sort_order, created_at, updated_at, updated_by')
+    .select(REQUEST_CATEGORY_SELECT)
     .single();
 
   if (error) return { data: null, error: error.message };

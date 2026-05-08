@@ -3,7 +3,6 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
-import { KpiDashboard } from '@/components/KpiDashboard';
 import { AlertTriangle, BarChart3, CalendarCheck, Car, CheckCircle, Loader2, Settings2, ShoppingCart, Sparkles, Timer, TrendingUp, type LucideIcon, UserPlus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -35,6 +34,8 @@ import {
 } from '@/lib/personalDashboard';
 import { evaluateCustomKpiFormula, type CustomKpiFormula } from '@/lib/customKpiFormula';
 import { CustomKpiCard } from '@/components/CustomKpiCard';
+
+const KpiDashboard = React.lazy(() => import('@/components/KpiDashboard').then((module) => ({ default: module.KpiDashboard })));
 
 const ALL_KPI_IDS = KPI_DEFINITIONS.map(k => k.id);
 const BASIC_KPIS = ['bg_to_delivery', 'bg_to_disb'];
@@ -547,12 +548,20 @@ export default function ExecutiveDashboard() {
               <p className="text-[11px] text-muted-foreground">{visibleKpis.length} KPI cards active</p>
             </div>
             {visibleKpis.length > 0 ? (
-              <KpiDashboard
-                kpiSummaries={visibleKpis}
-                vehicles={filteredVehicles}
-                showAdvanced={showAdvanced}
-                showFilters={false}
-              />
+              <React.Suspense
+                fallback={(
+                  <div className="glass-panel p-6 text-sm text-muted-foreground">
+                    Loading KPI analytics...
+                  </div>
+                )}
+              >
+                <KpiDashboard
+                  kpiSummaries={visibleKpis}
+                  vehicles={filteredVehicles}
+                  showAdvanced={showAdvanced}
+                  showFilters={false}
+                />
+              </React.Suspense>
             ) : (
               <div className="glass-panel p-6 text-sm text-muted-foreground">
                 No KPI cards are selected. Use Customize to turn the KPIs you care about back on.

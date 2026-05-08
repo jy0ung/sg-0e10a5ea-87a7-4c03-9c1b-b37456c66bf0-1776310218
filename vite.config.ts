@@ -6,6 +6,61 @@ import { VitePWA } from "vite-plugin-pwa";
 
 const buildSourceMaps = process.env.BUILD_SOURCEMAP === "true";
 
+const vendorChunkGroups = [
+  { name: "vendor-react", packages: ["react", "react-dom", "react-router-dom"] },
+  {
+    name: "vendor-ui",
+    packages: [
+      "@radix-ui/react-accordion", "@radix-ui/react-alert-dialog",
+      "@radix-ui/react-aspect-ratio", "@radix-ui/react-avatar",
+      "@radix-ui/react-checkbox", "@radix-ui/react-collapsible",
+      "@radix-ui/react-context-menu", "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu", "@radix-ui/react-hover-card",
+      "@radix-ui/react-label", "@radix-ui/react-menubar",
+      "@radix-ui/react-navigation-menu", "@radix-ui/react-popover",
+      "@radix-ui/react-progress", "@radix-ui/react-radio-group",
+      "@radix-ui/react-scroll-area", "@radix-ui/react-select",
+      "@radix-ui/react-separator", "@radix-ui/react-slider",
+      "@radix-ui/react-slot", "@radix-ui/react-switch",
+      "@radix-ui/react-tabs", "@radix-ui/react-toast",
+      "@radix-ui/react-toggle", "@radix-ui/react-toggle-group",
+      "@radix-ui/react-tooltip", "lucide-react", "sonner", "vaul",
+      "cmdk", "input-otp", "embla-carousel-react", "react-day-picker",
+      "react-resizable-panels", "next-themes",
+    ],
+  },
+  { name: "vendor-data", packages: ["@tanstack/react-query", "@supabase/supabase-js"] },
+  { name: "vendor-charts", packages: ["recharts"] },
+  { name: "vendor-excel", packages: ["exceljs"] },
+  {
+    name: "vendor-forms",
+    packages: [
+      "react-hook-form", "@hookform/resolvers", "zod", "date-fns",
+      "tailwind-merge", "clsx", "class-variance-authority",
+    ],
+  },
+] as const;
+
+function matchesPackage(id: string, packageName: string) {
+  return id.includes(`/node_modules/${packageName}/`) || id.includes(`\\node_modules\\${packageName}\\`);
+}
+
+function resolveManualChunk(id: string) {
+  if (id.includes("/src/lib/import-parser.ts")) return "feature-auto-aging-import";
+  if (id.includes("/src/lib/googleSheetsImport.ts")) return "feature-google-sheets-import";
+  if (id.includes("/src/services/reportService.ts")) return "feature-auto-aging-reporting";
+  if (id.includes("/src/services/businessReportService.ts")) return "feature-business-reports";
+  if (id.includes("/src/components/KpiDashboard.tsx")) return "feature-executive-kpis";
+
+  for (const group of vendorChunkGroups) {
+    if (group.packages.some((packageName) => matchesPackage(id, packageName))) {
+      return group.name;
+    }
+  }
+
+  return undefined;
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const viteEnv = loadEnv(mode, process.cwd(), ["VITE_"]);
@@ -96,39 +151,7 @@ export default defineConfig(({ mode }) => {
     sourcemap: buildSourceMaps,
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Core React runtime — loaded on every page
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          // All Radix UI primitives + icon/animation libs
-          "vendor-ui": [
-            "@radix-ui/react-accordion", "@radix-ui/react-alert-dialog",
-            "@radix-ui/react-aspect-ratio", "@radix-ui/react-avatar",
-            "@radix-ui/react-checkbox", "@radix-ui/react-collapsible",
-            "@radix-ui/react-context-menu", "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu", "@radix-ui/react-hover-card",
-            "@radix-ui/react-label", "@radix-ui/react-menubar",
-            "@radix-ui/react-navigation-menu", "@radix-ui/react-popover",
-            "@radix-ui/react-progress", "@radix-ui/react-radio-group",
-            "@radix-ui/react-scroll-area", "@radix-ui/react-select",
-            "@radix-ui/react-separator", "@radix-ui/react-slider",
-            "@radix-ui/react-slot", "@radix-ui/react-switch",
-            "@radix-ui/react-tabs", "@radix-ui/react-toast",
-            "@radix-ui/react-toggle", "@radix-ui/react-toggle-group",
-            "@radix-ui/react-tooltip",
-            "lucide-react", "sonner", "vaul", "cmdk",
-            "input-otp", "embla-carousel-react", "react-day-picker",
-            "react-resizable-panels", "next-themes",
-          ],
-          // Data-fetching and backend client
-          "vendor-data": ["@tanstack/react-query", "@supabase/supabase-js"],
-          // Charting library — large, only used on dashboard pages
-          "vendor-charts": ["recharts"],
-          // Excel import/export — large, only used on import/report pages
-          "vendor-excel": ["exceljs"],
-          // Form utilities
-          "vendor-forms": ["react-hook-form", "@hookform/resolvers", "zod", "date-fns",
-                           "tailwind-merge", "clsx", "class-variance-authority"],
-        },
+        manualChunks: resolveManualChunk,
       },
     },
   },

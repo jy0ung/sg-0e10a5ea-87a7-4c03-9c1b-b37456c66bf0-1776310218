@@ -73,6 +73,8 @@ import {
 interface CategoryDraft {
   label: string;
   description: string;
+  response_sla_hours: number | null;
+  resolution_sla_hours: number | null;
   is_active: boolean;
 }
 
@@ -91,6 +93,8 @@ function hasCategoryChanges(category: RequestCategoryRecord, draft: CategoryDraf
   if (!draft) return false;
   return draft.label !== category.label
     || draft.description !== category.description
+    || draft.response_sla_hours !== category.response_sla_hours
+    || draft.resolution_sla_hours !== category.resolution_sla_hours
     || draft.is_active !== category.is_active;
 }
 
@@ -197,6 +201,13 @@ function selectValue(value: string | null | undefined) {
 
 function optionalSelectValue(value: string) {
   return value === ANY_SELECT_VALUE || value === NONE_SELECT_VALUE ? '' : value;
+}
+
+function parseSlaHours(value: string) {
+  if (!value.trim()) return null;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(1, parsed);
 }
 
 export default function RequestSetup() {
@@ -313,6 +324,8 @@ export default function RequestSetup() {
     setDrafts(Object.fromEntries(categories.map((category) => [category.id, {
       label: category.label,
       description: category.description,
+      response_sla_hours: category.response_sla_hours,
+      resolution_sla_hours: category.resolution_sla_hours,
       is_active: category.is_active,
     }])));
   }, [categories]);
@@ -429,6 +442,8 @@ export default function RequestSetup() {
         ...(current[category.id] ?? {
           label: category.label,
           description: category.description,
+          response_sla_hours: category.response_sla_hours,
+          resolution_sla_hours: category.resolution_sla_hours,
           is_active: category.is_active,
         }),
         ...patch,
@@ -511,6 +526,8 @@ export default function RequestSetup() {
       {
         label: draft.label,
         description: draft.description,
+        response_sla_hours: draft.response_sla_hours,
+        resolution_sla_hours: draft.resolution_sla_hours,
         is_active: draft.is_active,
       },
       { actorId: user.id, companyId: user.company_id },
@@ -1019,7 +1036,8 @@ export default function RequestSetup() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="categories">
-            <TabsList className="mb-6">
+            <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <TabsList className="inline-flex h-auto min-w-max">
               <TabsTrigger value="categories">
                 Categories
                 {activeCategoryCount > 0 && (
@@ -1058,6 +1076,7 @@ export default function RequestSetup() {
                 )}
               </TabsTrigger>
             </TabsList>
+            </div>
 
             <TabsContent value="categories" className="space-y-4">
           {/* Create category dialog */}
@@ -1204,6 +1223,35 @@ export default function RequestSetup() {
                             rows={2}
                             disabled={isSaving}
                           />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 rounded-lg border border-border px-4 py-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor={`category-response-sla-${category.id}`}>First response SLA (hours)</Label>
+                          <Input
+                            id={`category-response-sla-${category.id}`}
+                            type="number"
+                            min={1}
+                            max={720}
+                            value={draft?.response_sla_hours ?? ''}
+                            onChange={(e) => updateCategoryDraft(category, { response_sla_hours: parseSlaHours(e.target.value) })}
+                            disabled={isSaving}
+                          />
+                          <p className="text-xs text-muted-foreground">Leave blank when this category has no response target.</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`category-resolution-sla-${category.id}`}>Resolution SLA (hours)</Label>
+                          <Input
+                            id={`category-resolution-sla-${category.id}`}
+                            type="number"
+                            min={1}
+                            max={2160}
+                            value={draft?.resolution_sla_hours ?? ''}
+                            onChange={(e) => updateCategoryDraft(category, { resolution_sla_hours: parseSlaHours(e.target.value) })}
+                            disabled={isSaving}
+                          />
+                          <p className="text-xs text-muted-foreground">New requests copy this target when they are submitted.</p>
                         </div>
                       </div>
 
