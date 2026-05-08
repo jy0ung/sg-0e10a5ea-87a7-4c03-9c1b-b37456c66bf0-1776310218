@@ -4,16 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useData } from '@/contexts/DataContext';
-import {
-  generateAgingSummaryData,
-  generateSlaComplianceData,
-  generateSalesmanPerformanceData,
-  generateVehicleExportData,
-  downloadAsXlsx,
-  downloadAsCsv,
-} from '@/services/reportService';
-import { preloadExcelJS } from '@/lib/exceljs-loader';
-import { Download, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 type ReportType = 'aging_summary' | 'sla_compliance' | 'salesman_performance' | 'vehicle_full';
@@ -24,6 +15,15 @@ const REPORT_TYPES: { value: ReportType; label: string; description: string }[] 
   { value: 'salesman_performance', label: 'Salesman Performance', description: 'Vehicle counts, delivery count, and average BG→Delivery per salesman' },
   { value: 'vehicle_full', label: 'Full Vehicle Export', description: 'All vehicle fields including computed KPI days — filterable by branch, model, date range' },
 ];
+
+type ReportToolsModule = typeof import('@/services/reportService');
+
+let reportToolsPromise: Promise<ReportToolsModule> | null = null;
+
+function loadReportTools() {
+  reportToolsPromise ??= import('@/services/reportService');
+  return reportToolsPromise;
+}
 
 export default function ReportCenter() {
   const { vehicles, kpiSummaries, slas, loading } = useData();
@@ -49,35 +49,28 @@ export default function ReportCenter() {
     dateTo: dateTo || undefined,
   });
 
-  const generateData = (): Record<string, unknown>[] => {
+  const generateData = async (): Promise<Record<string, unknown>[]> => {
+    const reportTools = await loadReportTools();
     const opts = getOptions();
     switch (reportType) {
-      case 'aging_summary': return generateAgingSummaryData(vehicles, kpiSummaries, opts);
-      case 'sla_compliance': return generateSlaComplianceData(vehicles, slas, opts);
-      case 'salesman_performance': return generateSalesmanPerformanceData(vehicles, opts);
-      case 'vehicle_full': return generateVehicleExportData(vehicles, opts);
+      case 'aging_summary': return reportTools.generateAgingSummaryData(vehicles, kpiSummaries, opts);
+      case 'sla_compliance': return reportTools.generateSlaComplianceData(vehicles, slas, opts);
+      case 'salesman_performance': return reportTools.generateSalesmanPerformanceData(vehicles, opts);
+      case 'vehicle_full': return reportTools.generateVehicleExportData(vehicles, opts);
     }
   };
 
-  const handlePreview = () => setPreview(generateData().slice(0, 10));
-
-  const handleDownloadXlsx = async () => {
-    setExporting(true);
-    try {
-      const data = generateData();
-      const report = REPORT_TYPES.find(r => r.value === reportType)!;
-      await downloadAsXlsx(data, report.label.replace(/\s+/g, '_'), report.label);
-    } finally {
-      setExporting(false);
-    }
+  const handlePreview = async () => {
+    setPreview((await generateData()).slice(0, 10));
   };
 
   const handleDownloadCsv = async () => {
     setExporting(true);
     try {
-      const data = generateData();
+      const reportTools = await loadReportTools();
+      const data = await generateData();
       const report = REPORT_TYPES.find(r => r.value === reportType)!;
-      downloadAsCsv(data, report.label.replace(/\s+/g, '_'));
+      reportTools.downloadAsCsv(data, report.label.replace(/\s+/g, '_'));
     } finally {
       setExporting(false);
     }
@@ -144,21 +137,10 @@ export default function ReportCenter() {
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border">
-          <Button variant="outline" size="sm" onClick={handlePreview} disabled={noData}>
+          <Button variant="outline" size="sm" onClick={() => void handlePreview()} disabled={noData}>
             Preview (first 10 rows)
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownloadXlsx}
-            onPointerEnter={preloadExcelJS}
-            onFocus={preloadExcelJS}
-            disabled={exporting || noData}
-          >
-            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />}
-            Export XLSX
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDownloadCsv} disabled={exporting || noData}>
+          <Button variant="outline" size="sm" onClick={() => void handleDownloadCsv()} disabled={exporting || noData}>
             {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}
             Export CSV
           </Button>

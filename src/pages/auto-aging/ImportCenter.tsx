@@ -10,9 +10,9 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCircle, Info, PlusCircle } from 'lucide-react';
-import { parseWorkbook, publishCanonical, normalizeVehicleRawCell, normalizeVehicleRawRow } from '@/lib/import-parser';
-import { preloadExcelJS } from '@/lib/exceljs-loader';
+import { FileSpreadsheet, CheckCircle, AlertTriangle, Loader2, AlertCircle, Info, PlusCircle } from 'lucide-react';
+import { normalizeVehicleRawCell, normalizeVehicleRawRow } from '@/lib/import-normalization';
+import { publishCanonical } from '@/lib/import-publish';
 import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 import { splitImportRowsForPublish } from '@/lib/import-review';
 import { loadBranchMappingLookup, loadPaymentMappingLookup, createBranchMapping } from '@/services/mappingService';
@@ -37,6 +37,15 @@ const BULK_INCOMPLETE_FIELDS: Array<{
   { key: 'model', label: 'Model', placeholder: 'Enter the vehicle model' },
   { key: 'branch_code', label: 'Branch Code', placeholder: 'Enter the branch code' },
 ];
+
+type GoogleSheetsImportModule = typeof import('@/lib/googleSheetsImport');
+
+let googleSheetsImportPromise: Promise<GoogleSheetsImportModule> | null = null;
+
+function loadGoogleSheetsImport() {
+  googleSheetsImportPromise ??= import('@/lib/googleSheetsImport');
+  return googleSheetsImportPromise;
+}
 
 function areSameRowNumbers(left: number[], right: number[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
@@ -273,6 +282,8 @@ export default function ImportCenter() {
     reviewRows: number;
     status: ImportStatus;
   } | null>(null);
+  const [googleSheetUrl, setGoogleSheetUrl] = useState('');
+  const [importingGoogleSheet, setImportingGoogleSheet] = useState(false);
 
   // ─── Error classification helpers ────────────────────────────────────────────
   const blockingValidationIssues = validationIssues.filter(issue => issue.severity === 'error');
@@ -706,12 +717,57 @@ export default function ImportCenter() {
     setFocusBlockingRow(true);
   }, [blockingRows, selectedBlockingRowIndex]);
 
-  const handleFileDrop = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    // Reset so the same file can be chosen again (iOS Safari otherwise skips
-    // the onChange when re-selecting). Must be done before any early return.
-    try { e.target.value = ''; } catch { /* noop */ }
-    if (!file) return;
+  const processImportedRows = useCallback(async (
+    rows: VehicleRaw[],
+    missingColumns: string[],
+    sourceName: string,
+  ) => {
+    setFileName(sourceName);
+    setMissingCols(missingColumns);
+
+    const validationResult = await validateVehicleImportBatch(
+      rows as unknown as Record<string, unknown>[],
+      companyId,
+      (processed, total) => setValidationProgress({ processed, total }),
+    );
+
+    const errorRowCount = new Set(validationResult.errors.map((error) => error.rowNumber).filter((rowNumber): rowNumber is number => typeof rowNumber === 'number')).size;
+    const batch: ImportBatchInsert = {
+      fileName: sourceName,
+      uploadedBy: user?.email || 'Unknown',
+      uploadedAt: new Date().toISOString(),
+      status: missingColumns.length > 0 ? 'failed' : 'validated',
+      totalRows: rows.length,
+      validRows: Math.max(rows.length - errorRowCount, 0),
+      errorRows: errorRowCount,
+      duplicateRows: rows.filter((row, index, allRows) => row.chassis_no && allRows.some((candidate, candidateIndex) => candidateIndex !== index && candidate.chassis_no === row.chassis_no)).length,
+      companyId,
+      publishedRows: 0,
+      reviewRows: 0,
+    };
+
+    const { data: batchData, error: batchError } = await createImportBatch(batch, user?.id || 'system-user');
+    if (batchError) {
+      throw new Error(`Failed to create import batch: ${batchError.message}`);
+    }
+
+    const id = batchData?.id ?? '';
+    if (!id) throw new Error('Import batch created but no ID returned');
+
+    const previewIssues = buildPreviewIssues(rows, id);
+    setBatchId(id);
+    setRawRows(rows);
+    setEditPatchesByRowId(new Map());
+    setValidationIssues(previewIssues);
+    setServerErrors(validationResult.isValid ? validationResult.warnings : validationResult.errors);
+    setPreviewValidationRevision(0);
+    setPreviewValidationState('ready');
+    addImportBatch({ ...batch, id, status: batch.status as ImportStatus, duplicateRows: previewIssues.filter((issue) => issue.issueType === 'duplicate').length } as ImportBatch);
+    setLastPublishSummary(null);
+    setStep('review');
+  }, [addImportBatch, companyId, user?.email, user?.id]);
+
+  const handleGoogleSheetImport = useCallback(async () => {
     if (!companyId) {
       toast({
         title: 'Import unavailable',
@@ -720,72 +776,38 @@ export default function ImportCenter() {
       });
       return;
     }
-    // Immediate feedback so the user knows the tap registered — critical on
-    // tablets where there's no cursor / hover state to indicate progress.
-    toast({ title: 'Reading file', description: file.name });
-    setFileName(file.name);
+
+    const trimmedUrl = googleSheetUrl.trim();
+    if (!trimmedUrl) {
+      toast({
+        title: 'Google Sheet required',
+        description: 'Paste the Google Sheet URL first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setImportingGoogleSheet(true);
     setValidationProgress({ processed: 0, total: 0 });
     setStep('validating');
+    toast({ title: 'Reading Google Sheet', description: 'Fetching the published CSV export.' });
 
     try {
-      // Parse the workbook
-      const buffer = await file.arrayBuffer();
-      const { rows, missingColumns } = await parseWorkbook(buffer);
-
-      setMissingCols(missingColumns);
-
-      // Server-side validation
-      const validationResult = await validateVehicleImportBatch(
-        rows as unknown as Record<string, unknown>[],
-        companyId,
-        (processed, total) => setValidationProgress({ processed, total })
-      );
-
-      // Always create the batch record in DB first so we get a real UUID
-      const errorRowCount = new Set(validationResult.errors.map(error => error.rowNumber).filter((rowNumber): rowNumber is number => typeof rowNumber === 'number')).size;
-      const batch: ImportBatchInsert = {
-        fileName: file.name,
-        uploadedBy: user?.email || 'Unknown',
-        uploadedAt: new Date().toISOString(),
-        status: missingColumns.length > 0 ? 'failed' : 'validated',
-        totalRows: rows.length,
-        validRows: Math.max(rows.length - errorRowCount, 0),
-        errorRows: errorRowCount,
-        duplicateRows: rows.filter((row, index, allRows) => row.chassis_no && allRows.some((candidate, candidateIndex) => candidateIndex !== index && candidate.chassis_no === row.chassis_no)).length,
-        companyId,
-        publishedRows: 0,
-        reviewRows: 0,
-      };
-
-      const { data: batchData, error: batchError } = await createImportBatch(batch, user?.id || 'system-user');
-
-      if (batchError) {
-        throw new Error(`Failed to create import batch: ${batchError.message}`);
-      }
-
-      const id = batchData?.id ?? '';
-      if (!id) throw new Error('Import batch created but no ID returned');
-      const previewIssues = buildPreviewIssues(rows, id);
-      setBatchId(id);
-      setRawRows(rows);
-      setEditPatchesByRowId(new Map());
-      setValidationIssues(previewIssues);
-      setServerErrors(validationResult.isValid ? validationResult.warnings : validationResult.errors);
-      setPreviewValidationRevision(0);
-      setPreviewValidationState('ready');
-      addImportBatch({ ...batch, id, status: batch.status as ImportStatus, duplicateRows: previewIssues.filter(issue => issue.issueType === 'duplicate').length } as ImportBatch);
-      setLastPublishSummary(null);
-      setStep('review');
+      const { importFromGoogleSheet } = await loadGoogleSheetsImport();
+      const { rows, missingColumns, sourceName } = await importFromGoogleSheet(trimmedUrl);
+      await processImportedRows(rows, missingColumns, sourceName);
     } catch (error) {
-      loggingService.error('Import error', { error }, 'ImportCenter');
+      loggingService.error('Google Sheet import error', { error }, 'ImportCenter');
       toast({
-        title: 'Import failed',
+        title: 'Google Sheet import failed',
         description: error instanceof Error ? error.message : 'Unknown error',
         variant: 'destructive',
       });
       setStep('upload');
+    } finally {
+      setImportingGoogleSheet(false);
     }
-  }, [addImportBatch, companyId, toast, user]);
+  }, [companyId, googleSheetUrl, processImportedRows, toast]);
 
   const handlePublish = useCallback(async () => {
     if (missingCols.length > 0 || isPreviewValidating) {
@@ -928,6 +950,7 @@ export default function ImportCenter() {
     setBranchMappingInputs({});
     setSavedBranchMappings(new Set());
     setLastPublishSummary(null);
+    setGoogleSheetUrl('');
   };
 
   const publishLabel = hasPendingReviewChanges
@@ -940,7 +963,7 @@ export default function ImportCenter() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Import Center"
-        description="Upload and process consolidated inventory report workbooks"
+        description="Import and process consolidated inventory data from Google Sheets"
         breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Import Center' }]}
       />
 
@@ -959,43 +982,30 @@ export default function ImportCenter() {
       </div>
 
       {step === 'upload' && (
-        <div className="glass-panel p-6 sm:p-12 text-center">
-          {/*
-            Tablet-safe file picker:
-            - The actual tap target is the native file input itself, stretched
-              over the whole drop zone with `opacity: 0`. This avoids the
-              synthetic `element.click()` path that iPadOS Safari can silently
-              ignore.
-            - Keep the input in the normal layout tree; some tablet browsers do
-              not allow opening the picker from `display:none`/visually-hidden
-              controls.
-            - Clear the current value on click so picking the same workbook a
-              second time still fires `onChange`.
-          */}
-          <div
-            className="relative w-full border-2 border-dashed border-border rounded-lg p-8 sm:p-12 hover:border-primary/50 transition-colors text-center overflow-hidden"
-            onPointerEnter={preloadExcelJS}
-            onFocusCapture={preloadExcelJS}
-          >
-            <input
-              id="import-file-input"
-              type="file"
-              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-              onChange={handleFileDrop}
-              onClick={event => {
-                event.currentTarget.value = '';
-              }}
-              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-              aria-label="Choose consolidated inventory workbook to import"
-            />
-            <Upload className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-foreground font-medium mb-1">Tap to choose a workbook</p>
-            <p className="text-sm text-muted-foreground mb-4">Supports .xlsx and .xls consolidated inventory workbooks, including multi-sheet replacements.</p>
-            <span
-              className="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium shadow"
-            >
-              <Upload className="h-4 w-4" />Browse files
-            </span>
+        <div className="glass-panel p-6 sm:p-12 space-y-6 text-center">
+          <div className="rounded-lg border border-border bg-secondary/10 p-4 text-left">
+            <div className="space-y-2">
+              <label htmlFor="google-sheet-url" className="text-xs font-medium text-muted-foreground">Import from Google Sheet</label>
+              <Input
+                id="google-sheet-url"
+                value={googleSheetUrl}
+                onChange={(event) => setGoogleSheetUrl(event.target.value)}
+                placeholder="https://docs.google.com/spreadsheets/d/..."
+                disabled={importingGoogleSheet}
+              />
+              <p className="text-xs text-muted-foreground">
+                Public or published sheets only for now. The app reads the sheet through Google&apos;s CSV export, which keeps the import path lightweight and removes the browser workbook parser.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Workbook upload has been retired from the web app for performance reasons. If your source starts in Excel, publish it to Google Sheets first.
+              </p>
+            </div>
+            <div className="mt-3 flex justify-end">
+              <Button type="button" variant="outline" onClick={() => void handleGoogleSheetImport()} disabled={importingGoogleSheet}>
+                {importingGoogleSheet ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
+                Import From Google Sheet
+              </Button>
+            </div>
           </div>
         </div>
       )}

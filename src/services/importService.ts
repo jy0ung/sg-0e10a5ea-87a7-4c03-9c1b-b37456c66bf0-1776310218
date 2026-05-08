@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { normalizeSupportedDateValue } from "@/lib/dateParsing";
 import { normalizeImportNumericText } from '@/lib/importNumeric';
-import { publishCanonical } from "@/lib/import-parser";
+import { publishCanonical } from "@/lib/import-publish";
 import { loadBranchMappingLookup, loadPaymentMappingLookup } from "./mappingService";
 import { loggingService } from "./loggingService";
 import { performanceService } from "./performanceService";
