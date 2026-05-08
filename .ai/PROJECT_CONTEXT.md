@@ -73,6 +73,8 @@ CRITICAL: Read this file first in every session before asking project basics. Th
 - Deploy image: `Dockerfile` builds root app and optionally HRMS web (`BUILD_HRMS_WEB=true`), serves via nginx on port 8080, and proxies Supabase `/auth|rest|graphql|functions|storage/v1` and `/realtime/v1` to `SUPABASE_INTERNAL_URL`.
 - Production domains from docs/config: main app `https://ubs.protonfookloi.com`, HRMS `https://hrms.protonfookloi.com`. `VITE_HRMS_APP_URL` is required for production/staging main-app builds.
 - `docker/nginx.conf` contains two server blocks: HRMS hostname serves `/usr/share/nginx/html/hrms-root`; default server serves root app and same-origin `/hrms/` bundle. Both include security headers and `no-store` for SPA HTML.
+- PWA/service worker: `vite.config.ts` uses Workbox `navigateFallback: "/index.html"`. Supabase same-origin API paths must stay in `navigateFallbackDenylist` (`/auth/v1`, `/rest/v1`, `/graphql/v1`, `/functions/v1`, `/storage/v1`, `/realtime/v1`) so auth email verification links reach Kong/GoTrue instead of booting the SPA.
+- Auth verify rescue: `src/pages/AuthVerifyPage.tsx` is deliberately registered at `/auth/v1/verify` as a compatibility fallback for browsers already controlled by an older service worker. It fetches the real same-origin Auth verify URL as a non-navigation request and redirects to Supabase's final `/reset-password` or `/signup` URL.
 - CI gates in `.github/workflows/ci.yml`: lint, typecheck + RPC contract check, unit tests, production build, bundle budget, HRMS mobile build, Playwright smoke/accessibility/responsive tests, optional RLS matrix on push.
 - Production verification scripts: `npm run verify:production` and `npm run smoke:production`. `docs/LAUNCH_CHECKLIST.md` notes 2026-05-06 production validation for commit `70820b7`, production verification, HRMS ingress activation, production super admin creation, and 57/57 module smoke routes passing.
 - Backup/DR: `.github/workflows/db-backup.yml`, `docs/BACKUP_DR.md`, `docs/DR_DRILLS.md`, and `docs/INCIDENT_RESPONSE.md`. Launch checklist still marks PITR/restore drill evidence as open.
@@ -98,8 +100,10 @@ CRITICAL: Read this file first in every session before asking project basics. Th
 
 - 2026-05-08: Initial PROJECT_CONTEXT.md created from live repo deep dive. Captured auth/profile flow, roles/scopes, module architecture, Supabase schema/API contracts, deploy workflow, production constraints, dirty worktree state, and current tech debt.
 - 2026-05-08: Invite/reset auth-link fix: Supabase PKCE email verification can redirect back to `/signup?code=...` or `/reset-password?code=...` without preserving `type`. `src/pages/SignUpPage.tsx` and `src/pages/ResetPasswordPage.tsx` now accept bare code callbacks on their dedicated routes. `supabase/templates/invite.html` should use `{{ .ConfirmationURL }}` rather than hand-building session-token fragments.
+- 2026-05-08: Password reset 404 root cause: existing PWA service workers could intercept top-level `/auth/v1/verify?...` email-link navigations and serve `index.html`, causing React `NotFound` at the Auth URL. `vite.config.ts` must denylist Supabase proxy paths from Workbox navigation fallback. `src/pages/AuthVerifyPage.tsx` exists as a rescue route for clients that are already controlled by the older service worker.
 
 ## Change Log
 
 - 2026-05-08: Added durable context file per Memory & Context Protocol. Future sessions must read this first and update it in place when discovering drift.
 - 2026-05-08: Documented PKCE invite/recovery callback behavior and invite template rule after fixing reset/invite link handling.
+- 2026-05-08: Documented service-worker interception of `/auth/v1/verify` email links and the `/auth/v1/verify` SPA rescue route.

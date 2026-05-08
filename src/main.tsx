@@ -57,6 +57,7 @@ const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const SignUpPage = lazy(() => import("./pages/SignUpPage"));
+const AuthVerifyPage = lazy(() => import("./pages/AuthVerifyPage"));
 const AccountPending = lazy(() => import("./pages/AccountPending"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
@@ -260,6 +261,10 @@ const router = createBrowserRouter([
   {
     path: "/signup",
     element: <S><SignUpPage /></S>,
+  },
+  {
+    path: "/auth/v1/verify",
+    element: <S><AuthVerifyPage /></S>,
   },
   {
     path: "/account-pending",

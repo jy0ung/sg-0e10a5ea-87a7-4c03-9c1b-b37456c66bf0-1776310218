@@ -59,7 +59,12 @@ export default defineConfig(({ mode }) => {
         // same-origin routed navigation under SW control to render the offline
         // shell instead of index.html.
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//, /^\/supabase\//],
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/supabase\//,
+          /^\/(auth|rest|graphql|functions|storage)\/v1(?:\/|$)/,
+          /^\/realtime\/v1(?:\/|$)/,
+        ],
         runtimeCaching: [
           {
             urlPattern: /^\/api\//,
