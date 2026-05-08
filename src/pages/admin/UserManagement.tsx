@@ -461,6 +461,10 @@ export default function UserManagement() {
       toast.error('You cannot delete your own account.');
       return;
     }
+    if (p.company_id && p.status !== 'pending' && p.status !== 'inactive') {
+      toast.error('Deactivate this user before deleting the account.');
+      return;
+    }
     setDeleteTarget(p);
   };
 
@@ -483,6 +487,13 @@ export default function UserManagement() {
     if (p.role === 'super_admin' && !isSuperAdmin) return false;
     if (p.access_scope === 'global' && !isSuperAdmin) return false;
     return true;
+  };
+
+  const canDeleteUserAccount = (p: ProfileRow) => {
+    if (p.id === user?.id) return false;
+    if (p.role === 'super_admin') return false;
+    if (p.access_scope === 'global' && !isSuperAdmin) return false;
+    return !p.company_id || p.status === 'pending' || p.status === 'inactive';
   };
 
   const requestStatusAction = (p: ProfileRow, action: AccountStatusAction) => {
@@ -774,6 +785,19 @@ export default function UserManagement() {
                                   Revoke full access
                                 </DropdownMenuItem>
                               ) : null}
+                              {p.status === 'inactive' && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => requestDeleteInvitedUser(p)}
+                                    disabled={deletingUser === p.id || !canDeleteUserAccount(p)}
+                                  >
+                                    {deletingUser === p.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                                    Delete user
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </>
@@ -1087,9 +1111,11 @@ export default function UserManagement() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete invited user?</AlertDialogTitle>
+            <AlertDialogTitle>{deleteTarget?.status === 'inactive' ? 'Delete deactivated user?' : 'Delete invited user?'}</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete {deleteTarget?.email ?? 'this invited user'} only if they have never signed in. Existing users should be deactivated instead.
+              {deleteTarget?.status === 'inactive'
+                ? `Delete ${deleteTarget.email} permanently so the email can be invited again.`
+                : `Delete ${deleteTarget?.email ?? 'this invited user'} only if they have never signed in. Existing users should be deactivated first.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1103,7 +1129,7 @@ export default function UserManagement() {
               }}
             >
               {deletingUser ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
-              Delete invite
+              {deleteTarget?.status === 'inactive' ? 'Delete user' : 'Delete invite'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

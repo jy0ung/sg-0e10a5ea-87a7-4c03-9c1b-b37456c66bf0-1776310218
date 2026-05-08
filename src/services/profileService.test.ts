@@ -152,14 +152,14 @@ describe('deleteInvitedUser', () => {
       error: {
         message: 'Edge Function returned a non-2xx status code',
         context: new Response(JSON.stringify({
-          error: 'This user has already signed in. Deactivate the user instead of deleting their account.',
+          error: 'This user has already signed in. Deactivate the user before deleting their account.',
         }), { status: 409 }),
       },
     });
 
     const result = await deleteInvitedUser('user-1');
 
-    expect(result.error).toBe('This user has already signed in. Deactivate the user instead of deleting their account.');
+    expect(result.error).toBe('This user has already signed in. Deactivate the user before deleting their account.');
   });
 });
 
@@ -171,8 +171,8 @@ describe('account status actions', () => {
 
     expect(result.error).toBeNull();
     expect(functionInvocations[0]).toMatchObject({
-      name: 'update-user-status',
-      body: { user_id: 'user-1', status: 'inactive', reason: 'Left company' },
+      name: 'delete-user',
+      body: { action: 'update_status', user_id: 'user-1', status: 'inactive', reason: 'Left company' },
     });
   });
 
@@ -183,8 +183,8 @@ describe('account status actions', () => {
 
     expect(result.error).toBeNull();
     expect(functionInvocations[0]).toMatchObject({
-      name: 'update-user-status',
-      body: { user_id: 'user-1', status: 'active', reason: null },
+      name: 'delete-user',
+      body: { action: 'update_status', user_id: 'user-1', status: 'active', reason: null },
     });
   });
 

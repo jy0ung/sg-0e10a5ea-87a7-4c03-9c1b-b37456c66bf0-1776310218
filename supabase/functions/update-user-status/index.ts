@@ -10,6 +10,12 @@ interface UpdateUserStatusPayload {
 const ADMIN_ROLES = ['super_admin', 'company_admin'];
 const LONG_BAN_DURATION = '876000h';
 
+interface AuthBanResult {
+  attempted: boolean;
+  updated: boolean;
+  error: string | null;
+}
+
 function jsonResponse(body: Record<string, unknown>, status: number, corsHeaders: Record<string, string>) {
   return new Response(JSON.stringify(body), {
     status,
@@ -131,16 +137,20 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const authBanResult: AuthBanResult = { attempted: false, updated: false, error: null };
     const { data: targetAuth, error: targetAuthError } = await adminClient.auth.admin.getUserById(targetUserId);
     if (targetAuthError || !targetAuth.user) {
-      return jsonResponse({ error: targetAuthError?.message ?? 'Auth user not found' }, 404, corsHeaders);
-    }
-
-    const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
-      ban_duration: nextStatus === 'inactive' ? LONG_BAN_DURATION : 'none',
-    });
-    if (authUpdateError) {
-      return jsonResponse({ error: authUpdateError.message }, 500, corsHeaders);
+      authBanResult.error = targetAuthError?.message ?? 'Auth user not found';
+    } else {
+      authBanResult.attempted = true;
+      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(targetUserId, {
+        ban_duration: nextStatus === 'inactive' ? LONG_BAN_DURATION : 'none',
+      });
+      if (authUpdateError) {
+        authBanResult.error = authUpdateError.message;
+      } else {
+        authBanResult.updated = true;
+      }
     }
 
     const { error: updateError } = await adminClient
@@ -149,7 +159,7 @@ Deno.serve(async (req: Request) => {
       .eq('id', targetUserId);
 
     if (updateError) {
-      if (nextStatus === 'inactive') {
+      if (nextStatus === 'inactive' && authBanResult.updated) {
         await adminClient.auth.admin.updateUserById(targetUserId, { ban_duration: 'none' });
       }
       return jsonResponse({ error: updateError.message }, 500, corsHeaders);
@@ -165,7 +175,9 @@ Deno.serve(async (req: Request) => {
         email: targetProfile.email,
         previous_status: targetProfile.status,
         next_status: nextStatus,
-        auth_ban_updated: true,
+        auth_ban_attempted: authBanResult.attempted,
+        auth_ban_updated: authBanResult.updated,
+        auth_ban_error: authBanResult.error,
         reason,
       },
       table_name: 'user_actions',
@@ -174,6 +186,8 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({
       message: `${targetProfile.email} ${nextStatus === 'inactive' ? 'deactivated' : 'reactivated'}`,
       status: nextStatus,
+      auth_ban_updated: authBanResult.updated,
+      auth_ban_error: authBanResult.error,
     }, 200, corsHeaders);
   } catch (err) {
     return jsonResponse(

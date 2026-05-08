@@ -230,28 +230,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [clearSessionArtifacts, fetchProfile]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-
-    const refreshActiveProfile = () => {
-      const currentProfile = profileRef.current;
-      if (!currentProfile?.id) return;
-      void fetchProfile(currentProfile.id);
-    };
-
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') refreshActiveProfile();
-    };
-
-    window.addEventListener('focus', refreshActiveProfile);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-
-    return () => {
-      window.removeEventListener('focus', refreshActiveProfile);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-    };
-  }, [fetchProfile]);
-
   const login = useCallback(async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });

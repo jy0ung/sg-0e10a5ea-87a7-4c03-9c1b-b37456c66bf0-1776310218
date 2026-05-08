@@ -180,8 +180,9 @@ async function updateUserAccountStatus(
   status: 'active' | 'inactive',
   reason?: string,
 ): Promise<{ error: string | null }> {
-  const { data, error } = await supabase.functions.invoke('update-user-status', {
+  const { data, error } = await supabase.functions.invoke('delete-user', {
     body: {
+      action: 'update_status',
       user_id: userId,
       status,
       reason: reason?.trim() || null,
