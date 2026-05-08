@@ -49,7 +49,7 @@ Production cutover remains blocked until the following evidence is captured and 
 
 - Infrastructure: keep the all-in-one production host, production `.env`, production DNS/TLS, GHCR image publishing, and reverse-proxy security headers verified.
 - Credentialed production: configure `PROD_LOGIN_EMAIL`, `PROD_LOGIN_PASSWORD`, and `PROD_LOGIN_REQUIRED=1` when production verification should include a real browser login.
-- Live RLS and edge-function security: rerun `npm run test:rls` against the seeded live stack, attach the evidence to `docs/SECURITY_SIGNOFF.md`, confirm all edge functions validate JWT and same-company access, pin CORS to production origins, and complete reviewer sign-off.
+- Live RLS and edge-function security: rerun `npm run test:rls` against an isolated staging stack with dedicated RLS test users, attach the evidence to `docs/SECURITY_SIGNOFF.md`, confirm all edge functions validate JWT and same-company access, pin CORS to production origins, and complete reviewer sign-off.
 - Observability: create/connect the production Sentry project, set `VITE_SENTRY_DSN`, upload source maps in the release job, configure alert routing, and prove a synthetic frontend error arrives within 60 seconds.
 - Reliability: enable production PITR, run the nightly logical dump with production secrets, complete a restore-to-staging drill, configure uptime monitoring, and fill the live on-call rota.
 - Performance: run the expected-volume load test for 100,000 vehicles and 10,000 sales orders with Vehicle Explorer p95 below 2 seconds.
@@ -98,5 +98,5 @@ npm run typecheck
 
 Still requires external setup before production launch:
 
-- Run `npm run test:rls` against the seeded live Supabase stack and attach evidence in `docs/SECURITY_SIGNOFF.md`.
+- Run `npm run test:rls` against an isolated staging Supabase stack and attach evidence in `docs/SECURITY_SIGNOFF.md`.
 - Have a release reviewer complete the sign-off table before production cutover.

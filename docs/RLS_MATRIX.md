@@ -61,4 +61,4 @@ This document tracks row-level-security posture per table. Every tenant-scoped t
 
 An automated Vitest + Supabase integration suite signs in as user A (company X) and attempts every SELECT/INSERT/UPDATE/DELETE against rows owned by user B (company Y). Every attempt must fail. This is the acceptance gate for Phase 0.
 
-Production release sign-off is tracked in `docs/SECURITY_SIGNOFF.md`. The release cannot be approved until `npm run test:rls` passes against the seeded live Supabase stack and the evidence is recorded there.
+Production release sign-off is tracked in `docs/SECURITY_SIGNOFF.md`. The release cannot be approved until `npm run test:rls` passes against a dedicated local or isolated staging Supabase target and the evidence is recorded there.

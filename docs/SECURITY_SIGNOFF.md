@@ -13,7 +13,7 @@ bash scripts/security-check.sh
 npm run test:rls
 ```
 
-`npm run test:rls` requires a live Supabase stack with seeded RLS users and `RLS_E2E=1`. If the live stack is unavailable, mark the gate blocked rather than waived.
+`npm run test:rls` requires a reachable Supabase stack with dedicated RLS test users and `RLS_E2E=1`. Use a local or isolated staging environment for those synthetic tenants; do not seed them into the live production database. If the required non-production environment is unavailable, mark the gate blocked rather than waived.
 
 ## Edge Function Review
 
@@ -29,7 +29,7 @@ npm run test:rls
 | ---- | ------ | -------- | -------- | ---- |
 | Edge function static guardrail | Passed | `npm run security:edge-functions` | | 2026-04-27 |
 | Full security script | Passed | `bash scripts/security-check.sh` | | 2026-04-28 |
-| RLS cross-company integration suite | Passed locally; live evidence pending | Local seeded Supabase: `npm run test:rls`, `84 passed`. Rerun with live `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `RLS_USER_A_EMAIL`, `RLS_USER_A_PASSWORD`, `RLS_USER_B_EMAIL`, and `RLS_USER_B_PASSWORD` before cutover | | 2026-04-28 |
+| RLS cross-company integration suite | Passed locally; isolated staging evidence pending | Local seeded Supabase: `npm run test:rls`, `84 passed`. Rerun against an isolated staging Supabase target with `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `RLS_USER_A_EMAIL`, `RLS_USER_A_PASSWORD`, `RLS_USER_B_EMAIL`, and `RLS_USER_B_PASSWORD` before cutover | | 2026-04-28 |
 | Sentry redaction/user-context review | Passed in Phase 2 slice 1 | `src/services/errorTrackingService.test.ts` | | 2026-04-27 |
 | Backup/incident/on-call runbook review | Passed in Phase 2 slice 2 | `docs/BACKUP_DR.md`, `docs/INCIDENT_RESPONSE.md`, `docs/ONCALL.md` | | 2026-04-27 |
 

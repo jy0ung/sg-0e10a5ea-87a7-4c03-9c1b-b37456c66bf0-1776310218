@@ -33,11 +33,12 @@
 
 - `src/test/rls-matrix.spec.ts` is the cross-tenant acceptance gate for Phase 0.
 - It signs in as user A (company X) and, for every tenant-scoped table, asserts that A cannot SELECT/INSERT rows belonging to company Y. It also asserts that a fresh signup cannot escalate via `raw_user_meta_data` and that notifications cannot be spoofed onto another tenant's user.
-- The suite is excluded from the default `vitest run` because it requires a live Supabase stack. To execute:
+- The suite is excluded from the default `vitest run` because it requires a reachable Supabase stack. To execute safely:
   1. `supabase start` (apply migrations).
-  2. Seed two tenants + users with `SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run test:rls:seed`.
+  2. Seed two tenants + users in a local or isolated staging environment with `SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npm run test:rls:seed`.
   3. Export the returned credentials as `RLS_USER_A_*` / `RLS_USER_B_*` along with `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`.
   4. `npm run test:rls`.
+- Do not seed synthetic RLS tenants into the live production database. If `rls-a`, `rls-b`, `a@rls.test`, or `b@rls.test` already exist outside local/staging, remove them with `CONFIRM_RLS_TEST_CLEANUP=delete-rls-test-data npm run test:rls:cleanup` from a trusted admin shell.
 - Run this harness before every release; a red run blocks the tag.
 - CI now includes an optional `RLS Matrix` job on pushes. Configure the staging
   secrets `RLS_SUPABASE_URL`, `RLS_SUPABASE_ANON_KEY`, `RLS_USER_A_EMAIL`,
