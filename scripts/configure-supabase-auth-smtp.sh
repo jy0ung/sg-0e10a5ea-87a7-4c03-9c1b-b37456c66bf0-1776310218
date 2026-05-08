@@ -83,6 +83,7 @@ fi
 
 ROOT_DIR="${1:-$(pwd)}"
 CONFIG_FILE="${ROOT_DIR}/supabase/config.toml"
+RECOVERY_TEMPLATE_FILE="${ROOT_DIR}/supabase/templates/recovery.html"
 SYSTEMD_ENV_FILE="${SYSTEMD_ENV_FILE:-/etc/flc-bi/supabase.env}"
 SUPABASE_SERVICE_FILE="${SUPABASE_SERVICE_FILE:-/etc/systemd/system/flc-bi-supabase.service}"
 SUDO_BIN="${SUDO_BIN-sudo}"
@@ -92,6 +93,10 @@ RESTART_SUPABASE_SERVICE="${RESTART_SUPABASE_SERVICE:-1}"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
   die "No supabase/config.toml found in ${ROOT_DIR}"
+fi
+
+if [[ ! -f "$RECOVERY_TEMPLATE_FILE" ]]; then
+  die "No recovery email template found at ${RECOVERY_TEMPLATE_FILE}"
 fi
 
 current_site_url="$(sed -n 's/^site_url = "\(.*\)"$/\1/p' "$CONFIG_FILE" | head -n 1)"
@@ -168,6 +173,14 @@ sender_name = "${AUTH_SMTP_SENDER_NAME}"
 EOF
 }
 
+build_recovery_template_block() {
+  cat <<'EOF'
+[auth.email.template.recovery]
+subject = "Reset your FLC BI password"
+content_path = "./supabase/templates/recovery.html"
+EOF
+}
+
 log "Updating auth URLs in supabase/config.toml"
 SUPABASE_API_EXTERNAL_URL_VALUE="$SUPABASE_API_EXTERNAL_URL" perl -0pi -e '
   my $value = $ENV{SUPABASE_API_EXTERNAL_URL_VALUE};
@@ -214,6 +227,26 @@ if ! awk -v expected="$AUTH_RATE_LIMIT_EMAIL_SENT" '
   END { exit found ? 0 : 1 }
 ' "$CONFIG_FILE"; then
   die "Unable to set auth.rate_limit.email_sent in ${CONFIG_FILE}"
+fi
+
+log "Ensuring Supabase recovery email template is configured"
+RECOVERY_TEMPLATE_BLOCK="$(build_recovery_template_block)"
+if grep -q '^\[auth\.email\.template\.recovery\]$' "$CONFIG_FILE"; then
+  RECOVERY_TEMPLATE_BLOCK="$RECOVERY_TEMPLATE_BLOCK" perl -0pi -e '
+    my $block = $ENV{RECOVERY_TEMPLATE_BLOCK};
+    s{^\[auth\.email\.template\.recovery\]\n(?:(?!^\[).)*}{$block . "\n\n"}mse;
+  ' "$CONFIG_FILE"
+else
+  printf '\n%s\n' "$RECOVERY_TEMPLATE_BLOCK" >>"$CONFIG_FILE"
+fi
+if ! awk '
+  /^\[auth\.email\.template\.recovery\]$/ { in_template = 1; next }
+  /^\[/ { in_template = 0 }
+  in_template && $0 == "content_path = \"./supabase/templates/recovery.html\"" { content_path = 1 }
+  in_template && $0 == "subject = \"Reset your FLC BI password\"" { subject = 1 }
+  END { exit content_path && subject ? 0 : 1 }
+' "$CONFIG_FILE"; then
+  die "Unable to configure auth.email.template.recovery in ${CONFIG_FILE}"
 fi
 
 if ! grep -q '^# BEGIN managed auth SMTP relay$' "$CONFIG_FILE"; then

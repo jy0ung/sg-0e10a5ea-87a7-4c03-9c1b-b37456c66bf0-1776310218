@@ -15,6 +15,7 @@ import { useRoleSectionMatrix } from '@/hooks/usePermissions';
 import { getDedicatedHrmsWorkspacePath, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
+import { brandAssets } from '@/config/brand';
 
 interface NavItem {
   label: string;
@@ -269,13 +270,13 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
           "h-14 flex items-center border-b border-sidebar-border flex-shrink-0 gap-3",
           collapsed ? "px-4 justify-center" : "px-4"
         )}>
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-            <span className="text-primary-foreground font-bold text-sm">F</span>
+          <div className="w-8 h-8 rounded-lg bg-white border border-sidebar-border flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm">
+            <img src={brandAssets.compactLogo} alt="Fook Loi" className="h-7 w-7 object-contain" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-foreground font-bold text-sm leading-tight tracking-tight">Fook Loi UBS</p>
-              <p className="text-[10px] text-muted-foreground leading-tight">Business Intelligence</p>
+              <p className="text-foreground font-bold text-sm leading-tight tracking-tight">Fook Loi Group UBS</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">Unified Business System</p>
             </div>
           )}
         </div>

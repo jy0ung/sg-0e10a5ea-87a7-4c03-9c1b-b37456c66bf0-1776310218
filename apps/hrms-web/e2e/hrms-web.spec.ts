@@ -39,7 +39,7 @@ async function setupDedicatedHrmsMocks(page: Page, options: { hrmsModuleActive?:
 async function assertDedicatedHrmsShell(page: Page) {
   await expect(page.locator('text=Route Error')).toHaveCount(0);
   await expect(page.locator('aside').first()).toBeVisible();
-  await expect(page.getByText('FLC HRMS').first()).toBeVisible();
+  await expect(page.getByText('Fook Loi Group HRMS').first()).toBeVisible();
   await expect(page.getByText('HRMS-only access')).toBeVisible();
   expect(page.url()).not.toMatch(/\/login$/);
 }

@@ -334,16 +334,16 @@ async function checkHrmsWebShell() {
 
     await page.goto(new URL('/', targetUrl).toString(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.waitForURL((url) => url.pathname.endsWith('/leave'), { timeout: 20_000 });
-    await page.getByText('FLC HRMS').first().waitFor({ state: 'visible', timeout: 10_000 });
+    await page.getByText('Fook Loi Group HRMS').first().waitFor({ state: 'visible', timeout: 10_000 });
     await page.getByText('HRMS-only access').waitFor({ state: 'visible', timeout: 10_000 });
 
     await page.goto(new URL('/admin', targetUrl).toString(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.waitForURL((url) => url.pathname.endsWith('/settings'), { timeout: 20_000 });
-    await page.getByText('FLC HRMS').first().waitFor({ state: 'visible', timeout: 10_000 });
+    await page.getByText('Fook Loi Group HRMS').first().waitFor({ state: 'visible', timeout: 10_000 });
 
     await page.goto(new URL('/leave-calendar?view=team#month', targetUrl).toString(), { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await page.waitForURL((url) => url.pathname.endsWith('/leave/calendar') && url.search === '?view=team' && url.hash === '#month', { timeout: 20_000 });
-    await page.getByText('FLC HRMS').first().waitFor({ state: 'visible', timeout: 10_000 });
+    await page.getByText('Fook Loi Group HRMS').first().waitFor({ state: 'visible', timeout: 10_000 });
 
     addResult(name, true, `validated ${targetUrl.origin}`);
   } catch (error) {

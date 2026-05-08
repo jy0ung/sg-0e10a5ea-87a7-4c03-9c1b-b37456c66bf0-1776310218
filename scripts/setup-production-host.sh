@@ -243,6 +243,10 @@ configure_supabase_config() {
     return
   fi
 
+  if [[ ! -f supabase/templates/recovery.html ]]; then
+    die "No recovery email template found at supabase/templates/recovery.html"
+  fi
+
   log "Updating supabase/config.toml for ${APP_URL}"
   local redirect_urls
 
@@ -320,6 +324,33 @@ EOF
     END { exit found ? 0 : 1 }
   ' supabase/config.toml; then
     die "Unable to set auth.rate_limit.email_sent in supabase/config.toml"
+  fi
+
+  log "Ensuring Supabase recovery email template is configured"
+  local recovery_template_block
+  recovery_template_block=$(cat <<'EOF'
+[auth.email.template.recovery]
+subject = "Reset your FLC BI password"
+content_path = "./supabase/templates/recovery.html"
+EOF
+)
+
+  if grep -q '^\[auth\.email\.template\.recovery\]$' supabase/config.toml; then
+    RECOVERY_TEMPLATE_BLOCK="$recovery_template_block" perl -0pi -e '
+      my $block = $ENV{RECOVERY_TEMPLATE_BLOCK};
+      s{^\[auth\.email\.template\.recovery\]\n(?:(?!^\[).)*}{$block . "\n\n"}mse;
+    ' supabase/config.toml
+  else
+    printf '\n%s\n' "$recovery_template_block" >>supabase/config.toml
+  fi
+  if ! awk '
+    /^\[auth\.email\.template\.recovery\]$/ { in_template = 1; next }
+    /^\[/ { in_template = 0 }
+    in_template && $0 == "content_path = \"./supabase/templates/recovery.html\"" { content_path = 1 }
+    in_template && $0 == "subject = \"Reset your FLC BI password\"" { subject = 1 }
+    END { exit content_path && subject ? 0 : 1 }
+  ' supabase/config.toml; then
+    die "Unable to configure auth.email.template.recovery in supabase/config.toml"
   fi
 }
 

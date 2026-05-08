@@ -12,6 +12,49 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { brandAssets, brandName } from '@/config/brand';
 
 const invalidResetLinkMessage = 'Invalid or expired reset link. Request a new password reset email and try again.';
+const expiredResetLinkMessage = 'This reset link is invalid or has expired. Request a new password reset email and use the newest link.';
+const resetLinkTimeoutMessage = 'We could not validate this reset link. Check your connection and request a new password reset email if the problem continues.';
+const authOperationTimeoutMs = 8000;
+
+type AuthCallbackParams = {
+  type: string | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  tokenHash: string | null;
+  code: string | null;
+  error: string | null;
+  errorCode: string | null;
+  errorDescription: string | null;
+};
+
+type AuthErrorLike = {
+  message?: string;
+  code?: string;
+  status?: number;
+};
+
+function getAuthErrorMessage(error: AuthErrorLike | null | undefined) {
+  if (!error) return invalidResetLinkMessage;
+  if (error.code === 'otp_expired' || /expired/i.test(error.message ?? '')) return expiredResetLinkMessage;
+  if (error.message) return error.message;
+  return invalidResetLinkMessage;
+}
+
+function getCallbackErrorMessage(params: AuthCallbackParams) {
+  if (!params.error && !params.errorCode && !params.errorDescription) return '';
+  if (params.errorCode === 'otp_expired') return expiredResetLinkMessage;
+  if (params.errorDescription) return params.errorDescription.replace(/\+/g, ' ');
+  return invalidResetLinkMessage;
+}
+
+function withTimeout<T>(operation: Promise<T>, timeoutMessage = resetLinkTimeoutMessage): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), authOperationTimeoutMs);
+  });
+
+  return Promise.race([operation, timeout]).finally(() => clearTimeout(timeoutId));
+}
 
 function decodeJwtPayload(accessToken: string) {
   const [, payload] = accessToken.split('.');
@@ -47,7 +90,7 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     let isMounted = true;
 
-    const getCallbackParams = () => {
+    const getCallbackParams = (): AuthCallbackParams => {
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
       const searchParams = new URLSearchParams(window.location.search);
 
@@ -57,21 +100,36 @@ export default function ResetPasswordPage() {
         refreshToken: hashParams.get('refresh_token') || searchParams.get('refresh_token'),
         tokenHash: hashParams.get('token_hash') || searchParams.get('token_hash'),
         code: hashParams.get('code') || searchParams.get('code'),
+        error: hashParams.get('error') || searchParams.get('error'),
+        errorCode: hashParams.get('error_code') || searchParams.get('error_code'),
+        errorDescription: hashParams.get('error_description') || searchParams.get('error_description'),
       };
     };
 
     const initializeRecovery = async () => {
-      const { type, accessToken, refreshToken, tokenHash, code } = getCallbackParams();
+      const params = getCallbackParams();
+      const { type, accessToken, refreshToken, tokenHash, code } = params;
+      const callbackErrorMessage = getCallbackErrorMessage(params);
+
+      if (callbackErrorMessage) {
+        if (isMounted) {
+          setError(callbackErrorMessage);
+          setInitializing(false);
+        }
+        return;
+      }
+
       // Supabase PKCE email links verify at /auth/v1/verify and then redirect
       // back with ?code=...; that redirect does not always preserve type.
       // Since this page is only for password recovery, a bare code/token_hash
       // here is treated as a recovery callback.
-      const isRecoveryCallback = type === 'recovery' || (!type && !!(code || tokenHash || (accessToken && refreshToken)));
-      const hasRecoveryCallback = isRecoveryCallback && !!(accessToken || tokenHash || code);
+      const hasSessionTokens = !!(accessToken && refreshToken);
+      const isRecoveryCallback = type === 'recovery' || (!type && !!(code || tokenHash || hasSessionTokens));
+      const hasRecoveryCallback = isRecoveryCallback && !!(hasSessionTokens || tokenHash || code);
 
       if (!hasRecoveryCallback) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (isRecoverySession(session)) {
+        const { data: { session }, error: sessionError } = await withTimeout(supabase.auth.getSession());
+        if (!sessionError && isRecoverySession(session)) {
           if (isMounted) {
             setIsRecovery(true);
             setError('');
@@ -88,10 +146,10 @@ export default function ResetPasswordPage() {
       }
 
       if (code) {
-        const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
+        const { error: codeError } = await withTimeout(supabase.auth.exchangeCodeForSession(code));
         if (codeError) {
           if (isMounted) {
-            setError(invalidResetLinkMessage);
+            setError(getAuthErrorMessage(codeError));
             setInitializing(false);
           }
           return;
@@ -99,14 +157,14 @@ export default function ResetPasswordPage() {
       }
 
       if (tokenHash) {
-        const { error: tokenError } = await supabase.auth.verifyOtp({
+        const { error: tokenError } = await withTimeout(supabase.auth.verifyOtp({
           type: 'recovery',
           token_hash: tokenHash,
-        });
+        }));
 
         if (tokenError) {
           if (isMounted) {
-            setError(invalidResetLinkMessage);
+            setError(getAuthErrorMessage(tokenError));
             setInitializing(false);
           }
           return;
@@ -114,14 +172,14 @@ export default function ResetPasswordPage() {
       }
 
       if (accessToken && refreshToken) {
-        const { error: sessionError } = await supabase.auth.setSession({
+        const { error: sessionError } = await withTimeout(supabase.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken,
-        });
+        }));
 
         if (sessionError) {
           if (isMounted) {
-            setError(invalidResetLinkMessage);
+            setError(getAuthErrorMessage(sessionError));
             setInitializing(false);
           }
           return;
@@ -142,7 +200,12 @@ export default function ResetPasswordPage() {
       }
     });
 
-    void initializeRecovery();
+    void initializeRecovery().catch((err) => {
+      if (isMounted) {
+        setError(err instanceof Error ? err.message : resetLinkTimeoutMessage);
+        setInitializing(false);
+      }
+    });
 
     return () => {
       isMounted = false;

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type QueuedResult = {
   data: unknown;
-  error: { message: string } | null;
+  error: { message: string; context?: Response } | null;
 };
 
 const queuedResults: QueuedResult[] = [];
@@ -54,7 +54,7 @@ vi.mock('./auditService', () => ({
   logUserAction: vi.fn().mockResolvedValue({ error: null }),
 }));
 
-import { deleteInvitedUser, inviteUser, listProfiles, updateProfile } from './profileService';
+import { deactivateUser, deleteInvitedUser, inviteUser, listProfiles, reactivateUser, updateProfile } from './profileService';
 
 beforeEach(() => {
   queuedResults.length = 0;
@@ -144,5 +144,63 @@ describe('deleteInvitedUser', () => {
     const result = await deleteInvitedUser('user-1');
 
     expect(result.error).toBe('This user has already signed in.');
+  });
+
+  it('surfaces non-2xx edge function response body errors', async () => {
+    queueResolves({
+      data: null,
+      error: {
+        message: 'Edge Function returned a non-2xx status code',
+        context: new Response(JSON.stringify({
+          error: 'This user has already signed in. Deactivate the user instead of deleting their account.',
+        }), { status: 409 }),
+      },
+    });
+
+    const result = await deleteInvitedUser('user-1');
+
+    expect(result.error).toBe('This user has already signed in. Deactivate the user instead of deleting their account.');
+  });
+});
+
+describe('account status actions', () => {
+  it('calls update-user-status to deactivate a user with a reason', async () => {
+    queueResolves({ data: { status: 'inactive' }, error: null });
+
+    const result = await deactivateUser('user-1', 'Left company');
+
+    expect(result.error).toBeNull();
+    expect(functionInvocations[0]).toMatchObject({
+      name: 'update-user-status',
+      body: { user_id: 'user-1', status: 'inactive', reason: 'Left company' },
+    });
+  });
+
+  it('calls update-user-status to reactivate a user', async () => {
+    queueResolves({ data: { status: 'active' }, error: null });
+
+    const result = await reactivateUser('user-1');
+
+    expect(result.error).toBeNull();
+    expect(functionInvocations[0]).toMatchObject({
+      name: 'update-user-status',
+      body: { user_id: 'user-1', status: 'active', reason: null },
+    });
+  });
+
+  it('surfaces update-user-status non-2xx response body errors', async () => {
+    queueResolves({
+      data: null,
+      error: {
+        message: 'Edge Function returned a non-2xx status code',
+        context: new Response(JSON.stringify({
+          error: 'At least one active super admin account is required',
+        }), { status: 409 }),
+      },
+    });
+
+    const result = await deactivateUser('user-1');
+
+    expect(result.error).toBe('At least one active super admin account is required');
   });
 });

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { SUPABASE_URL, setupSessionForUpdateUser } from "./helpers/auth-mock";
+import { SUPABASE_URL, setupRecoveryCallbackMocks } from "./helpers/auth-mock";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH FLOWS  (unauthenticated — no mocking needed)
@@ -7,7 +7,7 @@ import { SUPABASE_URL, setupSessionForUpdateUser } from "./helpers/auth-mock";
 test.describe("Login page", () => {
   test("renders brand, email and password fields", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.locator("text=FLC BI")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /fook loi group ubs/i })).toBeVisible();
     await expect(page.locator("#email")).toBeVisible();
     await expect(page.locator("#password")).toBeVisible();
     await expect(page.locator('button[type="submit"]')).toBeVisible();
@@ -77,6 +77,8 @@ test.describe("Reset Password page", () => {
   });
 
   test("shows the reset form for a valid recovery callback", async ({ page }) => {
+    await setupRecoveryCallbackMocks(page);
+
     await page.goto("/reset-password#type=recovery&token_hash=fake-recovery-token");
 
     await expect(page.locator("text=/set your new password/i")).toBeVisible({ timeout: 5000 });
@@ -85,8 +87,27 @@ test.describe("Reset Password page", () => {
     await expect(page.locator('button[type="submit"]')).toBeDisabled();
   });
 
+  test("shows the reset form for a bare PKCE recovery code callback", async ({ page }) => {
+    await setupRecoveryCallbackMocks(page);
+
+    await page.goto("/reset-password?code=fake-recovery-code");
+
+    await expect(page.locator("text=/set your new password/i")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("#password")).toBeVisible();
+    await expect(page.locator("#confirm")).toBeVisible();
+  });
+
+  test("shows expired-link state immediately for GoTrue expired callbacks", async ({ page }) => {
+    await page.goto(
+      "/reset-password?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired"
+    );
+
+    await expect(page.locator("text=/invalid or has expired/i")).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("#password")).toHaveCount(0);
+  });
+
   test("shows success state after a successful password update", async ({ page }) => {
-    await setupSessionForUpdateUser(page);
+    await setupRecoveryCallbackMocks(page);
 
     // Override only the PUT (updateUser) to return success
     await page.route(`${SUPABASE_URL}/auth/v1/user`, (route) => {
@@ -115,7 +136,7 @@ test.describe("Reset Password page", () => {
   });
 
   test("shows error message after a failed password update", async ({ page }) => {
-    await setupSessionForUpdateUser(page);
+    await setupRecoveryCallbackMocks(page);
 
     // Override only the PUT (updateUser) to return an auth error
     await page.route(`${SUPABASE_URL}/auth/v1/user`, (route) => {

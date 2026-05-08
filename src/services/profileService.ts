@@ -34,6 +34,28 @@ export interface CompanyOption {
   name: string;
 }
 
+type FunctionErrorWithContext = {
+  message?: string;
+  context?: Response;
+};
+
+async function getFunctionErrorMessage(error: unknown): Promise<string> {
+  const functionError = error as FunctionErrorWithContext;
+  const response = functionError?.context;
+
+  if (response && typeof response.json === 'function') {
+    try {
+      const payload = await response.clone().json() as { error?: unknown; message?: unknown };
+      if (payload.error) return String(payload.error);
+      if (payload.message) return String(payload.message);
+    } catch {
+      // Fall through to the Supabase client error message.
+    }
+  }
+
+  return functionError?.message ?? 'Edge function request failed';
+}
+
 /** List all profiles (optionally scoped to a company for non-super-admins). */
 export async function listProfiles(companyId?: string): Promise<ListProfilesResult> {
   let q = supabase
@@ -134,7 +156,7 @@ export async function inviteUser(payload: {
       portal_access_only: payload.portalAccessOnly ?? false,
     },
   });
-  if (error) return { error: error.message };
+  if (error) return { error: await getFunctionErrorMessage(error) };
   if (data && typeof data === 'object' && 'error' in data && data.error) {
     return { error: String(data.error) };
   }
@@ -146,11 +168,40 @@ export async function deleteInvitedUser(userId: string): Promise<{ error: string
   const { data, error } = await supabase.functions.invoke('delete-user', {
     body: { user_id: userId },
   });
-  if (error) return { error: error.message };
+  if (error) return { error: await getFunctionErrorMessage(error) };
   if (data && typeof data === 'object' && 'error' in data && data.error) {
     return { error: String(data.error) };
   }
   return { error: null };
+}
+
+async function updateUserAccountStatus(
+  userId: string,
+  status: 'active' | 'inactive',
+  reason?: string,
+): Promise<{ error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('update-user-status', {
+    body: {
+      user_id: userId,
+      status,
+      reason: reason?.trim() || null,
+    },
+  });
+  if (error) return { error: await getFunctionErrorMessage(error) };
+  if (data && typeof data === 'object' && 'error' in data && data.error) {
+    return { error: String(data.error) };
+  }
+  return { error: null };
+}
+
+/** Deactivate an existing user account and block future sign-in/session refresh. */
+export async function deactivateUser(userId: string, reason?: string): Promise<{ error: string | null }> {
+  return updateUserAccountStatus(userId, 'inactive', reason);
+}
+
+/** Restore an inactive user account and remove the Supabase Auth ban marker. */
+export async function reactivateUser(userId: string, reason?: string): Promise<{ error: string | null }> {
+  return updateUserAccountStatus(userId, 'active', reason);
 }
 
 /** Re-authenticate then update password (Settings → Change Password). */

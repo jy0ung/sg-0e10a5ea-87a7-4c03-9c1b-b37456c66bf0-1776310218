@@ -1,9 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
-import { listProfiles, updateProfile, inviteUser, deleteInvitedUser, listCompanyOptions, setPortalAccess, type ProfileRow, type CompanyOption } from '@/services/profileService';
-import { Shield, Loader2, Save, Settings, UserPlus, Copy, Check, CheckCircle, UserCheck, KeyRound, Trash2 } from 'lucide-react';
+import {
+  deactivateUser,
+  deleteInvitedUser,
+  inviteUser,
+  listCompanyOptions,
+  listProfiles,
+  reactivateUser,
+  setPortalAccess,
+  updateProfile,
+  type CompanyOption,
+  type ProfileRow,
+} from '@/services/profileService';
+import {
+  Ban,
+  Check,
+  CheckCircle,
+  Clock,
+  Copy,
+  KeyRound,
+  Loader2,
+  MoreHorizontal,
+  RotateCcw,
+  Save,
+  Search,
+  Settings,
+  Shield,
+  Trash2,
+  UserCheck,
+  UserMinus,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +41,27 @@ import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE, type Employee, type BranchRecord } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import { PermissionEditor } from '@/components/admin/PermissionEditor';
@@ -20,6 +71,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { listEmployeeDirectory } from '@/services/hrmsService';
 import { authService } from '@/services/authService';
+import { cn } from '@/lib/utils';
 
 const ROLES: { value: AppRole; label: string }[] = [
   { value: 'super_admin', label: 'Super Admin' },
@@ -33,14 +85,32 @@ const ROLES: { value: AppRole; label: string }[] = [
 ];
 
 const SCOPES: { value: AccessScope; label: string }[] = [
-  { value: 'self', label: 'Self — own records only' },
-  { value: 'branch', label: 'Branch — assigned branch' },
-  { value: 'company', label: 'Company — full company' },
-  { value: 'global', label: 'Global — all companies' },
+  { value: 'self', label: 'Self - own records only' },
+  { value: 'branch', label: 'Branch - assigned branch' },
+  { value: 'company', label: 'Company - full company' },
+  { value: 'global', label: 'Global - all companies' },
 ];
 
-function _scopeLabel(scope: string): string {
+type AccountFilter = 'active' | 'pending' | 'inactive' | 'all';
+type AccountStatusAction = 'deactivate' | 'reactivate';
+
+function scopeLabel(scope: string): string {
   return SCOPES.find(s => s.value === scope)?.label || scope;
+}
+
+function roleLabel(role: AppRole): string {
+  return ROLES.find(r => r.value === role)?.label ?? role.replace(/_/g, ' ');
+}
+
+function getInitials(name: string, email: string): string {
+  const source = name.trim() || email.trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return source.slice(0, 2).toUpperCase() || 'U';
+}
+
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? '').toLowerCase();
 }
 
 export default function UserManagement() {
@@ -63,10 +133,17 @@ export default function UserManagement() {
   const [grantingAccess, setGrantingAccess] = useState<string>('');
   const [resettingPassword, setResettingPassword] = useState<string>('');
   const [deletingUser, setDeletingUser] = useState<string>('');
+  const [updatingAccountStatus, setUpdatingAccountStatus] = useState<string>('');
   const [employeesByCompany, setEmployeesByCompany] = useState<Record<string, Employee[]>>({});
   const [pendingSelections, setPendingSelections] = useState<
     Record<string, { role: AppRole; company_id: string; employee_id: string | null }>
   >({});
+  const [accountFilter, setAccountFilter] = useState<AccountFilter>('active');
+  const [search, setSearch] = useState('');
+  const [statusActionUser, setStatusActionUser] = useState<ProfileRow | null>(null);
+  const [statusAction, setStatusAction] = useState<AccountStatusAction>('deactivate');
+  const [statusReason, setStatusReason] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<ProfileRow | null>(null);
 
   const editForm = useForm<UserUpdateFormData>({
     resolver: zodResolver(userUpdateSchema),
@@ -82,6 +159,7 @@ export default function UserManagement() {
   });
 
   const canManage = hasRole(['super_admin', 'company_admin']);
+  const isSuperAdmin = user?.role === 'super_admin';
 
   const inviteForm = useForm<InviteUserFormData>({
     resolver: zodResolver(inviteUserSchema),
@@ -132,25 +210,31 @@ export default function UserManagement() {
     load();
   }, [user?.company_id]);
 
-  if (!canManage) return <UnauthorizedAccess />;
+  const linkedEmployeeProfileIdByEmployeeId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const profile of profiles) {
+      if (profile.employee_id) map.set(profile.employee_id, profile.id);
+    }
+    return map;
+  }, [profiles]);
 
-  const openEdit = (p: ProfileRow) => {
-    setEditUser(p);
-    setEditBranch(p.branch_id || 'none');
-    editForm.reset({
-      name: p.name,
-      role: p.role as UserUpdateFormData['role'],
-      access_scope: p.access_scope as UserUpdateFormData['access_scope'],
-      branch_id: p.branch_id,
-      employee_id: p.employee_id ?? null,
-      portal_access_only: p.portal_access_only,
-    });
-  };
+  const pendingUsers = useMemo(
+    () => profiles.filter(p => !p.company_id || p.status === 'pending'),
+    [profiles],
+  );
 
-  const linkedEmployeeProfileIdByEmployeeId = new Map<string, string>();
-  for (const profile of profiles) {
-    if (profile.employee_id) linkedEmployeeProfileIdByEmployeeId.set(profile.employee_id, profile.id);
-  }
+  const managedUsers = useMemo(
+    () => profiles.filter(p => p.company_id && p.status !== 'pending'),
+    [profiles],
+  );
+
+  const summary = useMemo(() => ({
+    active: managedUsers.filter(p => p.status === 'active').length,
+    pending: pendingUsers.length,
+    inactive: managedUsers.filter(p => p.status === 'inactive' || p.status === 'resigned').length,
+    portalOnly: managedUsers.filter(p => p.portal_access_only).length,
+    total: profiles.length,
+  }), [managedUsers, pendingUsers.length, profiles.length]);
 
   function getEmployeeOptions(companyId: string | null | undefined, currentProfileId?: string) {
     if (!companyId) return [];
@@ -166,6 +250,58 @@ export default function UserManagement() {
     if (!employee) return profile.employee_id;
     return employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name;
   }
+
+  function getBranchLabel(profile: ProfileRow) {
+    if (!profile.branch_id) return 'All branches';
+    const branch = branches.find(row => row.id === profile.branch_id || row.name === profile.branch_id);
+    return branch?.name ?? profile.branch_id;
+  }
+
+  const displayedUsers = (() => {
+    const query = search.trim().toLowerCase();
+    const source = accountFilter === 'pending'
+      ? pendingUsers
+      : managedUsers.filter(profile => {
+        if (accountFilter === 'active') return profile.status === 'active';
+        if (accountFilter === 'inactive') return profile.status === 'inactive' || profile.status === 'resigned';
+        return true;
+      });
+
+    if (!query) return source;
+
+    return source.filter(profile => {
+      const haystack = [
+        profile.name,
+        profile.email,
+        roleLabel(profile.role),
+        scopeLabel(profile.access_scope),
+        profile.status,
+        getEmployeeLabel(profile),
+        getBranchLabel(profile),
+      ].map(normalizeText).join(' ');
+      return haystack.includes(query);
+    });
+  })();
+
+  if (!canManage) return <UnauthorizedAccess />;
+
+  const refreshProfiles = async () => {
+    const refreshed = await listProfiles();
+    if (!refreshed.error) setProfiles(refreshed.data);
+  };
+
+  const openEdit = (p: ProfileRow) => {
+    setEditUser(p);
+    setEditBranch(p.branch_id || 'none');
+    editForm.reset({
+      name: p.name,
+      role: p.role as UserUpdateFormData['role'],
+      access_scope: p.access_scope as UserUpdateFormData['access_scope'],
+      branch_id: p.branch_id,
+      employee_id: p.employee_id ?? null,
+      portal_access_only: p.portal_access_only,
+    });
+  };
 
   const openPermissions = (p: ProfileRow) => {
     setPermissionUserId(p.id);
@@ -208,10 +344,7 @@ export default function UserManagement() {
     setSaving(false);
   };
 
-  const getSignupUrl = () => {
-    const origin = window.location.origin;
-    return `${origin}/signup`;
-  };
+  const getSignupUrl = () => `${window.location.origin}/signup`;
 
   const handleCopySignupLink = async () => {
     const url = getSignupUrl();
@@ -243,15 +376,8 @@ export default function UserManagement() {
     toast.success(`Invitation sent to ${data.email}`);
     setSignupUrl(getSignupUrl());
     inviteForm.reset({ email: '', name: '', role: 'analyst', employee_id: null, portal_access_only: false });
-    const refreshed = await listProfiles();
-    if (!refreshed.error) setProfiles(refreshed.data);
+    await refreshProfiles();
   };
-
-  // Pending users: created without a company assignment (e.g. via the
-  // Supabase Dashboard invite flow) or still flagged status='pending' by the
-  // handle_new_user trigger. Admins activate them by assigning role + company.
-  const pendingUsers = profiles.filter(p => !p.company_id || p.status === 'pending');
-  const activeUsers = profiles.filter(p => p.company_id && p.status !== 'pending');
 
   const getPendingSelection = (p: ProfileRow) => {
     const current = pendingSelections[p.id];
@@ -264,14 +390,14 @@ export default function UserManagement() {
     };
   };
 
-  const setPendingRole = (id: string, role: AppRole) => {
-    setPendingSelections(prev => ({ ...prev, [id]: { ...getPendingSelection({ id } as ProfileRow), ...prev[id], role } }));
+  const setPendingRole = (profile: ProfileRow, role: AppRole) => {
+    setPendingSelections(prev => ({ ...prev, [profile.id]: { ...getPendingSelection(profile), ...prev[profile.id], role } }));
   };
-  const setPendingCompany = (id: string, company_id: string) => {
-    setPendingSelections(prev => ({ ...prev, [id]: { ...getPendingSelection({ id } as ProfileRow), ...prev[id], company_id } }));
+  const setPendingCompany = (profile: ProfileRow, company_id: string) => {
+    setPendingSelections(prev => ({ ...prev, [profile.id]: { ...getPendingSelection(profile), ...prev[profile.id], company_id, employee_id: null } }));
   };
-  const setPendingEmployee = (id: string, employee_id: string | null) => {
-    setPendingSelections(prev => ({ ...prev, [id]: { ...getPendingSelection({ id } as ProfileRow), ...prev[id], employee_id } }));
+  const setPendingEmployee = (profile: ProfileRow, employee_id: string | null) => {
+    setPendingSelections(prev => ({ ...prev, [profile.id]: { ...getPendingSelection(profile), ...prev[profile.id], employee_id } }));
   };
 
   const handleActivate = async (p: ProfileRow) => {
@@ -300,8 +426,7 @@ export default function UserManagement() {
       return;
     }
     toast.success(`${p.email} activated`);
-    const refreshed = await listProfiles();
-    if (!refreshed.error) setProfiles(refreshed.data);
+    await refreshProfiles();
     setPendingSelections(prev => {
       const { [p.id]: _removed, ...rest } = prev;
       return rest;
@@ -317,8 +442,7 @@ export default function UserManagement() {
       return;
     }
     toast.success(grant ? `Main app access granted to ${p.name || p.email}` : `Main app access revoked for ${p.name || p.email}`);
-    const refreshed = await listProfiles();
-    if (!refreshed.error) setProfiles(refreshed.data);
+    await refreshProfiles();
   };
 
   const handleSendPasswordReset = async (p: ProfileRow) => {
@@ -332,43 +456,123 @@ export default function UserManagement() {
     toast.success(`Password reset email sent to ${p.email}`);
   };
 
-  const handleDeleteInvitedUser = async (p: ProfileRow) => {
+  const requestDeleteInvitedUser = (p: ProfileRow) => {
     if (p.id === user?.id) {
       toast.error('You cannot delete your own account.');
       return;
     }
+    setDeleteTarget(p);
+  };
 
-    const confirmed = window.confirm(
-      `Delete ${p.email}? This is only for invited users who never signed in. Existing active users should be deactivated instead.`,
-    );
-    if (!confirmed) return;
-
-    setDeletingUser(p.id);
-    const { error } = await deleteInvitedUser(p.id);
+  const confirmDeleteInvitedUser = async () => {
+    if (!deleteTarget) return;
+    setDeletingUser(deleteTarget.id);
+    const { error } = await deleteInvitedUser(deleteTarget.id);
     setDeletingUser('');
     if (error) {
       toast.error('Failed to delete user: ' + error);
       return;
     }
-    toast.success(`${p.email} deleted. You can invite the user again.`);
-    const refreshed = await listProfiles();
-    if (!refreshed.error) setProfiles(refreshed.data);
+    toast.success(`${deleteTarget.email} deleted. You can invite the user again.`);
+    setDeleteTarget(null);
+    await refreshProfiles();
+  };
+
+  const canChangeAccountStatus = (p: ProfileRow) => {
+    if (p.id === user?.id) return false;
+    if (p.role === 'super_admin' && !isSuperAdmin) return false;
+    if (p.access_scope === 'global' && !isSuperAdmin) return false;
+    return true;
+  };
+
+  const requestStatusAction = (p: ProfileRow, action: AccountStatusAction) => {
+    if (!canChangeAccountStatus(p)) {
+      toast.error('You do not have permission to change this account status.');
+      return;
+    }
+    setStatusActionUser(p);
+    setStatusAction(action);
+    setStatusReason('');
+  };
+
+  const confirmStatusAction = async () => {
+    if (!statusActionUser) return;
+
+    setUpdatingAccountStatus(statusActionUser.id);
+    const result = statusAction === 'deactivate'
+      ? await deactivateUser(statusActionUser.id, statusReason)
+      : await reactivateUser(statusActionUser.id, statusReason);
+    setUpdatingAccountStatus('');
+
+    if (result.error) {
+      toast.error(`${statusAction === 'deactivate' ? 'Failed to deactivate user: ' : 'Failed to reactivate user: '}${result.error}`);
+      return;
+    }
+
+    toast.success(`${statusActionUser.name || statusActionUser.email} ${statusAction === 'deactivate' ? 'deactivated' : 'reactivated'}`);
+    setStatusActionUser(null);
+    setStatusReason('');
+    await refreshProfiles();
+  };
+
+  const renderAccountStatus = (p: ProfileRow) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <StatusBadge status={p.status} />
+      {p.portal_access_only && <StatusBadge status="portal_only" />}
+    </div>
+  );
+
+  const renderPrimaryStatusAction = (p: ProfileRow) => {
+    if (p.status === 'active') {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => requestStatusAction(p, 'deactivate')}
+          disabled={updatingAccountStatus === p.id || !canChangeAccountStatus(p)}
+        >
+          {updatingAccountStatus === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
+          <span className="ml-1.5">Deactivate</span>
+        </Button>
+      );
+    }
+
+    if (p.status === 'inactive' || p.status === 'resigned') {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-primary/40 text-primary hover:bg-primary/10"
+          onClick={() => requestStatusAction(p, 'reactivate')}
+          disabled={updatingAccountStatus === p.id || !canChangeAccountStatus(p)}
+        >
+          {updatingAccountStatus === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+          <span className="ml-1.5">Reactivate</span>
+        </Button>
+      );
+    }
+
+    return null;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader title="Users & Roles" description="Manage platform users, roles, and account access" breadcrumbs={[{ label: 'FLC BI' }, { label: 'Admin' }, { label: 'Users & Roles' }]} />
+        <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading users...</div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <PageHeader title="Users & Roles" description="Manage platform users, roles, and access scope" breadcrumbs={[{ label: 'FLC BI' }, { label: 'Admin' }, { label: 'Users & Roles' }]} />
-        {canManage && (
-          <div className="flex items-center gap-2">
+      <PageHeader
+        title="Users & Roles"
+        description="Manage account status, roles, employee links, and application access"
+        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Admin' }, { label: 'Users & Roles' }]}
+        actions={
+          <>
             <Button variant="outline" size="sm" onClick={handleCopySignupLink}>
               {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
               {copied ? 'Copied' : 'Copy Sign-Up Link'}
@@ -377,258 +581,286 @@ export default function UserManagement() {
               <UserPlus className="h-4 w-4 mr-1" />
               Invite User
             </Button>
-          </div>
-        )}
+          </>
+        }
+      />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="glass-panel p-4">
+          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><UserCheck className="h-3.5 w-3.5" /> Active users</p>
+          <p className="text-2xl font-bold text-success">{summary.active}</p>
+        </div>
+        <div className="glass-panel p-4">
+          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Pending activation</p>
+          <p className="text-2xl font-bold text-warning">{summary.pending}</p>
+        </div>
+        <div className="glass-panel p-4">
+          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><UserMinus className="h-3.5 w-3.5" /> Inactive users</p>
+          <p className="text-2xl font-bold text-foreground">{summary.inactive}</p>
+        </div>
+        <div className="glass-panel p-4">
+          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Portal-only</p>
+          <p className="text-2xl font-bold text-primary">{summary.portalOnly}</p>
+        </div>
       </div>
-      {pendingUsers.length > 0 && canManage && (
-        <div className="glass-panel overflow-hidden border border-primary/30">
-          <div className="px-4 py-3 bg-primary/10 border-b border-primary/30 flex items-center gap-2">
-            <UserCheck className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">
-              {pendingUsers.length} user{pendingUsers.length === 1 ? '' : 's'} awaiting activation
-            </span>
-            <span className="text-xs text-muted-foreground ml-2">
-              Users created via the Supabase Dashboard or that haven't been assigned a company appear here.
-            </span>
+
+      <div className="glass-panel overflow-hidden">
+        <div className="p-4 border-b border-border space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:justify-between">
+            <Tabs value={accountFilter} onValueChange={(value) => setAccountFilter(value as AccountFilter)}>
+              <TabsList className="h-auto flex-wrap justify-start">
+                <TabsTrigger value="active">Active ({summary.active})</TabsTrigger>
+                <TabsTrigger value="pending">Pending ({summary.pending})</TabsTrigger>
+                <TabsTrigger value="inactive">Inactive ({summary.inactive})</TabsTrigger>
+                <TabsTrigger value="all">All ({summary.total})</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="relative w-full lg:max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-8 h-9"
+                placeholder="Search users, roles, employees..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-secondary/30 text-left">
-                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Email</th>
-                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Name</th>
-                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Role</th>
-                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Company</th>
-                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Employee</th>
-                <th className="px-4 py-2 text-xs text-muted-foreground font-medium w-32"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendingUsers.map(p => {
-                const sel = getPendingSelection(p);
-                return (
-                  <tr key={p.id} className="data-table-row">
-                    <td className="px-4 py-2 text-foreground text-xs">{p.email}</td>
-                    <td className="px-4 py-2 text-foreground">{p.name || '—'}</td>
-                    <td className="px-4 py-2">
-                      <Select value={sel.role} onValueChange={(v) => setPendingRole(p.id, v as AppRole)}>
-                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {ROLES.map(r => (
-                            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-4 py-2">
-                      <Select value={sel.company_id} onValueChange={(v) => setPendingCompany(p.id, v)}>
-                        <SelectTrigger className="h-8"><SelectValue placeholder="Select company" /></SelectTrigger>
-                        <SelectContent>
-                          {companies.map(c => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-4 py-2">
-                      <Select value={sel.employee_id ?? 'none'} onValueChange={(v) => setPendingEmployee(p.id, v === 'none' ? null : v)}>
-                        <SelectTrigger className="h-8"><SelectValue placeholder="Link employee" /></SelectTrigger>
+        </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-secondary/30 hover:bg-secondary/30">
+              <TableHead className="min-w-56">User</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Employee</TableHead>
+              <TableHead>Role & Scope</TableHead>
+              <TableHead>Branch</TableHead>
+              <TableHead className="w-56 text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {displayedUsers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                  No users match the current view.
+                </TableCell>
+              </TableRow>
+            )}
+
+            {displayedUsers.map(p => {
+              const isPending = !p.company_id || p.status === 'pending';
+              const pendingSelection = isPending ? getPendingSelection(p) : null;
+
+              return (
+                <TableRow key={p.id} className={cn('data-table-row', (p.status === 'inactive' || p.status === 'resigned') && 'bg-muted/25 text-muted-foreground')}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        'h-9 w-9 rounded-full flex items-center justify-center border text-xs font-semibold',
+                        p.status === 'active' ? 'bg-primary/15 text-primary border-primary/20' : 'bg-muted text-muted-foreground border-border',
+                      )}>
+                        {getInitials(p.name, p.email)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground truncate">{p.name || 'Unnamed user'}</p>
+                        <p className="text-xs text-muted-foreground truncate">{p.email}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+
+                  <TableCell>{renderAccountStatus(p)}</TableCell>
+
+                  <TableCell>
+                    {isPending && pendingSelection ? (
+                      <Select value={pendingSelection.employee_id ?? 'none'} onValueChange={(value) => setPendingEmployee(p, value === 'none' ? null : value)}>
+                        <SelectTrigger className="h-8 min-w-44"><SelectValue placeholder="Link employee" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">No employee link</SelectItem>
-                          {getEmployeeOptions(sel.company_id, p.id).map(employee => (
+                          {getEmployeeOptions(pendingSelection.company_id, p.id).map(employee => (
                             <SelectItem key={employee.id} value={employee.id}>
                               {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleActivate(p)}
-                          disabled={activating === p.id || !sel.company_id}
-                        >
-                          {activating === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Activate'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteInvitedUser(p)}
-                          disabled={deletingUser === p.id || p.id === user?.id}
-                        >
-                          {deletingUser === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                        </Button>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">{getEmployeeLabel(p)}</span>
+                    )}
+                  </TableCell>
+
+                  <TableCell>
+                    {isPending && pendingSelection ? (
+                      <div className="grid gap-2 min-w-56">
+                        <Select value={pendingSelection.role} onValueChange={(value) => setPendingRole(p, value as AppRole)}>
+                          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {ROLES.map(role => <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <Select value={pendingSelection.company_id} onValueChange={(value) => setPendingCompany(p, value)}>
+                          <SelectTrigger className="h-8"><SelectValue placeholder="Select company" /></SelectTrigger>
+                          <SelectContent>
+                            {companies.map(company => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div className="glass-panel overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-secondary/30 text-left">
-              <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Name</th>
-              <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Email</th>
-              <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Employee</th>
-              <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Role</th>
-              <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Access Scope</th>
-              <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Branch</th>
-              {canManage && <th className="px-4 py-3 text-xs text-muted-foreground font-medium">Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {activeUsers.length === 0 && (
-              <tr>
-                <td colSpan={canManage ? 7 : 6} className="px-4 py-10 text-center text-muted-foreground">
-                  No users found.
-                </td>
-              </tr>
-            )}
-            {activeUsers.map(p => (
-              <tr key={p.id} className="data-table-row">
-                <td className="px-4 py-3 text-foreground font-medium flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center">
-                    <span className="text-primary text-xs font-semibold">{p.name.charAt(0)}</span>
-                  </div>
-                  {p.name}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground text-xs">{p.email}</td>
-                <td className="px-4 py-3 text-muted-foreground text-xs">{getEmployeeLabel(p)}</td>
-                <td className="px-4 py-3">
-                  <div className="space-y-1">
-                    <span className="flex items-center gap-1 text-foreground capitalize">
-                      <Shield className="h-3 w-3 text-primary" />
-                      {p.role.replace(/_/g, ' ')}
-                    </span>
-                    {p.portal_access_only && (
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-amber-500">
-                        HRMS &amp; Internal Requests only
-                      </p>
+                    ) : (
+                      <div className="space-y-1">
+                        <span className="flex items-center gap-1 text-foreground capitalize">
+                          <Shield className="h-3.5 w-3.5 text-primary" />
+                          {roleLabel(p.role)}
+                        </span>
+                        <p className="text-xs text-muted-foreground">{scopeLabel(p.access_scope)}</p>
+                      </div>
                     )}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={p.access_scope} />
-                </td>
-                <td className="px-4 py-3 text-foreground">{p.branch_id || '—'}</td>
-                {canManage && (
-                  <td className="px-4 py-3 flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>Edit</Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleSendPasswordReset(p)}
-                      disabled={resettingPassword === p.id}
-                    >
-                      {resettingPassword === p.id
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                        : <KeyRound className="h-3.5 w-3.5 mr-1" />
-                      }
-                      Reset Password
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteInvitedUser(p)}
-                      disabled={deletingUser === p.id || p.id === user?.id}
-                    >
-                      {deletingUser === p.id
-                        ? <Loader2 className="h-3 w-3 animate-spin" />
-                        : <><Trash2 className="h-3 w-3 mr-1" />Delete</>
-                      }
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => openPermissions(p)}>
-                      <Settings className="h-3.5 w-3.5 mr-1" />Permissions
-                    </Button>
-                    {p.portal_access_only && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs border-green-600 text-green-700 hover:bg-green-50"
-                        onClick={() => handleGrantMainAppAccess(p, true)}
-                        disabled={grantingAccess === p.id}
-                      >
-                        {grantingAccess === p.id
-                          ? <Loader2 className="h-3 w-3 animate-spin" />
-                          : <><UserCheck className="h-3 w-3 mr-1" />Grant Full Access</>
-                        }
-                      </Button>
-                    )}
-                    {!p.portal_access_only && p.role !== 'super_admin' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-muted-foreground hover:text-destructive"
-                        onClick={() => handleGrantMainAppAccess(p, false)}
-                        disabled={grantingAccess === p.id}
-                      >
-                        {grantingAccess === p.id
-                          ? <Loader2 className="h-3 w-3 animate-spin" />
-                          : 'Revoke Full Access'
-                        }
-                      </Button>
-                    )}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </TableCell>
+
+                  <TableCell className="text-sm text-muted-foreground">{isPending ? 'Set on activation' : getBranchLabel(p)}</TableCell>
+
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-2">
+                      {isPending && pendingSelection ? (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleActivate(p)}
+                            disabled={activating === p.id || !pendingSelection.company_id}
+                          >
+                            {activating === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
+                            <span className="ml-1.5">Activate</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => requestDeleteInvitedUser(p)}
+                            disabled={deletingUser === p.id || p.id === user?.id}
+                            aria-label="Delete invited user"
+                          >
+                            {deletingUser === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(p)}>Edit</Button>
+                          {renderPrimaryStatusAction(p)}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More account actions">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              <DropdownMenuLabel>Account actions</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => openPermissions(p)}>
+                                <Settings className="h-4 w-4 mr-2" /> Permissions
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleSendPasswordReset(p)}
+                                disabled={resettingPassword === p.id || p.status !== 'active'}
+                              >
+                                {resettingPassword === p.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <KeyRound className="h-4 w-4 mr-2" />}
+                                Reset password
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {p.portal_access_only ? (
+                                <DropdownMenuItem onClick={() => handleGrantMainAppAccess(p, true)} disabled={grantingAccess === p.id || p.status !== 'active'}>
+                                  {grantingAccess === p.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserCheck className="h-4 w-4 mr-2" />}
+                                  Grant full access
+                                </DropdownMenuItem>
+                              ) : p.role !== 'super_admin' ? (
+                                <DropdownMenuItem onClick={() => handleGrantMainAppAccess(p, false)} disabled={grantingAccess === p.id || p.status !== 'active'}>
+                                  {grantingAccess === p.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserMinus className="h-4 w-4 mr-2" />}
+                                  Revoke full access
+                                </DropdownMenuItem>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
 
-      {/* Edit Dialog */}
       <Dialog open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit User: {editUser?.name}</DialogTitle>
+            <DialogTitle>Edit User: {editUser?.name || editUser?.email}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input {...editForm.register('name')} className={editForm.formState.errors.name ? 'border-destructive' : ''} />
-              {editForm.formState.errors.name && (
-                <p className="text-destructive text-xs">{editForm.formState.errors.name.message}</p>
-              )}
+          <div className="space-y-5 mt-2">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input {...editForm.register('name')} className={editForm.formState.errors.name ? 'border-destructive' : ''} />
+                {editForm.formState.errors.name && (
+                  <p className="text-destructive text-xs">{editForm.formState.errors.name.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={editForm.watch('role')} onValueChange={(value) => {
+                  editForm.setValue('role', value as UserUpdateFormData['role']);
+                  const defaultScope = ROLE_DEFAULT_SCOPE[value as AppRole] || 'company';
+                  editForm.setValue('access_scope', defaultScope as UserUpdateFormData['access_scope']);
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map(role => <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Access Scope</Label>
+                <Select value={editForm.watch('access_scope')} onValueChange={(value) => {
+                  editForm.setValue('access_scope', value as UserUpdateFormData['access_scope']);
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SCOPES.map(scope => <SelectItem key={scope.value} value={scope.value}>{scope.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Branch Assignment</Label>
+                <Select value={editBranch} onValueChange={(value) => {
+                  setEditBranch(value);
+                  editForm.setValue('branch_id', value === 'none' ? null : value);
+                }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No branch assigned</SelectItem>
+                    {branches.map(branch => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Role</Label>
-              <Select value={editForm.watch('role')} onValueChange={(v) => {
-                editForm.setValue('role', v as UserUpdateFormData['role']);
-                const defaultScope = ROLE_DEFAULT_SCOPE[v as AppRole] || 'company';
-                editForm.setValue('access_scope', defaultScope as UserUpdateFormData['access_scope']);
-              }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label>Linked Employee</Label>
+              <Select
+                value={editForm.watch('employee_id') ?? 'none'}
+                onValueChange={(value) => editForm.setValue('employee_id', value === 'none' ? null : value, { shouldDirty: true, shouldValidate: true })}
+              >
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
                 <SelectContent>
-                  {ROLES.map(r => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  <SelectItem value="none">No employee link</SelectItem>
+                  {getEmployeeOptions(editUser?.company_id, editUser?.id).map(employee => (
+                    <SelectItem key={employee.id} value={employee.id}>
+                      {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Access Scope</Label>
-              <Select value={editForm.watch('access_scope')} onValueChange={(v) => {
-                editForm.setValue('access_scope', v as UserUpdateFormData['access_scope']);
-              }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {SCOPES.map(s => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                This user can access: <strong className="text-foreground capitalize">{editForm.watch('access_scope')}</strong>
-              </p>
             </div>
 
             <div className="rounded-lg border border-border bg-secondary/30 p-3">
@@ -645,40 +877,6 @@ export default function UserManagement() {
                   onCheckedChange={(checked) => editForm.setValue('portal_access_only', checked, { shouldDirty: true, shouldValidate: true })}
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Branch Assignment</Label>
-              <Select value={editBranch} onValueChange={(v) => {
-                setEditBranch(v);
-                editForm.setValue('branch_id', v === 'none' ? null : v);
-              }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No branch assigned</SelectItem>
-                  {branches.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Linked Employee</Label>
-              <Select
-                value={editForm.watch('employee_id') ?? 'none'}
-                onValueChange={(v) => editForm.setValue('employee_id', v === 'none' ? null : v, { shouldDirty: true, shouldValidate: true })}
-              >
-                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No employee link</SelectItem>
-                  {getEmployeeOptions(editUser?.company_id, editUser?.id).map(employee => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
@@ -704,7 +902,6 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Permission Editor Dialog */}
       <Dialog open={!!permissionUserId} onOpenChange={(open) => !open && setPermissionUserId('')}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
           {permissionUserId && (
@@ -722,7 +919,6 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Invite User Dialog */}
       <Dialog open={inviteOpen} onOpenChange={(open) => { if (!open) { setInviteOpen(false); setSignupUrl(''); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -784,12 +980,10 @@ export default function UserManagement() {
 
                 <div className="space-y-2">
                   <Label>Role</Label>
-                  <Select value={inviteForm.watch('role')} onValueChange={(v) => inviteForm.setValue('role', v as InviteUserFormData['role'])}>
+                  <Select value={inviteForm.watch('role')} onValueChange={(value) => inviteForm.setValue('role', value as InviteUserFormData['role'])}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {ROLES.map(r => (
-                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                      ))}
+                      {ROLES.map(role => <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -798,7 +992,7 @@ export default function UserManagement() {
                   <Label>Linked Employee</Label>
                   <Select
                     value={inviteForm.watch('employee_id') ?? 'none'}
-                    onValueChange={(v) => inviteForm.setValue('employee_id', v === 'none' ? null : v, { shouldDirty: true, shouldValidate: true })}
+                    onValueChange={(value) => inviteForm.setValue('employee_id', value === 'none' ? null : value, { shouldDirty: true, shouldValidate: true })}
                   >
                     <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
                     <SelectContent>
@@ -852,6 +1046,68 @@ export default function UserManagement() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!statusActionUser} onOpenChange={(open) => { if (!open) setStatusActionUser(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{statusAction === 'deactivate' ? 'Deactivate user account?' : 'Reactivate user account?'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {statusAction === 'deactivate'
+                ? `${statusActionUser?.email ?? 'This user'} will be blocked from future sign-in and session refresh. Existing access tokens may remain valid until expiry, but the app will reject inactive profiles when it revalidates.`
+                : `${statusActionUser?.email ?? 'This user'} will regain sign-in and application access according to their assigned role and scope.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="status-reason">Reason</Label>
+            <Textarea
+              id="status-reason"
+              value={statusReason}
+              onChange={(event) => setStatusReason(event.target.value)}
+              placeholder={statusAction === 'deactivate' ? 'Optional reason for deactivation' : 'Optional reason for reactivation'}
+              className="min-h-24"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(updatingAccountStatus)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={statusAction === 'deactivate' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : undefined}
+              disabled={Boolean(updatingAccountStatus)}
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmStatusAction();
+              }}
+            >
+              {updatingAccountStatus ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : statusAction === 'deactivate' ? <Ban className="h-4 w-4 mr-2" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+              {statusAction === 'deactivate' ? 'Deactivate' : 'Reactivate'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete invited user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete {deleteTarget?.email ?? 'this invited user'} only if they have never signed in. Existing users should be deactivated instead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(deletingUser)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={Boolean(deletingUser)}
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmDeleteInvitedUser();
+              }}
+            >
+              {deletingUser ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete invite
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

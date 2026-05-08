@@ -147,6 +147,58 @@ export async function setupSessionForUpdateUser(page: Page) {
   await page.route(`${SUPABASE_URL}/realtime/**`, (route) => route.abort());
 }
 
+export async function setupRecoveryCallbackMocks(page: Page) {
+  await page.context().addInitScript(() => {
+    localStorage.setItem('flc.auth.session-code-verifier', 'fake-code-verifier/PASSWORD_RECOVERY');
+  });
+
+  await page.route(`${SUPABASE_URL}/auth/v1/verify*`, (route) => {
+    if (route.request().method() === "POST") {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(FAKE_SESSION),
+      });
+    } else {
+      route.continue();
+    }
+  });
+
+  await page.route(`${SUPABASE_URL}/auth/v1/token*`, (route) => {
+    if (route.request().method() === "POST") {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(FAKE_SESSION),
+      });
+    } else {
+      route.continue();
+    }
+  });
+
+  await page.route(`${SUPABASE_URL}/auth/v1/user`, (route) => {
+    if (route.request().method() === "GET") {
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_USER),
+      });
+    } else {
+      route.continue();
+    }
+  });
+
+  await page.route(`${SUPABASE_URL}/rest/v1/profiles*`, (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(MOCK_PROFILE),
+    });
+  });
+
+  await page.route(`${SUPABASE_URL}/realtime/**`, (route) => route.abort());
+}
+
 export async function setupAuthMocks(page: Page) {
   // ------------------------------------------------------------------
   // 1. Inject localStorage BEFORE any navigation so the Supabase client

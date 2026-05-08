@@ -38,4 +38,32 @@ describe('resolveAuthVerifyRedirect', () => {
       ),
     ).resolves.toMatch(/^\/reset-password\?error=access_denied/);
   });
+
+  it('falls back to reset-password when recovery verify fetch fails', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('network unavailable'));
+
+    await expect(
+      resolveAuthVerifyRedirect(
+        'https://ubs.protonfookloi.com/auth/v1/verify?token=pkce-token&type=recovery&redirect_to=https://ubs.protonfookloi.com/reset-password',
+        fetchImpl as unknown as typeof fetch,
+      ),
+    ).resolves.toMatch(/^\/reset-password\?error=access_denied/);
+  });
+
+  it('falls back to reset-password when recovery verify fetch times out', async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn().mockImplementation((_, init?: RequestInit) => new Promise<Response>((_, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+    }));
+
+    const redirect = resolveAuthVerifyRedirect(
+      'https://ubs.protonfookloi.com/auth/v1/verify?token=pkce-token&type=recovery',
+      fetchImpl as unknown as typeof fetch,
+      1,
+    );
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(redirect).resolves.toMatch(/^\/reset-password\?error=access_denied/);
+    vi.useRealTimers();
+  });
 });

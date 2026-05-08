@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
   Bell,
-  Briefcase,
   LogOut,
   Menu,
   ShieldCheck,
@@ -15,6 +14,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { brandAssets } from '@/config/brand';
 import { hrmsNavItems, type HrmsNavItem } from './navItems';
 
 function isActive(path: string, pathname: string): boolean {
@@ -40,12 +40,12 @@ function HrmsSidebar({ onNavigate }: { onNavigate?: () => void }) {
     <TooltipProvider delayDuration={200}>
       <aside className="flex h-full w-72 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
         <div className="flex h-14 shrink-0 items-center gap-3 border-b border-sidebar-border px-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <Briefcase className="h-4 w-4" />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-sidebar-border bg-white shadow-sm">
+            <img src={brandAssets.compactLogo} alt="Fook Loi" className="h-7 w-7 object-contain" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">FLC HRMS</p>
-            <p className="truncate text-[11px] text-sidebar-foreground/65">Dedicated workspace</p>
+            <p className="truncate text-sm font-semibold">Fook Loi Group HRMS</p>
+            <p className="truncate text-[11px] text-sidebar-foreground/65">Human Resource Management</p>
           </div>
         </div>
 
