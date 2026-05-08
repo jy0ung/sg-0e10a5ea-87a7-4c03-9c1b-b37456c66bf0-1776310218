@@ -161,6 +161,33 @@ export async function listTicketAttachments(
   }
 }
 
+export async function listAttachmentsForTickets(
+  ticketIds: string[],
+  companyId: string,
+): Promise<AttachmentServiceResult<Record<string, TicketAttachmentRecord[]>>> {
+  if (ticketIds.length === 0) return { data: {}, error: null };
+
+  try {
+    const { data, error } = await attachmentsTable()
+      .select('*')
+      .eq('company_id', companyId)
+      .in('ticket_id', ticketIds)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    const grouped = Object.fromEntries(ticketIds.map((ticketId) => [ticketId, [] as TicketAttachmentRecord[]]));
+    for (const attachment of (data as TicketAttachmentRecord[]) ?? []) {
+      grouped[attachment.ticket_id]?.push(attachment);
+    }
+
+    return { data: grouped, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load attachments';
+    return { data: {}, error: message };
+  }
+}
+
 // ── Get signed URL for download ───────────────────────────────────────────────
 
 export async function getAttachmentSignedUrl(

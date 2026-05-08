@@ -1,22 +1,26 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { AlertCircle, CalendarDays, CheckCircle2, Loader2, RefreshCcw, Ticket } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Loader2, MessageSquare, RefreshCcw, Send, Ticket } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
+import { TicketAttachmentList } from '@/components/tickets/TicketAttachmentList';
+import { Textarea } from '@/components/ui/textarea';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
 import {
+  addTicketComment,
   listMyTickets,
   listTicketActivity,
   type RequestTicketRecord,
   type TicketActivityRecord,
 } from '@/services/ticketService';
+import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
 
 const statusVariant: Record<RequestTicketRecord['status'], 'default' | 'secondary' | 'outline'> = {
   open: 'default',
@@ -63,13 +67,47 @@ export default function MyTickets() {
   const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
   const [tickets, setTickets] = useState<RequestTicketRecord[]>([]);
   const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
+  const [attachmentsByTicket, setAttachmentsByTicket] = useState<Record<string, TicketAttachmentRecord[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [savingCommentId, setSavingCommentId] = useState<string | null>(null);
 
   const customFieldLabelMap = useMemo(
     () => Object.fromEntries(formFields.map((field) => [`${field.category_key}:${field.key}`, field.label])),
     [formFields],
   );
+
+  const refreshTicketActivity = async (ticketId: string) => {
+    if (!user) return;
+    const { data } = await listTicketActivity([ticketId], user.company_id);
+    if (data) {
+      setActivitiesByTicket((current) => ({ ...current, ...data }));
+    }
+  };
+
+  const handleAddComment = async (ticketId: string) => {
+    if (!user) return;
+    const message = commentDrafts[ticketId]?.trim() ?? '';
+    if (!message) return;
+
+    setSavingCommentId(ticketId);
+    setError(null);
+    const { error: commentError } = await addTicketComment(
+      ticketId,
+      { message },
+      { userId: user.id, companyId: user.company_id },
+    );
+    setSavingCommentId(null);
+
+    if (commentError) {
+      setError(commentError.message || 'Unable to add comment.');
+      return;
+    }
+
+    setCommentDrafts((current) => ({ ...current, [ticketId]: '' }));
+    await refreshTicketActivity(ticketId);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -93,13 +131,16 @@ export default function MyTickets() {
       } else {
         const nextTickets = data ?? [];
         setTickets(nextTickets);
+        setCommentDrafts(Object.fromEntries(nextTickets.map((ticket) => [ticket.id, ''])));
 
-        const { data: activityData } = await listTicketActivity(
-          nextTickets.map((ticket) => ticket.id),
-          user.company_id,
-        );
+        const ticketIds = nextTickets.map((ticket) => ticket.id);
+        const [{ data: activityData }, { data: attachmentData }] = await Promise.all([
+          listTicketActivity(ticketIds, user.company_id),
+          listAttachmentsForTickets(ticketIds, user.company_id),
+        ]);
         if (cancelled) return;
         setActivitiesByTicket(activityData ?? {});
+        setAttachmentsByTicket(attachmentData ?? {});
       }
       setLoading(false);
     };
@@ -249,6 +290,39 @@ export default function MyTickets() {
                       Resolution note
                     </p>
                     <p className="mt-1 text-sm leading-5 text-foreground">{ticket.resolution_note}</p>
+                  </div>
+                )}
+
+                <TicketAttachmentList attachments={attachmentsByTicket[ticket.id] ?? []} />
+
+                {ticket.status !== 'closed' && (
+                  <div className="space-y-2 rounded-lg border border-border px-3 py-3">
+                    <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      Discussion
+                    </p>
+                    <Textarea
+                      value={commentDrafts[ticket.id] ?? ''}
+                      onChange={(event) => setCommentDrafts((current) => ({
+                        ...current,
+                        [ticket.id]: event.target.value,
+                      }))}
+                      placeholder="Add a clarification or follow-up note for the request owner."
+                      rows={3}
+                      disabled={savingCommentId === ticket.id}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => void handleAddComment(ticket.id)}
+                        disabled={savingCommentId === ticket.id || !commentDrafts[ticket.id]?.trim()}
+                      >
+                        {savingCommentId === ticket.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Add comment
+                      </Button>
+                    </div>
                   </div>
                 )}
 

@@ -10,6 +10,7 @@ interface DeleteUserPayload {
 
 const ADMIN_ROLES = ['super_admin', 'company_admin'];
 const LONG_BAN_DURATION = '876000h';
+const ARCHIVED_EMAIL_DOMAIN = 'archived.local';
 
 interface AuthBanResult {
   attempted: boolean;
@@ -26,6 +27,10 @@ function jsonResponse(body: Record<string, unknown>, status: number, corsHeaders
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function buildArchivedEmail(userId: string): string {
+  return `deleted+${userId}@${ARCHIVED_EMAIL_DOMAIN}`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -220,9 +225,27 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { error: deleteError } = await adminClient.auth.admin.deleteUser(targetUserId);
+    const shouldArchiveAccount = Boolean(targetAuth.user.last_sign_in_at && isDeactivated);
+    const { error: deleteError } = await adminClient.auth.admin.deleteUser(targetUserId, shouldArchiveAccount);
     if (deleteError) {
       return jsonResponse({ error: deleteError.message }, 500, corsHeaders);
+    }
+
+    if (shouldArchiveAccount) {
+      const { error: archiveProfileError } = await adminClient
+        .from('profiles')
+        .update({
+          email: buildArchivedEmail(targetUserId),
+          employee_id: null,
+          status: 'resigned',
+          portal_access_only: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', targetUserId);
+
+      if (archiveProfileError) {
+        return jsonResponse({ error: `User account was archived, but profile cleanup failed: ${archiveProfileError.message}` }, 500, corsHeaders);
+      }
     }
 
     await adminClient.from('audit_logs').insert({
@@ -234,11 +257,17 @@ Deno.serve(async (req: Request) => {
         component: 'delete-user edge function',
         email: targetProfile.email,
         status: targetProfile.status,
+        deletion_mode: shouldArchiveAccount ? 'soft_archive' : 'hard_delete',
       },
       table_name: 'user_actions',
     });
 
-    return jsonResponse({ message: `Deleted user ${targetProfile.email}` }, 200, corsHeaders);
+    return jsonResponse({
+      message: shouldArchiveAccount
+        ? `Archived user ${targetProfile.email}. The email can be invited again.`
+        : `Deleted user ${targetProfile.email}`,
+      deletion_mode: shouldArchiveAccount ? 'soft_archive' : 'hard_delete',
+    }, 200, corsHeaders);
   } catch (err) {
     return jsonResponse(
       { error: err instanceof Error ? err.message : 'Internal server error' },

@@ -6,10 +6,14 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock3,
+  Download,
   Inbox,
   Loader2,
+  MessageSquare,
+  Paperclip,
   RefreshCcw,
   Search,
+  Send,
   ShieldCheck,
   UserRound,
 } from 'lucide-react';
@@ -20,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
+import { TicketAttachmentList } from '@/components/tickets/TicketAttachmentList';
 import { Textarea } from '@/components/ui/textarea';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
@@ -32,6 +37,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  addTicketComment,
   listCompanyTickets,
   listTicketActivity,
   type CompanyTicketRecord,
@@ -40,6 +46,7 @@ import {
   type TicketStatus,
   updateTicket,
 } from '@/services/ticketService';
+import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
 import { listProfiles, type ProfileRow } from '@/services/profileService';
 import { ADMIN_ONLY } from '@/config/routeRoles';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
@@ -113,6 +120,22 @@ function customFieldEntries(
     }));
 }
 
+function csvCell(value: unknown): string {
+  const text = String(value ?? '');
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename: string, rows: string[][]) {
+  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function RequestQueue() {
   const { user } = useAuth();
   const { categories } = useRequestCategories(user?.company_id, true);
@@ -120,6 +143,7 @@ export default function RequestQueue() {
   const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
   const [tickets, setTickets] = useState<CompanyTicketRecord[]>([]);
   const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
+  const [attachmentsByTicket, setAttachmentsByTicket] = useState<Record<string, TicketAttachmentRecord[]>>({});
   const [assignees, setAssignees] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +153,7 @@ export default function RequestQueue() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
 
   const customFieldLabelMap = useMemo(
     () => Object.fromEntries(formFields.map((field) => [`${field.category_key}:${field.key}`, field.label])),
@@ -161,12 +186,17 @@ export default function RequestQueue() {
       setNoteDrafts(
         Object.fromEntries(nextTickets.map((ticket) => [ticket.id, ticket.resolution_note ?? ''])),
       );
-
-      const { data: activityData } = await listTicketActivity(
-        nextTickets.map((ticket) => ticket.id),
-        user.company_id,
+      setCommentDrafts(
+        Object.fromEntries(nextTickets.map((ticket) => [ticket.id, ''])),
       );
+
+      const ticketIds = nextTickets.map((ticket) => ticket.id);
+      const [{ data: activityData }, { data: attachmentData }] = await Promise.all([
+        listTicketActivity(ticketIds, user.company_id),
+        listAttachmentsForTickets(ticketIds, user.company_id),
+      ]);
       setActivitiesByTicket(activityData ?? {});
+      setAttachmentsByTicket(attachmentData ?? {});
     }
 
     setLoading(false);
@@ -375,6 +405,51 @@ export default function RequestQueue() {
     void refreshTicketActivity(ticketId);
   };
 
+  const handleAddComment = async (ticketId: string) => {
+    if (!user) return;
+    const message = commentDrafts[ticketId]?.trim() ?? '';
+    if (!message) return;
+
+    setSavingTicketId(ticketId);
+    setError(null);
+
+    const { error: commentError } = await addTicketComment(
+      ticketId,
+      { message },
+      { userId: user.id, companyId: user.company_id },
+    );
+
+    if (commentError) {
+      setError(commentError.message || 'Unable to add comment.');
+      setSavingTicketId(null);
+      return;
+    }
+
+    setCommentDrafts((current) => ({ ...current, [ticketId]: '' }));
+    setSavingTicketId(null);
+    void refreshTicketActivity(ticketId);
+  };
+
+  const handleExportCsv = () => {
+    const rows = [
+      ['ID', 'Subject', 'Status', 'Priority', 'Category', 'Subcategory', 'Requester', 'Owner', 'Due date', 'Created at'],
+      ...filteredTickets.map((ticket) => [
+        ticket.id,
+        ticket.subject,
+        formatTicketLabel(ticket.status),
+        ticket.priority,
+        getRequestCategoryLabel(ticket.category, categories),
+        ticket.subcategory ? getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories) : '',
+        ticket.submitted_by_name ?? ticket.submitted_by_email ?? '',
+        ticket.assigned_to_name ?? '',
+        ticket.requested_due_date ?? '',
+        ticket.created_at,
+      ]),
+    ];
+
+    downloadCsv(`internal-requests-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -386,10 +461,16 @@ export default function RequestQueue() {
           </p>
         </div>
 
-        <Button variant="outline" onClick={() => void loadTickets()} className="gap-2" disabled={loading}>
-          <RefreshCcw className="h-4 w-4" />
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleExportCsv} className="gap-2" disabled={loading || filteredTickets.length === 0}>
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button variant="outline" onClick={() => void loadTickets()} className="gap-2" disabled={loading}>
+            <RefreshCcw className="h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
@@ -549,6 +630,12 @@ export default function RequestQueue() {
                       {ticket.requested_due_date && (
                         <span className={isOverdue(ticket) ? 'font-medium text-destructive' : ''}>
                           Needed {formatDueDate(ticket.requested_due_date)}
+                        </span>
+                      )}
+                      {(attachmentsByTicket[ticket.id]?.length ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-1">
+                          <Paperclip className="h-3.5 w-3.5" />
+                          {attachmentsByTicket[ticket.id]?.length}
                         </span>
                       )}
                     </div>
@@ -733,6 +820,37 @@ export default function RequestQueue() {
                   <p className="text-xs text-muted-foreground">Shown to the requester when their request is resolved or closed.</p>
                 </div>
               )}
+
+              <TicketAttachmentList attachments={attachmentsByTicket[selectedTicket.id] ?? []} />
+
+              <div className="space-y-2 rounded-lg border border-border px-3 py-3">
+                <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Discussion
+                </p>
+                <Textarea
+                  value={commentDrafts[selectedTicket.id] ?? ''}
+                  onChange={(event) => setCommentDrafts((current) => ({
+                    ...current,
+                    [selectedTicket.id]: event.target.value,
+                  }))}
+                  placeholder="Ask for clarification, add an update, or document the next step."
+                  rows={3}
+                  disabled={savingTicketId === selectedTicket.id}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => void handleAddComment(selectedTicket.id)}
+                    disabled={savingTicketId === selectedTicket.id || !commentDrafts[selectedTicket.id]?.trim()}
+                  >
+                    {savingTicketId === selectedTicket.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    Add comment
+                  </Button>
+                </div>
+              </div>
 
               <TicketActivityList activities={activitiesByTicket[selectedTicket.id] ?? []} />
             </div>

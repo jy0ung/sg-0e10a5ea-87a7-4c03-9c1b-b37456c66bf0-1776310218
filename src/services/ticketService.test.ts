@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { supabase } from '@/integrations/supabase/client';
-import { createTicket, listMyTickets, listTicketActivity, updateTicket } from './ticketService';
+import { addTicketComment, createTicket, listMyTickets, listTicketActivity, updateTicket } from './ticketService';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
 import { evaluateRoutingRules } from './requestRoutingService';
@@ -216,5 +216,71 @@ describe('ticketService', () => {
         expect.objectContaining({ userId: 'agent-7', title: 'Request assigned to you' }),
       ]),
     );
+  });
+
+  it('adds request comments as activity and notifies requester and owner', async () => {
+    const currentSingle = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ticket-1',
+        company_id: 'company-1',
+        subject: 'Need help with order',
+        category: 'operations_support',
+        subcategory: null,
+        priority: 'medium',
+        status: 'in_progress',
+        description: 'Please help me follow up on this order request.',
+        submitted_by: 'user-9',
+        assigned_to: 'user-2',
+        assigned_at: '2026-04-30T10:00:00.000Z',
+        resolved_at: null,
+        resolution_note: null,
+        custom_fields: {},
+        created_at: '2026-04-30T09:00:00.000Z',
+        updated_at: '2026-04-30T10:00:00.000Z',
+      },
+      error: null,
+    });
+    const currentIdEq = vi.fn(() => ({ single: currentSingle }));
+    const currentCompanyEq = vi.fn(() => ({ eq: currentIdEq }));
+    const currentSelect = vi.fn(() => ({ eq: currentCompanyEq }));
+
+    const activitySingle = vi.fn().mockResolvedValue({
+      data: {
+        id: 'activity-1',
+        ticket_id: 'ticket-1',
+        company_id: 'company-1',
+        actor_id: 'admin-1',
+        event_type: 'comment_added',
+        message: 'Please attach the latest supporting document.',
+        metadata: { comment: true },
+        created_at: '2026-04-30T11:00:00.000Z',
+      },
+      error: null,
+    });
+    const activitySelect = vi.fn(() => ({ single: activitySingle }));
+    const activityInsert = vi.fn(() => ({ select: activitySelect }));
+
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: currentSelect }) as never)
+      .mockImplementationOnce(() => ({ insert: activityInsert }) as never);
+
+    const result = await addTicketComment(
+      'ticket-1',
+      { message: '  Please attach the latest supporting document.  ' },
+      { userId: 'admin-1', companyId: 'company-1' },
+    );
+
+    expect(result.error).toBeNull();
+    expect(activityInsert).toHaveBeenCalledWith(expect.objectContaining({
+      ticket_id: 'ticket-1',
+      event_type: 'comment_added',
+      message: 'Please attach the latest supporting document.',
+      metadata: { comment: true },
+    }));
+    expect(createNotifications).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ userId: 'user-9', title: 'New request comment' }),
+      expect.objectContaining({ userId: 'user-2', title: 'New request comment' }),
+    ]));
+    expect(logUserAction).toHaveBeenCalledWith('admin-1', 'create', 'ticket_comment', 'ticket-1', { component: 'TicketService' });
   });
 });

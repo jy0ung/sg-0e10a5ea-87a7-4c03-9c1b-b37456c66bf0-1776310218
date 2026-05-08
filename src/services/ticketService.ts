@@ -73,12 +73,16 @@ export interface UpdateTicketInput {
   resolution_note?: string | null;
 }
 
+export interface AddTicketCommentInput {
+  message: string;
+}
+
 export interface TicketServiceResult<T> {
   data: T | null;
   error: Error | null;
 }
 
-export type TicketActivityEventType = 'status_changed' | 'owner_changed' | 'resolution_note_updated' | 'priority_changed';
+export type TicketActivityEventType = 'status_changed' | 'owner_changed' | 'resolution_note_updated' | 'priority_changed' | 'comment_added';
 
 export interface TicketActivityRecord {
   id: string;
@@ -315,6 +319,19 @@ function buildTicketNotifications(
   }
 
   return notifications;
+}
+
+function buildCommentNotifications(ticket: TicketRecord, actorId: string, message: string): CreateNotificationInput[] {
+  const recipientIds = new Set<string>();
+  if (ticket.submitted_by !== actorId) recipientIds.add(ticket.submitted_by);
+  if (ticket.assigned_to && ticket.assigned_to !== actorId) recipientIds.add(ticket.assigned_to);
+
+  return [...recipientIds].map((userId) => ({
+    userId,
+    title: 'New request comment',
+    message: `"${ticket.subject}" has a new comment: ${message.slice(0, 120)}${message.length > 120 ? '...' : ''}`,
+    type: 'info',
+  }));
 }
 
 export async function listMyTickets(userId: string, companyId: string): Promise<TicketServiceResult<RequestTicketRecord[]>> {
@@ -615,6 +632,83 @@ export async function updateTicket(
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to update ticket');
     loggingService.error('Failed to update ticket', { error: error.message, ticketId, ...patch }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+export async function addTicketComment(
+  ticketId: string,
+  input: AddTicketCommentInput,
+  context: { userId: string; companyId: string },
+): Promise<TicketServiceResult<TicketActivityRecord>> {
+  const message = input.message.trim();
+  if (!message) {
+    return { data: null, error: new Error('Comment cannot be empty') };
+  }
+
+  try {
+    let { data: ticketData, error: ticketError } = await ticketsTable()
+      .select(TICKET_SELECT)
+      .eq('company_id', context.companyId)
+      .eq('id', ticketId)
+      .single();
+
+    const missingCustomFieldsOnly = Boolean(ticketError && String(ticketError.message ?? '').includes('custom_fields'));
+    const useLegacyTicketSelect = Boolean(ticketError && isMissingOperationalTicketFieldError(ticketError));
+    const fallbackSelect = missingCustomFieldsOnly ? OPERATIONAL_TICKET_SELECT : LEGACY_TICKET_SELECT;
+    if (useLegacyTicketSelect) {
+      const legacyResult = await ticketsTable()
+        .select(fallbackSelect)
+        .eq('company_id', context.companyId)
+        .eq('id', ticketId)
+        .single();
+      ticketData = legacyResult.data;
+      ticketError = legacyResult.error;
+    }
+
+    if (ticketError) throw ticketError;
+    const ticket = mapTicket(ticketData as TicketRow);
+
+    const { data, error } = await ticketActivityTable()
+      .insert({
+        ticket_id: ticketId,
+        company_id: context.companyId,
+        actor_id: context.userId,
+        event_type: 'comment_added',
+        message,
+        metadata: { comment: true },
+      })
+      .select('id, ticket_id, company_id, actor_id, event_type, message, metadata, created_at')
+      .single();
+
+    if (error) throw error;
+
+    const notifications = buildCommentNotifications(ticket, context.userId, message);
+    if (notifications.length > 0) {
+      await Promise.allSettled([createNotifications(notifications)]);
+    }
+
+    void logUserAction(context.userId, 'create', 'ticket_comment', ticketId, {
+      component: 'TicketService',
+    });
+
+    const row = data as TicketActivityRow;
+    return {
+      data: {
+        id: row.id,
+        ticket_id: row.ticket_id,
+        actor_id: row.actor_id,
+        actor_name: null,
+        event_type: row.event_type,
+        message: row.message,
+        metadata: row.metadata,
+        created_at: row.created_at,
+      },
+      error: null,
+    };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to add request comment');
+    loggingService.error('Failed to add request comment', { error: error.message, ticketId }, 'TicketService');
     return { data: null, error };
   }
 }

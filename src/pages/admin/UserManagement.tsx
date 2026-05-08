@@ -93,6 +93,7 @@ const SCOPES: { value: AccessScope; label: string }[] = [
 
 type AccountFilter = 'active' | 'pending' | 'inactive' | 'all';
 type AccountStatusAction = 'deactivate' | 'reactivate';
+const ARCHIVED_EMAIL_DOMAIN = '@archived.local';
 
 function scopeLabel(scope: string): string {
   return SCOPES.find(s => s.value === scope)?.label || scope;
@@ -111,6 +112,10 @@ function getInitials(name: string, email: string): string {
 
 function normalizeText(value: string | null | undefined): string {
   return (value ?? '').toLowerCase();
+}
+
+function isArchivedAccountProfile(profile: ProfileRow): boolean {
+  return profile.status === 'resigned' && profile.email.startsWith('deleted+') && profile.email.endsWith(ARCHIVED_EMAIL_DOMAIN);
 }
 
 export default function UserManagement() {
@@ -218,14 +223,19 @@ export default function UserManagement() {
     return map;
   }, [profiles]);
 
-  const pendingUsers = useMemo(
-    () => profiles.filter(p => !p.company_id || p.status === 'pending'),
+  const visibleProfiles = useMemo(
+    () => profiles.filter(profile => !isArchivedAccountProfile(profile)),
     [profiles],
   );
 
+  const pendingUsers = useMemo(
+    () => visibleProfiles.filter(p => !p.company_id || p.status === 'pending'),
+    [visibleProfiles],
+  );
+
   const managedUsers = useMemo(
-    () => profiles.filter(p => p.company_id && p.status !== 'pending'),
-    [profiles],
+    () => visibleProfiles.filter(p => p.company_id && p.status !== 'pending'),
+    [visibleProfiles],
   );
 
   const summary = useMemo(() => ({
@@ -233,8 +243,8 @@ export default function UserManagement() {
     pending: pendingUsers.length,
     inactive: managedUsers.filter(p => p.status === 'inactive' || p.status === 'resigned').length,
     portalOnly: managedUsers.filter(p => p.portal_access_only).length,
-    total: profiles.length,
-  }), [managedUsers, pendingUsers.length, profiles.length]);
+    total: visibleProfiles.length,
+  }), [managedUsers, pendingUsers.length, visibleProfiles.length]);
 
   function getEmployeeOptions(companyId: string | null | undefined, currentProfileId?: string) {
     if (!companyId) return [];
@@ -477,7 +487,7 @@ export default function UserManagement() {
       toast.error('Failed to delete user: ' + error);
       return;
     }
-    toast.success(`${deleteTarget.email} deleted. You can invite the user again.`);
+    toast.success(`${deleteTarget.email} archived. You can invite the user again.`);
     setDeleteTarget(null);
     await refreshProfiles();
   };
@@ -1114,7 +1124,7 @@ export default function UserManagement() {
             <AlertDialogTitle>{deleteTarget?.status === 'inactive' ? 'Delete deactivated user?' : 'Delete invited user?'}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget?.status === 'inactive'
-                ? `Delete ${deleteTarget.email} permanently so the email can be invited again.`
+                ? `Archive ${deleteTarget.email} so historical records are preserved and the email can be invited again.`
                 : `Delete ${deleteTarget?.email ?? 'this invited user'} only if they have never signed in. Existing users should be deactivated first.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1129,7 +1139,7 @@ export default function UserManagement() {
               }}
             >
               {deletingUser ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
-              {deleteTarget?.status === 'inactive' ? 'Delete user' : 'Delete invite'}
+              {deleteTarget?.status === 'inactive' ? 'Archive user' : 'Delete invite'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
