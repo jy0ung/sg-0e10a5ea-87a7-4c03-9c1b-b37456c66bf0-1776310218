@@ -87,6 +87,7 @@ CRITICAL: Read this file first in every session before asking project basics. Th
 - Public signup is disabled at `[auth].enable_signup=false`, but email auth must remain enabled for login, invites, and password recovery.
 - Production Supabase Auth email uses Resend SMTP (`GOTRUE_SMTP_HOST=smtp.resend.com`, user `resend`, sender `FOOK LOI SYSTEM`). GoTrue also enforces its own `auth.rate_limit.email_sent`; keep `[auth.rate_limit].email_sent = 30` in `supabase/config.toml`/production bootstrap and restart `flc-bi-supabase.service` after changes. Do not confuse this hourly GoTrue throttle with Resend's monthly quota.
 - 2026-05-08 live note: Supabase Auth was manually restarted with the existing Resend credential in-process and now reports `GOTRUE_RATE_LIMIT_EMAIL_SENT=30`. `/etc/flc-bi/supabase.env` now exists with `AUTH_SMTP_PASS`, `/etc/systemd/system/flc-bi-supabase.service` reads it via `EnvironmentFile=-/etc/flc-bi/supabase.env`, and the stored secret hash matches the running Auth container. Reboot persistence for Resend SMTP is closed.
+- Docker inspect may show duplicate `GOTRUE_RATE_LIMIT_EMAIL_SENT` entries (`360000` before `30`) because of generated container env layering; the running Auth process and effective `env` report `GOTRUE_RATE_LIMIT_EMAIL_SENT=30`.
 - Service-role key must never ship to the client. Client env is limited to public Vite variables; edge functions/scripts own service secrets.
 - RLS is primary authorization; client route gates are not security boundaries. Any new table needs explicit company/self/admin RLS plus updates to `docs/RLS_MATRIX.md` and tests where practical.
 - The generated Supabase types are incomplete/stale for newer request tables and some RPC returns (`unknown`); `src/services/ticketService.ts` and request setup services isolate `as never`/local shims until types are regenerated.
@@ -106,6 +107,7 @@ CRITICAL: Read this file first in every session before asking project basics. Th
 - 2026-05-08: Checked production Auth SMTP/rate-limit drift. Live GoTrue is configured for Resend SMTP, but effective `GOTRUE_RATE_LIMIT_EMAIL_SENT` was still 2, producing `/recover` 429 `over_email_send_rate_limit`. Durable config now sets `[auth.rate_limit].email_sent = 30` and production SMTP/bootstrap scripts expose `AUTH_RATE_LIMIT_EMAIL_SENT`.
 - 2026-05-08: Applied live rate-limit change by restarting Supabase with the existing Resend credential from the running Auth container. Verified live GoTrue reports `GOTRUE_RATE_LIMIT_EMAIL_SENT=30` and `/auth/v1/health` returns 200. Verified `/etc/flc-bi/supabase.env` persistence and matching SMTP secret hash with sudo.
 - 2026-05-08: Invite flow check: invite links use the same GoTrue `/auth/v1/verify` path as reset links but with `type=invite` and `redirect_to=/signup`. Live invalid-token probes for `https://ubs.protonfookloi.com/auth/v1/verify?...type=invite&redirect_to=https://ubs.protonfookloi.com/signup` and HRMS equivalent returned GoTrue `303` redirects to `/signup`, not SPA 404s. Live `GOTRUE_URI_ALLOW_LIST` includes main and HRMS signup/reset paths.
+- 2026-05-08: Docker inspect still lists a legacy duplicate `GOTRUE_RATE_LIMIT_EMAIL_SENT=360000` before the effective `GOTRUE_RATE_LIMIT_EMAIL_SENT=30`; process env confirms `30`.
 
 ## Change Log
 
@@ -116,3 +118,4 @@ CRITICAL: Read this file first in every session before asking project basics. Th
 - 2026-05-08: Added durable `AUTH_RATE_LIMIT_EMAIL_SENT`/`[auth.rate_limit].email_sent` config path for production Supabase Auth email.
 - 2026-05-08: Closed production SMTP persistence note after verifying `/etc/flc-bi/supabase.env`, systemd `EnvironmentFile`, and matching Auth SMTP secret hash.
 - 2026-05-08: Documented live invite verify path checks for main and HRMS domains.
+- 2026-05-08: Documented duplicate generated Auth rate-limit env entry and effective process value.
