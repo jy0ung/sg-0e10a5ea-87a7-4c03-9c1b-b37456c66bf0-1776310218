@@ -42,7 +42,7 @@ export default function AppLayout() {
 
       <div className="flex-1 flex flex-col min-w-0 h-screen">
         {/* Top bar */}
-        <header className="h-14 border-b border-border/80 flex items-center justify-between px-4 md:px-6 bg-background/85 backdrop-blur-md shadow-[0_1px_0_hsl(var(--border))] flex-shrink-0 z-10">
+        <header className="h-14 border-b border-border flex items-center justify-between px-4 md:px-6 bg-background flex-shrink-0 z-10">
           <div className="flex items-center gap-3">
             {isMobile && (
               <button

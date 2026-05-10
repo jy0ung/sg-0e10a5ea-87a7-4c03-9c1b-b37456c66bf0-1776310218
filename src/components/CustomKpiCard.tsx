@@ -22,7 +22,7 @@ export function CustomKpiCard({ title, formula, evaluation, onEdit, onRemove }: 
       : 'text-foreground';
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card/95 p-4 shadow-sm flex flex-col gap-3">
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span className="rounded-full bg-primary/10 text-primary px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest">
