@@ -596,7 +596,7 @@ export default function NewTicket() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-[1280px] space-y-4">
+    <div className="w-full space-y-4">
 
       {/* Page header */}
       <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
@@ -684,9 +684,9 @@ export default function NewTicket() {
           <CardDescription>Keep the request concise, categorized, and actionable for the receiving team.</CardDescription>
         </CardHeader>
         <CardContent className="p-4">
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
 
-            <div className="grid gap-3 md:grid-cols-[1fr_12rem]">
+            <div className="grid gap-3 md:grid-cols-[1fr_12rem] xl:col-span-2">
               <div className="space-y-1.5">
                 <Label htmlFor="subject">
                   Request title <span className="text-destructive">*</span>
@@ -714,7 +714,7 @@ export default function NewTicket() {
             </div>
 
             {/* Classification: category + priority */}
-            <div className="space-y-2">
+            <div className="space-y-2 xl:col-span-2">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
 
                 {/* Category */}
@@ -800,7 +800,7 @@ export default function NewTicket() {
             {/* Subcategory */}
             {(availableSubcategories.length > 0 ||
               (subcategoriesLoading && selectedCategoryKey)) && (
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 xl:col-span-2">
                 <Label htmlFor="subcategory">
                   Subcategory
                   {requiresSubcategory && <span className="text-destructive"> *</span>}
@@ -842,7 +842,7 @@ export default function NewTicket() {
             )}
 
             {customFields.length > 0 && (
-              <div className="rounded-lg border bg-muted/20 p-3">
+              <div className="rounded-lg border bg-muted/20 p-3 xl:col-span-2">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-foreground">Additional fields</p>
@@ -930,7 +930,7 @@ export default function NewTicket() {
             </div>
 
             {/* Attachments */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 xl:row-span-2">
               <div className="flex items-center justify-between gap-2">
                 <Label>
                   Attachments
@@ -1030,7 +1030,7 @@ export default function NewTicket() {
             </div>
 
             {/* Submit */}
-            <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between xl:col-span-2">
               <p className="text-xs text-muted-foreground">Drafts are saved locally until the request is submitted.</p>
               <Button
                 type="submit"

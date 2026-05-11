@@ -68,8 +68,8 @@ export function RequestQueueList({
   onSelectTicket,
 }: RequestQueueListProps) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2">
+    <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+      <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted/30 px-3 py-2">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Queue</h2>
           <p className="text-xs text-muted-foreground">{tickets.length} requests in view</p>
@@ -77,7 +77,7 @@ export function RequestQueueList({
         <Badge variant="outline">{openCount} open</Badge>
       </div>
 
-      <div className="max-h-[calc(100vh-14rem)] overflow-y-auto lg:max-h-[calc(100vh-18rem)]">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {tickets.map((ticket) => {
           const selected = ticket.id === selectedTicketId;
           const categoryLabel = getRequestCategoryLabel(ticket.category, categories);

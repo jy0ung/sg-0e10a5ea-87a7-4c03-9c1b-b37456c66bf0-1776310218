@@ -998,7 +998,7 @@ export default function RequestSetup() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-[1480px] space-y-4">
+    <div className="w-full space-y-4">
       <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">

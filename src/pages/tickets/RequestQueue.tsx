@@ -528,8 +528,8 @@ export default function RequestQueue() {
   );
 
   return (
-    <div className="mx-auto flex min-h-full max-w-[1480px] flex-col gap-4">
-      <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
+    <div className="flex h-full min-h-[720px] w-full flex-col gap-3 overflow-hidden lg:min-h-0">
+      <div className="shrink-0 rounded-lg border bg-card px-4 py-3 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Internal Requests</p>
@@ -562,32 +562,38 @@ export default function RequestQueue() {
       </div>
       </div>
 
-      {metricsExpanded && <RequestQueueMetricGrid metrics={queueMetrics} />}
+      {metricsExpanded && (
+        <div className="shrink-0">
+          <RequestQueueMetricGrid metrics={queueMetrics} />
+        </div>
+      )}
 
-      <RequestQueueFilters
-        searchTerm={searchTerm}
-        statusFilter={statusFilter}
-        priorityFilter={priorityFilter}
-        slaFilter={slaFilter}
-        counts={counts}
-        statusOptions={statusOptions}
-        priorityOptions={priorityOptions}
-        onSearchChange={setSearchTerm}
-        onStatusChange={setStatusFilter}
-        onPriorityChange={setPriorityFilter}
-        onSlaChange={setSlaFilter}
-      />
+      <div className="shrink-0">
+        <RequestQueueFilters
+          searchTerm={searchTerm}
+          statusFilter={statusFilter}
+          priorityFilter={priorityFilter}
+          slaFilter={slaFilter}
+          counts={counts}
+          statusOptions={statusOptions}
+          priorityOptions={priorityOptions}
+          onSearchChange={setSearchTerm}
+          onStatusChange={setStatusFilter}
+          onPriorityChange={setPriorityFilter}
+          onSlaChange={setSlaFilter}
+        />
+      </div>
 
       {loading ? (
-        <Card>
-          <CardContent className="flex items-center justify-center gap-3 py-12 text-muted-foreground">
+        <Card className="flex min-h-0 flex-1">
+          <CardContent className="flex flex-1 items-center justify-center gap-3 py-12 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
             <span>Loading the request queue...</span>
           </CardContent>
         </Card>
       ) : error ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-4 py-12 text-center">
+        <Card className="flex min-h-0 flex-1">
+          <CardContent className="flex flex-1 flex-col items-center justify-center gap-4 py-12 text-center">
             <AlertCircle className="h-8 w-8 text-destructive" />
             <div className="space-y-1">
               <p className="font-medium text-foreground">Unable to load the request queue</p>
@@ -600,8 +606,8 @@ export default function RequestQueue() {
           </CardContent>
         </Card>
       ) : filteredTickets.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+        <Card className="flex min-h-0 flex-1">
+          <CardContent className="flex flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
             <ShieldCheck className="h-8 w-8 text-muted-foreground" />
             <div className="space-y-1">
               <p className="font-medium text-foreground">No requests match this view</p>
@@ -610,7 +616,7 @@ export default function RequestQueue() {
           </CardContent>
         </Card>
       ) : selectedTicket ? (
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(420px,1.3fr)]">
+        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[minmax(340px,0.9fr)_minmax(560px,1.6fr)] xl:grid-cols-[minmax(380px,0.8fr)_minmax(640px,1.7fr)]">
           <RequestQueueList
             tickets={filteredTickets}
             selectedTicketId={selectedTicket.id}
@@ -624,14 +630,14 @@ export default function RequestQueue() {
             }}
           />
 
-          <section className="hidden overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:block">
+          <section className="hidden min-h-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:block">
             {renderDetailPanel(selectedTicket)}
           </section>
         </div>
       ) : null}
 
       {!loading && !error && totalCount > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm">
           <span>
             Showing {((page - 1) * REQUEST_QUEUE_PAGE_SIZE + 1).toLocaleString()}-
             {Math.min(page * REQUEST_QUEUE_PAGE_SIZE, totalCount).toLocaleString()} of {totalCount.toLocaleString()} requests

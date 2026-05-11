@@ -17,6 +17,7 @@ vi.mock('@/components/theme/ThemeToggle', () => ({
 
 vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
+  useIsTablet: () => false,
 }));
 
 function makeUser(role: AppRole): User {

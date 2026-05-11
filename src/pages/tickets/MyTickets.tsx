@@ -202,7 +202,7 @@ export default function MyTickets() {
   }, [user]);
 
   return (
-    <div className="mx-auto max-w-[1280px] space-y-4">
+    <div className="w-full space-y-4">
       <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -255,7 +255,7 @@ export default function MyTickets() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="grid gap-3 xl:grid-cols-2">
           {tickets.map((ticket) => {
             const extraFields = customFieldEntries(ticket, customFieldLabelMap);
             const canCancel = ticket.status === 'open' && !ticket.assigned_to;
