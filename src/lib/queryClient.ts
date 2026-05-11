@@ -1,8 +1,21 @@
 import { QueryClient } from '@tanstack/react-query';
 
+/**
+ * Differentiated staleTime constants for use in individual useQuery calls.
+ * Reference/config data (deal stages, branches, categories) — 5 min
+ * Transactional data (sales orders, invoices) — 60 s
+ * Notifications / alerts — 30 s
+ */
+export const STALE = {
+  reference: 5 * 60_000,
+  transactional: 60_000,
+  notifications: 30_000,
+} as const;
+
 export const APP_QUERY_DEFAULTS = {
   queries: {
-    staleTime: 60_000,
+    // Default covers most transactional data; override per-query where needed.
+    staleTime: STALE.transactional,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     retry: 1,

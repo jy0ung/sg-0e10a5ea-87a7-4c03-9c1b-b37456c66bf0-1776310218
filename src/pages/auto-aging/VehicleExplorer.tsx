@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { ExcelTable } from '@/components/shared/ExcelTable';
 import { VehicleDetailPanel } from '@/components/vehicles/VehicleDetailPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
@@ -12,7 +11,7 @@ import { updateVehicleWithAudit, invalidateVehicleCaches, searchVehicles } from 
 import { getUserPermissions } from '@/services/permissionService';
 import type { VehicleCanonical } from '@/types';
 import { loggingService } from '@/services/loggingService';
-import { VehicleBulkActions } from './VehicleBulkActions';
+import { VehicleResultsTable } from './VehicleResultsTable';
 import { VehicleExplorerFilters, type VehicleFilterState } from './VehicleExplorerFilters';
 import { useVehicleExplorerColumns, type VehicleRow } from './useVehicleExplorerColumns';
 
@@ -366,11 +365,12 @@ export default function VehicleExplorer() {
         defaultPageSize={DEFAULT_FILTERS.pageSize}
       />
 
-      <ExcelTable<VehicleRow>
+      <VehicleResultsTable
         data={pageData as VehicleRow[]}
         columns={filteredColumns}
         loading={serverQuery.isFetching && pageData.length === 0}
-        sort={{ key: sortField, direction: sortDir }}
+        sortField={sortField}
+        sortDir={sortDir}
         onSort={(key) => {
           if (sortField === key) {
             setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -379,28 +379,21 @@ export default function VehicleExplorer() {
             setSortDir('desc');
           }
         }}
-        pagination={{
-          page: currentPage,
-          pageSize: filters.pageSize,
-          totalPages,
-          total: filteredCount,
-          onPageChange: setPage,
-          onPageSizeChange: (pageSize) => setFilters((prev) => ({ ...prev, pageSize })),
-        }}
-        onEdit={canEdit ? handleCellEdit : undefined}
-        onRowClick={handleRowClick}
-        permissions={permissions}
+        page={currentPage}
+        pageSize={filters.pageSize}
+        totalPages={totalPages}
+        totalCount={filteredCount}
+        onPageChange={setPage}
+        onPageSizeChange={(pageSize) => setFilters((prev) => ({ ...prev, pageSize }))}
+        canEdit={userPermissions?.canEdit || false}
         readOnlyMode={readOnlyMode}
+        permissions={permissions}
+        onCellEdit={handleCellEdit}
+        onRowClick={handleRowClick}
+        pendingBulkAction={pendingBulkAction}
         onBulkAction={canEdit ? handleBulkAction : undefined}
+        onBulkActionComplete={handleBulkActionComplete}
       />
-
-      {pendingBulkAction && (
-        <VehicleBulkActions
-          selectedVehicles={pendingBulkAction.vehicles}
-          action={pendingBulkAction.action}
-          onComplete={handleBulkActionComplete}
-        />
-      )}
 
       <VehicleDetailPanel
         vehicle={selectedVehicle}

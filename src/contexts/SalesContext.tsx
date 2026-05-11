@@ -1,15 +1,16 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useCallback, useEffect, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useCallback, useMemo, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Customer, DealStage, SalesOrder, Invoice, SalesmanTarget } from '@/types';
 import { getCustomers } from '@/services/customerService';
-import { getSalesOrders, transitionOrderStage, subscribeToSalesOrderChanges, updateSalesOrder } from '@/services/salesOrderService';
+import { getSalesOrders, transitionOrderStage, updateSalesOrder } from '@/services/salesOrderService';
 import { getInvoices } from '@/services/invoiceService';
 import { getSalesmanTargets } from '@/services/salesTargetService';
 import { getDealStages } from '@/services/dealStageService';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveBranchCode } from '@/services/branchService';
+import { STALE } from '@/lib/queryClient';
 
 /** Stable query key factory — import in tests to reuse. */
 export const salesQueryKey = (companyId: string, branchId?: string | null) =>
@@ -73,21 +74,13 @@ export function SalesProvider({ children }: { children: ReactNode }) {
       return fetchSalesData(companyId, branchCode);
     },
     enabled: !!companyId,
-    staleTime: 30_000,
+    staleTime: STALE.transactional,
   });
 
   /** Invalidates the cache and awaits the next successful fetch. */
   const reloadSales = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId, branchId) });
   }, [queryClient, companyId, branchId]);
-
-  // Realtime: invalidate the sales cache whenever a sales_order row changes.
-  useEffect(() => {
-    if (!companyId) return;
-    return subscribeToSalesOrderChanges(companyId, () => {
-      queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId, branchId) });
-    });
-  }, [companyId, branchId, queryClient]);
 
   /** Optimistically update deal-stage in cache then persist via audited RPC. */
   const moveOrderStage = useCallback(async (orderId: string, stageId: string) => {

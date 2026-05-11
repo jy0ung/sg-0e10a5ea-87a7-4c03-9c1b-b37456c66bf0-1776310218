@@ -57,3 +57,50 @@ scripts                → seed + server bootstrap
 - Sentry (opt-in via `VITE_SENTRY_DSN`) wraps the root `ErrorBoundary`.
 - Structured logs flow through `errorTrackingService` / `loggingService`.
 - Edge function logs correlate with a `request_id` header.
+
+## UI conventions
+
+### StandardTable
+New list/table views use `src/components/shared/StandardTable.tsx` rather than raw HTML tables. Features: per-column sort, global text filter, client-side pagination, row selection, and bulk-action slot. For large server-paginated results use `ExcelTable` (wraps the same column definition contract).
+
+### Form validation
+All forms use the shared Zod helpers in `src/lib/forms.ts`:
+- `requiredString`, `optionalString`, `optionalEmail`, `optionalPhone`, `codeField` — composable field schemas.
+- `validateForm(schema, data)` — returns a `Record<string, string>` of field errors or `null` on success.
+- Do **not** add per-page ad-hoc validation state; route the validation through these helpers so error messages are consistent.
+
+### Toast variants
+`useToast` (shadcn/ui) and `toast` (Sonner) both support `warning` / `destructive` variants. Use `src/lib/errorMessages.ts` to translate raw Postgres / Supabase error codes into user-friendly messages before displaying a toast.
+
+## Service decomposition pattern
+
+Large service files are split into three concerns (see `salesOrder*Service.ts` as the reference):
+
+| File | Responsibility |
+|------|---------------|
+| `*CrudService.ts` | `create`, `update`, `delete`, `get*` — direct table reads/writes |
+| `*PipelineService.ts` | State-machine transitions, status rules, audited moves |
+| `*DashboardService.ts` | Aggregation RPCs, summary stats, KPI queries |
+
+A barrel file `salesOrderService.ts` re-exports all three for backwards compatibility — existing callers do not need updating.
+
+## Concurrency patterns
+
+- **Advisory locks** (`pg_advisory_xact_lock(hashtext(id))`) guard idempotent batch operations in `commit_import_batch` and equivalent multi-step writes. Acquire the lock as the first statement inside the transaction.
+- **RPC wrapper for long-running jobs** — edge functions that touch multiple rows use a `SECURITY DEFINER` PL/pgSQL RPC instead of issuing raw DML; the RPC acquires the advisory lock, performs all mutations atomically, and returns a structured result. See `rollover_company_leave_balances()`.
+- **CTEs for N+1 elimination** — functions that previously issued per-row sub-queries (e.g. SLA policy lookups in `auto_aging_report`) load the full reference table once into a local variable or CTE at function entry.
+
+## Target directory for new modules
+
+New features (post Phase 2 refactor) should be scaffolded under `src/features/`:
+
+```
+src/features/{module}/
+  pages/        → route-level page components (lazy-loaded from main.tsx)
+  components/   → module-private UI components
+  hooks/        → module-private hooks
+  services/     → if the module warrants its own service (otherwise use src/services/)
+```
+
+Existing code under `src/pages/` and `src/services/` remains in place. Migrate incrementally when touching a file for another reason.
+

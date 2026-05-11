@@ -466,10 +466,53 @@ Required non-command evidence:
 - Performance evidence shows server-side summaries and pagination meet agreed production volumes.
 - Business owner signs off on finance workflow semantics before AR/AP/GL launch.
 
+---
+
+## Milestone: Refactor & Scale (completed May 2026)
+
+**Goal:** Stability, modularity, UX polish, and performance headroom for 20–50 concurrent users — without a rewrite.
+
+### Phase 1 — Database Stability & Security ✅
+| Item | Migration | Status |
+|------|-----------|--------|
+| 8 missing indexes (tickets, import_batches, approval_instances, source_reconciliation_matches, sales_orders, vehicles bg_date, invoices payment_status, audit_logs) | `20260511070000_perf_indexes.sql` | Done |
+| RLS hardening — audit_logs, application_logs, announcements insert guard, dms_raw_* service-role-only write | `20260511080000_rls_security_hardening.sql` | Done |
+| Concurrency — `rollover_company_leave_balances()` RPC with `pg_advisory_lock`; `pg_advisory_xact_lock` in `commit_import_batch`; SLA policy CTE in `auto_aging_report` | `20260511090000_concurrency_hardening.sql` | Done |
+
+### Phase 2 — Architecture Modularity ✅
+- `ExecutiveDashboard.tsx` decomposed into `DashboardSnapshotSection`, `DashboardScorecards`, `DashboardBranchComparison`, `DashboardCustomInsights`
+- `VehicleExplorer.tsx` decomposed: `VehicleExplorerFilters` (filter bar), `VehicleResultsTable` (table + pagination), `VehicleDetailPanel` (Sheet side-drawer), `VehicleBulkActions`
+- `StandardTable` component added (`src/components/shared/StandardTable.tsx`) — sortable, filterable, paginated, row-selection
+- `src/lib/forms.ts` — shared Zod schemas + `validateForm()` factory; migrated manual form state in 3 pages
+- `salesOrderService.ts` split into `salesOrderCrudService`, `salesPipelineService`, `salesDashboardService` (barrel re-export preserves existing imports)
+- Target directory `src/features/{module}/` documented in ARCHITECTURE.md
+
+### Phase 3 — UI/UX Workflow ✅
+- `StepperProgress` component wired into ImportCenter and NewTicket
+- Breadcrumbs via `PageHeader` breadcrumbs prop on all detail pages
+- "Create Invoice" CTA on Sales Orders table row and detail panel
+- `AppSidebar` 3-state: Sheet drawer on mobile (<768px), icon-only rail on tablet (768–1023px), full sidebar on desktop (≥1024px)
+- `MobileCardList` variant for Sales Orders, Customers, Tickets on small viewports
+- `KpiSkeleton` + `TableSkeleton` placeholders on all dashboard charts
+- `ConfirmDialog` component applied to vehicle unlink, user status change, batch cancel, commission delete
+- Warning amber toast variant; `src/lib/errorMessages.ts` for Postgres error translation
+
+### Phase 4 — Scalability ✅
+- Realtime subscription removed from full sales-order list; retained only for per-user notifications
+- `queryClient.ts`: `STALE` constants (`reference: 5min`, `transactional: 60s`, `notifications: 30s`); `refetchOnWindowFocus: false`; `retry: 1`
+- Optimistic cache updates for `moveOrderStage` and `updateOrder` in `SalesContext`
+- Connection pooler (port 6543) documented in ENV.md; edge functions instructed to use `SUPABASE_DB_URL` with pooler URL
+
+### Phase 5 — Documentation ✅
+- ARCHITECTURE.md updated: StandardTable, form conventions, service decomposition pattern, concurrency patterns, feature directory target
+- RLS_MATRIX.md updated: audit_logs, application_logs, dms_raw_* tables, RPC contracts
+- ENV.md updated: pooler port 6543 section added
+
+---
+
 ## Source Index
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
-- [AUDIT.md](../AUDIT.md)
 - [CHANGELOG.md](../CHANGELOG.md)
 - [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md)
 - [PHASE1_CLOSEOUT.md](PHASE1_CLOSEOUT.md)

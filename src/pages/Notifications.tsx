@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { getNotifications, markAsRead, markAllAsRead, NotificationRow } from '@/services/notificationService';
 import { supabase } from '@/integrations/supabase/client';
+import { STALE } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { CheckCheck, Bell } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,7 +21,7 @@ export default function Notifications() {
     queryKey: notifKey,
     queryFn: () => getNotifications(user!.id).then(r => r.data),
     enabled: !!user,
-    staleTime: 60_000,
+    staleTime: STALE.notifications,
   });
 
   // Realtime: prepend new notifications live without a full refetch.

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { formatDate } from '@/lib/utils';
 import { Edit2, Save, X, Clock, History, CheckCircle2, Circle, ChevronLeft } from 'lucide-react';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -148,7 +148,7 @@ export function VehicleDetailPanel({
   );
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(isOpen) => {
         if (!isOpen) {
@@ -158,11 +158,11 @@ export function VehicleDetailPanel({
         }
       }}
     >
-      <DialogContent className="max-w-5xl w-full max-h-[92vh] flex flex-col gap-0 p-0 overflow-hidden">
-        <DialogTitle className="sr-only">Vehicle details for {vehicle.chassis_no}</DialogTitle>
-        <DialogDescription className="sr-only">
+      <SheetContent side="right" className="w-full sm:max-w-3xl flex flex-col gap-0 p-0 overflow-hidden">
+        <SheetTitle className="sr-only">Vehicle details for {vehicle.chassis_no}</SheetTitle>
+        <SheetDescription className="sr-only">
           Review milestone history, audit activity, and editable vehicle fields.
-        </DialogDescription>
+        </SheetDescription>
         {/* ── Accent stripe ── */}
         <div className="h-1 bg-gradient-to-r from-primary via-primary/60 to-transparent shrink-0" />
 
@@ -486,7 +486,7 @@ export function VehicleDetailPanel({
             </div>
           </ScrollArea>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

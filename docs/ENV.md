@@ -43,6 +43,20 @@ Set via `supabase secrets set` — never via client env:
 - `RESEND_API_KEY` (or SMTP equivalents)
 - `PUSH_NOTIFICATION_KEY`
 
+## Database connection (edge functions)
+
+Edge functions that need a direct Postgres connection must use the **connection pooler** (PgBouncer), not the direct Postgres port. Use `SUPABASE_DB_URL` with **port 6543**:
+
+```
+SUPABASE_DB_URL=postgresql://postgres:[password]@host:6543/postgres?pgbouncer=true
+```
+
+- Port **5432** — direct Postgres (no pooling); used by migrations and local tooling only.
+- Port **6543** — PgBouncer/connection pooler; required for edge functions and any short-lived connection that would otherwise exhaust Postgres connection slots.
+- Do **not** set `statement_cache_size` or named prepared statements when using the pooler (`pgbouncer=true` disables them automatically).
+
+For local `supabase start`, the pooler is available at `postgresql://postgres:postgres@127.0.0.1:6543/postgres`.
+
 ## DMS sync secrets
 
 Phase 5 DMS integration must run only from backend workers, scheduled jobs, or edge functions. Do not add any `VITE_DMS_*` variable; `VITE_*` values are bundled into the browser app.
