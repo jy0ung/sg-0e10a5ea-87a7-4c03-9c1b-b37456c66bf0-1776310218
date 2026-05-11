@@ -90,6 +90,40 @@ A barrel file `salesOrderService.ts` re-exports all three for backwards compatib
 - **RPC wrapper for long-running jobs** — edge functions that touch multiple rows use a `SECURITY DEFINER` PL/pgSQL RPC instead of issuing raw DML; the RPC acquires the advisory lock, performs all mutations atomically, and returns a structured result. See `rollover_company_leave_balances()`.
 - **CTEs for N+1 elimination** — functions that previously issued per-row sub-queries (e.g. SLA policy lookups in `auto_aging_report`) load the full reference table once into a local variable or CTE at function entry.
 
+## Immutable payment ledger pattern (AR / AP)
+
+Both AR (`payment_events`) and AP (`supplier_payment_events`) use the same pattern. Do not deviate from it when adding new finance ledgers.
+
+**Invariants:**
+- The event table is append-only. `REVOKE INSERT, UPDATE, DELETE FROM authenticated` prevents direct DML from the client tier.
+- All mutations go through `SECURITY DEFINER` RPCs only.
+- A `AFTER INSERT OR DELETE` trigger on the event table atomically recomputes the parent record's `paid_amount` and `payment_status`. No service layer should ever manually set those fields.
+- Reversals are first-class events (`event_type = 'reversal'`) with a `reversal_of_event_id` back-link. Double-reversal is rejected server-side.
+- Tenant isolation is enforced by RLS (`SELECT` via `profiles.company_id`) and by the RPC which validates `company_id` ownership before inserting.
+
+**RPC naming convention:**
+
+| Concern | AR | AP |
+|---|---|---|
+| Record event | `record_payment_event` | `record_supplier_payment_event` |
+| Reverse event | `reverse_payment_event` | `reverse_supplier_payment_event` |
+| Read ledger | `get_payment_events` | `get_supplier_payment_events` |
+| Aging summary | `get_ar_aging_summary` | `get_ap_aging_summary` |
+| Lifecycle move | — | `transition_pi_lifecycle` |
+
+**AP lifecycle state machine:**
+```
+received → verified → approved → scheduled ↘
+                                 approved  → paid
+any (except paid/cancelled)   → cancelled
+```
+Lifecycle transitions are enforced by `transition_pi_lifecycle()`. Payment RPCs reject calls unless `lifecycle_status IN ('approved', 'scheduled')`.
+
+**Service layer:**
+- `src/services/invoiceService.ts` — AR methods (`recordPaymentEvent`, `reversePaymentEvent`, `getPaymentEvents`, `getArAgingSummary`)
+- `src/services/apService.ts` — all AP methods
+- `src/services/purchaseInvoiceService.ts` — CRUD + `rowToInvoice` mapper (includes AP lifecycle fields)
+
 ## Target directory for new modules
 
 New features (post Phase 2 refactor) should be scaffolded under `src/features/`:

@@ -102,6 +102,9 @@ Phase closeouts and validated milestones:
 | Unified gap improvement plan | Code-addressable items mostly closed 2026-05-10 | Phase 1 and Phase 2 items are closed with follow-ups for server-side Auto Aging export/report contracts and server-side SLA summaries. Phase 3 is partially closed: APNs support is implemented, but approval governance refinement remains open. Phase 4 remains open as production evidence work. |
 | Phase 5 source staging foundation | Scaffolded 2026-05-10 | Backend-only migration adds `sync_runs`, raw DMS staging for sales orders, vehicle stock, collections, allocation/registration, deliveries, leads, prospects, SOA, and master data, plus legacy staging for customers, sales invoices, and reference/evidence records. It also seeds deterministic reconciliation candidates without updating canonical UBS records. No browser route consumes these tables yet. |
 | Stage 1B server-side reports and export | Implemented 2026-05-10 | Report Center replaced with server-side `auto_aging_report` Postgres RPC supporting four report types with pagination. Business report CSV exports capped at 10,000 rows. StockBalance, CommissionDashboard, SalesDashboard, Sales Advisors, Vehicle Transfer, Vehicle Detail, and Vehicle Bulk Actions migrated off full vehicle hydration. Executive Dashboard now uses server-side summary/branch comparison plus a capped `searchVehicles` slice for custom widgets, and added 13 new KPI tracker presets (vehicle aging, LOU aging, OBR status, registration/disbursement delay, commission tracking) with 15 new vehicle fields in the custom KPI formula catalog. Stale workbook/Google Sheets copy reworded in AutoAgingDashboard and ImportCenter; obsolete `src/services/reportService.ts` removed. `auto_aging_source_ledger` now defines the read-only DMS/UBS/legacy source-combination contract. |
+| Full-Stack Refactor (R1–R5) | Committed `e63d49f` 2026-05-11 | `STALE` constants extracted to `queryClient.ts`; `SalesContext` realtime subscription removed; `VehicleDetailPanel` converted to Sheet; `VehicleResultsTable` extracted; ENV.md pooler docs updated; ARCHITECTURE.md and DEVELOPMENT_PLAN.md updated. 401 tests passed. |
+| Stage 4 AR Foundation | Committed `cddb6c7` 2026-05-11 | `payment_events` immutable ledger on `invoices` with `REVOKE` on direct DML. Five SECURITY DEFINER RPCs: `record_payment_event`, `reverse_payment_event`, `get_payment_events`, `get_ar_aging_summary`, and official receipt allocation. Trigger recomputes `paid_amount`/`payment_status` atomically. `invoiceService` extended with AR methods; `Invoices.tsx` gains AR aging cards, payment status badge, and Record Payment dialog. 10 new tests (401 total). |
+| Stage 5 AP Foundation | Committed `b1a7d4b` 2026-05-11 | `supplier_payment_events` immutable ledger on `purchase_invoices` with same pattern as AR. Five SECURITY DEFINER RPCs: `record_supplier_payment_event`, `reverse_supplier_payment_event`, `get_supplier_payment_events`, `get_ap_aging_summary`, `transition_pi_lifecycle`. Lifecycle state machine: received → verified → approved → scheduled/paid; any → cancelled. `apService.ts` created; `purchaseInvoiceService` extended; `PurchaseInvoices.tsx` gains AP aging cards, lifecycle and payment badges, Verify/Approve/Pay action buttons, and Record Payment dialog. 12 new tests (413 total). |
 
 Relevant evidence:
 
@@ -115,7 +118,7 @@ Relevant evidence:
 
 ## Current Phase
 
-Current phase: Phase 5 / Stage 1 backend skeleton and Stage 2 Sales Pipeline vehicle-linking foundation are in progress. Server-side report RPCs, paginated exports, dashboard migrations, KPI tracker expansion, stale copy cleanup, Google Sheets/`.xlsx` decisions, the DMS/UBS/legacy source ledger, the first DMS staging Edge Function skeleton, and controlled existing-vehicle Sales Order link/unlink are implemented.
+Current phase: Phase 5 / Stages 0–5 complete as of 2026-05-11. Stage 6 (General Ledger and financial reporting) is next. DMS staging foundation, DMS normalizers, Sales Pipeline RPCs, Full-Stack Refactor, AR Foundation (immutable `payment_events` ledger), and AP Foundation (`supplier_payment_events` with lifecycle state machine) are all committed and locally validated with 413 tests passing.
 
 Stage 0 goal:
 
@@ -209,6 +212,9 @@ Current foundation slice status:
 13. ~~Next: implement `normalize_dms_vehicle_stock()` — the equivalent staged-data normalizer for `dms_raw_vehicle_stock` → `vehicles` using the same pattern, or add the `dms-sync-worker` Edge Function to `SUPABASE_INTERNAL_FUNCTIONS_CONFIG` so it is registered for future live invocation.~~ Done 2026-05-11 — both completed. Migration `20260511020000` + corrective `20260511030000` applied. Stage column correctly left to `recompute_vehicle_stage` trigger. `[functions.*]` sections added to `supabase/config.toml`; `SUPABASE_INTERNAL_FUNCTIONS_CONFIG` JSON documented in `docs/ENV.md`. 111/111 tests pass.
 14. ~~Next: implement `normalize_dms_customer()` — the staged-data normalizer for `dms_raw_sales_orders.dms_customer_id` → `customers`, or begin live DMS fetch/signing in `dms-sync-worker` (add actual HTTP fetch + HMAC signing of Proton DMS API calls).~~ Done 2026-05-11 — `normalize_dms_customer()` implemented. Migration `20260511040000` applied. 115/115 tests pass. Stage 1 checklist closed. **Live DMS fetch/HMAC signing deferred to Stage 2 (credentials/signing format not yet confirmed).**
 15. ~~Next: begin Stage 2 — Sales Pipeline foundation. Add `transition_sales_order_stage()` RPC with audit events; strengthen Sales Dashboard to load without full vehicle hydration.~~ Done 2026-05-11 — Stage 3 Sales Pipeline Foundation complete (see Stage 3 section below).
+16. ~~Next: begin Stage 4 — AR Foundation. Add `payment_events` immutable ledger to `invoices`.~~ Done 2026-05-11 — Stage 4 AR Foundation complete (`cddb6c7`). 401/401 tests pass.
+17. ~~Next: begin Stage 5 — AP Foundation. Add `supplier_payment_events` immutable ledger to `purchase_invoices` with lifecycle state machine.~~ Done 2026-05-11 — Stage 5 AP Foundation complete (`b1a7d4b`). 413/413 tests pass.
+18. Next: begin Stage 6 — General Ledger. Define chart of accounts, journal entry structure, posting rules that derive from AR `payment_events` and AP `supplier_payment_events`, and accounting period close contract.
 
 ### Stage 3 - Sales Pipeline Foundation
 
@@ -222,6 +228,36 @@ Current foundation slice status:
 - [x] 7 focused integration tests in `src/test/sales-pipeline.spec.ts` (5 `transition_sales_order_stage` + 1 `get_sales_pipeline_summary` + 1 `get_sales_dashboard_summary`). 122/122 tests pass 2026-05-11.
 - [x] 4 unit tests for new service methods in `salesOrderService.test.ts`. 387/411 tests pass (4 pre-existing failures unrelated to Stage 3).
 
+### Stage 4 - AR Foundation
+
+- [x] Migration `20260511090000_ar_foundation.sql` — `payment_events` immutable table on `invoices`; `REVOKE INSERT, UPDATE, DELETE FROM authenticated` on `payment_events`; tenant `SELECT` RLS policy. **Applied 2026-05-11.**
+- [x] `record_payment_event(invoice_id, amount, payment_date, ...)` SECURITY DEFINER RPC — validates invoice exists and belongs to caller's company; inserts event; trigger recomputes `paid_amount` and `payment_status`. Blocks double-payment past full amount.
+- [x] `reverse_payment_event(event_id, reason)` SECURITY DEFINER RPC — inserts a reversal event, guards against double-reversal, recomputes totals.
+- [x] `get_payment_events(invoice_id)` SECURITY DEFINER RPC — returns ledger with computed `is_reversed` flag.
+- [x] `get_ar_aging_summary(company_id)` SECURITY DEFINER RPC — aging buckets: `no_due_date`, `current`, `1_30_days`, `31_60_days`, `61_90_days`, `over_90_days`.
+- [x] Trigger `trg_recompute_invoice_payment` → `recompute_invoice_payment_status()` — SECURITY DEFINER, sums net payments, updates `paid_amount` + `payment_status` atomically.
+- [x] `invoiceService` extended with `recordPaymentEvent`, `reversePaymentEvent`, `getPaymentEvents`, `getArAgingSummary`; `InvoiceRecord` extended with AR fields (`paymentStatus`, `paidAmount`, `dueDate`).
+- [x] `Invoices.tsx` updated: AR aging summary cards, payment status badge, Record Payment dialog (amount/date/method/receipt ref), `invalidate` covers `['ar-aging', companyId]`.
+- [x] 10 new tests — 5 unit in `invoiceService.test.ts`, 5 integration in `src/test/ar-foundation.spec.ts` (skipped unless `RLS_E2E=1`). **401 total tests pass 2026-05-11.**
+
+### Stage 5 - AP Foundation
+
+- [x] Migration `20260511110000_ap_foundation.sql` — `supplier_payment_events` immutable table; `REVOKE` on direct DML; tenant `SELECT` RLS. Lifecycle columns on `purchase_invoices`: `lifecycle_status` (received|verified|approved|scheduled|paid|cancelled), `payment_status`, `paid_amount`, `due_date`, `notes`, `verified_at/by`, `approved_at/by`. **Applied 2026-05-11.**
+- [x] `record_supplier_payment_event(purchase_invoice_id, amount, payment_date, ...)` SECURITY DEFINER RPC — validates `lifecycle_status IN ('approved','scheduled')` before inserting.
+- [x] `reverse_supplier_payment_event(event_id, reason)` SECURITY DEFINER RPC — guards double-reversal; recomputes totals.
+- [x] `get_supplier_payment_events(purchase_invoice_id)` SECURITY DEFINER RPC — returns ledger with `is_reversed`.
+- [x] `get_ap_aging_summary(company_id)` SECURITY DEFINER RPC — same bucket structure as AR aging.
+- [x] `transition_pi_lifecycle(id, target_status, actor_id)` SECURITY DEFINER RPC — enforces valid transitions; sets `verified_at`/`approved_at` timestamps; rejects invalid jumps.
+- [x] Trigger `trg_recompute_pi_payment` → `recompute_pi_payment_status()` — SECURITY DEFINER atomic recompute.
+- [x] Indexes: `idx_purchase_invoices_lifecycle`, `idx_purchase_invoices_payment_status`, `idx_purchase_invoices_due_date` (partial: `payment_status <> 'paid'`), `idx_spe_purchase_invoice_id`, `idx_spe_company_id`.
+- [x] Old `status` column (pending|received|cancelled) preserved — `businessReportService` and `fetchChassisCostMap()` depend on it; `lifecycle_status` is a separate column.
+- [x] AP types added to `packages/types/src/index.ts`: `PurchaseInvoiceLifecycleStatus`, `ApPaymentStatus`, `SupplierPaymentEventType`, `ApAgingBucket`, `SupplierPaymentEvent`, `ApAgingSummary`.
+- [x] `packages/supabase/src/database.types.ts` regenerated with `supplier_payment_events` table and 5 new RPCs.
+- [x] `purchaseInvoiceService` extended: `PurchaseInvoiceRecord` gains AP lifecycle fields; `rowToInvoice()` maps all new columns.
+- [x] `apService.ts` created: `recordSupplierPaymentEvent`, `reverseSupplierPaymentEvent`, `getSupplierPaymentEvents`, `getApAgingSummary`, `transitionPiLifecycle`.
+- [x] `PurchaseInvoices.tsx` updated: AP aging summary cards, 6-state `LIFECYCLE_BADGE`, `AP_PAYMENT_BADGE`, `STALE.transactional` query, Verify/Approve/Pay action buttons per lifecycle state, Record Payment dialog.
+- [x] 12 new tests — 10 unit in `apService.test.ts`, 8 integration in `src/test/ap-foundation.spec.ts` (skipped unless `RLS_E2E=1`). **413 total tests pass 2026-05-11.**
+
 Recommended first Sales workflow slice after that:
 
 1. ~~Add controlled `link_vehicle_to_sales_order` and `unlink_vehicle_from_sales_order` RPCs with company/RLS checks.~~ Done 2026-05-10.
@@ -230,7 +266,7 @@ Recommended first Sales workflow slice after that:
 4. ~~Add a linked order panel in Vehicle Detail.~~ Done 2026-05-10.
 5. ~~Add integration/RLS coverage for create order, link vehicle, unlink vehicle, and context verification.~~ 86/86 live RLS tests passed 2026-05-11 on local Supabase.
 
-Do not start Finance workflows until Sales Pipeline and Auto Aging integration contracts are reliable enough to become finance dependencies.
+~~Do not start Finance workflows until Sales Pipeline and Auto Aging integration contracts are reliable enough to become finance dependencies.~~ Stage 4 AR and Stage 5 AP are implemented on top of the Sales Pipeline foundation.
 
 ## Immediate Action
 
