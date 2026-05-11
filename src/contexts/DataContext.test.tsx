@@ -26,6 +26,7 @@ vi.mock('@/integrations/supabase/client', () => {
   return {
     supabase: {
       from: vi.fn(() => createDefaultBuilder()),
+      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
       channel: vi.fn(() => channelStub),
       removeChannel: vi.fn(),
     }
@@ -55,6 +56,7 @@ describe('DataContext', () => {
     vi.clearAllMocks();
     // Restore default chainable mock after clearAllMocks
     vi.mocked(supabase.from).mockImplementation(() => createDefaultBuilder());
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: null });
   });
 
   describe('DataProvider', () => {
@@ -106,7 +108,9 @@ describe('DataContext', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.vehicles).toHaveLength(1);
+      // DataContext runs in summary-only mode — vehicles are never fetched from
+      // the table directly; the RPC (auto_aging_dashboard_summary) is called instead.
+      expect(result.current.vehicles).toHaveLength(0);
       expect(result.current.importBatches).toHaveLength(1);
     });
 

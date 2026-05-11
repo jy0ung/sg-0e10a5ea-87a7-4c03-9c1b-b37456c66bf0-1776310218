@@ -19,6 +19,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 vi.mock('@/contexts/DataContext', () => ({
   useData: () => ({
+    availableBranches: [] as string[],
     vehicles: [
       {
         id: 'vehicle-1',
