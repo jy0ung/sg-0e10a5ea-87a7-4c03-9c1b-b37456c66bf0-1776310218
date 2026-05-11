@@ -28,22 +28,22 @@ export default function HrmsWorkspaceRedirect() {
   }, [destination]);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="mx-auto max-w-[960px] space-y-4 animate-fade-in">
       <PageHeader
         title="Opening HRMS Workspace"
         description="FLC HRMS now runs in its dedicated workspace."
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'HRMS' }]}
       />
 
-      <div className="glass-panel p-6 max-w-2xl">
+      <div className="glass-panel max-w-2xl p-4 shadow-sm">
         <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
             <Briefcase className="h-5 w-5 text-primary" />
           </div>
-          <div className="space-y-4 min-w-0">
+          <div className="min-w-0 space-y-4">
             <div>
               <h2 className="text-base font-semibold text-foreground">FLC HRMS</h2>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Continue to the HRMS workspace with your current account session.
               </p>
             </div>

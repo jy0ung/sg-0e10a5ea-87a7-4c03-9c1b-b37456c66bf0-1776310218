@@ -137,7 +137,7 @@ export function RequestDetailPanel({
     <>
       <div className={variant === 'drawer'
         ? 'sticky top-0 z-10 -mx-4 border-b border-border bg-background/95 px-4 pb-3 pt-1 backdrop-blur'
-        : 'border-b border-border px-4 py-3'}
+        : 'border-b border-border bg-muted/30 px-4 py-3'}
       >
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0 space-y-2">
@@ -163,8 +163,8 @@ export function RequestDetailPanel({
 
       <div className={variant === 'drawer' ? 'space-y-4 pt-4' : 'space-y-4 p-4'}>
         {extraFields.length > 0 && (
-          <div className="rounded-lg border border-border px-3 py-2.5">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Additional details</p>
+          <div className="rounded-lg border border-border bg-background px-3 py-2.5">
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Additional details</p>
             <div className={`mt-2 grid gap-2 ${twoColumns}`}>
               {extraFields.map((field) => (
                 <div key={field.key} className="min-w-0">
@@ -178,7 +178,7 @@ export function RequestDetailPanel({
 
         <div className={`grid gap-3 ${gridColumns}`}>
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Status</p>
             <Select
               value={ticket.status}
               onValueChange={(value) => onStatusChange(ticket.id, value as TicketStatus)}
@@ -193,7 +193,7 @@ export function RequestDetailPanel({
             </Select>
           </div>
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Priority</p>
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Priority</p>
             <Select
               value={ticket.priority}
               onValueChange={(value) => onPriorityChange(ticket.id, value as TicketPriority)}
@@ -208,7 +208,7 @@ export function RequestDetailPanel({
             </Select>
           </div>
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Owner</p>
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Owner</p>
             <Select
               value={ticket.assigned_to ?? 'unassigned'}
               onValueChange={(value) => onAssignmentChange(ticket.id, value)}
@@ -226,16 +226,16 @@ export function RequestDetailPanel({
         </div>
 
         <div className={`grid gap-3 ${gridColumns}`}>
-          <div className="rounded-lg border border-border px-3 py-2.5">
-            <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-lg border border-border bg-background px-3 py-2.5">
+            <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
               <UserRound className="h-3.5 w-3.5" />
               Requester
             </p>
             <p className="mt-2 text-sm font-medium text-foreground">{ticket.submitted_by_name ?? 'Unknown requester'}</p>
             {ticket.submitted_by_email && <p className="mt-1 truncate text-xs text-muted-foreground">{ticket.submitted_by_email}</p>}
           </div>
-          <div className="rounded-lg border border-border px-3 py-2.5">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Category</p>
+          <div className="rounded-lg border border-border bg-background px-3 py-2.5">
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Category</p>
             <p className="mt-2 text-sm font-medium text-foreground">{getRequestCategoryLabel(ticket.category, categories)}</p>
             {ticket.subcategory && (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -243,8 +243,8 @@ export function RequestDetailPanel({
               </p>
             )}
           </div>
-          <div className="rounded-lg border border-border px-3 py-2.5">
-            <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-lg border border-border bg-background px-3 py-2.5">
+            <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
               <CalendarDays className="h-3.5 w-3.5" />
               Timing
             </p>
@@ -296,8 +296,10 @@ export function RequestDetailPanel({
         <TicketSlaSummary ticket={ticket} />
 
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Request detail</p>
-          <p className="whitespace-pre-line text-sm leading-5 text-foreground">{ticket.description}</p>
+          <div className="rounded-lg border bg-background px-3 py-2.5">
+            <p className="mb-1 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Request detail</p>
+            <p className="whitespace-pre-line text-sm leading-5 text-foreground">{ticket.description}</p>
+          </div>
         </div>
 
         {(ticket.desired_outcome || ticket.business_impact) && (

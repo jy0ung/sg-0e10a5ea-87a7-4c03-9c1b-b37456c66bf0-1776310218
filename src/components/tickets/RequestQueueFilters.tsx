@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Search, SlidersHorizontal } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import {
@@ -43,7 +43,20 @@ export function RequestQueueFilters({
   onSlaChange,
 }: RequestQueueFiltersProps) {
   return (
-    <div className="sticky top-0 z-10 flex flex-col gap-2 rounded-lg border border-border bg-card/95 p-2 shadow-sm backdrop-blur lg:flex-row lg:items-center">
+    <div className="sticky top-0 z-10 rounded-lg border bg-card p-3 shadow-sm backdrop-blur">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold leading-tight text-foreground">Queue filters</p>
+            <p className="text-[11px] leading-tight text-muted-foreground">Search, segment, and prioritize the active queue</p>
+          </div>
+        </div>
+        <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{counts.all} requests</span>
+      </div>
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
       <div className="relative flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -88,6 +101,7 @@ export function RequestQueueFilters({
           <SelectItem value="not_configured">No SLA</SelectItem>
         </SelectContent>
       </Select>
+      </div>
     </div>
   );
 }

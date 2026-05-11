@@ -94,7 +94,7 @@ function SettingsSectionHeader({ category, action, controls }: SettingsSectionHe
   const Icon = def.icon;
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-border bg-card/40 p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col gap-4 rounded-lg border bg-card p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
           <Icon className="h-5 w-5" />
@@ -218,15 +218,15 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
             </Button>
           )}
         />
-        <div className="glass-panel overflow-auto rounded-lg">
+        <div className="glass-panel max-h-[70vh] overflow-auto shadow-sm">
           <table className="w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Head</th>
-                <th className="px-3 py-2 font-medium">Cost Centre</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                {canWrite && <th className="px-3 py-2 font-medium w-20">Actions</th>}
+            <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                <th className="px-3 py-2 font-semibold">Name</th>
+                <th className="px-3 py-2 font-semibold">Head</th>
+                <th className="px-3 py-2 font-semibold">Cost Centre</th>
+                <th className="px-3 py-2 font-semibold">Status</th>
+                {canWrite && <th className="w-20 px-3 py-2 font-semibold">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -433,15 +433,15 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
             </Button>
           )}
         />
-        <div className="glass-panel overflow-auto rounded-lg">
+        <div className="glass-panel max-h-[70vh] overflow-auto shadow-sm">
           <table className="w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Title</th>
-                <th className="px-3 py-2 font-medium">Department</th>
-                <th className="px-3 py-2 font-medium">Level</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                {canWrite && <th className="px-3 py-2 font-medium w-20">Actions</th>}
+            <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                <th className="px-3 py-2 font-semibold">Title</th>
+                <th className="px-3 py-2 font-semibold">Department</th>
+                <th className="px-3 py-2 font-semibold">Level</th>
+                <th className="px-3 py-2 font-semibold">Status</th>
+                {canWrite && <th className="w-20 px-3 py-2 font-semibold">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -644,17 +644,17 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
             </Button>
           )}
         />
-        <div className="glass-panel overflow-auto rounded-lg">
+        <div className="glass-panel max-h-[70vh] overflow-auto shadow-sm">
           <table className="w-full min-w-[760px] text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Code</th>
-                <th className="px-3 py-2 font-medium">Days/Year</th>
-                <th className="px-3 py-2 font-medium">Rollover</th>
-                <th className="px-3 py-2 font-medium">Paid</th>
-                <th className="px-3 py-2 font-medium">Active</th>
-                {canWrite && <th className="px-3 py-2 font-medium w-20">Actions</th>}
+            <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                <th className="px-3 py-2 font-semibold">Name</th>
+                <th className="px-3 py-2 font-semibold">Code</th>
+                <th className="px-3 py-2 font-semibold">Days/Year</th>
+                <th className="px-3 py-2 font-semibold">Rollover</th>
+                <th className="px-3 py-2 font-semibold">Paid</th>
+                <th className="px-3 py-2 font-semibold">Active</th>
+                {canWrite && <th className="w-20 px-3 py-2 font-semibold">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -876,15 +876,15 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
             </Button>
           )}
         />
-        <div className="glass-panel overflow-auto rounded-lg">
+        <div className="glass-panel max-h-[70vh] overflow-auto shadow-sm">
           <table className="w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Type</th>
-                <th className="px-3 py-2 font-medium">Recurring</th>
-                {canWrite && <th className="px-3 py-2 font-medium w-20">Actions</th>}
+            <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                <th className="px-3 py-2 font-semibold">Name</th>
+                <th className="px-3 py-2 font-semibold">Date</th>
+                <th className="px-3 py-2 font-semibold">Type</th>
+                <th className="px-3 py-2 font-semibold">Recurring</th>
+                {canWrite && <th className="w-20 px-3 py-2 font-semibold">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -1007,13 +1007,13 @@ function RolloverPanel({ companyId, canWrite }: RolloverPanelProps) {
   }
 
   return (
-    <div className="space-y-6 max-w-md">
+    <div className="max-w-2xl space-y-4">
       <p className="text-sm text-muted-foreground">
         Running a rollover copies unused leave balances (up to the carry-forward cap per leave type)
         into the destination year. Only leave types with <em>Carry-forward</em> enabled are included.
         This operation is safe to re-run — duplicate balance rows are skipped.
       </p>
-      <div className="glass-panel p-5 space-y-4">
+      <div className="glass-panel space-y-4 p-4 shadow-sm">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">From year</Label>
@@ -1058,15 +1058,16 @@ export default function HrmsAdmin() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <div className="mx-auto max-w-[1480px] space-y-4">
       <PageHeader
         title="HRMS Settings"
+        description="Configure workforce structure, leave rules, holidays, and rollover operations."
         breadcrumbs={[{ label: 'HRMS' }, { label: 'HRMS Settings' }]}
       />
 
-      <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <nav className="rounded-lg border border-border bg-card/40 p-2 shadow-sm lg:sticky lg:top-6 lg:self-start">
-          <div className="px-2 pb-2 pt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <nav className="rounded-lg border bg-card p-2 shadow-sm lg:sticky lg:top-6 lg:self-start">
+          <div className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Configuration
           </div>
           {CATEGORIES.map(cat => {
@@ -1077,10 +1078,10 @@ export default function HrmsAdmin() {
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
                 className={cn(
-                  'group w-full rounded-md px-3 py-2.5 text-left transition-colors',
+                  'group w-full rounded-md border border-transparent px-3 py-2.5 text-left transition-colors',
                   active
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
+                    ? 'border-border bg-muted text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
                 )}
               >
                 <span className="flex items-start gap-3">
@@ -1089,7 +1090,7 @@ export default function HrmsAdmin() {
                     <span className="block text-sm font-medium leading-5">{cat.label}</span>
                     <span className={cn(
                       'block truncate text-xs leading-4',
-                      active ? 'text-primary-foreground/75' : 'text-muted-foreground',
+                      active ? 'text-muted-foreground' : 'text-muted-foreground',
                     )}>
                       {cat.summary}
                     </span>

@@ -175,7 +175,7 @@ export default function PayrollSummary() {
   const viewingRun = runs.find(r => r.id === viewRunId);
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1480px] space-y-4">
       <PageHeader
         title="Payroll Workspace"
         description="Prepare monthly payroll, monitor approval readiness, and track payout status."
@@ -190,46 +190,46 @@ export default function PayrollSummary() {
       />
 
       {!loading && (
-        <div className="grid gap-3 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
               <CardTitle className="text-sm font-medium">Latest headcount</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{payrollMetrics.latestHeadcount}</p>
+            <CardContent className="px-3 pb-3">
+              <p className="text-2xl font-semibold tabular-nums">{payrollMetrics.latestHeadcount}</p>
               <p className="text-xs text-muted-foreground">
                 {latestRun ? `${MONTHS[latestRun.periodMonth - 1]} ${latestRun.periodYear}` : 'No run yet'}
               </p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
               <CardTitle className="text-sm font-medium">Net payroll</CardTitle>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">RM {fmt(payrollMetrics.totalNet)}</p>
+            <CardContent className="px-3 pb-3">
+              <p className="truncate text-2xl font-semibold tabular-nums" title={`RM ${fmt(payrollMetrics.totalNet)}`}>RM {fmt(payrollMetrics.totalNet)}</p>
               <p className="text-xs text-muted-foreground">Across visible runs</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
               <CardTitle className="text-sm font-medium">Pending approval</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{payrollMetrics.pendingApprovals}</p>
+            <CardContent className="px-3 pb-3">
+              <p className="text-2xl font-semibold tabular-nums">{payrollMetrics.pendingApprovals}</p>
               <p className="text-xs text-muted-foreground">Runs waiting for review</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
               <CardTitle className="text-sm font-medium">Paid runs</CardTitle>
               <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{payrollMetrics.paidRuns}</p>
+            <CardContent className="px-3 pb-3">
+              <p className="text-2xl font-semibold tabular-nums">{payrollMetrics.paidRuns}</p>
               <p className="text-xs text-muted-foreground">Completed payroll cycles</p>
             </CardContent>
           </Card>
@@ -237,11 +237,11 @@ export default function PayrollSummary() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center h-40">
+        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
           <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
         </div>
       ) : runs.length === 0 ? (
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
             <CreditCard className="h-8 w-8 text-muted-foreground" />
             <p className="font-medium text-foreground">No payroll runs yet</p>
@@ -250,7 +250,7 @@ export default function PayrollSummary() {
         </Card>
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 shadow-sm">
             <div>
               <h2 className="text-base font-semibold text-foreground">Payroll runs</h2>
               <p className="text-sm text-muted-foreground">Newest cycles first, with approval state and payout actions.</p>
@@ -258,20 +258,20 @@ export default function PayrollSummary() {
             <Badge variant="outline">{runs.length} runs</Badge>
           </div>
           {sortedRuns.map(run => (
-            <Card key={run.id}>
-              <CardHeader className="pb-2">
+            <Card key={run.id} className="overflow-hidden shadow-sm">
+              <CardHeader className="border-b bg-muted/30 px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-base flex items-center gap-2">
+                  <div className="min-w-0">
+                    <CardTitle className="flex items-center gap-2 truncate text-base">
                       <CreditCard className="h-4 w-4 text-muted-foreground" />
                       {MONTHS[run.periodMonth - 1]} {run.periodYear}
                     </CardTitle>
-                    <p className="text-sm text-muted-foreground">{run.totalHeadcount} employees · RM {fmt(run.totalGross)} gross · RM {fmt(run.totalNet)} net</p>
+                    <p className="truncate text-sm text-muted-foreground">{run.totalHeadcount} employees · RM {fmt(run.totalGross)} gross · RM {fmt(run.totalNet)} net</p>
                   </div>
                   <Badge variant="outline" className={`capitalize text-xs ${STATUS_COLORS[run.status]}`}>{run.status}</Badge>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0 flex items-center gap-2 flex-wrap">
+              <CardContent className="flex flex-wrap items-center gap-2 p-4">
                 <Button size="sm" variant="outline" onClick={() => handleView(run.id)}>
                   <Eye className="h-3.5 w-3.5 mr-1" /> View Items
                 </Button>

@@ -24,7 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { HRMS_ADMIN_ROLES } from '@/config/hrmsConfig';
-import { GitMerge, Plus, Pencil, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { GitMerge, Plus, Pencil, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, X, SlidersHorizontal } from 'lucide-react';
 import {
   listApprovalFlows, createApprovalFlow, updateApprovalFlow,
   toggleApprovalFlowActive, deleteApprovalFlow, listEmployeesForSelect,
@@ -246,7 +246,7 @@ export default function ApprovalFlows() {
   if (!isAuthorized) return <UnauthorizedAccess />;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="mx-auto max-w-[1480px] space-y-4">
       <PageHeader
         title="Approval Flows"
         breadcrumbs={[{ label: 'HRMS' }, { label: 'Approval Flows' }]}
@@ -258,22 +258,35 @@ export default function ApprovalFlows() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           { label: 'Total Flows', value: flows.length },
           { label: 'Active', value: totalActive },
           { label: 'Inactive', value: flows.length - totalActive },
           { label: 'Entity Types', value: new Set(flows.map(f => f.entityType)).size },
         ].map(s => (
-          <div key={s.label} className="glass-panel p-3 text-center">
-            <div className="text-2xl font-bold">{s.value}</div>
-            <div className="text-xs text-muted-foreground">{s.label}</div>
+          <div key={s.label} className="glass-panel p-4">
+            <div className="text-2xl font-semibold tabular-nums">{s.value}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="rounded-lg border bg-card p-3 shadow-sm">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight text-foreground">Flow filters</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">Inspect workflows by request type and status</p>
+            </div>
+          </div>
+          <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{filtered.length} flows</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
         {(['all', 'leave_request', 'payroll_run', 'appraisal', 'internal_request', 'general'] as const).map(et => (
           <Button
             key={et}
@@ -284,18 +297,19 @@ export default function ApprovalFlows() {
             {et === 'all' ? 'All' : ENTITY_TYPE_LABELS[et]}
           </Button>
         ))}
+        </div>
       </div>
 
       {/* Table */}
-      <div className="glass-panel overflow-auto">
+      <div className="glass-panel max-h-[70vh] overflow-auto shadow-sm">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              <th className="px-3 py-2 font-medium">Name</th>
-              <th className="px-3 py-2 font-medium">Applies To</th>
-              <th className="px-3 py-2 font-medium">Steps</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Actions</th>
+          <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+            <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+              <th className="whitespace-nowrap px-3 py-2 font-semibold">Name</th>
+              <th className="whitespace-nowrap px-3 py-2 font-semibold">Applies To</th>
+              <th className="whitespace-nowrap px-3 py-2 font-semibold">Steps</th>
+              <th className="whitespace-nowrap px-3 py-2 font-semibold">Status</th>
+              <th className="whitespace-nowrap px-3 py-2 font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>

@@ -93,13 +93,13 @@ const EditableGridCell = React.memo(function EditableGridCell({
       return <span className="text-muted-foreground">—</span>;
     }
 
-    return <span>{String(value)}</span>;
+    return <span className="block max-w-[22rem] truncate" title={String(value)}>{String(value)}</span>;
   };
 
   return (
     <TableCell
       className={cn(
-        "whitespace-nowrap px-5 py-3",
+        "whitespace-nowrap px-3 py-2.5 text-sm",
         canEdit && "cursor-text hover:bg-secondary/20"
       )}
       style={column.width ? { minWidth: `${column.width}px` } : undefined}
@@ -250,7 +250,7 @@ const EditableGridRow = React.memo(function EditableGridRow({
   return (
     <TableRow
       className={cn(
-        'cursor-pointer hover:bg-secondary/30',
+        'cursor-pointer hover:bg-muted/40',
         onRowClick && 'hover:border-primary/30',
         isSelected && 'bg-primary/5',
         rowClassName
@@ -416,8 +416,9 @@ export function ExcelTable<T>({
   if (loading) {
     return (
       <div className="glass-panel p-8 text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-        <p className="text-sm text-muted-foreground">Loading data...</p>
+        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+        <p className="text-sm font-medium text-foreground">Loading records</p>
+        <p className="mt-1 text-xs text-muted-foreground">Fetching the latest operational data...</p>
       </div>
     );
   }
@@ -425,7 +426,8 @@ export function ExcelTable<T>({
   if (tableData.length === 0) {
     return (
       <div className="glass-panel p-8 text-center">
-        <p className="text-sm text-muted-foreground">No data available</p>
+        <p className="text-sm font-medium text-foreground">No records found</p>
+        <p className="mt-1 text-xs text-muted-foreground">Adjust filters or refresh the workspace to load matching rows.</p>
       </div>
     );
   }
@@ -459,10 +461,10 @@ export function ExcelTable<T>({
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+      <div className="rounded-lg border bg-card overflow-hidden shadow-sm">
+        <div className="max-h-[70vh] overflow-auto">
           <Table>
-            <TableHeader className="bg-muted/50 border-b">
+            <TableHeader className="sticky top-0 z-10 border-b bg-muted/80 backdrop-blur supports-[backdrop-filter]:bg-muted/70">
               <TableRow className="hover:bg-transparent">
                 {showSelection && (
                   <TableHead className="w-10">
@@ -478,7 +480,7 @@ export function ExcelTable<T>({
                   <TableHead
                     key={column.key}
                     className={cn(
-                      "whitespace-nowrap font-semibold uppercase tracking-wider text-[11px] text-muted-foreground h-11 px-5",
+                      "h-10 whitespace-nowrap px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground",
                       onSort && column.sortable !== false && "cursor-pointer hover:text-foreground transition-colors"
                     )}
                     style={column.width ? { minWidth: `${column.width}px` } : undefined}
@@ -533,7 +535,7 @@ export function ExcelTable<T>({
       </div>
 
       {pagination && (
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm">
           <span>
             Showing {pagination.total === 0 ? 0 : ((pagination.page - 1) * pagination.pageSize) + 1}
             {' '}to {Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} records
@@ -548,7 +550,7 @@ export function ExcelTable<T>({
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
-            <span className="text-xs text-foreground tabular-nums">
+            <span className="min-w-[92px] text-center text-xs text-foreground tabular-nums">
               Page {pagination.page} of {pagination.totalPages}
             </span>
             <Button

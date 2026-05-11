@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
-import { Calendar, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, Eye, Inbox, Star, XCircle } from 'lucide-react';
+import { Calendar, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, Eye, Inbox, SlidersHorizontal, Star, XCircle } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -162,53 +162,66 @@ export default function ApprovalInbox() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="mx-auto max-w-[1480px] space-y-4">
       <PageHeader
         title="Approval Inbox"
         description="Review assigned HRMS approvals across leave, payroll, and appraisals from one queue."
         breadcrumbs={[{ label: 'HRMS' }, { label: 'Approval Inbox' }]}
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="shadow-sm">
+          <CardHeader className="px-3 pb-1 pt-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Assigned Now</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{items.length}</div>
-            <p className="text-sm text-muted-foreground">Items currently waiting for your decision.</p>
+          <CardContent className="px-3 pb-3">
+            <div className="text-2xl font-semibold tabular-nums">{items.length}</div>
+            <p className="text-xs text-muted-foreground">Items currently waiting for your decision.</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="shadow-sm">
+          <CardHeader className="px-3 pb-1 pt-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Leave Queue</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{leaveCount}</div>
-            <p className="text-sm text-muted-foreground">Pending leave approvals assigned to you.</p>
+          <CardContent className="px-3 pb-3">
+            <div className="text-2xl font-semibold tabular-nums">{leaveCount}</div>
+            <p className="text-xs text-muted-foreground">Pending leave approvals assigned to you.</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="shadow-sm">
+          <CardHeader className="px-3 pb-1 pt-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Payroll Queue</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{payrollCount}</div>
-            <p className="text-sm text-muted-foreground">Pending payroll approvals assigned to you.</p>
+          <CardContent className="px-3 pb-3">
+            <div className="text-2xl font-semibold tabular-nums">{payrollCount}</div>
+            <p className="text-xs text-muted-foreground">Pending payroll approvals assigned to you.</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="shadow-sm">
+          <CardHeader className="px-3 pb-1 pt-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Appraisal Queue</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{appraisalCount}</div>
-            <p className="text-sm text-muted-foreground">Pending appraisal activations assigned to you.</p>
+          <CardContent className="px-3 pb-3">
+            <div className="text-2xl font-semibold tabular-nums">{appraisalCount}</div>
+            <p className="text-xs text-muted-foreground">Pending appraisal activations assigned to you.</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="rounded-lg border bg-card p-3 shadow-sm">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight text-foreground">Approval filters</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">Focus the decision queue by HRMS source</p>
+            </div>
+          </div>
+          <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{filteredItems.length} visible</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
         {([
           ['all', `All (${items.length})`],
           ['leave_request', `Leave (${leaveCount})`],
@@ -225,14 +238,15 @@ export default function ApprovalInbox() {
             {label}
           </Button>
         ))}
+        </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-40">
+        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
           <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
         </div>
       ) : filteredItems.length === 0 ? (
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="flex h-40 flex-col items-center justify-center gap-3 text-center">
             <Inbox className="h-8 w-8 text-muted-foreground" />
             <div>
@@ -251,10 +265,10 @@ export default function ApprovalInbox() {
             const itemKey = `${item.entityType}:${item.entityId}`;
 
             return (
-              <Card key={itemKey}>
-                <CardHeader className="pb-2">
+              <Card key={itemKey} className="overflow-hidden shadow-sm">
+                <CardHeader className="border-b bg-muted/30 px-4 py-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-2">
+                    <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         {isLeaveItem ? (
                           <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -263,7 +277,7 @@ export default function ApprovalInbox() {
                         ) : (
                           <CreditCard className="h-4 w-4 text-muted-foreground" />
                         )}
-                        <CardTitle className="text-base">{item.title}</CardTitle>
+                        <CardTitle className="truncate text-base">{item.title}</CardTitle>
                         <Badge variant="outline">
                           {isLeaveItem ? 'Leave' : item.entityType === 'appraisal' ? 'Appraisal' : 'Payroll'}
                         </Badge>
@@ -276,7 +290,7 @@ export default function ApprovalInbox() {
                     <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-200">pending</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-3 p-4">
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <p>Current step: {item.currentApprovalStepName ?? 'Awaiting review'}</p>
                     <p>Updated: {formatTimestamp(item.updatedAt)}</p>

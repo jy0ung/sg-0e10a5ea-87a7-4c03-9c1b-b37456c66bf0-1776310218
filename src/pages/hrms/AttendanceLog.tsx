@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { listAttendanceRecords, listEmployeeDirectory, upsertAttendance } from '@/services/hrmsService';
 import type { UpsertAttendanceInput, AttendanceStatus } from '@/types';
-import { Plus, Download } from 'lucide-react';
+import { Plus, Download, SlidersHorizontal } from 'lucide-react';
 import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
 import { upsertAttendanceSchema } from '@/lib/validations';
 
@@ -111,7 +111,7 @@ export default function AttendanceLog() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="mx-auto max-w-[1480px] space-y-4">
       <PageHeader
         title="Attendance Log"
         description="Track daily attendance records"
@@ -127,34 +127,47 @@ export default function AttendanceLog() {
       />
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {(Object.entries(counts) as [AttendanceStatus, number][]).map(([status, cnt]) => (
-          <Card key={status}>
-            <CardHeader className="pb-1 pt-3 px-3">
-              <CardTitle className="text-xs text-muted-foreground capitalize">{status.replace('_', ' ')}</CardTitle>
+          <Card key={status} className="shadow-sm">
+            <CardHeader className="px-3 pb-1 pt-3">
+              <CardTitle className="text-xs capitalize text-muted-foreground">{status.replace('_', ' ')}</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
-              <p className="text-2xl font-bold">{cnt}</p>
+              <p className="text-2xl font-semibold tabular-nums">{cnt}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="flex items-end gap-3 flex-wrap">
+      <div className="rounded-lg border bg-card p-3 shadow-sm">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight text-foreground">Attendance filters</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">Review records by period and employee scope</p>
+            </div>
+          </div>
+          <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{records.length} records</span>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label className="text-xs">From</Label>
-          <Input type="date" className="w-40" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          <Input type="date" className="h-9 w-40" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">To</Label>
-          <Input type="date" className="w-40" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          <Input type="date" className="h-9 w-40" value={dateTo} onChange={e => setDateTo(e.target.value)} />
         </div>
         {isManager && (
           <div className="space-y-1">
             <Label className="text-xs">Employee</Label>
             <Select value={empFilter} onValueChange={setEmpFilter}>
-              <SelectTrigger className="w-52"><SelectValue placeholder="All" /></SelectTrigger>
+              <SelectTrigger className="h-9 w-52"><SelectValue placeholder="All" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Employees</SelectItem>
                 {employees.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
@@ -162,18 +175,20 @@ export default function AttendanceLog() {
             </Select>
           </div>
         )}
+        </div>
       </div>
 
       {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center h-40">
+        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
           <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
         </div>
       ) : (
-        <Card>
+        <Card className="overflow-hidden shadow-sm">
           <CardContent className="p-0">
+            <div className="max-h-[70vh] overflow-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
                 <TableRow>
                   {isManager && <TableHead>Employee</TableHead>}
                   <TableHead>Date</TableHead>
@@ -208,6 +223,7 @@ export default function AttendanceLog() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Command,
   CommandEmpty,
@@ -206,7 +206,7 @@ function DatabaseFieldSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="h-10 w-full justify-between font-normal"
+          className="h-9 w-full justify-between font-normal"
         >
           <span className="truncate text-left">
             {selectedOption?.label ?? (field.placeholder || 'Search and select')}
@@ -596,33 +596,34 @@ export default function NewTicket() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-5xl space-y-3">
-
-      {/* Identity strip */}
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card/70 px-3 py-2">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary select-none">
-            {user?.name?.[0]?.toUpperCase() ?? '?'}
-          </div>
-          <div className="leading-tight min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">{user?.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-          </div>
-        </div>
-        <Badge variant="secondary" className="shrink-0">
-          {ROLE_LABELS[user?.role as AppRole] ?? user?.role ?? 'Staff'}
-        </Badge>
-      </div>
+    <div className="mx-auto max-w-[1280px] space-y-4">
 
       {/* Page header */}
-      <div>
-        <h1 className="text-xl font-bold text-foreground">{roleContext.pageTitle}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{roleContext.pageSubtitle}</p>
+      <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Internal Requests</p>
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">{roleContext.pageTitle}</h1>
+            <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">{roleContext.pageSubtitle}</p>
+          </div>
+          <div className="flex min-w-0 items-center gap-3 rounded-md border bg-background px-3 py-2">
+            <div className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md bg-primary/10 text-sm font-semibold text-primary">
+              {user?.name?.[0]?.toUpperCase() ?? '?'}
+            </div>
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-sm font-semibold text-foreground">{user?.name}</p>
+              <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+            </div>
+            <Badge variant="secondary" className="shrink-0">
+              {ROLE_LABELS[user?.role as AppRole] ?? user?.role ?? 'Staff'}
+            </Badge>
+          </div>
+        </div>
       </div>
 
       {/* Template picker */}
       {categoryTemplates.length > 0 && selectedCategoryKey && (
-        <div className="rounded-lg border border-border bg-card p-3 space-y-2">
+        <div className="rounded-lg border bg-card p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-muted-foreground" />
@@ -646,7 +647,7 @@ export default function NewTicket() {
                 type="button"
                 onClick={() => applyTemplate(t)}
                 className={cn(
-                  'inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                  'inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
                   activeTemplateId === t.id
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-border bg-muted/50 text-foreground hover:bg-muted',
@@ -677,9 +678,13 @@ export default function NewTicket() {
       )}
 
       {/* Main form card */}
-      <Card>
+      <Card className="overflow-hidden shadow-sm">
+        <CardHeader className="border-b bg-muted/30">
+          <CardTitle>Request details</CardTitle>
+          <CardDescription>Keep the request concise, categorized, and actionable for the receiving team.</CardDescription>
+        </CardHeader>
         <CardContent className="p-4">
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-3">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
 
             <div className="grid gap-3 md:grid-cols-[1fr_12rem]">
               <div className="space-y-1.5">
@@ -756,7 +761,7 @@ export default function NewTicket() {
                   <Label>
                     Priority <span className="text-destructive">*</span>
                   </Label>
-                  <div className="flex overflow-hidden rounded-lg border border-border">
+                  <div className="flex overflow-hidden rounded-md border border-border bg-background">
                     {PRIORITY_OPTIONS.map((p, idx) => (
                       <button
                         type="button"
@@ -785,7 +790,7 @@ export default function NewTicket() {
 
               {/* Category description callout */}
               {selectedCategory?.description && !categoriesLoading && (
-                <div className="flex items-start gap-2 rounded-md bg-muted/60 px-3 py-2">
+                <div className="flex items-start gap-2 rounded-md border bg-muted/50 px-3 py-2">
                   <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <p className="text-xs text-muted-foreground">{selectedCategory.description}</p>
                 </div>
@@ -837,6 +842,13 @@ export default function NewTicket() {
             )}
 
             {customFields.length > 0 && (
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Additional fields</p>
+                    <p className="text-xs text-muted-foreground">Fields required by the selected request category.</p>
+                  </div>
+                </div>
               <div className="grid gap-3 md:grid-cols-2">
                 {customFields.map((field) => {
                   const value = customFieldValues[field.key] ?? '';
@@ -881,6 +893,7 @@ export default function NewTicket() {
                     </div>
                   );
                 })}
+              </div>
               </div>
             )}
 
@@ -945,7 +958,7 @@ export default function NewTicket() {
                   if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click();
                 }}
                 className={cn(
-                  'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-3 text-center transition-colors',
+                  'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-4 py-4 text-center transition-colors',
                   dragOver
                     ? 'border-primary bg-primary/5'
                     : 'border-border bg-muted/30 hover:bg-muted/60',
@@ -1017,26 +1030,29 @@ export default function NewTicket() {
             </div>
 
             {/* Submit */}
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={
-                submitting ||
-                !form.formState.isValid ||
-                categorySelectionDisabled ||
-                (requiresSubcategory && !selectedSubcategoryKey) ||
-                customFields.some((field) => field.is_required && !customFieldValues[field.key]?.trim())
-              }
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Submitting…
-                </>
-              ) : (
-                'Submit Request'
-              )}
-            </Button>
+            <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-muted-foreground">Drafts are saved locally until the request is submitted.</p>
+              <Button
+                type="submit"
+                className="sm:min-w-40"
+                disabled={
+                  submitting ||
+                  !form.formState.isValid ||
+                  categorySelectionDisabled ||
+                  (requiresSubcategory && !selectedSubcategoryKey) ||
+                  customFields.some((field) => field.is_required && !customFieldValues[field.key]?.trim())
+                }
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  'Submit Request'
+                )}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

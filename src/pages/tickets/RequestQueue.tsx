@@ -528,12 +528,13 @@ export default function RequestQueue() {
   );
 
   return (
-    <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Internal Requests</p>
-          <h1 className="text-xl font-bold text-foreground">Request Workbench</h1>
-          <p className="mt-1 hidden text-sm text-muted-foreground lg:block">
+    <div className="mx-auto flex min-h-full max-w-[1480px] flex-col gap-4">
+      <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Internal Requests</p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">Request Workbench</h1>
+          <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">
             Triage demand, assign accountable owners, and close the loop with requester-visible outcomes.
           </p>
         </div>
@@ -541,6 +542,7 @@ export default function RequestQueue() {
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
+            size="sm"
             onClick={() => setMetricsExpanded((current) => !current)}
             className="gap-2"
             aria-expanded={metricsExpanded}
@@ -548,15 +550,16 @@ export default function RequestQueue() {
             {metricsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             Summary
           </Button>
-          <Button variant="outline" onClick={handleExportCsv} className="gap-2" disabled={loading || filteredTickets.length === 0}>
+          <Button variant="outline" size="sm" onClick={handleExportCsv} className="gap-2" disabled={loading || filteredTickets.length === 0}>
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
-          <Button variant="outline" onClick={() => void loadTickets()} className="gap-2" disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => void loadTickets()} className="gap-2" disabled={loading}>
             <RefreshCcw className="h-4 w-4" />
             Refresh
           </Button>
         </div>
+      </div>
       </div>
 
       {metricsExpanded && <RequestQueueMetricGrid metrics={queueMetrics} />}
@@ -621,14 +624,14 @@ export default function RequestQueue() {
             }}
           />
 
-          <section className="hidden rounded-xl border border-border bg-card lg:block">
+          <section className="hidden overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:block">
             {renderDetailPanel(selectedTicket)}
           </section>
         </div>
       ) : null}
 
       {!loading && !error && totalCount > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm">
           <span>
             Showing {((page - 1) * REQUEST_QUEUE_PAGE_SIZE + 1).toLocaleString()}-
             {Math.min(page * REQUEST_QUEUE_PAGE_SIZE, totalCount).toLocaleString()} of {totalCount.toLocaleString()} requests
@@ -644,7 +647,7 @@ export default function RequestQueue() {
               <ChevronLeft className="h-4 w-4" />
               Previous
             </Button>
-            <span className="text-xs">
+            <span className="min-w-[82px] text-center text-xs text-foreground tabular-nums">
               Page {page} of {totalPages}
             </span>
             <Button

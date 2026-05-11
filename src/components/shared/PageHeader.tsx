@@ -11,9 +11,9 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, actions, breadcrumbs }: PageHeaderProps) {
   return (
-    <div className="mb-6">
+    <div className="mb-4 rounded-lg border bg-card px-4 py-3 shadow-sm">
       {breadcrumbs && (
-        <nav aria-label="breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground mb-2 flex-wrap">
+        <nav aria-label="breadcrumb" className="mb-2 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
           {breadcrumbs.map((bc, i) => (
             <React.Fragment key={i}>
               {i > 0 && <ChevronRight className="h-3 w-3 flex-shrink-0 text-border" />}
@@ -33,12 +33,12 @@ export function PageHeader({ title, description, actions, breadcrumbs }: PageHea
           ))}
         </nav>
       )}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{title}</h1>
-          {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">{title}</h1>
+          {description && <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">{description}</p>}
         </div>
-        {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
+        {actions && <div className="flex flex-shrink-0 flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </div>
   );

@@ -22,7 +22,7 @@ import {
   reviewLeaveRequest,
 } from '@/services/hrmsService';
 import type { LeaveRequest, LeaveStatus, CreateLeaveRequestInput } from '@/types';
-import { CheckCircle2, XCircle, Clock, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Plus, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { HRMS_LEAVE_APPROVER_ROLES } from '@/config/hrmsConfig';
 import { createLeaveRequestSchema } from '@/lib/validations';
@@ -187,7 +187,7 @@ export default function LeaveManagement() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="mx-auto max-w-[1480px] space-y-4">
       <PageHeader
         title="Leave Management"
         description="Apply for leave and manage approvals"
@@ -201,10 +201,10 @@ export default function LeaveManagement() {
 
       {/* Pending approvals queue (managers only) */}
       {isManager && pendingApprovals.length > 0 && (
-        <Card className="border-amber-200 dark:border-amber-800">
-          <CardHeader className="pb-2">
+        <Card className="overflow-hidden border-amber-200 shadow-sm dark:border-amber-800">
+          <CardHeader className="border-b bg-amber-50/70 px-4 py-3 dark:bg-amber-950/20">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <CardTitle className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
                 <Clock className="h-4 w-4" />
                 Awaiting My Approval ({pendingApprovals.length})
               </CardTitle>
@@ -214,10 +214,10 @@ export default function LeaveManagement() {
             </div>
           </CardHeader>
           {approvalsExpanded && (
-            <CardContent className="pt-0 space-y-3">
+            <CardContent className="space-y-3 p-4">
               {pendingApprovals.map(pa => (
-                <div key={pa.id} className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
-                  <div className="text-sm space-y-0.5">
+                <div key={pa.id} className="flex flex-col gap-3 rounded-lg border bg-background p-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-0.5 text-sm">
                     <p className="font-medium">{pa.requesterName ?? pa.requesterId}</p>
                     {pa.leaveRequest && (
                       <p className="text-muted-foreground">
@@ -227,7 +227,7 @@ export default function LeaveManagement() {
                     )}
                     <p className="text-xs text-muted-foreground">Step: {pa.currentStepName} · Flow: {pa.flowName}</p>
                   </div>
-                  <div className="flex gap-1 shrink-0">
+                  <div className="flex shrink-0 gap-1">
                     <Button
                       size="sm" variant="outline"
                       className="text-green-700 border-green-300 hover:bg-green-50 h-7 px-2"
@@ -259,7 +259,20 @@ export default function LeaveManagement() {
       )}
 
       {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="rounded-lg border bg-card p-3 shadow-sm">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight text-foreground">Leave filters</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">Segment requests by queue and decision state</p>
+            </div>
+          </div>
+          <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{filtered.length} requests</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
         {isManager && (
           <>
             <Button
@@ -290,27 +303,28 @@ export default function LeaveManagement() {
             {s}
           </Button>
         ))}
+        </div>
       </div>
 
       {/* Requests list */}
       {loading ? (
-        <div className="flex items-center justify-center h-40">
+        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
           <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <Card>
-          <CardContent className="flex items-center justify-center h-32 text-muted-foreground">
+        <Card className="shadow-sm">
+          <CardContent className="flex h-32 items-center justify-center text-muted-foreground">
             {viewMode === 'my_queue' ? 'No approvals are currently assigned to you.' : 'No requests found.'}
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
           {filtered.map(req => (
-            <Card key={req.id}>
-              <CardHeader className="pb-2">
+            <Card key={req.id} className="overflow-hidden shadow-sm">
+              <CardHeader className="border-b bg-muted/30 px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-base">{req.employeeName ?? 'You'}</CardTitle>
+                  <div className="min-w-0">
+                    <CardTitle className="truncate text-base">{req.employeeName ?? 'You'}</CardTitle>
                     <p className="text-sm text-muted-foreground">{req.leaveTypeName} · {req.days} day(s)</p>
                   </div>
                   <Badge className={`flex items-center gap-1 text-xs capitalize ${STATUS_COLORS[req.status]}`} variant="outline">
@@ -318,7 +332,7 @@ export default function LeaveManagement() {
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0 space-y-1">
+              <CardContent className="space-y-2 p-4">
                 <p className="text-sm">
                   <span className="text-muted-foreground">Period: </span>
                   {req.startDate} → {req.endDate}
@@ -395,7 +409,7 @@ export default function LeaveManagement() {
                   </div>
                 )}
                 {canReviewRequest(req) && (
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex flex-wrap gap-2 pt-2">
                     <Button
                       size="sm" variant="outline"
                       className="text-green-700 border-green-300 hover:bg-green-50"

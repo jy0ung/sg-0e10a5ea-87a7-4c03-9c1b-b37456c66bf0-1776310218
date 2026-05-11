@@ -68,8 +68,8 @@ export function RequestQueueList({
   onSelectTicket,
 }: RequestQueueListProps) {
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
+    <section className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+      <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Queue</h2>
           <p className="text-xs text-muted-foreground">{tickets.length} requests in view</p>
@@ -92,7 +92,7 @@ export function RequestQueueList({
               type="button"
               onClick={() => onSelectTicket(ticket.id)}
               className={`w-full border-b border-border px-3 py-2.5 text-left transition-colors last:border-b-0 ${
-                selected ? 'bg-primary/5' : 'hover:bg-muted/50'
+                selected ? 'bg-primary/5 shadow-[inset_3px_0_0_hsl(var(--primary))]' : 'hover:bg-muted/50'
               }`}
             >
               <div className="flex items-start justify-between gap-3">

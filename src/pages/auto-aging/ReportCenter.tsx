@@ -121,13 +121,13 @@ export default function ReportCenter() {
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Aging Reports' }]}
       />
 
-      <div className="glass-panel p-5 space-y-5">
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="glass-panel p-4 space-y-4">
+        <div className="flex flex-wrap items-start gap-3">
           {/* Report Type */}
-          <div className="lg:col-span-1 space-y-2">
+          <div className="min-w-[240px] flex-1 space-y-1.5">
             <label htmlFor="auto-aging-report-type" className="text-xs font-medium text-muted-foreground">Report Type</label>
             <Select value={reportType} onValueChange={v => { setReportType(v as AutoAgingReportType); setRows(null); setTotalCount(0); }}>
-              <SelectTrigger id="auto-aging-report-type"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="auto-aging-report-type" className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {REPORT_TYPES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
               </SelectContent>
@@ -136,10 +136,10 @@ export default function ReportCenter() {
           </div>
 
           {/* Branch Filter */}
-          <div className="space-y-2">
+          <div className="w-full min-w-[150px] space-y-1.5 sm:w-40">
             <label htmlFor="auto-aging-report-branch" className="text-xs font-medium text-muted-foreground">Branch</label>
             <Select value={branchFilter} onValueChange={v => { setBranchFilter(v); setRows(null); }}>
-              <SelectTrigger id="auto-aging-report-branch"><SelectValue placeholder="All Branches" /></SelectTrigger>
+              <SelectTrigger id="auto-aging-report-branch" className="h-9"><SelectValue placeholder="All Branches" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Branches</SelectItem>
                 {branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
@@ -148,10 +148,10 @@ export default function ReportCenter() {
           </div>
 
           {/* Model Filter */}
-          <div className="space-y-2">
+          <div className="w-full min-w-[150px] space-y-1.5 sm:w-40">
             <label htmlFor="auto-aging-report-model" className="text-xs font-medium text-muted-foreground">Model</label>
             <Select value={modelFilter} onValueChange={v => { setModelFilter(v); setRows(null); }}>
-              <SelectTrigger id="auto-aging-report-model"><SelectValue placeholder="All Models" /></SelectTrigger>
+              <SelectTrigger id="auto-aging-report-model" className="h-9"><SelectValue placeholder="All Models" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Models</SelectItem>
                 {models.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
@@ -160,29 +160,35 @@ export default function ReportCenter() {
           </div>
 
           {/* Date Range */}
-          <div className="space-y-2">
+          <div className="w-full min-w-[150px] space-y-1.5 sm:w-40">
             <label htmlFor="auto-aging-report-date-from" className="text-xs font-medium text-muted-foreground">{getAutoAgingFieldLabel('bg_date', 'BG DATE')} From</label>
             <Input id="auto-aging-report-date-from" type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setRows(null); }} className="h-9 text-sm" />
           </div>
-          <div className="space-y-2">
+          <div className="w-full min-w-[150px] space-y-1.5 sm:w-40">
             <label htmlFor="auto-aging-report-date-to" className="text-xs font-medium text-muted-foreground">{getAutoAgingFieldLabel('bg_date', 'BG DATE')} To</label>
             <Input id="auto-aging-report-date-to" type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setRows(null); }} className="h-9 text-sm" />
+          </div>
+
+          <div className="flex items-end gap-2 pt-5">
+            <Button variant="default" size="sm" onClick={handleGenerate} disabled={generating || noData}>
+              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+              Generate
+            </Button>
+            {rows && rows.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => void handleDownloadCsv()} disabled={exporting || noData}>
+                {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}
+                Export CSV
+              </Button>
+            )}
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border">
-          <Button variant="outline" size="sm" onClick={handleGenerate} disabled={generating || noData}>
-            {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
-            Generate Report
-          </Button>
-          {rows && rows.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => void handleDownloadCsv()} disabled={exporting || noData}>
-              {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Download className="h-3.5 w-3.5 mr-1" />}
-              Export CSV{totalCount > 0 ? ` (${totalCount > EXPORT_CAP ? `first ${EXPORT_CAP.toLocaleString()}` : totalCount.toLocaleString()})` : ''}
-            </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+          <span>{noData && loading ? 'Loading summary data...' : selectedReport.description}</span>
+          {rows && rows.length > 0 && totalCount > 0 && (
+            <span className="tabular-nums">Export includes {totalCount > EXPORT_CAP ? `first ${EXPORT_CAP.toLocaleString()}` : totalCount.toLocaleString()} rows</span>
           )}
-          {noData && loading && <p className="text-xs text-muted-foreground">Loading summary data…</p>}
         </div>
       </div>
 
@@ -199,8 +205,8 @@ export default function ReportCenter() {
 
       {/* Results Table */}
       {rows && rows.length > 0 && (
-        <div className="glass-panel overflow-auto">
-          <div className="p-3 border-b border-border flex items-center justify-between">
+        <div className="glass-panel overflow-hidden">
+          <div className="p-3 border-b border-border flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
               {isPaginated
                 ? `${page * REPORT_PAGE_SIZE + 1}–${Math.min((page + 1) * REPORT_PAGE_SIZE, totalCount)} of ${totalCount.toLocaleString()} rows`
@@ -218,11 +224,12 @@ export default function ReportCenter() {
               </div>
             )}
           </div>
+          <div className="max-h-[70vh] overflow-auto">
           <table className="w-full text-xs">
-            <thead>
+            <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
               <tr className="border-b border-border bg-secondary/30 text-left">
                 {Object.keys(rows[0]).map(col => (
-                  <th key={col} className="px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{col}</th>
+                  <th key={col} className="px-3 py-2 font-semibold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">{col}</th>
                 ))}
               </tr>
             </thead>
@@ -230,12 +237,13 @@ export default function ReportCenter() {
               {rows.map((row, i) => (
                 <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary/20">
                   {Object.values(row).map((val, j) => (
-                    <td key={j} className="px-3 py-2 text-foreground whitespace-nowrap">{String(val)}</td>
+                    <td key={j} className="max-w-[20rem] truncate px-3 py-2 text-foreground whitespace-nowrap" title={String(val ?? '')}>{String(val)}</td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

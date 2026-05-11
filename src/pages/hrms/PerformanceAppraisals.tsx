@@ -338,9 +338,15 @@ export default function PerformanceAppraisals() {
   }
 
   const viewingAppraisal = appraisals.find(a => a.id === viewId);
+  const appraisalMetrics = {
+    total: appraisals.length,
+    open: appraisals.filter(a => a.status === 'open').length,
+    inProgress: appraisals.filter(a => a.status === 'in_progress').length,
+    completed: appraisals.filter(a => a.status === 'completed').length,
+  };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="mx-auto max-w-[1480px] space-y-4">
       <PageHeader
         title="Performance Appraisals"
         description="Manage appraisal cycles, self reviews, and manager feedback"
@@ -354,21 +360,42 @@ export default function PerformanceAppraisals() {
         }
       />
 
+      {!loading && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: 'Cycles', value: appraisalMetrics.total, helper: 'All appraisal cycles' },
+            { label: 'Open', value: appraisalMetrics.open, helper: 'Ready for review work' },
+            { label: 'Activation', value: appraisalMetrics.inProgress, helper: 'Waiting or in progress' },
+            { label: 'Completed', value: appraisalMetrics.completed, helper: 'Closed review cycles' },
+          ].map(metric => (
+            <Card key={metric.label} className="shadow-sm">
+              <CardHeader className="px-3 pb-1 pt-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{metric.label}</CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 pb-3">
+                <p className="text-2xl font-semibold tabular-nums">{metric.value}</p>
+                <p className="text-xs text-muted-foreground">{metric.helper}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {loading ? (
-        <div className="flex items-center justify-center h-40">
+        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
           <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
         </div>
       ) : appraisals.length === 0 ? (
-        <Card><CardContent className="flex items-center justify-center h-32 text-muted-foreground">No appraisal cycles yet.</CardContent></Card>
+        <Card className="shadow-sm"><CardContent className="flex h-32 items-center justify-center text-muted-foreground">No appraisal cycles yet.</CardContent></Card>
       ) : (
         <div className="space-y-3">
           {appraisals.map(a => (
-            <Card key={a.id}>
-              <CardHeader className="pb-2">
+            <Card key={a.id} className="overflow-hidden shadow-sm">
+              <CardHeader className="border-b bg-muted/30 px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-base">{a.title}</CardTitle>
-                    <p className="text-sm text-muted-foreground capitalize">
+                  <div className="min-w-0">
+                    <CardTitle className="truncate text-base">{a.title}</CardTitle>
+                    <p className="truncate text-sm capitalize text-muted-foreground">
                       {a.cycle.replace('_', ' ')} · {a.periodStart} → {a.periodEnd}
                     </p>
                   </div>
@@ -377,7 +404,7 @@ export default function PerformanceAppraisals() {
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0 flex items-center gap-2 flex-wrap">
+              <CardContent className="flex flex-wrap items-center gap-2 p-4">
                 <Button size="sm" variant="outline" onClick={() => handleView(a.id)}>
                   <Eye className="h-3.5 w-3.5 mr-1" /> View Reviews
                 </Button>

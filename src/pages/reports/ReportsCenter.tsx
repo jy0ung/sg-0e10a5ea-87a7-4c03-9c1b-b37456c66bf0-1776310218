@@ -63,27 +63,27 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">{config.description}</CardTitle>
+      <Card className="shadow-sm">
+        <CardHeader className="pb-2 pt-4">
+          <CardTitle className="text-sm font-semibold">{config.description}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="space-y-1">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
               <Label className="text-xs">Date From</Label>
-              <Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-40" />
+              <Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="h-9 w-40" />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-xs">Date To</Label>
-              <Input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-40" />
+              <Input type="date" value={to} onChange={e => setTo(e.target.value)} className="h-9 w-40" />
             </div>
-            <Button onClick={generate} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <Button size="sm" onClick={generate} disabled={loading}>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? 'animate-spin' : ''}`} />
               {loading ? 'Generating…' : 'Generate'}
             </Button>
             {generated && totalCount > 0 && (
-              <Button variant="outline" onClick={exportCSV} disabled={exporting}>
-                <Download className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={exportCSV} disabled={exporting}>
+                <Download className="h-3.5 w-3.5 mr-1" />
                 {exporting ? 'Exporting…' : `Export CSV (${totalCount.toLocaleString()})`}
               </Button>
             )}
@@ -93,12 +93,12 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
 
       {generated && (
         <>
-          <div className="rounded-md border overflow-x-auto">
+          <div className="max-h-[70vh] overflow-auto rounded-lg border bg-card shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-muted text-muted-foreground">
+              <thead className="sticky top-0 z-10 bg-muted/90 text-muted-foreground backdrop-blur">
                 <tr>
                   {config.columns.map(c => (
-                    <th key={c.key} className={`px-4 py-3 font-medium whitespace-nowrap ${c.numeric ? 'text-right' : 'text-left'}`}>{c.label}</th>
+                    <th key={c.key} className={`px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap ${c.numeric ? 'text-right' : 'text-left'}`}>{c.label}</th>
                   ))}
                 </tr>
               </thead>
@@ -108,7 +108,7 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
                 ) : rows.map((row, i) => (
                   <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
                     {config.columns.map(c => (
-                      <td key={c.key} className={`px-4 py-3 ${c.numeric ? 'text-right tabular-nums' : ''}`}>
+                      <td key={c.key} className={`max-w-[18rem] truncate px-3 py-2.5 ${c.numeric ? 'text-right tabular-nums' : ''}`} title={row[c.key] == null ? '' : String(row[c.key])}>
                         {row[c.key] == null ? '—' : c.numeric ? Number(row[c.key]).toLocaleString('en-MY', { minimumFractionDigits: 2 }) : String(row[c.key])}
                       </td>
                     ))}
@@ -119,7 +119,7 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
           </div>
 
           {/* Pagination bar */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm">
             <span>
               {totalCount === 0
                 ? 'No records'
@@ -158,7 +158,7 @@ export default function ReportsCenter() {
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Business Reports' }]}
       />
       <Tabs defaultValue="stock">
-        <TabsList className="flex-wrap h-auto gap-1">
+        <TabsList className="h-auto flex-wrap gap-1 rounded-lg border bg-card p-1 shadow-sm">
           {REPORTS.map(r => (
             <TabsTrigger key={r.id} value={r.id}>{r.label}</TabsTrigger>
           ))}

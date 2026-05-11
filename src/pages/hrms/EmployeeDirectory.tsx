@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Search, Plus, Users, UserCheck, UserMinus, Pencil } from 'lucide-react';
+import { Search, Plus, Users, UserCheck, UserMinus, Pencil, SlidersHorizontal } from 'lucide-react';
 import { AppRole, Employee, EmployeeStatus } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import { listDepartments, listJobTitles } from '@/services/hrmsAdminService';
@@ -276,7 +276,7 @@ export default function EmployeeDirectory() {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-fade-in">
+      <div className="mx-auto max-w-[1480px] space-y-4 animate-fade-in">
         <PageHeader
           title="Employee Directory"
           description="All staff profiles across the company"
@@ -288,7 +288,7 @@ export default function EmployeeDirectory() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="mx-auto max-w-[1480px] space-y-4 animate-fade-in">
       <PageHeader
         title="Employee Directory"
         description="All staff profiles across the company"
@@ -303,39 +303,53 @@ export default function EmployeeDirectory() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="glass-panel min-w-0 p-4">
+          <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
             <UserCheck className="h-3.5 w-3.5" /> Active
           </p>
-          <p className="text-2xl font-bold text-emerald-500">{activeCount}</p>
+          <p className="text-2xl font-semibold tabular-nums text-emerald-500">{activeCount}</p>
         </div>
-        <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+        <div className="glass-panel min-w-0 p-4">
+          <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
             <UserMinus className="h-3.5 w-3.5" /> Inactive
           </p>
-          <p className="text-2xl font-bold text-foreground">{inactiveCount}</p>
+          <p className="text-2xl font-semibold tabular-nums text-foreground">{inactiveCount}</p>
         </div>
-        <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1">Resigned</p>
-          <p className="text-2xl font-bold text-red-500">{resignedCount}</p>
+        <div className="glass-panel min-w-0 p-4">
+          <p className="mb-2 text-xs text-muted-foreground">Resigned</p>
+          <p className="text-2xl font-semibold tabular-nums text-red-500">{resignedCount}</p>
         </div>
-        <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+        <div className="glass-panel min-w-0 p-4">
+          <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
             <Users className="h-3.5 w-3.5" /> Total
           </p>
-          <p className="text-2xl font-bold text-foreground">{employees.length}</p>
+          <p className="text-2xl font-semibold tabular-nums text-foreground">{employees.length}</p>
         </div>
       </div>
 
       {/* Table panel */}
-      <div className="glass-panel p-4">
+      <div className="glass-panel overflow-hidden shadow-sm">
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="relative flex-1 min-w-44 max-w-xs">
-            <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+        <div className="border-b p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold leading-tight text-foreground">Directory filters</p>
+                <p className="text-[11px] leading-tight text-muted-foreground">Search staff records by identity, role, branch, and status</p>
+              </div>
+            </div>
+            <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{filtered.length} employees</span>
+          </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-44 max-w-xs flex-1">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="pl-8 h-8 text-sm"
+              className="h-9 pl-8 text-sm"
               placeholder="Code, name, email…"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -343,7 +357,7 @@ export default function EmployeeDirectory() {
           </div>
 
           <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="All Roles" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-40 text-xs"><SelectValue placeholder="All Roles" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem>
               {ALL_ROLES.map(r => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}
@@ -351,7 +365,7 @@ export default function EmployeeDirectory() {
           </Select>
 
           <Select value={statusFilter} onValueChange={setStatus}>
-            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-32 text-xs"><SelectValue placeholder="All Statuses" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
@@ -361,7 +375,7 @@ export default function EmployeeDirectory() {
           </Select>
 
           <Select value={branchFilter} onValueChange={setBranch}>
-            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Branches" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-36 text-xs"><SelectValue placeholder="All Branches" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Branches</SelectItem>
               {branches.map(b => (
@@ -369,28 +383,27 @@ export default function EmployeeDirectory() {
               ))}
             </SelectContent>
           </Select>
-
-          <span className="text-xs text-muted-foreground ml-auto">{filtered.length} employees</span>
+        </div>
         </div>
 
         {/* Table */}
-        <div className="overflow-auto">
+        <div className="max-h-[70vh] overflow-auto">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="pb-2 pr-4 font-medium">Code</th>
-                <th className="pb-2 pr-4 font-medium">Name</th>
-                <th className="pb-2 pr-4 font-medium">Role</th>
-                <th className="pb-2 pr-4 font-medium">IC</th>
-                <th className="pb-2 pr-4 font-medium">Contact</th>
-                <th className="pb-2 pr-4 font-medium">Email</th>
-                <th className="pb-2 pr-4 font-medium">Department</th>
-                <th className="pb-2 pr-4 font-medium">Job Title</th>
-                <th className="pb-2 pr-4 font-medium">Manager</th>
-                <th className="pb-2 pr-4 font-medium">Branch</th>
-                <th className="pb-2 pr-4 font-medium">Join Date</th>
-                <th className="pb-2 pr-4 font-medium">Status</th>
-                {canManage && <th className="pb-2 font-medium"></th>}
+            <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Code</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Name</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Role</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">IC</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Contact</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Email</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Department</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Job Title</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Manager</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Branch</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Join Date</th>
+                <th className="whitespace-nowrap px-3 py-2 font-semibold">Status</th>
+                {canManage && <th className="whitespace-nowrap px-3 py-2 font-semibold"></th>}
               </tr>
             </thead>
             <tbody>
@@ -405,29 +418,29 @@ export default function EmployeeDirectory() {
                   const branchCode = branches.find(b => b.id === emp.branchId)?.code ?? emp.branchId ?? '—';
                   const managerName = emp.managerId ? employeeById.get(emp.managerId)?.name ?? emp.managerId : '—';
                   return (
-                    <tr key={emp.id} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
-                      <td className="py-2 pr-4 font-mono text-xs font-medium">{emp.staffCode ?? '—'}</td>
-                      <td className="py-2 pr-4 font-medium text-sm">{emp.name}</td>
-                      <td className="py-2 pr-4">
+                    <tr key={emp.id} className="border-b border-border/40 transition-colors hover:bg-muted/40">
+                      <td className="whitespace-nowrap px-3 py-2 font-mono text-xs font-medium">{emp.staffCode ?? '—'}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-sm font-medium">{emp.name}</td>
+                      <td className="whitespace-nowrap px-3 py-2">
                         <Badge className={`text-[10px] capitalize ${ROLE_BADGE[emp.role]}`}>
                           {ROLE_LABEL[emp.role]}
                         </Badge>
                       </td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{canViewPii ? (emp.icNo ?? '—') : maskIc(emp.icNo)}</td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{canViewPii ? (emp.contactNo ?? '—') : maskContact(emp.contactNo)}</td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.email}</td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.departmentName ?? '—'}</td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.jobTitleName ?? '—'}</td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{managerName}</td>
-                      <td className="py-2 pr-4 text-xs">{branchCode}</td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">{emp.joinDate ?? '—'}</td>
-                      <td className="py-2 pr-4">
+                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{canViewPii ? (emp.icNo ?? '—') : maskIc(emp.icNo)}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{canViewPii ? (emp.contactNo ?? '—') : maskContact(emp.contactNo)}</td>
+                      <td className="max-w-[16rem] truncate px-3 py-2 text-xs text-muted-foreground" title={emp.email}>{emp.email}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{emp.departmentName ?? '—'}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{emp.jobTitleName ?? '—'}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{managerName}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-xs">{branchCode}</td>
+                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{emp.joinDate ?? '—'}</td>
+                      <td className="whitespace-nowrap px-3 py-2">
                         <Badge className={`text-[10px] capitalize ${STATUS_BADGE[emp.status]}`}>
                           {emp.status}
                         </Badge>
                       </td>
                       {canManage && (
-                        <td className="py-2">
+                        <td className="whitespace-nowrap px-3 py-2">
                           <div className="flex items-center gap-1">
                             <Button
                               variant="ghost" size="sm"

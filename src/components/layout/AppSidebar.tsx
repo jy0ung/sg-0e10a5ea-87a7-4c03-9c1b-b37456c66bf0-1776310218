@@ -161,8 +161,8 @@ const NavItemLink = React.memo(function NavItemLink({ item, collapsed, pathname,
     ? badgeCount > 99 ? '99+' : String(badgeCount)
     : null;
   const linkClassName = cn(
-    "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150",
-    collapsed && "justify-center px-2 py-2.5",
+    "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors duration-150",
+    collapsed && "justify-center px-2 py-2",
     active
       ? "nav-item-active"
       : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -263,22 +263,22 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate, sho
     <TooltipProvider delayDuration={200}>
       <aside
         className={cn(
-          "h-screen flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 flex-shrink-0 sticky top-0",
-          collapsed ? "w-16" : "w-64"
+          "h-screen flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 flex-shrink-0 sticky top-0 text-sidebar-foreground",
+          collapsed ? "w-14" : "w-[17rem]"
         )}
       >
         {/* Logo */}
         <div className={cn(
           "h-14 flex items-center border-b border-sidebar-border flex-shrink-0 gap-3",
-          collapsed ? "px-4 justify-center" : "px-4"
+          collapsed ? "px-3 justify-center" : "px-3.5"
         )}>
-          <div className="w-8 h-8 rounded-lg bg-white border border-sidebar-border flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm">
+          <div className="w-8 h-8 rounded-md bg-white border border-white/20 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm">
             <img src={brandAssets.compactLogo} alt="Fook Loi" className="h-7 w-7 object-contain" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-foreground font-bold text-sm leading-tight tracking-tight">Fook Loi Group UBS</p>
-              <p className="text-[10px] text-muted-foreground leading-tight">Unified Business System</p>
+              <p className="text-sidebar-accent-foreground font-semibold text-sm leading-tight tracking-tight">FLC BI</p>
+              <p className="text-[10px] text-sidebar-foreground/65 leading-tight">Operations intelligence</p>
             </div>
           )}
         </div>
@@ -334,8 +334,8 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate, sho
                 ) : isPlatform ? (
                   // Platform: non-clickable label (items always shown below)
                   <div className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-widest mb-0.5",
-                    hasActive ? "text-primary" : "text-muted-foreground"
+                    "flex items-center gap-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] mb-0.5",
+                    hasActive ? "text-sidebar-primary" : "text-sidebar-foreground/55"
                   )}>
                     <SectionIcon className="h-3.5 w-3.5 flex-shrink-0" />
                     <span>{name}</span>
@@ -347,10 +347,10 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate, sho
                       href={resolveNavigationHref(sectionPath!)}
                       onClick={onNavigate}
                       className={cn(
-                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-widest mb-0.5 transition-colors",
+                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[10px] font-semibold uppercase tracking-[0.18em] mb-0.5 transition-colors",
                         hasActive
-                          ? "text-primary bg-primary/5"
-                          : "text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50"
+                          ? "text-sidebar-primary bg-sidebar-accent"
+                          : "text-sidebar-foreground/60 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/70"
                       )}
                     >
                       <SectionIcon className="h-3.5 w-3.5 flex-shrink-0" />
@@ -364,10 +364,10 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate, sho
                       to={sectionPath!}
                       onClick={onNavigate}
                       className={cn(
-                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-widest mb-0.5 transition-colors",
+                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[10px] font-semibold uppercase tracking-[0.18em] mb-0.5 transition-colors",
                         hasActive
-                          ? "text-primary bg-primary/5"
-                          : "text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50"
+                          ? "text-sidebar-primary bg-sidebar-accent"
+                          : "text-sidebar-foreground/60 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/70"
                       )}
                     >
                       <SectionIcon className="h-3.5 w-3.5 flex-shrink-0" />
@@ -385,7 +385,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate, sho
                     {showGroupLabels ? (
                       grouped.map((g, gi) => (
                         <div key={g.group} className={cn("space-y-0.5", gi > 0 && "mt-2")}>
-                          <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45">
                             {g.group}
                           </p>
                           {g.items.map(item => (
@@ -428,7 +428,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate, sho
                     to="/profile"
                     className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center hover:bg-primary/30 transition-colors flex-shrink-0"
                   >
-                    <span className="text-foreground text-xs font-bold">{getInitials(user?.name)}</span>
+                    <span className="text-sidebar-accent-foreground text-xs font-bold">{getInitials(user?.name)}</span>
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side="right">
@@ -440,11 +440,11 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate, sho
               <>
                 <Link to="/profile" className="flex items-center gap-2.5 min-w-0 flex-1 group">
                   <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/30 transition-colors">
-                    <span className="text-foreground text-xs font-bold">{getInitials(user?.name)}</span>
+                    <span className="text-sidebar-accent-foreground text-xs font-bold">{getInitials(user?.name)}</span>
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-sidebar-accent-foreground truncate leading-tight">{user?.name}</p>
-                    <p className="text-[10px] text-muted-foreground capitalize truncate">{user?.role?.replace(/_/g, ' ')}</p>
+                    <p className="text-[10px] text-sidebar-foreground/60 capitalize truncate">{user?.role?.replace(/_/g, ' ')}</p>
                   </div>
                 </Link>
                 <Tooltip>

@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { listAnnouncements, createAnnouncement, deleteAnnouncement } from '@/services/hrmsService';
 import type { CreateAnnouncementInput, AnnouncementCategory, AnnouncementPriority } from '@/types';
-import { Pin, Plus, Trash2, Megaphone } from 'lucide-react';
+import { Pin, Plus, Trash2, Megaphone, SlidersHorizontal } from 'lucide-react';
 import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
 
 const MANAGER_ROLES = HRMS_MANAGER_ROLES;
@@ -29,12 +29,12 @@ const PRIORITY_COLORS: Record<AnnouncementPriority, string> = {
   urgent: 'bg-red-100 text-red-700 border-red-200',
 };
 
-const CATEGORY_ICONS: Record<AnnouncementCategory, string> = {
-  general:   '📢',
-  policy:    '📋',
-  event:     '🎉',
-  emergency: '🚨',
-  holiday:   '🏖️',
+const CATEGORY_LABELS: Record<AnnouncementCategory, string> = {
+  general:   'General',
+  policy:    'Policy',
+  event:     'Event',
+  emergency: 'Emergency',
+  holiday:   'Holiday',
 };
 
 function timeAgo(isoDate: string) {
@@ -92,7 +92,7 @@ export default function Announcements() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="mx-auto max-w-[1280px] space-y-4">
       <PageHeader
         title="Announcements"
         description="Company-wide communications and notices"
@@ -107,7 +107,20 @@ export default function Announcements() {
       />
 
       {/* Category filters */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="rounded-lg border bg-card p-3 shadow-sm">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-tight text-foreground">Announcement filters</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">Segment notices by category and urgency</p>
+            </div>
+          </div>
+          <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{filtered.length} notices</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
         {(['all', 'general', 'policy', 'event', 'emergency', 'holiday'] as const).map(cat => (
           <Button
             key={cat}
@@ -116,17 +129,18 @@ export default function Announcements() {
             onClick={() => setCatFilter(cat)}
             className="capitalize"
           >
-            {cat !== 'all' && CATEGORY_ICONS[cat as AnnouncementCategory]} {cat}
+            {cat === 'all' ? 'All' : CATEGORY_LABELS[cat as AnnouncementCategory]}
           </Button>
         ))}
+        </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-40">
+        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
           <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
             <Megaphone className="h-8 w-8 opacity-30" />
             <p>No announcements</p>
@@ -135,13 +149,15 @@ export default function Announcements() {
       ) : (
         <div className="space-y-3">
           {filtered.map(ann => (
-            <Card key={ann.id} data-pinned={ann.pinned ? 'true' : 'false'} className={ann.pinned ? 'border-primary/50 shadow-sm' : ''}>
-              <CardHeader className="pb-2">
+            <Card key={ann.id} data-pinned={ann.pinned ? 'true' : 'false'} className={`overflow-hidden shadow-sm ${ann.pinned ? 'border-primary/50' : ''}`}>
+              <CardHeader className="border-b bg-muted/30 px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{CATEGORY_ICONS[ann.category]}</span>
-                    <div>
-                      <CardTitle className="text-base flex items-center gap-1.5">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <Megaphone className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <CardTitle className="flex items-center gap-1.5 truncate text-base">
                         {ann.pinned && <Pin aria-label="Pinned announcement" className="h-3.5 w-3.5 text-primary" />}
                         {ann.title}
                       </CardTitle>
@@ -167,7 +183,7 @@ export default function Announcements() {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <p className="text-sm text-foreground/80 whitespace-pre-wrap">{ann.body}</p>
+                <p className="whitespace-pre-wrap text-sm leading-5 text-foreground/80">{ann.body}</p>
                 {ann.expiresAt && (
                   <p className="text-xs text-muted-foreground mt-2">Expires: {ann.expiresAt.slice(0, 10)}</p>
                 )}
@@ -197,7 +213,7 @@ export default function Announcements() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {(['general','policy','event','emergency','holiday'] as AnnouncementCategory[]).map(c => (
-                      <SelectItem key={c} value={c} className="capitalize">{CATEGORY_ICONS[c]} {c}</SelectItem>
+                      <SelectItem key={c} value={c} className="capitalize">{CATEGORY_LABELS[c]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

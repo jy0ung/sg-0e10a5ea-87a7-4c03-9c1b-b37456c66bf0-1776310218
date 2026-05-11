@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { AlertCircle, CalendarDays, CheckCircle2, Loader2, MessageSquare, RefreshCcw, Send, Ticket, XCircle } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Loader2, MessageSquare, Plus, RefreshCcw, Send, Ticket, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -201,12 +202,23 @@ export default function MyTickets() {
   }, [user]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">My Requests</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Review the internal requests you have already submitted.
-        </p>
+    <div className="mx-auto max-w-[1280px] space-y-4">
+      <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Internal Requests</p>
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">My Requests</h1>
+            <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">
+              Review submitted requests, add follow-up notes, and track requester-visible outcomes.
+            </p>
+          </div>
+          <Button asChild size="sm" className="shrink-0">
+            <Link to="/portal/tickets/new">
+              <Plus className="h-3.5 w-3.5" />
+              New Request
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -249,13 +261,13 @@ export default function MyTickets() {
             const canCancel = ticket.status === 'open' && !ticket.assigned_to;
 
             return (
-            <Card key={ticket.id}>
-              <CardHeader className="gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="text-lg">
+            <Card key={ticket.id} className="overflow-hidden shadow-sm">
+              <CardHeader className="gap-3 border-b bg-muted/20 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <CardTitle className="truncate text-base">
                     {ticket.subject}
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="truncate">
                     {user?.name} · {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}
                     {ticket.vso_number && <> · VSO {ticket.vso_number}</>}
                   </CardDescription>
@@ -304,7 +316,7 @@ export default function MyTickets() {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2 px-4 pb-4">
+              <CardContent className="space-y-3 px-4 py-4">
                 <p className="text-sm text-muted-foreground capitalize">
                   Category: {getRequestCategoryLabel(ticket.category, categories)}
                   {ticket.subcategory ? ` / ${getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories)}` : ''}
@@ -328,7 +340,10 @@ export default function MyTickets() {
                   )}
                 </div>
 
-                <p className="whitespace-pre-line text-sm leading-5 text-foreground">{ticket.description}</p>
+                <div className="rounded-lg border bg-background px-3 py-2.5">
+                  <p className="mb-1 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Request detail</p>
+                  <p className="whitespace-pre-line text-sm leading-5 text-foreground">{ticket.description}</p>
+                </div>
 
                 <TicketSlaSummary ticket={ticket} />
 
@@ -337,8 +352,8 @@ export default function MyTickets() {
                 {(ticket.desired_outcome || ticket.business_impact) && (
                   <div className="grid gap-3 md:grid-cols-2">
                     {ticket.desired_outcome && (
-                      <div className="rounded-lg border border-border px-3 py-2">
-                        <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <div className="rounded-lg border border-border bg-background px-3 py-2">
+                        <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Desired outcome
                         </p>
@@ -346,8 +361,8 @@ export default function MyTickets() {
                       </div>
                     )}
                     {ticket.business_impact && (
-                      <div className="rounded-lg border border-border px-3 py-2">
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <div className="rounded-lg border border-border bg-background px-3 py-2">
+                        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                           Business impact
                         </p>
                         <p className="mt-1 text-sm leading-5 text-foreground">{ticket.business_impact}</p>
@@ -357,8 +372,8 @@ export default function MyTickets() {
                 )}
 
                 {extraFields.length > 0 && (
-                  <div className="rounded-lg border border-border px-3 py-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="rounded-lg border border-border bg-background px-3 py-2">
+                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                       Additional details
                     </p>
                     <div className="mt-2 grid gap-2 md:grid-cols-2">
@@ -374,7 +389,7 @@ export default function MyTickets() {
 
                 {ticket.resolution_note && (
                   <div className="rounded-lg border border-border bg-secondary/30 px-3 py-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                       Resolution note
                     </p>
                     <p className="mt-1 text-sm leading-5 text-foreground">{ticket.resolution_note}</p>
@@ -384,8 +399,8 @@ export default function MyTickets() {
                 <TicketAttachmentList attachments={attachmentsByTicket[ticket.id] ?? []} />
 
                 {ticket.status !== 'closed' && ticket.status !== 'cancelled' && (
-                  <div className="space-y-2 rounded-lg border border-border px-3 py-3">
-                    <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <div className="space-y-2 rounded-lg border border-border bg-background px-3 py-3">
+                    <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                       <MessageSquare className="h-3.5 w-3.5" />
                       Discussion
                     </p>

@@ -998,46 +998,48 @@ export default function RequestSetup() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Internal Requests</p>
-          <h1 className="text-2xl font-bold text-foreground">Request Operations Setup</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+    <div className="mx-auto max-w-[1480px] space-y-4">
+      <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Internal Requests</p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">Request Operations Setup</h1>
+          <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">
             Shape the requester experience, routing logic, templates, and attachment controls from one workspace.
           </p>
         </div>
-        <div className="grid grid-cols-4 gap-2 text-center sm:min-w-[460px]">
-          <div className="rounded-lg border border-border bg-card px-3 py-2">
-            <p className="text-lg font-semibold text-foreground">{activeCategoryCount}</p>
+        <div className="grid w-full grid-cols-2 gap-2 text-center sm:w-auto sm:min-w-[460px] sm:grid-cols-4">
+          <div className="rounded-lg border bg-background px-3 py-2">
+            <p className="text-lg font-semibold tabular-nums text-foreground">{activeCategoryCount}</p>
             <p className="text-[11px] text-muted-foreground">Categories</p>
           </div>
-          <div className="rounded-lg border border-border bg-card px-3 py-2">
-            <p className="text-lg font-semibold text-foreground">{activeTemplateCount}</p>
+          <div className="rounded-lg border bg-background px-3 py-2">
+            <p className="text-lg font-semibold tabular-nums text-foreground">{activeTemplateCount}</p>
             <p className="text-[11px] text-muted-foreground">Templates</p>
           </div>
-          <div className="rounded-lg border border-border bg-card px-3 py-2">
-            <p className="text-lg font-semibold text-foreground">{activeFormFieldCount}</p>
+          <div className="rounded-lg border bg-background px-3 py-2">
+            <p className="text-lg font-semibold tabular-nums text-foreground">{activeFormFieldCount}</p>
             <p className="text-[11px] text-muted-foreground">Fields</p>
           </div>
-          <div className="rounded-lg border border-border bg-card px-3 py-2">
-            <p className="text-lg font-semibold text-foreground">{activeRoutingRuleCount}</p>
+          <div className="rounded-lg border bg-background px-3 py-2">
+            <p className="text-lg font-semibold tabular-nums text-foreground">{activeRoutingRuleCount}</p>
             <p className="text-[11px] text-muted-foreground">Rules</p>
           </div>
         </div>
       </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Request Customization</CardTitle>
+      <Card className="overflow-hidden shadow-sm">
+        <CardHeader className="border-b bg-muted/30">
+          <CardTitle>Request Customization</CardTitle>
           <CardDescription>
             Manage categories, subcategories, and templates from one canvas. Changes take effect immediately for new requests.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4">
           <Tabs defaultValue="categories">
-            <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-            <TabsList className="inline-flex h-auto min-w-max">
+            <div className="mb-4 overflow-x-auto">
+            <TabsList className="inline-flex h-auto min-w-max rounded-lg border bg-card p-1 shadow-sm">
               <TabsTrigger value="categories">
                 Categories
                 {activeCategoryCount > 0 && (
@@ -1134,12 +1136,12 @@ export default function RequestSetup() {
           </Dialog>
 
           {setupLoading ? (
-            <div className="flex items-center justify-center gap-3 rounded-xl border border-border py-12 text-muted-foreground">
+            <div className="flex items-center justify-center gap-3 rounded-lg border border-border py-12 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
               <span>Loading request setup...</span>
             </div>
           ) : setupError ? (
-            <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border py-12 text-center">
+            <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-border py-12 text-center">
               <AlertCircle className="h-8 w-8 text-destructive" />
               <div className="space-y-1">
                 <p className="font-medium text-foreground">Unable to load request setup</p>
@@ -1168,13 +1170,13 @@ export default function RequestSetup() {
                 onValueChange={setActiveCategoryKey}
                 className="w-full"
               >
-                <div className="flex items-center gap-2 border-b">
-                  <TabsList className="h-auto flex-1 overflow-x-auto rounded-none bg-transparent p-0 justify-start">
+                <div className="flex items-center gap-2 rounded-lg border bg-card px-2 py-1 shadow-sm">
+                  <TabsList className="h-auto flex-1 justify-start overflow-x-auto rounded-none bg-transparent p-0">
                     {categories.map((category) => (
                       <TabsTrigger
                         key={category.key}
                         value={category.key}
-                        className="relative rounded-none border-b-2 border-transparent bg-transparent px-4 py-2.5 text-sm font-medium shadow-none transition-none data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none"
+                        className="relative rounded-md border border-transparent bg-transparent px-3 py-1.5 text-sm font-medium shadow-none transition-none data-[state=active]:border-border data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-sm"
                       >
                         {category.label}
                         {!category.is_active && (
@@ -1204,7 +1206,7 @@ export default function RequestSetup() {
                   const isCreatingSub = creatingSubcategoryKey === category.key;
 
                   return (
-                    <TabsContent key={category.key} value={category.key} className="mt-0 pt-5 space-y-4">
+                    <TabsContent key={category.key} value={category.key} className="mt-0 space-y-4 pt-4">
                       {/* Name + description */}
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
@@ -1407,10 +1409,10 @@ export default function RequestSetup() {
           </TabsContent>
 
           {/* ── Templates tab ─────────────────────────────────────────── */}
-          <TabsContent value="templates" className="space-y-6">
+          <TabsContent value="templates" className="space-y-4">
             {/* Create template form */}
             {isAddingTemplate && (
-              <div className="rounded-xl border border-dashed border-border/70 bg-secondary/20 p-4 space-y-4">
+              <div className="rounded-lg border border-dashed border-border/70 bg-secondary/20 p-4 space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-foreground">New template</p>
                   <Button
@@ -1798,7 +1800,7 @@ export default function RequestSetup() {
           </TabsContent>
 
           {/* ── Form builder tab ──────────────────────────────────────────── */}
-          <TabsContent value="forms" className="space-y-6">
+          <TabsContent value="forms" className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-foreground">Custom Request Fields</p>
@@ -1815,7 +1817,7 @@ export default function RequestSetup() {
             </div>
 
             {isAddingField && (
-              <div className="rounded-xl border border-dashed border-border/70 bg-secondary/20 p-4 space-y-4">
+              <div className="rounded-lg border border-dashed border-border/70 bg-secondary/20 p-4 space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-foreground">New custom field</p>
                   <Button
@@ -2098,10 +2100,10 @@ export default function RequestSetup() {
           </TabsContent>
 
           {/* ── Routing tab ──────────────────────────────────────────────── */}
-          <TabsContent value="routing" className="space-y-6">
+          <TabsContent value="routing" className="space-y-4">
             {/* Create rule form */}
             {isAddingRule && (
-              <div className="rounded-xl border border-dashed border-border/70 bg-secondary/20 p-4 space-y-4">
+              <div className="rounded-lg border border-dashed border-border/70 bg-secondary/20 p-4 space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-foreground">New routing rule</p>
                   <Button
@@ -2546,7 +2548,7 @@ export default function RequestSetup() {
           </TabsContent>
 
           {/* ── Settings tab ─────────────────────────────────────────────── */}
-          <TabsContent value="settings" className="space-y-6">
+          <TabsContent value="settings" className="space-y-4">
             <div>
               <p className="text-sm font-semibold text-foreground">Attachment Settings</p>
               <p className="text-sm text-muted-foreground">
@@ -2560,7 +2562,7 @@ export default function RequestSetup() {
                 Loading settings…
               </div>
             ) : (
-              <div className="rounded-lg border border-border bg-card p-5 space-y-5 max-w-sm">
+              <div className="rounded-lg border border-border bg-card p-4 space-y-4 max-w-lg shadow-sm">
                 {/* Max file size */}
                 <div className="space-y-2">
                   <Label htmlFor="attach-max-size">Maximum file size per attachment (MB)</Label>
