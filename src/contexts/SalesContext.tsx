@@ -3,7 +3,7 @@ import React, { createContext, useContext, useCallback, useEffect, useMemo, Reac
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Customer, DealStage, SalesOrder, Invoice, SalesmanTarget } from '@/types';
 import { getCustomers } from '@/services/customerService';
-import { getSalesOrders, moveSalesOrderStage, subscribeToSalesOrderChanges, updateSalesOrder } from '@/services/salesOrderService';
+import { getSalesOrders, transitionOrderStage, subscribeToSalesOrderChanges, updateSalesOrder } from '@/services/salesOrderService';
 import { getInvoices } from '@/services/invoiceService';
 import { getSalesmanTargets } from '@/services/salesTargetService';
 import { getDealStages } from '@/services/dealStageService';
@@ -89,9 +89,9 @@ export function SalesProvider({ children }: { children: ReactNode }) {
     });
   }, [companyId, branchId, queryClient]);
 
-  /** Optimistically update deal-stage in cache then persist to DB. */
+  /** Optimistically update deal-stage in cache then persist via audited RPC. */
   const moveOrderStage = useCallback(async (orderId: string, stageId: string) => {
-    await moveSalesOrderStage(companyId, orderId, stageId, user?.id);
+    await transitionOrderStage(companyId, orderId, stageId, user?.id);
     queryClient.setQueryData<SalesData>(salesQueryKey(companyId, branchId), prev =>
       prev ? { ...prev, salesOrders: prev.salesOrders.map(o => o.id === orderId ? { ...o, dealStageId: stageId } : o) } : prev
     );

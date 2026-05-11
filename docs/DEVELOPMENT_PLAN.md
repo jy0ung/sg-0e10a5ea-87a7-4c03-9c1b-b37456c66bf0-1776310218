@@ -208,7 +208,19 @@ Current foundation slice status:
 12. ~~Next: implement `normalize_dms_sales_order()` — the first normalizer worker that reads `dms_raw_sales_orders.raw_payload`, applies `normalizer_column_authority` overwrite rules, and upserts into `sales_orders` with DMS reference columns set. This is the bridge from staging skeleton to live canonical UBS writes.~~ Done 2026-05-11 — 107/107 tests pass.
 13. ~~Next: implement `normalize_dms_vehicle_stock()` — the equivalent staged-data normalizer for `dms_raw_vehicle_stock` → `vehicles` using the same pattern, or add the `dms-sync-worker` Edge Function to `SUPABASE_INTERNAL_FUNCTIONS_CONFIG` so it is registered for future live invocation.~~ Done 2026-05-11 — both completed. Migration `20260511020000` + corrective `20260511030000` applied. Stage column correctly left to `recompute_vehicle_stage` trigger. `[functions.*]` sections added to `supabase/config.toml`; `SUPABASE_INTERNAL_FUNCTIONS_CONFIG` JSON documented in `docs/ENV.md`. 111/111 tests pass.
 14. ~~Next: implement `normalize_dms_customer()` — the staged-data normalizer for `dms_raw_sales_orders.dms_customer_id` → `customers`, or begin live DMS fetch/signing in `dms-sync-worker` (add actual HTTP fetch + HMAC signing of Proton DMS API calls).~~ Done 2026-05-11 — `normalize_dms_customer()` implemented. Migration `20260511040000` applied. 115/115 tests pass. Stage 1 checklist closed. **Live DMS fetch/HMAC signing deferred to Stage 2 (credentials/signing format not yet confirmed).**
-15. Next: begin Stage 2 — Sales Pipeline foundation. Add `transition_sales_order_stage()` RPC with audit events; strengthen Sales Dashboard to load without full vehicle hydration.
+15. ~~Next: begin Stage 2 — Sales Pipeline foundation. Add `transition_sales_order_stage()` RPC with audit events; strengthen Sales Dashboard to load without full vehicle hydration.~~ Done 2026-05-11 — Stage 3 Sales Pipeline Foundation complete (see Stage 3 section below).
+
+### Stage 3 - Sales Pipeline Foundation
+
+- [x] `transition_sales_order_stage()` RPC — atomic pipeline move, company scope + target-stage scope validation, `audit_logs` write, no-op if same stage, NULL un-assigns. Migration `20260511050000` + corrective `20260511060000` applied 2026-05-11.
+- [x] `get_sales_pipeline_summary()` RPC — per-stage order counts and total revenue, unassigned bucket, optional branch/date filters. Uses `sales_orders.stage_id` and `selling_price`. Migration `20260511050000/060000`.
+- [x] `get_sales_dashboard_summary()` RPC — single-call server-side Sales Dashboard KPIs: MTD orders/revenue, vehicles linked, branch breakdown, 6-month trend, outstanding AR. Migration `20260511050000/060000`.
+- [x] `transitionOrderStage()`, `getSalesPipelineSummary()`, `getSalesDashboardSummary()` service methods in `salesOrderService.ts` with full TypeScript interfaces.
+- [x] `SalesContext.moveOrderStage` updated to call `transitionOrderStage` RPC (audited) instead of direct DB update.
+- [x] `SalesDashboard` fully rewritten to server-side via `getSalesDashboardSummary` + `getVehicleKpiSummary` — no longer hydrates all sales orders/invoices client-side for KPI tiles.
+- [x] Corrective column-name fix: `sales_orders` uses `stage_id` (not `deal_stage_id`) and `selling_price` (not `total_price`); no `status` column exists — RPCs updated accordingly.
+- [x] 7 focused integration tests in `src/test/sales-pipeline.spec.ts` (5 `transition_sales_order_stage` + 1 `get_sales_pipeline_summary` + 1 `get_sales_dashboard_summary`). 122/122 tests pass 2026-05-11.
+- [x] 4 unit tests for new service methods in `salesOrderService.test.ts`. 387/411 tests pass (4 pre-existing failures unrelated to Stage 3).
 
 Recommended first Sales workflow slice after that:
 

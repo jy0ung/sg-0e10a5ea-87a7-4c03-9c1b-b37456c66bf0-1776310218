@@ -5136,6 +5136,19 @@ export type Database = {
           user_role: string
         }[]
       }
+      get_sales_dashboard_summary: {
+        Args: { p_branch_code?: string; p_company_id: string }
+        Returns: Json
+      }
+      get_sales_pipeline_summary: {
+        Args: {
+          p_branch_code?: string
+          p_company_id: string
+          p_from_date?: string
+          p_to_date?: string
+        }
+        Returns: Json
+      }
       is_same_company: { Args: { target_company_id: string }; Returns: boolean }
       link_vehicle_to_sales_order: {
         Args: {
@@ -5173,6 +5186,15 @@ export type Database = {
       }
       seed_source_reconciliation_candidates: {
         Args: { p_company_id?: string }
+        Returns: Json
+      }
+      transition_sales_order_stage: {
+        Args: {
+          p_actor_id?: string
+          p_company_id: string
+          p_order_id: string
+          p_stage_id: string
+        }
         Returns: Json
       }
       unlink_vehicle_from_sales_order: {

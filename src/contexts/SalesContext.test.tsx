@@ -21,8 +21,9 @@ vi.mock('@/services/customerService', () => ({
 }));
 vi.mock('@/services/salesOrderService', () => ({
   getSalesOrders: vi.fn(() => Promise.resolve({ data: mockSalesOrders })),
-  moveSalesOrderStage: vi.fn(() => Promise.resolve()),
-  updateSalesOrder: vi.fn(() => Promise.resolve()),
+  moveSalesOrderStage: vi.fn(() => Promise.resolve({ error: null })),
+  transitionOrderStage: vi.fn(() => Promise.resolve({ data: { action: 'transitioned' }, error: null })),
+  updateSalesOrder: vi.fn(() => Promise.resolve({ data: null, error: null })),
   subscribeToSalesOrderChanges: vi.fn(() => vi.fn()),
 }));
 vi.mock('@/services/invoiceService', () => ({
@@ -121,7 +122,7 @@ describe('SalesContext', () => {
 
   describe('mutations', () => {
     it('moveOrderStage updates cache optimistically', async () => {
-      const { moveSalesOrderStage } = await import('@/services/salesOrderService');
+      const { transitionOrderStage } = await import('@/services/salesOrderService');
       const { result } = renderHook(() => useSales(), { wrapper: createWrapper() });
 
       await waitFor(() => {
@@ -132,7 +133,7 @@ describe('SalesContext', () => {
         await result.current.moveOrderStage('so1', 'ds2');
       });
 
-      expect(moveSalesOrderStage).toHaveBeenCalledWith('comp1', 'so1', 'ds2', 'user1');
+      expect(transitionOrderStage).toHaveBeenCalledWith('comp1', 'so1', 'ds2', 'user1');
 
       await waitFor(() => {
         const order = result.current.salesOrders.find(o => o.id === 'so1');

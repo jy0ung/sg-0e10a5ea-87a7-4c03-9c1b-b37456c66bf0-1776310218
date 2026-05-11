@@ -166,6 +166,134 @@ export async function moveSalesOrderStage(companyId: string, id: string, dealSta
   return { error: null };
 }
 
+export interface TransitionOrderStageResult {
+  action: 'transitioned' | 'no_change';
+  orderId: string;
+  previousStageId: string | null;
+  newStageId: string | null;
+}
+
+/** Audited pipeline-stage transition via server-side RPC (preferred over moveSalesOrderStage). */
+export async function transitionOrderStage(
+  companyId: string,
+  orderId: string,
+  stageId: string | null,
+  actorId?: string,
+): Promise<{ data: TransitionOrderStageResult | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
+  const { data, error } = await supabase.rpc('transition_sales_order_stage', {
+    p_order_id:   orderId,
+    p_stage_id:   stageId,
+    p_company_id: companyId,
+    p_actor_id:   actorId ?? null,
+  });
+  if (error) return { data: null, error: new Error(error.message) };
+  const raw = data as Record<string, unknown>;
+  return {
+    data: {
+      action:          raw.action as 'transitioned' | 'no_change',
+      orderId:         raw.order_id as string,
+      previousStageId: raw.previous_stage_id as string | null,
+      newStageId:      raw.new_stage_id as string | null,
+    },
+    error: null,
+  };
+}
+
+export interface PipelineStageSummary {
+  dealStageId: string;
+  stageName: string;
+  stageOrder: number;
+  stageColor: string;
+  orderCount: number;
+  totalValue: number;
+}
+
+export interface PipelineSummary {
+  byStage: PipelineStageSummary[];
+  unassigned: { orderCount: number; totalValue: number };
+  totals:     { orderCount: number; totalValue: number };
+}
+
+export async function getSalesPipelineSummary(
+  companyId: string,
+  opts?: { branchCode?: string | null; fromDate?: string | null; toDate?: string | null },
+): Promise<{ data: PipelineSummary | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
+  const { data, error } = await supabase.rpc('get_sales_pipeline_summary', {
+    p_company_id:  companyId,
+    p_branch_code: opts?.branchCode ?? null,
+    p_from_date:   opts?.fromDate   ?? null,
+    p_to_date:     opts?.toDate     ?? null,
+  });
+  if (error) return { data: null, error: new Error(error.message) };
+  const raw = data as Record<string, unknown>;
+  const mapStage = (s: Record<string, unknown>): PipelineStageSummary => ({
+    dealStageId: s.deal_stage_id as string,
+    stageName:   s.stage_name   as string,
+    stageOrder:  Number(s.stage_order),
+    stageColor:  s.stage_color  as string,
+    orderCount:  Number(s.order_count),
+    totalValue:  Number(s.total_value),
+  });
+  const mapBucket = (b: Record<string, unknown>) => ({
+    orderCount: Number(b.order_count),
+    totalValue: Number(b.total_value),
+  });
+  return {
+    data: {
+      byStage:    ((raw.by_stage as Record<string, unknown>[]) ?? []).map(mapStage),
+      unassigned: mapBucket(raw.unassigned as Record<string, unknown>),
+      totals:     mapBucket(raw.totals     as Record<string, unknown>),
+    },
+    error: null,
+  };
+}
+
+export interface SalesDashboardSummary {
+  mtd: {
+    orderCount: number;
+    totalValue: number;
+  };
+  vehiclesLinked:  number;
+  branchBreakdown: { branchCode: string; orderCount: number }[];
+  monthlyTrend:    { monthKey: string; orderCount: number }[];
+  outstandingAr:   number;
+}
+
+export async function getSalesDashboardSummary(
+  companyId: string,
+  branchCode?: string | null,
+): Promise<{ data: SalesDashboardSummary | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
+  const { data, error } = await supabase.rpc('get_sales_dashboard_summary', {
+    p_company_id:  companyId,
+    p_branch_code: branchCode ?? null,
+  });
+  if (error) return { data: null, error: new Error(error.message) };
+  const raw = data as Record<string, unknown>;
+  const mtd = raw.mtd as Record<string, unknown>;
+  return {
+    data: {
+      mtd: {
+        orderCount: Number(mtd.order_count),
+        totalValue: Number(mtd.total_value),
+      },
+      vehiclesLinked:  Number(raw.vehicles_linked),
+      branchBreakdown: ((raw.branch_breakdown as Record<string, unknown>[]) ?? []).map(b => ({
+        branchCode: b.branch_code as string,
+        orderCount: Number(b.order_count),
+      })),
+      monthlyTrend: ((raw.monthly_trend as Record<string, unknown>[]) ?? []).map(t => ({
+        monthKey:   t.month_key as string,
+        orderCount: Number(t.order_count),
+      })),
+      outstandingAr: Number(raw.outstanding_ar),
+    },
+    error: null,
+  };
+}
+
 export interface LinkExistingVehicleParams {
   orderId: string;
   chassisNo?: string | null;

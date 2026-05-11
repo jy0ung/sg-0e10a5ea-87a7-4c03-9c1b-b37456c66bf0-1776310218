@@ -4,8 +4,11 @@ import {
   createVehicleFromSalesOrder,
   deleteSalesOrder,
   getLinkedSalesOrderForVehicle,
+  getSalesDashboardSummary,
+  getSalesPipelineSummary,
   linkExistingVehicle,
   moveSalesOrderStage,
+  transitionOrderStage,
   updateSalesOrder,
   unlinkExistingVehicle,
 } from './salesOrderService';
@@ -211,5 +214,109 @@ describe('salesOrderService', () => {
       vehicleId: 'vehicle-1',
       chassisNo: 'CHASSIS-1',
     }));
+  });
+
+  // -------------------------------------------------------------------------
+  // transitionOrderStage() — calls transition_sales_order_stage RPC
+  // -------------------------------------------------------------------------
+  it('calls transition_sales_order_stage RPC and maps result to TransitionOrderStageResult', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: { action: 'transitioned', order_id: 'order-1', previous_stage_id: null, new_stage_id: 'stage-2' },
+      error: null,
+    } as never);
+
+    const result = await transitionOrderStage('company-1', 'order-1', 'stage-2', 'actor-1');
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({
+      action: 'transitioned',
+      orderId: 'order-1',
+      previousStageId: null,
+      newStageId: 'stage-2',
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith('transition_sales_order_stage', {
+      p_order_id:   'order-1',
+      p_stage_id:   'stage-2',
+      p_company_id: 'company-1',
+      p_actor_id:   'actor-1',
+    });
+  });
+
+  it('transitionOrderStage passes null stage_id to un-assign from pipeline', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: { action: 'transitioned', order_id: 'order-1', previous_stage_id: 'stage-1', new_stage_id: null },
+      error: null,
+    } as never);
+
+    const result = await transitionOrderStage('company-1', 'order-1', null, undefined);
+
+    expect(result.error).toBeNull();
+    expect(result.data?.newStageId).toBeNull();
+    expect(supabase.rpc).toHaveBeenCalledWith('transition_sales_order_stage', {
+      p_order_id:   'order-1',
+      p_stage_id:   null,
+      p_company_id: 'company-1',
+      p_actor_id:   null,
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getSalesPipelineSummary() — calls get_sales_pipeline_summary RPC
+  // -------------------------------------------------------------------------
+  it('calls get_sales_pipeline_summary RPC and maps jsonb to PipelineSummary', async () => {
+    const rawJson = {
+      by_stage: [
+        { deal_stage_id: 'ds-1', stage_name: 'Enquiry', stage_order: 1, stage_color: '#fff', order_count: 5, total_value: 250000 },
+      ],
+      unassigned: { order_count: 2, total_value: 80000 },
+      totals: { order_count: 7, total_value: 330000 },
+    };
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: rawJson, error: null } as never);
+
+    const result = await getSalesPipelineSummary('company-1', { branchCode: 'KK' });
+
+    expect(result.error).toBeNull();
+    expect(result.data?.byStage).toHaveLength(1);
+    expect(result.data?.byStage[0]).toEqual({
+      dealStageId: 'ds-1',
+      stageName: 'Enquiry',
+      stageOrder: 1,
+      stageColor: '#fff',
+      orderCount: 5,
+      totalValue: 250000,
+    });
+    expect(result.data?.totals.orderCount).toBe(7);
+    expect(supabase.rpc).toHaveBeenCalledWith('get_sales_pipeline_summary', expect.objectContaining({
+      p_company_id:  'company-1',
+      p_branch_code: 'KK',
+    }));
+  });
+
+  // -------------------------------------------------------------------------
+  // getSalesDashboardSummary() — calls get_sales_dashboard_summary RPC
+  // -------------------------------------------------------------------------
+  it('calls get_sales_dashboard_summary RPC and maps jsonb to SalesDashboardSummary', async () => {
+    const rawJson = {
+      mtd: { order_count: 12, total_value: 600000 },
+      vehicles_linked: 8,
+      branch_breakdown: [{ branch_code: 'KK', order_count: 10 }],
+      monthly_trend: [{ month_key: '2026-05', order_count: 12 }],
+      outstanding_ar: 150000,
+    };
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: rawJson, error: null } as never);
+
+    const result = await getSalesDashboardSummary('company-1', 'KK');
+
+    expect(result.error).toBeNull();
+    expect(result.data?.mtd.orderCount).toBe(12);
+    expect(result.data?.mtd.totalValue).toBe(600000);
+    expect(result.data?.vehiclesLinked).toBe(8);
+    expect(result.data?.branchBreakdown[0].branchCode).toBe('KK');
+    expect(result.data?.monthlyTrend[0].monthKey).toBe('2026-05');
+    expect(result.data?.outstandingAr).toBe(150000);
+    expect(supabase.rpc).toHaveBeenCalledWith('get_sales_dashboard_summary', {
+      p_company_id:  'company-1',
+      p_branch_code: 'KK',
+    });
   });
 });
