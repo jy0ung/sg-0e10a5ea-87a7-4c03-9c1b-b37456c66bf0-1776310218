@@ -76,41 +76,40 @@ export default function SalesDashboard() {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="w-full space-y-4 animate-fade-in">
       <PageHeader
         title="Sales Overview"
         description="Month-to-date sales performance, branch activity, and sales-to-vehicle linkage at a glance."
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Overview' }]}
       />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
         {[
           { label: 'MTD Orders',  value: mtdOrderCount,                             icon: ShoppingCart, color: 'text-blue-500' },
-          { label: 'MTD Revenue', value: `RM ${(mtdRevenue / 1000).toFixed(0)}k`,   icon: DollarSign,   color: 'text-emerald-500' },
-          { label: 'Outstanding', value: `RM ${(outstandingAr / 1000).toFixed(0)}k`, icon: TrendingUp,  color: 'text-orange-500' },
+          { label: 'MTD Revenue', value: `RM${(mtdRevenue / 1000).toFixed(0)}k`,   icon: DollarSign,   color: 'text-emerald-500' },
+          { label: 'Outstanding', value: `RM${(outstandingAr / 1000).toFixed(0)}k`, icon: TrendingUp,  color: 'text-orange-500' },
+          { label: 'BG Linked', value: `${vehiclesLinked}/${totalOrders}`, icon: TrendingUp, color: 'text-primary' },
         ].map(k => (
           <div key={k.label} className="glass-panel p-4 flex items-center gap-3">
             <div className={`p-2 rounded-lg bg-secondary ${k.color}`}><k.icon className="h-4 w-4" /></div>
             <div>
               <p className="text-xs text-muted-foreground">{k.label}</p>
-              <p className={`text-xl font-bold ${k.color}`}>{k.value}</p>
+              <p className={`whitespace-nowrap text-lg font-bold tracking-normal md:text-xl ${k.color}`}>{k.value}</p>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Monthly Trend */}
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
         <div className="glass-panel p-4">
           <p className="text-xs font-semibold text-muted-foreground mb-3">Monthly Orders — Last 6 Months</p>
-          <div className="flex items-end gap-2 h-28">
+          <div className="flex h-64 items-end gap-3">
             {trend.map(t => (
               <div key={t.label} className="flex flex-col items-center flex-1 gap-1">
                 <span className="text-[10px] text-muted-foreground">{t.count}</span>
                 <div
                   className="w-full rounded-sm bg-primary/70 transition-all"
-                  style={{ height: `${Math.max((t.count / maxTrend) * 80, t.count > 0 ? 6 : 0)}px` }}
+                  style={{ height: `${Math.max((t.count / maxTrend) * 210, t.count > 0 ? 8 : 0)}px` }}
                 />
                 <span className="text-[9px] text-muted-foreground">{t.label}</span>
               </div>
@@ -118,7 +117,6 @@ export default function SalesDashboard() {
           </div>
         </div>
 
-        {/* Branch Leaderboard */}
         <div className="glass-panel p-4">
           <p className="text-xs font-semibold text-muted-foreground mb-3">Orders by Branch (All Time)</p>
           <div className="space-y-2">
@@ -141,11 +139,12 @@ export default function SalesDashboard() {
         </div>
       </div>
 
-      {/* Cross-module stats */}
-      <div className="glass-panel p-4">
-        <p className="text-xs font-semibold text-muted-foreground mb-2">Auto Aging Integration</p>
-        <p className="text-sm">Orders linked to BG entries: <span className="font-bold text-primary">{vehiclesLinked}</span> of <span className="font-bold">{totalOrders}</span> orders</p>
-        <p className="text-xs text-muted-foreground mt-1">Total vehicles in Auto Aging: {vehicleCount.toLocaleString()}</p>
+      <div className="glass-panel flex flex-wrap items-center justify-between gap-3 p-4">
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground">Auto Aging Integration</p>
+          <p className="text-sm">Orders linked to BG entries: <span className="font-bold text-primary">{vehiclesLinked}</span> of <span className="font-bold">{totalOrders}</span> orders</p>
+        </div>
+        <p className="text-xs text-muted-foreground">Total vehicles in Auto Aging: {vehicleCount.toLocaleString()}</p>
       </div>
     </div>
   );

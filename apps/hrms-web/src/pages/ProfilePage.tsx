@@ -8,7 +8,7 @@ export default function ProfilePage() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="mx-auto max-w-[960px] space-y-4 animate-fade-in">
+    <div className="w-full space-y-4 animate-fade-in">
       <PageHeader
         title="Profile"
         description="Your HRMS account identity and access scope."

@@ -59,6 +59,6 @@ export function useHrmsShellConfig() {
     onSignOut: () => void logout(),
     topbarActions: [{ label: 'Open announcements', icon: Bell, to: '/announcements' }],
     searchPlaceholder: 'Search HRMS...',
-    widthMode: 'contained' as const,
+    widthMode: 'full' as const,
   };
 }

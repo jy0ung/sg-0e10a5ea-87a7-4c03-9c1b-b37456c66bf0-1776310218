@@ -62,8 +62,8 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
   };
 
   return (
-    <div className="space-y-4">
-      <Card className="shadow-sm">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <Card className="shrink-0 shadow-sm">
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="text-sm font-semibold">{config.description}</CardTitle>
         </CardHeader>
@@ -92,9 +92,9 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
       </Card>
 
       {generated && (
-        <>
-          <div className="max-h-[70vh] overflow-auto rounded-lg border bg-card shadow-sm">
-            <table className="w-full text-sm">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card shadow-sm">
+          <div className="min-h-0 flex-1 overflow-auto">
+            <table className="min-w-full text-sm">
               <thead className="sticky top-0 z-10 bg-muted/90 text-muted-foreground backdrop-blur">
                 <tr>
                   {config.columns.map(c => (
@@ -108,7 +108,7 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
                 ) : rows.map((row, i) => (
                   <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
                     {config.columns.map(c => (
-                      <td key={c.key} className={`max-w-[18rem] truncate px-3 py-2.5 ${c.numeric ? 'text-right tabular-nums' : ''}`} title={row[c.key] == null ? '' : String(row[c.key])}>
+                      <td key={c.key} className={`whitespace-nowrap px-3 py-2.5 ${c.numeric ? 'text-right tabular-nums' : ''}`} title={row[c.key] == null ? '' : String(row[c.key])}>
                         {row[c.key] == null ? '—' : c.numeric ? Number(row[c.key]).toLocaleString('en-MY', { minimumFractionDigits: 2 }) : String(row[c.key])}
                       </td>
                     ))}
@@ -118,30 +118,29 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
             </table>
           </div>
 
-          {/* Pagination bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t bg-card px-3 py-2 text-xs text-muted-foreground">
             <span>
               {totalCount === 0
                 ? 'No records'
                 : `${page * REPORT_PAGE_SIZE + 1}–${Math.min((page + 1) * REPORT_PAGE_SIZE, totalCount)} of ${totalCount.toLocaleString()} records`}
             </span>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 0 || loading} onClick={() => loadPage(page - 1)}>
+              <Button aria-label="Previous report page" variant="outline" size="icon" className="h-7 w-7" disabled={page === 0 || loading} onClick={() => loadPage(page - 1)}>
                 <ChevronLeft className="h-3 w-3" />
               </Button>
               <span className="px-2">Page {page + 1} of {totalPages}</span>
-              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1 || loading} onClick={() => loadPage(page + 1)}>
+              <Button aria-label="Next report page" variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1 || loading} onClick={() => loadPage(page + 1)}>
                 <ChevronRight className="h-3 w-3" />
               </Button>
             </div>
           </div>
-        {exportCapped && (
-          <div className="flex items-center gap-2 mt-3 px-1">
+          {exportCapped && (
+          <div className="flex shrink-0 items-center gap-2 border-t px-3 py-2">
             <AlertTriangle className="h-3.5 w-3.5 text-warning flex-shrink-0" />
             <p className="text-xs text-warning">Export was capped at {REPORT_EXPORT_CAP.toLocaleString()} rows. Total records: {totalCount.toLocaleString()}.</p>
           </div>
         )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -151,20 +150,20 @@ export default function ReportsCenter() {
   const companyId = useCompanyId();
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-full min-h-0 w-full flex-col animate-fade-in">
       <PageHeader
         title="Business Reports"
         description="Generate and export cross-module operational reports for inventory, sales, purchasing, and transfers."
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Business Reports' }]}
       />
-      <Tabs defaultValue="stock">
-        <TabsList className="h-auto flex-wrap gap-1 rounded-lg border bg-card p-1 shadow-sm">
+      <Tabs defaultValue="stock" className="flex min-h-0 flex-1 flex-col">
+        <TabsList className="h-auto shrink-0 flex-wrap gap-1 rounded-lg border bg-card p-1 shadow-sm">
           {REPORTS.map(r => (
             <TabsTrigger key={r.id} value={r.id}>{r.label}</TabsTrigger>
           ))}
         </TabsList>
         {REPORTS.map(r => (
-          <TabsContent key={r.id} value={r.id} className="mt-4">
+          <TabsContent key={r.id} value={r.id} className="mt-3 min-h-0 flex-1">
             <ReportTab config={r} companyId={companyId} />
           </TabsContent>
         ))}

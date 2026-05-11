@@ -276,7 +276,7 @@ export default function EmployeeDirectory() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1480px] space-y-4 animate-fade-in">
+      <div className="w-full space-y-4 animate-fade-in">
         <PageHeader
           title="Employee Directory"
           description="All staff profiles across the company"
@@ -288,7 +288,7 @@ export default function EmployeeDirectory() {
   }
 
   return (
-    <div className="mx-auto max-w-[1480px] space-y-4 animate-fade-in">
+    <div className="w-full space-y-4 animate-fade-in">
       <PageHeader
         title="Employee Directory"
         description="All staff profiles across the company"

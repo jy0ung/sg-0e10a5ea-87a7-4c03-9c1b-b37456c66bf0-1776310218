@@ -93,7 +93,7 @@ export default function LeaveCalendar() {
   while (cells.length % 7 !== 0) cells.push(null);
 
   return (
-    <div className="mx-auto max-w-[1280px] space-y-4">
+    <div className="w-full space-y-4">
       <PageHeader
         title="Leave Calendar"
         description="Visual overview of approved leave"

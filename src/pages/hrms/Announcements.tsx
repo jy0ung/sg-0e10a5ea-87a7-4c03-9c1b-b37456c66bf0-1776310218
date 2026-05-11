@@ -92,7 +92,7 @@ export default function Announcements() {
   }
 
   return (
-    <div className="mx-auto max-w-[1280px] space-y-4">
+    <div className="w-full space-y-4">
       <PageHeader
         title="Announcements"
         description="Company-wide communications and notices"

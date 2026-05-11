@@ -346,7 +346,7 @@ export default function PerformanceAppraisals() {
   };
 
   return (
-    <div className="mx-auto max-w-[1480px] space-y-4">
+    <div className="w-full space-y-4">
       <PageHeader
         title="Performance Appraisals"
         description="Manage appraisal cycles, self reviews, and manager feedback"

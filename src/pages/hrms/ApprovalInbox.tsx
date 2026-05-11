@@ -162,7 +162,7 @@ export default function ApprovalInbox() {
   }
 
   return (
-    <div className="mx-auto max-w-[1480px] space-y-4">
+    <div className="w-full space-y-4">
       <PageHeader
         title="Approval Inbox"
         description="Review assigned HRMS approvals across leave, payroll, and appraisals from one queue."

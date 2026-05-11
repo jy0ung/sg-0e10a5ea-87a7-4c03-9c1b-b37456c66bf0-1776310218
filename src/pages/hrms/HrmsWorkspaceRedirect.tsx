@@ -28,7 +28,7 @@ export default function HrmsWorkspaceRedirect() {
   }, [destination]);
 
   return (
-    <div className="mx-auto max-w-[960px] space-y-4 animate-fade-in">
+    <div className="w-full space-y-4 animate-fade-in">
       <PageHeader
         title="Opening HRMS Workspace"
         description="FLC HRMS now runs in its dedicated workspace."

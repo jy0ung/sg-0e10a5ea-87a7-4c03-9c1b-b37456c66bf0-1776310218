@@ -222,6 +222,6 @@ export function useMainAppShellConfig() {
     topbarActions: [{ label: 'Open notifications', icon: Bell, to: '/notifications', badge: true }],
     focusedBackLink: isFocused && focusedSection ? { label: 'All modules', to: '/modules', icon: ArrowLeft } : null,
     searchPlaceholder: 'Search workspace...',
-    widthMode: 'contained' as const,
+    widthMode: 'full' as const,
   };
 }

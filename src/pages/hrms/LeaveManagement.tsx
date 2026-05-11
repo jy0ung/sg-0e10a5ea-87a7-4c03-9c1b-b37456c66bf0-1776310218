@@ -187,7 +187,7 @@ export default function LeaveManagement() {
   }
 
   return (
-    <div className="mx-auto max-w-[1480px] space-y-4">
+    <div className="w-full space-y-4">
       <PageHeader
         title="Leave Management"
         description="Apply for leave and manage approvals"

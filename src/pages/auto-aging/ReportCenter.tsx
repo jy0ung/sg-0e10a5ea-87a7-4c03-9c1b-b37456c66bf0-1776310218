@@ -114,14 +114,14 @@ export default function ReportCenter() {
   const selectedReport = REPORT_TYPES.find(r => r.value === reportType)!;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="flex h-full min-h-0 w-full flex-col gap-3 animate-fade-in">
       <PageHeader
         title="Auto Aging Reports"
         description="Generate and export vehicle-aging analytics, SLA compliance, and filtered KPI report sets."
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Aging Reports' }]}
       />
 
-      <div className="glass-panel p-4 space-y-4">
+      <div className="glass-panel shrink-0 p-4 space-y-4">
         <div className="flex flex-wrap items-start gap-3">
           {/* Report Type */}
           <div className="min-w-[240px] flex-1 space-y-1.5">
@@ -205,8 +205,8 @@ export default function ReportCenter() {
 
       {/* Results Table */}
       {rows && rows.length > 0 && (
-        <div className="glass-panel overflow-hidden">
-          <div className="p-3 border-b border-border flex flex-wrap items-center justify-between gap-2">
+        <div className="glass-panel flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="shrink-0 p-3 border-b border-border flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
               {isPaginated
                 ? `${page * REPORT_PAGE_SIZE + 1}–${Math.min((page + 1) * REPORT_PAGE_SIZE, totalCount)} of ${totalCount.toLocaleString()} rows`
@@ -214,18 +214,18 @@ export default function ReportCenter() {
             </p>
             {isPaginated && totalPages > 1 && (
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 0 || generating} onClick={() => void loadPage(page - 1)}>
+                <Button aria-label="Previous report page" variant="outline" size="icon" className="h-7 w-7" disabled={page === 0 || generating} onClick={() => void loadPage(page - 1)}>
                   <ChevronLeft className="h-3 w-3" />
                 </Button>
                 <span className="px-2 text-xs text-muted-foreground">Page {page + 1} of {totalPages}</span>
-                <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1 || generating} onClick={() => void loadPage(page + 1)}>
+                <Button aria-label="Next report page" variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1 || generating} onClick={() => void loadPage(page + 1)}>
                   <ChevronRight className="h-3 w-3" />
                 </Button>
               </div>
             )}
           </div>
-          <div className="max-h-[70vh] overflow-auto">
-          <table className="w-full text-xs">
+          <div className="min-h-0 flex-1 overflow-auto">
+          <table className="min-w-full text-xs">
             <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
               <tr className="border-b border-border bg-secondary/30 text-left">
                 {Object.keys(rows[0]).map(col => (
@@ -237,7 +237,7 @@ export default function ReportCenter() {
               {rows.map((row, i) => (
                 <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary/20">
                   {Object.values(row).map((val, j) => (
-                    <td key={j} className="max-w-[20rem] truncate px-3 py-2 text-foreground whitespace-nowrap" title={String(val ?? '')}>{String(val)}</td>
+                    <td key={j} className="px-3 py-2 text-foreground whitespace-nowrap" title={String(val ?? '')}>{String(val)}</td>
                   ))}
                 </tr>
               ))}

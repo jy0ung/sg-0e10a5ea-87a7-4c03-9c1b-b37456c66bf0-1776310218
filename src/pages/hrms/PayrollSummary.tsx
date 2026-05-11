@@ -175,7 +175,7 @@ export default function PayrollSummary() {
   const viewingRun = runs.find(r => r.id === viewRunId);
 
   return (
-    <div className="mx-auto max-w-[1480px] space-y-4">
+    <div className="w-full space-y-4">
       <PageHeader
         title="Payroll Workspace"
         description="Prepare monthly payroll, monitor approval readiness, and track payout status."

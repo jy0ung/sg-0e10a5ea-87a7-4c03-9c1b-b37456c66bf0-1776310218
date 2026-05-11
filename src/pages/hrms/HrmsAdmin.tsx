@@ -1058,7 +1058,7 @@ export default function HrmsAdmin() {
   }
 
   return (
-    <div className="mx-auto max-w-[1480px] space-y-4">
+    <div className="w-full space-y-4">
       <PageHeader
         title="HRMS Settings"
         description="Configure workforce structure, leave rules, holidays, and rollover operations."

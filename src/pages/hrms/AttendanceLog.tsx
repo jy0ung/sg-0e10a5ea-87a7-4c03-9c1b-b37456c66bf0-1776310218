@@ -111,7 +111,7 @@ export default function AttendanceLog() {
   }
 
   return (
-    <div className="mx-auto max-w-[1480px] space-y-4">
+    <div className="w-full space-y-4">
       <PageHeader
         title="Attendance Log"
         description="Track daily attendance records"
