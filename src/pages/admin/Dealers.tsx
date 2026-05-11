@@ -14,6 +14,7 @@ import { Dealer } from '@/types';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
+import { dealerSchema, validateForm } from '@/lib/forms';
 
 type FormState = {
   name: string; accCode: string; companyRegNo: string;
@@ -48,7 +49,11 @@ export default function Dealers() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) return toast({ title: 'Name is required', variant: 'destructive' });
+    const errors = validateForm(dealerSchema, form);
+    if (errors) {
+      const firstMsg = Object.values(errors)[0] as string;
+      return toast({ title: firstMsg, variant: 'destructive' });
+    }
     setSaving(true);
     const { error } = await upsertDealer(companyId, {
       id: editId ?? undefined,

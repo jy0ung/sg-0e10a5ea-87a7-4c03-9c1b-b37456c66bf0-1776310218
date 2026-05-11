@@ -4,8 +4,7 @@ import { useData } from '@/contexts/DataContext';
 import { getAutoAgingDashboardSummary, getAutoAgingReport, searchVehicles } from '@/services/vehicleService';
 import { useAuth } from '@/contexts/AuthContext';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
-import { AlertTriangle, BarChart3, CalendarCheck, Car, CheckCircle, Loader2, Settings2, ShoppingCart, Sparkles, Timer, TrendingUp, type LucideIcon, UserPlus } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { AlertTriangle, BarChart3, CalendarCheck, Car, CheckCircle, Loader2, Settings2, ShoppingCart, Sparkles, Timer, TrendingUp, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -18,7 +17,6 @@ import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { BranchPeriodFilter } from '@/components/shared/BranchPeriodFilter';
 import { getDashboardPeriodRange, getDashboardScopeSummary, loadDashboardFilterState, matchesDashboardPeriod, saveDashboardFilterState } from '@/lib/dashboardFilters';
 import {
-  CUSTOM_INSIGHT_DEFINITIONS,
   DEFAULT_PERSONAL_DASHBOARD,
   createCustomFormulaWidget,
   createCustomMetricWidget,
@@ -35,7 +33,11 @@ import {
   type PersonalDashboardPreferences,
 } from '@/lib/personalDashboard';
 import { evaluateCustomKpiFormula, type CustomKpiFormula } from '@/lib/customKpiFormula';
-import { CustomKpiCard } from '@/components/CustomKpiCard';
+import { DashboardSnapshotSection } from '@/components/dashboard/DashboardSnapshotSection';
+import { DashboardScorecards } from '@/components/dashboard/DashboardScorecards';
+import { DashboardBranchComparison } from '@/components/dashboard/DashboardBranchComparison';
+import { DashboardCustomInsights } from '@/components/dashboard/DashboardCustomInsights';
+import type { DashboardCardMetric } from '@/components/dashboard/types';
 
 const KpiDashboard = React.lazy(() => import('@/components/KpiDashboard').then((module) => ({ default: module.KpiDashboard })));
 
@@ -48,15 +50,6 @@ function toServerValue(value: string): string | null {
   return value === 'all' ? null : value;
 }
 
-interface DashboardCardMetric {
-  key: string;
-  label: string;
-  value: string | number;
-  helperText?: string;
-  icon: LucideIcon;
-  iconClassName: string;
-  valueClassName: string;
-}
 
 type DashboardCustomWidget = PersonalDashboardCustomMetric | PersonalDashboardCustomFormula;
 
@@ -412,15 +405,6 @@ export default function ExecutiveDashboard() {
     })).sort((a, b) => b.avg - a.avg);
   }, [branchReportResult, filteredVehicles]);
 
-  const chartColors = [
-    'hsl(var(--primary))',
-    'hsl(199, 89%, 48%)',
-    'hsl(142, 71%, 45%)',
-    'hsl(38, 92%, 50%)',
-    'hsl(280, 65%, 60%)',
-    'hsl(350, 80%, 55%)',
-    'hsl(175, 70%, 40%)',
-  ];
   const firstName = user?.name?.split(' ')[0] ?? 'there';
 
   const snapshotCards = useMemo<DashboardCardMetric[]>(() => {
@@ -565,50 +549,9 @@ export default function ExecutiveDashboard() {
   const renderSystemWidget = (widgetId: DashboardSystemWidgetId) => {
     switch (widgetId) {
       case 'snapshot':
-        return (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Operational Snapshot</p>
-              <p className="text-[11px] text-muted-foreground">{scopeLabel}</p>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {snapshotCards.map(card => {
-                const Icon = card.icon;
-                return (
-                  <div key={card.key} className="glass-panel p-4 flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${card.iconClassName}`}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">{card.label}</p>
-                      <p className={`text-xl font-bold ${card.valueClassName}`}>{card.value}</p>
-                      {card.helperText && <p className="text-[10px] text-muted-foreground">{card.helperText}</p>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
+        return <DashboardSnapshotSection cards={snapshotCards} scopeLabel={scopeLabel} />;
 
-      case 'scorecards':
-        return (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {scorecards.map(card => {
-              const Icon = card.icon;
-              return (
-                <div key={card.key} className="kpi-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon className={`h-4 w-4 ${card.iconClassName}`} />
-                    <span className="text-xs text-muted-foreground font-medium">{card.label}</span>
-                  </div>
-                  <p className={`text-2xl font-bold ${card.valueClassName}`}>{card.value}</p>
-                  {card.helperText && <p className="text-[11px] text-muted-foreground mt-1">{card.helperText}</p>}
-                </div>
-              );
-            })}
-          </div>
-        );
+        return <DashboardScorecards cards={scorecards} />;
 
       case 'kpi-analytics':
         return (
@@ -644,36 +587,7 @@ export default function ExecutiveDashboard() {
         );
 
       case 'branch-comparison':
-        return (
-          <div className="glass-panel p-6">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div>
-                <h3 className="font-semibold text-foreground">Branch Comparison</h3>
-                <p className="text-sm text-muted-foreground">Average BG to Delivery cycle time by branch in the current scope.</p>
-              </div>
-              <p className="text-[11px] text-muted-foreground">{branchData.length} branches compared</p>
-            </div>
-            {branchData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={branchData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="branch" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} />
-                  <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px', fontSize: '12px', color: 'hsl(var(--foreground))' }} />
-                  <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
-                    {branchData.map((_, index) => (
-                      <Cell key={index} fill={chartColors[Math.min(index, chartColors.length - 1)]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="rounded-xl border border-dashed border-border/70 px-4 py-6 text-sm text-muted-foreground">
-                No BG to Delivery branch comparison is available for the current filters.
-              </div>
-            )}
-          </div>
-        );
+        return <DashboardBranchComparison data={branchData} />;
 
       default:
         return null;
@@ -681,55 +595,13 @@ export default function ExecutiveDashboard() {
   };
 
   const renderCustomInsightGroup = (widgets: DashboardCustomWidget[]) => (
-    <div className="glass-panel p-5">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-4">
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Custom Insights</p>
-          <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mt-1">
-            <Sparkles className="h-4 w-4 text-primary" />
-            Personal KPI Builder
-          </h3>
-          <p className="text-sm text-muted-foreground">Track the signals that matter to you in the same scope as the rest of the dashboard.</p>
-        </div>
-        <p className="text-[11px] text-muted-foreground">{scopeLabel}</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {widgets.map(widget => {
-          if (widget.type === 'custom-formula') {
-            const evaluation = customFormulaResults.get(widget.id);
-            if (!evaluation) return null;
-            return (
-              <CustomKpiCard
-                key={widget.id}
-                title={widget.title}
-                formula={widget.formula}
-                evaluation={evaluation}
-                onRemove={() => removeCustomInsight(widget.id)}
-              />
-            );
-          }
-
-          const definition = CUSTOM_INSIGHT_DEFINITIONS.find(item => item.id === widget.metricId);
-          const result = customMetricResults.get(widget.id);
-
-          return (
-            <div key={widget.id} className="rounded-2xl border border-border/60 bg-card/95 p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest ${definition?.accentClassName ?? 'bg-primary/10 text-primary'}`}>
-                  {definition?.label ?? 'Custom Insight'}
-                </span>
-              </div>
-              <div className="space-y-1">
-                <p className="text-base font-semibold text-foreground">{widget.title}</p>
-                <p className="text-3xl font-bold text-foreground">{result?.value ?? '—'}</p>
-                <p className="text-sm font-medium text-foreground/80">{result?.detail ?? definition?.emptyLabel ?? 'No data'}</p>
-                <p className="text-xs text-muted-foreground">{result?.helperText ?? definition?.description}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <DashboardCustomInsights
+      widgets={widgets}
+      scopeLabel={scopeLabel}
+      customMetricResults={customMetricResults}
+      customFormulaResults={customFormulaResults}
+      onRemove={removeCustomInsight}
+    />
   );
 
   if (loading) {

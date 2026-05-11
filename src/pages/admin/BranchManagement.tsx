@@ -11,6 +11,7 @@ import { BranchRecord } from '@/types';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
+import { branchSchema, validateForm } from '@/lib/forms';
 
 type FormState = { code: string; name: string; orSeries: string; vdoSeries: string };
 const empty: FormState = { code: '', name: '', orSeries: '', vdoSeries: '' };
@@ -42,7 +43,11 @@ export default function BranchManagement() {
   };
 
   const handleSave = async () => {
-    if (!form.code.trim() || !form.name.trim()) return toast({ title: 'Code and Name are required', variant: 'destructive' });
+    const errors = validateForm(branchSchema, form);
+    if (errors) {
+      const firstMsg = Object.values(errors)[0] as string;
+      return toast({ title: firstMsg, variant: 'destructive' });
+    }
     setSaving(true);
     const { error } = await upsertBranch(companyId, {
       id: editId ?? undefined,
