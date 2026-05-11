@@ -1,5 +1,3 @@
-WARN: environment variable is unset: AUTH_SMTP_PASS
-Connecting to db 5432
 export type Json =
   | string
   | number
