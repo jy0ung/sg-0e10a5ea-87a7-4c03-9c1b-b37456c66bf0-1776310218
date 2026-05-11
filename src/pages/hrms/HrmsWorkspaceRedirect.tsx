@@ -32,7 +32,7 @@ export default function HrmsWorkspaceRedirect() {
       <PageHeader
         title="Opening HRMS Workspace"
         description="FLC HRMS now runs in its dedicated workspace."
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'HRMS' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'HRMS' }]}
       />
 
       <div className="glass-panel p-6 max-w-2xl">

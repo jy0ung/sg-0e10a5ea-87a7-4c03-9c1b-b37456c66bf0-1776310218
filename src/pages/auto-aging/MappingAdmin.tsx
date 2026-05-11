@@ -210,7 +210,7 @@ export default function MappingAdmin() {
       <PageHeader
         title="Mapping Administration"
         description="Manage data normalisation rules used during imports"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Mappings' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Mappings' }]}
       />
 
       {loading ? (

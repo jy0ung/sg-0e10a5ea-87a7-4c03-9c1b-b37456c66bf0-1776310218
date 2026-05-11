@@ -12,7 +12,10 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { createSalesOrder, linkExistingVehicle, unlinkExistingVehicle } from '@/services/salesOrderService';
 import { searchVehicles } from '@/services/vehicleService';
 import { SalesOrder, SalesOrderStatus, VehicleCanonical } from '@/types';
-import { Loader2, Plus, Search, Link2 } from 'lucide-react';
+import { Loader2, Plus, Search, Link2, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { MobileCardList } from '@/components/shared/MobileCardList';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { salesOrderSchema } from '@/lib/validations';
 
@@ -30,8 +33,9 @@ const STATUSES: SalesOrderStatus[] = ['enquiry','quoted','confirmed','booked','d
 export default function SalesOrders() {
   const { user } = useAuth();
   const companyId = useCompanyId();
-  const { salesOrders, customers, reloadSales, loading } = useSales();
+  const { salesOrders, customers, invoices, reloadSales, loading } = useSales();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [addOpen, setAddOpen] = useState(false);
@@ -41,12 +45,15 @@ export default function SalesOrders() {
   const [vehicleResults, setVehicleResults] = useState<VehicleCanonical[]>([]);
   const [vehicleSearchLoading, setVehicleSearchLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [unlinkTarget, setUnlinkTarget] = useState<SalesOrder | null>(null);
   const [form, setForm] = useState({ orderNo: '', customerId: '', branchCode: '', salesmanName: '', model: '', variant: '', colour: '', bookingDate: new Date().toISOString().split('T')[0], bookingAmount: '', totalPrice: '', status: 'enquiry' as SalesOrderStatus, vsoNo: '', depositAmount: '', bankLoanAmount: '', financeCompany: '', insuranceCompany: '', plateNo: '' });
 
   const filtered = salesOrders.filter(o =>
     (statusFilter === 'all' || o.status === statusFilter) &&
     [o.orderNo, o.customerName, o.model, o.branchCode, o.salesmanName].join(' ').toLowerCase().includes(search.toLowerCase())
   );
+
+  const invoicedOrderIds = new Set(invoices.map(inv => inv.salesOrderId).filter(Boolean));
 
   const handleCreate = async () => {
     const result = salesOrderSchema.safeParse({
@@ -143,6 +150,7 @@ export default function SalesOrders() {
     setCreating(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await reloadSales();
+    setUnlinkTarget(null);
     toast({ title: 'Vehicle unlinked', description: order.chassisNo ? `Chassis: ${order.chassisNo}` : undefined });
   };
 
@@ -151,7 +159,7 @@ export default function SalesOrders() {
       <PageHeader
         title="Sales Orders"
         description="Track orders from enquiry to delivery"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Orders' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Orders' }]}
         actions={<Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" />New Order</Button>}
       />
 
@@ -174,7 +182,7 @@ export default function SalesOrders() {
           <span className="text-xs text-muted-foreground ml-auto">{filtered.length} orders</span>
         </div>
 
-        <div className="overflow-auto">
+        <div className="overflow-auto hidden sm:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -201,19 +209,31 @@ export default function SalesOrders() {
                   <td className="py-2 pr-4"><span className={`px-1.5 py-0.5 rounded text-[11px] font-medium capitalize ${STATUS_COLORS[o.status]}`}>{o.status}</span></td>
                   <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{o.chassisNo ?? '—'}</td>
                   <td className="py-2 text-right">
-                    {!o.vehicleId && (o.status === 'confirmed' || o.status === 'booked') && (
-                      <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => openLinkDialog(o)}>
-                        <Link2 className="h-3 w-3 mr-1" />Link Vehicle
-                      </Button>
-                    )}
-                    {o.vehicleId && (
-                      <div className="flex justify-end items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-600">Vehicle Linked</Badge>
-                        <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => handleUnlinkVehicle(o)} disabled={creating}>
-                          Unlink
+                    <div className="flex items-center justify-end gap-1">
+                      {!invoicedOrderIds.has(o.id) && (o.status === 'delivered' || o.status === 'booked') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          onClick={() => navigate('/sales/invoices', { state: { prefillOrderId: o.id } })}
+                        >
+                          <FileText className="h-3 w-3 mr-1" />Create Invoice
                         </Button>
-                      </div>
-                    )}
+                      )}
+                      {!o.vehicleId && (o.status === 'confirmed' || o.status === 'booked') && (
+                        <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => openLinkDialog(o)}>
+                          <Link2 className="h-3 w-3 mr-1" />Link Vehicle
+                        </Button>
+                      )}
+                      {o.vehicleId && (
+                        <div className="flex justify-end items-center gap-2">
+                          <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-600">Vehicle Linked</Badge>
+                          <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => setUnlinkTarget(o)} disabled={creating}>
+                            Unlink
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -221,6 +241,46 @@ export default function SalesOrders() {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile card list */}
+        <MobileCardList
+          data={filtered}
+          emptyMessage="No orders found"
+          renderCard={o => (
+            <div key={o.id} className="glass-panel p-3 space-y-1.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-semibold">{o.orderNo}</span>
+                <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium capitalize ${STATUS_COLORS[o.status]}`}>{o.status}</span>
+              </div>
+              <div className="text-foreground font-medium">{o.customerName ?? '—'}</div>
+              <div className="text-xs text-muted-foreground">{o.model}{o.variant ? ` / ${o.variant}` : ''} · {o.branchCode}</div>
+              {o.chassisNo && <div className="text-xs text-muted-foreground font-mono">Chassis: {o.chassisNo}</div>}
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {!invoicedOrderIds.has(o.id) && (o.status === 'delivered' || o.status === 'booked') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                    onClick={() => navigate('/sales/invoices', { state: { prefillOrderId: o.id } })}
+                  >
+                    <FileText className="h-3.5 w-3.5 mr-1" />Create Invoice
+                  </Button>
+                )}
+                {!o.vehicleId && (o.status === 'confirmed' || o.status === 'booked') && (
+                  <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => openLinkDialog(o)}>
+                    <Link2 className="h-3.5 w-3.5 mr-1" />Link Vehicle
+                  </Button>
+                )}
+                {o.vehicleId && (
+                  <>
+                    <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-600">Vehicle Linked</Badge>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs px-2" onClick={() => setUnlinkTarget(o)} disabled={creating}>Unlink</Button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        />
       </div>
       )}
 
@@ -317,6 +377,18 @@ export default function SalesOrders() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Unlink vehicle confirmation */}
+      <ConfirmDialog
+        open={!!unlinkTarget}
+        onOpenChange={open => { if (!open) setUnlinkTarget(null); }}
+        title="Unlink vehicle?"
+        description={`This will remove the vehicle link${unlinkTarget?.chassisNo ? ` (Chassis: ${unlinkTarget.chassisNo})` : ''} from order ${unlinkTarget?.orderNo ?? ''}. The vehicle record is preserved.`}
+        confirmLabel="Unlink"
+        confirmVariant="destructive"
+        loading={creating}
+        onConfirm={() => unlinkTarget && handleUnlinkVehicle(unlinkTarget)}
+      />
     </div>
   );
 }

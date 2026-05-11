@@ -580,7 +580,7 @@ export default function UserManagement() {
   if (loading) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <PageHeader title="Users & Roles" description="Manage platform users, roles, and account access" breadcrumbs={[{ label: 'FLC BI' }, { label: 'Admin' }, { label: 'Users & Roles' }]} />
+        <PageHeader title="Users & Roles" description="Manage platform users, roles, and account access" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Users & Roles' }]} />
         <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading users...</div>
       </div>
     );
@@ -591,7 +591,7 @@ export default function UserManagement() {
       <PageHeader
         title="Users & Roles"
         description="Manage account status, roles, employee links, and application access"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Admin' }, { label: 'Users & Roles' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Users & Roles' }]}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={handleCopySignupLink}>

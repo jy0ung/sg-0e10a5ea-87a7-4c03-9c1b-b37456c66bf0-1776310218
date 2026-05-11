@@ -72,7 +72,7 @@ export default function SalesmanPerformancePage() {
       <PageHeader
         title="Salesman Performance"
         description="Actual orders vs targets by salesman"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Performance' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Performance' }]}
         actions={<Button size="sm" onClick={() => { setEditTarget(null); setForm({ salesmanId:'',salesmanName:'',branchCode:'',targetUnits:'',targetRevenue:'' }); setTargetOpen(true); }}><Plus className="h-4 w-4 mr-1" />Set Target</Button>}
       />
 

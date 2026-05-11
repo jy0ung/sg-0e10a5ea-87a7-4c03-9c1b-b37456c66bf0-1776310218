@@ -3,7 +3,7 @@
 import { toast as sonnerToast } from 'sonner';
 import type { ReactNode } from 'react';
 
-type ToastVariant = 'default' | 'destructive' | 'success';
+type ToastVariant = 'default' | 'destructive' | 'success' | 'warning';
 
 interface ToastArgs {
   title?: ReactNode;
@@ -23,6 +23,7 @@ function renderToast(args: ToastArgs): string | number {
   };
   if (args.variant === 'destructive') return sonnerToast.error(title as string, opts);
   if (args.variant === 'success') return sonnerToast.success(title as string, opts);
+  if (args.variant === 'warning') return sonnerToast.warning(title as string, opts);
   return sonnerToast(title as string, opts);
 }
 

@@ -120,7 +120,7 @@ export default function CommissionDashboard() {
       <PageHeader
         title="Commission Dashboard"
         description="Manage commission rules and track incentive payouts per salesman"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Commissions' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Commissions' }]}
       />
 
       {/* Summary cards */}

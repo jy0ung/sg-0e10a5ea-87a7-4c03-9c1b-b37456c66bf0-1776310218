@@ -119,7 +119,7 @@ export default function SalesAdvisors() {
         <PageHeader
           title="Sales Advisors"
           description="Sales advisor profiles and branch assignments"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Sales Advisors' }]}
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Sales Advisors' }]}
         />
         <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading advisors…</div>
       </div>
@@ -131,7 +131,7 @@ export default function SalesAdvisors() {
       <PageHeader
         title="Sales Advisors"
         description="Sales advisor profiles and branch assignments"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Sales Advisors' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Sales Advisors' }]}
         actions={
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />New SA

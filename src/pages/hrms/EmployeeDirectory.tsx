@@ -280,7 +280,7 @@ export default function EmployeeDirectory() {
         <PageHeader
           title="Employee Directory"
           description="All staff profiles across the company"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'HRMS' }, { label: 'Employee Directory' }]}
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'HRMS' }, { label: 'Employee Directory' }]}
         />
         <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading employees…</div>
       </div>
@@ -292,7 +292,7 @@ export default function EmployeeDirectory() {
       <PageHeader
         title="Employee Directory"
         description="All staff profiles across the company"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'HRMS' }, { label: 'Employee Directory' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'HRMS' }, { label: 'Employee Directory' }]}
         actions={
           canManage ? (
             <Button size="sm" onClick={() => setAddOpen(true)}>

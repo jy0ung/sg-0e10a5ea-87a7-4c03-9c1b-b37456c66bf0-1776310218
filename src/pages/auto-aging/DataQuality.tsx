@@ -44,7 +44,7 @@ export default function DataQuality() {
       <PageHeader
         title="Data Quality"
         description={`${qualityIssues.length} issues detected across all imports`}
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Data Quality' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Data Quality' }]}
       />
 
       {/* Summary tiles — auto-fit so they never leave blank columns */}

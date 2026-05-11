@@ -17,7 +17,7 @@ export default function ImportReviewQueue() {
       <PageHeader
         title="Review Queue"
         description="Review rows held back from Auto Aging imports before they are published into vehicles"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Review Queue' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Review Queue' }]}
       />
 
       {queuedBatches.length === 0 ? (

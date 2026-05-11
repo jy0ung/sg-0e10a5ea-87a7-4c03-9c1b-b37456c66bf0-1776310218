@@ -86,7 +86,7 @@ export default function StockBalance() {
       <PageHeader
         title="Stock Balance"
         description="Live vehicle inventory by chassis number and location"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Inventory' }, { label: 'Stock Balance' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Stock Balance' }]}
       />
 
       {/* Summary cards (current page breakdown) */}

@@ -118,7 +118,7 @@ export default function ReportCenter() {
       <PageHeader
         title="Auto Aging Reports"
         description="Generate and export vehicle-aging analytics, SLA compliance, and filtered KPI report sets."
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Aging Reports' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Aging Reports' }]}
       />
 
       <div className="glass-panel p-5 space-y-5">

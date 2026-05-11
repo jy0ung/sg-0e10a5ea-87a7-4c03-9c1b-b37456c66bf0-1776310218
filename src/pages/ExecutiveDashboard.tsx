@@ -4,7 +4,7 @@ import { useData } from '@/contexts/DataContext';
 import { getAutoAgingDashboardSummary, getAutoAgingReport, searchVehicles } from '@/services/vehicleService';
 import { useAuth } from '@/contexts/AuthContext';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
-import { AlertTriangle, BarChart3, CalendarCheck, Car, CheckCircle, Loader2, Settings2, ShoppingCart, Sparkles, Timer, TrendingUp, UserPlus } from 'lucide-react';
+import { AlertTriangle, BarChart3, CalendarCheck, Car, CheckCircle, Settings2, ShoppingCart, Sparkles, Timer, TrendingUp, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -37,6 +37,7 @@ import { DashboardSnapshotSection } from '@/components/dashboard/DashboardSnapsh
 import { DashboardScorecards } from '@/components/dashboard/DashboardScorecards';
 import { DashboardBranchComparison } from '@/components/dashboard/DashboardBranchComparison';
 import { DashboardCustomInsights } from '@/components/dashboard/DashboardCustomInsights';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { DashboardCardMetric } from '@/components/dashboard/types';
 
 const KpiDashboard = React.lazy(() => import('@/components/KpiDashboard').then((module) => ({ default: module.KpiDashboard })));
@@ -606,8 +607,22 @@ export default function ExecutiveDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-80" />
+          </div>
+          <Skeleton className="h-9 w-40" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-[280px] rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Skeleton className="h-[240px] rounded-xl" />
+          <Skeleton className="h-[240px] rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -617,7 +632,7 @@ export default function ExecutiveDashboard() {
       <PageHeader
         title="My Dashboard"
         description={`Welcome back, ${firstName}. Personalize the company view around the KPIs, widgets, and insights you actually use.`}
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'My Dashboard' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'My Dashboard' }]}
         actions={
           <div className="flex items-center gap-3">
             <BranchPeriodFilter

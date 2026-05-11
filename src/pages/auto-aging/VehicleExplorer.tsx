@@ -311,7 +311,7 @@ export default function VehicleExplorer() {
         <PageHeader
           title="Vehicle Explorer"
           description="Vehicle inventory and milestone details"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Vehicle Explorer' }]}
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Vehicle Explorer' }]}
         />
         <div className="glass-panel p-12 text-center">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" aria-hidden />
@@ -333,7 +333,7 @@ export default function VehicleExplorer() {
       <PageHeader
         title="Vehicle Explorer"
         description={`${filteredCount} of ${totalVehicleCount} vehicles`}
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Vehicle Explorer' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Vehicle Explorer' }]}
         actions={
           <div className="flex items-center gap-2">
             {userPermissions?.canEdit && (

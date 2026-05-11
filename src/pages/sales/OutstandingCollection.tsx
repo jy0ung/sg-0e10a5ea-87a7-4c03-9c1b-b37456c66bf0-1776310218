@@ -71,7 +71,7 @@ export default function OutstandingCollection() {
       <PageHeader
         title="Outstanding Collection"
         description="Unpaid and partially paid invoices by aging bucket"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Outstanding Collection' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Outstanding Collection' }]}
       />
 
       {/* KPI cards */}

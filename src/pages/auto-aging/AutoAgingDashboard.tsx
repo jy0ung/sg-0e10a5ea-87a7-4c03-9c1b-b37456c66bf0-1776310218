@@ -7,9 +7,10 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Download, Upload, X, Loader2, AlertCircle } from 'lucide-react';
+import { RefreshCw, Download, Upload, X, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { BranchPeriodFilter } from '@/components/shared/BranchPeriodFilter';
 import { getAutoAgingDashboardSummary, searchVehicles } from '@/services/vehicleService';
@@ -184,8 +185,18 @@ export default function AutoAgingDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-52" />
+            <Skeleton className="h-4 w-72" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-[260px] rounded-xl" />
+        <Skeleton className="h-[260px] rounded-xl" />
       </div>
     );
   }
@@ -196,7 +207,7 @@ export default function AutoAgingDashboard() {
         <PageHeader
           title="Auto Aging Overview"
           description="Vehicle aging analysis across operational milestones"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Overview' }]}
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Overview' }]}
         />
         <div className="glass-panel p-12 text-center">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
@@ -218,7 +229,7 @@ export default function AutoAgingDashboard() {
         <PageHeader
           title="Auto Aging Overview"
           description="Vehicle aging analysis across operational milestones"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Overview' }]}
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Overview' }]}
         />
         <div className="glass-panel p-12 text-center">
           <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -238,7 +249,7 @@ export default function AutoAgingDashboard() {
         <PageHeader
           title="Auto Aging Overview"
           description="Vehicle aging analysis across operational milestones"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Overview' }]}
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Overview' }]}
           actions={
             <BranchPeriodFilter
               branches={branches}
@@ -274,7 +285,7 @@ export default function AutoAgingDashboard() {
       <PageHeader
         title="Auto Aging Overview"
         description="Vehicle aging analysis across operational milestones"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Overview' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Overview' }]}
         actions={
           <div className="flex items-center gap-2">
             <BranchPeriodFilter

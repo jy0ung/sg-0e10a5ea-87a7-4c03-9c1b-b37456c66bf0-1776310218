@@ -125,7 +125,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Settings" description="Manage your profile and preferences" breadcrumbs={[{ label: 'FLC BI' }, { label: 'Settings' }]} />
+      <PageHeader title="Settings" description="Manage your profile and preferences" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Settings' }]} />
 
       <div className="grid md:grid-cols-2 gap-6">
         <div className="glass-panel p-6 space-y-5">

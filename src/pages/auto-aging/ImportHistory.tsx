@@ -22,7 +22,7 @@ export default function ImportHistory() {
       <PageHeader
         title="Import History"
         description="Track all data import operations"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Import History' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Import History' }]}
       />
 
       {importBatches.length === 0 ? (

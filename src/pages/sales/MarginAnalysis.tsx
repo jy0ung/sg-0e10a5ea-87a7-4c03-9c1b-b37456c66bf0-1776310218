@@ -95,7 +95,7 @@ export default function MarginAnalysis() {
       <PageHeader
         title="Margin Analysis"
         description={hasRealData ? `Profit margin by vehicle model — ${totalRealUnits} of ${totalUnits} units with actual cost data` : 'Profit margin by vehicle model (estimated — link purchase invoices for actuals)'}
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Margin Analysis' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Margin Analysis' }]}
       />
 
       {/* KPI cards */}

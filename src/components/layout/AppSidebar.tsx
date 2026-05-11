@@ -224,9 +224,11 @@ interface AppSidebarProps {
   setCollapsed: (v: boolean) => void;
   isFocused?: boolean;
   onNavigate?: () => void;
+  /** When false (tablet mode), the collapse toggle is hidden */
+  showCollapseToggle?: boolean;
 }
 
-export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: AppSidebarProps) {
+export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate, showCollapseToggle = true }: AppSidebarProps) {
   const { user, logout, hasRole } = useAuth();
   const { isModuleActive } = useModuleAccess();
   const location = useLocation();
@@ -479,7 +481,8 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
             </div>
           )}
 
-          {/* Collapse toggle */}
+          {/* Collapse toggle — hidden on tablet (icon-rail auto-collapsed) */}
+          {showCollapseToggle && (
           <div className="border-t border-sidebar-border/50 p-2">
             <button
               onClick={() => setCollapsed(!collapsed)}
@@ -498,6 +501,7 @@ export function AppSidebar({ collapsed, setCollapsed, isFocused, onNavigate }: A
               )}
             </button>
           </div>
+          )}
         </div>
       </aside>
     </TooltipProvider>

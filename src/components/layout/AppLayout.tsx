@@ -4,7 +4,7 @@ import { Bell, Menu } from 'lucide-react';
 import { Link, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFocusedMode } from '@/hooks/useFocusedMode';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile, useIsTablet } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
@@ -15,19 +15,24 @@ export default function AppLayout() {
   const { user } = useAuth();
   const { isFocused } = useFocusedMode();
   const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
+
+  // Tablet auto-collapses sidebar to icon-rail; user cannot override
+  const effectiveCollapsed = isTablet ? true : collapsed;
 
   const sidebar = (
     <AppSidebar
-      collapsed={isMobile ? false : collapsed}
-      setCollapsed={setCollapsed}
+      collapsed={isMobile ? false : effectiveCollapsed}
+      setCollapsed={isTablet ? () => {} : setCollapsed}
       isFocused={isFocused}
       onNavigate={isMobile ? () => setMobileOpen(false) : undefined}
+      showCollapseToggle={!isTablet}
     />
   );
 
   return (
     <div className="h-screen flex w-full bg-background overflow-hidden">
-      {/* Desktop sidebar */}
+      {/* Desktop / tablet sidebar */}
       {!isMobile && sidebar}
 
       {/* Mobile sidebar sheet */}

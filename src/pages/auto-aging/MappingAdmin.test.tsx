@@ -2,6 +2,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import MappingAdmin from './MappingAdmin';
 import type { BranchMapping, PaymentMethodMapping } from '@/types';
 
@@ -138,7 +139,7 @@ describe('MappingAdmin', () => {
 
   it('creates a new branch mapping and reloads the table', async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={qc}><MappingAdmin /></QueryClientProvider>);
+    render(<MemoryRouter><QueryClientProvider client={qc}><MappingAdmin /></QueryClientProvider></MemoryRouter>);
 
     await screen.findByText('RAW-KK');
 
@@ -168,7 +169,7 @@ describe('MappingAdmin', () => {
 
   it('updates a payment mapping and persists the edited values', async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={qc}><MappingAdmin /></QueryClientProvider>);
+    render(<MemoryRouter><QueryClientProvider client={qc}><MappingAdmin /></QueryClientProvider></MemoryRouter>);
 
     await screen.findByText('CASH');
 
@@ -203,7 +204,7 @@ describe('MappingAdmin', () => {
 
   it('deletes a branch mapping and refreshes the list', async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={qc}><MappingAdmin /></QueryClientProvider>);
+    render(<MemoryRouter><QueryClientProvider client={qc}><MappingAdmin /></QueryClientProvider></MemoryRouter>);
 
     await screen.findByText('RAW-KK');
 

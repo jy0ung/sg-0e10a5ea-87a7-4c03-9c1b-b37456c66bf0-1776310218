@@ -80,7 +80,7 @@ export default function ImportReviewDetail() {
         description={batch
           ? `${batch.reviewRows ?? rows.length} queued row${(batch.reviewRows ?? rows.length) !== 1 ? 's' : ''} waiting for review`
           : 'Inspect queued import rows and their validation issues'}
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Review Queue' }, { label: batch?.fileName ?? 'Batch' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Review Queue' }, { label: batch?.fileName ?? 'Batch' }]}
         actions={
           <Button variant="outline" size="sm" onClick={() => navigate('/auto-aging/review')}>
             <ArrowLeft className="h-3.5 w-3.5 mr-1" />Back to Queue

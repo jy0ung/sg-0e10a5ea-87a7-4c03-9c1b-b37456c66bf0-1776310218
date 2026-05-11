@@ -181,7 +181,7 @@ export default function ModuleDirectory() {
       <PageHeader
         title="Module Directory"
         description="All operational areas, tools, and workspaces available in this platform."
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Module Directory' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Module Directory' }]}
       />
 
       {/* Quick access */}

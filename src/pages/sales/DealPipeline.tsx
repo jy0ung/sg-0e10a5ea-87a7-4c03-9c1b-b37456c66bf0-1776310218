@@ -44,7 +44,7 @@ export default function DealPipeline() {
       <PageHeader
         title="Deal Pipeline"
         description="Drag-and-drop kanban tracking of deals by stage"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Pipeline' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Pipeline' }]}
       />
 
       <div className="flex gap-3 overflow-x-auto pb-4">

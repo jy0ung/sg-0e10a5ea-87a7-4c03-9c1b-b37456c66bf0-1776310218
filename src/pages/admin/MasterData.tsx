@@ -467,7 +467,7 @@ export default function MasterData() {
       <PageHeader
         title="Master Data"
         description="Manage Finance Companies, Insurance Companies, Vehicle Models and Colours"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Admin' }, { label: 'Master Data' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Master Data' }]}
       />
 
       <Tabs defaultValue="finance">

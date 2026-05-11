@@ -155,7 +155,7 @@ export default function ReportsCenter() {
       <PageHeader
         title="Business Reports"
         description="Generate and export cross-module operational reports for inventory, sales, purchasing, and transfers."
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Business Reports' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Business Reports' }]}
       />
       <Tabs defaultValue="stock">
         <TabsList className="flex-wrap h-auto gap-1">

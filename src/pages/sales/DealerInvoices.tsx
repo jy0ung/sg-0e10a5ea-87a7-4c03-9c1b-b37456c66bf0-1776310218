@@ -114,7 +114,7 @@ export default function DealerInvoices() {
   if (isError) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <PageHeader title="Dealer Invoices" description="Manage dealer invoice records" breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Dealer Invoices' }]} />
+        <PageHeader title="Dealer Invoices" description="Manage dealer invoice records" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Dealer Invoices' }]} />
         <PageErrorState title="Unable to load dealer invoices" error={error} onRetry={() => void refetch()} />
       </div>
     );

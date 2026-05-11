@@ -120,7 +120,7 @@ export default function PurchaseInvoices() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Purchase Invoices" description="CBU vehicle procurement invoices from suppliers"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Purchasing' }, { label: 'Purchase Invoices' }]} />
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing', path: '/purchasing/invoices' }, { label: 'Purchase Invoices' }]} />
         <TableSkeleton rows={8} cols={6} colWidths={['w-24','w-32','w-28','w-24','w-20','w-16']} />
       </div>
     );
@@ -130,7 +130,7 @@ export default function PurchaseInvoices() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Purchase Invoices" description="CBU vehicle procurement invoices from suppliers"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Purchasing' }, { label: 'Purchase Invoices' }]} />
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing', path: '/purchasing/invoices' }, { label: 'Purchase Invoices' }]} />
         <PageErrorState title="Unable to load purchase invoices" error={error} onRetry={() => void refetch()} />
       </div>
     );
@@ -141,7 +141,7 @@ export default function PurchaseInvoices() {
       <PageHeader
         title="Purchase Invoices"
         description="CBU vehicle procurement invoices from suppliers"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Purchasing' }, { label: 'Purchase Invoices' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing', path: '/purchasing/invoices' }, { label: 'Purchase Invoices' }]}
         actions={
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />New Invoice

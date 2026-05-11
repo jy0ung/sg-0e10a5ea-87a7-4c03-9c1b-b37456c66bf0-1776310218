@@ -1,6 +1,7 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import SLAAdmin from './SLAAdmin';
 
 const mockUpdateSla = vi.fn();
@@ -35,7 +36,7 @@ describe('SLAAdmin', () => {
   });
 
   it('enables save for edited rows and persists the changed SLA value', () => {
-    render(<SLAAdmin />);
+    render(<MemoryRouter><SLAAdmin /></MemoryRouter>);
 
     const deliveryRow = screen.getByText('BG -> Delivery').closest('tr');
     const disbursementRow = screen.getByText('BG -> Disbursement').closest('tr');

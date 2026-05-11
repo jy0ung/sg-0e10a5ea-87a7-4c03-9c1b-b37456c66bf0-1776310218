@@ -68,7 +68,7 @@ export default function Customers() {
       <PageHeader
         title="Customers"
         description="Manage customer records"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Customers' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Customers' }]}
         actions={<Button size="sm" onClick={openAdd}><Plus className="h-4 w-4 mr-1" />Add Customer</Button>}
       />
 

@@ -97,7 +97,7 @@ export default function ChassisMovement() {
       <PageHeader
         title="Chassis Movement Log"
         description="Full audit trail for any vehicle chassis number"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Inventory' }, { label: 'Chassis Movement' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Chassis Movement' }]}
       />
 
       {/* Search bar */}

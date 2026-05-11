@@ -80,7 +80,7 @@ export default function SalesDashboard() {
       <PageHeader
         title="Sales Overview"
         description="Month-to-date sales performance, branch activity, and sales-to-vehicle linkage at a glance."
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Overview' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Overview' }]}
       />
 
       {/* KPI Cards */}

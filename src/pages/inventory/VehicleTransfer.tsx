@@ -114,7 +114,7 @@ export default function VehicleTransfer() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Vehicle Transfer" description="Inter-branch chassis movement tracking"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Inventory' }, { label: 'Vehicle Transfer' }]} />
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Vehicle Transfer' }]} />
         <TableSkeleton rows={8} cols={7} colWidths={['w-20','w-20','w-20','w-28','w-20','w-24','w-16']} />
       </div>
     );
@@ -124,7 +124,7 @@ export default function VehicleTransfer() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Vehicle Transfer" description="Inter-branch chassis movement tracking"
-          breadcrumbs={[{ label: 'FLC BI' }, { label: 'Inventory' }, { label: 'Vehicle Transfer' }]} />
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Vehicle Transfer' }]} />
         <PageErrorState title="Unable to load vehicle transfers" error={error} onRetry={() => void refetch()} />
       </div>
     );
@@ -135,7 +135,7 @@ export default function VehicleTransfer() {
       <PageHeader
         title="Vehicle Transfer"
         description="Inter-branch chassis movement tracking"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Inventory' }, { label: 'Vehicle Transfer' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Vehicle Transfer' }]}
         actions={
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />New Transfer

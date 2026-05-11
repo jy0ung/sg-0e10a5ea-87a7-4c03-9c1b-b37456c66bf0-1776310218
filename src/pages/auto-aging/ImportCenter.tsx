@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { StepperProgress, type StepperStep } from '@/components/shared/StepperProgress';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ExcelTable, type TableColumn } from '@/components/shared/ExcelTable';
 import { ValidationSummaryModal } from '@/components/shared/ValidationSummaryModal';
@@ -23,6 +24,14 @@ import type { DataQualityIssue, ImportBatch, ImportBatchInsert, ImportStatus, Ve
 import { loggingService } from '@/services/loggingService';
 
 type Step = 'upload' | 'validating' | 'review' | 'publishing' | 'done';
+
+const IMPORT_STEPS: StepperStep[] = [
+  { key: 'upload',     label: 'Upload' },
+  { key: 'validating', label: 'Validating' },
+  { key: 'review',     label: 'Review' },
+  { key: 'publishing', label: 'Publishing' },
+  { key: 'done',       label: 'Done' },
+];
 
 type BulkIncompleteFieldKey = 'branch_code' | 'model' | 'payment_method' | 'salesman_name' | 'customer_name';
 
@@ -964,21 +973,12 @@ export default function ImportCenter() {
       <PageHeader
         title="Import Center"
         description="Import vehicle inventory data for corrections, backfill, or manual exception uploads"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Import Center' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Import Center' }]}
       />
 
       {/* Progress */}
       <div className="glass-panel p-4">
-        <div className="flex items-center gap-2">
-          {(['upload', 'validating', 'review', 'publishing', 'done'] as Step[]).map((s, i) => (
-            <React.Fragment key={s}>
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${step === s ? 'bg-primary/15 text-primary' : s < step ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
-                <span className="capitalize">{s}</span>
-              </div>
-              {i < 4 && <div className="flex-1 h-0.5 bg-border" />}
-            </React.Fragment>
-          ))}
-        </div>
+        <StepperProgress steps={IMPORT_STEPS} currentStep={step} />
       </div>
 
       {step === 'upload' && (

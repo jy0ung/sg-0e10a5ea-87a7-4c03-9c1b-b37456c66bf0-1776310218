@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -62,12 +63,32 @@ export default function Invoices() {
   const companyId = useCompanyId();
   const { invoices, customers, salesOrders, reloadSales, loading } = useSales();
   const { toast } = useToast();
+  const location = useLocation();
   const [addOpen, setAddOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payTarget, setPayTarget] = useState<Invoice | null>(null);
   const [payAmount, setPayAmount] = useState('');
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ invoiceNo: '', salesOrderId: '', customerId: '', issueDate: new Date().toISOString().split('T')[0], dueDate: '', subtotal: '', taxAmount: '', discountAmount: '', notes: '', invoiceType: 'customer_sales' as InvoiceType });
+
+  // Pre-fill from Sales Orders "Create Invoice" CTA
+  useEffect(() => {
+    const prefillOrderId = (location.state as { prefillOrderId?: string } | null)?.prefillOrderId;
+    if (!prefillOrderId) return;
+    const order = salesOrders.find(o => o.id === prefillOrderId);
+    if (!order) return;
+    setForm(f => ({
+      ...f,
+      salesOrderId: order.id,
+      customerId: order.customerId ?? f.customerId,
+      invoiceNo: `INV-${order.orderNo}`,
+      subtotal: String(order.totalPrice ?? ''),
+    }));
+    setAddOpen(true);
+    // Clear location state so a refresh doesn't re-open
+    window.history.replaceState({}, '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalRevenue = invoices.filter(i => i.paymentStatus === 'paid').reduce((s, i) => s + i.totalAmount, 0);
   const outstanding = invoices.filter(i => i.paymentStatus !== 'paid').reduce((s, i) => s + (i.totalAmount - (i.paidAmount ?? 0)), 0);
@@ -123,7 +144,7 @@ export default function Invoices() {
       <PageHeader
         title="Invoices"
         description="Track invoices and payment status"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Sales' }, { label: 'Invoices' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Invoices' }]}
         actions={<Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" />New Invoice</Button>}
       />
 

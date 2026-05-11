@@ -32,7 +32,7 @@ export default function SLAAdmin() {
       <PageHeader
         title="SLA Policies"
         description="Configure target days for each KPI milestone pair"
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'SLA Policies' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'SLA Policies' }]}
       />
 
       <div className="glass-panel overflow-hidden">

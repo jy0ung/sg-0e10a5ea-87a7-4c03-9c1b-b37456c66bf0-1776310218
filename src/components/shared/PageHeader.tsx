@@ -1,4 +1,6 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 
 interface PageHeaderProps {
   title: string;
@@ -11,11 +13,22 @@ export function PageHeader({ title, description, actions, breadcrumbs }: PageHea
   return (
     <div className="mb-6">
       {breadcrumbs && (
-        <nav className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+        <nav aria-label="breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground mb-2 flex-wrap">
           {breadcrumbs.map((bc, i) => (
             <React.Fragment key={i}>
-              {i > 0 && <span>/</span>}
-              <span className={i === breadcrumbs.length - 1 ? 'text-foreground' : ''}>{bc.label}</span>
+              {i > 0 && <ChevronRight className="h-3 w-3 flex-shrink-0 text-border" />}
+              {bc.path ? (
+                <Link
+                  to={bc.path}
+                  className="hover:text-foreground transition-colors"
+                >
+                  {bc.label}
+                </Link>
+              ) : (
+                <span className={i === breadcrumbs.length - 1 ? 'text-foreground font-medium' : ''}>
+                  {bc.label}
+                </span>
+              )}
             </React.Fragment>
           ))}
         </nav>

@@ -106,7 +106,7 @@ export default function VehicleDetail() {
       <PageHeader
         title={vehicle.chassis_no}
         description={`${vehicle.model} • ${vehicle.branch_code} • ${vehicle.customer_name}`}
-        breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Vehicles' }, { label: vehicle.chassis_no }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Vehicles' }, { label: vehicle.chassis_no }]}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
