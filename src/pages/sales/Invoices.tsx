@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
-import { createInvoice, recordPayment } from '@/services/invoiceService';
+import { createInvoice, recordPaymentEvent } from '@/services/invoiceService';
 import { Invoice, InvoicePaymentStatus, InvoiceType } from '@/types';
 import { Plus, CreditCard } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
@@ -68,6 +68,9 @@ export default function Invoices() {
   const [payOpen, setPayOpen] = useState(false);
   const [payTarget, setPayTarget] = useState<Invoice | null>(null);
   const [payAmount, setPayAmount] = useState('');
+  const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
+  const [payMethod, setPayMethod] = useState('');
+  const [payRef, setPayRef] = useState('');
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ invoiceNo: '', salesOrderId: '', customerId: '', issueDate: new Date().toISOString().split('T')[0], dueDate: '', subtotal: '', taxAmount: '', discountAmount: '', notes: '', invoiceType: 'customer_sales' as InvoiceType });
 
@@ -129,7 +132,10 @@ export default function Invoices() {
   const handlePay = async () => {
     if (!payTarget || !payAmount) return;
     setSaving(true);
-    const { error } = await recordPayment(companyId, payTarget.id, parseFloat(payAmount));
+    const { error } = await recordPaymentEvent(payTarget.id, parseFloat(payAmount), payDate, {
+      paymentMethod: payMethod || undefined,
+      receiptReference: payRef || undefined,
+    });
     setSaving(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await reloadSales();
@@ -137,7 +143,7 @@ export default function Invoices() {
     toast({ title: 'Payment recorded' });
   };
 
-  const openPay = (inv: Invoice) => { setPayTarget(inv); setPayAmount(''); setPayOpen(true); };
+  const openPay = (inv: Invoice) => { setPayTarget(inv); setPayAmount(''); setPayDate(new Date().toISOString().slice(0, 10)); setPayMethod(''); setPayRef(''); setPayOpen(true); };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -236,9 +242,23 @@ export default function Invoices() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground">Invoice: {payTarget?.invoiceNo} — Outstanding: RM {((payTarget?.totalAmount ?? 0) - (payTarget?.paidAmount ?? 0)).toLocaleString()}</p>
-          <div className="space-y-2 py-2">
-            <label htmlFor="sales-invoice-payment-amount" className="text-xs font-medium text-muted-foreground">Amount Paid *</label>
-            <Input id="sales-invoice-payment-amount" type="number" className="h-8 text-sm" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <label htmlFor="sales-pay-amount" className="text-xs font-medium text-muted-foreground">Amount Paid *</label>
+              <Input id="sales-pay-amount" type="number" className="h-8 text-sm" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="sales-pay-date" className="text-xs font-medium text-muted-foreground">Payment Date *</label>
+              <Input id="sales-pay-date" type="date" className="h-8 text-sm" value={payDate} onChange={e => setPayDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="sales-pay-method" className="text-xs font-medium text-muted-foreground">Payment Method</label>
+              <Input id="sales-pay-method" className="h-8 text-sm" placeholder="Cash / Bank Transfer / etc." value={payMethod} onChange={e => setPayMethod(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="sales-pay-ref" className="text-xs font-medium text-muted-foreground">Receipt Reference</label>
+              <Input id="sales-pay-ref" className="h-8 text-sm" placeholder="OR No. / Cheque No." value={payRef} onChange={e => setPayRef(e.target.value)} />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setPayOpen(false)}>Cancel</Button>

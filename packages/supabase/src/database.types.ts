@@ -2376,6 +2376,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           customer_name: string | null
+          dms_collection_ref: string | null
           due_date: string | null
           id: string
           invoice_date: string
@@ -2384,7 +2385,9 @@ export type Database = {
           notes: string | null
           paid_amount: number
           payment_status: string
+          reconciliation_status: string
           sales_order_id: string
+          source_type: string
           tax_amount: number
           total_amount: number
           updated_at: string
@@ -2395,6 +2398,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           customer_name?: string | null
+          dms_collection_ref?: string | null
           due_date?: string | null
           id?: string
           invoice_date: string
@@ -2403,7 +2407,9 @@ export type Database = {
           notes?: string | null
           paid_amount?: number
           payment_status?: string
+          reconciliation_status?: string
           sales_order_id: string
+          source_type?: string
           tax_amount?: number
           total_amount?: number
           updated_at?: string
@@ -2414,6 +2420,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           customer_name?: string | null
+          dms_collection_ref?: string | null
           due_date?: string | null
           id?: string
           invoice_date?: string
@@ -2422,7 +2429,9 @@ export type Database = {
           notes?: string | null
           paid_amount?: number
           payment_status?: string
+          reconciliation_status?: string
           sales_order_id?: string
+          source_type?: string
           tax_amount?: number
           total_amount?: number
           updated_at?: string
@@ -3069,6 +3078,83 @@ export type Database = {
           verified_by?: string | null
         }
         Relationships: []
+      }
+      payment_events: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          event_type: string
+          id: string
+          invoice_id: string
+          notes: string | null
+          official_receipt_id: string | null
+          payment_date: string
+          payment_method: string | null
+          receipt_reference: string | null
+          reversal_of_event_id: string | null
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          event_type: string
+          id?: string
+          invoice_id: string
+          notes?: string | null
+          official_receipt_id?: string | null
+          payment_date: string
+          payment_method?: string | null
+          receipt_reference?: string | null
+          reversal_of_event_id?: string | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          id?: string
+          invoice_id?: string
+          notes?: string | null
+          official_receipt_id?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          receipt_reference?: string | null
+          reversal_of_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_events_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_events_official_receipt_id_fkey"
+            columns: ["official_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "official_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_events_reversal_of_event_id_fkey"
+            columns: ["reversal_of_event_id"]
+            isOneToOne: false
+            referencedRelation: "payment_events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_method_mappings: {
         Row: {
@@ -5127,6 +5213,15 @@ export type Database = {
       current_access_scope: { Args: never; Returns: string }
       current_company_id: { Args: never; Returns: string }
       current_role: { Args: never; Returns: string }
+      get_ar_aging_summary: {
+        Args: { p_company_id: string }
+        Returns: {
+          bucket: string
+          invoice_count: number
+          overdue_amount: number
+          total_outstanding: number
+        }[]
+      }
       get_my_access_scope: {
         Args: never
         Returns: {
@@ -5134,6 +5229,22 @@ export type Database = {
           user_branch_id: string
           user_company_id: string
           user_role: string
+        }[]
+      }
+      get_payment_events: {
+        Args: { p_invoice_id: string }
+        Returns: {
+          amount: number
+          created_at: string
+          created_by: string
+          event_type: string
+          id: string
+          is_reversed: boolean
+          notes: string
+          payment_date: string
+          payment_method: string
+          receipt_reference: string
+          reversal_of_event_id: string
         }[]
       }
       get_sales_dashboard_summary: {
@@ -5163,6 +5274,22 @@ export type Database = {
       normalize_dms_vehicle_stock: {
         Args: { p_delivery_id?: string; p_raw_id: string }
         Returns: Json
+      }
+      record_payment_event: {
+        Args: {
+          p_amount: number
+          p_invoice_id: string
+          p_notes?: string
+          p_official_receipt_id?: string
+          p_payment_date: string
+          p_payment_method?: string
+          p_receipt_reference?: string
+        }
+        Returns: string
+      }
+      reverse_payment_event: {
+        Args: { p_event_id: string; p_reason?: string }
+        Returns: string
       }
       search_vehicles: {
         Args: {

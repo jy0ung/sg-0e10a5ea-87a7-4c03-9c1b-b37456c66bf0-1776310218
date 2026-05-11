@@ -806,6 +806,8 @@ export interface SalesOrder {
 
 export type InvoicePaymentStatus = 'unpaid' | 'partial' | 'paid';
 export type InvoiceType = 'customer_sales' | 'dealer_sales' | 'purchase';
+export type InvoiceReconciliationStatus = 'pending' | 'reconciled' | 'disputed' | 'override';
+export type InvoiceSourceType = 'ubs_local' | 'dms_snapshot' | 'legacy_backfill';
 
 export interface Invoice {
   id: string;
@@ -827,6 +829,38 @@ export interface Invoice {
   updatedAt: string;
   // Phase 1B migration fields
   invoiceType: InvoiceType;
+  // Stage 4 AR fields
+  reconciliationStatus?: InvoiceReconciliationStatus;
+  sourceType?: InvoiceSourceType;
+  dmsCollectionRef?: string;
+}
+
+export type PaymentEventType = 'payment' | 'reversal' | 'write_off' | 'adjustment';
+
+export interface PaymentEvent {
+  id: string;
+  companyId: string;
+  invoiceId: string;
+  eventType: PaymentEventType;
+  amount: number;
+  paymentDate: string;
+  paymentMethod?: string;
+  receiptReference?: string;
+  officialReceiptId?: string;
+  notes?: string;
+  reversalOfEventId?: string;
+  isReversed?: boolean;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export type ArAgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
+
+export interface ArAgingSummary {
+  bucket: ArAgingBucket;
+  invoiceCount: number;
+  totalOutstanding: number;
+  overdueAmount: number;
 }
 
 export interface SalesmanTarget {
