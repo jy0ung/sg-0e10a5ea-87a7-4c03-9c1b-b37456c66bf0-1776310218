@@ -863,6 +863,40 @@ export interface ArAgingSummary {
   overdueAmount: number;
 }
 
+// ===== Accounts Payable (Stage 5) =====
+
+export type PurchaseInvoiceLifecycleStatus =
+  | 'received' | 'verified' | 'approved' | 'scheduled' | 'paid' | 'cancelled';
+
+export type ApPaymentStatus = 'unpaid' | 'partial' | 'paid';
+
+export type SupplierPaymentEventType = 'payment' | 'reversal' | 'write_off' | 'adjustment';
+
+export type ApAgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
+
+export interface SupplierPaymentEvent {
+  id: string;
+  companyId: string;
+  purchaseInvoiceId: string;
+  eventType: SupplierPaymentEventType;
+  amount: number;
+  paymentDate: string;
+  paymentMethod?: string;
+  referenceNo?: string;
+  notes?: string;
+  reversalOfEventId?: string;
+  isReversed?: boolean;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface ApAgingSummary {
+  bucket: ApAgingBucket;
+  invoiceCount: number;
+  totalOutstanding: number;
+  overdueAmount: number;
+}
+
 export interface SalesmanTarget {
   id: string;
   salesmanName: string;

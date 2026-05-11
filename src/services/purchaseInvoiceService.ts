@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { logUserAction } from './auditService';
 import { loggingService } from "./loggingService";
 import { insertVehicle } from "./vehicleService";
+import type { PurchaseInvoiceLifecycleStatus, ApPaymentStatus } from '@/types';
 
 export type PurchaseInvoiceStatus = 'pending' | 'received' | 'cancelled';
 
@@ -16,6 +17,16 @@ export interface PurchaseInvoiceRecord {
   status: PurchaseInvoiceStatus;
   receivedDate?: string;
   remark?: string;
+  // AP lifecycle fields (Stage 5)
+  lifecycleStatus: PurchaseInvoiceLifecycleStatus;
+  paymentStatus: ApPaymentStatus;
+  paidAmount: number;
+  dueDate?: string;
+  notes?: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  approvedAt?: string;
+  approvedBy?: string;
 }
 
 function rowToInvoice(row: Record<string, unknown>): PurchaseInvoiceRecord {
@@ -30,6 +41,16 @@ function rowToInvoice(row: Record<string, unknown>): PurchaseInvoiceRecord {
     status: (row.status as PurchaseInvoiceStatus) ?? 'pending',
     receivedDate: row.received_date ? String(row.received_date) : undefined,
     remark: row.remark ? String(row.remark) : undefined,
+    // AP lifecycle fields (Stage 5 — default-safe for rows pre-migration)
+    lifecycleStatus: (row.lifecycle_status as PurchaseInvoiceLifecycleStatus) ?? 'received',
+    paymentStatus: (row.payment_status as ApPaymentStatus) ?? 'unpaid',
+    paidAmount: Number(row.paid_amount ?? 0),
+    dueDate: row.due_date ? String(row.due_date) : undefined,
+    notes: row.notes ? String(row.notes) : undefined,
+    verifiedAt: row.verified_at ? String(row.verified_at) : undefined,
+    verifiedBy: row.verified_by ? String(row.verified_by) : undefined,
+    approvedAt: row.approved_at ? String(row.approved_at) : undefined,
+    approvedBy: row.approved_by ? String(row.approved_by) : undefined,
   };
 }
 

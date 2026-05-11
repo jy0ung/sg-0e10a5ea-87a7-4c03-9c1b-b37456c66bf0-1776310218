@@ -3501,51 +3501,78 @@ export type Database = {
       purchase_invoices: {
         Row: {
           amount: number
+          approved_at: string | null
+          approved_by: string | null
           chassis_no: string
           company_id: string
           created_at: string
           deleted_at: string | null
+          due_date: string | null
           id: string
           invoice_date: string
           invoice_no: string
           is_deleted: boolean
+          lifecycle_status: string
           model: string
+          notes: string | null
+          paid_amount: number
+          payment_status: string
           received_date: string | null
           remark: string | null
           status: string
           supplier: string
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           amount: number
+          approved_at?: string | null
+          approved_by?: string | null
           chassis_no: string
           company_id: string
           created_at?: string
           deleted_at?: string | null
+          due_date?: string | null
           id?: string
           invoice_date: string
           invoice_no: string
           is_deleted?: boolean
+          lifecycle_status?: string
           model: string
+          notes?: string | null
+          paid_amount?: number
+          payment_status?: string
           received_date?: string | null
           remark?: string | null
           status?: string
           supplier: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           chassis_no?: string
           company_id?: string
           created_at?: string
           deleted_at?: string | null
+          due_date?: string | null
           id?: string
           invoice_date?: string
           invoice_no?: string
           is_deleted?: boolean
+          lifecycle_status?: string
           model?: string
+          notes?: string | null
+          paid_amount?: number
+          payment_status?: string
           received_date?: string | null
           remark?: string | null
           status?: string
           supplier?: string
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: [
           {
@@ -4403,6 +4430,73 @@ export type Database = {
           },
         ]
       }
+      supplier_payment_events: {
+        Row: {
+          amount: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          event_type: string
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string | null
+          purchase_invoice_id: string
+          reference_no: string | null
+          reversal_of_event_id: string | null
+        }
+        Insert: {
+          amount: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          event_type: string
+          id?: string
+          notes?: string | null
+          payment_date: string
+          payment_method?: string | null
+          purchase_invoice_id: string
+          reference_no?: string | null
+          reversal_of_event_id?: string | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          purchase_invoice_id?: string
+          reference_no?: string | null
+          reversal_of_event_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_payment_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payment_events_purchase_invoice_id_fkey"
+            columns: ["purchase_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payment_events_reversal_of_event_id_fkey"
+            columns: ["reversal_of_event_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_payment_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           attn: string | null
@@ -5213,6 +5307,15 @@ export type Database = {
       current_access_scope: { Args: never; Returns: string }
       current_company_id: { Args: never; Returns: string }
       current_role: { Args: never; Returns: string }
+      get_ap_aging_summary: {
+        Args: { p_company_id: string }
+        Returns: {
+          bucket: string
+          invoice_count: number
+          overdue_amount: number
+          total_outstanding: number
+        }[]
+      }
       get_ar_aging_summary: {
         Args: { p_company_id: string }
         Returns: {
@@ -5260,6 +5363,22 @@ export type Database = {
         }
         Returns: Json
       }
+      get_supplier_payment_events: {
+        Args: { p_purchase_invoice_id: string }
+        Returns: {
+          amount: number
+          created_at: string
+          created_by: string
+          event_type: string
+          id: string
+          is_reversed: boolean
+          notes: string
+          payment_date: string
+          payment_method: string
+          reference_no: string
+          reversal_of_event_id: string
+        }[]
+      }
       is_same_company: { Args: { target_company_id: string }; Returns: boolean }
       link_vehicle_to_sales_order: {
         Args: {
@@ -5287,7 +5406,22 @@ export type Database = {
         }
         Returns: string
       }
+      record_supplier_payment_event: {
+        Args: {
+          p_amount: number
+          p_notes?: string
+          p_payment_date: string
+          p_payment_method?: string
+          p_purchase_invoice_id: string
+          p_reference_no?: string
+        }
+        Returns: string
+      }
       reverse_payment_event: {
+        Args: { p_event_id: string; p_reason?: string }
+        Returns: string
+      }
+      reverse_supplier_payment_event: {
         Args: { p_event_id: string; p_reason?: string }
         Returns: string
       }
@@ -5314,6 +5448,10 @@ export type Database = {
       seed_source_reconciliation_candidates: {
         Args: { p_company_id?: string }
         Returns: Json
+      }
+      transition_pi_lifecycle: {
+        Args: { p_actor_id?: string; p_id: string; p_target_status: string }
+        Returns: string
       }
       transition_sales_order_stage: {
         Args: {

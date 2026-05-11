@@ -13,18 +13,38 @@ import {
   createPurchaseInvoice,
   listPurchaseInvoices,
   markPurchaseInvoiceReceived,
+  type PurchaseInvoiceRecord,
 } from '@/services/purchaseInvoiceService';
+import {
+  transitionPiLifecycle,
+  recordSupplierPaymentEvent,
+  getApAgingSummary,
+} from '@/services/apService';
+import { STALE } from '@/lib/queryClient';
 import { purchaseInvoiceSchema } from '@/lib/validations';
-import { Search, Plus, Truck } from 'lucide-react';
+import { Search, Plus, Truck, CheckCircle, ThumbsUp, CreditCard } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
+import type { PurchaseInvoiceLifecycleStatus } from '@/types';
 
-type PIStatus = 'pending' | 'received' | 'cancelled';
+type _PIStatus = 'pending' | 'received' | 'cancelled';
 
-const STATUS_BADGE: Record<PIStatus, string> = {
-  pending:   'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  received:  'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+
+
+
+const LIFECYCLE_BADGE: Record<PurchaseInvoiceLifecycleStatus, string> = {
+  received:  'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  verified:  'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  approved:  'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+  scheduled: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  paid:      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   cancelled: 'bg-secondary text-secondary-foreground',
+};
+
+const AP_PAYMENT_BADGE: Record<string, string> = {
+  unpaid:  'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  partial: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  paid:    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
 };
 
 const EMPTY_FORM = { invoiceNo: '', supplier: '', chassisNo: '', model: '', invoiceDate: new Date().toISOString().split('T')[0], amount: '', remark: '' };
@@ -45,14 +65,33 @@ export default function PurchaseInvoices() {
   const [form, setForm]           = useState(EMPTY_FORM);
   const [saving, setSaving]       = useState(false);
 
+  // Payment dialog state
+  const [payOpen, setPayOpen]       = useState(false);
+  const [payTarget, setPayTarget]   = useState<PurchaseInvoiceRecord | null>(null);
+  const [payAmount, setPayAmount]   = useState('');
+  const [payDate, setPayDate]       = useState(new Date().toISOString().slice(0, 10));
+  const [payMethod, setPayMethod]   = useState('');
+  const [payRef, setPayRef]         = useState('');
+  const [paying, setPaying]         = useState(false);
+
   const { data: invoices = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['purchase-invoices', companyId],
     queryFn: () => listPurchaseInvoices(companyId),
     enabled: !!companyId,
-    staleTime: 30_000,
+    staleTime: STALE.transactional,
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['purchase-invoices', companyId] });
+  const { data: agingData = [] } = useQuery({
+    queryKey: ['ap-aging', companyId],
+    queryFn: async () => { const { data } = await getApAgingSummary(companyId); return data ?? []; },
+    enabled: !!companyId,
+    staleTime: STALE.transactional,
+  });
+
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ['purchase-invoices', companyId] });
+    void queryClient.invalidateQueries({ queryKey: ['ap-aging', companyId] });
+  };
 
   const filtered = invoices.filter(i => {
     if (statusFilter !== 'all' && i.status !== statusFilter) return false;
@@ -60,8 +99,52 @@ export default function PurchaseInvoices() {
     return !q || [i.invoiceNo, i.supplier, i.chassisNo, i.model].join(' ').toLowerCase().includes(q);
   });
 
-  const totalAmount = invoices.reduce((s, i) => s + i.amount, 0);
-  const pendingAmount = invoices.filter(i => i.status === 'pending').reduce((s, i) => s + i.amount, 0);
+  const totalOutstanding = agingData.reduce((s, b) => s + b.totalOutstanding, 0);
+  const due30 = agingData.filter(b => b.bucket === 'current' || b.bucket === '1_30_days').reduce((s, b) => s + b.totalOutstanding, 0);
+  const overdue3160 = agingData.find(b => b.bucket === '31_60_days')?.totalOutstanding ?? 0;
+  const overdueOver60 = agingData.filter(b => b.bucket === '61_90_days' || b.bucket === 'over_90_days').reduce((s, b) => s + b.totalOutstanding, 0);
+
+  const handleVerify = async (pi: PurchaseInvoiceRecord) => {
+    const { error } = await transitionPiLifecycle(pi.id, 'verified', user?.id);
+    if (error) { toast({ title: 'Failed to verify', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Invoice verified', description: pi.invoiceNo });
+    invalidate();
+  };
+
+  const handleApprove = async (pi: PurchaseInvoiceRecord) => {
+    const { error } = await transitionPiLifecycle(pi.id, 'approved', user?.id);
+    if (error) { toast({ title: 'Failed to approve', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Invoice approved', description: pi.invoiceNo });
+    invalidate();
+  };
+
+  const openPayDialog = (pi: PurchaseInvoiceRecord) => {
+    setPayTarget(pi);
+    setPayAmount('');
+    setPayDate(new Date().toISOString().slice(0, 10));
+    setPayMethod('');
+    setPayRef('');
+    setPayOpen(true);
+  };
+
+  const handleRecordPayment = async () => {
+    if (!payTarget || !payAmount) return;
+    const amount = parseFloat(payAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast({ title: 'Invalid amount', variant: 'destructive' });
+      return;
+    }
+    setPaying(true);
+    const { error } = await recordSupplierPaymentEvent(payTarget.id, amount, payDate, {
+      paymentMethod: payMethod || undefined,
+      referenceNo: payRef || undefined,
+    });
+    setPaying(false);
+    if (error) { toast({ title: 'Payment failed', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Payment recorded', description: `${payTarget.invoiceNo} — ${fmt(amount)}` });
+    setPayOpen(false);
+    invalidate();
+  };
 
   const handleCreate = async () => {
     const amount = parseFloat(form.amount);
@@ -149,23 +232,23 @@ export default function PurchaseInvoices() {
         }
       />
 
-      {/* Summary cards */}
+      {/* AP Aging summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1">Total Invoices</p>
-          <p className="text-2xl font-bold text-foreground">{invoices.length}</p>
+          <p className="text-xs text-muted-foreground mb-1">Total Outstanding (AP)</p>
+          <p className="text-2xl font-bold text-foreground">{fmt(totalOutstanding)}</p>
         </div>
         <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1">Total Amount</p>
-          <p className="text-2xl font-bold text-foreground">{fmt(totalAmount)}</p>
+          <p className="text-xs text-muted-foreground mb-1">Due ≤ 30 Days</p>
+          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{fmt(due30)}</p>
         </div>
         <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1">Pending Receipt</p>
-          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{invoices.filter(i => i.status === 'pending').length}</p>
+          <p className="text-xs text-muted-foreground mb-1">Overdue 31–60 Days</p>
+          <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{fmt(overdue3160)}</p>
         </div>
         <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1">Pending Amount</p>
-          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{fmt(pendingAmount)}</p>
+          <p className="text-xs text-muted-foreground mb-1">Overdue 60+ Days</p>
+          <p className="text-2xl font-bold text-red-700 dark:text-red-300">{fmt(overdueOver60)}</p>
         </div>
       </div>
 
@@ -196,10 +279,11 @@ export default function PurchaseInvoices() {
                 <th className="pb-2 pr-4 font-medium">Invoice No</th>
                 <th className="pb-2 pr-4 font-medium">Supplier</th>
                 <th className="pb-2 pr-4 font-medium">Chassis No</th>
-                <th className="pb-2 pr-4 font-medium">Model</th>
                 <th className="pb-2 pr-4 font-medium">Invoice Date</th>
                 <th className="pb-2 pr-4 font-medium">Amount</th>
-                <th className="pb-2 pr-4 font-medium">Status</th>
+                <th className="pb-2 pr-4 font-medium">Paid</th>
+                <th className="pb-2 pr-4 font-medium">Lifecycle</th>
+                <th className="pb-2 pr-4 font-medium">Payment</th>
                 <th className="pb-2 font-medium">Actions</th>
               </tr>
             </thead>
@@ -212,16 +296,34 @@ export default function PurchaseInvoices() {
                     <td className="py-2 pr-4 font-mono text-xs font-medium">{pi.invoiceNo}</td>
                     <td className="py-2 pr-4 text-xs">{pi.supplier}</td>
                     <td className="py-2 pr-4 font-mono text-xs">{pi.chassisNo}</td>
-                    <td className="py-2 pr-4 text-xs">{pi.model}</td>
                     <td className="py-2 pr-4 text-xs text-muted-foreground">{pi.invoiceDate}</td>
                     <td className="py-2 pr-4 text-xs font-medium">{fmt(pi.amount)}</td>
+                    <td className="py-2 pr-4 text-xs">{fmt(pi.paidAmount)}</td>
                     <td className="py-2 pr-4">
-                      <Badge className={`text-[10px] capitalize ${STATUS_BADGE[pi.status]}`}>{pi.status}</Badge>
+                      <Badge className={`text-[10px] capitalize ${LIFECYCLE_BADGE[pi.lifecycleStatus]}`}>{pi.lifecycleStatus}</Badge>
                     </td>
-                    <td className="py-2">
+                    <td className="py-2 pr-4">
+                      <Badge className={`text-[10px] capitalize ${AP_PAYMENT_BADGE[pi.paymentStatus] ?? ''}`}>{pi.paymentStatus}</Badge>
+                    </td>
+                    <td className="py-2 flex items-center gap-1 flex-wrap">
                       {pi.status === 'pending' && (
                         <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-emerald-600" onClick={() => markReceived(pi.id)}>
-                          Mark Received
+                          <Truck className="h-3 w-3 mr-0.5" />Receive
+                        </Button>
+                      )}
+                      {pi.lifecycleStatus === 'received' && (
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-purple-600" onClick={() => handleVerify(pi)}>
+                          <CheckCircle className="h-3 w-3 mr-0.5" />Verify
+                        </Button>
+                      )}
+                      {pi.lifecycleStatus === 'verified' && (
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-emerald-600" onClick={() => handleApprove(pi)}>
+                          <ThumbsUp className="h-3 w-3 mr-0.5" />Approve
+                        </Button>
+                      )}
+                      {(pi.lifecycleStatus === 'approved' || pi.lifecycleStatus === 'scheduled') && pi.paymentStatus !== 'paid' && (
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-blue-600" onClick={() => openPayDialog(pi)}>
+                          <CreditCard className="h-3 w-3 mr-0.5" />Pay
                         </Button>
                       )}
                     </td>
@@ -232,6 +334,43 @@ export default function PurchaseInvoices() {
           </table>
         </div>
       </div>
+
+      {/* Record Payment Dialog */}
+      <Dialog open={payOpen} onOpenChange={setPayOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Record Supplier Payment</DialogTitle></DialogHeader>
+          {payTarget && (
+            <div className="space-y-1 mb-2 text-xs text-muted-foreground">
+              <p><span className="font-medium text-foreground">{payTarget.invoiceNo}</span> — {payTarget.supplier}</p>
+              <p>Invoice amount: {fmt(payTarget.amount)} | Paid: {fmt(payTarget.paidAmount)} | <span className="font-medium text-red-600">Outstanding: {fmt(payTarget.amount - payTarget.paidAmount)}</span></p>
+            </div>
+          )}
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="pi-pay-amount" className="text-xs font-medium text-muted-foreground">Amount (RM) *</label>
+                <Input id="pi-pay-amount" type="number" className="h-8 text-sm" placeholder="0.00" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="pi-pay-date" className="text-xs font-medium text-muted-foreground">Payment Date *</label>
+                <Input id="pi-pay-date" type="date" className="h-8 text-sm" value={payDate} onChange={e => setPayDate(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="pi-pay-method" className="text-xs font-medium text-muted-foreground">Payment Method</label>
+              <Input id="pi-pay-method" className="h-8 text-sm" placeholder="e.g. Bank Transfer, Cheque" value={payMethod} onChange={e => setPayMethod(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="pi-pay-ref" className="text-xs font-medium text-muted-foreground">Reference No</label>
+              <Input id="pi-pay-ref" className="h-8 text-sm" placeholder="Cheque no / bank ref" value={payRef} onChange={e => setPayRef(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" size="sm" onClick={() => setPayOpen(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleRecordPayment} disabled={paying || !payAmount}>{paying ? 'Recording…' : 'Record Payment'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Invoice Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
