@@ -59,6 +59,21 @@ export async function getSalesOrders(companyId: string, branchCode?: string | nu
   return { data: (data ?? []).map(r => mapOrder(r as Record<string, unknown>)), error: null };
 }
 
+export function subscribeToSalesOrderChanges(companyId: string, onChange: () => void) {
+  const channel = supabase
+    .channel(`realtime:sales_orders:${companyId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'sales_orders', filter: `company_id=eq.${companyId}` },
+      onChange,
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
+
 export async function createSalesOrder(companyId: string, fields: SalesOrderEditableFields, actorId?: string): Promise<{ data: SalesOrder | null; error: Error | null }> {
   if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase
@@ -149,6 +164,135 @@ export async function moveSalesOrderStage(companyId: string, id: string, dealSta
   if (error) return { error: new Error(error.message) };
   if (actorId) void logUserAction(actorId, 'update', 'sales_order', id, { component: 'SalesOrderService' });
   return { error: null };
+}
+
+export interface LinkExistingVehicleParams {
+  orderId: string;
+  chassisNo?: string | null;
+  vehicleId?: string | null;
+}
+
+export interface LinkExistingVehicleResult {
+  salesOrderId: string;
+  vehicleId: string;
+  chassisNo: string;
+  orderNo?: string;
+}
+
+export interface UnlinkExistingVehicleResult {
+  salesOrderId: string;
+  previousVehicleId: string | null;
+  previousChassisNo: string | null;
+  orderNo?: string;
+}
+
+export async function linkExistingVehicle(
+  companyId: string,
+  params: LinkExistingVehicleParams,
+  actorId?: string,
+): Promise<{ data: LinkExistingVehicleResult | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
+  if (!params.orderId) return { data: null, error: new Error('Sales order id is required') };
+  if (!params.vehicleId && !params.chassisNo?.trim()) {
+    return { data: null, error: new Error('Vehicle id or chassis number is required') };
+  }
+
+  const { data, error } = await supabase.rpc('link_vehicle_to_sales_order' as never, {
+    p_sales_order_id: params.orderId,
+    p_chassis_no: params.chassisNo?.trim() || null,
+    p_vehicle_id: params.vehicleId ?? null,
+  } as never);
+
+  if (error) {
+    loggingService.error('linkExistingVehicle failed', { error, params }, 'SalesOrderService');
+    return { data: null, error: new Error(error.message) };
+  }
+
+  const raw = (data ?? {}) as Record<string, unknown>;
+  const result: LinkExistingVehicleResult = {
+    salesOrderId: String(raw.sales_order_id ?? params.orderId),
+    vehicleId: String(raw.vehicle_id ?? params.vehicleId ?? ''),
+    chassisNo: String(raw.chassis_no ?? params.chassisNo ?? ''),
+    orderNo: raw.order_no ? String(raw.order_no) : undefined,
+  };
+
+  if (actorId) {
+    void logUserAction(actorId, 'update', 'sales_order', result.salesOrderId, {
+      component: 'SalesOrderService',
+      action: 'link_existing_vehicle',
+      vehicleId: result.vehicleId,
+      chassisNo: result.chassisNo,
+    });
+  }
+
+  return { data: result, error: null };
+}
+
+export async function unlinkExistingVehicle(
+  companyId: string,
+  orderId: string,
+  actorId?: string,
+): Promise<{ data: UnlinkExistingVehicleResult | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
+  if (!orderId) return { data: null, error: new Error('Sales order id is required') };
+
+  const { data, error } = await supabase.rpc('unlink_vehicle_from_sales_order' as never, {
+    p_sales_order_id: orderId,
+  } as never);
+
+  if (error) {
+    loggingService.error('unlinkExistingVehicle failed', { error, orderId }, 'SalesOrderService');
+    return { data: null, error: new Error(error.message) };
+  }
+
+  const raw = (data ?? {}) as Record<string, unknown>;
+  const result: UnlinkExistingVehicleResult = {
+    salesOrderId: String(raw.sales_order_id ?? orderId),
+    previousVehicleId: raw.previous_vehicle_id ? String(raw.previous_vehicle_id) : null,
+    previousChassisNo: raw.previous_chassis_no ? String(raw.previous_chassis_no) : null,
+    orderNo: raw.order_no ? String(raw.order_no) : undefined,
+  };
+
+  if (actorId) {
+    void logUserAction(actorId, 'update', 'sales_order', result.salesOrderId, {
+      component: 'SalesOrderService',
+      action: 'unlink_existing_vehicle',
+      vehicleId: result.previousVehicleId,
+      chassisNo: result.previousChassisNo,
+    });
+  }
+
+  return { data: result, error: null };
+}
+
+export async function getLinkedSalesOrderForVehicle(
+  companyId: string,
+  vehicleId: string | null | undefined,
+  chassisNo: string | null | undefined,
+): Promise<{ data: SalesOrder | null; error: Error | null }> {
+  if (!companyId) return { data: null, error: missingCompanyError() };
+  if (!vehicleId && !chassisNo) return { data: null, error: null };
+
+  let query = supabase
+    .from('sales_orders')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('is_deleted', false)
+    .limit(1);
+
+  if (vehicleId) {
+    query = query.eq('vehicle_id', vehicleId);
+  } else if (chassisNo) {
+    query = query.eq('chassis_no', chassisNo);
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    loggingService.error('getLinkedSalesOrderForVehicle failed', { error, vehicleId, chassisNo }, 'SalesOrderService');
+    return { data: null, error: new Error(error.message) };
+  }
+
+  return { data: data ? mapOrder(data as Record<string, unknown>) : null, error: null };
 }
 
 /**

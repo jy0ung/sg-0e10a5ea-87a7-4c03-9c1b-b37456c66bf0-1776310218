@@ -18,7 +18,11 @@ export type CustomInsightMetricId =
   | 'largest_booking_value_branch'
   | 'average_bg_to_delivery'
   | 'average_delivery_to_disbursement'
-  | 'worst_kpi_compliance';
+  | 'worst_kpi_compliance'
+  | 'pending_delivery_count'
+  | 'pending_lou'
+  | 'missing_obr'
+  | 'avg_registration_delay';
 
 export interface PersonalDashboardSectionWidget {
   id: DashboardSystemWidgetId;
@@ -150,6 +154,34 @@ export const CUSTOM_INSIGHT_DEFINITIONS: CustomInsightDefinition[] = [
     description: 'Surface the KPI with the lowest current compliance rate.',
     emptyLabel: 'No KPI compliance data',
     accentClassName: 'bg-destructive/10 text-destructive',
+  },
+  {
+    id: 'pending_delivery_count',
+    label: 'Vehicles Pending Delivery',
+    description: 'Count of vehicles booked but not yet delivered.',
+    emptyLabel: 'No pending vehicles',
+    accentClassName: 'bg-warning/10 text-warning',
+  },
+  {
+    id: 'pending_lou',
+    label: 'Pending LOU',
+    description: 'Delivered vehicles where LOU has not been received.',
+    emptyLabel: 'No pending LOU',
+    accentClassName: 'bg-destructive/10 text-destructive',
+  },
+  {
+    id: 'missing_obr',
+    label: 'Missing OBR',
+    description: 'Registered vehicles without OBR documentation.',
+    emptyLabel: 'No missing OBR',
+    accentClassName: 'bg-destructive/10 text-destructive',
+  },
+  {
+    id: 'avg_registration_delay',
+    label: 'Avg Registration Delay',
+    description: 'Average days from outlet receipt to registration.',
+    emptyLabel: 'No registration data',
+    accentClassName: 'bg-info/10 text-info',
   },
 ];
 
@@ -424,6 +456,41 @@ export function evaluateCustomInsight(metricId: CustomInsightMetricId, context: 
         value: `${worst.compliance}%`,
         detail: worst.summary.shortLabel,
         helperText: `${worst.summary.overdueCount} overdue / ${worst.summary.validCount} valid`,
+      };
+    }
+    case 'pending_delivery_count': {
+      const pending = context.vehicles.filter(v => v.bg_date && !v.delivery_date);
+      return {
+        value: `${pending.length}`,
+        detail: 'Awaiting delivery',
+        helperText: `${context.vehicles.length} total vehicles`,
+      };
+    }
+    case 'pending_lou': {
+      const pending = context.vehicles.filter(v => v.delivery_date && !v.lou);
+      return {
+        value: `${pending.length}`,
+        detail: 'LOU not received',
+        helperText: `of ${context.vehicles.filter(v => v.delivery_date).length} delivered`,
+      };
+    }
+    case 'missing_obr': {
+      const missing = context.vehicles.filter(v => v.reg_date && !v.obr);
+      return {
+        value: `${missing.length}`,
+        detail: 'OBR missing',
+        helperText: `of ${context.vehicles.filter(v => v.reg_date).length} registered`,
+      };
+    }
+    case 'avg_registration_delay': {
+      const values = context.vehicles
+        .map(vehicle => vehicle.outlet_to_reg)
+        .filter((value): value is number => value != null && value >= 0);
+      if (values.length === 0) return { value: '—', detail: 'No data', helperText: CUSTOM_INSIGHT_DEFINITIONS.find(def => def.id === metricId)?.emptyLabel ?? '' };
+      return {
+        value: `${roundAverage(values)}d`,
+        detail: 'Outlet → Registration',
+        helperText: `${values.length} vehicles averaged`,
       };
     }
     default:

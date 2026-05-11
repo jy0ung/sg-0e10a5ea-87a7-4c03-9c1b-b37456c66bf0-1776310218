@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/test/rls-matrix.spec.ts'],
+    include: ['src/test/rls-matrix.spec.ts', 'src/test/dms-normalizer.spec.ts'],
     exclude: ['**/node_modules/**', '**/dist/**'],
   },
   resolve: {

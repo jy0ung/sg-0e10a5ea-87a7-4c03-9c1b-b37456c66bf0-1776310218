@@ -221,6 +221,197 @@ export async function insertVehicle(
 }
 
 // ---------------------------------------------------------------------------
+// Server-side Auto Aging report generation
+// ---------------------------------------------------------------------------
+
+export type AutoAgingReportType = 'aging_summary' | 'sla_compliance' | 'salesman_performance' | 'vehicle_export';
+
+export interface AutoAgingReportParams {
+  reportType: AutoAgingReportType;
+  branch?: string | null;
+  model?: string | null;
+  bgDateFrom?: string | null;
+  bgDateTo?: string | null;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AutoAgingReportResult {
+  rows: Record<string, unknown>[];
+  totalCount: number;
+}
+
+const reportCache = new LruCache<string, AutoAgingReportResult>({ max: 32, ttlMs: 30_000 });
+
+export interface AutoAgingSourceLedgerParams {
+  branch?: string | null;
+  model?: string | null;
+  search?: string | null;
+  bgDateFrom?: string | null;
+  bgDateTo?: string | null;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AutoAgingSourceLedgerRow {
+  sourceKey: string;
+  vehicleId: string | null;
+  salesOrderId: string | null;
+  chassisNo: string | null;
+  branchCode: string | null;
+  model: string | null;
+  customerName: string | null;
+  salesmanName: string | null;
+  paymentMethod: string | null;
+  dmsSoNo: string | null;
+  lastSourceAt: string | null;
+  needsReconciliation: boolean;
+  sourcePresence: Record<string, boolean>;
+  sourceConflicts: Record<string, unknown>;
+  authority: Record<string, unknown>;
+  localFacts: Record<string, unknown>;
+  dmsFacts: Record<string, unknown>;
+  legacyFacts: Record<string, unknown>;
+}
+
+export interface AutoAgingSourceLedgerResult {
+  rows: AutoAgingSourceLedgerRow[];
+  totalCount: number;
+  sourceCounts: Record<string, number>;
+  generatedAt: string | null;
+}
+
+const sourceLedgerCache = new LruCache<string, AutoAgingSourceLedgerResult>({ max: 32, ttlMs: 30_000 });
+
+function toStringOrNull(value: unknown): string | null {
+  return value == null ? null : String(value);
+}
+
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function mapBooleanRecord(value: unknown): Record<string, boolean> {
+  const record = toRecord(value);
+  return Object.fromEntries(Object.entries(record).map(([key, item]) => [key, Boolean(item)]));
+}
+
+function mapNumberRecord(value: unknown): Record<string, number> {
+  const record = toRecord(value);
+  return Object.fromEntries(Object.entries(record).map(([key, item]) => [key, Number(item ?? 0)]));
+}
+
+function mapSourceLedgerRow(row: Record<string, unknown>): AutoAgingSourceLedgerRow {
+  return {
+    sourceKey: String(row.source_key || ''),
+    vehicleId: toStringOrNull(row.vehicle_id),
+    salesOrderId: toStringOrNull(row.sales_order_id),
+    chassisNo: toStringOrNull(row.chassis_no),
+    branchCode: toStringOrNull(row.branch_code),
+    model: toStringOrNull(row.model),
+    customerName: toStringOrNull(row.customer_name),
+    salesmanName: toStringOrNull(row.salesman_name),
+    paymentMethod: toStringOrNull(row.payment_method),
+    dmsSoNo: toStringOrNull(row.dms_so_no),
+    lastSourceAt: toStringOrNull(row.last_source_at),
+    needsReconciliation: Boolean(row.needs_reconciliation),
+    sourcePresence: mapBooleanRecord(row.source_presence),
+    sourceConflicts: toRecord(row.source_conflicts),
+    authority: toRecord(row.authority),
+    localFacts: toRecord(row.local_facts),
+    dmsFacts: toRecord(row.dms_facts),
+    legacyFacts: toRecord(row.legacy_facts),
+  };
+}
+
+export async function getAutoAgingReport(
+  params: AutoAgingReportParams,
+): Promise<{ data: AutoAgingReportResult; error: Error | null }> {
+  const queryId = `auto-aging-report-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
+  const cacheKey = JSON.stringify(params);
+  const cached = reportCache.get(cacheKey);
+  if (cached) {
+    performanceService.endQueryTimer(queryId, 'auto_aging_report_cached');
+    return { data: cached, error: null };
+  }
+
+  const { data, error } = await supabase.rpc('auto_aging_report' as never, {
+    p_report_type: params.reportType,
+    p_branch: params.branch ?? null,
+    p_model: params.model ?? null,
+    p_bg_date_from: params.bgDateFrom ?? null,
+    p_bg_date_to: params.bgDateTo ?? null,
+    p_limit: params.limit ?? 500,
+    p_offset: params.offset ?? 0,
+  } as never);
+
+  performanceService.endQueryTimer(queryId, 'auto_aging_report');
+
+  if (error) {
+    loggingService.error('auto_aging_report RPC failed', { params, error }, 'VehicleService');
+    return { data: { rows: [], totalCount: 0 }, error: new Error(error.message) };
+  }
+
+  const raw = (data ?? {}) as Record<string, unknown>;
+  const result: AutoAgingReportResult = {
+    rows: Array.isArray(raw.rows) ? raw.rows as Record<string, unknown>[] : [],
+    totalCount: Number(raw.total_count ?? 0),
+  };
+
+  reportCache.set(cacheKey, result);
+  return { data: result, error: null };
+}
+
+export async function getAutoAgingSourceLedger(
+  params: AutoAgingSourceLedgerParams = {},
+): Promise<{ data: AutoAgingSourceLedgerResult; error: Error | null }> {
+  const queryId = `auto-aging-source-ledger-${Date.now()}`;
+  performanceService.startQueryTimer(queryId);
+
+  const cacheKey = JSON.stringify(params);
+  const cached = sourceLedgerCache.get(cacheKey);
+  if (cached) {
+    performanceService.endQueryTimer(queryId, 'auto_aging_source_ledger_cached');
+    return { data: cached, error: null };
+  }
+
+  const { data, error } = await supabase.rpc('auto_aging_source_ledger' as never, {
+    p_branch: params.branch ?? null,
+    p_model: params.model ?? null,
+    p_search: params.search ?? null,
+    p_bg_date_from: params.bgDateFrom ?? null,
+    p_bg_date_to: params.bgDateTo ?? null,
+    p_limit: params.limit ?? 100,
+    p_offset: params.offset ?? 0,
+  } as never);
+
+  performanceService.endQueryTimer(queryId, 'auto_aging_source_ledger');
+
+  if (error) {
+    loggingService.error('auto_aging_source_ledger RPC failed', { params, error }, 'VehicleService');
+    return {
+      data: { rows: [], totalCount: 0, sourceCounts: {}, generatedAt: null },
+      error: new Error(error.message),
+    };
+  }
+
+  const raw = (data ?? {}) as Record<string, unknown>;
+  const result: AutoAgingSourceLedgerResult = {
+    rows: Array.isArray(raw.rows)
+      ? raw.rows.map(item => mapSourceLedgerRow(item as Record<string, unknown>))
+      : [],
+    totalCount: Number(raw.total_count ?? 0),
+    sourceCounts: mapNumberRecord(raw.source_counts),
+    generatedAt: toStringOrNull(raw.generated_at),
+  };
+
+  sourceLedgerCache.set(cacheKey, result);
+  return { data: result, error: null };
+}
+
+// ---------------------------------------------------------------------------
 // Phase 2 #17: server-side paginated search + KPI summary
 // ---------------------------------------------------------------------------
 
@@ -331,11 +522,13 @@ const searchCache = new LruCache<string, VehicleSearchResult>({ max: 64, ttlMs: 
 const kpiCache = new LruCache<string, VehicleKpiSummary>({ max: 16, ttlMs: 30_000 });
 const dashboardSummaryCache = new LruCache<string, AutoAgingDashboardSummary>({ max: 32, ttlMs: 30_000 });
 
-/** Clear the paginated search + KPI caches. Call after vehicle mutations. */
+/** Clear the paginated search + KPI + report caches. Call after vehicle mutations. */
 export function invalidateVehicleCaches(): void {
   searchCache.clear();
   kpiCache.clear();
   dashboardSummaryCache.clear();
+  reportCache.clear();
+  sourceLedgerCache.clear();
 }
 
 export async function searchVehicles(

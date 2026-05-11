@@ -33,7 +33,7 @@ const EMPTY_FORM = { fromBranch: '', toBranch: '', chassisNo: '', model: '', col
 export default function VehicleTransfer() {
   const { user } = useAuth();
   const companyId = useCompanyId();
-  const { vehicles } = useData();
+  const { availableBranches } = useData();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -43,7 +43,7 @@ export default function VehicleTransfer() {
   const [form, setForm]           = useState(EMPTY_FORM);
   const [saving, setSaving]       = useState(false);
 
-  const branches = [...new Set(vehicles.map(v => v.branch_code).filter(Boolean))].sort() as string[];
+  const branches = availableBranches;
 
   const { data: transfers = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['vehicle-transfers', companyId],

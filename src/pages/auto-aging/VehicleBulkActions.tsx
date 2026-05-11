@@ -22,13 +22,13 @@ interface VehicleBulkActionsProps {
 
 export function VehicleBulkActions({ selectedVehicles, action, onComplete }: VehicleBulkActionsProps) {
   const { user } = useAuth();
-  const { reloadFromDb, vehicles } = useData();
+  const { reloadFromDb, availableBranches } = useData();
   const { toast } = useToast();
   const [loading, setLoading] = React.useState(false);
   const [open, setOpen] = React.useState(true);
   const [targetBranch, setTargetBranch] = React.useState('');
 
-  const branches = [...new Set(vehicles.map(v => v.branch_code))].sort();
+  const branches = availableBranches;
 
   useEffect(() => { setOpen(true); }, []);
 

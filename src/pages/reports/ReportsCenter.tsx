@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { Download, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import { REPORT_PAGE_SIZE, type ReportConfig, type ReportRow, REPORTS } from '@/services/businessReportService';
+import { Download, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { REPORT_PAGE_SIZE, REPORT_EXPORT_CAP, type ReportConfig, type ReportRow, REPORTS } from '@/services/businessReportService';
 
 function ReportTab({ config, companyId }: { config: ReportConfig; companyId: string }) {
   const today = new Date().toISOString().slice(0, 10);
@@ -38,10 +38,15 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
 
   const generate = () => loadPage(0);
 
+  const [exportCapped, setExportCapped] = useState(false);
+
   const exportCSV = async () => {
     setExporting(true);
+    setExportCapped(false);
     try {
-      const all = await config.fetchAll(companyId, from, to);
+      const result = await config.fetchAll(companyId, from, to);
+      const all = result.rows;
+      if (result.totalCount > REPORT_EXPORT_CAP) setExportCapped(true);
       const header = config.columns.map(c => c.label).join(',');
       const body = all.map(r => config.columns.map(c => {
         const v = r[c.key];
@@ -130,6 +135,12 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
               </Button>
             </div>
           </div>
+        {exportCapped && (
+          <div className="flex items-center gap-2 mt-3 px-1">
+            <AlertTriangle className="h-3.5 w-3.5 text-warning flex-shrink-0" />
+            <p className="text-xs text-warning">Export was capped at {REPORT_EXPORT_CAP.toLocaleString()} rows. Total records: {totalCount.toLocaleString()}.</p>
+          </div>
+        )}
         </>
       )}
     </div>

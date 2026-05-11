@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
+import { useCompanyId } from '@/hooks/useCompanyId';
+import { getVehicleByChassis } from '@/services/vehicleService';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, Pencil, TrendingUp } from 'lucide-react';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
@@ -10,14 +13,49 @@ import { VehicleEditDialog } from '@/components/vehicles/VehicleEditDialog';
 import { forecastVehicleMilestones, getVehicleRisk } from '@/utils/forecasting';
 import { Badge } from '@/components/ui/badge';
 import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
+import { getQualityIssuesByChassis } from '@/services/autoAgingDataService';
+import { getLinkedSalesOrderForVehicle } from '@/services/salesOrderService';
 
 export default function VehicleDetail() {
   const { chassisNo } = useParams<{ chassisNo: string }>();
-  const { vehicles, qualityIssues, kpiSummaries, slas, loading, reloadFromDb } = useData();
+  const { kpiSummaries, slas } = useData();
+  const companyId = useCompanyId();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
 
-  const vehicle = vehicles.find(v => v.chassis_no === chassisNo);
+  const { data: vehicle, isLoading: vehicleLoading } = useQuery({
+    queryKey: ['vehicle-detail', companyId, chassisNo],
+    queryFn: async () => {
+      if (!companyId || !chassisNo) return null;
+      const res = await getVehicleByChassis(companyId, chassisNo);
+      if (res.error) throw res.error;
+      return res.data;
+    },
+    enabled: !!companyId && !!chassisNo,
+    staleTime: 15_000,
+  });
+
+  const { data: issues = [] } = useQuery({
+    queryKey: ['vehicle-detail-issues', companyId, chassisNo],
+    queryFn: () => getQualityIssuesByChassis(companyId, chassisNo!),
+    enabled: !!companyId && !!chassisNo,
+    staleTime: 15_000,
+  });
+
+  const { data: linkedSalesOrder } = useQuery({
+    queryKey: ['vehicle-detail-linked-sales-order', companyId, vehicle?.id, vehicle?.chassis_no],
+    queryFn: async () => {
+      if (!companyId || !vehicle) return null;
+      const res = await getLinkedSalesOrderForVehicle(companyId, vehicle.id, vehicle.chassis_no);
+      if (res.error) throw res.error;
+      return res.data;
+    },
+    enabled: !!companyId && !!vehicle,
+    staleTime: 15_000,
+  });
+
+  const loading = vehicleLoading;
 
   if (loading && !vehicle) {
     return (
@@ -35,8 +73,6 @@ export default function VehicleDetail() {
       </div>
     );
   }
-
-  const issues = qualityIssues.filter(q => q.chassisNo === chassisNo);
 
   const milestones = [
     { label: getAutoAgingFieldLabel('bg_date', 'BG DATE'), date: vehicle.bg_date },
@@ -103,6 +139,29 @@ export default function VehicleDetail() {
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="glass-panel p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Linked Sales Order</h3>
+          {linkedSalesOrder ? (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {[
+                ['Order No', linkedSalesOrder.orderNo],
+                ['VSO No', linkedSalesOrder.vsoNo || '—'],
+                ['Customer', linkedSalesOrder.customerName || '—'],
+                ['Salesman', linkedSalesOrder.salesmanName || '—'],
+                ['Status', linkedSalesOrder.status],
+                ['Booking Date', linkedSalesOrder.bookingDate],
+              ].map(([label, value]) => (
+                <div key={label as string}>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-foreground font-medium capitalize">{value}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No sales order is linked to this vehicle yet.</p>
+          )}
         </div>
 
         <div className="glass-panel p-5">
@@ -210,7 +269,7 @@ export default function VehicleDetail() {
         vehicle={vehicle}
         open={editOpen}
         onOpenChange={setEditOpen}
-        onSaved={() => reloadFromDb()}
+        onSaved={() => queryClient.invalidateQueries({ queryKey: ['vehicle-detail', companyId, chassisNo] })}
       />
     </div>
   );

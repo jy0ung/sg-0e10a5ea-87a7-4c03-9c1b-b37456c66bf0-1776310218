@@ -43,6 +43,38 @@ Set via `supabase secrets set` — never via client env:
 - `RESEND_API_KEY` (or SMTP equivalents)
 - `PUSH_NOTIFICATION_KEY`
 
+## DMS sync secrets
+
+Phase 5 DMS integration must run only from backend workers, scheduled jobs, or edge functions. Do not add any `VITE_DMS_*` variable; `VITE_*` values are bundled into the browser app.
+
+Provision DMS values through Supabase secrets, a systemd env file, or the deployment secret manager used by the backend worker:
+
+- `DMS_API_BASE_URL` — Proton DMS API origin, for example `https://dcs-api.proton.com`.
+- `DMS_CLIENT_ID` — DMS integration client or dealer identifier.
+- `DMS_CLIENT_SECRET` — DMS integration secret.
+- `DMS_SIGNING_KEY` — request signing key or HMAC secret when required by Proton.
+- `DMS_TOKEN_URL` — optional token endpoint if different from `DMS_API_BASE_URL`.
+- `DMS_DEFAULT_COMPANY_ID` — UBS company id used by first read-only sync jobs when no tenant mapping table exists yet.
+
+The first DMS sync remains read-only. Raw responses must land in `sync_runs` and `dms_raw_*` staging tables before any canonical UBS table is updated.
+
+`supabase/functions/dms-sync-worker` is the first backend skeleton. It accepts caller-supplied raw DMS records, creates a `sync_runs` audit row, and upserts those records into the selected `dms_raw_*` staging table. It does not perform live DMS fetches yet, and it must not be exposed to the browser as a normal page dependency.
+
+All Edge Functions are declared in `supabase/config.toml` under `[functions.*]` sections. For the self-hosted `supabase-edge-runtime` container, set the following env var and restart the Edge Runtime service before invoking any function in production:
+
+```
+SUPABASE_INTERNAL_FUNCTIONS_CONFIG='[
+  {"name":"invite-user","verify_jwt":true},
+  {"name":"delete-user","verify_jwt":true},
+  {"name":"update-user-status","verify_jwt":true},
+  {"name":"send-push-notification","verify_jwt":true},
+  {"name":"rollover-leave-balances","verify_jwt":true},
+  {"name":"dms-sync-worker","verify_jwt":true}
+]'
+```
+
+Add new function names to this list whenever a new Edge Function is deployed. The same list is documented as a comment in `supabase/config.toml`.
+
 ## Self-hosted auth SMTP relay
 
 Production auth email for invites and password resets is sent by self-hosted Supabase Auth, not by the frontend app. Keep Mailpit for local development and configure the live server with `scripts/configure-supabase-auth-smtp.sh`.

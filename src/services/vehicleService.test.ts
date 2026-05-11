@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getAutoAgingDashboardSummary,
+  getAutoAgingSourceLedger,
   getVehicleById,
   invalidateVehicleCaches,
   searchVehicles,
@@ -222,6 +223,76 @@ describe('vehicleService', () => {
         p_model: 'X50',
         p_from: '2026-04-01',
         p_to: '2026-04-30',
+      });
+    });
+  });
+
+  describe('getAutoAgingSourceLedger', () => {
+    it('maps the source ledger RPC payload and parameters', async () => {
+      vi.mocked(supabase.rpc).mockResolvedValue({
+        data: {
+          rows: [
+            {
+              source_key: 'chassis:ch001',
+              vehicle_id: 'vehicle-1',
+              sales_order_id: 'sales-order-1',
+              chassis_no: 'CH001',
+              branch_code: 'KK',
+              model: 'X50',
+              customer_name: 'Customer A',
+              salesman_name: 'Advisor A',
+              payment_method: 'Loan',
+              dms_so_no: 'SO-001',
+              last_source_at: '2026-05-10T12:00:00Z',
+              needs_reconciliation: true,
+              source_presence: { ubs_vehicle: true, dms_vehicle_stock: true, legacy_invoice: false },
+              source_conflicts: { branch_code: { ubs: 'KK', source: 'TWU' } },
+              authority: { proton_dms: ['stock_status'], ubs: ['lou'] },
+              local_facts: { lou: 'Pending' },
+              dms_facts: { stock_status: 'Allocated' },
+              legacy_facts: {},
+            },
+          ],
+          total_count: 1,
+          source_counts: { ubs_vehicle: 1, dms_vehicle_stock: 1, needs_reconciliation: 1 },
+          generated_at: '2026-05-10T12:01:00Z',
+        },
+        error: null,
+      } as any);
+
+      const result = await getAutoAgingSourceLedger({
+        branch: 'KK',
+        model: 'X50',
+        search: 'CH001',
+        bgDateFrom: '2026-04-01',
+        bgDateTo: '2026-04-30',
+        limit: 20,
+        offset: 40,
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.data.totalCount).toBe(1);
+      expect(result.data.sourceCounts).toEqual({ ubs_vehicle: 1, dms_vehicle_stock: 1, needs_reconciliation: 1 });
+      expect(result.data.rows[0]).toMatchObject({
+        sourceKey: 'chassis:ch001',
+        vehicleId: 'vehicle-1',
+        salesOrderId: 'sales-order-1',
+        chassisNo: 'CH001',
+        branchCode: 'KK',
+        dmsSoNo: 'SO-001',
+        needsReconciliation: true,
+        sourcePresence: { ubs_vehicle: true, dms_vehicle_stock: true, legacy_invoice: false },
+        localFacts: { lou: 'Pending' },
+        dmsFacts: { stock_status: 'Allocated' },
+      });
+      expect(supabase.rpc).toHaveBeenCalledWith('auto_aging_source_ledger', {
+        p_branch: 'KK',
+        p_model: 'X50',
+        p_search: 'CH001',
+        p_bg_date_from: '2026-04-01',
+        p_bg_date_to: '2026-04-30',
+        p_limit: 20,
+        p_offset: 40,
       });
     });
   });

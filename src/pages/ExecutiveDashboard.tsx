@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useData } from '@/contexts/DataContext';
+import { getAutoAgingDashboardSummary, getAutoAgingReport, searchVehicles } from '@/services/vehicleService';
 import { useAuth } from '@/contexts/AuthContext';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { AlertTriangle, BarChart3, CalendarCheck, Car, CheckCircle, Loader2, Settings2, ShoppingCart, Sparkles, Timer, TrendingUp, type LucideIcon, UserPlus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
 import {
   fetchDashboardPreferences,
   upsertDashboardPreferences,
@@ -14,7 +16,7 @@ import { ExecutiveDashboardSettings } from './ExecutiveDashboardSettings';
 import { useSales } from '@/contexts/SalesContext';
 import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { BranchPeriodFilter } from '@/components/shared/BranchPeriodFilter';
-import { getDashboardScopeSummary, loadDashboardFilterState, matchesDashboardPeriod, saveDashboardFilterState } from '@/lib/dashboardFilters';
+import { getDashboardPeriodRange, getDashboardScopeSummary, loadDashboardFilterState, matchesDashboardPeriod, saveDashboardFilterState } from '@/lib/dashboardFilters';
 import {
   CUSTOM_INSIGHT_DEFINITIONS,
   DEFAULT_PERSONAL_DASHBOARD,
@@ -40,6 +42,11 @@ const KpiDashboard = React.lazy(() => import('@/components/KpiDashboard').then((
 const ALL_KPI_IDS = KPI_DEFINITIONS.map(k => k.id);
 const BASIC_KPIS = ['bg_to_delivery', 'bg_to_disb'];
 const ADVANCED_KPIS = ALL_KPI_IDS;
+const EXECUTIVE_VEHICLE_SAMPLE_LIMIT = 5_000;
+
+function toServerValue(value: string): string | null {
+  return value === 'all' ? null : value;
+}
 
 interface DashboardCardMetric {
   key: string;
@@ -58,7 +65,7 @@ type DashboardRenderBlock =
   | { kind: 'custom-group'; widgets: DashboardCustomWidget[] };
 
 export default function ExecutiveDashboard() {
-  const { kpiSummaries, vehicles, qualityIssues, lastRefresh, importBatches, loading } = useData();
+  const { kpiSummaries: contextKpiSummaries, lastRefresh, importBatches, loading, availableBranches: contextBranches, availableModels: contextModels } = useData();
   const { user } = useAuth();
   const { salesOrders, customers } = useSales();
 
@@ -71,6 +78,9 @@ export default function ExecutiveDashboard() {
   const [newInsightMetricId, setNewInsightMetricId] = useState<CustomInsightMetricId>(CUSTOM_INSIGHT_DEFINITIONS[0].id);
   const [newInsightTitle, setNewInsightTitle] = useState('');
   const { branch: branchFilter, period: periodFilter, model: modelFilter } = dashboardFilter;
+  const periodRange = useMemo(() => getDashboardPeriodRange(periodFilter), [periodFilter]);
+  const bgDateFrom = periodRange.from?.toISOString().slice(0, 10) ?? null;
+  const bgDateTo = periodRange.to?.toISOString().slice(0, 10) ?? null;
 
   // Load preferences
   useEffect(() => {
@@ -208,27 +218,62 @@ export default function ExecutiveDashboard() {
     void savePreferences(selectedKpis, showAdvanced, nextDashboard);
   }, [savePreferences, selectedKpis, showAdvanced]);
 
+  // Merge DataContext summary branches/models with sales order values
   const availableBranches = useMemo(() => {
-    const branchValues = new Set<string>();
-    vehicles.forEach(vehicle => {
-      if (vehicle.branch_code) branchValues.add(vehicle.branch_code);
-    });
+    const branchValues = new Set<string>(contextBranches);
     salesOrders.forEach(order => {
       if (order.branchCode) branchValues.add(order.branchCode);
     });
     return Array.from(branchValues).sort();
-  }, [salesOrders, vehicles]);
+  }, [contextBranches, salesOrders]);
 
   const availableModels = useMemo(() => {
-    const modelValues = new Set<string>();
-    vehicles.forEach(vehicle => {
-      if (vehicle.model) modelValues.add(vehicle.model);
-    });
+    const modelValues = new Set<string>(contextModels);
     salesOrders.forEach(order => {
       if (order.model) modelValues.add(order.model);
     });
     return Array.from(modelValues).sort();
-  }, [salesOrders, vehicles]);
+  }, [contextModels, salesOrders]);
+
+  const dashboardSummaryParams = useMemo(() => ({
+    branch: toServerValue(branchFilter),
+    model: toServerValue(modelFilter),
+    bgDateFrom,
+    bgDateTo,
+  }), [bgDateFrom, bgDateTo, branchFilter, modelFilter]);
+
+  const { data: dashboardSummary } = useQuery({
+    queryKey: ['executive-dashboard-auto-aging-summary', user?.company_id, dashboardSummaryParams] as const,
+    queryFn: async () => {
+      const res = await getAutoAgingDashboardSummary(dashboardSummaryParams);
+      if (res.error) throw res.error;
+      return res.data;
+    },
+    enabled: !!user?.company_id,
+    placeholderData: previous => previous,
+    staleTime: 15_000,
+  });
+
+  const { data: vehicleSlice } = useQuery({
+    queryKey: ['executive-dashboard-vehicle-slice', user?.company_id, dashboardSummaryParams] as const,
+    queryFn: async () => {
+      const res = await searchVehicles({
+        branch: dashboardSummaryParams.branch,
+        model: dashboardSummaryParams.model,
+        bgDateFrom: dashboardSummaryParams.bgDateFrom,
+        bgDateTo: dashboardSummaryParams.bgDateTo,
+        limit: EXECUTIVE_VEHICLE_SAMPLE_LIMIT,
+        offset: 0,
+        sortColumn: 'bg_date',
+        sortDirection: 'desc',
+      });
+      if (res.error) throw res.error;
+      return res.data;
+    },
+    enabled: !!user?.company_id,
+    placeholderData: previous => previous,
+    staleTime: 15_000,
+  });
 
   useEffect(() => {
     if (branchFilter !== 'all' && availableBranches.length > 0 && !availableBranches.includes(branchFilter)) {
@@ -242,13 +287,9 @@ export default function ExecutiveDashboard() {
     }
   }, [availableModels, modelFilter]);
 
-  const scopedVehicles = useMemo(() => {
-    return vehicles.filter(vehicle => {
-      if (branchFilter !== 'all' && vehicle.branch_code !== branchFilter) return false;
-      if (modelFilter !== 'all' && vehicle.model !== modelFilter) return false;
-      return true;
-    });
-  }, [branchFilter, modelFilter, vehicles]);
+  const scopedVehicles = useMemo(() => vehicleSlice?.rows ?? [], [vehicleSlice?.rows]);
+  const scopedVehicleCount = vehicleSlice?.totalCount ?? scopedVehicles.length;
+  const vehicleSliceIsCapped = scopedVehicleCount > scopedVehicles.length;
 
   const filteredVehicles = useMemo(() => {
     return scopedVehicles.filter(vehicle => {
@@ -289,13 +330,13 @@ export default function ExecutiveDashboard() {
     });
   }, [customers, periodFilter, scopedCustomerIds]);
 
-  const filteredQualityIssues = useMemo(() => {
-    const chassisNumbers = new Set(filteredVehicles.map(vehicle => vehicle.chassis_no));
-    return qualityIssues.filter(issue => chassisNumbers.has(issue.chassisNo));
-  }, [filteredVehicles, qualityIssues]);
+  const summaryKpiSummaries = dashboardSummary?.kpiSummaries ?? contextKpiSummaries;
 
   const filteredKpiSummaries = useMemo(() => {
-    const slas = kpiSummaries.map(summary => ({
+    if (summaryKpiSummaries.length > 0) {
+      return summaryKpiSummaries;
+    }
+    const slas = contextKpiSummaries.map(summary => ({
       id: summary.kpiId,
       kpiId: summary.kpiId,
       label: summary.label,
@@ -303,7 +344,9 @@ export default function ExecutiveDashboard() {
       companyId: user?.company_id || '',
     }));
     return computeKpiSummaries(filteredVehicles, slas);
-  }, [filteredVehicles, kpiSummaries, user?.company_id]);
+  }, [contextKpiSummaries, filteredVehicles, summaryKpiSummaries, user?.company_id]);
+
+  const filteredQualityIssues = useMemo(() => dashboardSummary?.qualityIssueSample ?? [], [dashboardSummary?.qualityIssueSample]);
 
   const visibleKpis = filteredKpiSummaries.filter(k => selectedKpis.includes(k.kpiId));
 
@@ -311,9 +354,12 @@ export default function ExecutiveDashboard() {
   const periodBookingAmt = filteredSalesOrders.reduce((sum, order) => sum + (order.totalPrice ?? 0), 0);
   const periodCarsOut = scopedVehicles.filter(vehicle => matchesDashboardPeriod(vehicle.delivery_date, periodFilter)).length;
   const periodNewCustomers = filteredCustomers.length;
-  const totalVehicles = filteredVehicles.length;
+  const summaryVehicleCount = filteredKpiSummaries.length > 0
+    ? Math.max(...filteredKpiSummaries.map(s => s.validCount + s.invalidCount + s.missingCount))
+    : 0;
+  const totalVehicles = Math.max(summaryVehicleCount, scopedVehicleCount);
   const totalOverdue = filteredKpiSummaries.reduce((sum, summary) => sum + summary.overdueCount, 0);
-  const totalIssues = filteredQualityIssues.length;
+  const totalIssues = dashboardSummary?.qualityIssueCount ?? filteredQualityIssues.length;
   const lastBatch = importBatches[0];
   const slaCompliance = useMemo(() => {
     if (filteredKpiSummaries.length === 0) return 0;
@@ -324,7 +370,33 @@ export default function ExecutiveDashboard() {
 
   const scopeLabel = getDashboardScopeSummary(dashboardFilter);
 
+  // Server-side branch comparison data via auto_aging_report RPC
+  const branchReportParams = useMemo(() => ({
+    reportType: 'sla_compliance' as const,
+    branch: branchFilter !== 'all' ? branchFilter : undefined,
+    model: modelFilter !== 'all' ? modelFilter : undefined,
+  }), [branchFilter, modelFilter]);
+
+  const { data: branchReportResult } = useQuery({
+    queryKey: ['exec-dashboard-branch-comparison', branchReportParams] as const,
+    queryFn: async () => {
+      const res = await getAutoAgingReport(branchReportParams);
+      if (res.error) throw res.error;
+      return res.data;
+    },
+    placeholderData: (prev) => prev,
+  });
+
   const branchData = useMemo(() => {
+    // Prefer server-side data when available
+    if (branchReportResult && branchReportResult.rows.length > 0) {
+      return branchReportResult.rows.map(row => ({
+        branch: String(row['Branch'] ?? ''),
+        avg: Number(row['BG → Delivery Median'] ?? 0),
+        count: Number(row['Vehicles'] ?? 0),
+      })).sort((a, b) => b.avg - a.avg);
+    }
+    // Fallback while the server-side branch comparison query is loading.
     const groups = new Map<string, number[]>();
     filteredVehicles.forEach(v => {
       if (v.bg_to_delivery !== null && v.bg_to_delivery !== undefined && v.bg_to_delivery >= 0) {
@@ -338,7 +410,7 @@ export default function ExecutiveDashboard() {
       avg: Math.round(vals.reduce((s, v) => s + v, 0) / vals.length),
       count: vals.length,
     })).sort((a, b) => b.avg - a.avg);
-  }, [filteredVehicles]);
+  }, [branchReportResult, filteredVehicles]);
 
   const chartColors = [
     'hsl(var(--primary))',
@@ -382,13 +454,14 @@ export default function ExecutiveDashboard() {
       {
         key: 'vehicles-in-scope',
         label: 'Vehicles in Scope',
-        value: filteredVehicles.length,
+        value: totalVehicles,
+        helperText: vehicleSliceIsCapped ? `${scopedVehicles.length.toLocaleString()} loaded for custom widgets` : undefined,
         icon: CalendarCheck,
         iconClassName: 'bg-orange-500/10 text-orange-500',
         valueClassName: 'text-orange-500',
       },
     ];
-  }, [filteredVehicles.length, periodBookingAmt, periodBookings.length, periodCarsOut, periodNewCustomers]);
+  }, [periodBookingAmt, periodBookings.length, periodCarsOut, periodNewCustomers, scopedVehicles.length, totalVehicles, vehicleSliceIsCapped]);
 
   const scorecards = useMemo<DashboardCardMetric[]>(() => ([
     {

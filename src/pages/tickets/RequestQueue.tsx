@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 import {
   AlertCircle,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Download,
   Loader2,
@@ -34,7 +36,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   addTicketComment,
-  listCompanyTickets,
+  listCompanyTicketsPage,
   listTicketActivity,
   type CompanyTicketRecord,
   type TicketActivityRecord,
@@ -68,6 +70,7 @@ const priorityOptions: Array<{ value: TicketPriority; label: string }> = [
 ];
 
 const requestOwnerRoles = new Set(ADMIN_ONLY);
+const REQUEST_QUEUE_PAGE_SIZE = 25;
 
 function useIsLargeScreen() {
   const [isLargeScreen, setIsLargeScreen] = useState(() => {
@@ -133,6 +136,8 @@ export default function RequestQueue() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [slaFilter, setSlaFilter] = useState<SlaFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [metricsExpanded, setMetricsExpanded] = useState(() => {
@@ -157,7 +162,13 @@ export default function RequestQueue() {
     setError(null);
 
     const [{ data, error: fetchError }, profileResult] = await Promise.all([
-      listCompanyTickets(user.company_id),
+      listCompanyTicketsPage(user.company_id, {
+        page,
+        pageSize: REQUEST_QUEUE_PAGE_SIZE,
+        status: statusFilter,
+        priority: priorityFilter,
+        search: searchTerm,
+      }),
       listProfiles(user.company_id),
     ]);
 
@@ -166,8 +177,9 @@ export default function RequestQueue() {
     } else if (profileResult.error) {
       setError(profileResult.error || 'Unable to load request owners.');
     } else {
-      const nextTickets = data ?? [];
+      const nextTickets = data?.rows ?? [];
       setTickets(nextTickets);
+      setTotalCount(data?.totalCount ?? 0);
       setAssignees(
         profileResult.data
           .filter((profile) => profile.status === 'active' && requestOwnerRoles.has(profile.role))
@@ -190,11 +202,15 @@ export default function RequestQueue() {
     }
 
     setLoading(false);
-  }, [user]);
+  }, [page, priorityFilter, searchTerm, statusFilter, user]);
 
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [priorityFilter, searchTerm, statusFilter]);
 
   useEffect(() => {
     if (isLargeScreen) setDetailDrawerOpen(false);
@@ -234,6 +250,8 @@ export default function RequestQueue() {
   const selectedTicket = useMemo(() => {
     return filteredTickets.find((ticket) => ticket.id === selectedTicketId) ?? filteredTickets[0] ?? null;
   }, [filteredTickets, selectedTicketId]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / REQUEST_QUEUE_PAGE_SIZE));
 
   useEffect(() => {
     if (!selectedTicket) {
@@ -608,6 +626,40 @@ export default function RequestQueue() {
           </section>
         </div>
       ) : null}
+
+      {!loading && !error && totalCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+          <span>
+            Showing {((page - 1) * REQUEST_QUEUE_PAGE_SIZE + 1).toLocaleString()}-
+            {Math.min(page * REQUEST_QUEUE_PAGE_SIZE, totalCount).toLocaleString()} of {totalCount.toLocaleString()} requests
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <span className="text-xs">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Drawer open={!isLargeScreen && detailDrawerOpen && !!selectedTicket} onOpenChange={setDetailDrawerOpen}>
         <DrawerContent className="max-h-[92vh]">

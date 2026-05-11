@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -9,8 +8,7 @@ import {
   type ModuleSettingRecord,
   type ResolvedPlatformModule,
 } from '@/lib/moduleAccess';
-
-type ModuleSettingRow = Database['public']['Tables']['module_settings']['Row'];
+import { fetchModuleSettings, upsertModuleSetting, type ModuleSettingRow } from '@/services/moduleSettingsService';
 
 interface ModuleAccessContextValue {
   modules: ResolvedPlatformModule[];
@@ -26,16 +24,6 @@ const ModuleAccessContext = createContext<ModuleAccessContextValue | undefined>(
 
 function getModuleSettingsQueryKey(companyId: string) {
   return ['module-settings', companyId] as const;
-}
-
-async function fetchModuleSettings(companyId: string): Promise<ModuleSettingRow[]> {
-  const { data, error } = await supabase
-    .from('module_settings')
-    .select('*')
-    .eq('company_id', companyId);
-
-  if (error) throw error;
-  return data ?? [];
 }
 
 export function ModuleAccessProvider({ children }: { children: React.ReactNode }) {
@@ -92,9 +80,7 @@ export function ModuleAccessProvider({ children }: { children: React.ReactNode }
       updated_by: user?.id ?? null,
     };
 
-    const { error } = await supabase
-      .from('module_settings')
-      .upsert(payload, { onConflict: 'company_id,module_id' });
+    const { error } = await upsertModuleSetting(payload);
 
     if (error) throw error;
 

@@ -15,7 +15,6 @@ import { loggingService } from '@/services/loggingService';
 import { VehicleBulkActions } from './VehicleBulkActions';
 import { VehicleExplorerFilters, type VehicleFilterState } from './VehicleExplorerFilters';
 import { useVehicleExplorerColumns, type VehicleRow } from './useVehicleExplorerColumns';
-import { deriveVehicleStage } from '@/utils/vehicleStage';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250] as const;
 
@@ -34,53 +33,6 @@ function getRowValue(row: VehicleRow, key: string): unknown {
   return (row as unknown as Record<string, unknown>)[key];
 }
 
-function filterVehicles(vehicles: VehicleCanonical[], filters: VehicleFilterState): VehicleCanonical[] {
-  const { search, branch, model, payment, stage } = filters;
-  const needle = search.toLowerCase();
-  return vehicles.filter((v) => {
-    if (
-      needle &&
-      !v.chassis_no.toLowerCase().includes(needle) &&
-      !v.customer_name.toLowerCase().includes(needle) &&
-      !v.invoice_no?.toLowerCase().includes(needle)
-    ) {
-      return false;
-    }
-    if (branch !== 'all' && v.branch_code !== branch) return false;
-    if (model !== 'all' && v.model !== model) return false;
-    if (payment !== 'all') {
-      const raw = (v.payment_method ?? '').trim();
-      if (payment === 'Unspecified') {
-        const isUnspec = !raw || raw.toLowerCase() === 'unknown' || raw === '-' || raw === '\u2014';
-        if (!isUnspec) return false;
-      } else if (raw.toUpperCase() !== payment.toUpperCase()) {
-        return false;
-      }
-    }
-    if (stage !== 'all') {
-      const current = v.stage_override ?? v.stage ?? deriveVehicleStage(v);
-      if (current !== stage) return false;
-    }
-    return true;
-  });
-}
-
-function sortVehicles(rows: VehicleCanonical[], sortField: string, sortDir: 'asc' | 'desc'): VehicleCanonical[] {
-  return [...rows].sort((a, b) => {
-    const aVal = getRowValue(a as VehicleRow, sortField);
-    const bVal = getRowValue(b as VehicleRow, sortField);
-
-    if (aVal == null) return 1;
-    if (bVal == null) return -1;
-    if (typeof aVal === 'string' && typeof bVal === 'string') {
-      return sortDir === 'desc' ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
-    }
-    return sortDir === 'desc'
-      ? (bVal as number) - (aVal as number)
-      : (aVal as number) - (bVal as number);
-  });
-}
-
 function toServerValue(value: string): string | null {
   return value === 'all' ? null : value;
 }
@@ -91,7 +43,7 @@ function normalizeServerSortField(sortField: string): string {
 
 export default function VehicleExplorer() {
   const { user } = useAuth();
-  const { vehicles, loading, loadErrors, reloadFromDb } = useData();
+  const { loading, loadErrors, reloadFromDb, availableBranches, availableModels } = useData();
   const queryClient = useQueryClient();
   const { chassis_no: chassisParam } = useParams();
   const [searchParams] = useSearchParams();
@@ -174,10 +126,9 @@ export default function VehicleExplorer() {
     staleTime: 15_000,
   });
 
-  const usingServerData = Boolean(serverQuery.data && !serverQuery.error);
   const optionRows = useMemo(
-    () => (vehicles.length > 0 ? vehicles : serverQuery.data?.rows ?? []),
-    [vehicles, serverQuery.data?.rows],
+    () => serverQuery.data?.rows ?? [],
+    [serverQuery.data?.rows],
   );
 
   useEffect(() => {
@@ -187,46 +138,29 @@ export default function VehicleExplorer() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (chassisParam) {
-      const vehicle = vehicles.find((v) => v.chassis_no === chassisParam);
+    if (chassisParam && serverQuery.data) {
+      const vehicle = serverQuery.data.rows.find((v) => v.chassis_no === chassisParam);
       if (vehicle) {
         setSelectedVehicle(vehicle);
         setDetailPanelOpen(true);
       }
     }
-  }, [chassisParam, vehicles]);
+  }, [chassisParam, serverQuery.data]);
 
-  // Distinct values for filter dropdowns, derived from the full dataset so
-  // users can still filter to any legal value regardless of the visible page.
-  const branches = useMemo(
-    () => [...new Set(optionRows.map((v) => v.branch_code))].sort(),
-    [optionRows],
-  );
-  const models = useMemo(
-    () => [...new Set(optionRows.map((v) => v.model))].sort(),
-    [optionRows],
-  );
+  // Distinct values for filter dropdowns
+  const branches = useMemo(() => availableBranches.length > 0 ? availableBranches : [...new Set(optionRows.map((v) => v.branch_code))].sort(), [availableBranches, optionRows]);
+  const models = useMemo(() => availableModels.length > 0 ? availableModels : [...new Set(optionRows.map((v) => v.model))].sort(), [availableModels, optionRows]);
   const payments = useMemo(
     () => [...new Set(optionRows.map((v) => v.payment_method))].sort(),
     [optionRows],
   );
 
-  const fallbackFiltered = useMemo(
-    () => (usingServerData ? [] : filterVehicles(vehicles, filters)),
-    [usingServerData, vehicles, filters],
-  );
-  const fallbackSorted = useMemo(
-    () => (usingServerData ? [] : sortVehicles(fallbackFiltered, sortField, sortDir)),
-    [usingServerData, fallbackFiltered, sortField, sortDir],
-  );
-  const filteredCount = usingServerData ? serverQuery.data?.totalCount ?? 0 : fallbackFiltered.length;
-  const totalVehicleCount = vehicles.length > 0 ? vehicles.length : filteredCount;
+  const filteredCount = serverQuery.data?.totalCount ?? 0;
+  const totalVehicleCount = filteredCount; // Use filtered count for now since we don't fetch all
   const totalPages = Math.max(1, Math.ceil(filteredCount / filters.pageSize));
   const currentPage = Math.min(page, totalPages);
   const startIdx = (currentPage - 1) * filters.pageSize;
-  const pageData = usingServerData
-    ? serverQuery.data?.rows ?? []
-    : fallbackSorted.slice(startIdx, startIdx + filters.pageSize);
+  const pageData = serverQuery.data?.rows ?? [];
 
   useEffect(() => {
     setPage(1);
@@ -290,16 +224,31 @@ export default function VehicleExplorer() {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!userPermissions) {
       loggingService.warn('Permissions not loaded yet; skipping export', {}, 'VehicleExplorer');
       return;
     }
     setExportLoading(true);
     try {
+      // Fetch up to 10,000 matching vehicles for export to prevent client OOM
+      const res = await searchVehicles({
+        branch: toServerValue(filters.branch),
+        model: toServerValue(filters.model),
+        payment: toServerValue(filters.payment),
+        stage: toServerValue(filters.stage),
+        search: debouncedSearch.trim() || null,
+        limit: 10000,
+        offset: 0,
+        sortColumn: normalizeServerSortField(sortField),
+        sortDirection: sortDir,
+      });
+      if (res.error) throw res.error;
+      const exportRows = res.data.rows;
+
       const exportColumns = filteredColumns;
       const headers = exportColumns.map((c) => c.label).join(',');
-      const rows = sortVehicles(filterVehicles(vehicles, filters), sortField, sortDir)
+      const csvRows = exportRows
         .map((vehicle, index) =>
           exportColumns
             .map((col) => {
@@ -311,7 +260,7 @@ export default function VehicleExplorer() {
             .join(','),
         )
         .join('\n');
-      const csv = `${headers}\n${rows}`;
+      const csv = `${headers}\n${csvRows}`;
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -348,7 +297,7 @@ export default function VehicleExplorer() {
     setPendingBulkAction(null);
   };
 
-  if (loading && vehicles.length === 0 && !serverQuery.data && !serverQuery.isFetching) {
+  if (loading && !serverQuery.data && !serverQuery.isFetching) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 text-primary animate-spin" aria-label="Loading vehicles" />
@@ -356,7 +305,7 @@ export default function VehicleExplorer() {
     );
   }
 
-  if (loadErrors.length > 0 && vehicles.length === 0 && !usingServerData) {
+  if (loadErrors.length > 0 && !serverQuery.data && !serverQuery.isFetching) {
     return (
       <div className="space-y-4 animate-fade-in">
         <PageHeader

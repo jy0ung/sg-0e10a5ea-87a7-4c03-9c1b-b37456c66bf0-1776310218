@@ -163,37 +163,19 @@ export async function deleteVehicleColour(companyId: string, id: string): Promis
   return { error: error ? new Error(error.message) : null };
 }
 
-// ===== Generic helpers =====
-
-function mkSimple<T>(tbl: string, map: (r: Record<string,unknown>) => T) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const tb = () => (supabase as any).from(tbl);
-  return {
-    getAll: async (cid: string): Promise<{ data: T[]; error: Error|null }> => {
-      const { data, error } = await tb().select('*').eq('company_id', cid).order('created_at');
-      if (error) return { data: [], error: new Error(error.message) };
-      return { data: (data ?? []).map((r: Record<string,unknown>) => map(r)), error: null };
-    },
-    upsert: async (cid: string, fields: Partial<T> & { id?: string }): Promise<{ error: Error|null }> => {
-      const { id, ...rest } = fields as Record<string,unknown> & { id?: string };
-      const row: Record<string,unknown> = { company_id: cid, ...Object.fromEntries(Object.entries(rest).map(([k,v]) => [k.replace(/([A-Z])/g,'_$1').toLowerCase(), v])), updated_at: new Date().toISOString() };
-      const { error } = id ? await tb().update(row).eq('company_id', cid).eq('id', id) : await tb().insert({ ...row, id: crypto.randomUUID() });
-      return { error: error ? new Error(error.message) : null };
-    },
-    del: async (cid: string, id: string): Promise<{ error: Error|null }> => {
-      const { error } = await tb().delete().eq('company_id', cid).eq('id', id);
-      return { error: error ? new Error(error.message) : null };
-    },
-  };
-}
-
 // ===== TIN Types =====
-const _tt = mkSimple<TinType>('tin_types', r => ({ id: r.id as string, code: r.code as string, name: r.name as string, status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string }));
-export const getTinTypes = (cid: string) => _tt.getAll(cid);
+export const getTinTypes = async (cid: string): Promise<{ data: TinType[]; error: Error|null }> => {
+  const { data, error } = await supabase.from('tin_types').select('*').eq('company_id', cid).order('created_at');
+  if (error) return { data: [], error: new Error(error.message) };
+  return { data: (data ?? []).map(r => ({ id: r.id as string, code: r.code as string, name: r.name as string, status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
+};
 export const upsertTinType = (cid: string, f: Partial<TinType> & { id?: string }) =>
   f.id ? supabase.from('tin_types').update({ code: f.code, name: f.name, status: f.status, updated_at: new Date().toISOString() }).eq('company_id', cid).eq('id', f.id).then(({ error }) => ({ error: error ? new Error(error.message) : null }))
        : supabase.from('tin_types').insert({ id: crypto.randomUUID(), company_id: cid, code: f.code, name: f.name, status: f.status ?? 'Active' }).then(({ error }) => ({ error: error ? new Error(error.message) : null }));
-export const deleteTinType = (cid: string, id: string) => _tt.del(cid, id);
+export const deleteTinType = async (cid: string, id: string): Promise<{ error: Error|null }> => {
+  const { error } = await supabase.from('tin_types').delete().eq('company_id', cid).eq('id', id);
+  return { error: error ? new Error(error.message) : null };
+};
 
 // ===== Registration Fees =====
 export const getRegistrationFees = async (cid: string): Promise<{ data: RegistrationFee[]; error: Error|null }> => {

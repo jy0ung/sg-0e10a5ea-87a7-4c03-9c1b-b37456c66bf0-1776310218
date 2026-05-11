@@ -3,14 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   createVehicleFromSalesOrder,
   deleteSalesOrder,
+  getLinkedSalesOrderForVehicle,
+  linkExistingVehicle,
   moveSalesOrderStage,
   updateSalesOrder,
+  unlinkExistingVehicle,
 } from './salesOrderService';
 import { logUserAction, logVehicleEdit } from './auditService';
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: vi.fn(),
+    rpc: vi.fn(),
   },
 }));
 
@@ -122,6 +126,90 @@ describe('salesOrderService', () => {
     expect(linkBuilder.eq).toHaveBeenNthCalledWith(2, 'id', 'order-1');
     expect(logVehicleEdit).toHaveBeenCalledWith('actor-1', 'vehicle-1', expect.objectContaining({
       source: { before: null, after: 'Sales Order SO-001' },
+    }));
+  });
+
+  it('links an existing vehicle through the controlled RPC and audits the order update', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: {
+        sales_order_id: 'order-1',
+        vehicle_id: 'vehicle-1',
+        chassis_no: 'CHASSIS-1',
+        order_no: 'SO-001',
+      },
+      error: null,
+    } as never);
+
+    const result = await linkExistingVehicle('company-1', {
+      orderId: 'order-1',
+      chassisNo: 'CHASSIS-1',
+      vehicleId: 'vehicle-1',
+    }, 'actor-1');
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({
+      salesOrderId: 'order-1',
+      vehicleId: 'vehicle-1',
+      chassisNo: 'CHASSIS-1',
+      orderNo: 'SO-001',
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith('link_vehicle_to_sales_order', {
+      p_sales_order_id: 'order-1',
+      p_chassis_no: 'CHASSIS-1',
+      p_vehicle_id: 'vehicle-1',
+    });
+    expect(logUserAction).toHaveBeenCalledWith('actor-1', 'update', 'sales_order', 'order-1', expect.objectContaining({
+      action: 'link_existing_vehicle',
+      vehicleId: 'vehicle-1',
+      chassisNo: 'CHASSIS-1',
+    }));
+  });
+
+  it('loads a linked sales order by vehicle id', async () => {
+    const builder = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { ...orderRow, vehicle_id: 'vehicle-1', chassis_no: 'CHASSIS-1' }, error: null }),
+    };
+    vi.mocked(supabase.from).mockReturnValue(builder as never);
+
+    const result = await getLinkedSalesOrderForVehicle('company-1', 'vehicle-1', 'CHASSIS-1');
+
+    expect(result.error).toBeNull();
+    expect(result.data?.id).toBe('order-1');
+    expect(builder.eq).toHaveBeenNthCalledWith(1, 'company_id', 'company-1');
+    expect(builder.eq).toHaveBeenNthCalledWith(2, 'is_deleted', false);
+    expect(builder.eq).toHaveBeenNthCalledWith(3, 'vehicle_id', 'vehicle-1');
+  });
+
+  it('unlinks an existing vehicle through the controlled RPC and audits the order update', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: {
+        sales_order_id: 'order-1',
+        previous_vehicle_id: 'vehicle-1',
+        previous_chassis_no: 'CHASSIS-1',
+        order_no: 'SO-001',
+      },
+      error: null,
+    } as never);
+
+    const result = await unlinkExistingVehicle('company-1', 'order-1', 'actor-1');
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({
+      salesOrderId: 'order-1',
+      previousVehicleId: 'vehicle-1',
+      previousChassisNo: 'CHASSIS-1',
+      orderNo: 'SO-001',
+    });
+    expect(supabase.rpc).toHaveBeenCalledWith('unlink_vehicle_from_sales_order', {
+      p_sales_order_id: 'order-1',
+    });
+    expect(logUserAction).toHaveBeenCalledWith('actor-1', 'update', 'sales_order', 'order-1', expect.objectContaining({
+      action: 'unlink_existing_vehicle',
+      vehicleId: 'vehicle-1',
+      chassisNo: 'CHASSIS-1',
     }));
   });
 });

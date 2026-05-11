@@ -92,13 +92,27 @@ export const CUSTOM_KPI_FIELD_CATALOG: Record<CustomKpiSource, CustomKpiFieldDef
   vehicles: [
     { key: 'branch_code', label: getAutoAgingFieldLabel('branch_code', 'BRCH K1'), kind: 'string' },
     { key: 'model', label: getAutoAgingFieldLabel('model', 'MODEL'), kind: 'string' },
+    { key: 'variant', label: 'Variant', kind: 'string' },
+    { key: 'color', label: 'Color', kind: 'string' },
     { key: 'payment_method', label: getAutoAgingFieldLabel('payment_method', 'PAYMENT METHOD'), kind: 'string' },
+    { key: 'full_payment_type', label: 'Full Payment Type', kind: 'string' },
     { key: 'salesman_name', label: getAutoAgingFieldLabel('salesman_name', 'SA NAME'), kind: 'string' },
+    { key: 'customer_name', label: 'Customer Name', kind: 'string' },
+    { key: 'stage', label: 'Stage', kind: 'string' },
     { key: 'is_d2d', label: 'Is D2D', kind: 'boolean' },
+    { key: 'commission_paid', label: 'Commission Paid', kind: 'boolean' },
     { key: 'bg_date', label: getAutoAgingFieldLabel('bg_date', 'BG DATE'), kind: 'date' },
-    { key: 'delivery_date', label: getAutoAgingFieldLabel('delivery_date', 'DELIVERY DATE'), kind: 'date' },
+    { key: 'vaa_date', label: 'VAA Date', kind: 'date' },
+    { key: 'full_payment_date', label: 'Full Payment Date', kind: 'date' },
+    { key: 'shipment_etd_pkg', label: 'Shipment ETD PKG', kind: 'date' },
+    { key: 'shipment_eta_kk_twu_sdk', label: 'Shipment ETA KK/TWU/SDK', kind: 'date' },
+    { key: 'date_received_by_outlet', label: 'Date Received by Outlet', kind: 'date' },
     { key: 'reg_date', label: getAutoAgingFieldLabel('reg_date', 'REG DATE'), kind: 'date' },
+    { key: 'delivery_date', label: getAutoAgingFieldLabel('delivery_date', 'DELIVERY DATE'), kind: 'date' },
     { key: 'disb_date', label: getAutoAgingFieldLabel('disb_date', 'DISB. DATE'), kind: 'date' },
+    { key: 'lou', label: 'LOU', kind: 'string' },
+    { key: 'obr', label: 'OBR', kind: 'string' },
+    { key: 'contra_sola', label: 'Contra Sola', kind: 'string' },
     { key: 'bg_to_delivery', label: 'BG → Delivery (days)', kind: 'number' },
     { key: 'bg_to_shipment_etd', label: 'BG → Shipment ETD (days)', kind: 'number' },
     { key: 'etd_to_outlet', label: 'ETD → Outlet (days)', kind: 'number' },
@@ -385,6 +399,7 @@ export interface CustomKpiPreset {
 }
 
 export const CUSTOM_KPI_PRESETS: CustomKpiPreset[] = [
+  // ── Sales presets ───────────────────────────────────────────────
   {
     id: 'bookings-total',
     title: 'Total Bookings',
@@ -406,31 +421,6 @@ export const CUSTOM_KPI_PRESETS: CustomKpiPreset[] = [
       field: 'totalPrice',
       filters: [],
       format: 'currency',
-    },
-  },
-  {
-    id: 'avg-bg-to-delivery',
-    title: 'Average BG → Delivery',
-    description: 'Average cycle time from BG to delivery across vehicles.',
-    formula: {
-      source: 'vehicles',
-      aggregation: 'avg',
-      field: 'bg_to_delivery',
-      filters: [{ field: 'bg_to_delivery', operator: 'is_not_null' }],
-      format: 'days',
-      target: { value: 45, comparison: 'lte' },
-    },
-  },
-  {
-    id: 'overdue-vehicles',
-    title: 'Overdue Vehicles (> 45 days)',
-    description: 'Count of vehicles whose BG → Delivery exceeds 45 days.',
-    formula: {
-      source: 'vehicles',
-      aggregation: 'count',
-      filters: [{ field: 'bg_to_delivery', operator: 'gt', value: 45 }],
-      format: 'number',
-      target: { value: 0, comparison: 'lte' },
     },
   },
   {
@@ -458,6 +448,198 @@ export const CUSTOM_KPI_PRESETS: CustomKpiPreset[] = [
       sort: 'desc',
       filters: [],
       format: 'currency',
+    },
+  },
+
+  // ── Vehicle aging presets ──────────────────────────────────────
+  {
+    id: 'avg-bg-to-delivery',
+    title: 'Average BG → Delivery',
+    description: 'Average cycle time from BG to delivery across vehicles.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'avg',
+      field: 'bg_to_delivery',
+      filters: [{ field: 'bg_to_delivery', operator: 'is_not_null' }],
+      format: 'days',
+      target: { value: 45, comparison: 'lte' },
+    },
+  },
+  {
+    id: 'overdue-vehicles',
+    title: 'Overdue Vehicles (> 45 days)',
+    description: 'Count of vehicles whose BG → Delivery exceeds 45 days.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'count',
+      filters: [{ field: 'bg_to_delivery', operator: 'gt', value: 45 }],
+      format: 'number',
+      target: { value: 0, comparison: 'lte' },
+    },
+  },
+  {
+    id: 'pending-delivery',
+    title: 'Vehicles Pending Delivery',
+    description: 'Count of vehicles with a BG date but no delivery date.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'count',
+      filters: [
+        { field: 'bg_date', operator: 'is_not_null' },
+        { field: 'delivery_date', operator: 'is_null' },
+      ],
+      format: 'number',
+    },
+  },
+  {
+    id: 'p90-bg-to-delivery',
+    title: 'P90 BG → Delivery',
+    description: 'The 90th percentile BG-to-Delivery cycle time from KPI summary.',
+    formula: {
+      source: 'kpi_summaries',
+      aggregation: 'max',
+      field: 'p90',
+      filters: [{ field: 'shortLabel', operator: 'eq', value: 'BG → Delivery' }],
+      format: 'days',
+      target: { value: 60, comparison: 'lte' },
+    },
+  },
+
+  // ── LOU aging presets ─────────────────────────────────────────
+  {
+    id: 'pending-lou',
+    title: 'Pending LOU',
+    description: 'Vehicles delivered but LOU not yet received.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'count',
+      filters: [
+        { field: 'delivery_date', operator: 'is_not_null' },
+        { field: 'lou', operator: 'is_null' },
+      ],
+      format: 'number',
+      target: { value: 0, comparison: 'lte' },
+    },
+  },
+  {
+    id: 'lou-by-branch',
+    title: 'Pending LOU by Branch',
+    description: 'Branch with the most pending LOU items.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'count',
+      groupBy: 'branch_code',
+      sort: 'desc',
+      filters: [
+        { field: 'delivery_date', operator: 'is_not_null' },
+        { field: 'lou', operator: 'is_null' },
+      ],
+      format: 'number',
+    },
+  },
+
+  // ── OBR status presets ────────────────────────────────────────
+  {
+    id: 'missing-obr',
+    title: 'Missing OBR',
+    description: 'Registered vehicles without OBR documentation.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'count',
+      filters: [
+        { field: 'reg_date', operator: 'is_not_null' },
+        { field: 'obr', operator: 'is_null' },
+      ],
+      format: 'number',
+      target: { value: 0, comparison: 'lte' },
+    },
+  },
+  {
+    id: 'obr-by-branch',
+    title: 'Missing OBR by Branch',
+    description: 'Branch with the most vehicles missing OBR.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'count',
+      groupBy: 'branch_code',
+      sort: 'desc',
+      filters: [
+        { field: 'reg_date', operator: 'is_not_null' },
+        { field: 'obr', operator: 'is_null' },
+      ],
+      format: 'number',
+    },
+  },
+
+  // ── Registration & disbursement delay presets ──────────────────
+  {
+    id: 'avg-registration-delay',
+    title: 'Avg Registration Delay',
+    description: 'Average days from outlet receipt to registration.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'avg',
+      field: 'outlet_to_reg',
+      filters: [{ field: 'outlet_to_reg', operator: 'is_not_null' }],
+      format: 'days',
+      target: { value: 7, comparison: 'lte' },
+    },
+  },
+  {
+    id: 'pending-disbursement',
+    title: 'Pending Disbursement',
+    description: 'Delivered vehicles still awaiting disbursement.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'count',
+      filters: [
+        { field: 'delivery_date', operator: 'is_not_null' },
+        { field: 'disb_date', operator: 'is_null' },
+      ],
+      format: 'number',
+    },
+  },
+  {
+    id: 'avg-delivery-to-disb',
+    title: 'Avg Delivery → Disbursement',
+    description: 'Average days from delivery to disbursement.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'avg',
+      field: 'delivery_to_disb',
+      filters: [{ field: 'delivery_to_disb', operator: 'is_not_null' }],
+      format: 'days',
+      target: { value: 14, comparison: 'lte' },
+    },
+  },
+
+  // ── Commission tracking presets ───────────────────────────────
+  {
+    id: 'unpaid-commission',
+    title: 'Unpaid Commission',
+    description: 'Delivered vehicles with commission not yet paid.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'count',
+      filters: [
+        { field: 'delivery_date', operator: 'is_not_null' },
+        { field: 'commission_paid', operator: 'eq', value: false },
+      ],
+      format: 'number',
+    },
+  },
+  {
+    id: 'slowest-delivery-branch',
+    title: 'Slowest Delivery Branch',
+    description: 'Branch with the highest average BG → Delivery.',
+    formula: {
+      source: 'vehicles',
+      aggregation: 'avg',
+      field: 'bg_to_delivery',
+      groupBy: 'branch_code',
+      sort: 'desc',
+      filters: [{ field: 'bg_to_delivery', operator: 'is_not_null' }],
+      format: 'days',
     },
   },
 ];

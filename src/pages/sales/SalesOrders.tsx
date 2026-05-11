@@ -9,9 +9,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/contexts/SalesContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { createSalesOrder, createVehicleFromSalesOrder } from '@/services/salesOrderService';
-import { SalesOrder, SalesOrderStatus } from '@/types';
-import { Plus, Search, Link2 } from 'lucide-react';
+import { createSalesOrder, linkExistingVehicle, unlinkExistingVehicle } from '@/services/salesOrderService';
+import { searchVehicles } from '@/services/vehicleService';
+import { SalesOrder, SalesOrderStatus, VehicleCanonical } from '@/types';
+import { Loader2, Plus, Search, Link2 } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { salesOrderSchema } from '@/lib/validations';
 
@@ -37,6 +38,8 @@ export default function SalesOrders() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkOrder, setLinkOrder] = useState<SalesOrder | null>(null);
   const [chassisNo, setChassisNo] = useState('');
+  const [vehicleResults, setVehicleResults] = useState<VehicleCanonical[]>([]);
+  const [vehicleSearchLoading, setVehicleSearchLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ orderNo: '', customerId: '', branchCode: '', salesmanName: '', model: '', variant: '', colour: '', bookingDate: new Date().toISOString().split('T')[0], bookingAmount: '', totalPrice: '', status: 'enquiry' as SalesOrderStatus, vsoNo: '', depositAmount: '', bankLoanAmount: '', financeCompany: '', insuranceCompany: '', plateNo: '' });
 
@@ -98,16 +101,49 @@ export default function SalesOrders() {
     toast({ title: 'Order created' });
   };
 
-  const handleLinkVehicle = async () => {
-    if (!linkOrder || !chassisNo.trim()) return toast({ title: 'Chassis No is required', variant: 'destructive' });
+  const openLinkDialog = (order: SalesOrder) => {
+    setLinkOrder(order);
+    setChassisNo(order.chassisNo ?? '');
+    setVehicleResults([]);
+    setLinkOpen(true);
+  };
+
+  const handleVehicleSearch = async () => {
+    if (!chassisNo.trim()) return toast({ title: 'Search text is required', variant: 'destructive' });
+    setVehicleSearchLoading(true);
+    const { data, error } = await searchVehicles({ search: chassisNo.trim(), limit: 8, sortColumn: 'chassis_no', sortDirection: 'asc' });
+    setVehicleSearchLoading(false);
+    if (error) return toast({ title: 'Vehicle search failed', description: error.message, variant: 'destructive' });
+    setVehicleResults(data.rows);
+    if (data.rows.length === 0) toast({ title: 'No matching vehicles found' });
+  };
+
+  const handleLinkVehicle = async (vehicle?: VehicleCanonical) => {
+    const targetChassis = vehicle?.chassis_no ?? chassisNo.trim();
+    if (!linkOrder || !targetChassis) return toast({ title: 'Chassis No is required', variant: 'destructive' });
     setCreating(true);
-    const { error } = await createVehicleFromSalesOrder(linkOrder.id, chassisNo.trim(), user?.id ?? '', companyId);
+    const { error } = await linkExistingVehicle(companyId, {
+      orderId: linkOrder.id,
+      chassisNo: targetChassis,
+      vehicleId: vehicle?.id ?? null,
+    }, user?.id);
     setCreating(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await reloadSales();
     setLinkOpen(false);
     setChassisNo('');
-    toast({ title: 'Inventory entry created', description: `Chassis: ${chassisNo}` });
+    setVehicleResults([]);
+    toast({ title: 'Vehicle linked', description: `Chassis: ${targetChassis}` });
+  };
+
+  const handleUnlinkVehicle = async (order: SalesOrder) => {
+    if (!order.vehicleId) return;
+    setCreating(true);
+    const { error } = await unlinkExistingVehicle(companyId, order.id, user?.id);
+    setCreating(false);
+    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    await reloadSales();
+    toast({ title: 'Vehicle unlinked', description: order.chassisNo ? `Chassis: ${order.chassisNo}` : undefined });
   };
 
   return (
@@ -166,11 +202,18 @@ export default function SalesOrders() {
                   <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{o.chassisNo ?? '—'}</td>
                   <td className="py-2 text-right">
                     {!o.vehicleId && (o.status === 'confirmed' || o.status === 'booked') && (
-                      <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => { setLinkOrder(o); setLinkOpen(true); }}>
-                        <Link2 className="h-3 w-3 mr-1" />Create Inventory
+                      <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={() => openLinkDialog(o)}>
+                        <Link2 className="h-3 w-3 mr-1" />Link Vehicle
                       </Button>
                     )}
-                    {o.vehicleId && <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-600">Inventory Linked</Badge>}
+                    {o.vehicleId && (
+                      <div className="flex justify-end items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-600">Vehicle Linked</Badge>
+                        <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => handleUnlinkVehicle(o)} disabled={creating}>
+                          Unlink
+                        </Button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -232,18 +275,45 @@ export default function SalesOrders() {
         </DialogContent>
       </Dialog>
 
-      {/* Link BG Dialog */}
+      {/* Link Existing Vehicle Dialog */}
       <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Create Inventory Tracking Entry</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground">Order: {linkOrder?.orderNo} — {linkOrder?.model}. This creates the inventory tracking row used by Auto Aging and the consolidated inventory report.</p>
-          <div className="space-y-2 py-2">
-            <label htmlFor="sales-order-bg-chassis-no" className="text-xs font-medium text-muted-foreground">Chassis Number *</label>
-            <Input id="sales-order-bg-chassis-no" className="h-8 text-sm font-mono" placeholder="e.g. PM00A1234" value={chassisNo} onChange={e => setChassisNo(e.target.value)} />
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Link Existing Vehicle</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Order: {linkOrder?.orderNo} — {linkOrder?.model}. The selected vehicle must already exist in Auto Aging for the same company.</p>
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <label htmlFor="sales-order-link-chassis-no" className="text-xs font-medium text-muted-foreground">Chassis Number or Search Text *</label>
+              <div className="flex gap-2">
+                <Input id="sales-order-link-chassis-no" className="h-8 text-sm font-mono" placeholder="e.g. PM00A1234" value={chassisNo} onChange={e => setChassisNo(e.target.value)} />
+                <Button type="button" variant="outline" size="sm" className="h-8" onClick={handleVehicleSearch} disabled={vehicleSearchLoading}>
+                  {vehicleSearchLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                </Button>
+              </div>
+            </div>
+            {vehicleResults.length > 0 && (
+              <div className="rounded-md border border-border overflow-hidden">
+                <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 px-3 py-2 text-[11px] font-medium text-muted-foreground bg-secondary/40">
+                  <span>Chassis</span>
+                  <span>Model</span>
+                  <span>Branch</span>
+                  <span></span>
+                </div>
+                {vehicleResults.map(vehicle => (
+                  <div key={vehicle.id} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 px-3 py-2 text-xs border-t border-border items-center">
+                    <span className="font-mono">{vehicle.chassis_no}</span>
+                    <span>{vehicle.model}</span>
+                    <span>{vehicle.branch_code}</span>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleLinkVehicle(vehicle)} disabled={creating}>
+                      Link
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLinkOpen(false)}>Cancel</Button>
-            <Button onClick={handleLinkVehicle} disabled={creating}>{creating ? 'Creating…' : 'Create Inventory Entry'}</Button>
+            <Button onClick={() => handleLinkVehicle()} disabled={creating}>{creating ? 'Linking…' : 'Link by Chassis'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

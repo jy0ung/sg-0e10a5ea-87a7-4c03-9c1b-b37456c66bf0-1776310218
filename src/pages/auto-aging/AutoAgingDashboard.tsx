@@ -223,7 +223,7 @@ export default function AutoAgingDashboard() {
         <div className="glass-panel p-12 text-center">
           <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No Data Imported Yet</h3>
-          <p className="text-sm text-muted-foreground mb-6">Upload your consolidated inventory report workbook to start analyzing vehicle aging across milestones.</p>
+          <p className="text-sm text-muted-foreground mb-6">Import vehicle inventory data through the Import Center to start analyzing aging across milestones.</p>
           <Button onClick={() => navigate('/auto-aging/import')} className="bg-primary text-primary-foreground">
             <Upload className="h-4 w-4 mr-2" />Go to Import Center
           </Button>

@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 export const REPORT_PAGE_SIZE = 100;
+export const REPORT_EXPORT_CAP = 10_000;
 
 export interface ReportRow {
   [key: string]: string | number | null | undefined;
@@ -12,7 +13,7 @@ export interface ReportConfig {
   description: string;
   columns: { key: string; label: string; numeric?: boolean }[];
   query: (companyId: string, from: string, to: string, page: number) => Promise<{ data: ReportRow[]; count: number }>;
-  fetchAll: (companyId: string, from: string, to: string) => Promise<ReportRow[]>;
+  fetchAll: (companyId: string, from: string, to: string) => Promise<{ rows: ReportRow[]; totalCount: number }>;
 }
 
 async function queryTable(
@@ -44,16 +45,19 @@ async function fetchAllPages(
   to: string,
   dateCol: string,
   select: string,
-): Promise<ReportRow[]> {
+): Promise<{ rows: ReportRow[]; totalCount: number }> {
+  // First page also gets the total count
   const results: ReportRow[] = [];
+  let totalCount = 0;
   let page = 0;
-  while (true) {
-    const { data } = await queryTable(table, companyId, from, to, dateCol, select, page);
+  while (results.length < REPORT_EXPORT_CAP) {
+    const { data, count } = await queryTable(table, companyId, from, to, dateCol, select, page);
+    if (page === 0) totalCount = count;
     results.push(...data);
     if (data.length < REPORT_PAGE_SIZE) break;
     page += 1;
   }
-  return results;
+  return { rows: results.slice(0, REPORT_EXPORT_CAP), totalCount };
 }
 
 export const REPORTS: ReportConfig[] = [
@@ -76,23 +80,25 @@ export const REPORTS: ReportConfig[] = [
         .eq('company_id', companyId)
         .order('created_at', { ascending: false })
         .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
-      return { data: (data ?? []) as ReportRow[], count: count ?? 0 };
+      return { data: (data ?? []) as unknown as ReportRow[], count: count ?? 0 };
     },
     fetchAll: async (companyId) => {
       const results: ReportRow[] = [];
+      let totalCount = 0;
       let page = 0;
-      while (true) {
-        const { data } = await supabase
+      while (results.length < REPORT_EXPORT_CAP) {
+        const { data, count } = await supabase
           .from('vehicles')
-          .select('chassis_no,model,colour,branch_id,status,created_at')
+          .select('chassis_no,model,colour,branch_id,status,created_at', { count: page === 0 ? 'exact' : undefined })
           .eq('company_id', companyId)
           .order('created_at', { ascending: false })
           .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
-        results.push(...((data ?? []) as ReportRow[]));
+        if (page === 0) totalCount = count ?? 0;
+        results.push(...((data ?? []) as unknown as ReportRow[]));
         if ((data ?? []).length < REPORT_PAGE_SIZE) break;
         page += 1;
       }
-      return results;
+      return { rows: results.slice(0, REPORT_EXPORT_CAP), totalCount };
     },
   },
   {
@@ -114,23 +120,25 @@ export const REPORTS: ReportConfig[] = [
         .eq('company_id', companyId)
         .order('chassis_no')
         .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
-      return { data: (data ?? []) as ReportRow[], count: count ?? 0 };
+      return { data: (data ?? []) as unknown as ReportRow[], count: count ?? 0 };
     },
     fetchAll: async (companyId) => {
       const results: ReportRow[] = [];
+      let totalCount = 0;
       let page = 0;
-      while (true) {
-        const { data } = await supabase
+      while (results.length < REPORT_EXPORT_CAP) {
+        const { data, count } = await supabase
           .from('vehicles')
-          .select('chassis_no,plate_no,model,engine_no,colour,status')
+          .select('chassis_no,plate_no,model,engine_no,colour,status', { count: page === 0 ? 'exact' : undefined })
           .eq('company_id', companyId)
           .order('chassis_no')
           .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
-        results.push(...((data ?? []) as ReportRow[]));
+        if (page === 0) totalCount = count ?? 0;
+        results.push(...((data ?? []) as unknown as ReportRow[]));
         if ((data ?? []).length < REPORT_PAGE_SIZE) break;
         page += 1;
       }
-      return results;
+      return { rows: results.slice(0, REPORT_EXPORT_CAP), totalCount };
     },
   },
   {

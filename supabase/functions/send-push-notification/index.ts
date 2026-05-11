@@ -15,6 +15,11 @@
  *
  * Environment secrets (set in Supabase Dashboard → Settings → Edge Functions):
  *   FCM_SERVER_KEY             — Firebase Cloud Messaging server key (Android)
+ *   APNS_TEAM_ID               — Apple Developer Team ID (iOS)
+ *   APNS_KEY_ID                — APNs Auth Key ID (iOS)
+ *   APNS_PRIVATE_KEY           — APNs .p8 private key PEM; escaped \n is accepted (iOS)
+ *   APNS_BUNDLE_ID             — iOS app bundle identifier / APNs topic (iOS)
+ *   APNS_USE_SANDBOX           — "true" to use api.sandbox.push.apple.com (optional)
  *   SUPABASE_URL               — auto-provided
  *   SUPABASE_SERVICE_ROLE_KEY  — auto-provided
  *   SUPABASE_ANON_KEY          — auto-provided
@@ -59,6 +64,7 @@ const NOTIFY_ROLES = new Set([
 const RATE_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_MAX_CALLS = 20;
 const rateLimitStore = new Map<string, number[]>();
+let cachedApnsJwt: { token: string; issuedAtSeconds: number } | null = null;
 
 function isRateLimited(callerId: string): boolean {
   const now = Date.now();
@@ -71,6 +77,119 @@ function isRateLimited(callerId: string): boolean {
   return false;
 }
 // ---------------------------------------------------------------------------
+
+function base64Url(input: string | ArrayBuffer): string {
+  const bytes = typeof input === 'string'
+    ? new TextEncoder().encode(input)
+    : new Uint8Array(input);
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary)
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const base64 = pem
+    .replace(/\\n/g, '\n')
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\s/g, '');
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
+}
+
+async function getApnsJwt() {
+  const teamId = Deno.env.get('APNS_TEAM_ID');
+  const keyId = Deno.env.get('APNS_KEY_ID');
+  const privateKey = Deno.env.get('APNS_PRIVATE_KEY');
+  if (!teamId || !keyId || !privateKey) return null;
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (cachedApnsJwt && nowSeconds - cachedApnsJwt.issuedAtSeconds < 50 * 60) {
+    return cachedApnsJwt.token;
+  }
+
+  const encodedHeader = base64Url(JSON.stringify({ alg: 'ES256', kid: keyId }));
+  const encodedPayload = base64Url(JSON.stringify({ iss: teamId, iat: nowSeconds }));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    pemToArrayBuffer(privateKey),
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    key,
+    new TextEncoder().encode(signingInput),
+  );
+
+  cachedApnsJwt = {
+    token: `${signingInput}.${base64Url(signature)}`,
+    issuedAtSeconds: nowSeconds,
+  };
+  return cachedApnsJwt.token;
+}
+
+async function sendApnsNotification(
+  tokens: string[],
+  title: string,
+  msgBody: string,
+  path: string | undefined,
+): Promise<{ token: string; ok: boolean; error?: string }[]> {
+  const bundleId = Deno.env.get('APNS_BUNDLE_ID');
+  const jwt = await getApnsJwt();
+  if (!bundleId || !jwt) {
+    console.warn('[push] APNs secrets not set — skipping iOS notifications');
+    return tokens.map(() => ({ token: 'apns', ok: false, error: 'APNs is not configured' }));
+  }
+
+  const host = Deno.env.get('APNS_USE_SANDBOX') === 'true'
+    ? 'https://api.sandbox.push.apple.com'
+    : 'https://api.push.apple.com';
+  const payload = {
+    aps: {
+      alert: { title, body: msgBody },
+      sound: 'default',
+    },
+    ...(path ? { path } : {}),
+  };
+
+  const results = await Promise.all(tokens.map(async (token) => {
+    try {
+      const res = await fetch(`${host}/3/device/${token}`, {
+        method: 'POST',
+        headers: {
+          'authorization': `bearer ${jwt}`,
+          'apns-topic': bundleId,
+          'apns-push-type': 'alert',
+          'apns-priority': '10',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        console.error(`[push] APNs responded with HTTP ${res.status}`);
+      }
+      return { token: 'apns', ok: res.ok };
+    } catch (apnsErr) {
+      console.error('[push] APNs fetch failed:', (apnsErr as Error).message);
+      return { token: 'apns', ok: false, error: 'APNs request failed' };
+    }
+  }));
+
+  return results;
+}
 
 Deno.serve(async (req: Request) => {
   const corsHeaders = buildCorsHeaders(req);
@@ -231,9 +350,9 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  const iosTokens = tokens.filter((t) => t.platform === 'ios');
+  const iosTokens = tokens.filter((t) => t.platform === 'ios').map((t) => t.token);
   if (iosTokens.length > 0) {
-    console.info(`[push] ${iosTokens.length} iOS token(s) pending APNs implementation`);
+    results.push(...await sendApnsNotification(iosTokens, title, msgBody, path));
   }
 
   return new Response(JSON.stringify({ sent: results.length, results }), {

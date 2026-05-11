@@ -1,14 +1,26 @@
 import React from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useSales } from '@/contexts/SalesContext';
-import { useData } from '@/contexts/DataContext';
+import { getVehicleKpiSummary } from '@/services/vehicleService';
+import { useQuery } from '@tanstack/react-query';
 import { ShoppingCart, DollarSign, TrendingUp, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function SalesDashboard() {
   const { salesOrders, invoices, loading: salesLoading } = useSales();
-  const { vehicles, loading: dataLoading } = useData();
 
-  if (salesLoading || dataLoading) {
+  // Use server-side KPI summary to get vehicle count instead of loading all vehicles
+  const { data: kpiSummary, isLoading: kpiLoading } = useQuery({
+    queryKey: ['sales-dashboard-vehicle-kpi'],
+    queryFn: async () => {
+      const res = await getVehicleKpiSummary();
+      if (res.error) throw res.error;
+      return res.data;
+    },
+  });
+
+  const vehicleCount = kpiSummary?.total ?? 0;
+
+  if (salesLoading || kpiLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 text-primary animate-spin" />
@@ -116,7 +128,7 @@ export default function SalesDashboard() {
       <div className="glass-panel p-4">
         <p className="text-xs font-semibold text-muted-foreground mb-2">Auto Aging Integration</p>
         <p className="text-sm">Orders linked to BG entries: <span className="font-bold text-primary">{vehiclesLinked}</span> of <span className="font-bold">{salesOrders.length}</span> orders</p>
-        <p className="text-xs text-muted-foreground mt-1">Total vehicles in Auto Aging: {vehicles.length}</p>
+        <p className="text-xs text-muted-foreground mt-1">Total vehicles in Auto Aging: {vehicleCount.toLocaleString()}</p>
       </div>
     </div>
   );

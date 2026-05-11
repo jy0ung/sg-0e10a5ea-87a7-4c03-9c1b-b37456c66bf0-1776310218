@@ -31,7 +31,7 @@ const EMPTY_FORM = { code: '', name: '', ic: '', email: '', contact: '', branch:
 
 export default function SalesAdvisors() {
   const { user } = useAuth();
-  const { vehicles } = useData();
+  const { availableBranches } = useData();
   const { toast } = useToast();
 
   const [advisors, setAdvisors]   = useState<SalesAdvisor[]>([]);
@@ -44,7 +44,7 @@ export default function SalesAdvisors() {
   const [form, setForm]             = useState(EMPTY_FORM);
   const [saving, setSaving]         = useState(false);
 
-  const branches = [...new Set(vehicles.map(v => v.branch_code).filter(Boolean))].sort() as string[];
+  const branches = availableBranches;
 
   // Load sales advisors via service
   const loadAdvisors = useCallback(async () => {

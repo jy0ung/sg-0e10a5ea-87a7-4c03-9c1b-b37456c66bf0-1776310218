@@ -3,10 +3,10 @@ import React, { createContext, useContext, useCallback, useEffect, useMemo, Reac
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Customer, DealStage, SalesOrder, Invoice, SalesmanTarget } from '@/types';
 import { getCustomers } from '@/services/customerService';
-import { getSalesOrders, moveSalesOrderStage, updateSalesOrder } from '@/services/salesOrderService';
+import { getSalesOrders, moveSalesOrderStage, subscribeToSalesOrderChanges, updateSalesOrder } from '@/services/salesOrderService';
 import { getInvoices } from '@/services/invoiceService';
 import { getSalesmanTargets } from '@/services/salesTargetService';
-import { supabase } from '@/integrations/supabase/client';
+import { getDealStages } from '@/services/dealStageService';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveBranchCode } from '@/services/branchService';
@@ -27,23 +27,15 @@ async function fetchSalesData(companyId: string, branchCode?: string | null): Pr
   const [customersRes, ordersRes, stagesRes, invoicesRes, targetsRes] = await Promise.all([
     getCustomers(companyId),
     getSalesOrders(companyId, branchCode),
-    supabase.from('deal_stages').select('*').eq('company_id', companyId).order('stage_order'),
+    getDealStages(companyId),
     getInvoices(companyId),
     getSalesmanTargets(companyId),
   ]);
 
-  const dealStages = (stagesRes.data ?? []).map((r: Record<string, unknown>) => ({
-    id: r.id as string,
-    companyId: r.company_id as string,
-    name: r.name as string,
-    stageOrder: r.stage_order as number,
-    color: r.color as string,
-  }));
-
   return {
     customers: customersRes.data,
     salesOrders: ordersRes.data,
-    dealStages,
+    dealStages: stagesRes.data,
     invoices: invoicesRes.data,
     salesmanTargets: targetsRes.data,
   };
@@ -92,15 +84,9 @@ export function SalesProvider({ children }: { children: ReactNode }) {
   // Realtime: invalidate the sales cache whenever a sales_order row changes.
   useEffect(() => {
     if (!companyId) return;
-    const channel = supabase
-      .channel(`realtime:sales_orders:${companyId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'sales_orders', filter: `company_id=eq.${companyId}` },
-        () => { queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId, branchId) }); }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return subscribeToSalesOrderChanges(companyId, () => {
+      queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId, branchId) });
+    });
   }, [companyId, branchId, queryClient]);
 
   /** Optimistically update deal-stage in cache then persist to DB. */

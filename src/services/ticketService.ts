@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Database, Json } from '@/integrations/supabase/types';
 import { type RequestCategoryValue } from '@/lib/requestCategories';
 import { logUserAction } from './auditService';
 import { loggingService } from './loggingService';
@@ -101,6 +102,21 @@ export interface TicketServiceResult<T> {
   error: Error | null;
 }
 
+export interface PaginatedTicketResult<T> {
+  rows: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CompanyTicketListOptions {
+  page?: number;
+  pageSize?: number;
+  status?: TicketStatus | 'all';
+  priority?: TicketPriority | 'all';
+  search?: string;
+}
+
 export type TicketActivityEventType = 'status_changed' | 'owner_changed' | 'resolution_note_updated' | 'priority_changed' | 'comment_added';
 
 export interface TicketActivityRecord {
@@ -115,6 +131,8 @@ export interface TicketActivityRecord {
 }
 
 type TicketRow = TicketRecord;
+type TicketUpdate = Database['public']['Tables']['tickets']['Update'];
+type TicketActivityDbInsert = Database['public']['Tables']['ticket_activity']['Insert'];
 
 interface ProfileLookupRow {
   id: string;
@@ -133,13 +151,13 @@ interface TicketActivityRow {
   created_at: string | null;
 }
 
-interface TicketActivityInsert {
+interface TicketActivityInsert extends TicketActivityDbInsert {
   ticket_id: string;
   company_id: string;
   actor_id: string;
   event_type: TicketActivityEventType;
   message: string;
-  metadata: Record<string, unknown>;
+  metadata: Json;
 }
 
 const LEGACY_TICKET_SELECT =
@@ -262,16 +280,16 @@ function mapRequestTicket(ticket: TicketRecord, profilesById: Map<string, Profil
   };
 }
 
-// Keep the generated-type escape hatch isolated to this service.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ticketsTable(): any {
-  return supabase.from('tickets' as never);
+function ticketsTable() {
+  return supabase.from('tickets');
 }
 
-// Keep the activity table escape hatch beside the tickets one.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ticketActivityTable(): any {
-  return supabase.from('ticket_activity' as never);
+function ticketActivityTable() {
+  return supabase.from('ticket_activity');
+}
+
+function toJsonObject(value: Record<string, unknown> | null | undefined): Json {
+  return (value ?? {}) as Json;
 }
 
 function formatTicketLabel(value: string) {
@@ -447,6 +465,40 @@ function buildCommentNotifications(ticket: TicketRecord, actorId: string, messag
   }));
 }
 
+async function enrichCompanyTickets(rows: TicketRecord[], companyId: string): Promise<CompanyTicketRecord[]> {
+  const ticketsWithApproval = await applyApprovalMetadata(rows);
+  const profilesById = await fetchProfilesById(
+    companyId,
+    ticketsWithApproval.flatMap((ticket) => {
+      const people = [ticket.submitted_by];
+      if (ticket.assigned_to) people.push(ticket.assigned_to);
+      return people;
+    }),
+  );
+
+  return ticketsWithApproval.map((ticket) => ({
+    ...mapRequestTicket(ticket, profilesById),
+    submitted_by_name: profilesById.get(ticket.submitted_by)?.name ?? null,
+    submitted_by_email: profilesById.get(ticket.submitted_by)?.email ?? null,
+  }));
+}
+
+function normalizeTicketPageOptions(options: CompanyTicketListOptions = {}) {
+  const pageSize = Math.min(Math.max(options.pageSize ?? 25, 1), 100);
+  const page = Math.max(options.page ?? 1, 1);
+  return {
+    ...options,
+    page,
+    pageSize,
+    from: (page - 1) * pageSize,
+    to: page * pageSize - 1,
+  };
+}
+
+function sanitizeTicketSearchTerm(search: string) {
+  return search.trim().replace(/[,%]/g, ' ');
+}
+
 export async function listMyTickets(userId: string, companyId: string): Promise<TicketServiceResult<RequestTicketRecord[]>> {
   try {
     let { data, error } = await ticketsTable()
@@ -499,27 +551,86 @@ export async function listCompanyTickets(companyId: string): Promise<TicketServi
 
     if (error) throw error;
 
-    const rows = await applyApprovalMetadata(((data ?? []) as TicketRow[]).map(mapTicket));
-    const profilesById = await fetchProfilesById(
-      companyId,
-      rows.flatMap((ticket) => {
-        const people = [ticket.submitted_by];
-        if (ticket.assigned_to) people.push(ticket.assigned_to);
-        return people;
-      }),
-    );
+    return { data: await enrichCompanyTickets(((data ?? []) as TicketRow[]).map(mapTicket), companyId), error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to load company tickets');
+    loggingService.error('Failed to list company tickets', { error: error.message }, 'TicketService');
+    return { data: null, error };
+  }
+}
 
+export async function listCompanyTicketsPage(
+  companyId: string,
+  options: CompanyTicketListOptions = {},
+): Promise<TicketServiceResult<PaginatedTicketResult<CompanyTicketRecord>>> {
+  const normalized = normalizeTicketPageOptions(options);
+  const search = sanitizeTicketSearchTerm(normalized.search ?? '');
+
+  try {
+    let query = ticketsTable()
+      .select(TICKET_SELECT, { count: 'exact' })
+      .eq('company_id', companyId);
+
+    if (normalized.status && normalized.status !== 'all') {
+      query = query.eq('status', normalized.status);
+    }
+    if (normalized.priority && normalized.priority !== 'all') {
+      query = query.eq('priority', normalized.priority);
+    }
+    if (search) {
+      query = query.or([
+        `subject.ilike.%${search}%`,
+        `description.ilike.%${search}%`,
+        `vso_number.ilike.%${search}%`,
+      ].join(','));
+    }
+
+    let { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(normalized.from, normalized.to);
+
+    if (error && isMissingOperationalTicketFieldError(error)) {
+      let legacyQuery = ticketsTable()
+        .select(getFallbackTicketSelect(error), { count: 'exact' })
+        .eq('company_id', companyId);
+
+      if (normalized.status && normalized.status !== 'all') {
+        legacyQuery = legacyQuery.eq('status', normalized.status);
+      }
+      if (normalized.priority && normalized.priority !== 'all') {
+        legacyQuery = legacyQuery.eq('priority', normalized.priority);
+      }
+      if (search) {
+        legacyQuery = legacyQuery.or([
+          `subject.ilike.%${search}%`,
+          `description.ilike.%${search}%`,
+          `vso_number.ilike.%${search}%`,
+        ].join(','));
+      }
+
+      const legacyResult = await legacyQuery
+        .order('created_at', { ascending: false })
+        .range(normalized.from, normalized.to);
+      data = legacyResult.data;
+      error = legacyResult.error;
+      count = legacyResult.count;
+    }
+
+    if (error) throw error;
+
+    const rows = await enrichCompanyTickets(((data ?? []) as TicketRow[]).map(mapTicket), companyId);
     return {
-      data: rows.map((ticket) => ({
-        ...mapRequestTicket(ticket, profilesById),
-        submitted_by_name: profilesById.get(ticket.submitted_by)?.name ?? null,
-        submitted_by_email: profilesById.get(ticket.submitted_by)?.email ?? null,
-      })),
+      data: {
+        rows,
+        totalCount: count ?? rows.length,
+        page: normalized.page,
+        pageSize: normalized.pageSize,
+      },
       error: null,
     };
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to load company tickets');
-    loggingService.error('Failed to list company tickets', { error: error.message }, 'TicketService');
+    loggingService.error('Failed to list company tickets page', { error: error.message, options }, 'TicketService');
     return { data: null, error };
   }
 }
@@ -592,7 +703,7 @@ export async function createTicket(
       requested_due_date: input.requested_due_date?.trim() ? input.requested_due_date.trim() : null,
       business_impact: input.business_impact?.trim() ? input.business_impact.trim() : null,
       desired_outcome: input.desired_outcome?.trim() ? input.desired_outcome.trim() : null,
-      custom_fields: input.custom_fields ?? {},
+      custom_fields: toJsonObject(input.custom_fields),
       vso_number: input.vso_number?.trim() ? input.vso_number.trim() : null,
       company_id: context.companyId,
       submitted_by: context.userId,
@@ -669,7 +780,7 @@ export async function updateTicket(
   input: UpdateTicketInput,
   context: { userId: string; companyId: string },
 ): Promise<TicketServiceResult<TicketRecord>> {
-  const patch: Record<string, string | null> = {};
+  const patch: TicketUpdate = {};
 
   if (input.status) patch.status = input.status;
   if (input.priority) patch.priority = input.priority;
@@ -731,13 +842,13 @@ export async function updateTicket(
 
     if (error) throw error;
 
-    const [nextTicket] = await applyApprovalMetadata([mapTicket(data as TicketRow)]);
+    const [nextTicket] = await applyApprovalMetadata([mapTicket(data as unknown as TicketRow)]);
     const activityEntries = buildTicketActivityEntries(current, nextTicket, context.userId);
     const notifications = buildTicketNotifications(current, nextTicket, context.userId);
 
     const sideEffects: Promise<unknown>[] = [];
     if (activityEntries.length > 0) {
-      sideEffects.push(ticketActivityTable().insert(activityEntries));
+      sideEffects.push(ticketActivityTable().insert(activityEntries).then(res => res));
     }
     if (notifications.length > 0) {
       sideEffects.push(createNotifications(notifications));
@@ -776,10 +887,10 @@ export async function cancelMyTicket(
       return { data: null, error: new Error('Request can only be cancelled while open and unassigned') };
     }
 
-    const { data, error } = await supabase.rpc('cancel_own_ticket' as never, {
+    const { data, error } = await supabase.rpc('cancel_own_ticket', {
       p_ticket_id: ticketId,
       p_cancellation_note: reason,
-    } as never);
+    });
 
     if (error) throw error;
     if (!data) throw new Error('Request cancellation did not return a ticket');

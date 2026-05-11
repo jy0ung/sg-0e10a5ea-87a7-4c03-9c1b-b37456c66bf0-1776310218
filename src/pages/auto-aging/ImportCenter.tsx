@@ -249,7 +249,7 @@ function buildPreviewIssues(rows: VehicleRaw[], batchId: string): DataQualityIss
 
 export default function ImportCenter() {
   const navigate = useNavigate();
-  const { addImportBatch, updateImportBatch, setVehicles, addQualityIssues, refreshKpis, vehicles } = useData();
+  const { addImportBatch, updateImportBatch, addQualityIssues, reloadFromDb } = useData();
   const { user } = useAuth();
   const companyId = useCompanyId();
   const { toast } = useToast();
@@ -876,11 +876,11 @@ export default function ImportCenter() {
           loadPaymentMappingLookup(companyId),
           resolveNamesToIds(companyId, allNames),
         ]);
-        const { canonical, issues } = publishCanonical(cleanRows, branchMap, paymentMap, nameToIdMap);
-        const existingNonDup = vehicles.filter(v => !canonical.find(c => c.chassis_no === v.chassis_no));
-        await setVehicles([...canonical, ...existingNonDup]);
+        const { issues } = publishCanonical(cleanRows, branchMap, paymentMap, nameToIdMap);
         addQualityIssues([...reviewValidation.previewIssues, ...issues]);
-        refreshKpis();
+        // Server-side insert already happened in validateAndInsertVehicles.
+        // Reload DataContext to pick up the new vehicles from DB.
+        await reloadFromDb();
       } else {
         addQualityIssues(reviewValidation.previewIssues);
       }
@@ -922,7 +922,7 @@ export default function ImportCenter() {
       updateImportBatch(batchId, { status: 'failed' });
       setStep('review');
     }
-  }, [addQualityIssues, batchId, companyId, isPreviewValidating, mergedRawRows, missingCols.length, rawRows, refreshKpis, runReviewValidation, savedBranchMappings, setVehicles, toast, updateImportBatch, user, vehicles]);
+  }, [addQualityIssues, batchId, companyId, isPreviewValidating, mergedRawRows, missingCols.length, rawRows, reloadFromDb, runReviewValidation, savedBranchMappings, toast, updateImportBatch, user]);
 
   const handleExportErrors = useCallback(() => {
     const errorsText = serverErrors.map(e => 
@@ -963,7 +963,7 @@ export default function ImportCenter() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Import Center"
-        description="Import and process consolidated inventory data from Google Sheets"
+        description="Import vehicle inventory data for corrections, backfill, or manual exception uploads"
         breadcrumbs={[{ label: 'FLC BI' }, { label: 'Auto Aging' }, { label: 'Import Center' }]}
       />
 
@@ -994,10 +994,10 @@ export default function ImportCenter() {
                 disabled={importingGoogleSheet}
               />
               <p className="text-xs text-muted-foreground">
-                Public or published sheets only for now. The app reads the sheet through Google&apos;s CSV export, which keeps the import path lightweight and removes the browser workbook parser.
+                Public or published sheets only. The app reads the sheet through Google&apos;s CSV export, which keeps the import path lightweight.
               </p>
               <p className="text-xs text-muted-foreground">
-                Workbook upload has been retired from the web app for performance reasons. If your source starts in Excel, publish it to Google Sheets first.
+                Google Sheets import is intended for corrections, backfill, and exception uploads. Primary vehicle data will come from DMS sync once connected.
               </p>
             </div>
             <div className="mt-3 flex justify-end">
@@ -1029,7 +1029,7 @@ export default function ImportCenter() {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Parsing workbook…</p>
+            <p className="text-sm text-muted-foreground">Parsing import data…</p>
           )}
 
           <div className="mt-6 inline-block text-left space-y-1.5">
@@ -1188,7 +1188,7 @@ export default function ImportCenter() {
                 <div className={`rounded-md border p-4 text-sm ${publishableIncompleteCount > 0 ? 'border-amber-500/20 bg-amber-500/5 text-amber-700 dark:text-amber-400' : 'border-success/20 bg-success/5 text-success'}`}>
                   {publishableIncompleteCount > 0
                     ? 'No blocking rows need attention. The remaining rows will be queued for review if you publish now.'
-                    : 'No blocking rows need attention. This workbook is ready to publish.'}
+                    : 'No blocking rows need attention. This batch is ready to publish.'}
                 </div>
               )}
             </div>

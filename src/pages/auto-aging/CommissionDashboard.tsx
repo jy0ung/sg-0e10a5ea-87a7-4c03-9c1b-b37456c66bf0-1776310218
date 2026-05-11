@@ -33,7 +33,7 @@ const STATUS_COLORS: Record<CommissionRecord['status'], string> = {
 
 export default function CommissionDashboard() {
   const { user } = useAuth();
-  const { vehicles } = useData();
+  const { availableBranches } = useData();
   const { toast } = useToast();
   const companyId = useCompanyId();
   const canManage = ['super_admin', 'company_admin', 'director', 'general_manager'].includes(user?.role ?? '');
@@ -60,8 +60,9 @@ export default function CommissionDashboard() {
   });
   const loading = loadingRules || loadingRecords;
 
-  const salesmen = [...new Set(vehicles.map(v => v.salesman_name))].sort();
-  const branches = [...new Set(vehicles.map(v => v.branch_code))].sort();
+  // Derive salesmen from commission records (avoids loading full vehicles array)
+  const salesmen = [...new Set(records.map(r => r.salesmanName))].sort();
+  const branches = availableBranches;
 
   const filteredRecords = records.filter(r => {
     if (salesmanFilter !== 'all' && r.salesmanName !== salesmanFilter) return false;

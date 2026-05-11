@@ -23,6 +23,7 @@ vi.mock('@/services/salesOrderService', () => ({
   getSalesOrders: vi.fn(() => Promise.resolve({ data: mockSalesOrders })),
   moveSalesOrderStage: vi.fn(() => Promise.resolve()),
   updateSalesOrder: vi.fn(() => Promise.resolve()),
+  subscribeToSalesOrderChanges: vi.fn(() => vi.fn()),
 }));
 vi.mock('@/services/invoiceService', () => ({
   getInvoices: vi.fn(() => Promise.resolve({ data: mockInvoices })),

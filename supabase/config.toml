@@ -47,3 +47,42 @@ pass = "env(AUTH_SMTP_PASS)"
 admin_email = "flsys@protonfookloi.com"
 sender_name = "FOOK LOI SYSTEM"
 # END managed auth SMTP relay
+
+# ── Edge Function registration ────────────────────────────────────────────────
+# All functions listed here require a valid JWT (verify_jwt = true).
+# None are exposed as VITE_ browser dependencies.
+# For self-hosted production (supabase-edge-runtime container), set
+# SUPABASE_INTERNAL_FUNCTIONS_CONFIG to the JSON array below and restart the
+# Edge Runtime service before invoking any function in production:
+#
+#   SUPABASE_INTERNAL_FUNCTIONS_CONFIG='[
+#     {"name":"invite-user","verify_jwt":true},
+#     {"name":"delete-user","verify_jwt":true},
+#     {"name":"update-user-status","verify_jwt":true},
+#     {"name":"send-push-notification","verify_jwt":true},
+#     {"name":"rollover-leave-balances","verify_jwt":true},
+#     {"name":"dms-sync-worker","verify_jwt":true}
+#   ]'
+
+[functions.invite-user]
+verify_jwt = true
+
+[functions.delete-user]
+verify_jwt = true
+
+[functions.update-user-status]
+verify_jwt = true
+
+[functions.send-push-notification]
+verify_jwt = true
+
+[functions.rollover-leave-balances]
+verify_jwt = true
+
+# Phase 5: backend-only DMS staging worker.
+# Accepts caller-supplied raw DMS payloads and persists them into sync_runs
+# and dms_raw_* staging tables. Does not live-fetch DMS or write canonical
+# UBS rows. Must NOT be invoked from browser code — always use service role
+# or a privileged server-side caller.
+[functions.dms-sync-worker]
+verify_jwt = true
