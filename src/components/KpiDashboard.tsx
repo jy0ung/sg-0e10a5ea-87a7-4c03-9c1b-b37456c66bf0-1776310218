@@ -475,16 +475,16 @@ function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFil
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-3 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">KPI</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">SLA</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Median</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Avg</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">P90</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Valid</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Overdue</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Compliance</th>
+                <thead className="bg-muted/50 text-muted-foreground border-b border-border/50">
+                  <tr>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">KPI</th>
+                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">SLA</th>
+                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Median</th>
+                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Avg</th>
+                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">P90</th>
+                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Valid</th>
+                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Overdue</th>
+                    <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Compliance</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -496,38 +496,38 @@ function KpiDashboardImpl({ kpiSummaries, vehicles, showAdvanced = true, showFil
                     return (
                       <tr 
                         key={kpi.kpiId} 
-                        className="border-b border-border/50 hover:bg-secondary/20 transition-colors cursor-pointer"
+                        className="border-b border-border/30 last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
                         onClick={() => setSelectedSegment({ kpiId: kpi.kpiId, type: 'overdue', value: kpi.overdueCount })}
                       >
-                        <td className="px-3 py-3">
+                        <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
                             {getStatusIcon(kpi)}
                             <div>
-                              <p className="font-medium text-foreground">{kpi.shortLabel}</p>
+                              <p className="font-semibold text-foreground text-xs">{kpi.shortLabel}</p>
                               <p className="text-[10px] text-muted-foreground">{kpi.label}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-right text-muted-foreground">{kpi.slaDays}d</td>
-                        <td className="px-3 py-3 text-right">
-                          <span className={medianOverSLA ? 'text-destructive font-semibold' : 'text-foreground'}>
+                        <td className="px-5 py-3 text-right text-muted-foreground text-xs">{kpi.slaDays}d</td>
+                        <td className="px-5 py-3 text-right text-xs">
+                          <span className={medianOverSLA ? 'text-destructive font-semibold' : 'text-foreground font-medium'}>
                             {kpi.median}d
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-right text-foreground">{kpi.average}d</td>
-                        <td className="px-3 py-3 text-right">
-                          <span className={p90OverSLA ? 'text-warning font-medium' : 'text-foreground'}>
+                        <td className="px-5 py-3 text-right text-foreground text-xs">{kpi.average}d</td>
+                        <td className="px-5 py-3 text-right text-xs">
+                          <span className={p90OverSLA ? 'text-warning font-semibold' : 'text-foreground'}>
                             {kpi.p90}d
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-right text-muted-foreground">{kpi.validCount}</td>
-                        <td className="px-3 py-3 text-right">
-                          <span className={kpi.overdueCount > 0 ? 'text-destructive font-semibold' : 'text-success'}>
+                        <td className="px-5 py-3 text-right text-muted-foreground text-xs font-mono">{kpi.validCount}</td>
+                        <td className="px-5 py-3 text-right text-xs font-mono">
+                          <span className={kpi.overdueCount > 0 ? 'text-destructive font-semibold' : 'text-success font-medium'}>
                             {kpi.overdueCount}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-right">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${getComplianceBg(compliance)}`}>
+                        <td className="px-5 py-3 text-right">
+                          <span className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-wider ${getComplianceBg(compliance)}`}>
                             {compliance}%
                           </span>
                         </td>

@@ -23,13 +23,15 @@ interface DashboardBranchComparisonProps {
 
 export function DashboardBranchComparison({ data }: DashboardBranchComparisonProps) {
   return (
-    <div className="glass-panel p-6">
-      <div className="flex items-start justify-between gap-4 mb-4">
+    <div className="glass-panel p-6 bg-card">
+      <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h3 className="font-semibold text-foreground">Branch Comparison</h3>
-          <p className="text-sm text-muted-foreground">Average BG to Delivery cycle time by branch in the current scope.</p>
+          <h3 className="text-base font-semibold text-foreground">Branch Comparison</h3>
+          <p className="text-xs text-muted-foreground mt-1">Average BG to Delivery cycle time by branch in the current scope.</p>
         </div>
-        <p className="text-[11px] text-muted-foreground">{data.length} branches compared</p>
+        <div className="px-2.5 py-1 bg-muted rounded-md border text-[11px] font-medium text-muted-foreground">
+          {data.length} Branches
+        </div>
       </div>
       {data.length > 0 ? (
         <ResponsiveContainer width="100%" height={250}>

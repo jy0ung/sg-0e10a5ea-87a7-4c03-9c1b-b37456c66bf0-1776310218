@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Filter, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+
 import { VEHICLE_STAGES, VEHICLE_STAGE_LABELS } from '@/utils/vehicleStage';
 
 export interface VehicleFilterState {
@@ -82,33 +82,24 @@ export function VehicleExplorerFilters({
   };
 
   return (
-    <div className="glass-panel p-4 space-y-3">
+    <div className="bg-card border-y shadow-sm px-4 md:px-6 py-3 -mx-4 md:-mx-6 mb-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Filter className="h-4 w-4" aria-hidden />
-          <span className="text-xs font-medium uppercase tracking-wide">Filters</span>
-          {activeCount > 0 && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-              {activeCount} active
-            </Badge>
-          )}
-        </div>
 
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
           <input
             value={state.search}
             onChange={(e) => onChange({ search: e.target.value })}
             placeholder="Search chassis, customer, invoice..."
             aria-label="Search vehicles"
-            className="h-8 w-64 rounded-md bg-secondary border border-border pl-8 pr-8 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-9 pr-8"
           />
           {state.search && (
             <button
               type="button"
               aria-label="Clear search"
               onClick={() => onChange({ search: '' })}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -116,7 +107,7 @@ export function VehicleExplorerFilters({
         </div>
 
         <Select value={state.branch} onValueChange={(v) => onChange({ branch: v })}>
-          <SelectTrigger className="h-8 w-40 text-xs" aria-label="Branch filter">
+          <SelectTrigger className="h-9 w-36 text-sm" aria-label="Branch filter">
             <SelectValue placeholder="All Branches" />
           </SelectTrigger>
           <SelectContent>
@@ -128,7 +119,7 @@ export function VehicleExplorerFilters({
         </Select>
 
         <Select value={state.model} onValueChange={(v) => onChange({ model: v })}>
-          <SelectTrigger className="h-8 w-40 text-xs" aria-label="Model filter">
+          <SelectTrigger className="h-9 w-36 text-sm" aria-label="Model filter">
             <SelectValue placeholder="All Models" />
           </SelectTrigger>
           <SelectContent>
@@ -140,7 +131,7 @@ export function VehicleExplorerFilters({
         </Select>
 
         <Select value={state.payment} onValueChange={(v) => onChange({ payment: v })}>
-          <SelectTrigger className="h-8 w-40 text-xs" aria-label="Payment filter">
+          <SelectTrigger className="h-9 w-40 text-sm" aria-label="Payment filter">
             <SelectValue placeholder="All Payments" />
           </SelectTrigger>
           <SelectContent>
@@ -152,7 +143,7 @@ export function VehicleExplorerFilters({
         </Select>
 
         <Select value={state.stage} onValueChange={(v) => onChange({ stage: v })}>
-          <SelectTrigger className="h-8 w-52 text-xs" aria-label="Stage filter">
+          <SelectTrigger className="h-9 w-48 text-sm" aria-label="Stage filter">
             <SelectValue placeholder="All Stages" />
           </SelectTrigger>
           <SelectContent>
@@ -167,7 +158,7 @@ export function VehicleExplorerFilters({
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+            className="h-9 text-sm text-muted-foreground hover:text-foreground"
             onClick={handleClear}
           >
             <X className="h-3.5 w-3.5 mr-1" aria-hidden />
@@ -190,7 +181,7 @@ export function VehicleExplorerFilters({
             value={String(state.pageSize)}
             onValueChange={(v) => onChange({ pageSize: Number(v) })}
           >
-            <SelectTrigger className="h-8 w-20 text-xs" aria-label="Rows per page">
+            <SelectTrigger className="h-9 w-20 text-sm" aria-label="Rows per page">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

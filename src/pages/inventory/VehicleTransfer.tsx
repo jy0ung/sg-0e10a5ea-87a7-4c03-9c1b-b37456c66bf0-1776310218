@@ -153,14 +153,14 @@ export default function VehicleTransfer() {
         ))}
       </div>
 
-      <div className="glass-panel p-4">
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="relative flex-1 min-w-40 max-w-xs">
-            <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-8 h-8 text-sm" placeholder="Chassis, model, branch…" value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="bg-card border-y shadow-sm px-4 md:px-6 py-3 -mx-4 md:-mx-6 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9 h-9" placeholder="Chassis, model, branch…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <Select value={statusFilter} onValueChange={setStatus}>
-            <SelectTrigger className="h-8 w-36 text-xs" aria-label="Transfer status filter"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-40 text-sm" aria-label="Transfer status filter"><SelectValue placeholder="All Statuses" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
@@ -169,20 +169,24 @@ export default function VehicleTransfer() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-          <span className="text-xs text-muted-foreground ml-auto">{filtered.length} records</span>
+          <div className="text-xs font-medium text-muted-foreground ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-muted rounded-md border">
+            {filtered.length} records
+          </div>
         </div>
+      </div>
 
-        <div className="overflow-auto">
+      <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="pb-2 pr-4 font-medium">Running No</th>
-                <th className="pb-2 pr-4 font-medium">Route</th>
-                <th className="pb-2 pr-4 font-medium">Chassis No</th>
-                <th className="pb-2 pr-4 font-medium">Model</th>
-                <th className="pb-2 pr-4 font-medium">Status</th>
-                <th className="pb-2 pr-4 font-medium">Date</th>
-                <th className="pb-2 font-medium">Actions</th>
+            <thead className="bg-muted/50 text-muted-foreground border-b">
+              <tr>
+                <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Running No</th>
+                <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Route</th>
+                <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Chassis No</th>
+                <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Model</th>
+                <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Status</th>
+                <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Date</th>
+                <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -190,30 +194,30 @@ export default function VehicleTransfer() {
                 <tr><td colSpan={7} className="py-8 text-center text-muted-foreground text-sm">No transfer records found</td></tr>
               ) : (
                 filtered.map(t => (
-                  <tr key={t.id} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
-                    <td className="py-2 pr-4 font-mono text-xs font-medium">{t.runningNo}</td>
-                    <td className="py-2 pr-4">
+                  <tr key={t.id} className="border-b last:border-0 border-border/40 hover:bg-muted/30 transition-colors">
+                    <td className="px-5 py-3 font-mono text-xs font-semibold">{t.runningNo}</td>
+                    <td className="px-5 py-3">
                       <div className="flex items-center gap-1.5 text-xs">
-                        <span className="font-medium">{t.fromBranch}</span>
+                        <span className="font-medium text-foreground">{t.fromBranch}</span>
                         <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                        <span className="font-medium">{t.toBranch}</span>
+                        <span className="font-medium text-foreground">{t.toBranch}</span>
                       </div>
                     </td>
-                    <td className="py-2 pr-4 font-mono text-xs">{t.chassisNo}</td>
-                    <td className="py-2 pr-4 text-xs">{t.model}{t.colour ? ` / ${t.colour}` : ''}</td>
-                    <td className="py-2 pr-4">
-                      <Badge className={`text-[10px] capitalize ${STATUS_BADGE[t.status]}`}>{t.status.replace('_', ' ')}</Badge>
+                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{t.chassisNo}</td>
+                    <td className="px-5 py-3 text-xs">{t.model}{t.colour ? <span className="text-muted-foreground"> / {t.colour}</span> : ''}</td>
+                    <td className="px-5 py-3">
+                      <Badge className={`text-[10px] capitalize tracking-wider rounded-md font-medium ${STATUS_BADGE[t.status]}`}>{t.status.replace('_', ' ')}</Badge>
                     </td>
-                    <td className="py-2 pr-4 text-xs text-muted-foreground">{t.arrivedAt ?? t.createdAt}</td>
-                    <td className="py-2">
+                    <td className="px-5 py-3 text-xs text-muted-foreground">{t.arrivedAt ?? t.createdAt}</td>
+                    <td className="px-5 py-3">
                       <div className="flex gap-1">
                         {t.status === 'pending' && (
-                          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => updateStatus(t.id, 'in_transit')}>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5" onClick={() => updateStatus(t.id, 'in_transit')}>
                             Dispatch
                           </Button>
                         )}
                         {t.status === 'in_transit' && (
-                          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-emerald-600" onClick={() => updateStatus(t.id, 'arrived')}>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950" onClick={() => updateStatus(t.id, 'arrived')}>
                             Mark Arrived
                           </Button>
                         )}

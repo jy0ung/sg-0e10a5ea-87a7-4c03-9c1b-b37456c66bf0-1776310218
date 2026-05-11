@@ -86,7 +86,8 @@ begin
         reg_no text,
         invoice_no text,
         obr text,
-        salesman_id uuid
+        salesman_id uuid,
+        company_id text
       )
     ),
     ins as (
@@ -150,7 +151,8 @@ begin
         field text,
         issue_type text,
         message text,
-        severity text
+        severity text,
+        company_id text
       )
     ),
     ins as (

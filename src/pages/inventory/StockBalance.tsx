@@ -100,42 +100,44 @@ export default function StockBalance() {
       </div>
 
       {/* Filters + table */}
-      <div className="glass-panel p-4">
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="relative flex-1 min-w-40 max-w-xs">
-            <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-8 h-8 text-sm" placeholder="Chassis, model, plate…" value={search} onChange={e => handleSearchChange(e.target.value)} />
+      <div className="bg-card border-y shadow-sm px-4 md:px-6 py-3 -mx-4 md:-mx-6 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9 h-9" placeholder="Chassis, model, plate…" value={search} onChange={e => handleSearchChange(e.target.value)} />
           </div>
           <Select value={branchFilter} onValueChange={v => { setBranch(v); setPage(0); }}>
-            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Branches" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-40 text-sm"><SelectValue placeholder="All Branches" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Branches</SelectItem>
               {branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
             </SelectContent>
           </Select>
-          <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
+          <div className="text-xs font-medium text-muted-foreground ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-muted rounded-md border">
             <Package className="h-3.5 w-3.5" />{totalCount.toLocaleString()} vehicles
-          </span>
+          </div>
         </div>
+      </div>
 
+      <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
         {loading ? (
           <div className="flex items-center justify-center h-32">
             <Loader2 className="h-6 w-6 text-primary animate-spin" />
           </div>
         ) : (
           <>
-            <div className="overflow-auto">
+            <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                    <th className="pb-2 pr-4 font-medium">Status</th>
-                    <th className="pb-2 pr-4 font-medium">{getAutoAgingFieldLabel('chassis_no', 'CHASSIS NO.')}</th>
-                    <th className="pb-2 pr-4 font-medium">{getAutoAgingFieldLabel('model', 'MODEL')}</th>
-                    <th className="pb-2 pr-4 font-medium">Colour/Variant</th>
-                    <th className="pb-2 pr-4 font-medium">Plate No</th>
-                    <th className="pb-2 pr-4 font-medium">{getAutoAgingFieldLabel('branch_code', 'BRCH K1')}</th>
-                    <th className="pb-2 pr-4 font-medium">{getAutoAgingFieldLabel('bg_date', 'BG DATE')}</th>
-                    <th className="pb-2 font-medium">{getAutoAgingFieldLabel('salesman_name', 'SA NAME')}</th>
+                <thead className="bg-muted/50 text-muted-foreground border-b">
+                  <tr>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Status</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">{getAutoAgingFieldLabel('chassis_no', 'CHASSIS NO.')}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">{getAutoAgingFieldLabel('model', 'MODEL')}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Colour/Variant</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Plate No</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">{getAutoAgingFieldLabel('branch_code', 'BRCH K1')}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">{getAutoAgingFieldLabel('bg_date', 'BG DATE')}</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">{getAutoAgingFieldLabel('salesman_name', 'SA NAME')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -145,19 +147,19 @@ export default function StockBalance() {
                     vehicles.map(v => {
                       const status = deriveStatus(v);
                       return (
-                        <tr key={v.id} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
-                          <td className="py-2 pr-4">
-                            <Badge className={`text-[10px] capitalize ${STATUS_BADGE[status] ?? 'bg-secondary text-secondary-foreground'}`}>
+                        <tr key={v.id} className="border-b last:border-0 border-border/40 hover:bg-muted/30 transition-colors">
+                          <td className="px-5 py-3">
+                            <Badge className={`text-[10px] capitalize tracking-wider rounded-md font-medium ${STATUS_BADGE[status] ?? 'bg-secondary text-secondary-foreground'}`}>
                               {status.replace('_', ' ')}
                             </Badge>
                           </td>
-                          <td className="py-2 pr-4 font-mono text-xs">{v.chassis_no}</td>
-                          <td className="py-2 pr-4">{v.model}</td>
-                          <td className="py-2 pr-4 text-muted-foreground text-xs">{v.variant ?? '—'}</td>
-                          <td className="py-2 pr-4 text-xs">{v.reg_no ?? '—'}</td>
-                          <td className="py-2 pr-4 text-xs">{v.branch_code}</td>
-                          <td className="py-2 pr-4 text-xs text-muted-foreground">{v.bg_date ?? '—'}</td>
-                          <td className="py-2 text-xs text-muted-foreground">{v.salesman_name ?? '—'}</td>
+                          <td className="px-5 py-3 font-mono text-xs font-semibold">{v.chassis_no}</td>
+                          <td className="px-5 py-3">{v.model}</td>
+                          <td className="px-5 py-3 text-muted-foreground text-xs">{v.variant ?? '—'}</td>
+                          <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{v.reg_no ?? '—'}</td>
+                          <td className="px-5 py-3 text-xs text-muted-foreground">{v.branch_code}</td>
+                          <td className="px-5 py-3 text-xs text-muted-foreground">{v.bg_date ?? '—'}</td>
+                          <td className="px-5 py-3 text-xs text-muted-foreground">{v.salesman_name ?? '—'}</td>
                         </tr>
                       );
                     })
@@ -168,15 +170,15 @@ export default function StockBalance() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-3 border-t border-border mt-3">
-                <p className="text-xs text-muted-foreground">
+              <div className="flex items-center justify-between px-5 py-3 bg-muted/20 border-t border-border/50">
+                <p className="text-xs text-muted-foreground font-medium">
                   {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} of {totalCount.toLocaleString()}
                 </p>
                 <div className="flex items-center gap-1">
                   <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
                     <ChevronLeft className="h-3 w-3" />
                   </Button>
-                  <span className="px-2 text-xs text-muted-foreground">Page {page + 1} / {totalPages}</span>
+                  <span className="px-2 text-xs text-muted-foreground font-medium">Page {page + 1} / {totalPages}</span>
                   <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
                     <ChevronRight className="h-3 w-3" />
                   </Button>

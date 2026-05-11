@@ -101,19 +101,19 @@ export default function ChassisMovement() {
       />
 
       {/* Search bar */}
-      <div className="glass-panel p-4">
-        <div className="flex gap-2 max-w-md">
+      <div className="bg-card border-y shadow-sm px-4 md:px-6 py-3 -mx-4 md:-mx-6 flex flex-col gap-3">
+        <div className="flex gap-3 max-w-md">
           <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              className="pl-8 h-8 text-sm"
+              className="pl-9 h-9"
               placeholder="Enter chassis number…"
               value={query}
               onChange={e => setQuery(e.target.value.toUpperCase())}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
             />
           </div>
-          <Button size="sm" onClick={handleSearch} disabled={loading}>
+          <Button size="sm" onClick={handleSearch} disabled={loading} className="h-9 px-4">
             {loading ? <div className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" /> : 'Search'}
           </Button>
         </div>

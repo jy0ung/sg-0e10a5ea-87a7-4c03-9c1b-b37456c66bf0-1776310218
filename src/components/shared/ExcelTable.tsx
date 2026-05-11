@@ -99,7 +99,7 @@ const EditableGridCell = React.memo(function EditableGridCell({
   return (
     <TableCell
       className={cn(
-        "whitespace-nowrap",
+        "whitespace-nowrap px-5 py-3",
         canEdit && "cursor-text hover:bg-secondary/20"
       )}
       style={column.width ? { minWidth: `${column.width}px` } : undefined}
@@ -459,11 +459,11 @@ export function ExcelTable<T>({
         </div>
       </div>
 
-      <div className="glass-panel overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader>
-              <TableRow className="bg-secondary/30 hover:bg-secondary/30">
+            <TableHeader className="bg-muted/50 border-b">
+              <TableRow className="hover:bg-transparent">
                 {showSelection && (
                   <TableHead className="w-10">
                     <input 
@@ -478,8 +478,8 @@ export function ExcelTable<T>({
                   <TableHead
                     key={column.key}
                     className={cn(
-                      "whitespace-nowrap font-semibold text-foreground",
-                      onSort && column.sortable !== false && "cursor-pointer hover:bg-secondary/50"
+                      "whitespace-nowrap font-semibold uppercase tracking-wider text-[11px] text-muted-foreground h-11 px-5",
+                      onSort && column.sortable !== false && "cursor-pointer hover:text-foreground transition-colors"
                     )}
                     style={column.width ? { minWidth: `${column.width}px` } : undefined}
                     onClick={() => onSort && column.sortable !== false && onSort(column.key)}

@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
+
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { searchChassisFilter, type ChassisFilterRow } from '@/services/inventoryService';
@@ -67,67 +66,60 @@ export default function ChassisFilter() {
     <div className="space-y-6">
       <PageHeader title="Chassis Filter" description="Advanced search for vehicles by chassis, plate, model, engine or colour" />
 
-      <Card>
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {([
-              ['ownerName', 'Owner / Customer Name'],
-              ['vehicleType', 'Vehicle Type'],
-              ['chassisNo', 'Chassis No'],
-              ['plateNo', 'Plate No'],
-              ['model', 'Model'],
-              ['engineNo', 'Engine No'],
-              ['colour', 'Colour'],
-            ] as [keyof typeof filters, string][]).map(([k, label]) => (
-              <div key={k} className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{label}</Label>
-                <Input
-                  placeholder={`Filter by ${label.toLowerCase()}…`}
-                  value={filters[k]}
-                  onChange={set(k)}
-                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                />
-              </div>
+      <div className="bg-card border-y shadow-sm px-4 md:px-6 py-3 -mx-4 md:-mx-6 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Chassis No..."
+              value={filters.chassisNo}
+              onChange={set('chassisNo')}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              className="pl-9 h-9"
+            />
+          </div>
+          <Input placeholder="Plate No..." value={filters.plateNo} onChange={set('plateNo')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-32 h-9" />
+          <Input placeholder="Model..." value={filters.model} onChange={set('model')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-32 h-9" />
+          <Input placeholder="Engine No..." value={filters.engineNo} onChange={set('engineNo')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-32 h-9" />
+          <Input placeholder="Colour..." value={filters.colour} onChange={set('colour')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-24 h-9" />
+          <Input placeholder="Owner Name..." value={filters.ownerName} onChange={set('ownerName')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-40 h-9" />
+          
+          <Button onClick={handleSearch} disabled={loading} size="sm" className="h-9">
+            {loading ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
+            {loading ? 'Searching…' : 'Search'}
+          </Button>
+          {(activeFilters.length > 0 || searched) && (
+            <Button variant="ghost" onClick={clearAll} size="sm" className="h-9 text-muted-foreground hover:text-foreground">
+              Clear
+            </Button>
+          )}
+        </div>
+
+        {/* Active filter chips */}
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {activeFilters.map(([k, v]) => (
+              <span key={k} className={CHIP_CLASS}>
+                {k}: {v}
+                <button onClick={() => clearFilter(k)}><X className="h-3 w-3" /></button>
+              </span>
             ))}
           </div>
-
-          {/* Active filter chips */}
-          {activeFilters.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {activeFilters.map(([k, v]) => (
-                <span key={k} className={CHIP_CLASS}>
-                  {k}: {v}
-                  <button onClick={() => clearFilter(k)}><X className="h-3 w-3" /></button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="flex gap-2 mt-4">
-            <Button onClick={handleSearch} disabled={loading}>
-              {loading ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
-              {loading ? 'Searching…' : 'Search'}
-            </Button>
-            {(activeFilters.length > 0 || searched) && (
-              <Button variant="outline" onClick={clearAll}>
-                <X className="h-4 w-4 mr-2" />Clear
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
       {searched && (
         <>
-          <div className="rounded-md border overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted text-muted-foreground">
-                <tr>
-                  {['Chassis No', 'Plate No', 'Model', 'Engine No', 'Colour', 'Status', 'Branch', 'Owner Name'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
+          <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 text-muted-foreground border-b">
+                  <tr>
+                    {['Chassis No', 'Plate No', 'Model', 'Engine No', 'Colour', 'Status', 'Branch', 'Owner Name'].map(h => (
+                      <th key={h} className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
               <tbody>
                 {results.length === 0 ? (
                   <tr>
@@ -136,21 +128,22 @@ export default function ChassisFilter() {
                     </td>
                   </tr>
                 ) : results.map(v => (
-                  <tr key={v.id} className="border-t hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs font-semibold">{v.chassis_no ?? '—'}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{v.plate_no ?? '—'}</td>
-                    <td className="px-4 py-3">{v.model ?? '—'}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{v.engine_no ?? '—'}</td>
-                    <td className="px-4 py-3">{v.colour ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      {v.status ? <Badge variant={v.status === 'Available' ? 'default' : 'secondary'}>{v.status}</Badge> : '—'}
+                  <tr key={v.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                    <td className="px-5 py-3 font-mono text-xs font-semibold">{v.chassis_no ?? '—'}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{v.plate_no ?? '—'}</td>
+                    <td className="px-5 py-3">{v.model ?? '—'}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{v.engine_no ?? '—'}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{v.colour ?? '—'}</td>
+                    <td className="px-5 py-3">
+                      {v.status ? <Badge variant={v.status === 'Available' ? 'default' : 'secondary'} className="rounded-md font-medium text-[10px] uppercase tracking-wider">{v.status}</Badge> : '—'}
                     </td>
-                    <td className="px-4 py-3">{v.branch_id ?? '—'}</td>
-                    <td className="px-4 py-3">{v.owner_name ?? '—'}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{v.branch_id ?? '—'}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{v.owner_name ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Pagination bar */}
