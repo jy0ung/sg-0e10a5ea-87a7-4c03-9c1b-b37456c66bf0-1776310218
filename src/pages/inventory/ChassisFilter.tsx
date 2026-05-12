@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ScrollableRegion } from '@/components/shared/ScrollableRegion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -63,10 +64,25 @@ export default function ChassisFilter() {
   const set = (k: keyof typeof filters) => (e: React.ChangeEvent<HTMLInputElement>) => setFilters(f => ({ ...f, [k]: e.target.value }));
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Chassis Filter" description="Advanced search for vehicles by chassis, plate, model, engine or colour" />
+    <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
+      <PageHeader
+        title="Chassis Filter"
+        description="Advanced search for vehicles by chassis, plate, model, engine, colour, or owner"
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Chassis Filter' }]}
+      />
 
-      <div className="bg-card border-y shadow-sm px-4 md:px-6 py-3 -mx-4 md:-mx-6 flex flex-col gap-3">
+      <div className="shrink-0 rounded-lg border bg-card px-4 py-3 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Inventory Search Workbench</p>
+            <p className="mt-0.5 text-sm text-foreground">Layer multiple identifiers to find the exact vehicle record quickly.</p>
+          </div>
+          {searched && (
+            <span className="rounded-md border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+              {totalCount.toLocaleString()} matches
+            </span>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -78,11 +94,11 @@ export default function ChassisFilter() {
               className="pl-9 h-9"
             />
           </div>
-          <Input placeholder="Plate No..." value={filters.plateNo} onChange={set('plateNo')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-32 h-9" />
-          <Input placeholder="Model..." value={filters.model} onChange={set('model')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-32 h-9" />
-          <Input placeholder="Engine No..." value={filters.engineNo} onChange={set('engineNo')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-32 h-9" />
-          <Input placeholder="Colour..." value={filters.colour} onChange={set('colour')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-24 h-9" />
-          <Input placeholder="Owner Name..." value={filters.ownerName} onChange={set('ownerName')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-40 h-9" />
+          <Input placeholder="Plate No..." value={filters.plateNo} onChange={set('plateNo')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="h-9 w-32" />
+          <Input placeholder="Model..." value={filters.model} onChange={set('model')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="h-9 w-32" />
+          <Input placeholder="Engine No..." value={filters.engineNo} onChange={set('engineNo')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="h-9 w-32" />
+          <Input placeholder="Colour..." value={filters.colour} onChange={set('colour')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="h-9 w-28" />
+          <Input placeholder="Owner Name..." value={filters.ownerName} onChange={set('ownerName')} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="h-9 w-44" />
           
           <Button onClick={handleSearch} disabled={loading} size="sm" className="h-9">
             {loading ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
@@ -101,7 +117,7 @@ export default function ChassisFilter() {
             {activeFilters.map(([k, v]) => (
               <span key={k} className={CHIP_CLASS}>
                 {k}: {v}
-                <button onClick={() => clearFilter(k)}><X className="h-3 w-3" /></button>
+                <button type="button" aria-label={`Clear ${k} filter`} onClick={() => clearFilter(k)}><X className="h-3 w-3" /></button>
               </span>
             ))}
           </div>
@@ -109,12 +125,11 @@ export default function ChassisFilter() {
       </div>
 
       {searched && (
-        <>
-          <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-muted-foreground border-b">
-                  <tr>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
+          <ScrollableRegion className="min-h-0 flex-1 overflow-auto" label="Chassis filter results table">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-muted/90 text-muted-foreground border-b backdrop-blur">
+                <tr>
                     {['Chassis No', 'Plate No', 'Model', 'Engine No', 'Colour', 'Status', 'Branch', 'Owner Name'].map(h => (
                       <th key={h} className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">{h}</th>
                     ))}
@@ -143,27 +158,25 @@ export default function ChassisFilter() {
                 ))}
               </tbody>
             </table>
-            </div>
-          </div>
+          </ScrollableRegion>
 
-          {/* Pagination bar */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex shrink-0 items-center justify-between border-t bg-muted/20 px-5 py-3 text-xs text-muted-foreground">
             <span>
               {totalCount === 0
                 ? 'No vehicles found'
                 : `${page * FILTER_PAGE_SIZE + 1}–${Math.min((page + 1) * FILTER_PAGE_SIZE, totalCount)} of ${totalCount.toLocaleString()} vehicles`}
             </span>
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 0 || loading} onClick={() => runSearch(page - 1)}>
+              <Button variant="outline" size="icon" className="h-7 w-7" aria-label="Previous results page" disabled={page === 0 || loading} onClick={() => runSearch(page - 1)}>
                 <ChevronLeft className="h-3 w-3" />
               </Button>
               <span className="px-2">Page {page + 1} of {totalPages}</span>
-              <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1 || loading} onClick={() => runSearch(page + 1)}>
+              <Button variant="outline" size="icon" className="h-7 w-7" aria-label="Next results page" disabled={page >= totalPages - 1 || loading} onClick={() => runSearch(page + 1)}>
                 <ChevronRight className="h-3 w-3" />
               </Button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ScrollableRegion } from '@/components/shared/ScrollableRegion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -155,7 +156,7 @@ export default function SalesOrders() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
       <PageHeader
         title="Sales Orders"
         description="Track orders from enquiry to delivery"
@@ -166,49 +167,53 @@ export default function SalesOrders() {
       {loading ? (
         <TableSkeleton rows={8} cols={9} colWidths={['w-24','w-24','w-28','w-24','w-20','w-24','w-20','w-20','w-16']} />
       ) : (
-      <div className="glass-panel p-4">
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="relative flex-1 min-w-40 max-w-xs">
-            <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-8 h-8 text-sm" placeholder="Search orders…" value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="glass-panel flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Order Queue</p>
+            <p className="mt-0.5 text-sm text-foreground">Monitor customer orders, vehicle links, and invoice readiness in one workspace.</p>
+          </div>
+          <div className="relative min-w-[240px] flex-1 lg:max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input className="h-9 pl-9 text-sm" placeholder="Search orders…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-40 text-sm" aria-label="Sales order status filter"><SelectValue placeholder="All Statuses" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               {STATUSES.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
             </SelectContent>
           </Select>
-          <span className="text-xs text-muted-foreground ml-auto">{filtered.length} orders</span>
+          <span className="rounded-md border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">{filtered.length} orders</span>
         </div>
 
-        <div className="overflow-auto hidden sm:block">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="pb-2 pr-4 font-medium">Order No</th>
-                <th className="pb-2 pr-4 font-medium">VSO No</th>
-                <th className="pb-2 pr-4 font-medium">Customer</th>
-                <th className="pb-2 pr-4 font-medium">Model</th>
-                <th className="pb-2 pr-4 font-medium">Branch</th>
-                <th className="pb-2 pr-4 font-medium">Booking Date</th>
-                <th className="pb-2 pr-4 font-medium">Status</th>
-                <th className="pb-2 pr-4 font-medium">Chassis</th>
-                <th className="pb-2 font-medium"></th>
+        <ScrollableRegion className="hidden min-h-0 flex-1 overflow-auto sm:block" label="Sales orders table">
+          <table className="min-w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-muted/90 text-muted-foreground backdrop-blur">
+              <tr className="border-b border-border text-left text-xs">
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Order No</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">VSO No</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Customer</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Model</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Branch</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Booking Date</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Status</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Chassis</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(o => (
                 <tr key={o.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
-                  <td className="py-2 pr-4 font-mono text-xs font-medium">{o.orderNo}</td>
-                  <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{o.vsoNo ?? '—'}</td>
-                  <td className="py-2 pr-4">{o.customerName ?? '—'}</td>
-                  <td className="py-2 pr-4">{o.model}{o.variant ? ` / ${o.variant}` : ''}</td>
-                  <td className="py-2 pr-4">{o.branchCode}</td>
-                  <td className="py-2 pr-4 text-muted-foreground">{o.bookingDate}</td>
-                  <td className="py-2 pr-4"><span className={`px-1.5 py-0.5 rounded text-[11px] font-medium capitalize ${STATUS_COLORS[o.status]}`}>{o.status}</span></td>
-                  <td className="py-2 pr-4 font-mono text-xs text-muted-foreground">{o.chassisNo ?? '—'}</td>
-                  <td className="py-2 text-right">
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-medium">{o.orderNo}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-muted-foreground">{o.vsoNo ?? '—'}</td>
+                  <td className="whitespace-nowrap px-4 py-3">{o.customerName ?? '—'}</td>
+                  <td className="whitespace-nowrap px-4 py-3">{o.model}{o.variant ? ` / ${o.variant}` : ''}</td>
+                  <td className="whitespace-nowrap px-4 py-3">{o.branchCode}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{o.bookingDate}</td>
+                  <td className="whitespace-nowrap px-4 py-3"><span className={`px-1.5 py-0.5 rounded text-[11px] font-medium capitalize ${STATUS_COLORS[o.status]}`}>{o.status}</span></td>
+                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-muted-foreground">{o.chassisNo ?? '—'}</td>
+                  <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       {!invoicedOrderIds.has(o.id) && (o.status === 'delivered' || o.status === 'booked') && (
                         <Button
@@ -240,11 +245,11 @@ export default function SalesOrders() {
               {filtered.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-muted-foreground text-xs">No orders found</td></tr>}
             </tbody>
           </table>
-        </div>
+        </ScrollableRegion>
 
-        {/* Mobile card list */}
         <MobileCardList
           data={filtered}
+          className="p-3"
           emptyMessage="No orders found"
           renderCard={o => (
             <div key={o.id} className="glass-panel p-3 space-y-1.5 text-sm">
@@ -345,7 +350,7 @@ export default function SalesOrders() {
               <label htmlFor="sales-order-link-chassis-no" className="text-xs font-medium text-muted-foreground">Chassis Number or Search Text *</label>
               <div className="flex gap-2">
                 <Input id="sales-order-link-chassis-no" className="h-8 text-sm font-mono" placeholder="e.g. PM00A1234" value={chassisNo} onChange={e => setChassisNo(e.target.value)} />
-                <Button type="button" variant="outline" size="sm" className="h-8" onClick={handleVehicleSearch} disabled={vehicleSearchLoading}>
+                <Button type="button" variant="outline" size="sm" className="h-8" aria-label="Search vehicles" onClick={handleVehicleSearch} disabled={vehicleSearchLoading}>
                   {vehicleSearchLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
                 </Button>
               </div>

@@ -113,7 +113,7 @@ export default function VehicleTransfer() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 animate-fade-in">
+      <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
         <PageHeader title="Vehicle Transfer" description="Inter-branch chassis movement tracking"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Vehicle Transfer' }]} />
         <TableSkeleton rows={8} cols={7} colWidths={['w-20','w-20','w-20','w-28','w-20','w-24','w-16']} />
@@ -123,7 +123,7 @@ export default function VehicleTransfer() {
 
   if (isError) {
     return (
-      <div className="space-y-6 animate-fade-in">
+      <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
         <PageHeader title="Vehicle Transfer" description="Inter-branch chassis movement tracking"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Vehicle Transfer' }]} />
         <PageErrorState title="Unable to load vehicle transfers" error={error} onRetry={() => void refetch()} />
@@ -132,7 +132,7 @@ export default function VehicleTransfer() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
       <PageHeader
         title="Vehicle Transfer"
         description="Inter-branch chassis movement tracking"
@@ -144,8 +144,7 @@ export default function VehicleTransfer() {
         }
       />
 
-      {/* Summary strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-4">
         {(['pending','in_transit','arrived','cancelled'] as TransferStatus[]).map(s => (
           <div key={s} className="glass-panel p-4">
             <p className="text-xs text-muted-foreground capitalize mb-1">{s.replace('_', ' ')}</p>
@@ -154,9 +153,13 @@ export default function VehicleTransfer() {
         ))}
       </div>
 
-      <div className="bg-card border-y shadow-sm px-4 md:px-6 py-3 -mx-4 md:-mx-6 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px]">
+      <div className="glass-panel flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Transfer Queue</p>
+            <p className="mt-0.5 text-sm text-foreground">Track branch-to-branch movements from request through arrival.</p>
+          </div>
+          <div className="relative min-w-[220px] flex-1 lg:max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input className="pl-9 h-9" placeholder="Chassis, model, branch…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
@@ -170,16 +173,14 @@ export default function VehicleTransfer() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-          <div className="text-xs font-medium text-muted-foreground ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-muted rounded-md border">
+          <div className="flex items-center gap-1.5 rounded-md border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
             {filtered.length} records
           </div>
         </div>
-      </div>
 
-      <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-        <ScrollableRegion className="overflow-x-auto" label="Vehicle transfer records table">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-muted-foreground border-b">
+        <ScrollableRegion className="min-h-0 flex-1 overflow-auto" label="Vehicle transfer records table">
+          <table className="min-w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-muted/90 text-muted-foreground border-b backdrop-blur">
               <tr>
                 <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Running No</th>
                 <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Route</th>
@@ -196,22 +197,22 @@ export default function VehicleTransfer() {
               ) : (
                 filtered.map(t => (
                   <tr key={t.id} className="border-b last:border-0 border-border/40 hover:bg-muted/30 transition-colors">
-                    <td className="px-5 py-3 font-mono text-xs font-semibold">{t.runningNo}</td>
-                    <td className="px-5 py-3">
+                    <td className="whitespace-nowrap px-5 py-3 font-mono text-xs font-semibold">{t.runningNo}</td>
+                    <td className="whitespace-nowrap px-5 py-3">
                       <div className="flex items-center gap-1.5 text-xs">
                         <span className="font-medium text-foreground">{t.fromBranch}</span>
                         <ArrowRight className="h-3 w-3 text-muted-foreground" />
                         <span className="font-medium text-foreground">{t.toBranch}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{t.chassisNo}</td>
-                    <td className="px-5 py-3 text-xs">{t.model}{t.colour ? <span className="text-muted-foreground"> / {t.colour}</span> : ''}</td>
-                    <td className="px-5 py-3">
+                    <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-muted-foreground">{t.chassisNo}</td>
+                    <td className="whitespace-nowrap px-5 py-3 text-xs">{t.model}{t.colour ? <span className="text-muted-foreground"> / {t.colour}</span> : ''}</td>
+                    <td className="whitespace-nowrap px-5 py-3">
                       <Badge className={`text-[10px] capitalize tracking-wider rounded-md font-medium ${STATUS_BADGE[t.status]}`}>{t.status.replace('_', ' ')}</Badge>
                     </td>
-                    <td className="px-5 py-3 text-xs text-muted-foreground">{t.arrivedAt ?? t.createdAt}</td>
+                    <td className="whitespace-nowrap px-5 py-3 text-xs text-muted-foreground">{t.arrivedAt ?? t.createdAt}</td>
                     <td className="px-5 py-3">
-                      <div className="flex gap-1">
+                      <div className="flex justify-end gap-1">
                         {t.status === 'pending' && (
                           <Button variant="ghost" size="sm" className="h-7 text-xs px-2.5" onClick={() => updateStatus(t.id, 'in_transit')}>
                             Dispatch

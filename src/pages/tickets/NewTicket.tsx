@@ -43,7 +43,6 @@ import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useRequestTemplates } from '@/hooks/useRequestTemplates';
 import { useAttachmentSettings } from '@/hooks/useAttachmentSettings';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
-import { ROLE_LABELS } from '@/config/rolePermissions';
 import { createTicket } from '@/services/ticketService';
 import { uploadTicketAttachment } from '@/services/ticketAttachmentService';
 import { resolveBranchCode } from '@/services/branchService';
@@ -568,6 +567,15 @@ export default function NewTicket() {
     () => templates.filter((t) => t.category_key === selectedCategoryKey && t.is_active),
     [templates, selectedCategoryKey],
   );
+  const activeCategoryCount = useMemo(
+    () => categories.filter((category) => category.is_active).length,
+    [categories],
+  );
+  const activeTemplateCount = useMemo(
+    () => templates.filter((template) => template.is_active).length,
+    [templates],
+  );
+  const selectedCategoryLabel = selectedCategory?.label ?? 'Choose a category';
 
   const applyTemplate = (template: (typeof templates)[number]) => {
     setActiveTemplateId(template.id);
@@ -596,76 +604,38 @@ export default function NewTicket() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="w-full space-y-4">
-
-      {/* Page header */}
-      <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+    <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
+      <div className="shrink-0 rounded-lg border bg-card px-4 py-3 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Internal Requests</p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">{roleContext.pageTitle}</h1>
             <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">{roleContext.pageSubtitle}</p>
           </div>
-          <div className="flex min-w-0 items-center gap-3 rounded-md border bg-background px-3 py-2">
-            <div className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md bg-primary/10 text-sm font-semibold text-primary">
-              {user?.name?.[0]?.toUpperCase() ?? '?'}
+          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-[420px] sm:grid-cols-4">
+            <div className="rounded-md border bg-background px-3 py-2">
+              <p className="text-xs text-muted-foreground">Branch</p>
+              <p className="mt-0.5 truncate text-sm font-semibold text-foreground">{branchCode ?? 'Unassigned'}</p>
             </div>
-            <div className="min-w-0 leading-tight">
-              <p className="truncate text-sm font-semibold text-foreground">{user?.name}</p>
-              <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+            <div className="rounded-md border bg-background px-3 py-2">
+              <p className="text-xs text-muted-foreground">Categories</p>
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{activeCategoryCount}</p>
             </div>
-            <Badge variant="secondary" className="shrink-0">
-              {ROLE_LABELS[user?.role as AppRole] ?? user?.role ?? 'Staff'}
-            </Badge>
+            <div className="rounded-md border bg-background px-3 py-2">
+              <p className="text-xs text-muted-foreground">Templates</p>
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{activeTemplateCount}</p>
+            </div>
+            <div className="rounded-md border bg-background px-3 py-2">
+              <p className="text-xs text-muted-foreground">Form Fields</p>
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{customFields.length}</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Template picker */}
-      {categoryTemplates.length > 0 && selectedCategoryKey && (
-        <div className="rounded-lg border bg-card p-4 shadow-sm space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground">Start from a template</span>
-            </div>
-            {activeTemplate && (
-              <button
-                type="button"
-                onClick={clearTemplate}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="h-3 w-3" />
-                Clear
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {categoryTemplates.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => applyTemplate(t)}
-                className={cn(
-                  'inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
-                  activeTemplateId === t.id
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-muted/50 text-foreground hover:bg-muted',
-                )}
-              >
-                {t.name}
-              </button>
-            ))}
-          </div>
-          {activeTemplate?.description && (
-            <p className="text-xs text-muted-foreground">{activeTemplate.description}</p>
-          )}
-        </div>
-      )}
-
       {/* Categories not ready banner */}
       {(categoriesError || (!categoriesLoading && categories.length === 0)) && (
-        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+        <div className="shrink-0 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
           <div className="space-y-1">
             <p className="font-medium text-foreground">Request categories are not ready</p>
@@ -677,16 +647,23 @@ export default function NewTicket() {
         </div>
       )}
 
-      {/* Main form card */}
-      <Card className="overflow-hidden shadow-sm">
-        <CardHeader className="border-b bg-muted/30">
-          <CardTitle>Request details</CardTitle>
-          <CardDescription>Keep the request concise, categorized, and actionable for the receiving team.</CardDescription>
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden shadow-sm">
+        <CardHeader className="shrink-0 border-b bg-muted/30 px-4 py-3">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle className="text-base">Request details</CardTitle>
+              <CardDescription>Choose the category, apply a template if useful, then complete the required form fields.</CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="bg-background">{selectedCategoryLabel}</Badge>
+              <Badge variant="secondary">{customFields.length} field{customFields.length === 1 ? '' : 's'}</Badge>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="p-4">
+        <CardContent className="min-h-0 flex-1 overflow-auto p-4">
           <form onSubmit={form.handleSubmit(handleSubmit)} className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
 
-            <div className="grid gap-3 md:grid-cols-[1fr_12rem] xl:col-span-2">
+            <div className="xl:col-span-2">
               <div className="space-y-1.5">
                 <Label htmlFor="subject">
                   Request title <span className="text-destructive">*</span>
@@ -703,197 +680,241 @@ export default function NewTicket() {
                   </p>
                 )}
               </div>
-              <div className="space-y-1.5">
-                <Label>Branch</Label>
-                <Input
-                  value={branchCode ?? 'Unassigned'}
-                  readOnly
-                  className="bg-muted/50 cursor-default select-none"
-                />
-              </div>
             </div>
 
-            {/* Classification: category + priority */}
-            <div className="space-y-2 xl:col-span-2">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+            <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 xl:col-span-2 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Category and priority</p>
+                    <p className="text-xs text-muted-foreground">Routing choices drive templates and additional form fields.</p>
+                  </div>
+                  <Badge variant="outline" className="bg-background">{activeCategoryCount} active categories</Badge>
+                </div>
 
-                {/* Category */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="category">
-                    Category <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={selectedCategoryKey}
-                    onValueChange={(v) =>
-                      form.setValue('category', v as TicketFormData['category'], {
-                        shouldValidate: true,
-                      })
-                    }
-                    disabled={categorySelectionDisabled}
-                  >
-                    <SelectTrigger
-                      id="category"
-                      className={form.formState.errors.category ? 'border-destructive' : ''}
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(13rem,auto)]">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="category">
+                      Category <span className="text-destructive">*</span>
+                    </Label>
+                    <Select
+                      value={selectedCategoryKey}
+                      onValueChange={(v) =>
+                        form.setValue('category', v as TicketFormData['category'], {
+                          shouldValidate: true,
+                        })
+                      }
+                      disabled={categorySelectionDisabled}
                     >
-                      <SelectValue
-                        placeholder={
-                          categoriesLoading ? 'Loading categories…' : 'Select category'
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(({ key, label }) => (
-                        <SelectItem key={key} value={key}>
-                          {label}
-                        </SelectItem>
+                      <SelectTrigger
+                        id="category"
+                        className={form.formState.errors.category ? 'border-destructive' : ''}
+                      >
+                        <SelectValue
+                          placeholder={
+                            categoriesLoading ? 'Loading categories...' : 'Select category'
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map(({ key, label }) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.category && (
+                      <p className="text-destructive text-xs">
+                        {form.formState.errors.category.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>
+                      Priority <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="flex overflow-hidden rounded-md border border-border bg-background">
+                      {PRIORITY_OPTIONS.map((p, idx) => (
+                        <button
+                          type="button"
+                          key={p.value}
+                          title={p.hint}
+                          onClick={() =>
+                            form.setValue('priority', p.value, { shouldValidate: true })
+                          }
+                          className={cn(
+                            'flex-1 whitespace-nowrap px-3 py-2 text-xs font-semibold transition-colors',
+                            idx < PRIORITY_OPTIONS.length - 1 ? 'border-r border-border' : '',
+                            selectedPriority === p.value
+                              ? p.activeClasses
+                              : 'bg-background text-muted-foreground hover:bg-muted',
+                          )}
+                        >
+                          {p.label}
+                        </button>
                       ))}
-                    </SelectContent>
-                  </Select>
-                  {form.formState.errors.category && (
-                    <p className="text-destructive text-xs">
-                      {form.formState.errors.category.message}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {PRIORITY_OPTIONS.find((p) => p.value === selectedPriority)?.hint}
                     </p>
+                  </div>
+                </div>
+
+                {(availableSubcategories.length > 0 ||
+                  (subcategoriesLoading && selectedCategoryKey)) && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="subcategory">
+                      Subcategory
+                      {requiresSubcategory && <span className="text-destructive"> *</span>}
+                    </Label>
+                    <Select
+                      value={selectedSubcategoryKey}
+                      onValueChange={(v) =>
+                        form.setValue('subcategory', v, { shouldValidate: true })
+                      }
+                      disabled={subcategoriesLoading || availableSubcategories.length === 0}
+                    >
+                      <SelectTrigger
+                        id="subcategory"
+                        className={form.formState.errors.subcategory ? 'border-destructive' : ''}
+                      >
+                        <SelectValue
+                          placeholder={subcategoriesLoading ? 'Loading...' : 'Select subcategory'}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableSubcategories.map(({ key, label }) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.subcategory && (
+                      <p className="text-destructive text-xs">
+                        {form.formState.errors.subcategory.message}
+                      </p>
+                    )}
+                    {selectedSubcategory?.description && (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedSubcategory.description}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {selectedCategory?.description && !categoriesLoading && (
+                  <div className="flex items-start gap-2 rounded-md border bg-background px-3 py-2">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">{selectedCategory.description}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 rounded-md border bg-background p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-semibold text-foreground">Templates</p>
+                  </div>
+                  {activeTemplate && (
+                    <button
+                      type="button"
+                      onClick={clearTemplate}
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                      Clear
+                    </button>
                   )}
                 </div>
-
-                {/* Priority — visual button group */}
-                <div className="space-y-1.5">
-                  <Label>
-                    Priority <span className="text-destructive">*</span>
-                  </Label>
-                  <div className="flex overflow-hidden rounded-md border border-border bg-background">
-                    {PRIORITY_OPTIONS.map((p, idx) => (
-                      <button
-                        type="button"
-                        key={p.value}
-                        title={p.hint}
-                        onClick={() =>
-                          form.setValue('priority', p.value, { shouldValidate: true })
-                        }
-                        className={cn(
-                          'flex-1 px-4 py-2 text-xs font-semibold transition-colors whitespace-nowrap',
-                          idx < PRIORITY_OPTIONS.length - 1 ? 'border-r border-border' : '',
-                          selectedPriority === p.value
-                            ? p.activeClasses
-                            : 'bg-background text-muted-foreground hover:bg-muted',
-                        )}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {PRIORITY_OPTIONS.find((p) => p.value === selectedPriority)?.hint}
+                {categoryTemplates.length > 0 && selectedCategoryKey ? (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {categoryTemplates.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => applyTemplate(t)}
+                          className={cn(
+                            'inline-flex max-w-full items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
+                            activeTemplateId === t.id
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-muted/50 text-foreground hover:bg-muted',
+                          )}
+                        >
+                          <span className="truncate">{t.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {activeTemplate?.description ?? 'Templates prefill the subject, priority, description, and routing fields.'}
+                    </p>
+                  </>
+                ) : (
+                  <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+                    No templates are available for this category. Continue with the blank request form.
                   </p>
-                </div>
+                )}
               </div>
-
-              {/* Category description callout */}
-              {selectedCategory?.description && !categoriesLoading && (
-                <div className="flex items-start gap-2 rounded-md border bg-muted/50 px-3 py-2">
-                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground">{selectedCategory.description}</p>
-                </div>
-              )}
             </div>
-
-            {/* Subcategory */}
-            {(availableSubcategories.length > 0 ||
-              (subcategoriesLoading && selectedCategoryKey)) && (
-              <div className="space-y-1.5 xl:col-span-2">
-                <Label htmlFor="subcategory">
-                  Subcategory
-                  {requiresSubcategory && <span className="text-destructive"> *</span>}
-                </Label>
-                <Select
-                  value={selectedSubcategoryKey}
-                  onValueChange={(v) =>
-                    form.setValue('subcategory', v, { shouldValidate: true })
-                  }
-                  disabled={subcategoriesLoading || availableSubcategories.length === 0}
-                >
-                  <SelectTrigger
-                    id="subcategory"
-                    className={form.formState.errors.subcategory ? 'border-destructive' : ''}
-                  >
-                    <SelectValue
-                      placeholder={subcategoriesLoading ? 'Loading…' : 'Select subcategory'}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableSubcategories.map(({ key, label }) => (
-                      <SelectItem key={key} value={key}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.subcategory && (
-                  <p className="text-destructive text-xs">
-                    {form.formState.errors.subcategory.message}
-                  </p>
-                )}
-                {selectedSubcategory?.description && (
-                  <p className="text-xs text-muted-foreground">
-                    {selectedSubcategory.description}
-                  </p>
-                )}
-              </div>
-            )}
 
             {customFields.length > 0 && (
               <div className="rounded-lg border bg-muted/20 p-3 xl:col-span-2">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">Additional fields</p>
-                    <p className="text-xs text-muted-foreground">Fields required by the selected request category.</p>
+                    <p className="text-sm font-semibold text-foreground">Category form fields</p>
+                    <p className="text-xs text-muted-foreground">Extra details required for {selectedCategoryLabel.toLowerCase()} requests.</p>
                   </div>
+                  <Badge variant="secondary">{customFields.length}</Badge>
                 </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                {customFields.map((field) => {
-                  const value = customFieldValues[field.key] ?? '';
-                  const updateValue = (nextValue: string) => {
-                    setCustomFieldValues((current) => ({ ...current, [field.key]: nextValue }));
-                  };
+                <div className="grid gap-3 md:grid-cols-2">
+                  {customFields.map((field) => {
+                    const value = customFieldValues[field.key] ?? '';
+                    const updateValue = (nextValue: string) => {
+                      setCustomFieldValues((current) => ({ ...current, [field.key]: nextValue }));
+                    };
 
-                  return (
-                    <div
-                      key={field.id}
-                      className={cn('space-y-1.5', field.field_type === 'textarea' && 'md:col-span-2')}
-                    >
-                      <Label htmlFor={`custom-field-${field.key}`}>
-                        {field.label}
-                        {field.is_required && <span className="text-destructive"> *</span>}
-                      </Label>
-                      {field.field_type === 'textarea' ? (
-                        <Textarea
-                          id={`custom-field-${field.key}`}
-                          value={value}
-                          onChange={(event) => updateValue(event.target.value)}
-                          placeholder={field.placeholder}
-                          rows={3}
-                        />
-                      ) : field.field_type === 'database_select' ? (
-                        <DatabaseFieldSelect
-                          companyId={user?.company_id}
-                          field={field}
-                          value={value}
-                          onChange={updateValue}
-                        />
-                      ) : (
-                        <Input
-                          id={`custom-field-${field.key}`}
-                          type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
-                          value={value}
-                          onChange={(event) => updateValue(event.target.value)}
-                          placeholder={field.placeholder}
-                        />
-                      )}
-                      {field.help_text && <p className="text-xs text-muted-foreground">{field.help_text}</p>}
-                    </div>
-                  );
-                })}
-              </div>
+                    return (
+                      <div
+                        key={field.id}
+                        className={cn('space-y-1.5', field.field_type === 'textarea' && 'md:col-span-2')}
+                      >
+                        <Label htmlFor={`custom-field-${field.key}`}>
+                          {field.label}
+                          {field.is_required && <span className="text-destructive"> *</span>}
+                        </Label>
+                        {field.field_type === 'textarea' ? (
+                          <Textarea
+                            id={`custom-field-${field.key}`}
+                            value={value}
+                            onChange={(event) => updateValue(event.target.value)}
+                            placeholder={field.placeholder}
+                            rows={3}
+                          />
+                        ) : field.field_type === 'database_select' ? (
+                          <DatabaseFieldSelect
+                            companyId={user?.company_id}
+                            field={field}
+                            value={value}
+                            onChange={updateValue}
+                          />
+                        ) : (
+                          <Input
+                            id={`custom-field-${field.key}`}
+                            type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
+                            value={value}
+                            onChange={(event) => updateValue(event.target.value)}
+                            placeholder={field.placeholder}
+                          />
+                        )}
+                        {field.help_text && <p className="text-xs text-muted-foreground">{field.help_text}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
