@@ -24,7 +24,7 @@ async function chooseAdvancedScope(
     modelLabel?: string;
   },
 ) {
-  await page.getByRole('button', { name: /^Filter$/ }).click({ force: true });
+  await page.getByRole('button', { name: /^Filter(?:\s+\d+)?$/ }).click({ force: true });
   const scopeDialog = page.getByRole('dialog').filter({ hasText: 'Advanced Filter' });
   await expect(scopeDialog).toBeVisible();
 
@@ -98,6 +98,57 @@ async function setupAppFlowMocks(page: Page) {
     updated_at: nowTimestamp,
   };
 
+  const vehicleRows = [
+    {
+      id: 'vehicle-recent-kk',
+      company_id: companyId,
+      created_at: nowTimestamp,
+      is_deleted: false,
+      chassis_no: 'VEH-RECENT-KK',
+      bg_date: recentBookingDate,
+      delivery_date: recentDeliveryDate,
+      branch_code: 'KK',
+      model: 'Alpha',
+      payment_method: 'Cash',
+      salesman_name: 'Alex',
+      customer_name: 'Alice Tan',
+      bg_to_delivery: 5,
+      bg_to_shipment_etd: 1,
+      etd_to_outlet: 2,
+      outlet_to_reg: 1,
+      reg_to_delivery: 1,
+      bg_to_disb: 8,
+      delivery_to_disb: 3,
+    },
+    {
+      id: 'vehicle-older-twu',
+      company_id: companyId,
+      created_at: `${olderBookingDate}T08:00:00.000Z`,
+      is_deleted: false,
+      chassis_no: 'VEH-OLDER-TWU',
+      bg_date: olderBookingDate,
+      delivery_date: olderDeliveryDate,
+      branch_code: 'TWU',
+      model: 'Beta',
+      payment_method: 'Loan',
+      salesman_name: 'Benny',
+      customer_name: 'Brian Lee',
+      bg_to_delivery: 12,
+      bg_to_shipment_etd: 2,
+      etd_to_outlet: 3,
+      outlet_to_reg: 2,
+      reg_to_delivery: 1,
+      bg_to_disb: 15,
+      delivery_to_disb: 4,
+    },
+  ];
+
+  const filterVehicleRows = (payload: Record<string, unknown>) => vehicleRows.filter(row => {
+    if (payload.p_branch && row.branch_code !== payload.p_branch) return false;
+    if (payload.p_model && row.model !== payload.p_model) return false;
+    return true;
+  });
+
   await setupAuthMocks(page);
 
   await page.route(`${SUPABASE_URL}/rest/v1/dashboard_preferences*`, async route => {
@@ -166,44 +217,45 @@ async function setupAppFlowMocks(page: Page) {
     await fulfillJson(route, {});
   });
 
+  await page.route(`${SUPABASE_URL}/rest/v1/rpc/search_vehicles`, async route => {
+    const payload = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
+    const rows = filterVehicleRows(payload);
+    await fulfillJson(route, [{ rows, total_count: rows.length }]);
+  });
+
+  await page.route(`${SUPABASE_URL}/rest/v1/rpc/auto_aging_dashboard_summary`, async route => {
+    const payload = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
+    const rows = filterVehicleRows(payload);
+    await fulfillJson(route, {
+      available_branches: ['KK', 'TWU'],
+      available_models: ['Alpha', 'Beta'],
+      kpi_summaries: [
+        {
+          kpi_id: 'bg_to_delivery',
+          label: 'BG to Delivery',
+          short_label: 'BG -> Delivery',
+          valid_count: rows.length,
+          invalid_count: 0,
+          missing_count: 0,
+          median: rows[0]?.bg_to_delivery ?? 0,
+          average: rows[0]?.bg_to_delivery ?? 0,
+          p90: rows[0]?.bg_to_delivery ?? 0,
+          overdue_count: 0,
+          sla_days: 7,
+        },
+      ],
+      quality_issue_count: 0,
+      quality_issue_sample: [],
+    });
+  });
+
   await page.route(`${SUPABASE_URL}/rest/v1/vehicles*`, async route => {
     if (route.request().method() !== 'GET') {
       await fulfillJson(route, {});
       return;
     }
 
-    await fulfillJson(route, [
-      {
-        id: 'vehicle-recent-kk',
-        company_id: companyId,
-        created_at: nowTimestamp,
-        is_deleted: false,
-        chassis_no: 'VEH-RECENT-KK',
-        bg_date: recentBookingDate,
-        delivery_date: recentDeliveryDate,
-        branch_code: 'KK',
-        model: 'Alpha',
-        payment_method: 'Cash',
-        salesman_name: 'Alex',
-        customer_name: 'Alice Tan',
-        bg_to_delivery: 5,
-      },
-      {
-        id: 'vehicle-older-twu',
-        company_id: companyId,
-        created_at: `${olderBookingDate}T08:00:00.000Z`,
-        is_deleted: false,
-        chassis_no: 'VEH-OLDER-TWU',
-        bg_date: olderBookingDate,
-        delivery_date: olderDeliveryDate,
-        branch_code: 'TWU',
-        model: 'Beta',
-        payment_method: 'Loan',
-        salesman_name: 'Benny',
-        customer_name: 'Brian Lee',
-        bg_to_delivery: 12,
-      },
-    ]);
+    await fulfillJson(route, vehicleRows);
   });
 
   await page.route(`${SUPABASE_URL}/rest/v1/import_batches*`, async route => {
@@ -376,14 +428,14 @@ test('personal dashboard insights can be added and persist across reloads', asyn
   await settingsDialog.getByRole('button', { name: /done/i }).click();
   await expect(settingsDialog).toBeHidden();
 
-  const valueHotspotCard = page.getByText('Value Hotspot').last().locator('xpath=ancestor::div[contains(@class, "rounded-2xl")][1]');
+  const valueHotspotCard = page.getByTestId('custom-insight-card').filter({ hasText: 'Value Hotspot' });
   await expect(valueHotspotCard).toBeVisible();
   await expect(valueHotspotCard).toContainText('RM 120k');
   await expect(valueHotspotCard).toContainText('KK');
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-  const persistedValueHotspotCard = page.getByText('Value Hotspot').last().locator('xpath=ancestor::div[contains(@class, "rounded-2xl")][1]');
+  const persistedValueHotspotCard = page.getByTestId('custom-insight-card').filter({ hasText: 'Value Hotspot' });
   await expect(persistedValueHotspotCard).toBeVisible();
   await expect(persistedValueHotspotCard).toContainText('RM 120k');
   await expect(persistedValueHotspotCard).toContainText('KK');

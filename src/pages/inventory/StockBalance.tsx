@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ScrollableRegion } from '@/components/shared/ScrollableRegion';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -82,32 +83,30 @@ export default function StockBalance() {
   const branches = availableBranches;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
       <PageHeader
         title="Stock Balance"
         description="Live vehicle inventory by chassis number and location"
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Stock Balance' }]}
       />
 
-      {/* Summary cards (current page breakdown) */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-5">
         {(Object.entries(statusCounts) as [string, number][]).map(([s, n]) => (
-          <div key={s} className="glass-panel p-4">
+          <div key={s} className="glass-panel min-w-0 p-4">
             <p className="text-xs text-muted-foreground capitalize mb-1">{s.replace('_', ' ')}</p>
             <p className="text-2xl font-bold text-foreground">{n}</p>
           </div>
         ))}
       </div>
 
-      {/* Filters + table */}
-      <div className="bg-card border-y shadow-sm px-4 md:px-6 py-3 -mx-4 md:-mx-6 flex flex-col gap-3">
+      <div className="shrink-0 rounded-lg border bg-card px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative min-w-[240px] flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input className="pl-9 h-9" placeholder="Chassis, model, plate…" value={search} onChange={e => handleSearchChange(e.target.value)} />
           </div>
           <Select value={branchFilter} onValueChange={v => { setBranch(v); setPage(0); }}>
-            <SelectTrigger className="h-9 w-40 text-sm"><SelectValue placeholder="All Branches" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-40 text-sm" aria-label="Stock branch filter"><SelectValue placeholder="All Branches" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Branches</SelectItem>
               {branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
@@ -119,16 +118,16 @@ export default function StockBalance() {
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
         {loading ? (
-          <div className="flex items-center justify-center h-32">
+          <div className="flex min-h-[240px] flex-1 items-center justify-center">
             <Loader2 className="h-6 w-6 text-primary animate-spin" />
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-muted-foreground border-b">
+            <ScrollableRegion className="min-h-0 flex-1 overflow-auto" label="Stock balance vehicle table">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-muted/90 text-muted-foreground border-b backdrop-blur">
                   <tr>
                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">Status</th>
                     <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">{getAutoAgingFieldLabel('chassis_no', 'CHASSIS NO.')}</th>
@@ -166,20 +165,20 @@ export default function StockBalance() {
                   )}
                 </tbody>
               </table>
-            </div>
+            </ScrollableRegion>
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3 bg-muted/20 border-t border-border/50">
+              <div className="flex shrink-0 items-center justify-between px-5 py-3 bg-muted/20 border-t border-border/50">
                 <p className="text-xs text-muted-foreground font-medium">
                   {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} of {totalCount.toLocaleString()}
                 </p>
                 <div className="flex items-center gap-1">
-                  <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+                  <Button variant="outline" size="icon" className="h-7 w-7" disabled={page === 0} onClick={() => setPage(p => p - 1)} aria-label="Previous stock page">
                     <ChevronLeft className="h-3 w-3" />
                   </Button>
                   <span className="px-2 text-xs text-muted-foreground font-medium">Page {page + 1} / {totalPages}</span>
-                  <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>
+                  <Button variant="outline" size="icon" className="h-7 w-7" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} aria-label="Next stock page">
                     <ChevronRight className="h-3 w-3" />
                   </Button>
                 </div>

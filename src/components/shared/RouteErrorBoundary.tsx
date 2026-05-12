@@ -54,7 +54,7 @@ export class RouteErrorBoundary extends Component<Props, State> {
           <CardHeader>
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              <CardTitle className="text-destructive">
+              <CardTitle className="text-foreground">
                 This page failed to load{this.props.scope ? ` (${this.props.scope})` : ''}
               </CardTitle>
             </div>

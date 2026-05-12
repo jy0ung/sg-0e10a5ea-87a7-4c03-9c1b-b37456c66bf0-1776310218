@@ -59,7 +59,7 @@ export function DashboardCustomInsights({
           const result = customMetricResults.get(widget.id);
 
           return (
-            <div key={widget.id} className="rounded-lg border border-border/80 bg-card p-4 shadow-sm">
+            <div key={widget.id} data-testid="custom-insight-card" className="rounded-lg border border-border/80 bg-card p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest ${definition?.accentClassName ?? 'bg-primary/10 text-primary'}`}>
                   {definition?.label ?? 'Custom Insight'}

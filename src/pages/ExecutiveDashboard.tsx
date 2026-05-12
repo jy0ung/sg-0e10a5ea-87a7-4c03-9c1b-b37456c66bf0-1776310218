@@ -17,6 +17,7 @@ import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { BranchPeriodFilter } from '@/components/shared/BranchPeriodFilter';
 import { getDashboardPeriodRange, getDashboardScopeSummary, loadDashboardFilterState, matchesDashboardPeriod, saveDashboardFilterState } from '@/lib/dashboardFilters';
 import {
+  CUSTOM_INSIGHT_DEFINITIONS,
   DEFAULT_PERSONAL_DASHBOARD,
   createCustomFormulaWidget,
   createCustomMetricWidget,
@@ -552,6 +553,7 @@ export default function ExecutiveDashboard() {
       case 'snapshot':
         return <DashboardSnapshotSection cards={snapshotCards} scopeLabel={scopeLabel} />;
 
+      case 'scorecards':
         return <DashboardScorecards cards={scorecards} />;
 
       case 'kpi-analytics':

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ScrollableRegion } from '@/components/shared/ScrollableRegion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -201,7 +202,7 @@ export default function PurchaseInvoices() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6 animate-fade-in">
+      <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
         <PageHeader title="Purchase Invoices" description="CBU vehicle procurement invoices from suppliers"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing', path: '/purchasing/invoices' }, { label: 'Purchase Invoices' }]} />
         <TableSkeleton rows={8} cols={6} colWidths={['w-24','w-32','w-28','w-24','w-20','w-16']} />
@@ -211,7 +212,7 @@ export default function PurchaseInvoices() {
 
   if (isError) {
     return (
-      <div className="space-y-6 animate-fade-in">
+      <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
         <PageHeader title="Purchase Invoices" description="CBU vehicle procurement invoices from suppliers"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing', path: '/purchasing/invoices' }, { label: 'Purchase Invoices' }]} />
         <PageErrorState title="Unable to load purchase invoices" error={error} onRetry={() => void refetch()} />
@@ -220,7 +221,7 @@ export default function PurchaseInvoices() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
       <PageHeader
         title="Purchase Invoices"
         description="CBU vehicle procurement invoices from suppliers"
@@ -232,34 +233,37 @@ export default function PurchaseInvoices() {
         }
       />
 
-      {/* AP Aging summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-panel p-4">
+      <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="glass-panel min-w-0 p-4">
           <p className="text-xs text-muted-foreground mb-1">Total Outstanding (AP)</p>
-          <p className="text-2xl font-bold text-foreground">{fmt(totalOutstanding)}</p>
+          <p className="truncate text-xl font-semibold text-foreground tabular-nums" title={fmt(totalOutstanding)}>{fmt(totalOutstanding)}</p>
         </div>
-        <div className="glass-panel p-4">
+        <div className="glass-panel min-w-0 p-4">
           <p className="text-xs text-muted-foreground mb-1">Due ≤ 30 Days</p>
-          <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{fmt(due30)}</p>
+          <p className="truncate text-xl font-semibold text-amber-700 dark:text-amber-300 tabular-nums" title={fmt(due30)}>{fmt(due30)}</p>
         </div>
-        <div className="glass-panel p-4">
+        <div className="glass-panel min-w-0 p-4">
           <p className="text-xs text-muted-foreground mb-1">Overdue 31–60 Days</p>
-          <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">{fmt(overdue3160)}</p>
+          <p className="truncate text-xl font-semibold text-orange-700 dark:text-orange-300 tabular-nums" title={fmt(overdue3160)}>{fmt(overdue3160)}</p>
         </div>
-        <div className="glass-panel p-4">
+        <div className="glass-panel min-w-0 p-4">
           <p className="text-xs text-muted-foreground mb-1">Overdue 60+ Days</p>
-          <p className="text-2xl font-bold text-red-700 dark:text-red-300">{fmt(overdueOver60)}</p>
+          <p className="truncate text-xl font-semibold text-red-700 dark:text-red-300 tabular-nums" title={fmt(overdueOver60)}>{fmt(overdueOver60)}</p>
         </div>
       </div>
 
-      <div className="glass-panel p-4">
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="relative flex-1 min-w-40 max-w-xs">
-            <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-8 h-8 text-sm" placeholder="Invoice no, supplier, chassis…" value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="glass-panel flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">AP Invoice Workbench</p>
+            <p className="mt-0.5 text-sm text-foreground">Track invoice lifecycle, supplier payments, and aging exposure from one queue.</p>
+          </div>
+          <div className="relative min-w-[240px] flex-1 lg:max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input className="h-9 pl-9 text-sm" placeholder="Invoice no, supplier, chassis…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <Select value={statusFilter} onValueChange={setStatus}>
-            <SelectTrigger className="h-8 w-36 text-xs" aria-label="Purchase invoice status filter"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-40 text-sm" aria-label="Purchase invoice status filter"><SelectValue placeholder="All Statuses" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
@@ -267,72 +271,74 @@ export default function PurchaseInvoices() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-          <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
+          <span className="flex items-center gap-1 rounded-md border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
             <Truck className="h-3.5 w-3.5" />{filtered.length} invoices
           </span>
         </div>
 
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="pb-2 pr-4 font-medium">Invoice No</th>
-                <th className="pb-2 pr-4 font-medium">Supplier</th>
-                <th className="pb-2 pr-4 font-medium">Chassis No</th>
-                <th className="pb-2 pr-4 font-medium">Invoice Date</th>
-                <th className="pb-2 pr-4 font-medium">Amount</th>
-                <th className="pb-2 pr-4 font-medium">Paid</th>
-                <th className="pb-2 pr-4 font-medium">Lifecycle</th>
-                <th className="pb-2 pr-4 font-medium">Payment</th>
-                <th className="pb-2 font-medium">Actions</th>
+        <ScrollableRegion className="min-h-0 flex-1 overflow-auto" label="Purchase invoices table">
+          <table className="min-w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-muted/90 text-muted-foreground backdrop-blur">
+              <tr className="border-b border-border text-left text-xs">
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Invoice No</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Supplier</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Chassis No</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Invoice Date</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Amount</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Paid</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Lifecycle</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Payment</th>
+                <th className="whitespace-nowrap px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="py-8 text-center text-muted-foreground text-sm">No purchase invoices found</td></tr>
+                <tr><td colSpan={9} className="py-8 text-center text-muted-foreground text-sm">No purchase invoices found</td></tr>
               ) : (
                 filtered.map(pi => (
                   <tr key={pi.id} className="border-b border-border/40 hover:bg-muted/30 transition-colors">
-                    <td className="py-2 pr-4 font-mono text-xs font-medium">{pi.invoiceNo}</td>
-                    <td className="py-2 pr-4 text-xs">{pi.supplier}</td>
-                    <td className="py-2 pr-4 font-mono text-xs">{pi.chassisNo}</td>
-                    <td className="py-2 pr-4 text-xs text-muted-foreground">{pi.invoiceDate}</td>
-                    <td className="py-2 pr-4 text-xs font-medium">{fmt(pi.amount)}</td>
-                    <td className="py-2 pr-4 text-xs">{fmt(pi.paidAmount)}</td>
-                    <td className="py-2 pr-4">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-medium">{pi.invoiceNo}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs">{pi.supplier}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{pi.chassisNo}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">{pi.invoiceDate}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs font-medium tabular-nums">{fmt(pi.amount)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums">{fmt(pi.paidAmount)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
                       <Badge className={`text-[10px] capitalize ${LIFECYCLE_BADGE[pi.lifecycleStatus]}`}>{pi.lifecycleStatus}</Badge>
                     </td>
-                    <td className="py-2 pr-4">
+                    <td className="whitespace-nowrap px-4 py-3">
                       <Badge className={`text-[10px] capitalize ${AP_PAYMENT_BADGE[pi.paymentStatus] ?? ''}`}>{pi.paymentStatus}</Badge>
                     </td>
-                    <td className="py-2 flex items-center gap-1 flex-wrap">
-                      {pi.status === 'pending' && (
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-emerald-600" onClick={() => markReceived(pi.id)}>
-                          <Truck className="h-3 w-3 mr-0.5" />Receive
-                        </Button>
-                      )}
-                      {pi.lifecycleStatus === 'received' && (
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-purple-600" onClick={() => handleVerify(pi)}>
-                          <CheckCircle className="h-3 w-3 mr-0.5" />Verify
-                        </Button>
-                      )}
-                      {pi.lifecycleStatus === 'verified' && (
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-emerald-600" onClick={() => handleApprove(pi)}>
-                          <ThumbsUp className="h-3 w-3 mr-0.5" />Approve
-                        </Button>
-                      )}
-                      {(pi.lifecycleStatus === 'approved' || pi.lifecycleStatus === 'scheduled') && pi.paymentStatus !== 'paid' && (
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-blue-600" onClick={() => openPayDialog(pi)}>
-                          <CreditCard className="h-3 w-3 mr-0.5" />Pay
-                        </Button>
-                      )}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-1">
+                        {pi.status === 'pending' && (
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-emerald-600" onClick={() => markReceived(pi.id)}>
+                            <Truck className="h-3 w-3 mr-0.5" />Receive
+                          </Button>
+                        )}
+                        {pi.lifecycleStatus === 'received' && (
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-purple-600" onClick={() => handleVerify(pi)}>
+                            <CheckCircle className="h-3 w-3 mr-0.5" />Verify
+                          </Button>
+                        )}
+                        {pi.lifecycleStatus === 'verified' && (
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-emerald-600" onClick={() => handleApprove(pi)}>
+                            <ThumbsUp className="h-3 w-3 mr-0.5" />Approve
+                          </Button>
+                        )}
+                        {(pi.lifecycleStatus === 'approved' || pi.lifecycleStatus === 'scheduled') && pi.paymentStatus !== 'paid' && (
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-blue-600" onClick={() => openPayDialog(pi)}>
+                            <CreditCard className="h-3 w-3 mr-0.5" />Pay
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
-        </div>
+        </ScrollableRegion>
       </div>
 
       {/* Record Payment Dialog */}

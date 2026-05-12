@@ -183,6 +183,20 @@ export default function AutoAgingDashboard() {
     ]);
   };
 
+  const renderFilterControl = () => (
+    <BranchPeriodFilter
+      branches={branches}
+      branch={branchFilter}
+      period={periodFilter}
+      model={modelFilter}
+      models={models}
+      onBranchChange={(value) => setDashboardFilter(prev => ({ ...prev, branch: value }))}
+      onPeriodChange={(value) => setDashboardFilter(prev => ({ ...prev, period: value }))}
+      onModelChange={(value) => setDashboardFilter(prev => ({ ...prev, model: value }))}
+      periodLabel={AUTO_AGING_BG_DATE_PERIOD_LABEL}
+    />
+  );
+
   if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -208,6 +222,7 @@ export default function AutoAgingDashboard() {
           title="Auto Aging Overview"
           description="Vehicle aging analysis across operational milestones"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Overview' }]}
+          actions={renderFilterControl()}
         />
         <div className="glass-panel p-12 text-center">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
@@ -230,6 +245,7 @@ export default function AutoAgingDashboard() {
           title="Auto Aging Overview"
           description="Vehicle aging analysis across operational milestones"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Overview' }]}
+          actions={renderFilterControl()}
         />
         <div className="glass-panel p-12 text-center">
           <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -250,19 +266,7 @@ export default function AutoAgingDashboard() {
           title="Auto Aging Overview"
           description="Vehicle aging analysis across operational milestones"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Overview' }]}
-          actions={
-            <BranchPeriodFilter
-              branches={branches}
-              branch={branchFilter}
-              period={periodFilter}
-              model={modelFilter}
-              models={models}
-              onBranchChange={(value) => setDashboardFilter(prev => ({ ...prev, branch: value }))}
-              onPeriodChange={(value) => setDashboardFilter(prev => ({ ...prev, period: value }))}
-              onModelChange={(value) => setDashboardFilter(prev => ({ ...prev, model: value }))}
-              periodLabel={AUTO_AGING_BG_DATE_PERIOD_LABEL}
-            />
-          }
+          actions={renderFilterControl()}
         />
         <div className="glass-panel p-12 text-center space-y-4">
           <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
@@ -288,17 +292,7 @@ export default function AutoAgingDashboard() {
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Overview' }]}
         actions={
           <div className="flex items-center gap-2">
-            <BranchPeriodFilter
-              branches={branches}
-              branch={branchFilter}
-              period={periodFilter}
-              model={modelFilter}
-              models={models}
-              onBranchChange={(value) => setDashboardFilter(prev => ({ ...prev, branch: value }))}
-              onPeriodChange={(value) => setDashboardFilter(prev => ({ ...prev, period: value }))}
-              onModelChange={(value) => setDashboardFilter(prev => ({ ...prev, model: value }))}
-              periodLabel={AUTO_AGING_BG_DATE_PERIOD_LABEL}
-            />
+            {renderFilterControl()}
             <div className="text-right mr-2">
               <p className="text-[10px] text-muted-foreground">Last refresh</p>
               <p className="text-xs text-foreground">{new Date(lastRefresh).toLocaleString()}</p>

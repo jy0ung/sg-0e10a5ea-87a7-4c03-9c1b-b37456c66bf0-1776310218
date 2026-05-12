@@ -116,7 +116,9 @@ export default function LoginPage() {
           </Link>
           <p className="text-sm text-muted-foreground">
             Received an invitation?{' '}
-            <Link to="/signup" className="text-primary hover:underline">Complete your sign up</Link>
+            <Link to="/signup" className="font-medium text-primary underline decoration-primary/60 underline-offset-4 hover:text-primary/90">
+              Complete your sign up
+            </Link>
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { ScrollableRegion } from '@/components/shared/ScrollableRegion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -176,7 +177,7 @@ export default function VehicleTransfer() {
       </div>
 
       <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+        <ScrollableRegion className="overflow-x-auto" label="Vehicle transfer records table">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-muted-foreground border-b">
               <tr>
@@ -228,7 +229,7 @@ export default function VehicleTransfer() {
               )}
             </tbody>
           </table>
-        </div>
+        </ScrollableRegion>
       </div>
 
       {/* Add Transfer Dialog */}

@@ -35,15 +35,15 @@ function ShellActionLink({ action, collapsed, onNavigate }: { action: AppShellAc
     action.className,
   );
   const link = action.href || action.external ? (
-    <a href={action.href ?? action.to ?? '#'} className={className} onClick={onNavigate}>
+    <a href={action.href ?? action.to ?? '#'} className={className} onClick={onNavigate} aria-label={collapsed ? action.label : undefined}>
       {content}
     </a>
   ) : action.to ? (
-    <Link to={action.to} className={className} onClick={onNavigate}>
+    <Link to={action.to} className={className} onClick={onNavigate} aria-label={collapsed ? action.label : undefined}>
       {content}
     </Link>
   ) : (
-    <button type="button" className={cn(className, 'w-full text-left')} onClick={action.onClick}>
+    <button type="button" className={cn(className, 'w-full text-left')} onClick={action.onClick} aria-label={collapsed ? action.label : undefined}>
       {content}
     </button>
   );
@@ -103,7 +103,7 @@ export function AppShellSidebar({
           {!collapsed && (
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold leading-tight text-sidebar-accent-foreground">{brand.title}</p>
-              {brand.subtitle && <p className="truncate text-[10px] leading-tight text-sidebar-foreground/65">{brand.subtitle}</p>}
+              {brand.subtitle && <p className="truncate text-[10px] leading-tight text-sidebar-foreground/80">{brand.subtitle}</p>}
             </div>
           )}
         </div>
@@ -135,7 +135,7 @@ export function AppShellSidebar({
             const SectionIcon = section.icon;
             const headerClassName = cn(
               'mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] transition-colors',
-              hasActive ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground',
+              hasActive ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground',
               collapsed && 'justify-center px-2',
             );
             const headerContent = (
@@ -159,7 +159,7 @@ export function AppShellSidebar({
                   </Link>
                 ))}
                 {showHeader && !section.path && !collapsed && (
-                  <div className={cn('mb-1 flex items-center gap-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]', hasActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/45')}>
+                  <div className={cn('mb-1 flex items-center gap-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]', hasActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/75')}>
                     {SectionIcon && <SectionIcon className="h-3.5 w-3.5 shrink-0" />}
                     <span>{section.name}</span>
                   </div>
@@ -169,7 +169,7 @@ export function AppShellSidebar({
                   <div className="space-y-0.5">
                     {showGroupLabels ? grouped.map((group) => (
                       <div key={group.group} className="space-y-0.5">
-                        <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45">{group.group}</p>
+                        <p className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/75">{group.group}</p>
                         {group.items.map((item) => (
                           <AppShellNavLink key={item.path} item={item} pathname={pathname} collapsed={collapsed} onNavigate={onNavigate} />
                         ))}
@@ -202,7 +202,7 @@ export function AppShellSidebar({
                   {!collapsed && (
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium leading-tight text-sidebar-accent-foreground">{user.name}</p>
-                      <p className="truncate text-[10px] capitalize text-sidebar-foreground/60">{user.role?.replace(/_/g, ' ')}</p>
+                      <p className="truncate text-[10px] capitalize text-sidebar-foreground/75">{user.role?.replace(/_/g, ' ')}</p>
                     </div>
                   )}
                 </Link>
@@ -214,7 +214,7 @@ export function AppShellSidebar({
                   {!collapsed && (
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium leading-tight text-sidebar-accent-foreground">{user.name}</p>
-                      <p className="truncate text-[10px] capitalize text-sidebar-foreground/60">{user.role?.replace(/_/g, ' ')}</p>
+                      <p className="truncate text-[10px] capitalize text-sidebar-foreground/75">{user.role?.replace(/_/g, ' ')}</p>
                     </div>
                   )}
                 </div>
@@ -258,7 +258,8 @@ export function AppShellSidebar({
               <button
                 type="button"
                 onClick={() => onCollapseChange?.(!collapsed)}
-                className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground', collapsed && 'justify-center')}
+                className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground', collapsed && 'justify-center')}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               >
                 {collapsed ? <ChevronRight className="h-4 w-4" /> : <><ChevronLeft className="h-4 w-4" /><span>Collapse sidebar</span></>}
               </button>
