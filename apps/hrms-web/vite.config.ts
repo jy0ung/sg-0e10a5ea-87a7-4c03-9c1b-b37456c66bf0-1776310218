@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     resolve: {
       alias: {
-        '@': path.resolve(rootDir, 'src'),
+        '@': path.resolve(__dirname, 'src'),
         '@hrms-web': path.resolve(__dirname, 'src'),
         '@flc/types': path.resolve(rootDir, 'packages/types/src/index.ts'),
         '@flc/supabase': path.resolve(rootDir, 'packages/supabase/src/index.ts'),

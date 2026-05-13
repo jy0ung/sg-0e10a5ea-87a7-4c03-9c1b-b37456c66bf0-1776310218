@@ -1,0 +1,299 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  getAutoAgingDashboardSummary,
+  getAutoAgingSourceLedger,
+  getVehicleById,
+  invalidateVehicleCaches,
+  searchVehicles,
+  updateVehicleWithAudit,
+} from './vehicleService';
+import { supabase } from '@/integrations/supabase/client';
+import * as auditService from './auditService';
+
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    rpc: vi.fn(),
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn(),
+      maybeSingle: vi.fn(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis()
+    }))
+  }
+}));
+
+vi.mock('./auditService', () => ({
+  logUserAction: vi.fn(),
+  logVehicleEdit: vi.fn()
+}));
+
+describe('vehicleService', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidateVehicleCaches();
+  });
+
+  describe('getVehicleById', () => {
+    it('returns vehicle data on success', async () => {
+      const mockVehicle = { id: 'v1', chassis_no: 'CH123' };
+      const singleMock = vi.fn().mockResolvedValue({ data: mockVehicle, error: null });
+      
+      vi.mocked(supabase.from).mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: singleMock
+      }) as any);
+
+      const result = await getVehicleById('company-1', 'v1');
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual(mockVehicle);
+    });
+
+    it('returns error on failure', async () => {
+      const mockError = new Error('Not found');
+      const singleMock = vi.fn().mockResolvedValue({ data: null, error: mockError });
+      
+      vi.mocked(supabase.from).mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: singleMock
+      }) as any);
+
+      const result = await getVehicleById('company-1', 'v1');
+      expect(result.error).toEqual(mockError);
+      expect(result.data).toBeNull();
+    });
+  });
+
+  describe('updateVehicleWithAudit', () => {
+    it('updates vehicle and logs audit if changes exist', async () => {
+      const mockCurrentVehicle = { id: 'v1', status: 'Pending', remark: 'Old' };
+      const mockUpdatedVehicle = { id: 'v1', status: 'Delivered', remark: 'New' };
+      
+      // Setup mock to return different things for select vs update
+      let callCount = 0;
+      const singleMock = vi.fn().mockImplementation(() => {
+        if (callCount === 0) {
+          callCount++;
+          return Promise.resolve({ data: mockCurrentVehicle, error: null }); // for fetch current
+        }
+        return Promise.resolve({ data: mockUpdatedVehicle, error: null }); // for update
+      });
+      
+      vi.mocked(supabase.from).mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: singleMock,
+        update: vi.fn().mockReturnThis()
+      }) as any);
+
+      const result = await updateVehicleWithAudit('company-1', 'v1', { status: 'Delivered', remark: 'New' }, 'user1');
+      
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual(mockUpdatedVehicle);
+      expect(auditService.logVehicleEdit).toHaveBeenCalledWith('user1', 'v1', {
+        status: { before: 'Pending', after: 'Delivered' },
+        remark: { before: 'Old', after: 'New' }
+      });
+    });
+  });
+
+  describe('searchVehicles', () => {
+    it('passes server-side filter and pagination parameters to the search RPC', async () => {
+      vi.mocked(supabase.rpc).mockResolvedValue({
+        data: [{ rows: [{ id: 'v1', chassis_no: 'CH001', branch_code: 'KK', model: 'X50', is_d2d: false }], total_count: 1 }],
+        error: null,
+      } as any);
+
+      const result = await searchVehicles({
+        branch: 'KK',
+        model: 'X50',
+        payment: 'Cash',
+        stage: 'complete',
+        search: 'CH001',
+        bgDateFrom: '2026-04-01',
+        bgDateTo: '2026-04-30',
+        limit: 25,
+        offset: 50,
+        sortColumn: 'chassis_no',
+        sortDirection: 'asc',
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.data.totalCount).toBe(1);
+      expect(result.data.rows[0]).toMatchObject({ id: 'v1', chassis_no: 'CH001', branch_code: 'KK' });
+      expect(supabase.rpc).toHaveBeenCalledWith('search_vehicles', {
+        p_branch: 'KK',
+        p_model: 'X50',
+        p_payment: 'Cash',
+        p_stage: 'complete',
+        p_search: 'CH001',
+        p_bg_date_from: '2026-04-01',
+        p_bg_date_to: '2026-04-30',
+        p_has_delivery_date: null,
+        p_limit: 25,
+        p_offset: 50,
+        p_sort_column: 'chassis_no',
+        p_sort_direction: 'asc',
+      });
+    });
+  });
+
+  describe('getAutoAgingDashboardSummary', () => {
+    it('maps the dashboard summary RPC payload', async () => {
+      vi.mocked(supabase.rpc).mockResolvedValue({
+        data: {
+          available_branches: ['KK', 'TWU'],
+          available_models: ['X50', 'X70'],
+          kpi_summaries: [
+            {
+              kpi_id: 'bg_to_delivery',
+              label: 'BG Date to Delivery Date',
+              short_label: 'BG → Delivery',
+              valid_count: 10,
+              invalid_count: 1,
+              missing_count: 2,
+              median: 42,
+              average: 44,
+              p90: 58,
+              overdue_count: 3,
+              sla_days: 45,
+            },
+          ],
+          quality_issue_count: 4,
+          quality_issue_sample: [
+            {
+              id: 'issue-1',
+              chassis_no: 'CH001',
+              field: 'delivery_date',
+              issue_type: 'missing',
+              message: 'Delivery date is required',
+              severity: 'warning',
+              import_batch_id: 'batch-1',
+            },
+          ],
+        },
+        error: null,
+      } as any);
+
+      const result = await getAutoAgingDashboardSummary({
+        branch: 'KK',
+        model: 'X50',
+        bgDateFrom: '2026-04-01',
+        bgDateTo: '2026-04-30',
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.data).toEqual({
+        availableBranches: ['KK', 'TWU'],
+        availableModels: ['X50', 'X70'],
+        kpiSummaries: [
+          {
+            kpiId: 'bg_to_delivery',
+            label: 'BG Date to Delivery Date',
+            shortLabel: 'BG → Delivery',
+            validCount: 10,
+            invalidCount: 1,
+            missingCount: 2,
+            median: 42,
+            average: 44,
+            p90: 58,
+            overdueCount: 3,
+            slaDays: 45,
+          },
+        ],
+        qualityIssueCount: 4,
+        qualityIssueSample: [
+          {
+            id: 'issue-1',
+            chassisNo: 'CH001',
+            field: 'delivery_date',
+            issueType: 'missing',
+            message: 'Delivery date is required',
+            severity: 'warning',
+            importBatchId: 'batch-1',
+          },
+        ],
+      });
+      expect(supabase.rpc).toHaveBeenCalledWith('auto_aging_dashboard_summary', {
+        p_branch: 'KK',
+        p_model: 'X50',
+        p_from: '2026-04-01',
+        p_to: '2026-04-30',
+      });
+    });
+  });
+
+  describe('getAutoAgingSourceLedger', () => {
+    it('maps the source ledger RPC payload and parameters', async () => {
+      vi.mocked(supabase.rpc).mockResolvedValue({
+        data: {
+          rows: [
+            {
+              source_key: 'chassis:ch001',
+              vehicle_id: 'vehicle-1',
+              sales_order_id: 'sales-order-1',
+              chassis_no: 'CH001',
+              branch_code: 'KK',
+              model: 'X50',
+              customer_name: 'Customer A',
+              salesman_name: 'Advisor A',
+              payment_method: 'Loan',
+              dms_so_no: 'SO-001',
+              last_source_at: '2026-05-10T12:00:00Z',
+              needs_reconciliation: true,
+              source_presence: { ubs_vehicle: true, dms_vehicle_stock: true, legacy_invoice: false },
+              source_conflicts: { branch_code: { ubs: 'KK', source: 'TWU' } },
+              authority: { proton_dms: ['stock_status'], ubs: ['lou'] },
+              local_facts: { lou: 'Pending' },
+              dms_facts: { stock_status: 'Allocated' },
+              legacy_facts: {},
+            },
+          ],
+          total_count: 1,
+          source_counts: { ubs_vehicle: 1, dms_vehicle_stock: 1, needs_reconciliation: 1 },
+          generated_at: '2026-05-10T12:01:00Z',
+        },
+        error: null,
+      } as any);
+
+      const result = await getAutoAgingSourceLedger({
+        branch: 'KK',
+        model: 'X50',
+        search: 'CH001',
+        bgDateFrom: '2026-04-01',
+        bgDateTo: '2026-04-30',
+        limit: 20,
+        offset: 40,
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.data.totalCount).toBe(1);
+      expect(result.data.sourceCounts).toEqual({ ubs_vehicle: 1, dms_vehicle_stock: 1, needs_reconciliation: 1 });
+      expect(result.data.rows[0]).toMatchObject({
+        sourceKey: 'chassis:ch001',
+        vehicleId: 'vehicle-1',
+        salesOrderId: 'sales-order-1',
+        chassisNo: 'CH001',
+        branchCode: 'KK',
+        dmsSoNo: 'SO-001',
+        needsReconciliation: true,
+        sourcePresence: { ubs_vehicle: true, dms_vehicle_stock: true, legacy_invoice: false },
+        localFacts: { lou: 'Pending' },
+        dmsFacts: { stock_status: 'Allocated' },
+      });
+      expect(supabase.rpc).toHaveBeenCalledWith('auto_aging_source_ledger', {
+        p_branch: 'KK',
+        p_model: 'X50',
+        p_search: 'CH001',
+        p_bg_date_from: '2026-04-01',
+        p_bg_date_to: '2026-04-30',
+        p_limit: 20,
+        p_offset: 40,
+      });
+    });
+  });
+});

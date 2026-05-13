@@ -36,20 +36,20 @@ errorTrackingService.init({
 });
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
-const ForgotPasswordPage = lazy(() => import('@/pages/ForgotPasswordPage'));
-const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'));
-const SignUpPage = lazy(() => import('@/pages/SignUpPage'));
-const AccountPending = lazy(() => import('@/pages/AccountPending'));
-const NotFound = lazy(() => import('@/pages/NotFound'));
-const ApprovalInbox = lazy(() => import('@/pages/hrms/ApprovalInbox'));
-const LeaveManagement = lazy(() => import('@/pages/hrms/LeaveManagement'));
-const LeaveCalendar = lazy(() => import('@/pages/hrms/LeaveCalendar'));
-const AttendanceLog = lazy(() => import('@/pages/hrms/AttendanceLog'));
-const PayrollSummary = lazy(() => import('@/pages/hrms/PayrollSummary'));
-const PerformanceAppraisals = lazy(() => import('@/pages/hrms/PerformanceAppraisals'));
-const HrmsAnnouncements = lazy(() => import('@/pages/hrms/Announcements'));
-const EmployeeDirectory = lazy(() => import('@/pages/hrms/EmployeeDirectory'));
-const HrmsAdmin = lazy(() => import('@/pages/hrms/HrmsAdmin'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const SignUpPage = lazy(() => import('./pages/SignUpPage'));
+const AccountPending = lazy(() => import('./pages/AccountPending'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const ApprovalInbox = lazy(() => import('./pages/hrms/ApprovalInbox'));
+const LeaveManagement = lazy(() => import('./pages/hrms/LeaveManagement'));
+const LeaveCalendar = lazy(() => import('./pages/hrms/LeaveCalendar'));
+const AttendanceLog = lazy(() => import('./pages/hrms/AttendanceLog'));
+const PayrollSummary = lazy(() => import('./pages/hrms/PayrollSummary'));
+const PerformanceAppraisals = lazy(() => import('./pages/hrms/PerformanceAppraisals'));
+const HrmsAnnouncements = lazy(() => import('./pages/hrms/Announcements'));
+const EmployeeDirectory = lazy(() => import('./pages/hrms/EmployeeDirectory'));
+const HrmsAdmin = lazy(() => import('./pages/hrms/HrmsAdmin'));
 
 const queryClient = createAppQueryClient();
 
