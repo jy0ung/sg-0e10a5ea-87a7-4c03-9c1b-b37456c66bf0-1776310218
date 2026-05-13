@@ -159,16 +159,45 @@ function findUiIssues(bodyText: string): Issue[] {
 
 async function login(page: Page, baseUrl: URL, credentials: { email: string; password: string }, appName: string): Promise<void> {
   console.info(`LOGIN ${appName}: ${baseUrl.origin}`);
+
+  const consoleErrors: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text().slice(0, 300));
+  });
+
   await page.goto(new URL('/login', baseUrl.origin).toString(), {
     waitUntil: 'domcontentloaded',
     timeout: routeTimeoutMs,
   });
   await page.getByLabel('Email').fill(credentials.email);
   await page.getByLabel('Password').fill(credentials.password);
-  await Promise.all([
-    page.waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: routeTimeoutMs }),
-    page.getByRole('button', { name: /^Sign In$/ }).click(),
-  ]);
+
+  try {
+    await Promise.all([
+      page.waitForURL((url) => !url.pathname.endsWith('/login'), { timeout: routeTimeoutMs }),
+      page.getByRole('button', { name: /^Sign In$/ }).click(),
+    ]);
+  } catch (_e) {
+    const currentUrl = page.url();
+    // Capture the auth error message displayed on the login form
+    const formError = await page
+      .locator('.text-destructive span, [role="alert"]')
+      .first()
+      .textContent({ timeout: 2_000 })
+      .catch(() => null);
+    const buttonDisabled = await page
+      .getByRole('button', { name: /^Sign In$/ })
+      .isDisabled()
+      .catch(() => null);
+    const details = [
+      `URL: ${currentUrl}`,
+      formError ? `Auth error: "${formError.trim()}"` : 'No form error detected — credentials may be correct but auth is slow or blocked',
+      buttonDisabled != null ? `Sign In button disabled: ${buttonDisabled}` : null,
+      consoleErrors.length > 0 ? `Console errors: ${consoleErrors.slice(0, 3).join('; ')}` : null,
+    ].filter(Boolean).join(' | ');
+    throw new Error(`${appName} login failed. ${details}`);
+  }
+
   await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => undefined);
 
   const currentUrl = new URL(page.url());
