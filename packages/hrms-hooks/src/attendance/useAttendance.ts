@@ -28,12 +28,16 @@ export function useAttendanceRecords(
 
 export function useMyAttendance(
   employeeId: string,
+  companyId: string,
   opts?: { dateFrom?: string; dateTo?: string },
 ) {
   return useQuery({
     queryKey: attendanceKeys.records('', employeeId, opts?.dateFrom, opts?.dateTo),
-    queryFn: () => getMyAttendance(employeeId, opts),
-    enabled: Boolean(employeeId),
+    queryFn: () => getMyAttendance(employeeId, companyId, {
+      from: opts?.dateFrom ?? '',
+      to: opts?.dateTo ?? new Date().toISOString().slice(0, 10),
+    }),
+    enabled: Boolean(employeeId) && Boolean(companyId),
   });
 }
 
@@ -42,8 +46,8 @@ export function useMyAttendance(
 export function useUpsertAttendance(companyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof upsertAttendance>[0]) =>
-      upsertAttendance(input),
+    mutationFn: (input: Parameters<typeof upsertAttendance>[1]) =>
+      upsertAttendance(companyId, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: attendanceKeys.all(companyId) });
     },
@@ -53,8 +57,8 @@ export function useUpsertAttendance(companyId: string) {
 export function useClockIn(companyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ employeeId, note }: { employeeId: string; note?: string }) =>
-      clockIn(employeeId, note),
+    mutationFn: ({ employeeId, date }: { employeeId: string; date: string }) =>
+      clockIn(employeeId, companyId, date),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: attendanceKeys.all(companyId) });
     },
@@ -64,8 +68,8 @@ export function useClockIn(companyId: string) {
 export function useClockOut(companyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ employeeId, note }: { employeeId: string; note?: string }) =>
-      clockOut(employeeId, note),
+    mutationFn: ({ employeeId, date }: { employeeId: string; date: string }) =>
+      clockOut(employeeId, companyId, date),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: attendanceKeys.all(companyId) });
     },

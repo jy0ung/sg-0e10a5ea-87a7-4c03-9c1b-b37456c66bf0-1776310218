@@ -22,13 +22,11 @@ export function useUpdateEmployee(companyId: string) {
   return useMutation({
     mutationFn: ({
       id,
-      actorId,
       input,
     }: {
       id: string;
-      actorId: string;
-      input: Parameters<typeof updateEmployee>[2];
-    }) => updateEmployee(id, actorId, input),
+      input: Parameters<typeof updateEmployee>[1];
+    }) => updateEmployee(id, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: employeeKeys.directory(companyId) });
       void queryClient.invalidateQueries({ queryKey: employeeKeys.forSelect(companyId) });

@@ -18,7 +18,7 @@ function mapCustomer(row: Record<string, unknown>): Customer {
     email: row.email as string | undefined,
     phone: row.phone as string | undefined,
     address: row.address as string | undefined,
-    nric: row.nric as string | undefined,
+    nric: row.ic_no as string | undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -48,7 +48,7 @@ export async function createCustomer(companyId: string, fields: CustomerEditable
   if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase
     .from('customers')
-    .insert({ company_id: companyId, name: fields.name, email: fields.email, phone: fields.phone, address: fields.address, nric: fields.nric })
+    .insert({ company_id: companyId, name: fields.name, email: fields.email, phone: fields.phone, address: fields.address, ic_no: fields.nric })
     .select()
     .single();
   if (error) { loggingService.error('createCustomer failed', { error }); return { data: null, error: new Error(error.message) }; }
@@ -60,7 +60,7 @@ export async function updateCustomer(companyId: string, id: string, fields: Part
   if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase
     .from('customers')
-    .update({ name: fields.name, email: fields.email, phone: fields.phone, address: fields.address, nric: fields.nric, updated_at: new Date().toISOString() })
+    .update({ name: fields.name, email: fields.email, phone: fields.phone, address: fields.address, ic_no: fields.nric, updated_at: new Date().toISOString() })
     .eq('company_id', companyId)
     .eq('id', id)
     .select()

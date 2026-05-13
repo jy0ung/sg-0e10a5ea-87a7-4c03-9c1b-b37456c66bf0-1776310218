@@ -341,7 +341,6 @@ export async function deleteLeaveType(companyId: string, id: string, actorId: st
   const { count } = await supabase
     .from('leave_balances')
     .select('id', { count: 'exact', head: true })
-    .eq('company_id', companyId)
     .eq('leave_type_id', id);
   if ((count ?? 0) > 0) {
     // Soft delete: just deactivate

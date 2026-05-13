@@ -31,11 +31,11 @@ export function usePayrollItems(runId: string) {
   });
 }
 
-export function useMyPayslips(employeeId: string) {
+export function useMyPayslips(employeeId: string, companyId: string) {
   return useQuery({
     queryKey: payrollKeys.myPayslips(employeeId),
-    queryFn: () => getMyPayslips(employeeId),
-    enabled: Boolean(employeeId),
+    queryFn: () => getMyPayslips(employeeId, companyId),
+    enabled: Boolean(employeeId) && Boolean(companyId),
   });
 }
 
@@ -44,8 +44,8 @@ export function useMyPayslips(employeeId: string) {
 export function useCreatePayrollRun(companyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof createPayrollRun>[0]) =>
-      createPayrollRun(input),
+    mutationFn: ({ periodYear, periodMonth, createdBy }: { periodYear: number; periodMonth: number; createdBy: string }) =>
+      createPayrollRun(companyId, periodYear, periodMonth, createdBy),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: payrollKeys.runs(companyId) });
     },
@@ -55,8 +55,8 @@ export function useCreatePayrollRun(companyId: string) {
 export function useUpdatePayrollRunStatus(companyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof updatePayrollRunStatus>[0]) =>
-      updatePayrollRunStatus(input),
+    mutationFn: ({ runId, status }: { runId: string; status: Parameters<typeof updatePayrollRunStatus>[1] }) =>
+      updatePayrollRunStatus(runId, status),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: payrollKeys.runs(companyId) });
     },
@@ -78,8 +78,8 @@ export function useReviewPayrollRun(companyId: string, reviewerId: string) {
 export function useResubmitPayrollRun(companyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof resubmitPayrollRunFinalisation>[0]) =>
-      resubmitPayrollRunFinalisation(input),
+    mutationFn: ({ runId, requesterId }: { runId: string; requesterId: string }) =>
+      resubmitPayrollRunFinalisation(runId, requesterId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: payrollKeys.runs(companyId) });
     },

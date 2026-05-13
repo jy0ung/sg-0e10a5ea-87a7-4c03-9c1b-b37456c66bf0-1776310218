@@ -96,7 +96,7 @@ async function isEligibleApprover(
 
   if (step.approver_type === 'role') {
     const assigned = await userHasAssignedHrmsRole(companyId, userId, String(step.approver_role ?? ''));
-    return !assigned.error && assigned.data;
+    return assigned;
   }
 
   if (step.approver_type === 'direct_manager') {
@@ -193,7 +193,7 @@ export async function submitApprovalDecision(
   const { error: decisionErr } = await supabase
     .from('approval_decisions')
     .insert({
-      instance_id:         approvalRequestId,
+      approval_request_id: approvalRequestId,
       step_id:             String(currentStep.id),
       approver_id:         approverId,
       decision,

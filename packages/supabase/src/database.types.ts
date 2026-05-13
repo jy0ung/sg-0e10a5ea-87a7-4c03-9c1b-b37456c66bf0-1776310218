@@ -7,31 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       additional_items: {
@@ -522,9 +497,13 @@ export type Database = {
           approver_role: string | null
           approver_type: string
           approver_user_id: string | null
+          condition_rule: string | null
           created_at: string
+          escalation_rule: string | null
+          fallback_approver_user_id: string | null
           flow_id: string
           id: string
+          is_active: boolean
           name: string
           step_order: number
           updated_at: string
@@ -534,9 +513,13 @@ export type Database = {
           approver_role?: string | null
           approver_type: string
           approver_user_id?: string | null
+          condition_rule?: string | null
           created_at?: string
+          escalation_rule?: string | null
+          fallback_approver_user_id?: string | null
           flow_id: string
           id?: string
+          is_active?: boolean
           name: string
           step_order: number
           updated_at?: string
@@ -546,9 +529,13 @@ export type Database = {
           approver_role?: string | null
           approver_type?: string
           approver_user_id?: string | null
+          condition_rule?: string | null
           created_at?: string
+          escalation_rule?: string | null
+          fallback_approver_user_id?: string | null
           flow_id?: string
           id?: string
+          is_active?: boolean
           name?: string
           step_order?: number
           updated_at?: string
@@ -557,6 +544,13 @@ export type Database = {
           {
             foreignKeyName: "approval_steps_approver_user_id_fkey"
             columns: ["approver_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_steps_fallback_approver_user_id_fkey"
+            columns: ["fallback_approver_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1960,6 +1954,71 @@ export type Database = {
           },
         ]
       }
+      employee_hrms_role_assignments: {
+        Row: {
+          assigned_by: string | null
+          company_id: string
+          created_at: string
+          employee_id: string | null
+          hrms_role_id: string
+          id: string
+          is_primary: boolean
+          profile_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          company_id: string
+          created_at?: string
+          employee_id?: string | null
+          hrms_role_id: string
+          id?: string
+          is_primary?: boolean
+          profile_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_by?: string | null
+          company_id?: string
+          created_at?: string
+          employee_id?: string | null
+          hrms_role_id?: string
+          id?: string
+          is_primary?: boolean
+          profile_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_hrms_role_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_hrms_role_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_hrms_role_assignments_hrms_role_id_fkey"
+            columns: ["hrms_role_id"]
+            isOneToOne: false
+            referencedRelation: "hrms_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_hrms_role_assignments_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_module_assignments: {
         Row: {
           active: boolean
@@ -2163,6 +2222,81 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      hrms_roles: {
+        Row: {
+          authority_level: number
+          can_approve_requests: boolean
+          can_manage_employee_records: boolean
+          can_view_hrms_reports: boolean
+          category: string
+          code: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_system_default: boolean
+          name: string
+          scope: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          authority_level?: number
+          can_approve_requests?: boolean
+          can_manage_employee_records?: boolean
+          can_view_hrms_reports?: boolean
+          category?: string
+          code: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system_default?: boolean
+          name: string
+          scope?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          authority_level?: number
+          can_approve_requests?: boolean
+          can_manage_employee_records?: boolean
+          can_view_hrms_reports?: boolean
+          category?: string
+          code?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system_default?: boolean
+          name?: string
+          scope?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hrms_roles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hrms_roles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       import_batches: {
         Row: {
@@ -2552,8 +2686,13 @@ export type Database = {
       }
       leave_requests: {
         Row: {
+          attachment_file_name: string | null
+          attachment_file_path: string | null
+          attachment_file_size: number | null
+          attachment_mime_type: string | null
           company_id: string
           created_at: string
+          day_part: string
           days: number
           employee_id: string
           end_date: string
@@ -2568,8 +2707,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attachment_file_name?: string | null
+          attachment_file_path?: string | null
+          attachment_file_size?: number | null
+          attachment_mime_type?: string | null
           company_id: string
           created_at?: string
+          day_part?: string
           days: number
           employee_id: string
           end_date: string
@@ -2584,8 +2728,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attachment_file_name?: string | null
+          attachment_file_path?: string | null
+          attachment_file_size?: number | null
+          attachment_mime_type?: string | null
           company_id?: string
           created_at?: string
+          day_part?: string
           days?: number
           employee_id?: string
           end_date?: string
@@ -5593,9 +5742,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

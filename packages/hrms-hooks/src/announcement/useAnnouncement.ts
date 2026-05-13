@@ -40,7 +40,7 @@ export function useCreateAnnouncement(companyId: string) {
 export function useDeleteAnnouncement(companyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => deleteAnnouncement(id),
+    mutationFn: (id: string) => deleteAnnouncement(id, companyId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: announcementKeys.all(companyId) });
     },

@@ -50,8 +50,13 @@ export function useMyAppraisalItems(employeeId: string, companyId?: string) {
 export function useCreateAppraisal(companyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof createAppraisal>[0]) =>
-      createAppraisal(input),
+    mutationFn: ({
+      input,
+      createdBy,
+    }: {
+      input: Parameters<typeof createAppraisal>[1];
+      createdBy: string;
+    }) => createAppraisal(companyId, input, createdBy),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: appraisalKeys.all(companyId) });
     },
@@ -73,8 +78,8 @@ export function useReviewAppraisalActivation(companyId: string, reviewerId: stri
 export function useResubmitAppraisalActivation(companyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: Parameters<typeof resubmitAppraisalActivation>[0]) =>
-      resubmitAppraisalActivation(input),
+    mutationFn: ({ appraisalId, requesterId }: { appraisalId: string; requesterId: string }) =>
+      resubmitAppraisalActivation(appraisalId, requesterId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: appraisalKeys.all(companyId) });
     },
