@@ -571,10 +571,6 @@ export default function NewTicket() {
     () => categories.filter((category) => category.is_active).length,
     [categories],
   );
-  const activeTemplateCount = useMemo(
-    () => templates.filter((template) => template.is_active).length,
-    [templates],
-  );
   const selectedCategoryLabel = selectedCategory?.label ?? 'Choose a category';
 
   const applyTemplate = (template: (typeof templates)[number]) => {
@@ -604,33 +600,17 @@ export default function NewTicket() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
-      <div className="shrink-0 rounded-lg border bg-card px-4 py-3 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Internal Requests</p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">{roleContext.pageTitle}</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">{roleContext.pageSubtitle}</p>
-          </div>
-          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-[420px] sm:grid-cols-4">
-            <div className="rounded-md border bg-background px-3 py-2">
-              <p className="text-xs text-muted-foreground">Branch</p>
-              <p className="mt-0.5 truncate text-sm font-semibold text-foreground">{branchCode ?? 'Unassigned'}</p>
-            </div>
-            <div className="rounded-md border bg-background px-3 py-2">
-              <p className="text-xs text-muted-foreground">Categories</p>
-              <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{activeCategoryCount}</p>
-            </div>
-            <div className="rounded-md border bg-background px-3 py-2">
-              <p className="text-xs text-muted-foreground">Templates</p>
-              <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{activeTemplateCount}</p>
-            </div>
-            <div className="rounded-md border bg-background px-3 py-2">
-              <p className="text-xs text-muted-foreground">Form Fields</p>
-              <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{customFields.length}</p>
-            </div>
-          </div>
+    <div className="flex h-full min-h-0 w-full flex-col gap-2 animate-fade-in">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
+        <div className="min-w-0">
+          <h1 className="text-base font-semibold tracking-tight text-foreground">{roleContext.pageTitle}</h1>
+          <p className="text-[11px] text-muted-foreground">{roleContext.pageSubtitle}</p>
         </div>
+        {branchCode && (
+          <span className="rounded-md border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
+            Branch: <span className="font-medium text-foreground">{branchCode}</span>
+          </span>
+        )}
       </div>
 
       {/* Categories not ready banner */}

@@ -51,6 +51,12 @@ import { ADMIN_ONLY } from '@/config/routeRoles';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
 import { formatSlaState, getTicketSlaSummary } from '@/lib/ticketSla';
+import {
+  downloadCsv,
+  formatTicketLabel,
+  isApprovalAssignedToUser,
+  isOpenStatus,
+} from '@/lib/requestFormatters';
 
 type ApprovalReviewTarget = { ticketId: string; decision: 'approved' | 'rejected' } | null;
 
@@ -91,34 +97,8 @@ function useIsLargeScreen() {
   return isLargeScreen;
 }
 
-function formatTicketLabel(value: string) {
-  return value.replace(/_/g, ' ');
-}
-
-function isOpenStatus(status: TicketStatus) {
-  return status === 'open' || status === 'in_progress' || status === 'awaiting_requester';
-}
-
-function isApprovalAssignedToUser(ticket: CompanyTicketRecord, user: { id?: string; role?: string } | null | undefined) {
-  if (!user || ticket.approval_status !== 'pending') return false;
-  return ticket.current_approver_user_id === user.id || ticket.current_approver_role === user.role;
-}
-
-function csvCell(value: unknown): string {
-  const text = String(value ?? '');
-  return `"${text.replace(/"/g, '""')}"`;
-}
-
-function downloadCsv(filename: string, rows: string[][]) {
-  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
+// formatTicketLabel, isOpenStatus, isApprovalAssignedToUser, csvCell, downloadCsv
+// are now imported from '@/lib/requestFormatters'
 
 export default function RequestQueue() {
   const { user } = useAuth();
@@ -528,38 +508,32 @@ export default function RequestQueue() {
   );
 
   return (
-    <div className="flex h-full min-h-[720px] w-full flex-col gap-3 overflow-hidden lg:min-h-0">
-      <div className="shrink-0 rounded-lg border bg-card px-4 py-3 shadow-sm">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+    <div className="flex h-full min-h-[720px] w-full flex-col gap-2 overflow-hidden lg:min-h-0">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Internal Requests</p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">Request Workbench</h1>
-          <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">
-            Triage demand, assign accountable owners, and close the loop with requester-visible outcomes.
-          </p>
+          <h1 className="text-base font-semibold tracking-tight text-foreground">Request Workbench</h1>
+          <p className="text-[11px] text-muted-foreground">Triage, assign, and resolve internal requests</p>
         </div>
-
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setMetricsExpanded((current) => !current)}
-            className="gap-2"
+            className="h-8 gap-1.5 text-xs"
             aria-expanded={metricsExpanded}
           >
-            {metricsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {metricsExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
             Summary
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportCsv} className="gap-2" disabled={loading || filteredTickets.length === 0}>
-            <Download className="h-4 w-4" />
-            Export CSV
+          <Button variant="outline" size="sm" onClick={handleExportCsv} className="h-8 gap-1.5 text-xs" disabled={loading || filteredTickets.length === 0}>
+            <Download className="h-3.5 w-3.5" />
+            CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={() => void loadTickets()} className="gap-2" disabled={loading}>
-            <RefreshCcw className="h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={() => void loadTickets()} className="h-8 gap-1.5 text-xs" disabled={loading}>
+            <RefreshCcw className="h-3.5 w-3.5" />
             Refresh
           </Button>
         </div>
-      </div>
       </div>
 
       {metricsExpanded && (
@@ -637,34 +611,33 @@ export default function RequestQueue() {
       ) : null}
 
       {!loading && !error && totalCount > 0 && (
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
           <span>
-            Showing {((page - 1) * REQUEST_QUEUE_PAGE_SIZE + 1).toLocaleString()}-
-            {Math.min(page * REQUEST_QUEUE_PAGE_SIZE, totalCount).toLocaleString()} of {totalCount.toLocaleString()} requests
+            {((page - 1) * REQUEST_QUEUE_PAGE_SIZE + 1).toLocaleString()}–{Math.min(page * REQUEST_QUEUE_PAGE_SIZE, totalCount).toLocaleString()} of {totalCount.toLocaleString()}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
               size="sm"
-              className="gap-1"
+              className="h-7 gap-1 text-xs"
               disabled={page <= 1 || loading}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
             >
-              <ChevronLeft className="h-4 w-4" />
-              Previous
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Prev
             </Button>
-            <span className="min-w-[82px] text-center text-xs text-foreground tabular-nums">
-              Page {page} of {totalPages}
+            <span className="min-w-[70px] text-center text-[11px] text-foreground tabular-nums">
+              {page} / {totalPages}
             </span>
             <Button
               variant="outline"
               size="sm"
-              className="gap-1"
+              className="h-7 gap-1 text-xs"
               disabled={page >= totalPages || loading}
               onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
             >
               Next
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
