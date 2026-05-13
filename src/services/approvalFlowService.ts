@@ -16,6 +16,13 @@ function rowToStep(r: Record<string, unknown>): ApprovalStep {
     approverUserName: r.approver_user
       ? String((r.approver_user as Record<string, unknown>)?.name ?? '')
       : undefined,
+    fallbackApproverUserId: r.fallback_approver_user_id ? String(r.fallback_approver_user_id) : undefined,
+    fallbackApproverUserName: r.fallback_approver_user
+      ? String((r.fallback_approver_user as Record<string, unknown>)?.name ?? '')
+      : undefined,
+    escalationRule: r.escalation_rule ? String(r.escalation_rule) : undefined,
+    conditionRule: r.condition_rule ? String(r.condition_rule) : undefined,
+    isActive: r.is_active !== undefined ? Boolean(r.is_active) : true,
     allowSelfApproval: Boolean(r.allow_self_approval),
   };
 }
@@ -52,7 +59,7 @@ export async function listApprovalFlows(companyId: string): Promise<{ data: Appr
 
   const { data: steps, error: stepsError } = await supabase
     .from('approval_steps')
-    .select('*, approver_user:profiles!approval_steps_approver_user_id_fkey(name)')
+    .select('*, approver_user:profiles!approval_steps_approver_user_id_fkey(name), fallback_approver_user:profiles!approval_steps_fallback_approver_user_id_fkey(name)')
     .in('flow_id', flowIds)
     .order('step_order');
   if (stepsError) return { data: [], error: stepsError.message };
@@ -101,6 +108,10 @@ export async function createApprovalFlow(
         approver_type:      s.approverType,
         approver_role:      s.approverRole ?? null,
         approver_user_id:   s.approverUserId ?? null,
+        fallback_approver_user_id: s.fallbackApproverUserId ?? null,
+        escalation_rule:    s.escalationRule ?? null,
+        condition_rule:     s.conditionRule ?? null,
+        is_active:          s.isActive,
         allow_self_approval: s.allowSelfApproval,
       })),
     );
@@ -147,6 +158,10 @@ export async function updateApprovalFlow(
         approver_type:      s.approverType,
         approver_role:      s.approverRole ?? null,
         approver_user_id:   s.approverUserId ?? null,
+        fallback_approver_user_id: s.fallbackApproverUserId ?? null,
+        escalation_rule:    s.escalationRule ?? null,
+        condition_rule:     s.conditionRule ?? null,
+        is_active:          s.isActive,
         allow_self_approval: s.allowSelfApproval,
       })),
     );

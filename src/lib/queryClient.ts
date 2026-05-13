@@ -17,7 +17,12 @@ export const APP_QUERY_DEFAULTS = {
     // Default covers most transactional data; override per-query where needed.
     staleTime: STALE.transactional,
     gcTime: 5 * 60_000,
+    // Prevent background refetches from triggering while the user is in the
+    // middle of editing a form.  Both options are false by default here so
+    // that switching browser tabs or briefly losing network connectivity never
+    // silently invalidates in-progress work.
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: 1,
   },
 } as const;

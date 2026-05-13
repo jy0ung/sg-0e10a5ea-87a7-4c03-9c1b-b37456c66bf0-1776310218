@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,17 +13,23 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   listLeaveRequests,
   listLeaveTypes,
+  listLeaveBalances,
+  listLeaveHolidays,
+  getLeaveApprovalPreview,
+  getLeaveEmployeeInfo,
   createLeaveRequest,
   reviewLeaveRequest,
+  validateLeaveAttachment,
 } from '@/services/hrmsService';
-import type { LeaveRequest, LeaveStatus, CreateLeaveRequestInput } from '@/types';
-import { CheckCircle2, XCircle, Clock, Plus, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
-import { differenceInCalendarDays, format, parseISO } from 'date-fns';
+import type { LeaveDayPart, LeaveRequest, LeaveStatus, CreateLeaveRequestInput } from '@/types';
+import { AlertCircle, CheckCircle2, XCircle, Clock, Plus, ChevronDown, ChevronUp, FileText, Paperclip, SlidersHorizontal, X } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { HRMS_LEAVE_APPROVER_ROLES } from '@/config/hrmsConfig';
 import { createLeaveRequestSchema } from '@/lib/validations';
 import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
@@ -40,6 +46,97 @@ const STATUS_COLORS: Record<LeaveStatus, string> = {
   cancelled: 'bg-gray-100 text-gray-500 border-gray-200',
 };
 
+const LEAVE_DRAFT_STORAGE_PREFIX = 'flc.hrms.leave-draft';
+const ATTACHMENT_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';
+
+const DAY_PART_OPTIONS: Array<{ value: LeaveDayPart; label: string; days: string }> = [
+  { value: 'full_day', label: 'Full Day', days: '1.0' },
+  { value: 'half_day_morning', label: 'Half Day (Morning)', days: '0.5' },
+  { value: 'half_day_afternoon', label: 'Half Day (Afternoon)', days: '0.5' },
+];
+
+type ApplyFormState = Partial<CreateLeaveRequestInput> & {
+  dayPart: LeaveDayPart;
+};
+
+function getDefaultApplyForm(): ApplyFormState {
+  return { dayPart: 'full_day' };
+}
+
+function parseDate(value: string): Date {
+  return new Date(`${value}T00:00:00`);
+}
+
+function formatDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isWeekend(date: string): boolean {
+  const day = parseDate(date).getDay();
+  return day === 0 || day === 6;
+}
+
+function getHolidayDates(holidays: Array<{ date: string; isRecurring: boolean }>, startDate: string, endDate: string): Set<string> {
+  if (!startDate || !endDate) return new Set();
+  const years = new Set<string>();
+  const cursor = parseDate(startDate);
+  const end = parseDate(endDate);
+  while (cursor.getTime() <= end.getTime()) {
+    years.add(String(cursor.getFullYear()));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const holidayDates = new Set<string>();
+  for (const holiday of holidays) {
+    if (holiday.isRecurring) {
+      for (const year of years) holidayDates.add(`${year}-${holiday.date.slice(5)}`);
+    } else {
+      holidayDates.add(holiday.date);
+    }
+  }
+  return holidayDates;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function calculateLeaveDays(
+  startDate: string | undefined,
+  endDate: string | undefined,
+  dayPart: LeaveDayPart,
+  holidays: Array<{ date: string; isRecurring: boolean }> = [],
+): number {
+  if (!startDate) return 0;
+  const effectiveEndDate = dayPart === 'full_day' ? endDate : startDate;
+  if (!effectiveEndDate || effectiveEndDate < startDate) return 0;
+
+  const holidayDates = getHolidayDates(holidays, startDate, effectiveEndDate);
+  if (dayPart !== 'full_day') {
+    return isWeekend(startDate) || holidayDates.has(startDate) ? 0 : 0.5;
+  }
+
+  let days = 0;
+  const cursor = parseDate(startDate);
+  const end = parseDate(effectiveEndDate);
+  while (cursor.getTime() <= end.getTime()) {
+    const current = formatDateOnly(cursor);
+    if (!isWeekend(current) && !holidayDates.has(current)) days += 1;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
+
+function formatDays(days: number): string {
+  return days.toLocaleString(undefined, { minimumFractionDigits: days % 1 === 0 ? 0 : 1, maximumFractionDigits: 1 });
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export type LeaveApproverIdentity = {
   id?: string;
   role?: string;
@@ -53,7 +150,10 @@ export function isRequestAssignedToApprover(
 ): boolean {
   if (request.status !== 'pending' || !approver) return false;
   if (request.currentApproverUserId) return request.currentApproverUserId === approver.id;
-  if (request.currentApproverRole) return request.currentApproverRole === approver.role;
+  if (request.currentApproverRole) {
+    const looksLikeHrmsRoleId = /^[0-9a-f-]{24,}$/i.test(request.currentApproverRole);
+    return looksLikeHrmsRoleId ? isManager : request.currentApproverRole === approver.role;
+  }
   return isManager;
 }
 
@@ -85,26 +185,50 @@ export default function LeaveManagement() {
   const { toast } = useToast();
   const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
   const selfServiceEmployeeId = user?.employeeId ?? user?.id;
+  const selectedLeaveYear = useMemo(() => {
+    return Number((new Date()).getFullYear());
+  }, []);
 
   const queryClient = useQueryClient();
 
   const { data: leaveData, isPending: loading } = useQuery({
     queryKey: ['leave-management', user?.companyId, user?.id, isManager, selfServiceEmployeeId],
     queryFn: async () => {
-      const [reqRes, typeRes, approvalsRes] = await Promise.all([
+      const [reqRes, typeRes, balanceRes, holidayRes, employeeInfoRes, approvalPreviewRes, approvalsRes] = await Promise.all([
         listLeaveRequests(user!.companyId, isManager
           ? { includeApprovalHistory: true }
           : { employeeId: selfServiceEmployeeId, includeApprovalHistory: true }),
         listLeaveTypes(user!.companyId),
+        selfServiceEmployeeId ? listLeaveBalances(selfServiceEmployeeId, selectedLeaveYear) : Promise.resolve({ data: [], error: null }),
+        listLeaveHolidays(user!.companyId),
+        selfServiceEmployeeId ? getLeaveEmployeeInfo(user!.companyId, selfServiceEmployeeId) : Promise.resolve({ data: null, error: null }),
+        selfServiceEmployeeId ? getLeaveApprovalPreview(user!.companyId, selfServiceEmployeeId) : Promise.resolve({ data: null, error: null }),
         isManager ? getPendingApprovalsForUser(user!.companyId, user!.id) : Promise.resolve({ data: [], error: null }),
       ]);
       if (reqRes.error) toast({ title: 'Error', description: reqRes.error, variant: 'destructive' });
-      return { requests: reqRes.data, leaveTypes: typeRes.data, pendingApprovals: approvalsRes.data };
+      if (typeRes.error) toast({ title: 'Error', description: typeRes.error, variant: 'destructive' });
+      if (balanceRes.error) toast({ title: 'Error', description: balanceRes.error, variant: 'destructive' });
+      if (holidayRes.error) toast({ title: 'Error', description: holidayRes.error, variant: 'destructive' });
+      if (employeeInfoRes.error) toast({ title: 'Error', description: employeeInfoRes.error, variant: 'destructive' });
+      if (approvalPreviewRes.error) toast({ title: 'Approval flow warning', description: approvalPreviewRes.error, variant: 'destructive' });
+      return {
+        requests: reqRes.data,
+        leaveTypes: typeRes.data,
+        leaveBalances: balanceRes.data,
+        holidays: holidayRes.data,
+        employeeInfo: employeeInfoRes.data,
+        approvalPreview: approvalPreviewRes.data,
+        pendingApprovals: approvalsRes.data,
+      };
     },
     enabled: !!user?.companyId && (!!(isManager) || !!selfServiceEmployeeId),
   });
   const requests       = leaveData?.requests       ?? [];
   const leaveTypes     = leaveData?.leaveTypes     ?? [];
+  const leaveBalances   = leaveData?.leaveBalances  ?? [];
+  const holidays        = leaveData?.holidays       ?? [];
+  const employeeInfo    = leaveData?.employeeInfo   ?? null;
+  const approvalPreview = leaveData?.approvalPreview ?? null;
   const pendingApprovals = leaveData?.pendingApprovals ?? [];
 
   const [filterStatus, setFilterStatus] = useState<LeaveStatus | 'all'>('all');
@@ -121,7 +245,53 @@ export default function LeaveManagement() {
   const [reviewingApprovalId, setReviewingApprovalId] = useState<string | null>(null);
 
   // Apply form
-  const [applyForm, setApplyForm] = useState<Partial<CreateLeaveRequestInput>>({})
+  const [applyForm, setApplyForm] = useState<ApplyFormState>(getDefaultApplyForm);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const leaveDraftKey = user?.companyId && user?.id
+    ? `${LEAVE_DRAFT_STORAGE_PREFIX}:${user.companyId}:${user.id}`
+    : null;
+
+  const calculatedDays = calculateLeaveDays(
+    applyForm.startDate,
+    applyForm.dayPart === 'full_day' ? applyForm.endDate : applyForm.startDate,
+    applyForm.dayPart,
+    holidays,
+  );
+  const selectedBalance = leaveBalances.find(balance => balance.leaveTypeId === applyForm.leaveTypeId) ?? null;
+  const selectedLeaveType = leaveTypes.find(type => type.id === applyForm.leaveTypeId) ?? null;
+  const balanceInsufficient = !!selectedBalance && calculatedDays > selectedBalance.remainingDays;
+
+  useEffect(() => {
+    if (!leaveDraftKey || draftRestored) return;
+    setDraftRestored(true);
+    try {
+      const rawDraft = window.localStorage.getItem(leaveDraftKey);
+      if (!rawDraft) return;
+      const parsed = JSON.parse(rawDraft) as { form?: ApplyFormState };
+      if (parsed.form) setApplyForm({ ...getDefaultApplyForm(), ...parsed.form });
+    } catch {
+      window.localStorage.removeItem(leaveDraftKey);
+    }
+  }, [draftRestored, leaveDraftKey]);
+
+  useEffect(() => {
+    if (!leaveDraftKey || !draftRestored) return;
+    try {
+      window.localStorage.setItem(leaveDraftKey, JSON.stringify({ form: applyForm, updatedAt: new Date().toISOString() }));
+    } catch {
+      // Ignore storage failures; the in-memory form still works.
+    }
+  }, [applyForm, draftRestored, leaveDraftKey]);
+
+  useEffect(() => {
+    if (applyForm.dayPart === 'full_day' || !applyForm.startDate) return;
+    if (applyForm.endDate !== applyForm.startDate) {
+      setApplyForm(form => ({ ...form, endDate: form.startDate }));
+    }
+  }, [applyForm.dayPart, applyForm.endDate, applyForm.startDate]);
 
   function canReviewRequest(request: LeaveRequest): boolean {
     return isRequestAssignedToApprover(request, user, isManager);
@@ -144,26 +314,58 @@ export default function LeaveManagement() {
     }
   }
 
+  function handleAttachmentChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    e.target.value = '';
+    if (!file) return;
+
+    const validationError = validateLeaveAttachment(file);
+    setAttachmentError(validationError);
+    if (validationError) {
+      setAttachmentFile(null);
+      return;
+    }
+    setAttachmentFile(file);
+  }
+
+  function removeAttachment() {
+    setAttachmentFile(null);
+    setAttachmentError(null);
+  }
+
   async function handleApply(e: React.FormEvent) {
     e.preventDefault();
     if (!user?.companyId || !selfServiceEmployeeId) return;
-    const result = createLeaveRequestSchema.safeParse(applyForm);
+    const endDate = applyForm.dayPart === 'full_day' ? applyForm.endDate : applyForm.startDate;
+    const result = createLeaveRequestSchema.safeParse({ ...applyForm, endDate });
     if (!result.success) {
       toast({ title: 'Validation error', description: result.error.errors[0].message, variant: 'destructive' });
       return;
     }
-    const days = differenceInCalendarDays(
-      parseISO(applyForm.endDate!),
-      parseISO(applyForm.startDate!),
-    ) + 1;
+    if (attachmentError) {
+      toast({ title: 'Attachment error', description: attachmentError, variant: 'destructive' });
+      return;
+    }
+    if (calculatedDays <= 0) {
+      toast({ title: 'Validation error', description: 'Select at least one working leave day.', variant: 'destructive' });
+      return;
+    }
+    if (balanceInsufficient) {
+      toast({ title: 'Insufficient leave balance', description: `${selectedLeaveType?.name ?? 'Selected leave'} remaining balance is ${selectedBalance?.remainingDays ?? 0} day(s).`, variant: 'destructive' });
+      return;
+    }
     const { error } = await createLeaveRequest(selfServiceEmployeeId, user.companyId, {
-      ...applyForm as CreateLeaveRequestInput,
-      days,
+      ...result.data,
+      days: calculatedDays,
+      attachmentFile: attachmentFile ?? undefined,
     });
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: 'Leave application submitted' });
     setShowApply(false);
-    setApplyForm({});
+    setApplyForm(getDefaultApplyForm());
+    setAttachmentFile(null);
+    setAttachmentError(null);
+    if (leaveDraftKey) window.localStorage.removeItem(leaveDraftKey);
     void queryClient.invalidateQueries({ queryKey: ['leave-management', user?.companyId] });
   }
 
@@ -340,6 +542,13 @@ export default function LeaveManagement() {
                 {req.reason && (
                   <p className="text-sm"><span className="text-muted-foreground">Reason: </span>{req.reason}</p>
                 )}
+                {req.attachmentFileName && (
+                  <p className="flex items-center gap-1.5 text-sm">
+                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Attachment: </span>
+                    <span className="truncate">{req.attachmentFileName}</span>
+                  </p>
+                )}
                 {req.reviewerNote && (
                   <p className="text-sm"><span className="text-muted-foreground">Note: </span>{req.reviewerNote}</p>
                 )}
@@ -399,7 +608,7 @@ export default function LeaveManagement() {
                           <span>pending</span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Waiting for {req.currentApproverRole ? req.currentApproverRole.replace(/_/g, ' ') : 'assigned approver'}
+                          Waiting for {req.currentApproverRole ? 'assigned HRMS role' : 'assigned approver'}
                         </p>
                       </div>
                     )}
@@ -434,9 +643,23 @@ export default function LeaveManagement() {
 
       {/* Apply leave dialog */}
       <Dialog open={showApply} onOpenChange={setShowApply}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Apply for Leave</DialogTitle></DialogHeader>
           <form onSubmit={handleApply} className="space-y-4">
+            <div className="grid gap-3 rounded-md border bg-muted/20 p-3 sm:grid-cols-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Branch</p>
+                <p className="mt-1 truncate text-sm font-medium">{employeeInfo?.branch ?? 'Not assigned'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Department</p>
+                <p className="mt-1 truncate text-sm font-medium">{employeeInfo?.department ?? 'Not assigned'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Position</p>
+                <p className="mt-1 truncate text-sm font-medium">{employeeInfo?.position ?? 'Not assigned'}</p>
+              </div>
+            </div>
             <div className="space-y-2">
               <Label>Leave Type</Label>
               <Select
@@ -451,23 +674,141 @@ export default function LeaveManagement() {
                 </SelectContent>
               </Select>
             </div>
+
+            {selectedBalance && (
+              <div className="grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Entitled Leave</p>
+                  <p className="font-semibold">{formatDays(selectedBalance.entitledDays)} Days</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Used Leave</p>
+                  <p className="font-semibold">{formatDays(selectedBalance.usedDays)} Days</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Remaining Leave</p>
+                  <p className={balanceInsufficient ? 'font-semibold text-destructive' : 'font-semibold'}>
+                    {formatDays(selectedBalance.remainingDays)} Days
+                  </p>
+                </div>
+              </div>
+            )}
+            {applyForm.leaveTypeId && !selectedBalance && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                No balance record was found for this leave type in {selectedLeaveYear}.
+              </p>
+            )}
+
+            <div className="space-y-2">
+              <Label>Leave Duration</Label>
+              <ToggleGroup
+                type="single"
+                value={applyForm.dayPart}
+                onValueChange={value => {
+                  if (!value) return;
+                  const dayPart = value as LeaveDayPart;
+                  setApplyForm(form => ({
+                    ...form,
+                    dayPart,
+                    endDate: dayPart === 'full_day' ? form.endDate : form.startDate,
+                  }));
+                }}
+                className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+              >
+                {DAY_PART_OPTIONS.map(option => (
+                  <ToggleGroupItem
+                    key={option.value}
+                    value={option.value}
+                    className="h-auto justify-start rounded-md border px-3 py-2 text-left data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                  >
+                    <span>
+                      <span className="block text-sm font-medium">{option.label}</span>
+                      <span className="block text-xs opacity-80">{option.days} day</span>
+                    </span>
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Start Date</Label>
-                <Input type="date" value={applyForm.startDate ?? ''} onChange={e => setApplyForm(f => ({ ...f, startDate: e.target.value }))} required />
+                <Input
+                  type="date"
+                  value={applyForm.startDate ?? ''}
+                  onChange={e => setApplyForm(f => ({
+                    ...f,
+                    startDate: e.target.value,
+                    endDate: f.dayPart === 'full_day' ? f.endDate : e.target.value,
+                  }))}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label>End Date</Label>
-                <Input type="date" value={applyForm.endDate ?? ''} onChange={e => setApplyForm(f => ({ ...f, endDate: e.target.value }))} required />
+                <Input
+                  type="date"
+                  value={applyForm.dayPart === 'full_day' ? applyForm.endDate ?? '' : applyForm.startDate ?? ''}
+                  onChange={e => setApplyForm(f => ({ ...f, endDate: e.target.value }))}
+                  disabled={applyForm.dayPart !== 'full_day'}
+                  required
+                />
               </div>
+            </div>
+            <div className="rounded-md border bg-muted/20 px-3 py-2">
+              <p className="text-sm font-semibold">Total Leave Applied: {formatDays(calculatedDays)} Day{calculatedDays === 1 ? '' : 's'}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Weekends and configured public/company holidays are excluded.</p>
+              {balanceInsufficient && (
+                <p className="mt-1 text-xs font-medium text-destructive">Insufficient balance for this leave type.</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Reason (optional)</Label>
               <Textarea value={applyForm.reason ?? ''} onChange={e => setApplyForm(f => ({ ...f, reason: e.target.value }))} rows={3} />
             </div>
+            <div className="space-y-2">
+              <Label>Supporting Document</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ATTACHMENT_ACCEPT}
+                className="sr-only"
+                onChange={handleAttachmentChange}
+              />
+              <Button type="button" variant="outline" className="w-full justify-start gap-2" onClick={() => fileInputRef.current?.click()}>
+                <Paperclip className="h-4 w-4" />
+                Upload PDF/JPG/PNG (max 3MB)
+              </Button>
+              {attachmentFile && (
+                <div className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
+                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{attachmentFile.name}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(attachmentFile.size)}</span>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={removeAttachment} aria-label={`Remove ${attachmentFile.name}`}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {attachmentError && (
+                <p className="flex items-start gap-1.5 text-xs text-destructive">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  {attachmentError}
+                </p>
+              )}
+            </div>
+            <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+              <p>
+                This leave request will be submitted to:{' '}
+                <span className="font-semibold">{approvalPreview?.nextStepLabel ?? 'Manual HR review'}</span>
+              </p>
+              {approvalPreview?.fullFlow && approvalPreview.fullFlow.length > 1 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Approval flow: {approvalPreview.fullFlow.join(' → ')}
+                </p>
+              )}
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowApply(false)}>Cancel</Button>
-              <Button type="submit">Submit</Button>
+              <Button type="submit" disabled={calculatedDays <= 0 || balanceInsufficient || !!attachmentError}>Submit</Button>
             </DialogFooter>
           </form>
         </DialogContent>

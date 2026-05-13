@@ -195,26 +195,26 @@ export function AppShellSidebar({
           {user && (
             <div className={cn('flex items-center gap-2 px-3 py-3', collapsed && 'justify-center px-2')}>
               {user.profilePath ? (
-                <Link to={user.profilePath} className="flex min-w-0 flex-1 items-center gap-2.5 group">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/20 transition-colors group-hover:bg-primary/30">
+                <Link to={user.profilePath} className="group flex min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-1 transition-colors hover:bg-sidebar-accent/70">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/20 transition-colors group-hover:bg-primary/30">
                     <span className="text-xs font-bold text-sidebar-accent-foreground">{getInitials(user.name)}</span>
                   </div>
                   {!collapsed && (
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium leading-tight text-sidebar-accent-foreground">{user.name}</p>
-                      <p className="truncate text-[10px] capitalize text-sidebar-foreground/75">{user.role?.replace(/_/g, ' ')}</p>
+                      <p className="mt-0.5 truncate text-[10px] capitalize leading-tight text-sidebar-foreground/75">{user.role?.replace(/_/g, ' ')}</p>
                     </div>
                   )}
                 </Link>
               ) : (
-                <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/20">
+                <div className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-1">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/20">
                     <span className="text-xs font-bold text-sidebar-accent-foreground">{getInitials(user.name)}</span>
                   </div>
                   {!collapsed && (
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium leading-tight text-sidebar-accent-foreground">{user.name}</p>
-                      <p className="truncate text-[10px] capitalize text-sidebar-foreground/75">{user.role?.replace(/_/g, ' ')}</p>
+                      <p className="mt-0.5 truncate text-[10px] capitalize leading-tight text-sidebar-foreground/75">{user.role?.replace(/_/g, ' ')}</p>
                     </div>
                   )}
                 </div>

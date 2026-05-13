@@ -1,26 +1,20 @@
-import { supabase } from '@/integrations/supabase/client';
+import * as pkg from '@flc/hrms-services';
 import { logUserAction } from '@/services/auditService';
 import { inviteUser } from '@/services/profileService';
 import { Employee, EmployeeStatus, AppRole } from '@/types';
-import { DIRECTORY_EMPLOYEE_SELECT, rowToDirectoryEmployee } from './shared';
+import { supabase } from '@/integrations/supabase/client';
 
 export async function listEmployeeDirectory(companyId: string): Promise<{ data: Employee[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from('employees')
-    .select(DIRECTORY_EMPLOYEE_SELECT)
-    .eq('company_id', companyId)
-    .order('name');
-
-  if (error) return { data: [], error: error.message };
-
-  return {
-    data: (data ?? []).map((row: Record<string, unknown>) => rowToDirectoryEmployee(row)),
-    error: null,
-  };
+  try {
+    const data = await pkg.listEmployeeDirectory(companyId);
+    return { data: data as Employee[], error: null };
+  } catch (e) {
+    return { data: [], error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export interface CreateEmployeeInput {
-  id: string;       // must be pre-generated (crypto.randomUUID())
+  id: string;
   email: string;
   name: string;
   role: AppRole;
@@ -31,36 +25,6 @@ export interface CreateEmployeeInput {
   icNo?: string;
   contactNo?: string;
   joinDate?: string;
-}
-
-async function syncSalesAdvisorAssignment(
-  employeeId: string,
-  companyId: string,
-  role: AppRole,
-): Promise<{ error: string | null }> {
-  if (role === 'sales') {
-    const { error } = await supabase
-      .from('employee_module_assignments')
-      .upsert({
-        company_id: companyId,
-        employee_id: employeeId,
-        module_key: 'sales',
-        assignment_role: 'sales_advisor',
-        is_primary: true,
-        active: true,
-        source: 'manual',
-      }, { onConflict: 'employee_id,module_key,assignment_role' });
-    return { error: error?.message ?? null };
-  }
-
-  const { error } = await supabase
-    .from('employee_module_assignments')
-    .update({ active: false, is_primary: false })
-    .eq('employee_id', employeeId)
-    .eq('module_key', 'sales')
-    .eq('assignment_role', 'sales_advisor');
-
-  return { error: error?.message ?? null };
 }
 
 export async function createEmployee(input: CreateEmployeeInput, actorId?: string): Promise<{ error: string | null }> {
@@ -78,24 +42,19 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
     contact_no:          input.contactNo ?? null,
     join_date:           input.joinDate ?? null,
   });
-
   if (error) return { error: error.message };
 
-  // Auto-invite the employee to set up their HRMS profile (portal access only by default).
   if (input.email && !input.email.endsWith('@company.local')) {
     const inviteResult = await inviteUser({
-      email:           input.email,
-      name:            input.name,
-      role:            input.role,
-      companyId:       input.companyId,
-      employeeId:      input.id,
+      email:            input.email,
+      name:             input.name,
+      role:             input.role,
+      companyId:        input.companyId,
+      employeeId:       input.id,
       portalAccessOnly: true,
     });
     if (inviteResult.error) return { error: `Employee created but invite failed: ${inviteResult.error}` };
   }
-
-  const assignment = await syncSalesAdvisorAssignment(input.id, input.companyId, input.role);
-  if (assignment.error) return assignment;
 
   if (actorId) {
     void logUserAction(actorId, 'create', 'employee', input.id,
@@ -120,72 +79,17 @@ export interface UpdateEmployeeInput {
 }
 
 export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string, companyId?: string): Promise<{ error: string | null }> {
-  const payload: Record<string, unknown> = {};
-  if (input.name         !== undefined) payload.name                = input.name;
-  if (input.role         !== undefined) payload.primary_role        = input.role;
-  if (input.branchId     !== undefined) payload.branch_id           = input.branchId;
-  if (input.managerId    !== undefined) payload.manager_employee_id = input.managerId;
-  if (input.staffCode    !== undefined) payload.staff_code          = input.staffCode?.toUpperCase();
-  if (input.icNo         !== undefined) payload.ic_no               = input.icNo;
-  if (input.contactNo    !== undefined) payload.contact_no          = input.contactNo;
-  if (input.joinDate     !== undefined) payload.join_date           = input.joinDate;
-  if (input.resignDate   !== undefined) payload.resign_date         = input.resignDate;
-  if (input.status       !== undefined) payload.status              = input.status;
-  if (input.departmentId !== undefined) payload.department_id       = input.departmentId;
-  if (input.jobTitleId   !== undefined) payload.job_title_id        = input.jobTitleId;
-
-  let updateQuery = supabase.from('employees').update(payload as never).eq('id', id);
-  if (companyId) updateQuery = updateQuery.eq('company_id', companyId);
-  const { error } = await updateQuery;
-  if (error) return { error: error.message };
-
-  if (input.role !== undefined) {
-    let employeeQuery = supabase
-      .from('employees')
-      .select('company_id')
-      .eq('id', id);
-    if (companyId) employeeQuery = employeeQuery.eq('company_id', companyId);
-    const { data: employeeRow, error: employeeError } = await employeeQuery.single();
-    if (employeeError) return { error: employeeError.message };
-    if (employeeRow?.company_id) {
-      const assignment = await syncSalesAdvisorAssignment(id, String(employeeRow.company_id), input.role);
-      if (assignment.error) return assignment;
+  try {
+    await pkg.updateEmployee(id, input, companyId);
+    if (actorId) {
+      void logUserAction(actorId, 'update', 'employee', id, { changes: input as unknown as import('@/integrations/supabase/types').Json });
     }
+    return { error: null };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
   }
-
-  if (actorId) {
-    void logUserAction(actorId, 'update', 'employee', id, { changes: payload as unknown as import('@/integrations/supabase/types').Json });
-  }
-  return { error: null };
 }
 
-/** Batch-resolve salesman names → profile IDs for a given company. */
-export async function resolveNamesToIds(
-  companyId: string,
-  names: string[],
-): Promise<Map<string, string>> {
-  const unique = [...new Set(names.map(n => n.trim().toLowerCase()).filter(Boolean))];
-  if (!unique.length) return new Map();
-
-  const { data } = await supabase
-    .from('profiles')
-    .select('id, name')
-    .eq('company_id', companyId);
-
-  const map = new Map<string, string>();
-  for (const row of data ?? []) {
-    const key = String(row.name ?? '').trim().toLowerCase();
-    map.set(key, String(row.id));
-  }
-
-  const result = new Map<string, string>();
-  for (const original of names) {
-    const id = map.get(original.trim().toLowerCase());
-    if (id) result.set(original, id);
-  }
-  return result;
+export async function resolveNamesToIds(companyId: string, names: string[]): Promise<Map<string, string>> {
+  return pkg.resolveNamesToIds(companyId, names);
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LEAVE
-// ═══════════════════════════════════════════════════════════════════════════════

@@ -12,6 +12,7 @@ import type { AppRole } from '@/types';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchRoleSections, saveRoleSections } from '@/services/roleSectionService';
+import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 
 const ALL_ROLES: AppRole[] = [
   'super_admin',
@@ -28,6 +29,7 @@ const ALL_ROLES: AppRole[] = [
 export default function RolePermissionsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const canManage = !!user && ['super_admin', 'company_admin'].includes(user.role);
   const [permissions, setPermissions] = useState<Record<AppRole, SectionName[]>>(
     () => ({ ...DEFAULT_ROLE_SECTIONS })
   );
@@ -125,6 +127,8 @@ export default function RolePermissionsPage() {
     });
     setDirty(true);
   };
+
+  if (!canManage) return <UnauthorizedAccess />;
 
   return (
     <div className="w-full space-y-6">
@@ -250,7 +254,7 @@ export default function RolePermissionsPage() {
       <div className="rounded-md border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-1">
         <p className="font-medium text-foreground">Notes</p>
         <ul className="list-disc list-inside space-y-0.5">
-          <li>Permissions are stored locally in this browser. They apply to all users on this device.</li>
+          <li>Permissions are stored in the company role matrix and apply to users after navigation refreshes.</li>
           <li>Individual nav items within a section may have additional role restrictions enforced in code.</li>
           <li>The <strong>Admin</strong> section's sensitive items (Users & Roles, Audit Log, etc.) are always restricted to admin roles regardless of this matrix.</li>
         </ul>

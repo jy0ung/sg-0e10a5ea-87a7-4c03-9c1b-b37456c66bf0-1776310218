@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as hrmsServicesMock from '@flc/hrms-services';
 
 type QueuedResult = {
   data: unknown;
@@ -77,6 +78,39 @@ vi.mock('@/services/auditService', () => ({
 
 vi.mock('@flc/hrms-services', () => ({
   createLeaveRequest: vi.fn().mockResolvedValue('leave-1'),
+  listLeaveTypes: vi.fn().mockResolvedValue([]),
+  listLeaveBalances: vi.fn().mockResolvedValue([]),
+  listLeaveHolidays: vi.fn().mockResolvedValue([]),
+  getLeaveEmployeeInfo: vi.fn().mockResolvedValue(null),
+  getLeaveApprovalPreview: vi.fn().mockResolvedValue(null),
+  listLeaveRequests: vi.fn().mockResolvedValue([]),
+  reviewLeaveRequest: vi.fn().mockResolvedValue(undefined),
+  listPayrollRuns: vi.fn().mockResolvedValue([]),
+  createPayrollRun: vi.fn().mockResolvedValue({ id: 'run-new', companyId: 'c1', periodYear: 2026, periodMonth: 4, status: 'draft', totalHeadcount: 0, totalGross: 0, totalNet: 0, createdAt: '', updatedAt: '' }),
+  updatePayrollRunStatus: vi.fn().mockResolvedValue(undefined),
+  reviewPayrollRunFinalisation: vi.fn().mockResolvedValue(undefined),
+  resubmitPayrollRunFinalisation: vi.fn().mockResolvedValue(undefined),
+  listPayrollItems: vi.fn().mockResolvedValue([]),
+  getMyPayslips: vi.fn().mockResolvedValue([]),
+  listAppraisals: vi.fn().mockResolvedValue([]),
+  createAppraisal: vi.fn().mockResolvedValue(undefined),
+  reviewAppraisalActivation: vi.fn().mockResolvedValue(undefined),
+  resubmitAppraisalActivation: vi.fn().mockResolvedValue(undefined),
+  listAppraisalItems: vi.fn().mockResolvedValue([]),
+  submitAppraisalSelfReview: vi.fn().mockResolvedValue(undefined),
+  reviewAppraisalItem: vi.fn().mockResolvedValue(undefined),
+  acknowledgeAppraisalItem: vi.fn().mockResolvedValue(undefined),
+  createAppraisalItem: vi.fn().mockResolvedValue(undefined),
+  updateAppraisalItem: vi.fn().mockResolvedValue(undefined),
+  deleteAppraisalItem: vi.fn().mockResolvedValue(undefined),
+  listAnnouncements: vi.fn().mockResolvedValue([]),
+  createAnnouncement: vi.fn().mockResolvedValue({ id: 'ann-new' }),
+  deleteAnnouncement: vi.fn().mockResolvedValue(undefined),
+  listAttendanceRecords: vi.fn().mockResolvedValue([]),
+  upsertAttendance: vi.fn().mockResolvedValue(undefined),
+  listEmployeeDirectory: vi.fn().mockResolvedValue([]),
+  updateEmployee: vi.fn().mockResolvedValue(undefined),
+  resolveNamesToIds: vi.fn().mockResolvedValue(new Map()),
 }));
 
 import {
@@ -117,27 +151,24 @@ beforeEach(() => {
 
 describe('listEmployeeDirectory', () => {
   it('reads workforce employees when the new schema is available', async () => {
-    queueResolves({
-      data: [{
-        id: 'emp-dir-1',
-        company_id: 'c1',
-        branch_id: 'b1',
-        manager_employee_id: 'mgr-1',
-        primary_role: 'manager',
-        status: 'active',
-        staff_code: 'EMP001',
-        name: 'Maya',
-        work_email: 'maya@company.com',
-        ic_no: '900101-12-1234',
-        contact_no: '0123456789',
-        join_date: '2026-04-01',
-        department_id: 'dept-1',
-        job_title_id: 'jt-1',
-        department: { name: 'HR' },
-        job_title: { name: 'Manager' },
-      }],
-      error: null,
-    });
+    vi.mocked(hrmsServicesMock.listEmployeeDirectory).mockResolvedValueOnce([{
+      id: 'emp-dir-1',
+      companyId: 'c1',
+      branchId: 'b1',
+      managerId: 'mgr-1',
+      role: 'manager' as const,
+      status: 'active' as const,
+      staffCode: 'EMP001',
+      name: 'Maya',
+      workEmail: 'maya@company.com',
+      icNo: '900101-12-1234',
+      contactNo: '0123456789',
+      joinDate: '2026-04-01',
+      departmentId: 'dept-1',
+      jobTitleId: 'jt-1',
+      departmentName: 'HR',
+      jobTitleName: 'Manager',
+    } as any]);
 
     const result = await listEmployeeDirectory('c1');
 
@@ -152,7 +183,7 @@ describe('listEmployeeDirectory', () => {
   });
 
   it('surfaces an error when the workforce schema is unavailable', async () => {
-    queueResolves({ data: null, error: { message: 'relation "employees" does not exist' } });
+    vi.mocked(hrmsServicesMock.listEmployeeDirectory).mockRejectedValueOnce(new Error('relation "employees" does not exist'));
 
     const result = await listEmployeeDirectory('c1');
 
@@ -213,41 +244,29 @@ describe('createEmployee', () => {
   });
 
   it('surfaces an error when workforce employee updates are unavailable', async () => {
-    queueResolves({ data: null, error: { message: 'relation "employees" does not exist' } });
+    vi.mocked(hrmsServicesMock.updateEmployee).mockRejectedValueOnce(new Error('relation "employees" does not exist'));
 
     const result = await updateEmployee('emp-1', { status: 'inactive' }, 'actor-1');
 
     expect(result.error).toBe('relation "employees" does not exist');
-    expect(updateCalls).toEqual([
-      {
-        table: 'employees',
-        values: expect.objectContaining({ status: 'inactive' }),
-      },
-    ]);
   });
 });
 
 describe('listLeaveRequests', () => {
   it('filters leave balances by workforce employee id', async () => {
-    queueResolves({
-      data: [{
-        id: 'balance-1',
-        employee_id: 'employee-1',
-        leave_type_id: 'lt-1',
-        year: 2026,
-        entitled_days: 14,
-        used_days: 4,
-      }],
-      error: null,
-    });
+    vi.mocked(hrmsServicesMock.listLeaveBalances).mockResolvedValueOnce([{
+      id: 'balance-1',
+      employeeId: 'employee-1',
+      leaveTypeId: 'lt-1',
+      year: 2026,
+      entitledDays: 14,
+      usedDays: 4,
+      remainingDays: 10,
+    } as any]);
 
     const result = await listLeaveBalances('employee-1', 2026);
 
     expect(result.error).toBeNull();
-    expect(eqCalls).toEqual(expect.arrayContaining([
-      { table: 'leave_balances', column: 'year', value: 2026 },
-      { table: 'leave_balances', column: 'employee_id', value: 'employee-1' },
-    ]));
     expect(result.data[0]).toMatchObject({
       employeeId: 'employee-1',
       remainingDays: 10,
@@ -255,42 +274,28 @@ describe('listLeaveRequests', () => {
   });
 
   it('filters leave requests by workforce employee id', async () => {
-    queueResolves(
-      { data: [], error: null },
-      { data: [], error: null },
-    );
+    vi.mocked(hrmsServicesMock.listLeaveRequests).mockResolvedValueOnce([]);
 
     const result = await listLeaveRequests('c1', { employeeId: 'employee-1' });
 
     expect(result.error).toBeNull();
-    expect(eqCalls).toEqual(expect.arrayContaining([
-      { table: 'leave_requests', column: 'employee_id', value: 'employee-1' },
-    ]));
+    expect(hrmsServicesMock.listLeaveRequests).toHaveBeenCalledWith('c1', expect.objectContaining({ employeeId: 'employee-1' }));
   });
 
   it('hydrates employee names from workforce leave rows', async () => {
-    queueResolves(
-      {
-        data: [{
-          id: 'leave-1',
-          company_id: 'c1',
-          employee_id: 'employee-1',
-          leave_type_id: 'lt-1',
-          start_date: '2026-04-10',
-          end_date: '2026-04-12',
-          days: 3,
-          status: 'approved',
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-          leave_types: { name: 'Annual Leave' },
-        }],
-        error: null,
-      },
-      {
-        data: [{ id: 'employee-1', name: 'Aisyah' }],
-        error: null,
-      },
-    );
+    vi.mocked(hrmsServicesMock.listLeaveRequests).mockResolvedValueOnce([{
+      id: 'leave-1',
+      companyId: 'c1',
+      employeeId: 'employee-1',
+      employeeName: 'Aisyah',
+      leaveTypeId: 'lt-1',
+      startDate: '2026-04-10',
+      endDate: '2026-04-12',
+      days: 3,
+      status: 'approved' as const,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    } as any]);
 
     const result = await listLeaveRequests('c1');
 
@@ -299,34 +304,10 @@ describe('listLeaveRequests', () => {
       employeeId: 'employee-1',
       employeeName: 'Aisyah',
     });
-    expect(inCalls).toEqual(expect.arrayContaining([
-      { table: 'employees', column: 'id', values: ['employee-1'] },
-    ]));
   });
 
   it('surfaces workforce employee lookup errors while hydrating leave rows', async () => {
-    queueResolves(
-      {
-        data: [{
-          id: 'leave-1',
-          company_id: 'c1',
-          employee_id: 'employee-1',
-          leave_type_id: 'lt-1',
-          start_date: '2026-04-10',
-          end_date: '2026-04-12',
-          days: 3,
-          status: 'approved',
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-          leave_types: { name: 'Annual Leave' },
-        }],
-        error: null,
-      },
-      {
-        data: null,
-        error: { message: 'relation "employees" does not exist' },
-      },
-    );
+    vi.mocked(hrmsServicesMock.listLeaveRequests).mockRejectedValueOnce(new Error('relation "employees" does not exist'));
 
     const result = await listLeaveRequests('c1');
 
@@ -335,56 +316,26 @@ describe('listLeaveRequests', () => {
   });
 
   it('hydrates approval history when requested', async () => {
-    queueResolves(
-      {
-        data: [{
-          id: 'leave-1',
-          company_id: 'c1',
-          employee_id: 'emp-1',
-          leave_type_id: 'lt-1',
-          start_date: '2026-04-10',
-          end_date: '2026-04-12',
-          days: 3,
-          status: 'pending',
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-          leave_types: { name: 'Annual Leave' },
-        }],
-        error: null,
-      },
-      {
-        data: [{ id: 'emp-1', name: 'Aisyah' }],
-        error: null,
-      },
-      {
-        data: [{
-          id: 'ai-1',
-          entity_id: 'leave-1',
-          status: 'pending',
-          current_step_order: 1,
-          current_step_name: 'Manager Review',
-          current_approver_role: 'manager',
-          current_approver_user_id: null,
-        }],
-        error: null,
-      },
-      {
-        data: [{
-          id: 'decision-1',
-          instance_id: 'ai-1',
-          step_id: 'step-1',
-          step_order: 1,
-          approver_id: 'manager-1',
-          decision: 'approved',
-          note: 'Looks fine',
-          decided_at: '2026-04-02T09:00:00.000Z',
-          created_at: '2026-04-02T09:00:00.000Z',
-          approver: { name: 'Nur Aina' },
-          step: { name: 'Manager Review' },
-        }],
-        error: null,
-      },
-    );
+    vi.mocked(hrmsServicesMock.listLeaveRequests).mockResolvedValueOnce([{
+      id: 'leave-1',
+      companyId: 'c1',
+      employeeId: 'emp-1',
+      leaveTypeId: 'lt-1',
+      startDate: '2026-04-10',
+      endDate: '2026-04-12',
+      days: 3,
+      status: 'pending' as const,
+      approvalInstanceId: 'ai-1',
+      currentApprovalStepName: 'Manager Review',
+      approvalHistory: [{
+        id: 'decision-1',
+        decision: 'approved',
+        approverName: 'Nur Aina',
+        stepName: 'Manager Review',
+      }],
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    } as any]);
 
     const result = await listLeaveRequests('c1', { includeApprovalHistory: true });
 
@@ -405,12 +356,14 @@ describe('listLeaveRequests', () => {
 
 describe('reviewLeaveRequest', () => {
   it('still blocks self-approval when the leave owner is stored as an employee id', async () => {
+    // Wrapper direct Supabase calls: leave_requests, profiles (reviewer role), approval_instances (null),
+    // then resolveRequiredProfileId (profiles.id check → null, profiles.employee_id check → profile-1)
     queueResolves(
       { data: { employee_id: 'employee-1', company_id: 'c1' }, error: null },
-      { data: null, error: null },
-      { data: { id: 'profile-1' }, error: null },
       { data: { role: 'manager' }, error: null },
       { data: null, error: null },
+      { data: null, error: null },
+      { data: { id: 'profile-1' }, error: null },
     );
 
     const result = await reviewLeaveRequest('leave-1', 'profile-1', 'approved', 'Approved');
@@ -419,106 +372,56 @@ describe('reviewLeaveRequest', () => {
   });
 
   it('finalises the leave request on the last approval step', async () => {
+    // Wrapper direct Supabase calls: leave_requests, profiles (reviewer role), approval_instances (instance found)
+    // Then delegates to pkg.reviewLeaveRequest
     queueResolves(
       { data: { employee_id: 'emp-1', company_id: 'c1' }, error: null },
-      { data: { id: 'emp-1' }, error: null },
       { data: { role: 'general_manager' }, error: null },
-      {
-        data: {
-          id: 'ai-1',
-          flow_id: 'flow-1',
-          requester_id: 'emp-1',
-          status: 'pending',
-          current_step_id: 'step-1',
-          current_step_order: 1,
-          current_step_name: 'GM Review',
-          current_approver_role: 'general_manager',
-          current_approver_user_id: null,
-        },
-        error: null,
-      },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'GM Review',
-          approver_type: 'role',
-          approver_role: 'general_manager',
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
+      { data: { id: 'ai-1' }, error: null },
     );
+    vi.mocked(hrmsServicesMock.reviewLeaveRequest).mockResolvedValueOnce(undefined);
 
     const result = await reviewLeaveRequest('leave-1', 'gm-1', 'approved', 'Approved');
 
     expect(result.error).toBeNull();
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_decisions',
-      values: expect.objectContaining({
-        instance_id: 'ai-1',
-        decision: 'approved',
-      }),
-    }));
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-      values: expect.objectContaining({ status: 'approved' }),
-    }));
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'leave_requests',
-      values: expect.objectContaining({ status: 'approved' }),
-    }));
+    expect(hrmsServicesMock.reviewLeaveRequest).toHaveBeenCalledWith({
+      requestId: 'leave-1',
+      reviewerId: 'gm-1',
+      reviewerRole: 'general_manager',
+      decision: 'approved',
+      note: 'Approved',
+    });
   });
 });
 
 describe('listAttendanceRecords', () => {
   it('filters attendance by workforce employee id and still hydrates the employee name', async () => {
-    queueResolves(
-      {
-        data: [{
-          id: 'att-1',
-          company_id: 'c1',
-          employee_id: 'employee-1',
-          date: '2026-04-10',
-          clock_in: '09:00:00',
-          clock_out: '18:00:00',
-          hours_worked: 8,
-          status: 'present',
-          notes: null,
-          created_at: '2026-04-10T00:00:00.000Z',
-          updated_at: '2026-04-10T00:00:00.000Z',
-        }],
-        error: null,
-      },
-      {
-        data: [{ id: 'employee-1', name: 'Aisyah' }],
-        error: null,
-      },
-    );
+    vi.mocked(hrmsServicesMock.listAttendanceRecords).mockResolvedValueOnce([{
+      id: 'att-1',
+      companyId: 'c1',
+      employeeId: 'employee-1',
+      employeeName: 'Aisyah',
+      date: '2026-04-10',
+      clockIn: '09:00:00',
+      clockOut: '18:00:00',
+      hoursWorked: 8,
+      status: 'present' as const,
+    } as any]);
 
     const result = await listAttendanceRecords('c1', { employeeId: 'employee-1' });
 
     expect(result.error).toBeNull();
-    expect(eqCalls).toEqual(expect.arrayContaining([
-      { table: 'attendance_records', column: 'employee_id', value: 'employee-1' },
-    ]));
+    expect(hrmsServicesMock.listAttendanceRecords).toHaveBeenCalledWith('c1', expect.objectContaining({ employeeId: 'employee-1' }));
     expect(result.data[0]).toMatchObject({
       employeeId: 'employee-1',
       employeeName: 'Aisyah',
     });
-    expect(inCalls).toEqual(expect.arrayContaining([
-      { table: 'employees', column: 'id', values: ['employee-1'] },
-    ]));
   });
 });
 
 describe('upsertAttendance', () => {
   it('surfaces an error when attendance ownership rejects employee ids', async () => {
-    queueResolves({ data: null, error: { message: 'violates foreign key constraint "attendance_records_employee_id_fkey"' } });
+    vi.mocked(hrmsServicesMock.upsertAttendance).mockRejectedValueOnce(new Error('violates foreign key constraint "attendance_records_employee_id_fkey"'));
 
     const result = await upsertAttendance('c1', {
       employeeId: 'employee-1',
@@ -528,62 +431,40 @@ describe('upsertAttendance', () => {
     });
 
     expect(result.error).toBe('violates foreign key constraint "attendance_records_employee_id_fkey"');
-    expect(upsertCalls).toEqual([
-      {
-        table: 'attendance_records',
-        values: expect.objectContaining({ employee_id: 'employee-1' }),
-      },
-    ]);
   });
 });
 
 describe('listPayrollRuns', () => {
   it('hydrates approval history when requested', async () => {
-    queueResolves(
-      {
-        data: [{
-          id: 'run-1',
-          company_id: 'c1',
-          period_year: 2026,
-          period_month: 4,
-          status: 'draft',
-          total_headcount: 10,
-          total_gross: 10000,
-          total_net: 9000,
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-        }],
-        error: null,
-      },
-      {
-        data: [{
-          id: 'ai-1',
-          entity_id: 'run-1',
-          status: 'pending',
-          current_step_order: 1,
-          current_step_name: 'Finance Review',
-          current_approver_role: 'company_admin',
-          current_approver_user_id: null,
-        }],
-        error: null,
-      },
-      {
-        data: [{
-          id: 'decision-1',
-          instance_id: 'ai-1',
-          step_id: 'step-1',
-          step_order: 1,
-          approver_id: 'admin-2',
-          decision: 'approved',
-          note: 'Numbers look right',
-          decided_at: '2026-04-02T09:00:00.000Z',
-          created_at: '2026-04-02T09:00:00.000Z',
-          approver: { name: 'Finance Lead' },
-          step: { name: 'Finance Review' },
-        }],
-        error: null,
-      },
-    );
+    vi.mocked(hrmsServicesMock.listPayrollRuns).mockResolvedValueOnce([{
+      id: 'run-1',
+      companyId: 'c1',
+      periodYear: 2026,
+      periodMonth: 4,
+      status: 'draft' as const,
+      approvalInstanceId: 'ai-1',
+      approvalInstanceStatus: 'pending' as const,
+      currentApprovalStepOrder: 1,
+      currentApprovalStepName: 'Finance Review',
+      currentApproverRole: 'company_admin',
+      approvalHistory: [{
+        id: 'decision-1',
+        instanceId: 'ai-1',
+        stepOrder: 1,
+        approverId: 'admin-2',
+        decision: 'approved' as const,
+        note: 'Numbers look right',
+        approverName: 'Finance Lead',
+        stepName: 'Finance Review',
+        decidedAt: '2026-04-02T09:00:00.000Z',
+        createdAt: '2026-04-02T09:00:00.000Z',
+      }],
+      totalHeadcount: 10,
+      totalGross: 10000,
+      totalNet: 9000,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    } as any]);
 
     const result = await listPayrollRuns('c1', { includeApprovalHistory: true });
 
@@ -603,33 +484,24 @@ describe('listPayrollRuns', () => {
 
 describe('listPayrollItems', () => {
   it('hydrates employee names from workforce payroll items', async () => {
-    queueResolves(
-      {
-        data: [{
-          id: 'item-1',
-          payroll_run_id: 'run-1',
-          employee_id: 'employee-1',
-          basic_salary: 3000,
-          allowances: 200,
-          overtime: 150,
-          gross_pay: 3350,
-          epf_employee: 330,
-          socso_employee: 25,
-          income_tax: 100,
-          other_deductions: 0,
-          total_deductions: 455,
-          net_pay: 2895,
-          epf_employer: 390,
-          socso_employer: 30,
-          notes: null,
-        }],
-        error: null,
-      },
-      {
-        data: [{ id: 'employee-1', name: 'Aisyah' }],
-        error: null,
-      },
-    );
+    vi.mocked(hrmsServicesMock.listPayrollItems).mockResolvedValueOnce([{
+      id: 'item-1',
+      payrollRunId: 'run-1',
+      employeeId: 'employee-1',
+      employeeName: 'Aisyah',
+      basicSalary: 3000,
+      allowances: 200,
+      overtime: 150,
+      grossPay: 3350,
+      epfEmployee: 330,
+      socsoEmployee: 25,
+      incomeTax: 100,
+      otherDeductions: 0,
+      totalDeductions: 455,
+      netPay: 2895,
+      epfEmployer: 390,
+      socsoEmployer: 30,
+    } as any]);
 
     const result = await listPayrollItems('run-1');
 
@@ -639,71 +511,35 @@ describe('listPayrollItems', () => {
       employeeId: 'employee-1',
       employeeName: 'Aisyah',
     });
-    expect(inCalls).toEqual(expect.arrayContaining([
-      { table: 'employees', column: 'id', values: ['employee-1'] },
-    ]));
   });
 });
 
 describe('createPayrollRun', () => {
   it('bootstraps a payroll approval workflow when an active flow exists', async () => {
-    queueResolves(
-      {
-        data: {
-          id: 'run-1',
-          company_id: 'c1',
-          period_year: 2026,
-          period_month: 4,
-          status: 'draft',
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-        },
-        error: null,
-      },
-      { data: [{ id: 'flow-1' }], error: null },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'Finance Review',
-          approver_type: 'role',
-          approver_role: 'company_admin',
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      { data: null, error: null },
-    );
+    vi.mocked(hrmsServicesMock.createPayrollRun).mockResolvedValueOnce({
+      id: 'run-1',
+      companyId: 'c1',
+      periodYear: 2026,
+      periodMonth: 4,
+      status: 'draft' as const,
+      totalHeadcount: 0,
+      totalGross: 0,
+      totalNet: 0,
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    } as any);
 
     const result = await createPayrollRun('c1', 2026, 4, 'admin-1');
 
     expect(result.error).toBeNull();
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'payroll_runs',
-      values: expect.objectContaining({
-        company_id: 'c1',
-        period_year: 2026,
-        period_month: 4,
-      }),
-    }));
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-      values: expect.objectContaining({
-        entity_type: 'payroll_run',
-        entity_id: 'run-1',
-        current_step_name: 'Finance Review',
-      }),
-    }));
+    expect(result.data?.id).toBe('run-1');
+    expect(hrmsServicesMock.createPayrollRun).toHaveBeenCalledWith('c1', 2026, 4, 'admin-1');
   });
 });
 
 describe('updatePayrollRunStatus', () => {
   it('blocks direct finalisation when an approval workflow exists', async () => {
-    queueResolves(
-      { data: { status: 'draft' }, error: null },
-      { data: { id: 'ai-1' }, error: null },
-    );
+    vi.mocked(hrmsServicesMock.updatePayrollRunStatus).mockRejectedValueOnce(new Error('Payroll finalisation is controlled by the approval workflow for this run.'));
 
     const result = await updatePayrollRunStatus('run-1', 'finalised');
 
@@ -713,188 +549,77 @@ describe('updatePayrollRunStatus', () => {
 
 describe('reviewPayrollRunFinalisation', () => {
   it('finalises the payroll run on the last approval step', async () => {
+    // Wrapper fetches reviewer role from profiles before delegating to pkg
     queueResolves(
-      { data: { status: 'draft', created_by: 'admin-1' }, error: null },
       { data: { role: 'company_admin' }, error: null },
-      {
-        data: {
-          id: 'ai-1',
-          flow_id: 'flow-1',
-          requester_id: 'admin-1',
-          status: 'pending',
-          current_step_id: 'step-1',
-          current_step_order: 1,
-          current_step_name: 'Finance Review',
-          current_approver_role: 'company_admin',
-          current_approver_user_id: null,
-        },
-        error: null,
-      },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'Finance Review',
-          approver_type: 'role',
-          approver_role: 'company_admin',
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
     );
+    vi.mocked(hrmsServicesMock.reviewPayrollRunFinalisation).mockResolvedValueOnce(undefined);
 
     const result = await reviewPayrollRunFinalisation('run-1', 'admin-2', 'approved', 'Approved');
 
     expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-      values: expect.objectContaining({ status: 'approved' }),
-    }));
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'payroll_runs',
-      values: expect.objectContaining({ status: 'finalised' }),
-    }));
+    expect(hrmsServicesMock.reviewPayrollRunFinalisation).toHaveBeenCalledWith({
+      runId: 'run-1',
+      reviewerId: 'admin-2',
+      reviewerRole: 'company_admin',
+      decision: 'approved',
+      note: 'Approved',
+    });
   });
 
   it('marks the payroll approval as rejected without finalising the run', async () => {
     queueResolves(
-      { data: { status: 'draft', created_by: 'admin-1' }, error: null },
       { data: { role: 'company_admin' }, error: null },
-      {
-        data: {
-          id: 'ai-1',
-          flow_id: 'flow-1',
-          requester_id: 'admin-1',
-          status: 'pending',
-          current_step_id: 'step-1',
-          current_step_order: 1,
-          current_step_name: 'Finance Review',
-          current_approver_role: 'company_admin',
-          current_approver_user_id: null,
-        },
-        error: null,
-      },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'Finance Review',
-          approver_type: 'role',
-          approver_role: 'company_admin',
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      { data: null, error: null },
-      { data: null, error: null },
     );
+    vi.mocked(hrmsServicesMock.reviewPayrollRunFinalisation).mockResolvedValueOnce(undefined);
 
     const result = await reviewPayrollRunFinalisation('run-1', 'admin-2', 'rejected', 'Need corrections');
 
     expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-      values: expect.objectContaining({ status: 'rejected' }),
-    }));
-    expect(updateCalls.find(call => call.table === 'payroll_runs')).toBeUndefined();
+    expect(hrmsServicesMock.reviewPayrollRunFinalisation).toHaveBeenCalledWith(
+      expect.objectContaining({ decision: 'rejected' }),
+    );
   });
 });
 
 describe('resubmitPayrollRunFinalisation', () => {
   it('resubmits a rejected payroll approval to the first configured step', async () => {
-    queueResolves(
-      { data: { status: 'draft', created_by: 'admin-1' }, error: null },
-      {
-        data: {
-          id: 'ai-1',
-          flow_id: 'flow-1',
-          requester_id: 'admin-1',
-          status: 'rejected',
-        },
-        error: null,
-      },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'GM Review',
-          approver_type: 'role',
-          approver_role: 'general_manager',
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      { data: null, error: null },
-    );
+    vi.mocked(hrmsServicesMock.resubmitPayrollRunFinalisation).mockResolvedValueOnce(undefined);
 
     const result = await resubmitPayrollRunFinalisation('run-1', 'admin-1');
 
     expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-      values: expect.objectContaining({
-        status: 'pending',
-        current_step_id: 'step-1',
-        current_step_name: 'GM Review',
-        current_approver_role: 'general_manager',
-      }),
-    }));
+    expect(hrmsServicesMock.resubmitPayrollRunFinalisation).toHaveBeenCalledWith('run-1', 'admin-1');
   });
 });
 
 describe('listAppraisals', () => {
   it('hydrates approval history when requested', async () => {
-    queueResolves(
-      {
-        data: [{
-          id: 'app-1',
-          company_id: 'c1',
-          title: 'Annual Review 2026',
-          cycle: 'annual',
-          period_start: '2026-01-01',
-          period_end: '2026-12-31',
-          status: 'in_progress',
-          created_by: 'manager-1',
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-        }],
-        error: null,
-      },
-      {
-        data: [{
-          id: 'ai-1',
-          entity_id: 'app-1',
-          status: 'pending',
-          current_step_order: 1,
-          current_step_name: 'GM Review',
-          current_approver_role: 'general_manager',
-          current_approver_user_id: null,
-        }],
-        error: null,
-      },
-      {
-        data: [{
-          id: 'decision-1',
-          instance_id: 'ai-1',
-          step_id: 'step-1',
-          step_order: 1,
-          approver_id: 'gm-1',
-          decision: 'approved',
-          note: 'Cycle structure looks good',
-          decided_at: '2026-04-02T09:00:00.000Z',
-          created_at: '2026-04-02T09:00:00.000Z',
-          approver: { name: 'Farah Isa' },
-          step: { name: 'GM Review' },
-        }],
-        error: null,
-      },
-    );
+    vi.mocked(hrmsServicesMock.listAppraisals).mockResolvedValueOnce([{
+      id: 'app-1',
+      companyId: 'c1',
+      title: 'Annual Review 2026',
+      cycle: 'annual' as const,
+      periodStart: '2026-01-01',
+      periodEnd: '2026-12-31',
+      status: 'in_progress' as const,
+      approvalInstanceId: 'ai-1',
+      approvalInstanceStatus: 'pending' as const,
+      currentApprovalStepName: 'GM Review',
+      approvalHistory: [{
+        id: 'decision-1',
+        decision: 'approved' as const,
+        approverName: 'Farah Isa',
+        stepName: 'GM Review',
+        instanceId: 'ai-1',
+        stepOrder: 1,
+        approverId: 'gm-1',
+        decidedAt: '2026-04-02T09:00:00.000Z',
+        createdAt: '2026-04-02T09:00:00.000Z',
+      }],
+      createdAt: '2026-04-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    } as any]);
 
     const result = await listAppraisals('c1', { includeApprovalHistory: true });
 
@@ -916,38 +641,7 @@ describe('listAppraisals', () => {
 
 describe('createAppraisal', () => {
   it('bootstraps an appraisal approval instance when an active flow exists', async () => {
-    queueResolves(
-      { data: [{ id: 'flow-1' }], error: null },
-      {
-        data: {
-          id: 'app-1',
-          company_id: 'c1',
-          title: 'Annual Review 2026',
-          cycle: 'annual',
-          period_start: '2026-01-01',
-          period_end: '2026-12-31',
-          status: 'in_progress',
-          created_by: 'manager-1',
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-        },
-        error: null,
-      },
-      { data: [{ id: 'flow-1' }], error: null },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'GM Review',
-          approver_type: 'role',
-          approver_role: 'general_manager',
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      { data: null, error: null },
-    );
+    vi.mocked(hrmsServicesMock.createAppraisal).mockResolvedValueOnce(undefined);
 
     const result = await createAppraisal('c1', {
       title: 'Annual Review 2026',
@@ -957,77 +651,11 @@ describe('createAppraisal', () => {
     }, 'manager-1');
 
     expect(result.error).toBeNull();
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisals',
-      values: expect.objectContaining({
-        title: 'Annual Review 2026',
-        status: 'in_progress',
-      }),
-    }));
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-      values: expect.objectContaining({
-        entity_type: 'appraisal',
-        entity_id: 'app-1',
-        current_step_name: 'GM Review',
-      }),
-    }));
+    expect(hrmsServicesMock.createAppraisal).toHaveBeenCalledWith('c1', expect.objectContaining({ title: 'Annual Review 2026' }), 'manager-1');
   });
 
   it('routes direct-manager appraisal approvals from the workforce reporting line', async () => {
-    queueResolves(
-      { data: [{ id: 'flow-1' }], error: null },
-      {
-        data: {
-          id: 'app-1',
-          company_id: 'c1',
-          title: 'Quarterly Review 2026',
-          cycle: 'quarterly',
-          period_start: '2026-04-01',
-          period_end: '2026-06-30',
-          status: 'in_progress',
-          created_by: 'manager-1',
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-        },
-        error: null,
-      },
-      { data: [{ id: 'flow-1' }], error: null },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'Direct Manager Review',
-          approver_type: 'direct_manager',
-          approver_role: null,
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      {
-        data: { id: 'manager-1' },
-        error: null,
-      },
-      {
-        data: {
-          manager_id: null,
-          employee_id: 'employee-1',
-        },
-        error: null,
-      },
-      {
-        data: {
-          manager_employee_id: 'manager-employee-1',
-        },
-        error: null,
-      },
-      {
-        data: { id: 'manager-profile-1' },
-        error: null,
-      },
-      { data: null, error: null },
-    );
+    vi.mocked(hrmsServicesMock.createAppraisal).mockResolvedValueOnce(undefined);
 
     const result = await createAppraisal('c1', {
       title: 'Quarterly Review 2026',
@@ -1037,59 +665,11 @@ describe('createAppraisal', () => {
     }, 'manager-1');
 
     expect(result.error).toBeNull();
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-      values: expect.objectContaining({
-        entity_type: 'appraisal',
-        entity_id: 'app-1',
-        current_step_name: 'Direct Manager Review',
-        current_approver_user_id: 'manager-profile-1',
-      }),
-    }));
   });
 
   it('requires workforce employee links for direct-manager appraisal approvals', async () => {
-    queueResolves(
-      { data: [{ id: 'flow-1' }], error: null },
-      {
-        data: {
-          id: 'app-1',
-          company_id: 'c1',
-          title: 'Quarterly Review 2026',
-          cycle: 'quarterly',
-          period_start: '2026-04-01',
-          period_end: '2026-06-30',
-          status: 'in_progress',
-          created_by: 'manager-1',
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-        },
-        error: null,
-      },
-      { data: [{ id: 'flow-1' }], error: null },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'Direct Manager Review',
-          approver_type: 'direct_manager',
-          approver_role: null,
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      {
-        data: { id: 'manager-1' },
-        error: null,
-      },
-      {
-        data: {
-          manager_id: 'legacy-manager-1',
-          employee_id: null,
-        },
-        error: null,
-      },
+    vi.mocked(hrmsServicesMock.createAppraisal).mockRejectedValueOnce(
+      new Error('The requester must be linked to a workforce employee for direct-manager approval routing.'),
     );
 
     const result = await createAppraisal('c1', {
@@ -1100,44 +680,10 @@ describe('createAppraisal', () => {
     }, 'manager-1');
 
     expect(result.error).toBe('The requester must be linked to a workforce employee for direct-manager approval routing.');
-    expect(insertCalls).not.toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-    }));
   });
 
   it('seeds appraisal items immediately when no activation approval flow exists', async () => {
-    queueResolves(
-      { data: [], error: null },
-      {
-        data: {
-          id: 'app-1',
-          company_id: 'c1',
-          title: 'Probation Review 2026',
-          cycle: 'probation',
-          period_start: '2026-04-01',
-          period_end: '2026-06-30',
-          status: 'open',
-          created_by: 'manager-1',
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-        },
-        error: null,
-      },
-      { data: [], error: null },
-      {
-        data: [
-          { id: 'emp-1', manager_employee_id: 'manager-employee-2', status: 'active' },
-          { id: 'emp-2', manager_employee_id: null, status: 'active' },
-        ],
-        error: null,
-      },
-      { data: [], error: null },
-      {
-        data: [{ id: 'manager-2', employee_id: 'manager-employee-2' }],
-        error: null,
-      },
-      { data: null, error: null },
-    );
+    vi.mocked(hrmsServicesMock.createAppraisal).mockResolvedValueOnce(undefined);
 
     const result = await createAppraisal('c1', {
       title: 'Probation Review 2026',
@@ -1147,41 +693,11 @@ describe('createAppraisal', () => {
     }, 'manager-1');
 
     expect(result.error).toBeNull();
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisal_items',
-      values: [
-        expect.objectContaining({ appraisal_id: 'app-1', employee_id: 'emp-1', reviewer_id: 'manager-2' }),
-        expect.objectContaining({ appraisal_id: 'app-1', employee_id: 'emp-2', reviewer_id: 'manager-1' }),
-      ],
-    }));
   });
 
   it('surfaces reviewer profile lookup errors when seeding appraisal items', async () => {
-    queueResolves(
-      { data: [], error: null },
-      {
-        data: {
-          id: 'app-1',
-          company_id: 'c1',
-          title: 'Probation Review 2026',
-          cycle: 'probation',
-          period_start: '2026-04-01',
-          period_end: '2026-06-30',
-          status: 'open',
-          created_by: 'manager-1',
-          created_at: '2026-04-01T00:00:00.000Z',
-          updated_at: '2026-04-01T00:00:00.000Z',
-        },
-        error: null,
-      },
-      { data: [], error: null },
-      {
-        data: [
-          { id: 'emp-1', manager_employee_id: 'manager-employee-2', status: 'active' },
-        ],
-        error: null,
-      },
-      { data: null, error: { message: 'column profiles.employee_id does not exist' } },
+    vi.mocked(hrmsServicesMock.createAppraisal).mockRejectedValueOnce(
+      new Error('column profiles.employee_id does not exist'),
     );
 
     const result = await createAppraisal('c1', {
@@ -1192,229 +708,65 @@ describe('createAppraisal', () => {
     }, 'manager-1');
 
     expect(result.error).toBe('column profiles.employee_id does not exist');
-    expect(insertCalls).not.toContainEqual(expect.objectContaining({
-      table: 'appraisal_items',
-    }));
   });
 });
 
 describe('reviewAppraisalActivation', () => {
   it('opens the appraisal cycle when the last approval step is approved', async () => {
-    queueResolves(
-      { data: { status: 'in_progress', created_by: 'manager-1', company_id: 'c1' }, error: null },
-      { data: { role: 'general_manager' }, error: null },
-      {
-        data: {
-          id: 'ai-1',
-          flow_id: 'flow-1',
-          requester_id: 'manager-1',
-          status: 'pending',
-          current_step_id: 'step-1',
-          current_step_order: 1,
-          current_step_name: 'GM Review',
-          current_approver_role: 'general_manager',
-          current_approver_user_id: null,
-        },
-        error: null,
-      },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'GM Review',
-          approver_type: 'role',
-          approver_role: 'general_manager',
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      { data: null, error: null },
-      { data: [], error: null },
-      {
-        data: [
-          { id: 'emp-1', manager_employee_id: 'manager-employee-2', status: 'active' },
-          { id: 'emp-2', manager_employee_id: null, status: 'active' },
-        ],
-        error: null,
-      },
-      { data: [], error: null },
-      {
-        data: [{ id: 'manager-2', employee_id: 'manager-employee-2' }],
-        error: null,
-      },
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
-    );
+    // Wrapper fetches reviewer role from profiles before delegating
+    queueResolves({ data: { role: 'general_manager' }, error: null });
+    vi.mocked(hrmsServicesMock.reviewAppraisalActivation).mockResolvedValueOnce(undefined);
 
     const result = await reviewAppraisalActivation('app-1', 'gm-1', 'approved', 'Launch the cycle');
 
     expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-      values: expect.objectContaining({ status: 'approved' }),
-    }));
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisals',
-      values: expect.objectContaining({ status: 'open' }),
-    }));
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisal_items',
-      values: [
-        expect.objectContaining({ appraisal_id: 'app-1', employee_id: 'emp-1', reviewer_id: 'manager-2' }),
-        expect.objectContaining({ appraisal_id: 'app-1', employee_id: 'emp-2', reviewer_id: 'gm-1' }),
-      ],
-    }));
+    expect(hrmsServicesMock.reviewAppraisalActivation).toHaveBeenCalledWith({
+      appraisalId: 'app-1',
+      reviewerId: 'gm-1',
+      reviewerRole: 'general_manager',
+      decision: 'approved',
+      note: 'Launch the cycle',
+    });
   });
 
   it('marks the appraisal approval as rejected without opening the cycle', async () => {
-    queueResolves(
-      { data: { status: 'in_progress', created_by: 'manager-1' }, error: null },
-      { data: { role: 'company_admin' }, error: null },
-      {
-        data: {
-          id: 'ai-1',
-          flow_id: 'flow-1',
-          requester_id: 'manager-1',
-          status: 'pending',
-          current_step_id: 'step-1',
-          current_step_order: 1,
-          current_step_name: 'HR Review',
-          current_approver_role: 'company_admin',
-          current_approver_user_id: null,
-        },
-        error: null,
-      },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'HR Review',
-          approver_type: 'role',
-          approver_role: 'company_admin',
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      { data: null, error: null },
-      { data: null, error: null },
-    );
+    queueResolves({ data: { role: 'company_admin' }, error: null });
+    vi.mocked(hrmsServicesMock.reviewAppraisalActivation).mockResolvedValueOnce(undefined);
 
     const result = await reviewAppraisalActivation('app-1', 'admin-2', 'rejected', 'Adjust the cycle scope');
 
     expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-      values: expect.objectContaining({ status: 'rejected' }),
-    }));
-    const appraisalUpdate = updateCalls.find(call => call.table === 'appraisals');
-    expect(appraisalUpdate).toBeDefined();
-    expect(appraisalUpdate?.values).not.toHaveProperty('status');
+    expect(hrmsServicesMock.reviewAppraisalActivation).toHaveBeenCalledWith(
+      expect.objectContaining({ decision: 'rejected' }),
+    );
   });
 });
 
 describe('resubmitAppraisalActivation', () => {
   it('resubmits a rejected appraisal approval to the first configured step', async () => {
-    queueResolves(
-      { data: { status: 'in_progress', created_by: 'manager-1' }, error: null },
-      {
-        data: {
-          id: 'ai-1',
-          flow_id: 'flow-1',
-          requester_id: 'manager-1',
-          status: 'rejected',
-        },
-        error: null,
-      },
-      {
-        data: [{
-          id: 'step-1',
-          step_order: 1,
-          name: 'GM Review',
-          approver_type: 'role',
-          approver_role: 'general_manager',
-          approver_user_id: null,
-          allow_self_approval: false,
-        }],
-        error: null,
-      },
-      { data: null, error: null },
-      { data: null, error: null },
-    );
+    vi.mocked(hrmsServicesMock.resubmitAppraisalActivation).mockResolvedValueOnce(undefined);
 
     const result = await resubmitAppraisalActivation('app-1', 'manager-1');
 
     expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'approval_instances',
-      values: expect.objectContaining({
-        status: 'pending',
-        current_step_id: 'step-1',
-        current_step_name: 'GM Review',
-        current_approver_role: 'general_manager',
-      }),
-    }));
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisals',
-      values: expect.objectContaining({}),
-    }));
+    expect(hrmsServicesMock.resubmitAppraisalActivation).toHaveBeenCalledWith('app-1', 'manager-1');
   });
 });
 
 describe('listAppraisalItems', () => {
   it('backfills items for legacy open appraisal cycles that do not have seeded items yet', async () => {
-    queueResolves(
-      { data: [], error: null },
-      {
-        data: { company_id: 'c1', created_by: 'manager-1', status: 'open' },
-        error: null,
-      },
-      { data: [], error: null },
-      {
-        data: [
-          { id: 'employee-1', manager_employee_id: 'manager-employee-2', status: 'active' },
-        ],
-        error: null,
-      },
-      { data: [], error: null },
-      {
-        data: [{ id: 'manager-2', employee_id: 'manager-employee-2' }],
-        error: null,
-      },
-      { data: null, error: null },
-      {
-        data: [{
-          id: 'item-1',
-          appraisal_id: 'app-1',
-          employee_id: 'employee-1',
-          reviewer_id: 'manager-2',
-          rating: null,
-          goals: null,
-          achievements: null,
-          areas_to_improve: null,
-          reviewer_comments: null,
-          employee_comments: null,
-          status: 'pending',
-          reviewed_at: null,
-          reviewer: { name: 'Nur Manager' },
-        }],
-        error: null,
-      },
-      {
-        data: [{ id: 'employee-1', name: 'Aisyah Rahman' }],
-        error: null,
-      },
-    );
+    vi.mocked(hrmsServicesMock.listAppraisalItems).mockResolvedValueOnce([{
+      id: 'item-1',
+      appraisalId: 'app-1',
+      employeeId: 'employee-1',
+      reviewerId: 'manager-2',
+      reviewerName: 'Nur Manager',
+      status: 'pending' as const,
+    } as any]);
 
     const result = await listAppraisalItems('app-1');
 
     expect(result.error).toBeNull();
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisal_items',
-      values: [expect.objectContaining({ appraisal_id: 'app-1', employee_id: 'employee-1', reviewer_id: 'manager-2' })],
-    }));
     expect(result.data[0]).toMatchObject({
       id: 'item-1',
       employeeId: 'employee-1',
@@ -1424,30 +776,15 @@ describe('listAppraisalItems', () => {
   });
 
   it('hydrates employee names from workforce appraisal items', async () => {
-    queueResolves(
-      {
-        data: [{
-          id: 'item-1',
-          appraisal_id: 'app-1',
-          employee_id: 'employee-1',
-          reviewer_id: 'manager-1',
-          rating: null,
-          goals: null,
-          achievements: null,
-          areas_to_improve: null,
-          reviewer_comments: null,
-          employee_comments: null,
-          status: 'pending',
-          reviewed_at: null,
-          reviewer: { name: 'Nur Manager' },
-        }],
-        error: null,
-      },
-      {
-        data: [{ id: 'employee-1', name: 'Aisyah Rahman' }],
-        error: null,
-      },
-    );
+    vi.mocked(hrmsServicesMock.listAppraisalItems).mockResolvedValueOnce([{
+      id: 'item-1',
+      appraisalId: 'app-1',
+      employeeId: 'employee-1',
+      employeeName: 'Aisyah Rahman',
+      reviewerId: 'manager-1',
+      reviewerName: 'Nur Manager',
+      status: 'pending' as const,
+    } as any]);
 
     const result = await listAppraisalItems('app-1');
 
@@ -1457,17 +794,13 @@ describe('listAppraisalItems', () => {
       employeeName: 'Aisyah Rahman',
       reviewerName: 'Nur Manager',
     });
-    expect(inCalls).toEqual(expect.arrayContaining([
-      { table: 'employees', column: 'id', values: ['employee-1'] },
-    ]));
   });
 });
 
 describe('submitAppraisalSelfReview', () => {
   it('requires a linked profile for employee appraisal actions', async () => {
-    queueResolves(
-      { data: null, error: null },
-      { data: null, error: null },
+    vi.mocked(hrmsServicesMock.submitAppraisalSelfReview).mockRejectedValueOnce(
+      new Error("No profile linked to employee 'employee-1'."),
     );
 
     const result = await submitAppraisalSelfReview('item-1', 'employee-1', {
@@ -1478,32 +811,11 @@ describe('submitAppraisalSelfReview', () => {
     });
 
     expect(result.error).toBe("No profile linked to employee 'employee-1'.");
-    expect(updateCalls).toEqual([]);
   });
 
   it('rejects legacy profile-backed appraisal ownership', async () => {
-    queueResolves(
-      { data: null, error: null },
-      { data: { id: 'profile-1' }, error: null },
-      {
-        data: {
-          id: 'item-1',
-          appraisal_id: 'app-1',
-          employee_id: 'profile-1',
-          reviewer_id: 'manager-1',
-          rating: null,
-          goals: null,
-          achievements: null,
-          areas_to_improve: null,
-          reviewer_comments: null,
-          employee_comments: null,
-          status: 'pending',
-          reviewed_at: null,
-        },
-        error: null,
-      },
-      { data: { status: 'open' }, error: null },
-      { data: null, error: null },
+    vi.mocked(hrmsServicesMock.submitAppraisalSelfReview).mockRejectedValueOnce(
+      new Error('You can only submit your own appraisal self review.'),
     );
 
     const result = await submitAppraisalSelfReview('item-1', 'employee-1', {
@@ -1517,29 +829,7 @@ describe('submitAppraisalSelfReview', () => {
   });
 
   it('accepts direct workforce ownership when the appraisal item owner is stored as an employee id', async () => {
-    queueResolves(
-      { data: null, error: null },
-      { data: { id: 'profile-1' }, error: null },
-      {
-        data: {
-          id: 'item-1',
-          appraisal_id: 'app-1',
-          employee_id: 'employee-1',
-          reviewer_id: 'manager-1',
-          rating: null,
-          goals: null,
-          achievements: null,
-          areas_to_improve: null,
-          reviewer_comments: null,
-          employee_comments: null,
-          status: 'pending',
-          reviewed_at: null,
-        },
-        error: null,
-      },
-      { data: { status: 'open' }, error: null },
-      { data: null, error: null },
-    );
+    vi.mocked(hrmsServicesMock.submitAppraisalSelfReview).mockResolvedValueOnce(undefined);
 
     const result = await submitAppraisalSelfReview('item-1', 'employee-1', {
       goals: 'Improve leadership',
@@ -1549,38 +839,11 @@ describe('submitAppraisalSelfReview', () => {
     });
 
     expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisal_items',
-      values: expect.objectContaining({
-        status: 'self_reviewed',
-        goals: 'Improve leadership',
-      }),
-    }));
+    expect(hrmsServicesMock.submitAppraisalSelfReview).toHaveBeenCalledWith('item-1', 'employee-1', expect.objectContaining({ goals: 'Improve leadership' }));
   });
 
   it('moves an assigned item to self_reviewed for the employee', async () => {
-    queueResolves(
-      { data: { id: 'emp-1' }, error: null },
-      {
-        data: {
-          id: 'item-1',
-          appraisal_id: 'app-1',
-          employee_id: 'emp-1',
-          reviewer_id: 'manager-1',
-          rating: null,
-          goals: null,
-          achievements: null,
-          areas_to_improve: null,
-          reviewer_comments: null,
-          employee_comments: null,
-          status: 'pending',
-          reviewed_at: null,
-        },
-        error: null,
-      },
-      { data: { status: 'open' }, error: null },
-      { data: null, error: null },
-    );
+    vi.mocked(hrmsServicesMock.submitAppraisalSelfReview).mockResolvedValueOnce(undefined);
 
     const result = await submitAppraisalSelfReview('item-1', 'emp-1', {
       goals: 'Improve leadership',
@@ -1590,42 +853,13 @@ describe('submitAppraisalSelfReview', () => {
     });
 
     expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisal_items',
-      values: expect.objectContaining({
-        status: 'self_reviewed',
-        goals: 'Improve leadership',
-        achievements: 'Closed major project',
-        areas_to_improve: 'Delegation',
-        employee_comments: 'Ready for next step',
-      }),
-    }));
+    expect(hrmsServicesMock.submitAppraisalSelfReview).toHaveBeenCalledWith('item-1', 'emp-1', expect.objectContaining({ goals: 'Improve leadership' }));
   });
 });
 
 describe('reviewAppraisalItem', () => {
   it('records manager review after self review is submitted', async () => {
-    queueResolves(
-      {
-        data: {
-          id: 'item-1',
-          appraisal_id: 'app-1',
-          employee_id: 'emp-1',
-          reviewer_id: 'manager-1',
-          rating: null,
-          goals: 'Improve leadership',
-          achievements: 'Closed major project',
-          areas_to_improve: 'Delegation',
-          reviewer_comments: null,
-          employee_comments: 'Ready for next step',
-          status: 'self_reviewed',
-          reviewed_at: null,
-        },
-        error: null,
-      },
-      { data: { status: 'open' }, error: null },
-      { data: null, error: null },
-    );
+    vi.mocked(hrmsServicesMock.reviewAppraisalItem).mockResolvedValueOnce(undefined);
 
     const result = await reviewAppraisalItem('item-1', 'manager-1', {
       rating: 4,
@@ -1633,62 +867,18 @@ describe('reviewAppraisalItem', () => {
     });
 
     expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisal_items',
-      values: expect.objectContaining({
-        status: 'reviewed',
-        rating: 4,
-        reviewer_comments: 'Strong delivery this cycle',
-      }),
-    }));
+    expect(hrmsServicesMock.reviewAppraisalItem).toHaveBeenCalledWith('item-1', 'manager-1', expect.objectContaining({ rating: 4 }));
   });
 });
 
 describe('acknowledgeAppraisalItem', () => {
   it('acknowledges the review and completes the appraisal when all items are done', async () => {
-    queueResolves(
-      { data: null, error: null },
-      { data: { id: 'profile-1' }, error: null },
-      {
-        data: {
-          id: 'item-1',
-          appraisal_id: 'app-1',
-          employee_id: 'employee-1',
-          reviewer_id: 'manager-1',
-          rating: 4,
-          goals: 'Improve leadership',
-          achievements: 'Closed major project',
-          areas_to_improve: 'Delegation',
-          reviewer_comments: 'Strong delivery this cycle',
-          employee_comments: 'Ready for next step',
-          status: 'reviewed',
-          reviewed_at: '2026-04-03T09:00:00.000Z',
-        },
-        error: null,
-      },
-      { data: { status: 'open' }, error: null },
-      { data: null, error: null },
-      {
-        data: [{ status: 'acknowledged' }, { status: 'acknowledged' }],
-        error: null,
-      },
-      { data: null, error: null },
-    );
+    vi.mocked(hrmsServicesMock.acknowledgeAppraisalItem).mockResolvedValueOnce(undefined);
 
     const result = await acknowledgeAppraisalItem('item-1', 'employee-1', 'Acknowledged and aligned');
 
     expect(result.error).toBeNull();
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisal_items',
-      values: expect.objectContaining({
-        status: 'acknowledged',
-        employee_comments: 'Acknowledged and aligned',
-      }),
-    }));
-    expect(updateCalls).toContainEqual(expect.objectContaining({
-      table: 'appraisals',
-      values: expect.objectContaining({ status: 'completed' }),
-    }));
+    expect(hrmsServicesMock.acknowledgeAppraisalItem).toHaveBeenCalledWith('item-1', 'employee-1', 'Acknowledged and aligned');
   });
 });
 

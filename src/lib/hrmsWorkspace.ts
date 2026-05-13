@@ -1,5 +1,29 @@
 const HRMS_BASE_PATH = '/hrms';
 
+/**
+ * Canonical HRMS module paths used by the main app when building deep links
+ * into the dedicated HRMS workspace. Always pass these through
+ * getDedicatedHrmsWorkspacePath() — never use them as raw hrefs.
+ *
+ * Within apps/hrms-web itself, use route-relative paths (e.g. '/leave')
+ * defined in apps/hrms-web/src/layout/navItems.ts.
+ */
+export const HRMS_PATHS = {
+  root: HRMS_BASE_PATH,
+  leave: `${HRMS_BASE_PATH}/leave`,
+  leaveCalendar: `${HRMS_BASE_PATH}/leave/calendar`,
+  attendance: `${HRMS_BASE_PATH}/attendance`,
+  approvals: `${HRMS_BASE_PATH}/approvals`,
+  appraisals: `${HRMS_BASE_PATH}/appraisals`,
+  announcements: `${HRMS_BASE_PATH}/announcements`,
+  employees: `${HRMS_BASE_PATH}/employees`,
+  payroll: `${HRMS_BASE_PATH}/payroll`,
+  settings: `${HRMS_BASE_PATH}/settings`,
+  login: `${HRMS_BASE_PATH}/login`,
+} as const;
+
+export type HrmsPath = (typeof HRMS_PATHS)[keyof typeof HRMS_PATHS];
+
 const HRMS_ROUTE_ALIASES: Record<string, string> = {
   '/admin': '/settings',
   '/leave-calendar': '/leave/calendar',

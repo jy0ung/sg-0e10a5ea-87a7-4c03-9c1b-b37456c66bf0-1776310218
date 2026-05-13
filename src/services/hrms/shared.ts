@@ -10,6 +10,10 @@ export type ApprovalStepRecord = {
   approverType: 'role' | 'specific_user' | 'direct_manager';
   approverRole?: string;
   approverUserId?: string;
+  fallbackApproverUserId?: string;
+  escalationRule?: string;
+  conditionRule?: string;
+  isActive: boolean;
   allowSelfApproval: boolean;
 };
 
@@ -52,6 +56,10 @@ export function rowToApprovalStep(row: Record<string, unknown>): ApprovalStepRec
     approverType: (row.approver_type as ApprovalStepRecord['approverType']) ?? 'role',
     approverRole: row.approver_role ? String(row.approver_role) : undefined,
     approverUserId: row.approver_user_id ? String(row.approver_user_id) : undefined,
+    fallbackApproverUserId: row.fallback_approver_user_id ? String(row.fallback_approver_user_id) : undefined,
+    escalationRule: row.escalation_rule ? String(row.escalation_rule) : undefined,
+    conditionRule: row.condition_rule ? String(row.condition_rule) : undefined,
+    isActive: row.is_active !== undefined ? Boolean(row.is_active) : true,
     allowSelfApproval: Boolean(row.allow_self_approval),
   };
 }
@@ -168,11 +176,26 @@ async function resolveDirectManagerApproverUserId(
 export async function resolveStepRouting(
   step: ApprovalStepRecord,
   requesterId: string,
+  companyId?: string,
 ): Promise<{ approverRole: string | null; approverUserId: string | null; error: string | null }> {
   if (step.approverType === 'role') {
-    return step.approverRole
-      ? { approverRole: step.approverRole, approverUserId: null, error: null }
-      : { approverRole: null, approverUserId: null, error: `Approval step '${step.name}' is missing an approver role.` };
+    if (!step.approverRole) {
+      return { approverRole: null, approverUserId: null, error: `Approval step '${step.name}' is missing an HRMS role.` };
+    }
+    if (companyId) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: assignments, error } = await (supabase as any)
+        .from('employee_hrms_role_assignments')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('hrms_role_id', step.approverRole)
+        .limit(1);
+      if (error) return { approverRole: null, approverUserId: null, error: error.message };
+      if (!assignments?.length && step.fallbackApproverUserId) {
+        return { approverRole: null, approverUserId: step.fallbackApproverUserId, error: null };
+      }
+    }
+    return { approverRole: step.approverRole, approverUserId: null, error: null };
   }
 
   if (step.approverType === 'specific_user') {
@@ -185,6 +208,37 @@ export async function resolveStepRouting(
   return managerApprover.error
     ? { approverRole: null, approverUserId: null, error: managerApprover.error }
     : { approverRole: null, approverUserId: managerApprover.data, error: null };
+}
+
+export async function userHasAssignedHrmsRole(
+  companyId: string,
+  profileId: string,
+  hrmsRoleId: string,
+): Promise<{ data: boolean; error: string | null }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: profile, error: profileError } = await (supabase as any)
+    .from('profiles')
+    .select('employee_id')
+    .eq('id', profileId)
+    .maybeSingle();
+  if (profileError) return { data: false, error: profileError.message };
+
+  const employeeId = profile?.employee_id ? String(profile.employee_id) : null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from('employee_hrms_role_assignments')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('hrms_role_id', hrmsRoleId)
+    .limit(1);
+
+  query = employeeId
+    ? query.or(`profile_id.eq.${profileId},employee_id.eq.${employeeId}`)
+    : query.eq('profile_id', profileId);
+
+  const { data, error } = await query;
+  if (error) return { data: false, error: error.message };
+  return { data: (data ?? []).length > 0, error: null };
 }
 
 export async function bootstrapApprovalInstanceForEntity(
@@ -210,14 +264,15 @@ export async function bootstrapApprovalInstanceForEntity(
   const flowId = String(flows[0].id);
   const { data: steps, error: stepError } = await supabase
     .from('approval_steps')
-    .select('id, step_order, name, approver_type, approver_role, approver_user_id, allow_self_approval')
+    .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
     .eq('flow_id', flowId)
     .order('step_order');
   if (stepError) return { error: stepError.message };
   if (!steps?.length) return { error: `The active ${entityType} approval flow has no steps configured.` };
 
-  const firstStep = rowToApprovalStep(steps[0] as Record<string, unknown>);
-  const routing = await resolveStepRouting(firstStep, requesterId);
+  const firstStep = (steps ?? []).map(row => rowToApprovalStep(row as Record<string, unknown>)).find(step => step.isActive);
+  if (!firstStep) return { error: `The active ${entityType} approval flow has no active steps configured.` };
+  const routing = await resolveStepRouting(firstStep, requesterId, companyId);
   if (routing.error) return { error: routing.error };
 
   const { error: instanceError } = await supabase.from('approval_instances').insert({
@@ -353,4 +408,3 @@ export async function resolveStoredProfileIds(
 
   return { data: profileIds, error: null };
 }
-

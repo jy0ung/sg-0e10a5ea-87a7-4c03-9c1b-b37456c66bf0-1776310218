@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
@@ -29,7 +28,8 @@ import {
   listApprovalFlows, createApprovalFlow, updateApprovalFlow,
   toggleApprovalFlowActive, deleteApprovalFlow, listEmployeesForSelect,
 } from '@/services/approvalFlowService';
-import type { ApprovalFlow, ApprovalStep, CreateApprovalFlowInput, FlowEntityType, AppRole } from '@/types';
+import { listHrmsRoles } from '@/services/hrmsRoleService';
+import type { ApprovalFlow, ApprovalStep, CreateApprovalFlowInput, FlowEntityType } from '@/types';
 import { approvalFlowWithStepsSchema, type ApprovalFlowFormData } from '@/lib/validations';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -56,22 +56,12 @@ const APPROVER_TYPE_LABELS = {
   direct_manager: "Requester's Manager",
 };
 
-const ALL_ROLES: { value: AppRole; label: string }[] = [
-  { value: 'super_admin',     label: 'Super Admin' },
-  { value: 'company_admin',   label: 'Company Admin' },
-  { value: 'director',        label: 'Director' },
-  { value: 'general_manager', label: 'General Manager' },
-  { value: 'manager',         label: 'Manager' },
-  { value: 'sales',           label: 'Sales Advisor' },
-  { value: 'accounts',        label: 'Accounts' },
-  { value: 'analyst',         label: 'Analyst' },
-];
-
-type StepDraft = Omit<ApprovalStep, 'id' | 'flowId' | 'approverUserName'>;
+type StepDraft = Omit<ApprovalStep, 'id' | 'flowId' | 'approverUserName' | 'approverRoleName' | 'fallbackApproverUserName'>;
 
 const EMPTY_STEP: StepDraft = {
   stepOrder: 1, name: '', approverType: 'role',
-  approverRole: '', approverUserId: '', allowSelfApproval: false,
+  approverRole: '', approverUserId: '', fallbackApproverUserId: '',
+  escalationRule: '', conditionRule: '', isActive: true, allowSelfApproval: false,
 };
 
 const EMPTY_FORM: ApprovalFlowFormData = {
@@ -80,7 +70,11 @@ const EMPTY_FORM: ApprovalFlowFormData = {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function ApprovalFlows() {
+interface ApprovalFlowsProps {
+  embedded?: boolean;
+}
+
+export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps = {}) {
   const { user } = useAuth();
   const companyId = useCompanyId();
   const { toast } = useToast();
@@ -102,6 +96,15 @@ export default function ApprovalFlows() {
   const { data: employees = [] } = useQuery({
     queryKey: ['employees-for-select', companyId],
     queryFn: async () => { const { data } = await listEmployeesForSelect(companyId); return data; },
+    enabled: isAuthorized && !!companyId,
+  });
+  const { data: hrmsRoles = [] } = useQuery({
+    queryKey: ['approval-hrms-roles', companyId],
+    queryFn: async () => {
+      const { data, error } = await listHrmsRoles(companyId);
+      if (error) throw new Error(error);
+      return data.filter(role => role.isActive && role.canApproveRequests);
+    },
     enabled: isAuthorized && !!companyId,
   });
 
@@ -144,6 +147,10 @@ export default function ApprovalFlows() {
       approverType:      s.approverType,
       approverRole:      s.approverRole ?? '',
       approverUserId:    s.approverUserId ?? '',
+      fallbackApproverUserId: s.fallbackApproverUserId ?? '',
+      escalationRule:    s.escalationRule ?? '',
+      conditionRule:     s.conditionRule ?? '',
+      isActive:          s.isActive,
       allowSelfApproval: s.allowSelfApproval,
     })));
     setFormErrors({});
@@ -210,6 +217,10 @@ export default function ApprovalFlows() {
         approverType:      s.approverType,
         approverRole:      s.approverRole || undefined,
         approverUserId:    s.approverUserId || undefined,
+        fallbackApproverUserId: s.fallbackApproverUserId || undefined,
+        escalationRule:    s.escalationRule || undefined,
+        conditionRule:     s.conditionRule || undefined,
+        isActive:          s.isActive,
         allowSelfApproval: s.allowSelfApproval,
       })),
     };
@@ -247,15 +258,33 @@ export default function ApprovalFlows() {
 
   return (
     <div className="w-full space-y-4">
-      <PageHeader
-        title="Approval Flows"
-        breadcrumbs={[{ label: 'HRMS' }, { label: 'Approval Flows' }]}
-        actions={
-          <Button size="sm" onClick={openCreate}>
+      {!embedded && (
+        <PageHeader
+          title="Approval Flows"
+          breadcrumbs={[{ label: 'HRMS' }, { label: 'Approval Flows' }]}
+          actions={
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-1" />New Flow
+            </Button>
+          }
+        />
+      )}
+      {embedded && (
+        <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <GitMerge className="h-5 w-5 text-primary" />
+              <h2 className="text-base font-semibold">Approval Flow Designer</h2>
+            </div>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Configure reusable approval sequences for leave, internal requests, payroll, appraisals, and future workflows.
+            </p>
+          </div>
+          <Button size="sm" onClick={openCreate} className="shrink-0">
             <Plus className="h-4 w-4 mr-1" />New Flow
           </Button>
-        }
-      />
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -356,145 +385,207 @@ export default function ApprovalFlows() {
 
       {/* Flow Builder Dialog */}
       <Dialog open={dialogOpen} onOpenChange={v => !v && setDialogOpen(false)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[92vh] max-w-5xl overflow-hidden p-0">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <GitMerge className="h-4 w-4" />
-              {editTarget ? 'Edit Approval Flow' : 'New Approval Flow'}
-            </DialogTitle>
+            <div className="border-b px-6 py-4">
+              <DialogTitle className="flex items-center gap-2">
+                <GitMerge className="h-4 w-4" />
+                {editTarget ? 'Edit Approval Flow' : 'New Approval Flow'}
+              </DialogTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Define the workflow scope, then arrange the approval levels in the order they must be completed.
+              </p>
+            </div>
           </DialogHeader>
 
-          {/* Section 1: Flow details */}
-          <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Name *</Label>
-              <Input className="h-8 text-sm" value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-              {formErrors.name && <p className="text-xs text-destructive">{formErrors.name}</p>}
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Description</Label>
-              <Textarea className="text-sm resize-none" rows={2} value={form.description ?? ''}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Applies To *</Label>
-              <Select value={form.entityType}
-                onValueChange={v => setForm(f => ({ ...f, entityType: v as FlowEntityType }))}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(ENTITY_TYPE_LABELS) as FlowEntityType[]).map(et => (
-                    <SelectItem key={et} value={et}>{ENTITY_TYPE_LABELS[et]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={form.isActive} onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))} />
-              <Label className="text-sm">Active</Label>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Section 2: Steps */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium">Approval Steps</h4>
-              <Button size="sm" variant="outline" onClick={addStep}>
-                <Plus className="h-3.5 w-3.5 mr-1" />Add Step
-              </Button>
-            </div>
-            {formErrors.steps && <p className="text-xs text-destructive">{formErrors.steps}</p>}
-
-            {steps.map((step, idx) => (
-              <div key={idx} className="border border-border rounded-md p-3 space-y-2 bg-secondary/20">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground">Step {idx + 1}</span>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-6 px-1.5" onClick={() => moveStep(idx, -1)} disabled={idx === 0}>
-                      <ChevronUp className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-6 px-1.5" onClick={() => moveStep(idx, 1)} disabled={idx === steps.length - 1}>
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-6 px-1.5 text-destructive hover:text-destructive" onClick={() => removeStep(idx)}>
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Step Name *</Label>
-                  <Input className="h-7 text-sm" value={step.name}
-                    onChange={e => updateStep(idx, { name: e.target.value })} />
-                  {stepErrors[idx]?.name && <p className="text-xs text-destructive">{stepErrors[idx].name}</p>}
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Approver Type</Label>
-                  <Select value={step.approverType}
-                    onValueChange={v => updateStep(idx, { approverType: v as StepDraft['approverType'], approverRole: '', approverUserId: '' })}>
-                    <SelectTrigger className="h-7 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(APPROVER_TYPE_LABELS) as StepDraft['approverType'][]).map(at => (
-                        <SelectItem key={at} value={at}>{APPROVER_TYPE_LABELS[at]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {step.approverType === 'role' && (
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Role *</Label>
-                    <Select value={step.approverRole ?? ''}
-                      onValueChange={v => updateStep(idx, { approverRole: v })}>
-                      <SelectTrigger className="h-7 text-sm"><SelectValue placeholder="Select role" /></SelectTrigger>
-                      <SelectContent>
-                        {ALL_ROLES.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {stepErrors[idx]?.approverRole && <p className="text-xs text-destructive">{stepErrors[idx].approverRole}</p>}
-                  </div>
-                )}
-
-                {step.approverType === 'specific_user' && (
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Employee *</Label>
-                    <Select value={step.approverUserId ?? ''}
-                      onValueChange={v => updateStep(idx, { approverUserId: v })}>
-                      <SelectTrigger className="h-7 text-sm"><SelectValue placeholder="Select employee" /></SelectTrigger>
-                      <SelectContent>
-                        {employees.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {stepErrors[idx]?.approverUserId && <p className="text-xs text-destructive">{stepErrors[idx].approverUserId}</p>}
-                  </div>
-                )}
-
-                {step.approverType === 'direct_manager' && (
-                  <p className="text-xs text-muted-foreground">No extra config needed — the requester's direct manager will be the approver.</p>
-                )}
-
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id={`self-approval-${idx}`}
-                    checked={step.allowSelfApproval}
-                    onCheckedChange={v => updateStep(idx, { allowSelfApproval: !!v })}
-                  />
-                  <Label htmlFor={`self-approval-${idx}`} className="text-xs">Allow self-approval</Label>
-                </div>
+          <div className="grid min-h-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="space-y-4 border-b bg-muted/20 p-6 lg:border-b-0 lg:border-r">
+              <div>
+                <h3 className="text-sm font-semibold">Workflow Details</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Reusable configuration for a request family.</p>
               </div>
-            ))}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Name *</Label>
+                <Input className="h-9 text-sm" value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                {formErrors.name && <p className="text-xs text-destructive">{formErrors.name}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Description</Label>
+                <Textarea className="text-sm resize-none" rows={4} value={form.description ?? ''}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Applies To *</Label>
+                <Select value={form.entityType}
+                  onValueChange={v => setForm(f => ({ ...f, entityType: v as FlowEntityType }))}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(ENTITY_TYPE_LABELS) as FlowEntityType[]).map(et => (
+                      <SelectItem key={et} value={et}>{ENTITY_TYPE_LABELS[et]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+                <div>
+                  <Label className="text-sm">Active workflow</Label>
+                  <p className="text-xs text-muted-foreground">Active flows can receive new requests.</p>
+                </div>
+                <Switch checked={form.isActive} onCheckedChange={v => setForm(f => ({ ...f, isActive: v }))} />
+              </div>
+            </div>
 
-            {steps.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No steps yet. Click "+ Add Step" to begin.
-              </p>
-            )}
+            <div className="min-h-0 overflow-y-auto p-6">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold">Approval Sequence</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Each level shows the approver, rule, required action, and fallback behavior.</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={addStep} className="shrink-0">
+                  <Plus className="h-3.5 w-3.5 mr-1" />Add Step
+                </Button>
+              </div>
+              {formErrors.steps && <p className="mb-3 text-xs text-destructive">{formErrors.steps}</p>}
+
+              <div className="space-y-3">
+                {steps.map((step, idx) => (
+                  <div key={idx} className="rounded-lg border bg-card shadow-sm">
+                    <div className="flex flex-col gap-3 border-b bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{step.name || `Approval Level ${idx + 1}`}</p>
+                          <p className="text-xs text-muted-foreground">Action required: approve or reject request</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => moveStep(idx, -1)} disabled={idx === 0}>
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => moveStep(idx, 1)} disabled={idx === steps.length - 1}>
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => removeStep(idx)}>
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 p-4 md:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Step Name *</Label>
+                        <Input className="h-8 text-sm" value={step.name}
+                          onChange={e => updateStep(idx, { name: e.target.value })} />
+                        {stepErrors[idx]?.name && <p className="text-xs text-destructive">{stepErrors[idx].name}</p>}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Routing Rule</Label>
+                        <Select value={step.approverType}
+                          onValueChange={v => updateStep(idx, { approverType: v as StepDraft['approverType'], approverRole: '', approverUserId: '' })}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {(Object.keys(APPROVER_TYPE_LABELS) as StepDraft['approverType'][]).map(at => (
+                              <SelectItem key={at} value={at}>{APPROVER_TYPE_LABELS[at]}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {step.approverType === 'role' && (
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Responsible HRMS Role *</Label>
+                          <Select value={step.approverRole ?? ''}
+                            onValueChange={v => updateStep(idx, { approverRole: v })}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select HRMS role" /></SelectTrigger>
+                            <SelectContent>
+                              {hrmsRoles.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          {stepErrors[idx]?.approverRole && <p className="text-xs text-destructive">{stepErrors[idx].approverRole}</p>}
+                        </div>
+                      )}
+
+                      {step.approverType === 'specific_user' && (
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Responsible Person *</Label>
+                          <Select value={step.approverUserId ?? ''}
+                            onValueChange={v => updateStep(idx, { approverUserId: v })}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select employee" /></SelectTrigger>
+                            <SelectContent>
+                              {employees.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          {stepErrors[idx]?.approverUserId && <p className="text-xs text-destructive">{stepErrors[idx].approverUserId}</p>}
+                        </div>
+                      )}
+
+                      {step.approverType === 'direct_manager' && (
+                        <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground md:col-span-2">
+                          Responsible person: the requester's direct manager. Fallback: workflow cannot start if no manager is assigned.
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Fallback Approver</Label>
+                        <Select value={step.fallbackApproverUserId ?? ''}
+                          onValueChange={v => updateStep(idx, { fallbackApproverUserId: v === '__none__' ? '' : v })}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Optional fallback person" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">None</SelectItem>
+                            {employees.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2">
+                        <div>
+                          <Label className="text-xs font-medium">Step active</Label>
+                          <p className="text-xs text-muted-foreground">Inactive steps are skipped for new routing.</p>
+                        </div>
+                        <Switch checked={step.isActive} onCheckedChange={v => updateStep(idx, { isActive: v })} />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Condition / Rule</Label>
+                        <Input className="h-8 text-sm" value={step.conditionRule ?? ''}
+                          onChange={e => updateStep(idx, { conditionRule: e.target.value })} placeholder="Example: leave days > 3" />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Escalation Rule</Label>
+                        <Input className="h-8 text-sm" value={step.escalationRule ?? ''}
+                          onChange={e => updateStep(idx, { escalationRule: e.target.value })} placeholder="Example: escalate after 2 business days" />
+                      </div>
+
+                      <div className="flex items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 md:col-span-2">
+                        <Checkbox
+                          id={`self-approval-${idx}`}
+                          checked={step.allowSelfApproval}
+                          onCheckedChange={v => updateStep(idx, { allowSelfApproval: !!v })}
+                        />
+                        <div>
+                          <Label htmlFor={`self-approval-${idx}`} className="text-xs font-medium">Allow self-approval</Label>
+                          <p className="text-xs text-muted-foreground">Keep disabled for separation of duties unless explicitly required.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {steps.length === 0 && (
+                <p className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
+                  No steps yet. Click "Add Step" to begin.
+                </p>
+              )}
+            </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t px-6 py-4">
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save Flow'}</Button>
           </DialogFooter>

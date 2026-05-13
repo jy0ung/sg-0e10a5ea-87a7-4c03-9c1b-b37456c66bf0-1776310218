@@ -24,7 +24,6 @@ describe('HRMS web route metadata', () => {
       'employees',
       'payroll',
       'settings',
-      'approval-flows',
       'unauthorized',
     ]);
   });
@@ -34,7 +33,8 @@ describe('HRMS web route metadata', () => {
     expect(hrmsCompatibilityRedirects).toContainEqual({ path: 'admin', to: '/settings' });
     expect(hrmsCompatibilityRedirects).toContainEqual({ path: 'hrms/leave', to: '/leave' });
     expect(hrmsCompatibilityRedirects).toContainEqual({ path: 'hrms/admin', to: '/settings' });
-    expect(hrmsCompatibilityRedirects).toContainEqual({ path: 'hrms/approval-flows', to: '/approval-flows' });
+    expect(hrmsCompatibilityRedirects).toContainEqual({ path: 'approval-flows', to: '/settings' });
+    expect(hrmsCompatibilityRedirects).toContainEqual({ path: 'hrms/approval-flows', to: '/settings' });
     expect(hrmsCompatibilityRedirects.every((route) => !route.to.startsWith('/hrms'))).toBe(true);
   });
 });

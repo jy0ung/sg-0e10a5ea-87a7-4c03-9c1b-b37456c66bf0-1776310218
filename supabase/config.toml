@@ -30,6 +30,10 @@ email_sent = 30
 enable_signup = true
 enable_confirmations = true
 
+[auth.email.template.invite]
+subject = "You have been invited to FLC BI"
+content_path = "./supabase/templates/invite.html"
+
 [auth.email.template.recovery]
 subject = "Reset your FLC BI password"
 content_path = "./supabase/templates/recovery.html"

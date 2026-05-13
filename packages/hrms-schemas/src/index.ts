@@ -29,9 +29,13 @@ export const createLeaveRequestSchema = z.object({
   leaveTypeId: z.string().min(1, 'Select a leave type'),
   startDate:   z.string().min(1, 'Start date is required'),
   endDate:     z.string().min(1, 'End date is required'),
+  dayPart:     z.enum(['full_day', 'half_day_morning', 'half_day_afternoon']).default('full_day'),
   reason:      z.string().max(500, 'Reason too long').optional(),
 }).refine(d => !d.startDate || !d.endDate || d.endDate >= d.startDate, {
   message: 'End date must be on or after start date',
+  path: ['endDate'],
+}).refine(d => d.dayPart === 'full_day' || !d.startDate || !d.endDate || d.startDate === d.endDate, {
+  message: 'Half-day leave must start and end on the same date',
   path: ['endDate'],
 });
 export type CreateLeaveRequestFormData = z.infer<typeof createLeaveRequestSchema>;

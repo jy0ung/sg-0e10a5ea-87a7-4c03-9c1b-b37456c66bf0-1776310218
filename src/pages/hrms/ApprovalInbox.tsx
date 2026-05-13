@@ -365,7 +365,7 @@ export default function ApprovalInbox() {
                             <span>pending</span>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Waiting for {item.currentApproverRole ? item.currentApproverRole.replace(/_/g, ' ') : 'assigned approver'}
+                            Waiting for {item.currentApproverRole ? 'assigned HRMS role' : 'assigned approver'}
                           </p>
                         </div>
                       )}

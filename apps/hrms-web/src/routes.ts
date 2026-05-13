@@ -1,6 +1,7 @@
 export const hrmsCompatibilityRedirects = [
   { path: 'leave-calendar', to: '/leave/calendar' },
   { path: 'admin', to: '/settings' },
+  { path: 'approval-flows', to: '/settings' },
   { path: 'hrms/leave', to: '/leave' },
   { path: 'hrms/leave-calendar', to: '/leave/calendar' },
   { path: 'hrms/attendance', to: '/attendance' },
@@ -10,7 +11,7 @@ export const hrmsCompatibilityRedirects = [
   { path: 'hrms/employees', to: '/employees' },
   { path: 'hrms/payroll', to: '/payroll' },
   { path: 'hrms/admin', to: '/settings' },
-  { path: 'hrms/approval-flows', to: '/approval-flows' },
+  { path: 'hrms/approval-flows', to: '/settings' },
 ];
 
 export function getHrmsRouterBaseName(baseUrl: string): string {
@@ -28,6 +29,5 @@ export const hrmsProtectedRoutePaths = [
   'employees',
   'payroll',
   'settings',
-  'approval-flows',
   'unauthorized',
 ] as const;

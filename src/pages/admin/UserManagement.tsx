@@ -82,6 +82,7 @@ const ROLES: { value: AppRole; label: string }[] = [
   { value: 'sales', label: 'Sales' },
   { value: 'accounts', label: 'Accounts' },
   { value: 'analyst', label: 'Analyst' },
+  { value: 'creator_updater', label: 'Creator/Updater' },
 ];
 
 const SCOPES: { value: AccessScope; label: string }[] = [

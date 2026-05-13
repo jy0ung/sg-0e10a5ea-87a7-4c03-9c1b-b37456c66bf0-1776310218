@@ -70,7 +70,6 @@ describe('HrmsLayout', () => {
       '/employees',
       '/payroll',
       '/settings',
-      '/approval-flows',
     ]);
   });
 
@@ -92,6 +91,6 @@ describe('HrmsLayout', () => {
     expect(screen.getByRole('link', { name: 'Employees' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Payroll' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Approval Flows' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Approval Flows' })).not.toBeInTheDocument();
   });
 });

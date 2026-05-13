@@ -97,7 +97,10 @@ export default function PayrollSummary() {
   function canReviewRun(run: PayrollRun): boolean {
     if (!isManager || !user || run.status !== 'draft' || run.approvalInstanceStatus !== 'pending') return false;
     if (run.currentApproverUserId) return run.currentApproverUserId === user.id;
-    if (run.currentApproverRole) return run.currentApproverRole === user.role;
+    if (run.currentApproverRole) {
+      const looksLikeHrmsRoleId = /^[0-9a-f-]{24,}$/i.test(run.currentApproverRole);
+      return looksLikeHrmsRoleId ? isManager : run.currentApproverRole === user.role;
+    }
     return false;
   }
 
@@ -369,7 +372,7 @@ export default function PayrollSummary() {
                           <span>pending</span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Waiting for {run.currentApproverRole ? run.currentApproverRole.replace(/_/g, ' ') : 'assigned approver'}
+                          Waiting for {run.currentApproverRole ? 'assigned HRMS role' : 'assigned approver'}
                         </p>
                       </div>
                     )}

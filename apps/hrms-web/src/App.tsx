@@ -50,7 +50,6 @@ const PerformanceAppraisals = lazy(() => import('@/pages/hrms/PerformanceApprais
 const HrmsAnnouncements = lazy(() => import('@/pages/hrms/Announcements'));
 const EmployeeDirectory = lazy(() => import('@/pages/hrms/EmployeeDirectory'));
 const HrmsAdmin = lazy(() => import('@/pages/hrms/HrmsAdmin'));
-const ApprovalFlows = lazy(() => import('@/pages/hrms/ApprovalFlows'));
 
 const queryClient = createAppQueryClient();
 
@@ -112,7 +111,6 @@ const router = createBrowserRouter([
       { path: 'employees', element: <RequireRole roles={MANAGER_AND_UP}><R scope="Employees"><S><EmployeeDirectory /></S></R></RequireRole> },
       { path: 'payroll', element: <RequireRole roles={HRMS_PAYROLL}><R scope="Payroll"><S><PayrollSummary /></S></R></RequireRole> },
       { path: 'settings', element: <RequireRole roles={HRMS_ADMIN}><R scope="Settings"><S><HrmsAdmin /></S></R></RequireRole> },
-      { path: 'approval-flows', element: <RequireRole roles={HRMS_ADMIN}><R scope="Approval Flows"><S><ApprovalFlows /></S></R></RequireRole> },
       { path: 'unauthorized', element: <UnauthorizedAccess /> },
       ...hrmsCompatibilityRedirects.map((route) => ({
         path: route.path,

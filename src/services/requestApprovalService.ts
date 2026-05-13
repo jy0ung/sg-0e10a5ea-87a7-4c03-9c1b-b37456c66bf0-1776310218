@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { ApprovalDecision, ApprovalInstanceStatus } from '@/types';
-import { rowToApprovalDecision, rowToApprovalStep, resolveStepRouting } from './hrms/shared';
+import { rowToApprovalDecision, rowToApprovalStep, resolveStepRouting, userHasAssignedHrmsRole } from './hrms/shared';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
 
@@ -59,11 +59,6 @@ function approvalDecisionsTable(): any {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function profilesTable(): any {
-  return supabase.from('profiles' as never);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ticketsTable(): any {
   return supabase.from('tickets' as never);
 }
@@ -106,15 +101,16 @@ export async function getInternalRequestApprovalPlan(
 
   const flowId = String(flows[0].id);
   const { data: steps, error: stepsError } = await approvalStepsTable()
-    .select('id, step_order, name, approver_type, approver_role, approver_user_id, allow_self_approval')
+    .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
     .eq('flow_id', flowId)
     .order('step_order');
 
   if (stepsError) return { data: null, error: stepsError.message };
   if (!steps?.length) return { data: null, error: 'The active Internal Request approval flow has no steps configured.' };
 
-  const firstStep = rowToApprovalStep(steps[0] as Record<string, unknown>);
-  const routing = await resolveStepRouting(firstStep, requesterId);
+  const firstStep = (steps ?? []).map((row: Record<string, unknown>) => rowToApprovalStep(row)).find(step => step.isActive);
+  if (!firstStep) return { data: null, error: 'The active Internal Request approval flow has no active steps configured.' };
+  const routing = await resolveStepRouting(firstStep, requesterId, companyId);
   if (routing.error) return { data: null, error: routing.error };
 
   return {
@@ -230,21 +226,13 @@ export async function reviewInternalRequestApproval(
   const approval = approvalRow as Record<string, unknown>;
   if (approval.status !== 'pending') return { error: `This request approval is already ${approval.status}.` };
 
-  const { data: reviewer, error: reviewerError } = await profilesTable()
-    .select('role')
-    .eq('id', context.userId)
-    .eq('company_id', context.companyId)
-    .single();
-  if (reviewerError) return { error: reviewerError.message };
-  const reviewerRole = String((reviewer as Record<string, unknown> | null)?.role ?? '');
-
   const { data: stepRows, error: stepsError } = await approvalStepsTable()
-    .select('id, step_order, name, approver_type, approver_role, approver_user_id, allow_self_approval')
+    .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
     .eq('flow_id', String(approval.flow_id))
     .order('step_order');
   if (stepsError) return { error: stepsError.message };
 
-  const steps = (stepRows ?? []).map((row: Record<string, unknown>) => rowToApprovalStep(row));
+  const steps = (stepRows ?? []).map((row: Record<string, unknown>) => rowToApprovalStep(row)).filter(step => step.isActive);
   const currentStep = steps.find((step) => step.id === approval.current_step_id)
     ?? steps.find((step) => step.stepOrder === Number(approval.current_step_order));
   if (!currentStep) return { error: 'The current approval step could not be resolved.' };
@@ -254,16 +242,19 @@ export async function reviewInternalRequestApproval(
     return { error: 'You cannot approve or reject your own request.' };
   }
 
-  const isAssignedApprover = currentStep.approverType === 'role'
-    ? Boolean(approval.current_approver_role) && approval.current_approver_role === reviewerRole
-    : Boolean(approval.current_approver_user_id) && approval.current_approver_user_id === context.userId;
+  let isAssignedApprover = Boolean(approval.current_approver_user_id) && approval.current_approver_user_id === context.userId;
+  if (currentStep.approverType === 'role' && approval.current_approver_role) {
+    const assigned = await userHasAssignedHrmsRole(context.companyId, context.userId, String(approval.current_approver_role));
+    if (assigned.error) return { error: assigned.error };
+    isAssignedApprover = assigned.data;
+  }
   if (!isAssignedApprover) return { error: 'You are not the assigned approver for the current step.' };
 
   const nextStep = decision === 'approved'
     ? steps.find((step) => step.stepOrder > currentStep.stepOrder)
     : undefined;
   const nextRouting = nextStep
-    ? await resolveStepRouting(nextStep, requesterId)
+    ? await resolveStepRouting(nextStep, requesterId, context.companyId)
     : { approverRole: null, approverUserId: null, error: null };
   if (nextRouting.error) return { error: nextRouting.error };
 

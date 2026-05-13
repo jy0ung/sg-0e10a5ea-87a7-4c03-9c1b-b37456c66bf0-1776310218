@@ -204,12 +204,29 @@ export const createLeaveRequestSchema = z.object({
   leaveTypeId: z.string().min(1, 'Select a leave type'),
   startDate:   z.string().min(1, 'Start date is required'),
   endDate:     z.string().min(1, 'End date is required'),
+  dayPart:     z.enum(['full_day', 'half_day_morning', 'half_day_afternoon']).default('full_day'),
   reason:      z.string().max(500, 'Reason too long').optional(),
 }).refine(d => !d.startDate || !d.endDate || d.endDate >= d.startDate, {
   message: 'End date must be on or after start date',
   path: ['endDate'],
+}).refine(d => d.dayPart === 'full_day' || !d.startDate || !d.endDate || d.startDate === d.endDate, {
+  message: 'Half-day leave must start and end on the same date',
+  path: ['endDate'],
 });
 export type CreateLeaveRequestFormData = z.infer<typeof createLeaveRequestSchema>;
+
+export const hrmsRoleSchema = z.object({
+  name: z.string().min(2, 'Role name must be at least 2 characters').max(80, 'Role name is too long'),
+  category: z.enum(['executive', 'hr', 'department', 'line_management', 'employee', 'payroll', 'attendance', 'custom']),
+  scope: z.enum(['company', 'branch', 'department', 'self']),
+  authorityLevel: z.coerce.number().int().min(1, 'Authority level must be at least 1').max(999, 'Authority level cannot exceed 999'),
+  description: z.string().max(500, 'Description is too long').optional(),
+  canApproveRequests: z.boolean(),
+  canManageEmployeeRecords: z.boolean(),
+  canViewHrmsReports: z.boolean(),
+  isActive: z.boolean(),
+});
+export type HrmsRoleFormData = z.infer<typeof hrmsRoleSchema>;
 
 export const upsertAttendanceSchema = z.object({
   employeeId:  z.string().min(1, 'Select an employee'),
@@ -282,6 +299,10 @@ export const approvalStepSchema = z.object({
   approverType:     z.enum(['role','specific_user','direct_manager']),
   approverRole:     z.string().nullable().optional(),
   approverUserId:   z.string().nullable().optional(),
+  fallbackApproverUserId: z.string().nullable().optional(),
+  escalationRule:   z.string().max(240, 'Escalation rule is too long').optional(),
+  conditionRule:    z.string().max(240, 'Condition rule is too long').optional(),
+  isActive:         z.boolean().default(true),
   allowSelfApproval: z.boolean().default(false),
 }).refine(d => d.approverType !== 'role' || !!d.approverRole, {
   message: 'Select a role for this step',

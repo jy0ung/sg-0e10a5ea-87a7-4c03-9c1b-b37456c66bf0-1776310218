@@ -143,7 +143,10 @@ export default function PerformanceAppraisals() {
   function canReviewAppraisal(appraisal: Appraisal): boolean {
     if (!isManager || !user || appraisal.status !== 'in_progress' || appraisal.approvalInstanceStatus !== 'pending') return false;
     if (appraisal.currentApproverUserId) return appraisal.currentApproverUserId === user.id;
-    if (appraisal.currentApproverRole) return appraisal.currentApproverRole === user.role;
+    if (appraisal.currentApproverRole) {
+      const looksLikeHrmsRoleId = /^[0-9a-f-]{24,}$/i.test(appraisal.currentApproverRole);
+      return looksLikeHrmsRoleId ? isManager : appraisal.currentApproverRole === user.role;
+    }
     return false;
   }
 
@@ -490,7 +493,7 @@ export default function PerformanceAppraisals() {
                           <span>pending</span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Waiting for {a.currentApproverRole ? a.currentApproverRole.replace(/_/g, ' ') : 'assigned approver'}
+                          Waiting for {a.currentApproverRole ? 'assigned HRMS role' : 'assigned approver'}
                         </p>
                       </div>
                     )}

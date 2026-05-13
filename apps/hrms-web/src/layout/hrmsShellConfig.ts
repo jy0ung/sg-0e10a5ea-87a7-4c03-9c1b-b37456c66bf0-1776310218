@@ -15,8 +15,7 @@ const HRMS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/announcements/, title: 'Announcements', kicker: 'Company communications' },
   { pattern: /^\/employees/, title: 'Employee Directory', kicker: 'Workforce records' },
   { pattern: /^\/payroll/, title: 'Payroll Workspace', kicker: 'Runs, approvals, and payout status' },
-  { pattern: /^\/settings/, title: 'HRMS Settings', kicker: 'Departments, roles, leave, and holidays' },
-  { pattern: /^\/approval-flows/, title: 'Approval Flows', kicker: 'Workflow governance' },
+  { pattern: /^\/settings/, title: 'HRMS Settings', kicker: 'Admin console and workflow governance' },
   { pattern: /^\/profile/, title: 'Profile', kicker: 'HRMS identity and access' },
 ];
 

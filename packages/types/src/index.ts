@@ -40,6 +40,64 @@ export interface Branch {
 }
 
 // ===== HRMS =====
+export type HrmsRoleScope = 'company' | 'branch' | 'department' | 'self';
+export type HrmsRoleCategory =
+  | 'executive'
+  | 'hr'
+  | 'department'
+  | 'line_management'
+  | 'employee'
+  | 'payroll'
+  | 'attendance'
+  | 'custom';
+
+export interface HrmsRole {
+  id: string;
+  companyId: string;
+  code: string;
+  name: string;
+  category: HrmsRoleCategory;
+  scope: HrmsRoleScope;
+  authorityLevel: number;
+  description?: string;
+  canApproveRequests: boolean;
+  canManageEmployeeRecords: boolean;
+  canViewHrmsReports: boolean;
+  isActive: boolean;
+  isSystemDefault: boolean;
+  assignedUserCount: number;
+  lastUpdatedByName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateHrmsRoleInput {
+  name: string;
+  category: HrmsRoleCategory;
+  scope: HrmsRoleScope;
+  authorityLevel: number;
+  description?: string;
+  canApproveRequests: boolean;
+  canManageEmployeeRecords: boolean;
+  canViewHrmsReports: boolean;
+  isActive: boolean;
+}
+
+export type UpdateHrmsRoleInput = CreateHrmsRoleInput;
+
+export interface HrmsRoleAssignment {
+  id: string;
+  companyId: string;
+  hrmsRoleId: string;
+  employeeId?: string;
+  profileId?: string;
+  employeeName?: string;
+  profileName?: string;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type EmployeeStatus = 'active' | 'inactive' | 'resigned';
 
 export interface Employee {
@@ -90,6 +148,7 @@ export interface LeaveBalance {
 }
 
 export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type LeaveDayPart = 'full_day' | 'half_day_morning' | 'half_day_afternoon';
 
 export interface LeaveRequest {
   id: string;
@@ -101,7 +160,12 @@ export interface LeaveRequest {
   startDate: string;
   endDate: string;
   days: number;
+  dayPart?: LeaveDayPart;
   reason?: string;
+  attachmentFileName?: string;
+  attachmentFilePath?: string;
+  attachmentFileSize?: number;
+  attachmentMimeType?: string;
   status: LeaveStatus;
   reviewedBy?: string;
   reviewedAt?: string;
@@ -122,7 +186,13 @@ export interface CreateLeaveRequestInput {
   startDate: string;
   endDate: string;
   days: number;
+  dayPart?: LeaveDayPart;
   reason?: string;
+  attachmentFile?: File;
+  attachmentFileName?: string;
+  attachmentFilePath?: string;
+  attachmentFileSize?: number;
+  attachmentMimeType?: string;
 }
 
 // ===== HRMS — Attendance =====
@@ -397,9 +467,15 @@ export interface ApprovalStep {
   stepOrder: number;
   name: string;
   approverType: ApproverType;
+  approverRoleName?: string;
   approverRole?: string;
   approverUserId?: string;
   approverUserName?: string;
+  fallbackApproverUserId?: string;
+  fallbackApproverUserName?: string;
+  escalationRule?: string;
+  conditionRule?: string;
+  isActive: boolean;
   allowSelfApproval: boolean;
 }
 

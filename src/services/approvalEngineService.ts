@@ -17,6 +17,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
 import type { ApprovalFlow, PendingApproval, FlowEntityType } from '@/types';
+import { userHasAssignedHrmsRole } from '@/services/hrms/shared';
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ async function getActiveFlow(
     description: flow.description ? String(flow.description) : undefined,
     entityType:  flow.entity_type as FlowEntityType,
     isActive:    Boolean(flow.is_active),
-    steps: (steps ?? []).map(s => ({
+    steps: (steps ?? []).filter(s => s.is_active !== false).map(s => ({
       id:               String(s.id),
       flowId:           String(s.flow_id),
       stepOrder:        Number(s.step_order),
@@ -60,6 +61,10 @@ async function getActiveFlow(
       approverUserName: s.approver_user
         ? String((s.approver_user as Record<string, unknown>)?.name ?? '')
         : undefined,
+      fallbackApproverUserId: s.fallback_approver_user_id ? String(s.fallback_approver_user_id) : undefined,
+      escalationRule: s.escalation_rule ? String(s.escalation_rule) : undefined,
+      conditionRule: s.condition_rule ? String(s.condition_rule) : undefined,
+      isActive: s.is_active !== undefined ? Boolean(s.is_active) : true,
       allowSelfApproval: Boolean(s.allow_self_approval),
     })),
     createdAt: String(flow.created_at),
@@ -90,12 +95,8 @@ async function isEligibleApprover(
   }
 
   if (step.approver_type === 'role') {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, company_id')
-      .eq('id', userId)
-      .single();
-    return !!profile && profile.company_id === companyId && profile.role === step.approver_role;
+    const assigned = await userHasAssignedHrmsRole(companyId, userId, String(step.approver_role ?? ''));
+    return !assigned.error && assigned.data;
   }
 
   if (step.approver_type === 'direct_manager') {
@@ -276,15 +277,7 @@ export async function getPendingApprovalsForUser(
   companyId: string,
   approverId: string,
 ): Promise<{ data: PendingApproval[]; error: string | null }> {
-  // 1. Fetch approver's role (one query)
-  const { data: approverProfile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', approverId)
-    .single();
-  const approverRole = approverProfile?.role ?? null;
-
-  // 2. Fetch all pending approval_requests for the company with requester data (one query)
+  // 1. Fetch all pending approval_requests for the company with requester data (one query)
   const { data: requests, error } = await supabase
     .from('approval_requests')
     .select('*, requester:profiles!approval_requests_requester_id_fkey(name, manager_id)')
@@ -297,7 +290,7 @@ export async function getPendingApprovalsForUser(
   const allRequests = requests as Array<Record<string, unknown>>;
   const uniqueFlowIds = [...new Set(allRequests.map(r => String(r.flow_id)))];
 
-  // 3. Batch-fetch all steps for all relevant flows (one query)
+  // 2. Batch-fetch all steps for all relevant flows (one query)
   const { data: allSteps } = await supabase
     .from('approval_steps')
     .select('id, flow_id, step_order, name, approver_type, approver_role, approver_user_id, allow_self_approval')
@@ -310,7 +303,7 @@ export async function getPendingApprovalsForUser(
     stepsByKey.set(stepKey(s.flow_id, s.step_order), s as Record<string, unknown>);
   }
 
-  // 4. Batch-fetch flow names (one query)
+  // 3. Batch-fetch flow names (one query)
   const { data: allFlows } = await supabase
     .from('approval_flows')
     .select('id, name')
@@ -329,8 +322,9 @@ export async function getPendingApprovalsForUser(
     let isEligible = false;
     if (step.approver_type === 'specific_user' && step.approver_user_id === approverId) {
       isEligible = true;
-    } else if (step.approver_type === 'role' && approverRole === step.approver_role) {
-      isEligible = true;
+    } else if (step.approver_type === 'role' && step.approver_role) {
+      const assigned = await userHasAssignedHrmsRole(companyId, approverId, String(step.approver_role));
+      isEligible = !assigned.error && assigned.data;
     } else if (step.approver_type === 'direct_manager') {
       const requesterRow = req.requester as Record<string, unknown> | null;
       if (requesterRow?.manager_id === approverId) isEligible = true;

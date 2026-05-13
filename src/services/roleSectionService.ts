@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { loggingService } from './loggingService';
-import type { SectionName } from '@/config/rolePermissions';
+import { ALL_SECTIONS, type SectionName } from '@/config/rolePermissions';
 import type { AppRole } from '@/types';
 
 /**
@@ -74,8 +74,8 @@ export async function fetchRoleSections(
 
 /**
  * Write-through update for a single role's allowed sections. Called by the
- * admin role matrix editor. The caller must have `super_admin`, `company_admin`,
- * `director`, or `general_manager` — enforced by RLS.
+ * admin role matrix editor. UI callers restrict this to `super_admin` and
+ * `company_admin`; RLS remains the final authority.
  */
 export async function saveRoleSections(
   companyId: string,
@@ -83,11 +83,12 @@ export async function saveRoleSections(
   sections: SectionName[],
 ): Promise<{ error: Error | null }> {
   try {
-    const rows: Omit<RoleSectionRow, 'id'>[] = sections.map((section) => ({
+    const allowedSections = new Set(sections);
+    const rows: Omit<RoleSectionRow, 'id'>[] = ALL_SECTIONS.map((section) => ({
       company_id: companyId,
       role,
       section,
-      allowed: true,
+      allowed: allowedSections.has(section),
     }));
     const { error } = await client.from('role_sections').upsert(rows, {
       onConflict: 'company_id,role,section',

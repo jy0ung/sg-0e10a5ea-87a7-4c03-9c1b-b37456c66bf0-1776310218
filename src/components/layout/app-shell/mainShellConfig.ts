@@ -40,7 +40,7 @@ import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { brandAssets } from '@/config/brand';
 import { useFocusedMode } from '@/hooks/useFocusedMode';
 import { useRoleSectionMatrix } from '@/hooks/usePermissions';
-import { getDedicatedHrmsWorkspacePath, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
+import { getDedicatedHrmsWorkspacePath, HRMS_PATHS, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
 import type { AppRole } from '@/types';
 import type { AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from './types';
@@ -64,7 +64,7 @@ const sectionDefs: MainSectionDef[] = [
   { name: 'Inventory', icon: Package, path: '/inventory/stock' },
   { name: 'Purchasing', icon: Truck, path: '/purchasing/invoices' },
   { name: 'Reports', icon: BarChart3, path: '/reports' },
-  { name: 'HRMS', icon: Briefcase, path: '/hrms/', external: true },
+  { name: 'HRMS', icon: Briefcase, path: `${HRMS_PATHS.root}/`, external: true },
   { name: 'Admin', icon: Shield, path: '/admin/settings' },
 ];
 
@@ -104,7 +104,7 @@ const navItems: MainNavItem[] = [
 
   { label: 'Purchase Invoices', path: '/purchasing/invoices', icon: Truck, section: 'Purchasing', group: 'Operations' },
   { label: 'Business Reports', path: '/reports', icon: BarChart3, section: 'Reports', group: 'Workspace', end: true },
-  { label: 'Open HRMS Workspace', path: '/hrms/', href: getDedicatedHrmsWorkspacePath('/hrms/'), icon: Briefcase, section: 'HRMS', group: 'Workspace', external: true },
+  { label: 'Open HRMS Workspace', path: `${HRMS_PATHS.root}/`, href: getDedicatedHrmsWorkspacePath(HRMS_PATHS.root), icon: Briefcase, section: 'HRMS', group: 'Workspace', external: true },
 
   { label: 'Activity Overview', path: '/admin/activity', icon: BarChart3, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin'] },
   { label: 'Audit Log', path: '/admin/audit', icon: FileText, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },

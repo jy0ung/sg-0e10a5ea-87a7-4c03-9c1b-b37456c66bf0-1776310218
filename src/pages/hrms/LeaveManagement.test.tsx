@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { LeaveRequest } from '@/types';
-import { filterLeaveRequestsForView, isRequestAssignedToApprover } from './LeaveManagement';
+import { calculateLeaveDays, filterLeaveRequestsForView, isRequestAssignedToApprover } from './LeaveManagement';
 
 function makeRequest(overrides: Partial<LeaveRequest> = {}): LeaveRequest {
   return {
@@ -50,5 +50,18 @@ describe('LeaveManagement queue helpers', () => {
     );
 
     expect(filtered.map(request => request.id)).toEqual(['req-1']);
+  });
+});
+
+describe('calculateLeaveDays', () => {
+  it('excludes weekends and configured holidays for full-day ranges', () => {
+    expect(calculateLeaveDays('2026-05-15', '2026-05-19', 'full_day', [
+      { date: '2026-05-18', isRecurring: false },
+    ])).toBe(2);
+  });
+
+  it('counts half-day leave as 0.5 only on working days', () => {
+    expect(calculateLeaveDays('2026-05-15', '2026-05-15', 'half_day_morning')).toBe(0.5);
+    expect(calculateLeaveDays('2026-05-16', '2026-05-16', 'half_day_afternoon')).toBe(0);
   });
 });

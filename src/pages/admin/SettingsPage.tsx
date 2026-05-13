@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useBlocker } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { changePassword, updateProfile } from '@/services/profileService';
@@ -15,6 +16,17 @@ import { profileUpdateSchema, type ProfileUpdateFormData, changePasswordSchema, 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
+import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 function formatRole(role?: string) {
   return role ? role.replace(/_/g, ' ') : 'Unassigned';
@@ -45,8 +57,11 @@ export default function SettingsPage() {
     mode: 'onChange',
   });
 
+  // Sync form with server profile data, but NEVER when the user is actively
+  // editing (isDirty). This prevents auth token refreshes or background
+  // profile updates from destroying unsaved form edits.
   useEffect(() => {
-    if (user) {
+    if (user && !form.formState.isDirty) {
       form.reset({
         name: user.name || '',
         role: user.role || 'analyst',
@@ -55,6 +70,15 @@ export default function SettingsPage() {
       setBranchId(user.branch_id || 'none');
     }
   }, [user, form]);
+
+  // Warn on browser tab close / hard navigation when form is dirty.
+  useBeforeUnloadWarning(form.formState.isDirty);
+
+  // Block in-app React Router navigation when the profile form has unsaved changes.
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      form.formState.isDirty && currentLocation.pathname !== nextLocation.pathname,
+  );
 
   useEffect(() => {
     getBranches(user?.company_id || '').then(res => setBranches(res.data));
@@ -102,6 +126,9 @@ export default function SettingsPage() {
       toast.error('Failed to update profile: ' + error);
     } else {
       toast.success('Profile updated successfully');
+      // Reset to submitted values BEFORE refreshProfile() so the isDirty guard
+      // in the useEffect below does not block the subsequent server-data sync.
+      form.reset(data);
       await refreshProfile();
     }
     setSaving(false);
@@ -125,6 +152,26 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Unsaved-changes navigation guard */}
+      <AlertDialog open={blocker.state === 'blocked'}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to your profile. If you leave now, your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>Stay and save</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => blocker.proceed?.()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Leave without saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <PageHeader title="Settings" description="Manage your profile and preferences" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Settings' }]} />
 
       <div className="grid md:grid-cols-2 gap-6">

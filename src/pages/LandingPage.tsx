@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TicketCheck, ClipboardList, ArrowRight } from 'lucide-react';
 import { brandAssets, brandName } from '@/config/brand';
-import { getDedicatedHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
+import { getDedicatedHrmsWorkspacePath, HRMS_PATHS } from '@/lib/hrmsWorkspace';
 
 export default function LandingPage() {
-  const hrmsLoginUrl = getDedicatedHrmsWorkspacePath('/hrms/login');
+  const hrmsLoginUrl = getDedicatedHrmsWorkspacePath(HRMS_PATHS.login);
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">

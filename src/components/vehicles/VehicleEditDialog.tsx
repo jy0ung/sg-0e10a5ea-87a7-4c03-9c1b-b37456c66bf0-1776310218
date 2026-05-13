@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,6 +63,48 @@ export function VehicleEditDialog({ vehicle, open, onOpenChange, onSaved }: Vehi
     },
     mode: 'onChange',
   });
+
+  // Reset the form with the latest vehicle data each time the dialog transitions
+  // from closed → open.  This ensures a freshly opened dialog never shows stale
+  // data from a previous edit session or a background data refresh.
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpenRef.current && vehicle) {
+      form.reset({
+        chassis_no: vehicle.chassis_no || '',
+        branch_code: vehicle.branch_code || '',
+        model: vehicle.model || '',
+        variant: vehicle.variant || null,
+        color: vehicle.color || null,
+        customer_name: vehicle.customer_name || '',
+        salesman_name: vehicle.salesman_name || '',
+        payment_method: vehicle.payment_method || '',
+        bg_date: vehicle.bg_date || null,
+        shipment_etd_pkg: vehicle.shipment_etd_pkg || null,
+        shipment_eta_kk_twu_sdk: vehicle.shipment_eta_kk_twu_sdk || null,
+        date_received_by_outlet: vehicle.date_received_by_outlet || null,
+        reg_date: vehicle.reg_date || null,
+        delivery_date: vehicle.delivery_date || null,
+        disb_date: vehicle.disb_date || null,
+        vaa_date: vehicle.vaa_date || null,
+        full_payment_date: vehicle.full_payment_date || null,
+        reg_no: vehicle.reg_no || null,
+        invoice_no: vehicle.invoice_no || null,
+        lou: vehicle.lou || null,
+        contra_sola: vehicle.contra_sola || null,
+        obr: vehicle.obr || null,
+        dealer_transfer_price: vehicle.dealer_transfer_price || null,
+        full_payment_type: vehicle.full_payment_type || null,
+        shipment_name: vehicle.shipment_name || null,
+        remark: vehicle.remark || null,
+        is_d2d: vehicle.is_d2d,
+        commission_paid: vehicle.commission_paid ?? null,
+        commission_remark: vehicle.commission_remark || null,
+        stage_override: vehicle.stage_override ?? null,
+      });
+    }
+    wasOpenRef.current = open;
+  }, [open, vehicle, form]);
 
   const handleSubmit = (_data: VehicleFormData) => {
     onSaved();

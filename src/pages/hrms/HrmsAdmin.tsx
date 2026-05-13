@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -24,7 +25,8 @@ import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { HRMS_ADMIN_ROLES } from '@/config/hrmsConfig';
 import {
   Building2, Briefcase, Calendar, CalendarDays, RefreshCw,
-  Plus, Pencil, Trash2,
+  Plus, Pencil, Trash2, Shield, GitMerge, Users, Settings2,
+  Boxes, Clock, Mail, DollarSign, UserCog,
 } from 'lucide-react';
 import {
   listDepartments, createDepartment, updateDepartment, deleteDepartment,
@@ -38,14 +40,40 @@ import type {
   JobTitle, CreateJobTitleInput, JobTitleLevel,
   LeaveType, CreateLeaveTypeInput,
   PublicHoliday, CreateHolidayInput, HolidayType,
+  HrmsRole, CreateHrmsRoleInput, HrmsRoleCategory, HrmsRoleScope,
+  AppRole,
 } from '@/types';
+
 import {
-  departmentSchema, jobTitleSchema, leaveTypeAdminSchema, holidaySchema,
+  departmentSchema, jobTitleSchema, leaveTypeAdminSchema, holidaySchema, hrmsRoleSchema,
 } from '@/lib/validations';
+import {
+  createHrmsRole,
+  listHrmsRoleAssignments,
+  listHrmsRoles,
+  replaceHrmsRoleEmployeeAssignments,
+  updateHrmsRole,
+} from '@/services/hrmsRoleService';
+
+const ApprovalFlowsWorkspace = lazy(() => import('./ApprovalFlows'));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Category = 'departments' | 'job-titles' | 'leave-types' | 'holidays' | 'rollover';
+type Category =
+  | 'roles'
+  | 'approval-flows'
+  | 'departments'
+  | 'job-titles'
+  | 'leave-types'
+  | 'holidays'
+  | 'rollover'
+  | 'attendance-policies'
+  | 'employee-categories'
+  | 'payroll-defaults'
+  | 'notification-templates'
+  | 'system';
+
+type ConfigGroup = 'General' | 'HRMS Roles' | 'Approval Flows' | 'Departments' | 'Leave' | 'Attendance' | 'Employees' | 'Payroll' | 'Notifications' | 'System';
 
 interface CategoryDef {
   id: Category;
@@ -53,15 +81,29 @@ interface CategoryDef {
   icon: React.ElementType;
   description: string;
   summary: string;
+  group: ConfigGroup;
+  adminOnly?: boolean;
+  status?: string;
 }
 
 const CATEGORIES: CategoryDef[] = [
-  { id: 'departments',  label: 'Departments',     icon: Building2,    description: 'Organise employees into departments and assign department heads.', summary: 'Teams and cost centres' },
-  { id: 'job-titles',   label: 'Job Titles',       icon: Briefcase,    description: 'Define job titles and optionally link them to departments.', summary: 'Roles and seniority' },
-  { id: 'leave-types',  label: 'Leave Types',      icon: Calendar,     description: 'Configure leave types, entitlements, carry-forward rules, and paid/unpaid status.', summary: 'Entitlements and rules' },
-  { id: 'holidays',     label: 'Holiday Calendar', icon: CalendarDays, description: 'Manage public and company holidays.', summary: 'Company calendar' },
-  { id: 'rollover',     label: 'Leave Rollover',   icon: RefreshCw,    description: 'Roll over employee leave balances from one year to the next.', summary: 'Year-end rollover' },
+  { id: 'roles',          label: 'HRMS Roles',       icon: Shield,      description: 'Define HRMS organisational roles used by workflows, approval routing, HR visibility, and operational rules.', summary: 'Organisational roles', group: 'HRMS Roles', adminOnly: true },
+  { id: 'approval-flows', label: 'Approval Flows',   icon: GitMerge,    description: 'Build reusable HRMS approval sequences using HRMS roles, direct managers, fallback approvers, and workflow rules.', summary: 'Workflow designer', group: 'Approval Flows', adminOnly: true },
+  { id: 'departments',    label: 'Departments',      icon: Building2,   description: 'Organise employees into departments and assign department heads.', summary: 'Teams and cost centres', group: 'Departments' },
+  { id: 'job-titles',     label: 'Job Titles',       icon: Briefcase,   description: 'Define job titles and optionally link them to departments.', summary: 'Positions and seniority', group: 'Departments' },
+  { id: 'leave-types',    label: 'Leave Types',      icon: Calendar,    description: 'Configure leave types, entitlements, carry-forward rules, and paid/unpaid status.', summary: 'Entitlements and rules', group: 'Leave' },
+  { id: 'holidays',       label: 'Holiday Calendar', icon: CalendarDays, description: 'Manage public and company holidays used by leave calculations.', summary: 'Company calendar', group: 'Leave' },
+  { id: 'rollover',       label: 'Leave Rollover',   icon: RefreshCw,   description: 'Roll over employee leave balances from one year to the next.', summary: 'Year-end operation', group: 'Leave' },
+  { id: 'attendance-policies', label: 'Attendance Policies', icon: Clock, description: 'Review attendance operational rules, correction workflows, and officer responsibilities.', summary: 'Attendance rules', group: 'Attendance', status: 'Planning' },
+  { id: 'employee-categories', label: 'Employee Categories', icon: Users, description: 'Prepare HRMS categories for employee grouping, visibility rules, and workforce reporting.', summary: 'Workforce grouping', group: 'Employees', status: 'Planning' },
+  { id: 'payroll-defaults', label: 'Payroll Defaults', icon: DollarSign, description: 'Review payroll role ownership and default approval governance for payroll operations.', summary: 'Payroll controls', group: 'Payroll', status: 'Planning' },
+  { id: 'notification-templates', label: 'HRMS Email Templates', icon: Mail, description: 'Prepare HRMS-specific notification and email template configuration.', summary: 'HR notifications', group: 'Notifications', status: 'Planning' },
+  { id: 'system',         label: 'System Controls',  icon: Boxes,       description: 'Review HRMS configuration standards, access guardrails, and operational readiness notes.', summary: 'Readiness checklist', group: 'System' },
 ];
+
+const CONFIG_GROUPS: ConfigGroup[] = ['General', 'HRMS Roles', 'Approval Flows', 'Departments', 'Leave', 'Attendance', 'Employees', 'Payroll', 'Notifications', 'System'];
+
+const SECURITY_ADMIN_ROLES: AppRole[] = ['super_admin', 'company_admin'];
 
 const JOB_LEVELS: { value: JobTitleLevel; label: string }[] = [
   { value: 'junior',    label: 'Junior' },
@@ -81,6 +123,30 @@ function cn(...classes: (string | undefined | false)[]) {
 
 function getCategoryDef(category: Category) {
   return CATEGORIES.find(c => c.id === category)!;
+}
+
+function getGroupModuleCount(group: ConfigGroup, modules: CategoryDef[]) {
+  if (group === 'General') return modules.length;
+  return modules.filter(module => module.group === group).length;
+}
+
+function getModulePattern(module: Category) {
+  if (module === 'approval-flows') return 'Full workspace';
+  if (['departments', 'job-titles', 'leave-types', 'holidays'].includes(module)) return 'Data drawer';
+  if (module === 'roles') return 'Role editor';
+  return 'Compact dialog';
+}
+
+function getWorkspaceDialogClass(module: Category | null) {
+  if (!module) return 'flex max-h-[86vh] max-w-3xl flex-col overflow-hidden p-0';
+  if (module === 'approval-flows') {
+    return 'flex h-[92vh] max-w-[1200px] flex-col overflow-hidden p-0';
+  }
+  if (['departments', 'job-titles', 'leave-types', 'holidays'].includes(module)) {
+    return 'flex max-h-[88vh] max-w-5xl flex-col overflow-hidden p-0';
+  }
+  if (module === 'roles') return 'flex max-h-[88vh] max-w-4xl flex-col overflow-hidden p-0';
+  return 'flex max-h-[82vh] max-w-3xl flex-col overflow-hidden p-0';
 }
 
 interface SettingsSectionHeaderProps {
@@ -1043,82 +1109,675 @@ function RolloverPanel({ companyId, canWrite }: RolloverPanelProps) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SECURITY / WORKSPACE PANELS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface SecurityPanelProps {
+  companyId: string;
+  actorId: string;
+  canWrite: boolean;
+}
+
+const HRMS_ROLE_CATEGORIES: { value: HrmsRoleCategory; label: string }[] = [
+  { value: 'executive', label: 'Executive' },
+  { value: 'hr', label: 'HR' },
+  { value: 'department', label: 'Department' },
+  { value: 'line_management', label: 'Line Management' },
+  { value: 'employee', label: 'Employee' },
+  { value: 'payroll', label: 'Payroll' },
+  { value: 'attendance', label: 'Attendance' },
+  { value: 'custom', label: 'Custom' },
+];
+
+const HRMS_ROLE_SCOPES: { value: HrmsRoleScope; label: string }[] = [
+  { value: 'company', label: 'Company' },
+  { value: 'branch', label: 'Branch' },
+  { value: 'department', label: 'Department' },
+  { value: 'self', label: 'Self' },
+];
+
+const EMPTY_HRMS_ROLE_FORM: CreateHrmsRoleInput = {
+  name: '',
+  category: 'custom',
+  scope: 'company',
+  authorityLevel: 50,
+  description: '',
+  canApproveRequests: false,
+  canManageEmployeeRecords: false,
+  canViewHrmsReports: false,
+  isActive: true,
+};
+
+function RoleManagementPanel({ companyId, actorId, canWrite }: SecurityPanelProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: roles = [], isPending } = useQuery({
+    queryKey: ['hrms-roles', companyId],
+    queryFn: async () => {
+      const { data, error } = await listHrmsRoles(companyId);
+      if (error) throw new Error(error);
+      return data;
+    },
+    enabled: !!companyId,
+  });
+  const { data: employees = [] } = useQuery({
+    queryKey: ['hrms-role-employees', companyId],
+    queryFn: async () => {
+      const { data, error } = await listEmployeeDirectory(companyId);
+      if (error) throw new Error(error);
+      return data.filter(employee => employee.status === 'active');
+    },
+    enabled: !!companyId,
+  });
+
+  const [editingRole, setEditingRole] = useState<HrmsRole | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [form, setForm] = useState<CreateHrmsRoleInput>(EMPTY_HRMS_ROLE_FORM);
+  const [assignedEmployeeIds, setAssignedEmployeeIds] = useState<string[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<HrmsRole | null>(null);
+
+  function openCreate() {
+    setEditingRole(null);
+    setForm(EMPTY_HRMS_ROLE_FORM);
+    setAssignedEmployeeIds([]);
+    setErrors({});
+    setDialogOpen(true);
+  }
+
+  async function openEdit(role: HrmsRole) {
+    setEditingRole(role);
+    setForm({
+      name: role.name,
+      category: role.category,
+      scope: role.scope,
+      authorityLevel: role.authorityLevel,
+      description: role.description ?? '',
+      canApproveRequests: role.canApproveRequests,
+      canManageEmployeeRecords: role.canManageEmployeeRecords,
+      canViewHrmsReports: role.canViewHrmsReports,
+      isActive: role.isActive,
+    });
+    setErrors({});
+    const { data, error } = await listHrmsRoleAssignments(companyId, role.id);
+    if (error) toast({ title: 'Failed to load assignments', description: error, variant: 'destructive' });
+    setAssignedEmployeeIds(data.map(assignment => assignment.employeeId).filter((id): id is string => !!id));
+    setDialogOpen(true);
+  }
+
+  async function saveRole() {
+    if (!canWrite) return;
+    const parsed = hrmsRoleSchema.safeParse(form);
+    if (!parsed.success) {
+      const nextErrors: Record<string, string> = {};
+      for (const error of parsed.error.errors) nextErrors[String(error.path[0])] = error.message;
+      setErrors(nextErrors);
+      return;
+    }
+
+    setSaving(true);
+    const result = editingRole
+      ? await updateHrmsRole(companyId, editingRole.id, actorId, parsed.data)
+      : await createHrmsRole(companyId, actorId, parsed.data);
+    const roleId = editingRole?.id ?? result.data?.id;
+    const assignmentResult = roleId
+      ? await replaceHrmsRoleEmployeeAssignments(companyId, roleId, actorId, assignedEmployeeIds)
+      : { error: result.error };
+    setSaving(false);
+    if (result.error || assignmentResult.error) {
+      toast({ title: 'Failed to save HRMS role', description: result.error ?? assignmentResult.error ?? undefined, variant: 'destructive' });
+      return;
+    }
+    toast({ title: editingRole ? 'HRMS role updated' : 'HRMS role created' });
+    setDialogOpen(false);
+    void queryClient.invalidateQueries({ queryKey: ['hrms-roles', companyId] });
+  }
+
+  function toggleEmployee(employeeId: string) {
+    setAssignedEmployeeIds(prev => prev.includes(employeeId)
+      ? prev.filter(id => id !== employeeId)
+      : [...prev, employeeId]);
+  }
+
+  async function deactivateRole() {
+    if (!deactivateTarget || !canWrite) return;
+    const { error } = await updateHrmsRole(companyId, deactivateTarget.id, actorId, {
+      name: deactivateTarget.name,
+      category: deactivateTarget.category,
+      scope: deactivateTarget.scope,
+      authorityLevel: deactivateTarget.authorityLevel,
+      description: deactivateTarget.description ?? '',
+      canApproveRequests: deactivateTarget.canApproveRequests,
+      canManageEmployeeRecords: deactivateTarget.canManageEmployeeRecords,
+      canViewHrmsReports: deactivateTarget.canViewHrmsReports,
+      isActive: false,
+    });
+    if (error) toast({ title: 'Failed to deactivate role', description: error, variant: 'destructive' });
+    else toast({ title: 'HRMS role deactivated' });
+    setDeactivateTarget(null);
+    void queryClient.invalidateQueries({ queryKey: ['hrms-roles', companyId] });
+  }
+
+  return (
+    <>
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              <h2 className="text-base font-semibold">HRMS Organisational Roles</h2>
+            </div>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Manage HRMS roles used by approval flows, visibility rules, reporting, and operational workflows. Global app permission access stays in the main app Users & Permissions area.
+            </p>
+          </div>
+          {canWrite && (
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="mr-1 h-4 w-4" />New HRMS Role
+            </Button>
+          )}
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {roles.map(role => (
+            <div key={role.id} className="rounded-lg border bg-card p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{role.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground capitalize">{role.category.replace(/_/g, ' ')} · {role.scope}</p>
+                </div>
+                <Badge className={role.isActive ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-secondary text-secondary-foreground'}>
+                  {role.isActive ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+              <p className="mt-3 line-clamp-2 min-h-[40px] text-sm text-muted-foreground">{role.description ?? 'No description provided.'}</p>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="rounded-md border bg-muted/20 px-2 py-1.5"><span className="block font-semibold">{role.authorityLevel}</span><span className="text-muted-foreground">Level</span></div>
+                <div className="rounded-md border bg-muted/20 px-2 py-1.5"><span className="block font-semibold">{role.assignedUserCount}</span><span className="text-muted-foreground">Users</span></div>
+                <div className="rounded-md border bg-muted/20 px-2 py-1.5"><span className="block font-semibold">{role.canApproveRequests ? 'Yes' : 'No'}</span><span className="text-muted-foreground">Approves</span></div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1">
+                {role.canManageEmployeeRecords && <Badge variant="outline" className="text-[10px]">Employee records</Badge>}
+                {role.canViewHrmsReports && <Badge variant="outline" className="text-[10px]">Reports</Badge>}
+                {role.isSystemDefault && <Badge variant="secondary" className="text-[10px]">Default</Badge>}
+              </div>
+              <div className="mt-4 flex justify-between gap-2">
+                <p className="text-[11px] text-muted-foreground">Updated {role.updatedAt ? new Date(role.updatedAt).toLocaleDateString() : '—'}</p>
+                {canWrite && (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => void openEdit(role)}><Pencil className="h-3.5 w-3.5" /></Button>
+                    {role.isActive && <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeactivateTarget(role)}><Trash2 className="h-3.5 w-3.5" /></Button>}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {isPending && <p className="text-sm text-muted-foreground">Loading HRMS roles...</p>}
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={open => !open && setDialogOpen(false)}>
+        <DialogContent className="max-h-[88vh] max-w-3xl overflow-hidden p-0">
+          <DialogHeader className="border-b px-6 py-4">
+            <DialogTitle>{editingRole ? `Edit ${editingRole.name}` : 'New HRMS Role'}</DialogTitle>
+            <DialogDescription>
+              Configure the HRMS role definition and assign active employees. This does not grant global app module access.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[66vh] space-y-5 overflow-y-auto p-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Role name *</Label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Authority level *</Label>
+                <Input type="number" min={1} max={999} value={form.authorityLevel} onChange={e => setForm(f => ({ ...f, authorityLevel: Number(e.target.value) }))} />
+                {errors.authorityLevel && <p className="text-xs text-destructive">{errors.authorityLevel}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Category</Label>
+                <Select value={form.category} onValueChange={value => setForm(f => ({ ...f, category: value as HrmsRoleCategory }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{HRMS_ROLE_CATEGORIES.map(category => <SelectItem key={category.value} value={category.value}>{category.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Scope</Label>
+                <Select value={form.scope} onValueChange={value => setForm(f => ({ ...f, scope: value as HrmsRoleScope }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{HRMS_ROLE_SCOPES.map(scope => <SelectItem key={scope.value} value={scope.value}>{scope.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs text-muted-foreground">Description</Label>
+                <Textarea rows={3} value={form.description ?? ''} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+                {errors.description && <p className="text-xs text-destructive">{errors.description}</p>}
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ['canApproveRequests', 'Can approve HRMS requests'],
+                ['canManageEmployeeRecords', 'Can manage employee records'],
+                ['canViewHrmsReports', 'Can view HRMS reports'],
+                ['isActive', 'Role is active'],
+              ].map(([key, label]) => (
+                <label key={key} className="flex items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2">
+                  <span className="text-sm font-medium">{label}</span>
+                  <Switch checked={Boolean(form[key as keyof CreateHrmsRoleInput])} onCheckedChange={value => setForm(f => ({ ...f, [key]: value }))} />
+                </label>
+              ))}
+            </div>
+            <div className="rounded-lg border bg-card">
+              <div className="border-b px-4 py-3">
+                <h3 className="text-sm font-semibold">Assigned Employees</h3>
+                <p className="text-xs text-muted-foreground">Assignments are used by HRMS approval flows and workflow visibility rules.</p>
+              </div>
+              <div className="grid max-h-56 gap-2 overflow-y-auto p-4 sm:grid-cols-2">
+                {employees.map(employee => (
+                  // eslint-disable-next-line jsx-a11y/label-has-associated-control
+                  <label key={employee.id} className="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2">
+                    <Checkbox checked={assignedEmployeeIds.includes(employee.id)} onCheckedChange={() => toggleEmployee(employee.id)} />
+                    <span>
+                      <span className="block text-sm font-medium">{employee.name}</span>
+                      <span className="block text-xs text-muted-foreground">{employee.departmentName ?? 'No department'} · {employee.jobTitleName ?? 'No position'}</span>
+                    </span>
+                  </label>
+                ))}
+                {employees.length === 0 && <p className="text-sm text-muted-foreground">No active employees available.</p>}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="border-t px-6 py-4">
+            <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button onClick={saveRole} disabled={saving || !canWrite}>{saving ? 'Saving...' : 'Save Role'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deactivateTarget} onOpenChange={open => !open && setDeactivateTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate HRMS Role</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deactivate <strong>{deactivateTarget?.name}</strong>? Existing assignments are retained, but inactive roles should not be used for new workflow routing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deactivateRole} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Deactivate</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function SystemReadinessPanel() {
+  const checks = [
+    'HRMS Settings manages HRMS-specific roles, policies, workflows, and operational defaults only.',
+    'Global application module permissions stay in the main app Users & Permissions area.',
+    'Approval flows use HRMS organisational roles instead of global app navigation roles.',
+    'Destructive HRMS configuration changes require confirmation dialogs.',
+    'Large HRMS workspaces use scrollable dialogs to avoid page overflow.',
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-card p-5 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Boxes className="h-5 w-5 text-primary" />
+          <h2 className="text-base font-semibold">System Controls</h2>
+        </div>
+        <div className="mt-4 grid gap-2">
+          {checks.map(check => (
+            <div key={check} className="rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+              {check}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface AdminConsoleOverviewProps {
+  modules: CategoryDef[];
+  canManageSecurity: boolean;
+  onOpenModule: (module: Category) => void;
+  onOpenGroup: (group: ConfigGroup) => void;
+}
+
+function AdminConsoleOverview({
+  modules,
+  canManageSecurity,
+  onOpenModule,
+  onOpenGroup,
+}: AdminConsoleOverviewProps) {
+  const recommendedIds: Category[] = ['roles', 'approval-flows', 'departments', 'leave-types', 'attendance-policies'];
+  const recommended = recommendedIds
+    .map(id => modules.find(module => module.id === id))
+    .filter((module): module is CategoryDef => !!module);
+  const groupedAreas = [
+    {
+      title: 'HRMS Roles',
+      description: 'Organisational roles for approvals, visibility, reporting, and HR operations.',
+      group: 'HRMS Roles' as ConfigGroup,
+      ids: ['roles'] as Category[],
+      icon: Shield,
+    },
+    {
+      title: 'Workflow Governance',
+      description: 'Reusable approval routes with levels, conditions, and fallback handling.',
+      group: 'Approval Flows' as ConfigGroup,
+      ids: ['approval-flows'] as Category[],
+      icon: GitMerge,
+    },
+    {
+      title: 'Workforce Foundation',
+      description: 'Department structure, position catalogues, and reporting ownership.',
+      group: 'Departments' as ConfigGroup,
+      ids: ['departments', 'job-titles'] as Category[],
+      icon: Building2,
+    },
+    {
+      title: 'Leave Operations',
+      description: 'Entitlements, public holidays, rollover operations, and readiness controls.',
+      group: 'Leave' as ConfigGroup,
+      ids: ['leave-types', 'holidays', 'rollover'] as Category[],
+      icon: Settings2,
+    },
+    {
+      title: 'Operational Defaults',
+      description: 'Attendance, payroll, employee categories, notifications, and system readiness.',
+      group: 'System' as ConfigGroup,
+      ids: ['attendance-policies', 'employee-categories', 'payroll-defaults', 'notification-templates', 'system'] as Category[],
+      icon: UserCog,
+    },
+  ];
+  const statCards = [
+    { label: 'Configuration Modules', value: modules.length, detail: 'available workspaces' },
+    { label: 'Admin-Gated Modules', value: modules.filter(module => module.adminOnly).length, detail: canManageSecurity ? 'editable by you' : 'hidden for your role' },
+    { label: 'Workflow Modules', value: modules.filter(module => module.group === 'Approval Flows').length, detail: 'HRMS role routing' },
+    { label: 'Operational Modules', value: modules.filter(module => !module.adminOnly).length, detail: 'HRMS controls' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {statCards.map(card => (
+          <div key={card.label} className="rounded-lg border bg-background/80 p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{card.label}</p>
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <span className="text-2xl font-semibold tracking-tight">{card.value}</span>
+              <span className="text-xs text-muted-foreground">{card.detail}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.35fr)]">
+        <div className="rounded-lg border bg-background/80 p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold">Recommended Setup Path</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Open the core configuration workspaces in the usual implementation order.</p>
+            </div>
+            <Badge variant="outline">Guided</Badge>
+          </div>
+          <div className="mt-4 divide-y rounded-md border">
+            {recommended.map((module, index) => {
+              const Icon = module.icon;
+              return (
+                <div key={module.id} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-muted-foreground" />
+                        <p className="truncate text-sm font-medium">{module.label}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{module.summary}</p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="outline" className="shrink-0" onClick={() => onOpenModule(module.id)}>
+                    Open
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {groupedAreas.map(area => {
+            const Icon = area.icon;
+            const areaModules = area.ids
+              .map(id => modules.find(module => module.id === id))
+              .filter((module): module is CategoryDef => !!module);
+            if (areaModules.length === 0) return null;
+            return (
+              <div key={area.title} className="rounded-lg border bg-background/80 p-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold">{area.title}</h3>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{area.description}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {areaModules.map(module => (
+                    <Button
+                      key={module.id}
+                      size="sm"
+                      variant="secondary"
+                      className="h-8"
+                      onClick={() => onOpenModule(module.id)}
+                    >
+                      {module.label}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-3 h-8 px-2 text-xs"
+                  onClick={() => onOpenGroup(area.group)}
+                >
+                  View {area.group}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HrmsSettingsPlaceholderPanel({ category }: { category: Category }) {
+  const def = getCategoryDef(category);
+  const Icon = def.icon;
+  return (
+    <div className="rounded-lg border bg-card p-5 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold">{def.label}</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{def.description}</p>
+          <div className="mt-4 rounded-md border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+            This HRMS-specific workspace is reserved for operational configuration. It intentionally does not expose global app/module permissions.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function HrmsAdmin() {
   const { user } = useAuth();
   const companyId = useCompanyId();
-  const [activeCategory, setActiveCategory] = useState<Category>('departments');
+  const [activeGroup, setActiveGroup] = useState<ConfigGroup>('General');
+  const [activeModule, setActiveModule] = useState<Category | null>(null);
 
   const canWrite = !!user && (HRMS_ADMIN_ROLES as string[]).includes(user.role);
+  const canManageSecurity = !!user && SECURITY_ADMIN_ROLES.includes(user.role);
 
   if (!user || !(HRMS_ADMIN_ROLES as string[]).includes(user.role)) {
     return <UnauthorizedAccess />;
+  }
+
+  const visibleModules = CATEGORIES.filter(module => !module.adminOnly || canManageSecurity);
+  const modulesForActiveGroup = activeGroup === 'General'
+    ? []
+    : visibleModules.filter(module => module.group === activeGroup);
+  const activeModuleDef = activeModule ? getCategoryDef(activeModule) : null;
+
+  function renderModuleContent(module: Category) {
+    if (module === 'roles') return <RoleManagementPanel companyId={companyId} actorId={user.id} canWrite={canManageSecurity} />;
+    if (module === 'approval-flows') {
+      return (
+        <Suspense fallback={<div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">Loading approval flow designer...</div>}>
+          <ApprovalFlowsWorkspace embedded />
+        </Suspense>
+      );
+    }
+    if (module === 'departments') return <DepartmentsPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
+    if (module === 'job-titles') return <JobTitlesPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
+    if (module === 'leave-types') return <LeaveTypesPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
+    if (module === 'holidays') return <HolidaysPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
+    if (module === 'rollover') return <RolloverPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
+    if (module === 'system') return <SystemReadinessPanel />;
+    return <HrmsSettingsPlaceholderPanel category={module} />;
   }
 
   return (
     <div className="w-full space-y-4">
       <PageHeader
         title="HRMS Settings"
-        description="Configure workforce structure, leave rules, holidays, and rollover operations."
+        description="Enterprise configuration workspace for HRMS structure, access, approvals, and operational controls."
         breadcrumbs={[{ label: 'HRMS' }, { label: 'HRMS Settings' }]}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <nav className="rounded-lg border bg-card p-2 shadow-sm lg:sticky lg:top-6 lg:self-start">
-          <div className="px-2 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Configuration
-          </div>
-          {CATEGORIES.map(cat => {
-            const Icon = cat.icon;
-            const active = cat.id === activeCategory;
+      <div className="rounded-lg border bg-card p-2 shadow-sm">
+        <nav className="flex gap-1 overflow-x-auto pb-1" aria-label="Settings categories">
+          {CONFIG_GROUPS.map(group => {
+            const count = getGroupModuleCount(group, visibleModules);
+            const active = group === activeGroup;
+            if (count === 0) return null;
             return (
               <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
+                key={group}
+                type="button"
+                onClick={() => setActiveGroup(group)}
                 className={cn(
-                  'group w-full rounded-md border border-transparent px-3 py-2.5 text-left transition-colors',
+                  'shrink-0 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   active
-                    ? 'border-border bg-muted text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
               >
-                <span className="flex items-start gap-3">
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium leading-5">{cat.label}</span>
-                    <span className={cn(
-                      'block truncate text-xs leading-4',
-                      active ? 'text-muted-foreground' : 'text-muted-foreground',
-                    )}>
-                      {cat.summary}
-                    </span>
-                  </span>
-                </span>
+                {group}
               </button>
             );
           })}
         </nav>
-
-        <div className="min-w-0 space-y-4">
-          {activeCategory === 'departments' && (
-            <DepartmentsPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />
-          )}
-          {activeCategory === 'job-titles' && (
-            <JobTitlesPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />
-          )}
-          {activeCategory === 'leave-types' && (
-            <LeaveTypesPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />
-          )}
-          {activeCategory === 'holidays' && (
-            <HolidaysPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />
-          )}
-          {activeCategory === 'rollover' && (
-            <RolloverPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />
-          )}
-        </div>
       </div>
+
+      <section className="rounded-xl border bg-card/80 p-4 shadow-sm sm:p-5">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">
+              {activeGroup === 'General' ? 'Settings Command Center' : `${activeGroup} Configuration`}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {activeGroup === 'General'
+                ? 'Review the configuration landscape and jump into the right workspace.'
+                : 'Select a module to open its configuration workspace.'}
+            </p>
+          </div>
+          <Badge variant="outline" className="w-fit">
+            {getGroupModuleCount(activeGroup, visibleModules)} modules
+          </Badge>
+        </div>
+
+        {activeGroup === 'General' ? (
+          <AdminConsoleOverview
+            modules={visibleModules}
+            canManageSecurity={canManageSecurity}
+            onOpenModule={setActiveModule}
+            onOpenGroup={setActiveGroup}
+          />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {modulesForActiveGroup.map(module => {
+              const Icon = module.icon;
+              return (
+                <button
+                  key={module.id}
+                  type="button"
+                  onClick={() => setActiveModule(module.id)}
+                  className="group flex min-h-[142px] flex-col rounded-lg border bg-background/80 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {module.adminOnly && <Badge variant="outline" className="text-[10px]">Admin</Badge>}
+                      <Badge variant="secondary" className="text-[10px]">{getModulePattern(module.id)}</Badge>
+                      {module.status && <Badge variant="secondary" className="text-[10px]">{module.status}</Badge>}
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <h3 className="text-sm font-semibold text-foreground">{module.label}</h3>
+                    <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">{module.description}</p>
+                  </div>
+                  <span className="mt-auto pt-4 text-xs font-medium text-primary">Open {getModulePattern(module.id).toLowerCase()}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <Dialog open={!!activeModule} onOpenChange={open => !open && setActiveModule(null)}>
+        <DialogContent className={getWorkspaceDialogClass(activeModule)}>
+          {activeModuleDef && (
+            <DialogHeader className="border-b px-6 py-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  {React.createElement(activeModuleDef.icon, { className: 'h-5 w-5' })}
+                </div>
+                <div>
+                  <DialogTitle>{activeModuleDef.label}</DialogTitle>
+                  <DialogDescription>{activeModuleDef.description}</DialogDescription>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Badge variant="secondary">{getModulePattern(activeModuleDef.id)}</Badge>
+                    {activeModuleDef.adminOnly && <Badge variant="outline">Admin only</Badge>}
+                  </div>
+                </div>
+              </div>
+            </DialogHeader>
+          )}
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+            {activeModule && renderModuleContent(activeModule)}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

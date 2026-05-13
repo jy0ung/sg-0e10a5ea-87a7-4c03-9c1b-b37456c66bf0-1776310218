@@ -24,6 +24,7 @@ import { errorTrackingService } from "@/services/errorTrackingService";
 import { env } from "@/config/env";
 import { createAppQueryClient } from "@/lib/queryClient";
 import { isPortalOnlyUser, resolveAuthenticatedHomePath } from '@/lib/portalAccess';
+import { HRMS_PATHS } from '@/lib/hrmsWorkspace';
 import { onCLS, onINP, onLCP } from 'web-vitals';
 import {
   ADMIN_ONLY,
@@ -216,8 +217,8 @@ const router = createBrowserRouter([
       { path: "reports", element: withModuleAccess('reports', <R scope="Reports"><S><ReportsCenter /></S></R>) },
       { path: "inventory/chassis-filter", element: withModuleAccess('inventory', <R scope="Chassis Filter"><S><ChassisFilter /></S></R>) },
       { path: "hrms", element: withModuleAccess('hrms', <R scope="HRMS Workspace"><S><HrmsWorkspaceRedirect /></S></R>) },
-      { path: "hrms/admin", element: <LocationPreservingNavigate to="/hrms/settings" /> },
-      { path: "hrms/leave-calendar", element: <LocationPreservingNavigate to="/hrms/leave/calendar" /> },
+      { path: "hrms/admin", element: <LocationPreservingNavigate to={HRMS_PATHS.settings} /> },
+      { path: "hrms/leave-calendar", element: <LocationPreservingNavigate to={HRMS_PATHS.leaveCalendar} /> },
       { path: "hrms/*", element: withModuleAccess('hrms', <R scope="HRMS Workspace"><S><HrmsWorkspaceRedirect /></S></R>) },
     ],
   },

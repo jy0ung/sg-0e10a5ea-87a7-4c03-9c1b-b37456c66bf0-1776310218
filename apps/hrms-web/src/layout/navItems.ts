@@ -2,7 +2,6 @@ import {
   Calendar,
   Clock,
   CreditCard,
-  GitMerge,
   Megaphone,
   Settings2,
   Star,
@@ -40,5 +39,4 @@ export const hrmsNavItems: HrmsNavItem[] = [
   { label: 'Employees', path: '/employees', icon: Users, group: 'Workforce', roles: MANAGER_AND_UP },
   { label: 'Payroll', path: '/payroll', icon: CreditCard, group: 'Administration', roles: HRMS_PAYROLL },
   { label: 'Settings', path: '/settings', icon: Settings2, group: 'Administration', roles: HRMS_ADMIN },
-  { label: 'Approval Flows', path: '/approval-flows', icon: GitMerge, group: 'Administration', roles: HRMS_ADMIN },
 ];

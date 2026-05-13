@@ -165,9 +165,18 @@ export default function RequestQueue() {
           .filter((profile) => profile.status === 'active' && requestOwnerRoles.has(profile.role))
           .sort((left, right) => left.name.localeCompare(right.name)),
       );
-      setNoteDrafts(
-        Object.fromEntries(nextTickets.map((ticket) => [ticket.id, ticket.resolution_note ?? ''])),
-      );
+      setNoteDrafts((prev) => {
+        // Preserve any note the user has already started typing for a ticket on
+        // the current page.  Only initialize from server data when there is no
+        // existing entry in state (i.e. a ticket newly arriving in the view).
+        const next: Record<string, string> = {};
+        for (const ticket of nextTickets) {
+          next[ticket.id] = prev[ticket.id] !== undefined
+            ? prev[ticket.id]
+            : (ticket.resolution_note ?? '');
+        }
+        return next;
+      });
       setCommentDrafts(
         Object.fromEntries(nextTickets.map((ticket) => [ticket.id, ''])),
       );
