@@ -17,6 +17,7 @@ export * from './employee/employeeService';
 export * from './leave/leaveService';
 export * from './payroll/payrollService';
 export * from './appraisal/appraisalService';
+export * from './settings/settingsService';
 
 // Backward-compat alias used by apps/hrms-mobile
 export { listLeaveTypes as getLeaveTypes } from './leave/leaveService';
