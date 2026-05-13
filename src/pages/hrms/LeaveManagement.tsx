@@ -355,7 +355,7 @@ export default function LeaveManagement() {
       return;
     }
     const { error } = await createLeaveRequest(selfServiceEmployeeId, user.companyId, {
-      ...result.data,
+      ...(result.data as CreateLeaveRequestInput),
       days: calculatedDays,
       attachmentFile: attachmentFile ?? undefined,
     });

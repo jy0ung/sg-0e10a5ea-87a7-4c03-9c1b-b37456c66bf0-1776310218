@@ -149,7 +149,7 @@ export default function SalesOrders() {
     setCreating(true);
     const { error } = await unlinkExistingVehicle(companyId, order.id, user?.id);
     setCreating(false);
-    if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     await reloadSales();
     setUnlinkTarget(null);
     toast({ title: 'Vehicle unlinked', description: order.chassisNo ? `Chassis: ${order.chassisNo}` : undefined });

@@ -89,19 +89,16 @@ export async function createSalesOrder(companyId: string, fields: SalesOrderEdit
       company_id: companyId,
       order_no: fields.orderNo,
       customer_id: fields.customerId,
-      customer_name: fields.customerName,
       branch_code: fields.branchCode,
-      salesman_id: fields.salesmanId,
       salesman_name: fields.salesmanName,
       model: fields.model,
       variant: fields.variant,
-      colour: fields.colour,
+      color: fields.colour,
       booking_date: fields.bookingDate,
-      delivery_date: fields.deliveryDate,
+      expected_delivery_date: fields.deliveryDate,
       booking_amount: fields.bookingAmount,
-      total_price: fields.totalPrice,
-      status: fields.status,
-      deal_stage_id: fields.dealStageId,
+      selling_price: fields.totalPrice,
+      stage_id: fields.dealStageId,
       chassis_no: fields.chassisNo,
       vehicle_id: fields.vehicleId,
       notes: fields.notes,
@@ -125,19 +122,17 @@ export async function updateSalesOrder(companyId: string, id: string, fields: Pa
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (fields.orderNo !== undefined) updates.order_no = fields.orderNo;
   if (fields.customerId !== undefined) updates.customer_id = fields.customerId;
-  if (fields.customerName !== undefined) updates.customer_name = fields.customerName;
+  if (fields.customerName !== undefined) updates.salesman_name = fields.salesmanName;
   if (fields.branchCode !== undefined) updates.branch_code = fields.branchCode;
-  if (fields.salesmanId !== undefined) updates.salesman_id = fields.salesmanId;
   if (fields.salesmanName !== undefined) updates.salesman_name = fields.salesmanName;
   if (fields.model !== undefined) updates.model = fields.model;
   if (fields.variant !== undefined) updates.variant = fields.variant;
-  if (fields.colour !== undefined) updates.colour = fields.colour;
+  if (fields.colour !== undefined) updates.color = fields.colour;
   if (fields.bookingDate !== undefined) updates.booking_date = fields.bookingDate;
-  if (fields.deliveryDate !== undefined) updates.delivery_date = fields.deliveryDate;
+  if (fields.deliveryDate !== undefined) updates.expected_delivery_date = fields.deliveryDate;
   if (fields.bookingAmount !== undefined) updates.booking_amount = fields.bookingAmount;
-  if (fields.totalPrice !== undefined) updates.total_price = fields.totalPrice;
-  if (fields.status !== undefined) updates.status = fields.status;
-  if (fields.dealStageId !== undefined) updates.deal_stage_id = fields.dealStageId;
+  if (fields.totalPrice !== undefined) updates.selling_price = fields.totalPrice;
+  if (fields.dealStageId !== undefined) updates.stage_id = fields.dealStageId;
   if (fields.chassisNo !== undefined) updates.chassis_no = fields.chassisNo;
   if (fields.vehicleId !== undefined) updates.vehicle_id = fields.vehicleId;
   if (fields.notes !== undefined) updates.notes = fields.notes;
@@ -165,7 +160,7 @@ export async function moveSalesOrderStage(companyId: string, id: string, dealSta
   if (!companyId) return { error: missingCompanyError() };
   const { error } = await supabase
     .from('sales_orders')
-    .update({ deal_stage_id: dealStageId, updated_at: new Date().toISOString() })
+    .update({ stage_id: dealStageId, updated_at: new Date().toISOString() })
     .eq('company_id', companyId)
     .eq('id', id);
   if (error) return { error: new Error(error.message) };

@@ -74,7 +74,7 @@ export async function computeSalesmanActuals(companyId: string, year: number, mo
 
   if (ordersResult.error) return { data: [], error: new Error(ordersResult.error.message) };
 
-  const orders = (ordersResult.data ?? []) as Record<string, unknown>[];
+  const orders = (ordersResult.data ?? []) as unknown as Record<string, unknown>[];
 
   // Group by salesman_name (DB salesman_targets has no salesman_id column)
   const map = new Map<string, { name: string; branch: string; totalUnits: number; totalRevenue: number; deliveredUnits: number; prices: number[] }>();

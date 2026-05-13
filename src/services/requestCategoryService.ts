@@ -122,7 +122,7 @@ async function fetchRequestCategories(companyId: string, includeInactive = false
     }
 
     const legacyResult = await legacyQuery;
-    data = legacyResult.data;
+    data = legacyResult.data as typeof data;
     error = legacyResult.error;
   }
   if (error) return { data: [] as RequestCategoryRecord[], error: error.message };

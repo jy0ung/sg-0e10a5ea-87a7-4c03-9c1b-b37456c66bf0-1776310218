@@ -56,7 +56,7 @@ describe('DataContext', () => {
     vi.clearAllMocks();
     // Restore default chainable mock after clearAllMocks
     vi.mocked(supabase.from).mockImplementation(() => createDefaultBuilder());
-    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: null });
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: null } as never);
   });
 
   describe('DataProvider', () => {

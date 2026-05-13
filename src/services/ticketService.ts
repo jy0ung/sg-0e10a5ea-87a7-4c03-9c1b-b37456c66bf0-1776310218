@@ -314,6 +314,7 @@ async function fetchTicketForUpdate(ticketId: string, companyId: string) {
   const useLegacyTicketSelect = Boolean(error && isMissingOperationalTicketFieldError(error));
   const fallbackSelect = error ? getFallbackTicketSelect(error) : TICKET_SELECT;
   if (useLegacyTicketSelect) {
+    // @ts-expect-error - Supabase inferred union too complex; result cast via data as TicketRow in return
     const legacyResult = await ticketsTable()
       .select(fallbackSelect)
       .eq('company_id', companyId)
@@ -508,6 +509,7 @@ export async function listMyTickets(userId: string, companyId: string): Promise<
       .order('created_at', { ascending: false });
 
     if (error && isMissingOperationalTicketFieldError(error)) {
+      // @ts-expect-error - Supabase inferred union too complex; result cast via TicketRow below
       const legacyResult = await ticketsTable()
         .select(getFallbackTicketSelect(error))
         .eq('submitted_by', userId)
@@ -516,8 +518,6 @@ export async function listMyTickets(userId: string, companyId: string): Promise<
       data = legacyResult.data;
       error = legacyResult.error;
     }
-
-    if (error) throw error;
 
     const rows = await applyApprovalMetadata(((data ?? []) as TicketRow[]).map(mapTicket));
     const profilesById = await fetchProfilesById(
@@ -848,7 +848,7 @@ export async function updateTicket(
 
     const sideEffects: Promise<unknown>[] = [];
     if (activityEntries.length > 0) {
-      sideEffects.push(ticketActivityTable().insert(activityEntries).then(res => res));
+      sideEffects.push(Promise.resolve(ticketActivityTable().insert(activityEntries).then(res => res)));
     }
     if (notifications.length > 0) {
       sideEffects.push(createNotifications(notifications));

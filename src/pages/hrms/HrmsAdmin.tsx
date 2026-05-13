@@ -1218,9 +1218,9 @@ function RoleManagementPanel({ companyId, actorId, canWrite }: SecurityPanelProp
 
     setSaving(true);
     const result = editingRole
-      ? await updateHrmsRole(companyId, editingRole.id, actorId, parsed.data)
-      : await createHrmsRole(companyId, actorId, parsed.data);
-    const roleId = editingRole?.id ?? result.data?.id;
+      ? await updateHrmsRole(companyId, editingRole.id, actorId, parsed.data as CreateHrmsRoleInput)
+      : await createHrmsRole(companyId, actorId, parsed.data as CreateHrmsRoleInput);
+    const roleId = editingRole?.id ?? (result as { data?: { id?: string } }).data?.id;
     const assignmentResult = roleId
       ? await replaceHrmsRoleEmployeeAssignments(companyId, roleId, actorId, assignedEmployeeIds)
       : { error: result.error };

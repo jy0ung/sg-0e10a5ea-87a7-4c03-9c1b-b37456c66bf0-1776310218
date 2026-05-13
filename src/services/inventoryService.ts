@@ -283,5 +283,5 @@ export async function searchChassisFilter(
     return { rows: [], total: 0, error: new Error(error.message) };
   }
 
-  return { rows: (data ?? []) as ChassisFilterRow[], total: count ?? 0, error: null };
+  return { rows: (data ?? []) as unknown as ChassisFilterRow[], total: count ?? 0, error: null };
 }
