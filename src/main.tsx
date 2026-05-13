@@ -11,6 +11,7 @@ import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { AuthProvider, ProtectedRoute, useAuth } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { ModuleAccessProvider } from "@/contexts/ModuleAccessContext";
+import { BrandingProvider } from "@/contexts/BrandingContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RequireRole } from "@/components/shared/RequireRole";
 import { RequireActiveModule } from "@/components/shared/RequireActiveModule";
@@ -296,7 +297,9 @@ const App = () => {
           <Sonner />
           <ErrorBoundary>
             <AuthProvider>
-              <RouterProvider router={router} />
+              <BrandingProvider>
+                <RouterProvider router={router} />
+              </BrandingProvider>
             </AuthProvider>
           </ErrorBoundary>
         </TooltipProvider>

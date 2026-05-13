@@ -3,8 +3,13 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TicketCheck, ClipboardList, ArrowRight } from 'lucide-react';
-import { brandAssets, brandName } from '@/config/brand';
+import { BRANDING_DEFAULTS } from '@/services/brandingService';
 import { getDedicatedHrmsWorkspacePath, HRMS_PATHS } from '@/lib/hrmsWorkspace';
+
+const brandName = BRANDING_DEFAULTS.appName;
+const brandLogo = BRANDING_DEFAULTS.logoUrl ?? '';
+const brandLogoFull = BRANDING_DEFAULTS.loginLogoUrl ?? BRANDING_DEFAULTS.logoUrl ?? '';
+const copyrightText = BRANDING_DEFAULTS.copyrightText;
 
 export default function LandingPage() {
   const hrmsLoginUrl = getDedicatedHrmsWorkspacePath(HRMS_PATHS.login);
@@ -15,7 +20,7 @@ export default function LandingPage() {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex min-w-0 items-center gap-3">
-            <img src={brandAssets.compactLogo} alt="Fook Loi Group" className="h-10 w-10 shrink-0 rounded-md object-contain" />
+            <img src={brandLogo} alt={brandName} className="h-10 w-10 shrink-0 rounded-md object-contain" />
             <span className="truncate text-lg font-bold text-foreground">{brandName}</span>
           </div>
           <div className="flex items-center gap-2">
@@ -31,7 +36,7 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="flex-1 flex flex-col items-center justify-center px-6 py-20 text-center">
-        <img src={brandAssets.fullLogo} alt="Fook Loi Group" className="mb-8 h-auto max-h-28 w-full max-w-xl object-contain" />
+        <img src={brandLogoFull} alt={brandName} className="mb-8 h-auto max-h-28 w-full max-w-xl object-contain" />
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
           Welcome to {brandName}
         </h1>
@@ -85,7 +90,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-border py-6 text-center text-sm text-muted-foreground">
-        &copy; {new Date().getFullYear()} {brandName}. All rights reserved.
+      {copyrightText}
       </footer>
     </div>
   );

@@ -37,7 +37,7 @@ import {
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
-import { brandAssets } from '@/config/brand';
+import { useBranding } from '@/contexts/BrandingContext';
 import { useFocusedMode } from '@/hooks/useFocusedMode';
 import { useRoleSectionMatrix } from '@/hooks/usePermissions';
 import { getDedicatedHrmsWorkspacePath, HRMS_PATHS, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
@@ -159,6 +159,7 @@ function resolveNavigationHref(path: string): string {
 
 export function useMainAppShellConfig() {
   const { user, logout, hasRole } = useAuth();
+  const { branding } = useBranding();
   const { isFocused } = useFocusedMode();
   const { isModuleActive } = useModuleAccess();
   const { pathname } = useLocation();
@@ -209,10 +210,10 @@ export function useMainAppShellConfig() {
 
   return {
     brand: {
-      title: 'FLC BI',
+      title: branding.appShortName || branding.appName,
       subtitle: 'Operations intelligence',
-      logoSrc: brandAssets.compactLogo,
-      logoAlt: 'Fook Loi',
+      logoSrc: branding.logoUrl ?? undefined,
+      logoAlt: branding.companyName,
     },
     sections,
     routeChrome: MAIN_ROUTE_CHROME,

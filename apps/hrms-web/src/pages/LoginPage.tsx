@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { loginSchema, type LoginFormData } from '@/lib/validations';
-import { brandAssets } from '@/config/brand';
+import { BRANDING_DEFAULTS } from '@/services/brandingService';
+
+const brandLogo = BRANDING_DEFAULTS.logoUrl ?? '';
 
 function friendlyAuthError(raw: string): string {
   const message = raw.toLowerCase();
@@ -60,7 +62,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-md border border-border bg-card p-8 text-card-foreground shadow-sm animate-fade-in">
         <div className="mb-8 text-center">
           <div className="mb-3 inline-flex items-center gap-2">
-            <img src={brandAssets.compactLogo} alt="Fook Loi Group" className="h-11 w-11 rounded-md object-contain" />
+            <img src={brandLogo} alt={BRANDING_DEFAULTS.companyName} className="h-11 w-11 rounded-md object-contain" />
             <h1 className="text-2xl font-bold text-foreground">FLC HRMS</h1>
           </div>
           <p className="text-sm text-muted-foreground">Human resources workspace</p>

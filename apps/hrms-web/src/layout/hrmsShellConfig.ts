@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Bell } from 'lucide-react';
-import { brandAssets } from '@/config/brand';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBranding } from '@/contexts/BrandingContext';
 import type { AppShellNavSection, AppShellRouteChromeMatch } from '@/components/layout/app-shell';
 import type { AppRole } from '@/types';
 import { hrmsNavItems } from './navItems';
@@ -39,6 +39,7 @@ function groupHrmsItems(items: typeof hrmsNavItems): AppShellNavSection[] {
 
 export function useHrmsShellConfig() {
   const { user, logout, hasRole } = useAuth();
+  const { branding } = useBranding();
   const sections = useMemo(() => {
     const visibleItems = hrmsNavItems.filter((item) => !item.roles || hasRole(item.roles as AppRole[]));
     return groupHrmsItems(visibleItems);
@@ -46,10 +47,10 @@ export function useHrmsShellConfig() {
 
   return {
     brand: {
-      title: 'FLC HRMS',
+      title: branding.appShortName ? `${branding.appShortName} HRMS` : 'HRMS',
       subtitle: 'People operations',
-      logoSrc: brandAssets.compactLogo,
-      logoAlt: 'Fook Loi',
+      logoSrc: branding.logoUrl ?? undefined,
+      logoAlt: branding.companyName,
     },
     sections,
     routeChrome: HRMS_ROUTE_CHROME,

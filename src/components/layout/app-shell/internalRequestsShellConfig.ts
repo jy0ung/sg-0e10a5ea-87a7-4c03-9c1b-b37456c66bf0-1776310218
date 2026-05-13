@@ -1,7 +1,7 @@
 import { ArrowLeft, ClipboardList, ListTodo, Settings2, TicketCheck } from 'lucide-react';
 import { ADMIN_ONLY } from '@/config/routeRoles';
 import { useAuth } from '@/contexts/AuthContext';
-import { brandAssets } from '@/config/brand';
+import { useBranding } from '@/contexts/BrandingContext';
 import { canAccessMainApp } from '@/lib/portalAccess';
 import type { AppRole } from '@/types';
 import type { AppShellNavItem, AppShellRouteChromeMatch } from './types';
@@ -27,6 +27,7 @@ const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
 
 export function useInternalRequestsShellConfig() {
   const { user, logout } = useAuth();
+  const { branding } = useBranding();
   const navItems = requestQueueRoles.has((user?.role ?? '') as AppRole)
     ? [...baseNavItems, ...adminNavItems]
     : baseNavItems;
@@ -35,8 +36,8 @@ export function useInternalRequestsShellConfig() {
     brand: {
       title: 'Internal Requests',
       subtitle: 'Service operations',
-      logoSrc: brandAssets.compactLogo,
-      logoAlt: 'Fook Loi',
+      logoSrc: branding.logoUrl ?? undefined,
+      logoAlt: branding.companyName,
     },
     sections: [
       {

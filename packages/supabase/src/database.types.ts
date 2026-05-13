@@ -943,6 +943,93 @@ export type Database = {
         }
         Relationships: []
       }
+      company_branding: {
+        Row: {
+          accent_color: string | null
+          address: string | null
+          app_name: string | null
+          app_short_name: string | null
+          company_id: string
+          company_name: string | null
+          company_reg_no: string | null
+          copyright_text: string | null
+          created_at: string
+          default_locale: string | null
+          default_timezone: string | null
+          favicon_path: string | null
+          id: string
+          legal_name: string | null
+          login_logo_path: string | null
+          logo_path: string | null
+          support_email: string | null
+          support_phone: string | null
+          updated_at: string
+          updated_by: string | null
+          website: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          address?: string | null
+          app_name?: string | null
+          app_short_name?: string | null
+          company_id: string
+          company_name?: string | null
+          company_reg_no?: string | null
+          copyright_text?: string | null
+          created_at?: string
+          default_locale?: string | null
+          default_timezone?: string | null
+          favicon_path?: string | null
+          id?: string
+          legal_name?: string | null
+          login_logo_path?: string | null
+          logo_path?: string | null
+          support_email?: string | null
+          support_phone?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          website?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          address?: string | null
+          app_name?: string | null
+          app_short_name?: string | null
+          company_id?: string
+          company_name?: string | null
+          company_reg_no?: string | null
+          copyright_text?: string | null
+          created_at?: string
+          default_locale?: string | null
+          default_timezone?: string | null
+          favicon_path?: string | null
+          id?: string
+          legal_name?: string | null
+          login_logo_path?: string | null
+          logo_path?: string | null
+          support_email?: string | null
+          support_phone?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_branding_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_branding_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null

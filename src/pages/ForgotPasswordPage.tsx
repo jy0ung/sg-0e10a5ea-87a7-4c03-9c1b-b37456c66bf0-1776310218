@@ -8,7 +8,10 @@ import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/lib/validat
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { authService } from '@/services/authService';
-import { brandAssets, brandName } from '@/config/brand';
+import { BRANDING_DEFAULTS } from '@/services/brandingService';
+
+const brandName = BRANDING_DEFAULTS.appName;
+const brandLogo = BRANDING_DEFAULTS.logoUrl ?? '';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -39,7 +42,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md p-8 glass-panel gold-glow animate-fade-in">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-2">
-            <img src={brandAssets.compactLogo} alt="Fook Loi Group" className="h-11 w-11 rounded-md object-contain" />
+            <img src={brandLogo} alt={brandName} className="h-11 w-11 rounded-md object-contain" />
             <h1 className="text-2xl font-bold text-foreground">{brandName}</h1>
           </div>
           <p className="text-muted-foreground text-sm">Reset your password</p>

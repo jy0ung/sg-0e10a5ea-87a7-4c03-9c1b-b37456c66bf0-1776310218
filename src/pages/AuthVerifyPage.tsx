@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { brandAssets, brandName } from '@/config/brand';
+import { BRANDING_DEFAULTS } from '@/services/brandingService';
+
+const brandName = BRANDING_DEFAULTS.appName;
+const brandLogo = BRANDING_DEFAULTS.logoUrl ?? '';
 import { resolveAuthVerifyRedirect } from '@/lib/authVerifyRedirect';
 
 export default function AuthVerifyPage() {
@@ -29,7 +32,7 @@ export default function AuthVerifyPage() {
     <div className="min-h-screen flex items-center justify-center executive-gradient">
       <div className="w-full max-w-md p-8 glass-panel gold-glow animate-fade-in text-center space-y-4">
         <div className="inline-flex items-center gap-2">
-          <img src={brandAssets.compactLogo} alt="Fook Loi Group" className="h-11 w-11 rounded-md object-contain" />
+          <img src={brandLogo} alt={brandName} className="h-11 w-11 rounded-md object-contain" />
           <h1 className="text-2xl font-bold text-foreground">{brandName}</h1>
         </div>
         {error ? (

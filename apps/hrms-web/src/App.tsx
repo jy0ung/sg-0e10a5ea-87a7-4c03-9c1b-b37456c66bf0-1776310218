@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { AuthProvider, ProtectedRoute } from '@/contexts/AuthContext';
 import { ModuleAccessProvider, useModuleAccess } from '@/contexts/ModuleAccessContext';
+import { BrandingProvider } from '@/contexts/BrandingContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RouteErrorBoundary } from '@/components/shared/RouteErrorBoundary';
 import { LocationPreservingNavigate } from '@/components/shared/LocationPreservingNavigate';
@@ -135,7 +136,9 @@ export default function App() {
           <Sonner />
           <ErrorBoundary>
             <AuthProvider>
-              <RouterProvider router={router} />
+              <BrandingProvider>
+                <RouterProvider router={router} />
+              </BrandingProvider>
             </AuthProvider>
           </ErrorBoundary>
         </TooltipProvider>
