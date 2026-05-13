@@ -389,11 +389,12 @@ export async function resubmitAppraisalActivation(
  * Throws on database error.
  */
 export async function listAppraisalItems(appraisalId: string): Promise<AppraisalItem[]> {
-  const { data, error } = await supabase
+  const { data: initialData, error } = await supabase
     .from('appraisal_items')
     .select('*, reviewer:profiles!reviewer_id(name)')
     .eq('appraisal_id', appraisalId);
   if (error) throw new Error(error.message);
+  let data = initialData;
 
   if (!data?.length) {
     const { data: appraisalRow, error: appraisalError } = await supabase
@@ -447,7 +448,7 @@ export async function listAppraisalItems(appraisalId: string): Promise<Appraisal
 // ─── Self-service ─────────────────────────────────────────────────────────────
 
 /** Returns all appraisal items assigned to or owned by this employee. Throws on error. */
-export async function getMyAppraisalItems(employeeId: string): Promise<SelfServiceAppraisalItem[]> {
+export async function getMyAppraisalItems(employeeId: string, _companyId?: string): Promise<SelfServiceAppraisalItem[]> {
   const { data, error } = await supabase
     .from('appraisal_items')
     .select('*, reviewer:profiles!reviewer_id(name), appraisal:appraisals!appraisal_id(title, cycle, period_start, period_end, status)')
