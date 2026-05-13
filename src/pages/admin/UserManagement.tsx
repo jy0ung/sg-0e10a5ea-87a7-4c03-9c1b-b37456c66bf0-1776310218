@@ -174,7 +174,7 @@ export default function UserManagement() {
       name: '',
       role: 'analyst',
       employee_id: null,
-      portal_access_only: false,
+      portal_access_only: true,
     },
     mode: 'onChange',
   });
@@ -1044,9 +1044,9 @@ export default function UserManagement() {
                 <div className="rounded-lg border border-border bg-secondary/30 p-3">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
-                      <Label htmlFor="invite-portal-access-only">Internal Requests Only</Label>
+                      <Label htmlFor="invite-portal-access-only">HRMS Only (no main app access)</Label>
                       <p className="text-xs text-muted-foreground">
-                        Send this user directly into the Internal Requests portal without main app access.
+                        Limit this user to the HRMS app. Disable to grant full access to the main app.
                       </p>
                     </div>
                     <Switch
@@ -1064,7 +1064,12 @@ export default function UserManagement() {
                   </p>
                   {inviteForm.watch('portal_access_only') && (
                     <p className="text-primary">
-                      After sign-in, this user will land in the Internal Requests portal instead of the main app.
+                      After sign-in, this user will land in the HRMS app. Enable full access to also grant main app permissions.
+                    </p>
+                  )}
+                  {!inviteForm.watch('portal_access_only') && (
+                    <p className="text-primary">
+                      This user will have full access to the main app and HRMS.
                     </p>
                   )}
                 </div>

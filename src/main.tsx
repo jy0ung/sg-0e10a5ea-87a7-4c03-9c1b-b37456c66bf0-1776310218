@@ -23,8 +23,8 @@ import { SalesProvider } from "./contexts/SalesContext";
 import { errorTrackingService } from "@/services/errorTrackingService";
 import { env } from "@/config/env";
 import { createAppQueryClient } from "@/lib/queryClient";
-import { isPortalOnlyUser, resolveAuthenticatedHomePath } from '@/lib/portalAccess';
-import { HRMS_PATHS } from '@/lib/hrmsWorkspace';
+import { isPortalOnlyUser } from '@/lib/portalAccess';
+import { getDedicatedHrmsWorkspacePath, HRMS_PATHS } from '@/lib/hrmsWorkspace';
 import { onCLS, onINP, onLCP } from 'web-vitals';
 import {
   ADMIN_ONLY,
@@ -124,7 +124,18 @@ function ProtectedAppShell({ redirectTo = "/login" }: { redirectTo?: string | ((
   const location = useLocation();
 
   if (isPortalOnlyUser(user)) {
-    return <Navigate to={resolveAuthenticatedHomePath(user)} state={{ from: location }} replace />;
+    // Portal-specific roles (internal requests) → keep going to /portal
+    const hasPortalRole = ['portal_admin', 'portal_manager', 'portal_staff'].includes(user?.role ?? '');
+    if (hasPortalRole) {
+      return <Navigate to="/portal" state={{ from: location }} replace />;
+    }
+    // HRMS-only users (portal_access_only flag) → redirect to HRMS workspace
+    const hrmsPath = getDedicatedHrmsWorkspacePath(HRMS_PATHS.root);
+    if (!hrmsPath.startsWith('http')) {
+      return <Navigate to={hrmsPath} state={{ from: location }} replace />;
+    }
+    window.location.replace(hrmsPath);
+    return null;
   }
 
   return (

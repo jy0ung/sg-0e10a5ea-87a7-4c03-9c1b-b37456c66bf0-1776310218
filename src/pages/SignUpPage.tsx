@@ -10,6 +10,7 @@ import { inviteSignupSchema, type InviteSignupFormData } from '@/lib/validations
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { brandAssets, brandName } from '@/config/brand';
+import { getDedicatedHrmsWorkspacePath, HRMS_PATHS } from '@/lib/hrmsWorkspace';
 
 export default function SignUpPage() {
   const navigate = useNavigate();
@@ -183,7 +184,7 @@ export default function SignUpPage() {
     await supabase.auth.signOut();
     setLoading(false);
     setSuccess(true);
-    setTimeout(() => navigate('/login', { replace: true }), 2500);
+    setTimeout(() => window.location.replace(getDedicatedHrmsWorkspacePath(HRMS_PATHS.login)), 2500);
   };
 
   if (initializing) {
@@ -223,7 +224,7 @@ export default function SignUpPage() {
           <div className="text-center space-y-3">
             <CheckCircle className="h-12 w-12 text-primary mx-auto" />
             <p className="text-primary text-sm font-medium">Account set up successfully!</p>
-            <p className="text-muted-foreground text-xs">Redirecting to sign in...</p>
+            <p className="text-muted-foreground text-xs">Redirecting to HRMS login...</p>
           </div>
         ) : (
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
