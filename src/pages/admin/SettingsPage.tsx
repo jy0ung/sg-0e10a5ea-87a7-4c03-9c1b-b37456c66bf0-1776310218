@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useBlocker } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
-import { changePassword, updateProfile } from '@/services/profileService';
+import { changePassword, listProfiles, updateProfile, type ProfileRow } from '@/services/profileService';
 import { saveBranding, uploadBrandingAsset } from '@/services/brandingService';
+import { ROLE_LABELS } from '@/config/rolePermissions';
 import { useBranding } from '@/contexts/BrandingContext';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,9 +13,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, Save, KeyRound, Power, Building2, Upload } from 'lucide-react';
+import { Loader2, Save, KeyRound, Power, Building2, Upload, Users, Search } from 'lucide-react';
 import { getBranches } from '@/services/masterDataService';
-import type { BranchRecord } from '@/types';
+import type { AppRole, BranchRecord } from '@/types';
 import { profileUpdateSchema, type ProfileUpdateFormData, changePasswordSchema, type ChangePasswordFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -62,6 +63,13 @@ export default function SettingsPage() {
   const [savingBranding, setSavingBranding] = useState(false);
   const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  // Users / Roles state
+  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(false);
+  const [pendingRoles, setPendingRoles] = useState<Record<string, AppRole>>({});
+  const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
+  const [userSearch, setUserSearch] = useState('');
   const loginLogoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
 
@@ -107,6 +115,15 @@ export default function SettingsPage() {
   useEffect(() => {
     getBranches(user?.company_id || '').then(res => setBranches(res.data));
   }, [user?.company_id]);
+
+  // Load company users when admin tab is available
+  useEffect(() => {
+    if (!isAdmin || !user?.company_id) return;
+    setProfilesLoading(true);
+    listProfiles(user.role === 'super_admin' ? undefined : user.company_id)
+      .then(({ data }) => setProfiles(data))
+      .finally(() => setProfilesLoading(false));
+  }, [isAdmin, user?.company_id, user?.role]);
 
   // Sync branding DB values into local form state when branding loads
   useEffect(() => {
@@ -172,6 +189,24 @@ export default function SettingsPage() {
       await refreshProfile();
     }
     setSaving(false);
+  };
+
+  const handleRoleSave = async (profileId: string) => {
+    const newRole = pendingRoles[profileId];
+    if (!newRole || !user) return;
+    setSavingRoleId(profileId);
+    const { error } = await updateProfile(
+      { id: profileId, role: newRole },
+      { actorId: user.id, companyId: user.company_id },
+    );
+    if (error) {
+      toast.error('Failed to update role', { description: error });
+    } else {
+      toast.success('Role updated');
+      setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, role: newRole } : p));
+      setPendingRoles(prev => { const next = { ...prev }; delete next[profileId]; return next; });
+    }
+    setSavingRoleId(null);
   };
 
   const handleSaveBranding = async () => {
@@ -256,6 +291,7 @@ export default function SettingsPage() {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
           {canManageModules && <TabsTrigger value="modules">Modules</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
           {isAdmin && <TabsTrigger value="organization">Organization</TabsTrigger>}
         </TabsList>
 
@@ -432,6 +468,106 @@ export default function SettingsPage() {
                   );
                 })}
               </div>
+            </div>
+          </TabsContent>
+        )}
+
+        {/* ── Users / Roles Tab (admin only) ── */}
+        {isAdmin && (
+          <TabsContent value="users">
+            <div className="glass-panel p-6 space-y-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">User Roles</h3>
+                </div>
+                <div className="relative max-w-xs w-full">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    value={userSearch}
+                    onChange={e => setUserSearch(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background pl-8 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
+              </div>
+
+              {profilesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />Loading users...
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {profiles
+                    .filter(p => {
+                      const q = userSearch.toLowerCase();
+                      return !q || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
+                    })
+                    .map(p => {
+                      const isSelf = p.id === user?.id;
+                      const isTargetSuperAdmin = p.role === 'super_admin';
+                      const canEdit = !isSelf && !(isTargetSuperAdmin && user?.role !== 'super_admin');
+                      const pending = pendingRoles[p.id];
+                      const displayRole = pending ?? p.role;
+                      const isDirty = Boolean(pending && pending !== p.role);
+
+                      return (
+                        <div key={p.id} className="flex flex-col gap-3 rounded-xl border border-border/60 bg-secondary/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
+                              {isSelf && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">You</span>}
+                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
+                                p.status === 'active' ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                                : p.status === 'pending' ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+                                : 'bg-muted text-muted-foreground'
+                              }`}>{p.status}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">{p.email}</p>
+                          </div>
+
+                          <div className="flex items-center gap-2 self-end sm:self-auto">
+                            <Select
+                              value={displayRole}
+                              disabled={!canEdit || savingRoleId === p.id}
+                              onValueChange={v => setPendingRoles(prev => ({ ...prev, [p.id]: v as AppRole }))}
+                            >
+                              <SelectTrigger className="w-44 text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(Object.entries(ROLE_LABELS) as [AppRole, string][]).map(([value, label]) => (
+                                  // Only super_admin can grant/see super_admin option
+                                  (value !== 'super_admin' || user?.role === 'super_admin') && (
+                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                  )
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {canEdit && isDirty && (
+                              <Button
+                                size="sm"
+                                disabled={savingRoleId === p.id}
+                                onClick={() => handleRoleSave(p.id)}
+                              >
+                                {savingRoleId === p.id
+                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  : <Save className="h-3.5 w-3.5" />}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {profiles.filter(p => {
+                    const q = userSearch.toLowerCase();
+                    return !q || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
+                  }).length === 0 && (
+                    <p className="py-6 text-center text-sm text-muted-foreground">No users found.</p>
+                  )}
+                </div>
+              )}
             </div>
           </TabsContent>
         )}
