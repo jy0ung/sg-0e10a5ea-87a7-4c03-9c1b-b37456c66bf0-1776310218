@@ -276,11 +276,13 @@ export const jobTitleSchema = z.object({
 export type JobTitleFormData = z.infer<typeof jobTitleSchema>;
 
 export const leaveTypeAdminSchema = z.object({
-  name:        z.string().min(2, 'Name must be at least 2 characters').max(60),
-  code:        z.string().min(1).max(10).regex(/^[A-Z_]+$/, 'Uppercase letters and underscores only'),
-  daysPerYear: z.number().min(0, 'Cannot be negative').max(365),
-  isPaid:      z.boolean(),
-  active:      z.boolean().default(true),
+  name:                  z.string().min(2, 'Name must be at least 2 characters').max(60),
+  code:                  z.string().min(1).max(10).regex(/^[A-Z_]+$/, 'Uppercase letters and underscores only'),
+  daysPerYear:           z.number().min(0, 'Cannot be negative').max(365),
+  isPaid:                z.boolean(),
+  requiresBalance:       z.boolean().default(true),
+  minAdvanceNoticeDays:  z.number().int().min(0).max(365).nullable().optional(),
+  active:                z.boolean().default(true),
 });
 export type LeaveTypeAdminFormData = z.infer<typeof leaveTypeAdminSchema>;
 

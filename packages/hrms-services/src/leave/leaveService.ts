@@ -170,18 +170,21 @@ export async function listLeaveTypes(companyId: string): Promise<LeaveType[]> {
     .eq('active', true)
     .order('name');
   if (error) throw new Error(error.message);
-  return (data ?? []).map(r => ({
-    id:           String(r.id),
-    companyId:    String(r.company_id),
-    name:         String(r.name),
-    code:         String(r.code),
-    daysPerYear:  Number(r.days_per_year),
-    defaultDays:  Number(r.default_days ?? r.days_per_year),
-    carryForward: Boolean(r.carry_forward ?? true),
-    isPaid:       Boolean(r.is_paid),
-    active:       Boolean(r.active),
-    createdAt:    String(r.created_at),
-    updatedAt:    String(r.updated_at),
+  // TODO: Replace cast after Database generated types include requires_balance + min_advance_notice_days columns.
+  return (data ?? []).map(r => (r as unknown as Record<string, unknown>)).map(r => ({
+    id:                   String(r.id),
+    companyId:            String(r.company_id),
+    name:                 String(r.name),
+    code:                 String(r.code),
+    daysPerYear:          Number(r.days_per_year),
+    defaultDays:          Number(r.default_days ?? r.days_per_year),
+    carryForward:         Boolean(r.carry_forward ?? true),
+    isPaid:               Boolean(r.is_paid),
+    requiresBalance:      r.requires_balance != null ? Boolean(r.requires_balance) : true,
+    minAdvanceNoticeDays: r.min_advance_notice_days != null ? Number(r.min_advance_notice_days) : null,
+    active:               Boolean(r.active),
+    createdAt:            String(r.created_at),
+    updatedAt:            String(r.updated_at),
   }));
 }
 

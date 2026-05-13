@@ -642,20 +642,20 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
   const [deleteTarget, setDeleteTarget] = useState<LeaveType | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<CreateLeaveTypeInput>({
-    name: '', code: '', daysPerYear: 14, defaultDays: 14, carryForward: true, isPaid: true, active: true,
+    name: '', code: '', daysPerYear: 14, defaultDays: 14, carryForward: true, isPaid: true, requiresBalance: true, minAdvanceNoticeDays: null, active: true,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function openCreate() {
     setEditTarget(null);
-    setForm({ name: '', code: '', daysPerYear: 14, defaultDays: 14, carryForward: true, isPaid: true, active: true });
+    setForm({ name: '', code: '', daysPerYear: 14, defaultDays: 14, carryForward: true, isPaid: true, requiresBalance: true, minAdvanceNoticeDays: null, active: true });
     setErrors({});
     setDialogOpen(true);
   }
 
   function openEdit(lt: LeaveType) {
     setEditTarget(lt);
-    setForm({ name: lt.name, code: lt.code, daysPerYear: lt.daysPerYear, defaultDays: lt.defaultDays, carryForward: lt.carryForward, isPaid: lt.isPaid, active: lt.active });
+    setForm({ name: lt.name, code: lt.code, daysPerYear: lt.daysPerYear, defaultDays: lt.defaultDays, carryForward: lt.carryForward, isPaid: lt.isPaid, requiresBalance: lt.requiresBalance, minAdvanceNoticeDays: lt.minAdvanceNoticeDays ?? null, active: lt.active });
     setErrors({});
     setDialogOpen(true);
   }
@@ -674,6 +674,8 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
       daysPerYear: parsed.data.daysPerYear, isPaid: parsed.data.isPaid, active: parsed.data.active,
       defaultDays: form.defaultDays ?? parsed.data.daysPerYear,
       carryForward: form.carryForward ?? true,
+      requiresBalance: form.requiresBalance ?? true,
+      minAdvanceNoticeDays: form.minAdvanceNoticeDays ?? null,
     };
     const { error } = editTarget
       ? await updateLeaveType(companyId, editTarget.id, actorId, input)
@@ -719,20 +721,22 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
                 <th className="px-3 py-2 font-semibold">Days/Year</th>
                 <th className="px-3 py-2 font-semibold">Rollover</th>
                 <th className="px-3 py-2 font-semibold">Paid</th>
+                <th className="px-3 py-2 font-semibold">Balance</th>
+                <th className="px-3 py-2 font-semibold">Notice</th>
                 <th className="px-3 py-2 font-semibold">Active</th>
                 {canWrite && <th className="w-20 px-3 py-2 font-semibold">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canWrite ? 6 : 5} className="py-12 text-center text-muted-foreground text-xs">Loading…</td></tr>
+                <tr><td colSpan={canWrite ? 8 : 7} className="py-12 text-center text-muted-foreground text-xs">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={canWrite ? 6 : 5} className="py-12 text-center text-muted-foreground text-xs">No leave types yet</td></tr>
+                <tr><td colSpan={canWrite ? 8 : 7} className="py-12 text-center text-muted-foreground text-xs">No leave types yet</td></tr>
               ) : rows.map(lt => (
                 <tr key={lt.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
                   <td className="px-3 py-2 font-medium">{lt.name}</td>
                   <td className="px-3 py-2"><Badge variant="outline">{lt.code}</Badge></td>
-                  <td className="px-3 py-2">{lt.daysPerYear}</td>
+                  <td className="px-3 py-2">{lt.requiresBalance !== false ? lt.daysPerYear : '—'}</td>
                   <td className="px-3 py-2">
                     <Badge className={lt.carryForward
                       ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
@@ -746,6 +750,16 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
                       : 'bg-secondary text-secondary-foreground'}>
                       {lt.isPaid ? 'Paid' : 'Unpaid'}
                     </Badge>
+                  </td>
+                  <td className="px-3 py-2">
+                    <Badge className={lt.requiresBalance
+                      ? 'bg-secondary text-secondary-foreground'
+                      : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'}>
+                      {lt.requiresBalance ? 'Required' : 'Not required'}
+                    </Badge>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {lt.minAdvanceNoticeDays != null ? `${lt.minAdvanceNoticeDays}d` : '—'}
                   </td>
                   <td className="px-3 py-2">
                     {canWrite
@@ -791,7 +805,7 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
                 onChange={e => setForm(f => ({ ...f, daysPerYear: Number(e.target.value) }))} />
               {errors.daysPerYear && <p className="text-xs text-destructive">{errors.daysPerYear}</p>}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
                 <Switch checked={form.isPaid} onCheckedChange={v => setForm(f => ({ ...f, isPaid: v }))} />
                 <Label className="text-sm">Paid leave</Label>
@@ -804,6 +818,10 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
                 <Switch checked={form.carryForward ?? true} onCheckedChange={v => setForm(f => ({ ...f, carryForward: v }))} />
                 <Label className="text-sm">Carry-forward</Label>
               </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={form.requiresBalance ?? true} onCheckedChange={v => setForm(f => ({ ...f, requiresBalance: v }))} />
+                <Label className="text-sm">Requires balance</Label>
+              </div>
             </div>
             {(form.carryForward ?? true) && (
               <div className="space-y-1">
@@ -812,6 +830,19 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
                   onChange={e => setForm(f => ({ ...f, defaultDays: Number(e.target.value) }))} />
               </div>
             )}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Advance notice required (calendar days)</Label>
+              <Input
+                className="h-8 text-sm"
+                type="number"
+                min={0}
+                max={365}
+                placeholder="None"
+                value={form.minAdvanceNoticeDays ?? ''}
+                onChange={e => setForm(f => ({ ...f, minAdvanceNoticeDays: e.target.value === '' ? null : Number(e.target.value) }))}
+              />
+              <p className="text-xs text-muted-foreground">Leave blank for no advance notice requirement.</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button>

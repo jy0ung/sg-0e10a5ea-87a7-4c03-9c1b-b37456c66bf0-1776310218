@@ -262,7 +262,23 @@ export default function LeaveManagement() {
   );
   const selectedBalance = leaveBalances.find(balance => balance.leaveTypeId === applyForm.leaveTypeId) ?? null;
   const selectedLeaveType = leaveTypes.find(type => type.id === applyForm.leaveTypeId) ?? null;
-  const balanceInsufficient = !!selectedBalance && calculatedDays > selectedBalance.remainingDays;
+  // Balance check only applies when the leave type requires a balance (e.g. unpaid leave does not)
+  const balanceInsufficient =
+    (selectedLeaveType?.requiresBalance !== false) &&
+    !!selectedBalance &&
+    calculatedDays > selectedBalance.remainingDays;
+  // Advance notice check: block submission if start_date is fewer than minAdvanceNoticeDays calendar days away
+  const advanceNoticeDays = selectedLeaveType?.minAdvanceNoticeDays ?? null;
+  const advanceNoticeViolation: string | null = (() => {
+    if (!advanceNoticeDays || !applyForm.startDate) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const minStart = new Date(today.getTime() + advanceNoticeDays * 24 * 60 * 60 * 1000);
+    const start = new Date(`${applyForm.startDate}T00:00:00`);
+    return start < minStart
+      ? `${selectedLeaveType?.name ?? 'This leave type'} must be applied at least ${advanceNoticeDays} calendar day${advanceNoticeDays === 1 ? '' : 's'} in advance. Earliest start date: ${minStart.toISOString().slice(0, 10)}.`
+      : null;
+  })();
 
   useEffect(() => {
     if (!leaveDraftKey || draftRestored) return;
@@ -354,8 +370,16 @@ export default function LeaveManagement() {
       toast({ title: 'Insufficient leave balance', description: `${selectedLeaveType?.name ?? 'Selected leave'} remaining balance is ${selectedBalance?.remainingDays ?? 0} day(s).`, variant: 'destructive' });
       return;
     }
+    if (advanceNoticeViolation) {
+      toast({ title: 'Advance notice required', description: advanceNoticeViolation, variant: 'destructive' });
+      return;
+    }
     const { error } = await createLeaveRequest(selfServiceEmployeeId, user.companyId, {
-      ...result.data,
+      leaveTypeId: result.data.leaveTypeId,
+      startDate:   result.data.startDate,
+      endDate:     result.data.endDate,
+      dayPart:     result.data.dayPart,
+      reason:      result.data.reason,
       days: calculatedDays,
       attachmentFile: attachmentFile ?? undefined,
     });
@@ -669,13 +693,15 @@ export default function LeaveManagement() {
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent>
                   {leaveTypes.map(t => (
-                    <SelectItem key={t.id} value={t.id}>{t.name} ({t.daysPerYear}d/yr)</SelectItem>
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}{t.requiresBalance !== false ? ` (${t.daysPerYear}d/yr)` : ' (Unpaid)'}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {selectedBalance && (
+            {selectedLeaveType && selectedLeaveType.requiresBalance !== false && selectedBalance && (
               <div className="grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-3">
                 <div>
                   <p className="text-xs text-muted-foreground">Entitled Leave</p>
@@ -693,7 +719,12 @@ export default function LeaveManagement() {
                 </div>
               </div>
             )}
-            {applyForm.leaveTypeId && !selectedBalance && (
+            {selectedLeaveType && selectedLeaveType.requiresBalance === false && (
+              <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                This is an unpaid leave type. No leave balance is required to apply.
+              </p>
+            )}
+            {applyForm.leaveTypeId && selectedLeaveType?.requiresBalance !== false && !selectedBalance && (
               <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 No balance record was found for this leave type in {selectedLeaveYear}.
               </p>
@@ -742,6 +773,11 @@ export default function LeaveManagement() {
                   }))}
                   required
                 />
+                {advanceNoticeDays && (
+                  <p className="text-xs text-muted-foreground">
+                    Requires {advanceNoticeDays} day{advanceNoticeDays === 1 ? '' : 's'} advance notice
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>End Date</Label>
@@ -759,6 +795,9 @@ export default function LeaveManagement() {
               <p className="mt-0.5 text-xs text-muted-foreground">Weekends and configured public/company holidays are excluded.</p>
               {balanceInsufficient && (
                 <p className="mt-1 text-xs font-medium text-destructive">Insufficient balance for this leave type.</p>
+              )}
+              {advanceNoticeViolation && (
+                <p className="mt-1 text-xs font-medium text-destructive">{advanceNoticeViolation}</p>
               )}
             </div>
             <div className="space-y-2">
@@ -808,7 +847,7 @@ export default function LeaveManagement() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowApply(false)}>Cancel</Button>
-              <Button type="submit" disabled={calculatedDays <= 0 || balanceInsufficient || !!attachmentError}>Submit</Button>
+              <Button type="submit" disabled={calculatedDays <= 0 || balanceInsufficient || !!advanceNoticeViolation || !!attachmentError}>Submit</Button>
             </DialogFooter>
           </form>
         </DialogContent>

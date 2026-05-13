@@ -64,17 +64,19 @@ function rowToJobTitle(r: Record<string, unknown>): JobTitle {
 
 function rowToLeaveType(r: Record<string, unknown>): LeaveType {
   return {
-    id:          String(r.id ?? ''),
-    companyId:   String(r.company_id ?? ''),
-    name:        String(r.name ?? ''),
-    code:        String(r.code ?? ''),
-    daysPerYear: Number(r.days_per_year ?? r.default_days ?? 0),
-    defaultDays: Number(r.default_days ?? 0),
-    carryForward:Boolean(r.carry_forward),
-    isPaid:      Boolean(r.is_paid ?? true),
-    active:      Boolean(r.active),
-    createdAt:   String(r.created_at ?? ''),
-    updatedAt:   String(r.updated_at ?? ''),
+    id:                   String(r.id ?? ''),
+    companyId:            String(r.company_id ?? ''),
+    name:                 String(r.name ?? ''),
+    code:                 String(r.code ?? ''),
+    daysPerYear:          Number(r.days_per_year ?? r.default_days ?? 0),
+    defaultDays:          Number(r.default_days ?? 0),
+    carryForward:         Boolean(r.carry_forward),
+    isPaid:               Boolean(r.is_paid ?? true),
+    requiresBalance:      r.requires_balance != null ? Boolean(r.requires_balance) : true,
+    minAdvanceNoticeDays: r.min_advance_notice_days != null ? Number(r.min_advance_notice_days) : null,
+    active:               Boolean(r.active),
+    createdAt:            String(r.created_at ?? ''),
+    updatedAt:            String(r.updated_at ?? ''),
   };
 }
 

@@ -132,6 +132,10 @@ export interface LeaveType {
   defaultDays: number;
   carryForward: boolean;
   isPaid: boolean;
+  /** If false, balance check is skipped on submission (e.g. Unpaid Leave). */
+  requiresBalance: boolean;
+  /** If set, start_date must be >= today + N calendar days. */
+  minAdvanceNoticeDays: number | null;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -348,6 +352,8 @@ export interface CreateLeaveTypeInput {
   defaultDays?: number;
   carryForward?: boolean;
   isPaid: boolean;
+  requiresBalance?: boolean;
+  minAdvanceNoticeDays?: number | null;
   active: boolean;
 }
 export type UpdateLeaveTypeInput = CreateLeaveTypeInput;

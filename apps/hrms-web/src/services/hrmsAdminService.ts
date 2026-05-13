@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const untypedSupabase = supabase as any;
 import { logUserAction } from '@/services/auditService';
 import type {
   Department, CreateDepartmentInput, UpdateDepartmentInput,
@@ -263,17 +265,19 @@ export async function deleteJobTitle(companyId: string, id: string, actorId: str
 
 function rowToLeaveType(r: Record<string, unknown>): LeaveType {
   return {
-    id:           String(r.id ?? ''),
-    companyId:    String(r.company_id ?? ''),
-    name:         String(r.name ?? ''),
-    code:         String(r.code ?? ''),
-    daysPerYear:  Number(r.days_per_year),
-    defaultDays:  Number(r.default_days ?? r.days_per_year),
-    carryForward: Boolean(r.carry_forward ?? true),
-    isPaid:       Boolean(r.is_paid),
-    active:       Boolean(r.active),
-    createdAt:    String(r.created_at ?? ''),
-    updatedAt:    String(r.updated_at ?? ''),
+    id:                   String(r.id ?? ''),
+    companyId:            String(r.company_id ?? ''),
+    name:                 String(r.name ?? ''),
+    code:                 String(r.code ?? ''),
+    daysPerYear:          Number(r.days_per_year),
+    defaultDays:          Number(r.default_days ?? r.days_per_year),
+    carryForward:         Boolean(r.carry_forward ?? true),
+    isPaid:               Boolean(r.is_paid),
+    requiresBalance:      r.requires_balance != null ? Boolean(r.requires_balance) : true,
+    minAdvanceNoticeDays: r.min_advance_notice_days != null ? Number(r.min_advance_notice_days) : null,
+    active:               Boolean(r.active),
+    createdAt:            String(r.created_at ?? ''),
+    updatedAt:            String(r.updated_at ?? ''),
   };
 }
 
@@ -293,17 +297,20 @@ export async function createLeaveType(
   actorId: string,
   input: CreateLeaveTypeInput,
 ): Promise<{ data: LeaveType | null; error: string | null }> {
-  const { data, error } = await supabase
+  // TODO: Replace untypedSupabase after Database generated types include requires_balance + min_advance_notice_days columns.
+  const { data, error } = await untypedSupabase
     .from('leave_types')
     .insert({
-      company_id:    companyId,
-      name:          input.name,
-      code:          input.code.toUpperCase(),
-      days_per_year: input.daysPerYear,
-      default_days:  input.defaultDays ?? input.daysPerYear,
-      carry_forward: input.carryForward ?? true,
-      is_paid:       input.isPaid,
-      active:        input.active,
+      company_id:               companyId,
+      name:                     input.name,
+      code:                     input.code.toUpperCase(),
+      days_per_year:            input.daysPerYear,
+      default_days:             input.defaultDays ?? input.daysPerYear,
+      carry_forward:            input.carryForward ?? true,
+      is_paid:                  input.isPaid,
+      requires_balance:         input.requiresBalance ?? true,
+      min_advance_notice_days:  input.minAdvanceNoticeDays ?? null,
+      active:                   input.active,
     })
     .select('*')
     .single();
@@ -318,17 +325,20 @@ export async function updateLeaveType(
   actorId: string,
   input: UpdateLeaveTypeInput,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase
+  // TODO: Replace untypedSupabase after Database generated types include requires_balance + min_advance_notice_days columns.
+  const { error } = await untypedSupabase
     .from('leave_types')
     .update({
-      name:          input.name,
-      code:          input.code.toUpperCase(),
-      days_per_year: input.daysPerYear,
-      default_days:  input.defaultDays ?? input.daysPerYear,
-      carry_forward: input.carryForward ?? true,
-      is_paid:       input.isPaid,
-      active:        input.active,
-      updated_at:    new Date().toISOString(),
+      name:                     input.name,
+      code:                     input.code.toUpperCase(),
+      days_per_year:            input.daysPerYear,
+      default_days:             input.defaultDays ?? input.daysPerYear,
+      carry_forward:            input.carryForward ?? true,
+      is_paid:                  input.isPaid,
+      requires_balance:         input.requiresBalance ?? true,
+      min_advance_notice_days:  input.minAdvanceNoticeDays ?? null,
+      active:                   input.active,
+      updated_at:               new Date().toISOString(),
     })
     .eq('company_id', companyId)
     .eq('id', id);
@@ -341,7 +351,6 @@ export async function deleteLeaveType(companyId: string, id: string, actorId: st
   const { count } = await supabase
     .from('leave_balances')
     .select('id', { count: 'exact', head: true })
-    .eq('company_id', companyId)
     .eq('leave_type_id', id);
   if ((count ?? 0) > 0) {
     // Soft delete: just deactivate
