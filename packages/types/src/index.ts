@@ -496,6 +496,13 @@ export interface ApprovalFlow {
   entityType: FlowEntityType;
   isActive: boolean;
   createdBy?: string;
+  /** UUID of the department this flow is scoped to, or null for company-wide flows. */
+  departmentId?: string | null;
+  /** Human-readable department name (joined from departments table). */
+  departmentName?: string;
+  /** True when this flow is the preferred fallback for all departments without a specific flow. */
+  isDefault: boolean;
+  updatedBy?: string;
   steps: ApprovalStep[];
   createdAt: string;
   updatedAt: string;
@@ -506,6 +513,10 @@ export interface CreateApprovalFlowInput {
   description?: string;
   entityType: FlowEntityType;
   isActive: boolean;
+  /** UUID of the department to scope this flow to, or null/undefined for a company-wide flow. */
+  departmentId?: string | null;
+  /** Mark this as the default fallback when no department-specific flow matches. */
+  isDefault?: boolean;
   steps: Omit<ApprovalStep, 'id' | 'flowId' | 'approverUserName'>[];
 }
 export type UpdateApprovalFlowInput = CreateApprovalFlowInput;

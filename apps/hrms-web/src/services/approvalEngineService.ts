@@ -18,21 +18,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
 import type { ApprovalFlow, PendingApproval, FlowEntityType } from '@/types';
 import { userHasAssignedHrmsRole } from '@flc/hrms-services';
+import { resolveApprovalFlowId } from '@/services/approvalFlowService';
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 async function getActiveFlow(
   companyId: string,
   entityType: FlowEntityType,
+  departmentId?: string | null,
 ): Promise<ApprovalFlow | null> {
+  const flowId = await resolveApprovalFlowId(companyId, entityType, departmentId);
+  if (!flowId) return null;
+
   const { data: flow } = await supabase
     .from('approval_flows')
     .select('*')
-    .eq('company_id', companyId)
-    .eq('entity_type', entityType)
-    .eq('is_active', true)
-    .order('created_at', { ascending: true })
-    .limit(1)
+    .eq('id', flowId)
     .maybeSingle();
 
   if (!flow) return null;
@@ -44,12 +45,14 @@ async function getActiveFlow(
     .order('step_order');
 
   return {
-    id:          String(flow.id),
-    companyId:   String(flow.company_id),
-    name:        String(flow.name),
-    description: flow.description ? String(flow.description) : undefined,
-    entityType:  flow.entity_type as FlowEntityType,
-    isActive:    Boolean(flow.is_active),
+    id:           String(flow.id),
+    companyId:    String(flow.company_id),
+    name:         String(flow.name),
+    description:  flow.description ? String(flow.description) : undefined,
+    entityType:   flow.entity_type as FlowEntityType,
+    isActive:     Boolean(flow.is_active),
+    isDefault:    Boolean(flow.is_default),
+    departmentId: flow.department_id ? String(flow.department_id) : null,
     steps: (steps ?? []).filter(s => s.is_active !== false).map(s => ({
       id:               String(s.id),
       flowId:           String(s.flow_id),
@@ -127,7 +130,15 @@ export async function initiateApprovalRequest(
   companyId: string,
   requesterId: string,
 ): Promise<{ id: string | null; error: string | null }> {
-  const flow = await getActiveFlow(companyId, entityType);
+  // Look up requester's department for department-scoped flow resolution
+  const { data: requesterProfile } = await supabase
+    .from('profiles')
+    .select('department_id')
+    .eq('id', requesterId)
+    .maybeSingle();
+  const departmentId = requesterProfile?.department_id ? String(requesterProfile.department_id) : null;
+
+  const flow = await getActiveFlow(companyId, entityType, departmentId);
   if (!flow || flow.steps.length === 0) {
     return { id: null, error: null }; // No flow configured; proceed without workflow
   }

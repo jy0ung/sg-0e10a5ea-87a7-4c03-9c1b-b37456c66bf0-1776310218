@@ -27,6 +27,7 @@ import { GitMerge, Plus, Pencil, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, X,
 import {
   listApprovalFlows, createApprovalFlow, updateApprovalFlow,
   toggleApprovalFlowActive, deleteApprovalFlow, listEmployeesForSelect,
+  listDepartmentsForSelect,
 } from '@/services/approvalFlowService';
 import { listHrmsRoles } from '@/services/hrmsRoleService';
 import type { ApprovalFlow, ApprovalStep, CreateApprovalFlowInput, FlowEntityType } from '@/types';
@@ -65,7 +66,9 @@ const EMPTY_STEP: StepDraft = {
 };
 
 const EMPTY_FORM: ApprovalFlowFormData = {
-  name: '', description: '', entityType: 'general', isActive: true, steps: [],
+  name: '', description: '', entityType: 'general', isActive: true,
+  departmentId: null, isDefault: true,
+  steps: [],
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -97,6 +100,11 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
   const { data: employees = [] } = useQuery({
     queryKey: ['employees-for-select', companyId],
     queryFn: async () => { const { data } = await listEmployeesForSelect(companyId); return data; },
+    enabled: isAuthorized && !!companyId,
+  });
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments-for-select', companyId],
+    queryFn: async () => { const { data } = await listDepartmentsForSelect(companyId); return data; },
     enabled: isAuthorized && !!companyId,
   });
   const { data: hrmsRoles = [] } = useQuery({
@@ -136,11 +144,13 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
   function openEdit(flow: ApprovalFlow) {
     setEditTarget(flow);
     setForm({
-      name:        flow.name,
-      description: flow.description ?? '',
-      entityType:  flow.entityType,
-      isActive:    flow.isActive,
-      steps:       [],
+      name:         flow.name,
+      description:  flow.description ?? '',
+      entityType:   flow.entityType,
+      isActive:     flow.isActive,
+      departmentId: flow.departmentId ?? null,
+      isDefault:    flow.isDefault ?? !flow.departmentId,
+      steps:        [],
     });
     setSteps(flow.steps.map(s => ({
       stepOrder:         s.stepOrder,
@@ -208,10 +218,12 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
 
     setSaving(true);
     const input: CreateApprovalFlowInput = {
-      name:        parsed.data.name,
-      description: parsed.data.description,
-      entityType:  parsed.data.entityType,
-      isActive:    parsed.data.isActive,
+      name:         parsed.data.name,
+      description:  parsed.data.description,
+      entityType:   parsed.data.entityType,
+      isActive:     parsed.data.isActive,
+      departmentId: parsed.data.departmentId ?? null,
+      isDefault:    !parsed.data.departmentId,
       steps:       steps.map((s, i) => ({
         stepOrder:         i + 1,
         name:              s.name,
@@ -231,7 +243,13 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
       : await createApprovalFlow(companyId, user.id, input);
 
     setSaving(false);
-    if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
+    if (error) {
+      const friendlyError = error.includes('uq_approval_flows')
+        ? 'An active flow for this entity type and department scope already exists. Deactivate the existing flow first.'
+        : error;
+      toast({ title: 'Error', description: friendlyError, variant: 'destructive' });
+      return;
+    }
     toast({ title: editTarget ? 'Flow updated' : 'Flow created' });
     setDialogOpen(false);
     void queryClient.invalidateQueries({ queryKey: ['approval-flows', companyId] });
@@ -337,6 +355,7 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
             <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               <th className="whitespace-nowrap px-3 py-2 font-semibold">Name</th>
               <th className="whitespace-nowrap px-3 py-2 font-semibold">Applies To</th>
+              <th className="whitespace-nowrap px-3 py-2 font-semibold">Scope</th>
               <th className="whitespace-nowrap px-3 py-2 font-semibold">Steps</th>
               <th className="whitespace-nowrap px-3 py-2 font-semibold">Status</th>
               <th className="whitespace-nowrap px-3 py-2 font-semibold">Actions</th>
@@ -344,9 +363,9 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="py-8 text-center text-muted-foreground text-xs">Loading…</td></tr>
+              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground text-xs">Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={5} className="py-8 text-center text-muted-foreground text-xs">
+              <tr><td colSpan={6} className="py-8 text-center text-muted-foreground text-xs">
                 No approval flows yet. Create your first flow.
               </td></tr>
             ) : filtered.map(flow => (
@@ -356,6 +375,17 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
                   <Badge className={ENTITY_TYPE_BADGE[flow.entityType]}>
                     {ENTITY_TYPE_LABELS[flow.entityType]}
                   </Badge>
+                </td>
+                <td className="px-3 py-2">
+                  {flow.departmentId ? (
+                    <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300">
+                      {flow.departmentName ?? 'Department'}
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
+                      Default
+                    </Badge>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-muted-foreground">{flow.steps.length} step{flow.steps.length !== 1 ? 's' : ''}</td>
                 <td className="px-3 py-2">
@@ -428,6 +458,30 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Department Scope</Label>
+                  <Select
+                    value={form.departmentId ?? '__default__'}
+                    onValueChange={v => setForm(f => ({
+                      ...f,
+                      departmentId: v === '__default__' ? null : v,
+                      isDefault: v === '__default__',
+                    }))}
+                  >
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">All Departments (Default fallback)</SelectItem>
+                      {departments.map(d => (
+                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {form.departmentId
+                      ? 'Applies only to the selected department.'
+                      : 'Fallback for all departments without a specific flow.'}
+                  </p>
                 </div>
                 <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
                   <div>

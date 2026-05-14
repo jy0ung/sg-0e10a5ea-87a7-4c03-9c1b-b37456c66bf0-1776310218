@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { AppraisalItem, ApprovalDecision, Employee, EmployeeStatus, AppRole, FlowEntityType, DEFAULT_APP_ROLE } from '@/types';
+import { resolveApprovalFlowId } from '@/services/approvalFlowService';
 
 export const DIRECTORY_EMPLOYEE_SELECT = 'id, company_id, branch_id, manager_employee_id, primary_role, status, staff_code, name, work_email, personal_email, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, department:departments!employees_department_id_fkey(name), job_title:job_titles!employees_job_title_id_fkey(name)';
 
@@ -247,21 +248,17 @@ export async function bootstrapApprovalInstanceForEntity(
   entityId: string,
   requesterId: string,
 ): Promise<{ error: string | null }> {
-  const { data: flows, error: flowError } = await supabase
-    .from('approval_flows')
-    .select('id')
-    .eq('company_id', companyId)
-    .eq('entity_type', entityType)
-    .eq('is_active', true)
-    .order('updated_at', { ascending: false })
-    .limit(2);
-  if (flowError) return { error: flowError.message };
-  if (!flows?.length) return { error: null };
-  if (flows.length > 1) {
-    return { error: `Multiple active approval flows found for ${entityType}. Deactivate extras before continuing.` };
-  }
+  // Look up requester's department for department-scoped flow resolution
+  const { data: requesterProfile } = await supabase
+    .from('profiles')
+    .select('department_id')
+    .eq('id', requesterId)
+    .maybeSingle();
+  const departmentId = requesterProfile?.department_id ? String(requesterProfile.department_id) : null;
 
-  const flowId = String(flows[0].id);
+  const flowId = await resolveApprovalFlowId(companyId, entityType, departmentId);
+  if (!flowId) return { error: null };
+
   const { data: steps, error: stepError } = await supabase
     .from('approval_steps')
     .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')

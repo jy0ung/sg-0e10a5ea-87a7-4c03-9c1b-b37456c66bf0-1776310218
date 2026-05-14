@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
-import type { ApprovalFlow, ApprovalStep, CreateApprovalFlowInput, UpdateApprovalFlowInput } from '@/types';
+import type { ApprovalFlow, ApprovalStep, CreateApprovalFlowInput, FlowEntityType, UpdateApprovalFlowInput } from '@/types';
 
 // ─── Row mappers ─────────────────────────────────────────────────────────────
 
@@ -29,16 +29,22 @@ function rowToStep(r: Record<string, unknown>): ApprovalStep {
 
 function rowToFlow(r: Record<string, unknown>, steps: ApprovalStep[]): ApprovalFlow {
   return {
-    id:          String(r.id ?? ''),
-    companyId:   String(r.company_id ?? ''),
-    name:        String(r.name ?? ''),
-    description: r.description ? String(r.description) : undefined,
-    entityType:  (r.entity_type as ApprovalFlow['entityType']) ?? 'general',
-    isActive:    Boolean(r.is_active),
-    createdBy:   r.created_by ? String(r.created_by) : undefined,
+    id:             String(r.id ?? ''),
+    companyId:      String(r.company_id ?? ''),
+    name:           String(r.name ?? ''),
+    description:    r.description ? String(r.description) : undefined,
+    entityType:     (r.entity_type as ApprovalFlow['entityType']) ?? 'general',
+    isActive:       Boolean(r.is_active),
+    createdBy:      r.created_by ? String(r.created_by) : undefined,
+    departmentId:   r.department_id ? String(r.department_id) : null,
+    departmentName: r.department
+      ? String((r.department as Record<string, unknown>)?.name ?? '')
+      : undefined,
+    isDefault:      Boolean(r.is_default),
+    updatedBy:      r.updated_by ? String(r.updated_by) : undefined,
     steps,
-    createdAt:   String(r.created_at ?? ''),
-    updatedAt:   String(r.updated_at ?? ''),
+    createdAt:      String(r.created_at ?? ''),
+    updatedAt:      String(r.updated_at ?? ''),
   };
 }
 
@@ -49,7 +55,7 @@ function rowToFlow(r: Record<string, unknown>, steps: ApprovalStep[]): ApprovalF
 export async function listApprovalFlows(companyId: string): Promise<{ data: ApprovalFlow[]; error: string | null }> {
   const { data: flows, error } = await supabase
     .from('approval_flows')
-    .select('*')
+    .select('*, department:departments!approval_flows_department_id_fkey(name)')
     .eq('company_id', companyId)
     .order('name');
   if (error) return { data: [], error: error.message };
@@ -87,12 +93,15 @@ export async function createApprovalFlow(
   const { data: flow, error: flowError } = await supabase
     .from('approval_flows')
     .insert({
-      company_id:  companyId,
-      name:        input.name,
-      description: input.description ?? null,
-      entity_type: input.entityType,
-      is_active:   input.isActive,
-      created_by:  actorId,
+      company_id:    companyId,
+      name:          input.name,
+      description:   input.description ?? null,
+      entity_type:   input.entityType,
+      is_active:     input.isActive,
+      created_by:    actorId,
+      updated_by:    actorId,
+      department_id: input.departmentId ?? null,
+      is_default:    input.isDefault ?? false,
     })
     .select('*')
     .single();
@@ -132,11 +141,14 @@ export async function updateApprovalFlow(
   const { error: flowError } = await supabase
     .from('approval_flows')
     .update({
-      name:        input.name,
-      description: input.description ?? null,
-      entity_type: input.entityType,
-      is_active:   input.isActive,
-      updated_at:  new Date().toISOString(),
+      name:          input.name,
+      description:   input.description ?? null,
+      entity_type:   input.entityType,
+      is_active:     input.isActive,
+      updated_by:    actorId,
+      department_id: input.departmentId ?? null,
+      is_default:    input.isDefault ?? false,
+      updated_at:    new Date().toISOString(),
     })
     .eq('company_id', companyId)
     .eq('id', flowId);
@@ -209,4 +221,63 @@ export async function listEmployeesForSelect(
     data: (data ?? []).map(r => ({ id: String(r.id), name: String(r.name) })),
     error: null,
   };
+}
+
+/** Lightweight department list for the department scope picker. */
+export async function listDepartmentsForSelect(
+  companyId: string,
+): Promise<{ data: { id: string; name: string }[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('departments')
+    .select('id, name')
+    .eq('company_id', companyId)
+    .eq('is_active', true)
+    .order('name');
+  if (error) return { data: [], error: error.message };
+  return {
+    data: (data ?? []).map(r => ({ id: String(r.id), name: String(r.name) })),
+    error: null,
+  };
+}
+
+/**
+ * Resolve the ID of the best-matching approval flow for a given entity type
+ * and optional department.
+ *
+ * Priority:
+ *   1. Active flow scoped to the requester's exact department.
+ *   2. Active flow marked as default (is_default = true) with no department.
+ *   3. Any active flow with no department (backward compatibility).
+ *   4. null — no flow configured; caller handles the fallback case.
+ */
+export async function resolveApprovalFlowId(
+  companyId: string,
+  entityType: FlowEntityType,
+  departmentId?: string | null,
+): Promise<string | null> {
+  const { data: flows } = await supabase
+    .from('approval_flows')
+    .select('id, department_id, is_default')
+    .eq('company_id', companyId)
+    .eq('entity_type', entityType)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true });
+
+  if (!flows?.length) return null;
+
+  // Priority 1: exact department match
+  if (departmentId) {
+    const match = flows.find(f => f.department_id === departmentId);
+    if (match) return String(match.id);
+  }
+
+  // Priority 2: default flow (no department, explicitly marked default)
+  const defaultFlow = flows.find(f => Boolean(f.is_default) && !f.department_id);
+  if (defaultFlow) return String(defaultFlow.id);
+
+  // Priority 3: any flow with no department (backward compat with pre-department flows)
+  const fallback = flows.find(f => !f.department_id);
+  if (fallback) return String(fallback.id);
+
+  return null;
 }

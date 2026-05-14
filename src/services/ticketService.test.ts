@@ -38,13 +38,19 @@ describe('ticketService', () => {
   });
 
   function mockNoActiveInternalRequestApprovalFlow() {
-    const limit = vi.fn().mockResolvedValue({ data: [], error: null });
-    const order = vi.fn(() => ({ limit }));
+    const order = vi.fn().mockResolvedValue({ data: [], error: null });
     const activeEq = vi.fn(() => ({ order }));
     const entityEq = vi.fn(() => ({ eq: activeEq }));
     const companyEq = vi.fn(() => ({ eq: entityEq }));
     const select = vi.fn(() => ({ eq: companyEq }));
-    return { select, companyEq, entityEq, activeEq, order, limit };
+    return { select, companyEq, entityEq, activeEq, order };
+  }
+
+  function mockProfilesDepartmentLookup() {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    return { select };
   }
 
   function mockNoInternalRequestApprovalMetadata() {
@@ -69,11 +75,13 @@ describe('ticketService', () => {
   });
 
   it('derives ticket owner and company from authenticated context', async () => {
+    const profilesLookup = mockProfilesDepartmentLookup();
     const approvalFlowSelect = mockNoActiveInternalRequestApprovalFlow();
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-1' }, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
     vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: profilesLookup.select }) as never)
       .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
       .mockImplementationOnce(() => ({ insert }) as never);
 
@@ -216,11 +224,13 @@ describe('ticketService', () => {
   it('auto-assigns the ticket when a routing rule matches the submission context', async () => {
     vi.mocked(evaluateRoutingRules).mockResolvedValueOnce('agent-7');
 
+    const profilesLookup = mockProfilesDepartmentLookup();
     const approvalFlowSelect = mockNoActiveInternalRequestApprovalFlow();
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-2' }, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
     vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: profilesLookup.select }) as never)
       .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
       .mockImplementationOnce(() => ({ insert }) as never);
 

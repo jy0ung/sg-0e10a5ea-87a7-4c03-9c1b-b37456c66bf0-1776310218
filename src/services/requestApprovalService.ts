@@ -3,6 +3,7 @@ import type { ApprovalDecision, ApprovalInstanceStatus } from '@/types';
 import { rowToApprovalDecision, rowToApprovalStep, resolveStepRouting, userHasAssignedHrmsRole } from './hrms/shared';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
+import { resolveApprovalFlowId } from './approvalFlowService';
 
 export interface InternalRequestApprovalPlan {
   flowId: string;
@@ -39,8 +40,8 @@ interface ApprovalInstanceRow {
 type RequestApprovalDecision = 'approved' | 'rejected';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function approvalFlowsTable(): any {
-  return supabase.from('approval_flows' as never);
+function profilesTable(): any {
+  return supabase.from('profiles' as never);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -85,31 +86,28 @@ export async function getInternalRequestApprovalPlan(
   companyId: string,
   requesterId: string,
 ): Promise<{ data: InternalRequestApprovalPlan | null; error: string | null }> {
-  const { data: flows, error: flowError } = await approvalFlowsTable()
-    .select('id')
-    .eq('company_id', companyId)
-    .eq('entity_type', 'internal_request')
-    .eq('is_active', true)
-    .order('updated_at', { ascending: false })
-    .limit(2);
+  // Look up requester's department for department-scoped flow resolution
+  const { data: requesterProfile } = await profilesTable()
+    .select('department_id')
+    .eq('id', requesterId)
+    .maybeSingle();
+  const departmentId = (requesterProfile as Record<string, unknown>)?.department_id
+    ? String((requesterProfile as Record<string, unknown>).department_id)
+    : null;
 
-  if (flowError) return { data: null, error: flowError.message };
-  if (!flows?.length) return { data: null, error: null };
-  if (flows.length > 1) {
-    return { data: null, error: 'Multiple active Internal Request approval flows found. Deactivate extras before accepting new requests.' };
-  }
+  const flowId = await resolveApprovalFlowId(companyId, 'internal_request', departmentId);
+  if (!flowId) return { data: null, error: null };
 
-  const flowId = String(flows[0].id);
   const { data: steps, error: stepsError } = await approvalStepsTable()
     .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
     .eq('flow_id', flowId)
     .order('step_order');
 
   if (stepsError) return { data: null, error: stepsError.message };
-  if (!steps?.length) return { data: null, error: 'The active Internal Request approval flow has no steps configured.' };
+  if (!steps?.length) return { data: null, error: 'The configured approval flow has no steps. Please contact HR/Admin.' };
 
   const firstStep = (steps ?? []).map((row: Record<string, unknown>) => rowToApprovalStep(row)).find(step => step.isActive);
-  if (!firstStep) return { data: null, error: 'The active Internal Request approval flow has no active steps configured.' };
+  if (!firstStep) return { data: null, error: 'The configured approval flow has no active steps. Please contact HR/Admin.' };
   const routing = await resolveStepRouting(firstStep, requesterId, companyId);
   if (routing.error) return { data: null, error: routing.error };
 

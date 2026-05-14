@@ -318,39 +318,62 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
+          department_id: string | null
           description: string | null
           entity_type: string
           id: string
           is_active: boolean
+          is_default: boolean
           name: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           company_id: string
           created_at?: string
           created_by?: string | null
+          department_id?: string | null
           description?: string | null
           entity_type?: string
           id?: string
           is_active?: boolean
+          is_default?: boolean
           name: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           company_id?: string
           created_at?: string
           created_by?: string | null
+          department_id?: string | null
           description?: string | null
           entity_type?: string
           id?: string
           is_active?: boolean
+          is_default?: boolean
           name?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "approval_flows_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_flows_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_flows_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
