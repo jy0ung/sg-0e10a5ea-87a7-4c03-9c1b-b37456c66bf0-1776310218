@@ -201,12 +201,23 @@ export async function replaceHrmsRoleEmployeeAssignments(
   if (deleteError) return { error: deleteError.message };
 
   if (uniqueEmployeeIds.length) {
+    // Resolve profile_id for each employee so lookups by profile_id also work
+    const { data: profileRows } = await db
+      .from('profiles')
+      .select('id, employee_id')
+      .eq('company_id', companyId)
+      .in('employee_id', uniqueEmployeeIds);
+    const profileByEmployee = new Map(
+      (profileRows ?? []).map((p) => [String(p.employee_id), String(p.id)]),
+    );
+
     const { error: insertError } = await db
       .from('employee_hrms_role_assignments')
       .insert(uniqueEmployeeIds.map((employeeId, index) => ({
         company_id: companyId,
         hrms_role_id: roleId,
         employee_id: employeeId,
+        profile_id: profileByEmployee.get(employeeId) ?? null,
         is_primary: index === 0,
         assigned_by: actorId,
       })));
