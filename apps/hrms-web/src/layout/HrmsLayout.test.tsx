@@ -6,9 +6,14 @@ import HrmsLayout from './HrmsLayout';
 import { hrmsNavItems } from './navItems';
 
 const mockUseAuth = vi.fn();
+const mockUseHrmsAccess = vi.fn();
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
+}));
+
+vi.mock('@/hooks/useHrmsAccess', () => ({
+  useHrmsAccess: () => mockUseHrmsAccess(),
 }));
 
 vi.mock('@/components/theme/ThemeToggle', () => ({
@@ -31,12 +36,42 @@ function makeUser(role: AppRole): User {
   };
 }
 
+const ADMIN_ROLES: AppRole[] = ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'];
+const SELF_SERVICE_ROUTES = new Set(['leave', 'approvals', 'appraisals', 'announcements', 'profile']);
+
 function renderLayout(role: AppRole, initialPath = '/leave') {
   const user = makeUser(role);
   mockUseAuth.mockReturnValue({
     user,
     logout: vi.fn(),
     hasRole: (roles: AppRole[]) => role === 'super_admin' || roles.includes(role),
+  });
+
+  const isAdmin = ADMIN_ROLES.includes(role);
+  mockUseHrmsAccess.mockReturnValue({
+    canAccessRoute: (route: string) => isAdmin || SELF_SERVICE_ROUTES.has(route),
+    primaryRoleLabel: isAdmin ? 'HR Manager' : 'Staff',
+    loading: false,
+    error: null,
+    refresh: vi.fn(),
+    roles: [],
+    roleIds: [],
+    roleCodes: [],
+    roleNames: [],
+    primaryRole: null,
+    hasSelfServiceAccess: true,
+    canApproveRequests: isAdmin,
+    canAccessAttendance: isAdmin,
+    canManageAttendance: isAdmin,
+    canAccessEmployees: isAdmin,
+    canManageEmployees: isAdmin,
+    canAccessPayroll: isAdmin,
+    canAccessSettings: isAdmin,
+    canAccessAnnouncements: isAdmin,
+    canManageAnnouncements: isAdmin,
+    canAccessAppraisals: true,
+    canViewPii: isAdmin,
+    matchesApproverRole: () => false,
   });
 
   render(
@@ -56,6 +91,7 @@ function renderLayout(role: AppRole, initialPath = '/leave') {
 describe('HrmsLayout', () => {
   beforeEach(() => {
     mockUseAuth.mockReset();
+    mockUseHrmsAccess.mockReset();
   });
 
   it('keeps navigation limited to HRMS routes', () => {
