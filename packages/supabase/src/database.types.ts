@@ -7,8 +7,133 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      accounting_periods: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          company_id: string
+          created_at: string
+          end_date: string
+          id: string
+          name: string
+          period_month: number
+          period_year: number
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id: string
+          created_at?: string
+          end_date: string
+          id?: string
+          name: string
+          period_month: number
+          period_year: number
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id?: string
+          created_at?: string
+          end_date?: string
+          id?: string
+          name?: string
+          period_month?: number
+          period_year?: number
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_periods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounts: {
+        Row: {
+          code: string
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       additional_items: {
         Row: {
           company_id: string
@@ -2746,6 +2871,108 @@ export type Database = {
           },
         ]
       }
+      journal_entries: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string
+          entry_date: string
+          id: string
+          period_id: string
+          posted_at: string
+          posted_by: string | null
+          reference_no: string | null
+          source_id: string | null
+          source_type: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description: string
+          entry_date: string
+          id?: string
+          period_id: string
+          posted_at?: string
+          posted_by?: string | null
+          reference_no?: string | null
+          source_id?: string | null
+          source_type: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string
+          entry_date?: string
+          id?: string
+          period_id?: string
+          posted_at?: string
+          posted_by?: string | null
+          reference_no?: string | null
+          source_id?: string | null
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entries_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "accounting_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_entry_lines: {
+        Row: {
+          account_id: string
+          created_at: string
+          credit: number
+          debit: number
+          description: string | null
+          id: string
+          journal_entry_id: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          credit?: number
+          debit?: number
+          description?: string | null
+          id?: string
+          journal_entry_id: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          credit?: number
+          debit?: number
+          description?: string | null
+          id?: string
+          journal_entry_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entry_lines_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entry_lines_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_balances: {
         Row: {
           created_at: string
@@ -2893,7 +3120,9 @@ export type Database = {
           default_days: number
           id: string
           is_paid: boolean
+          min_advance_notice_days: number | null
           name: string
+          requires_balance: boolean
           updated_at: string
         }
         Insert: {
@@ -2906,7 +3135,9 @@ export type Database = {
           default_days?: number
           id?: string
           is_paid?: boolean
+          min_advance_notice_days?: number | null
           name: string
+          requires_balance?: boolean
           updated_at?: string
         }
         Update: {
@@ -2919,7 +3150,9 @@ export type Database = {
           default_days?: number
           id?: string
           is_paid?: boolean
+          min_advance_notice_days?: number | null
           name?: string
+          requires_balance?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -5636,6 +5869,18 @@ export type Database = {
           reversal_of_event_id: string
         }[]
       }
+      get_trial_balance: {
+        Args: { p_company_id: string; p_period_id: string }
+        Returns: {
+          account_code: string
+          account_id: string
+          account_name: string
+          account_type: string
+          net_balance: number
+          total_credit: number
+          total_debit: number
+        }[]
+      }
       is_same_company: { Args: { target_company_id: string }; Returns: boolean }
       link_vehicle_to_sales_order: {
         Args: {
@@ -5650,6 +5895,14 @@ export type Database = {
       normalize_dms_vehicle_stock: {
         Args: { p_delivery_id?: string; p_raw_id: string }
         Returns: Json
+      }
+      post_ap_payment_to_gl: {
+        Args: { p_supplier_payment_event_id: string }
+        Returns: string
+      }
+      post_ar_payment_to_gl: {
+        Args: { p_payment_event_id: string }
+        Returns: string
       }
       record_payment_event: {
         Args: {
@@ -5852,6 +6105,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

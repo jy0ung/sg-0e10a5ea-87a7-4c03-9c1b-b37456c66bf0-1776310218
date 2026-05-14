@@ -120,7 +120,7 @@ Relevant evidence:
 
 ## Current Phase
 
-Current phase: Phase 5 / Stages 0–5 complete as of 2026-05-14. Stage 6 (General Ledger and financial reporting) is next. DMS staging foundation, DMS normalizers, Sales Pipeline RPCs, Full-Stack Refactor, AR Foundation (immutable `payment_events` ledger), AP Foundation (`supplier_payment_events` with lifecycle state machine), HRMS role-based access system (`hrms_roles`, `employee_hrms_role_assignments`, `useHrmsAccess` hook, `deriveFullHrmsAccess` admin bypass), and six HRMS feature migrations (half-day leave, company branding, leave type rules, staff role consolidation, `creator_updater` defaults) are all committed and locally validated.
+Current phase: Phase 5 / Stages 0–6 complete as of 2026-05-14. Stage 7 (financial reporting UI) is next. DMS staging foundation, DMS normalizers, Sales Pipeline RPCs, Full-Stack Refactor, AR Foundation (immutable `payment_events` ledger), AP Foundation (`supplier_payment_events` with lifecycle state machine), HRMS role-based access system (`hrms_roles`, `employee_hrms_role_assignments`, `useHrmsAccess` hook, `deriveFullHrmsAccess` admin bypass), and six HRMS feature migrations (half-day leave, company branding, leave type rules, staff role consolidation, `creator_updater` defaults) are all committed and locally validated.
 
 Stage 0 goal:
 
@@ -200,12 +200,12 @@ Use this checklist to decide the next work item without needing to ask for a bro
 
 ### Stage 6 - General Ledger
 
-- [ ] Define chart of accounts (`accounts` table: code, name, type `asset|liability|equity|revenue|expense`, is_system).
-- [ ] Define journal entry structure (`journal_entries` header + `journal_entry_lines` with debit/credit/account/description).
-- [ ] Define accounting period table and period-close contract.
-- [ ] Add SECURITY DEFINER posting RPCs: `post_ar_payment_to_gl` (derives from AR `payment_events`), `post_ap_payment_to_gl` (derives from AP `supplier_payment_events`).
-- [ ] Add `get_trial_balance(company_id, period_id)` RPC.
-- [ ] Add focused tests and RLS coverage for journal entries and account tables.
+- [x] Define chart of accounts (`accounts` table: code, name, type `asset|liability|equity|revenue|expense`, is_system). Migration `20260514200000` applied.
+- [x] Define journal entry structure (`journal_entries` header + `journal_entry_lines` with debit/credit/account/description). Balance validated by DEFERRABLE constraint trigger.
+- [x] Define accounting period table and period-close contract (`accounting_periods`, status `open|closed|locked`).
+- [x] Add SECURITY DEFINER posting RPCs: `post_ar_payment_to_gl` (derives from AR `payment_events`), `post_ap_payment_to_gl` (derives from AP `supplier_payment_events`). Both idempotent.
+- [x] Add `get_trial_balance(company_id, period_id)` RPC.
+- [x] Add focused tests and RLS coverage for journal entries and account tables. 14/14 `glService.test.ts` tests pass.
 
 Current foundation slice status:
 
@@ -226,9 +226,9 @@ Current foundation slice status:
 15. ~~Next: begin Stage 2 — Sales Pipeline foundation. Add `transition_sales_order_stage()` RPC with audit events; strengthen Sales Dashboard to load without full vehicle hydration.~~ Done 2026-05-11 — Stage 3 Sales Pipeline Foundation complete (see Stage 3 section below).
 16. ~~Next: begin Stage 4 — AR Foundation. Add `payment_events` immutable ledger to `invoices`.~~ Done 2026-05-11 — Stage 4 AR Foundation complete (`cddb6c7`). 401/401 tests pass.
 17. ~~Next: begin Stage 5 — AP Foundation. Add `supplier_payment_events` immutable ledger to `purchase_invoices` with lifecycle state machine.~~ Done 2026-05-11 — Stage 5 AP Foundation complete (`b1a7d4b`). 413/413 tests pass.
-18. ~~Next: begin Stage 6 — General Ledger. Define chart of accounts, journal entry structure, posting rules that derive from AR `payment_events` and AP `supplier_payment_events`, and accounting period close contract.~~ In progress — see Stage 6 checklist below.
+18. ~~Next: begin Stage 6 — General Ledger. Define chart of accounts, journal entry structure, posting rules that derive from AR `payment_events` and AP `supplier_payment_events`, and accounting period close contract.~~ Done 2026-05-14 — Stage 6 GL Foundation complete. Migration `20260514200000` applied; `accounts`, `accounting_periods`, `journal_entries`, `journal_entry_lines` live; `post_ar_payment_to_gl`, `post_ap_payment_to_gl`, `get_trial_balance` RPCs shipped; `glService.ts` + 14 tests added. 788/788 tests pass.
 19. ~~Next: apply HRMS feature migrations (half-day leave, HRMS role system, company branding, leave type rules, staff role consolidation, analyst default cleanup) and implement HRMS role-based access control.~~ Done 2026-05-14 — 6 migrations applied; `hrms_roles` + `employee_hrms_role_assignments` tables live; `useHrmsAccess` + `deriveFullHrmsAccess()` shipped; `super_admin`/`company_admin` bypass in place (`e61a4ec`).
-20. Next: begin Stage 6 — General Ledger.
+20. ~~Next: begin Stage 6 — General Ledger.~~ Done — see item 18.
 
 ### Stage 3 - Sales Pipeline Foundation
 
