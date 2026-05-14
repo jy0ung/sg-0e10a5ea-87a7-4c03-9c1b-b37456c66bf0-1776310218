@@ -2,7 +2,7 @@
 
 Status: Active consolidated source of planning truth
 
-Last consolidated: 2026-05-11
+Last consolidated: 2026-05-14
 
 This document summarizes the active development plan across the repo. It does not replace the detailed phase docs, runbooks, or historical closeout notes. Use this file for current status, immediate priorities, and the next implementation direction; use the linked source documents for evidence and operational detail.
 
@@ -105,6 +105,8 @@ Phase closeouts and validated milestones:
 | Full-Stack Refactor (R1–R5) | Committed `e63d49f` 2026-05-11 | `STALE` constants extracted to `queryClient.ts`; `SalesContext` realtime subscription removed; `VehicleDetailPanel` converted to Sheet; `VehicleResultsTable` extracted; ENV.md pooler docs updated; ARCHITECTURE.md and DEVELOPMENT_PLAN.md updated. 401 tests passed. |
 | Stage 4 AR Foundation | Committed `cddb6c7` 2026-05-11 | `payment_events` immutable ledger on `invoices` with `REVOKE` on direct DML. Five SECURITY DEFINER RPCs: `record_payment_event`, `reverse_payment_event`, `get_payment_events`, `get_ar_aging_summary`, and official receipt allocation. Trigger recomputes `paid_amount`/`payment_status` atomically. `invoiceService` extended with AR methods; `Invoices.tsx` gains AR aging cards, payment status badge, and Record Payment dialog. 10 new tests (401 total). |
 | Stage 5 AP Foundation | Committed `b1a7d4b` 2026-05-11 | `supplier_payment_events` immutable ledger on `purchase_invoices` with same pattern as AR. Five SECURITY DEFINER RPCs: `record_supplier_payment_event`, `reverse_supplier_payment_event`, `get_supplier_payment_events`, `get_ap_aging_summary`, `transition_pi_lifecycle`. Lifecycle state machine: received → verified → approved → scheduled/paid; any → cancelled. `apService.ts` created; `purchaseInvoiceService` extended; `PurchaseInvoices.tsx` gains AP aging cards, lifecycle and payment badges, Verify/Approve/Pay action buttons, and Record Payment dialog. 12 new tests (413 total). |
+| HRMS feature batch (2026-05-13) | Committed across multiple commits | Six migrations applied: (1) `20260513090000` — half-day leave metadata (`day_part` column on `leave_requests`: `full_day/half_day_morning/half_day_afternoon`) and leave attachments. (2) `20260513103000` — `hrms_roles` and `employee_hrms_role_assignments` tables, RLS policies, system-default role seeding per company; approval routing updated to use HRMS role assignments. (3) `20260513120000` — `company_branding` table and `company-assets` storage bucket. (4) `20260513140000` — `requires_balance` and `min_advance_notice_days` rule columns on `leave_types`. (5) `20260513150000` — adds `staff` category to `hrms_roles_category_check`; consolidates legacy `employee` role into `staff`; seeds `staff` system-default for all companies; annotates `profiles.role` comment that `analyst` should not gate HRMS access. (6) `20260514113000` — `profiles.role` and `employees.primary_role` column defaults changed to `'creator_updater'`; pending `analyst` profiles with no company migrated; `handle_new_user()` rewritten to create pending accounts with `creator_updater` role. |
+| HRMS role-based access system | Committed `940f6d3` — CI fix `5f9d68f` — admin bypass `e61a4ec` 2026-05-14 | `useHrmsAccess` hook (in both root `src/hooks/` and `apps/hrms-web/src/hooks/`) queries `employee_hrms_role_assignments` and derives access via `deriveHrmsAccess()`. `HrmsLayout` and `RequireHrmsRouteAccess` consume the hook for fine-grained route visibility. `deriveFullHrmsAccess()` added to both `src/lib/hrms/access.ts` copies; `super_admin` and `company_admin` bypass the assignment query entirely and receive full access. `listUserAssignedHrmsRoleCodes()` added to `packages/hrms-services` (mobile use). CI failures resolved: TS2322 explicit `string[]` type in `approvalRouting.ts`; `useHrmsAccess` mock in `HrmsLayout.test.tsx` to avoid `QueryClientProvider` requirement. |
 
 Relevant evidence:
 
@@ -118,7 +120,7 @@ Relevant evidence:
 
 ## Current Phase
 
-Current phase: Phase 5 / Stages 0–5 complete as of 2026-05-11. Stage 6 (General Ledger and financial reporting) is next. DMS staging foundation, DMS normalizers, Sales Pipeline RPCs, Full-Stack Refactor, AR Foundation (immutable `payment_events` ledger), and AP Foundation (`supplier_payment_events` with lifecycle state machine) are all committed and locally validated with 413 tests passing.
+Current phase: Phase 5 / Stages 0–5 complete as of 2026-05-14. Stage 6 (General Ledger and financial reporting) is next. DMS staging foundation, DMS normalizers, Sales Pipeline RPCs, Full-Stack Refactor, AR Foundation (immutable `payment_events` ledger), AP Foundation (`supplier_payment_events` with lifecycle state machine), HRMS role-based access system (`hrms_roles`, `employee_hrms_role_assignments`, `useHrmsAccess` hook, `deriveFullHrmsAccess` admin bypass), and six HRMS feature migrations (half-day leave, company branding, leave type rules, staff role consolidation, `creator_updater` defaults) are all committed and locally validated.
 
 Stage 0 goal:
 
@@ -194,6 +196,16 @@ Use this checklist to decide the next work item without needing to ask for a bro
 - [ ] Internal Request: analytics dashboards and notification expansion.
 - [ ] Production APNs: provision secrets and record iOS device smoke evidence.
 - [ ] Launch readiness: PITR/restore drill, live RLS sign-off, OSV/CodeQL evidence, Sentry/alerts, rollback proof, and load testing.
+- [ ] HRMS: assign `employee_hrms_role_assignments` rows to existing employees who need HRMS self-service access (non-admin users have zero HRMS route access until assigned at least one active HRMS role).
+
+### Stage 6 - General Ledger
+
+- [ ] Define chart of accounts (`accounts` table: code, name, type `asset|liability|equity|revenue|expense`, is_system).
+- [ ] Define journal entry structure (`journal_entries` header + `journal_entry_lines` with debit/credit/account/description).
+- [ ] Define accounting period table and period-close contract.
+- [ ] Add SECURITY DEFINER posting RPCs: `post_ar_payment_to_gl` (derives from AR `payment_events`), `post_ap_payment_to_gl` (derives from AP `supplier_payment_events`).
+- [ ] Add `get_trial_balance(company_id, period_id)` RPC.
+- [ ] Add focused tests and RLS coverage for journal entries and account tables.
 
 Current foundation slice status:
 
@@ -214,7 +226,9 @@ Current foundation slice status:
 15. ~~Next: begin Stage 2 — Sales Pipeline foundation. Add `transition_sales_order_stage()` RPC with audit events; strengthen Sales Dashboard to load without full vehicle hydration.~~ Done 2026-05-11 — Stage 3 Sales Pipeline Foundation complete (see Stage 3 section below).
 16. ~~Next: begin Stage 4 — AR Foundation. Add `payment_events` immutable ledger to `invoices`.~~ Done 2026-05-11 — Stage 4 AR Foundation complete (`cddb6c7`). 401/401 tests pass.
 17. ~~Next: begin Stage 5 — AP Foundation. Add `supplier_payment_events` immutable ledger to `purchase_invoices` with lifecycle state machine.~~ Done 2026-05-11 — Stage 5 AP Foundation complete (`b1a7d4b`). 413/413 tests pass.
-18. Next: begin Stage 6 — General Ledger. Define chart of accounts, journal entry structure, posting rules that derive from AR `payment_events` and AP `supplier_payment_events`, and accounting period close contract.
+18. ~~Next: begin Stage 6 — General Ledger. Define chart of accounts, journal entry structure, posting rules that derive from AR `payment_events` and AP `supplier_payment_events`, and accounting period close contract.~~ In progress — see Stage 6 checklist below.
+19. ~~Next: apply HRMS feature migrations (half-day leave, HRMS role system, company branding, leave type rules, staff role consolidation, analyst default cleanup) and implement HRMS role-based access control.~~ Done 2026-05-14 — 6 migrations applied; `hrms_roles` + `employee_hrms_role_assignments` tables live; `useHrmsAccess` + `deriveFullHrmsAccess()` shipped; `super_admin`/`company_admin` bypass in place (`e61a4ec`).
+20. Next: begin Stage 6 — General Ledger.
 
 ### Stage 3 - Sales Pipeline Foundation
 
