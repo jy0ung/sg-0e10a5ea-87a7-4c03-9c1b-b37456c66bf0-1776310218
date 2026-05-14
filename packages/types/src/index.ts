@@ -2,6 +2,8 @@
 export type AppRole = 'super_admin' | 'company_admin' | 'director' | 'general_manager' | 'manager' | 'sales' | 'accounts' | 'analyst' | 'creator_updater';
 export type AccessScope = 'self' | 'branch' | 'company' | 'global';
 
+export const DEFAULT_APP_ROLE: AppRole = 'creator_updater';
+
 export const ROLE_DEFAULT_SCOPE: Record<AppRole, AccessScope> = {
   super_admin: 'global',
   company_admin: 'company',
@@ -46,6 +48,7 @@ export type HrmsRoleCategory =
   | 'hr'
   | 'department'
   | 'line_management'
+  | 'staff'
   | 'employee'
   | 'payroll'
   | 'attendance'

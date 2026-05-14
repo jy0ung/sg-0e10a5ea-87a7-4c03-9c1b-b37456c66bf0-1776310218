@@ -1,4 +1,3 @@
-import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
 import * as pkg from '@flc/hrms-services';
 import { PayrollRun, PayrollItem, PayrollRunStatus } from '@/types';
@@ -53,15 +52,7 @@ export async function reviewPayrollRunFinalisation(
   note?: string,
 ): Promise<{ error: string | null }> {
   try {
-    const { data: reviewer, error: reviewerError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', reviewerId)
-      .single();
-    if (reviewerError) return { error: reviewerError.message };
-    const reviewerRole = String((reviewer as Record<string, unknown> | null)?.role ?? '');
-
-    await pkg.reviewPayrollRunFinalisation({ runId, reviewerId, reviewerRole, decision, note });
+    await pkg.reviewPayrollRunFinalisation({ runId, reviewerId, decision, note });
     void logUserAction(reviewerId, 'update', 'payroll_run', runId, { decision, reviewerNote: note ?? null });
     return { error: null };
   } catch (e) {

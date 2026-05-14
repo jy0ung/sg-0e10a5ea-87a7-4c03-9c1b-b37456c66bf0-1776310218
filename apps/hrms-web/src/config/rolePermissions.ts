@@ -38,6 +38,6 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   manager: 'Manager',
   sales: 'Sales',
   accounts: 'Accounts',
-  analyst: 'Analyst',
+  analyst: 'Analyst (Legacy)',
   creator_updater: 'Creator / Updater',
 };

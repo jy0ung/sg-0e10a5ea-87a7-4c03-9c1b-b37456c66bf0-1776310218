@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { AppraisalItem, ApprovalDecision, Employee, EmployeeStatus, AppRole, FlowEntityType } from '@/types';
+import { AppraisalItem, ApprovalDecision, Employee, EmployeeStatus, AppRole, FlowEntityType, DEFAULT_APP_ROLE } from '@/types';
 
 export const DIRECTORY_EMPLOYEE_SELECT = 'id, company_id, branch_id, manager_employee_id, primary_role, status, staff_code, name, work_email, personal_email, ic_no, contact_no, join_date, resign_date, avatar_url, department_id, job_title_id, department:departments!employees_department_id_fkey(name), job_title:job_titles!employees_job_title_id_fkey(name)';
 
@@ -297,7 +297,7 @@ export function rowToDirectoryEmployee(row: Record<string, unknown>): Employee {
     id:             String(row.id ?? ''),
     email:          String(row.work_email ?? row.personal_email ?? ''),
     name:           String(row.name ?? ''),
-    role:           (row.primary_role as AppRole) ?? 'analyst',
+    role:           (row.primary_role as AppRole) ?? DEFAULT_APP_ROLE,
     companyId:      String(row.company_id ?? ''),
     branchId:       row.branch_id ? String(row.branch_id) : undefined,
     managerId:      row.manager_employee_id ? String(row.manager_employee_id) : (row.manager_id ? String(row.manager_id) : undefined),

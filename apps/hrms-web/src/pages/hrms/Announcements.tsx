@@ -15,12 +15,10 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { listAnnouncements, createAnnouncement, deleteAnnouncement } from '@/services/hrmsService';
 import type { CreateAnnouncementInput, AnnouncementCategory, AnnouncementPriority } from '@/types';
 import { Pin, Plus, Trash2, Megaphone, SlidersHorizontal } from 'lucide-react';
-import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
-
-const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 
 const PRIORITY_COLORS: Record<AnnouncementPriority, string> = {
   low:    'bg-gray-100 text-gray-500 border-gray-200',
@@ -49,8 +47,9 @@ function timeAgo(isoDate: string) {
 
 export default function Announcements() {
   const { user } = useAuth();
+  const hrmsAccess = useHrmsAccess();
   const { toast } = useToast();
-  const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
+  const canManageAnnouncements = hrmsAccess.canManageAnnouncements;
 
   const queryClient = useQueryClient();
   const { data: announcements = [], isPending: loading } = useQuery({
@@ -98,7 +97,7 @@ export default function Announcements() {
         description="Company-wide communications and notices"
         breadcrumbs={[{ label: 'HRMS' }, { label: 'Announcements' }]}
         actions={
-          isManager ? (
+          canManageAnnouncements ? (
             <Button size="sm" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4 mr-1" /> Post Announcement
             </Button>
@@ -170,7 +169,7 @@ export default function Announcements() {
                     <Badge variant="outline" className={`capitalize text-xs ${PRIORITY_COLORS[ann.priority]}`}>
                       {ann.priority}
                     </Badge>
-                    {isManager && (
+                    {canManageAnnouncements && (
                       <Button
                         size="icon" variant="ghost"
                         className="h-7 w-7 text-muted-foreground hover:text-destructive"

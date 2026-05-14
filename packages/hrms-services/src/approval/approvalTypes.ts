@@ -37,8 +37,6 @@ export type SubmitApprovalDecisionInput = {
   entityId: string;
   /** Profile UUID of the person submitting the decision. */
   reviewerId: string;
-  /** Main-app role of the reviewer (used for legacy role matching). */
-  reviewerRole: string;
   /** Company context — used for HRMS role resolution. */
   companyId: string;
   /**

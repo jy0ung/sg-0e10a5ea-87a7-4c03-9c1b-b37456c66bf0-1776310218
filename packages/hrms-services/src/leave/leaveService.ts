@@ -542,21 +542,18 @@ export async function cancelLeaveRequest(requestId: string): Promise<void> {
  *
  * Throws on any business rule violation or database error.
  *
- * @param input.reviewerRole  The caller's app-level role string, used for legacy
- *                            role-string comparison inside the engine.
  * @param auditAdapter        Optional adapter for emitting audit events.
  */
 export async function reviewLeaveRequest(
   input: {
     requestId: string;
     reviewerId: string;
-    reviewerRole: string;
     decision: 'approved' | 'rejected';
     note?: string;
   },
   auditAdapter?: ApprovalAuditAdapter,
 ): Promise<void> {
-  const { requestId, reviewerId, reviewerRole, decision, note } = input;
+  const { requestId, reviewerId, decision, note } = input;
 
   const { data: req, error: reqError } = await supabase
     .from('leave_requests')
@@ -570,7 +567,7 @@ export async function reviewLeaveRequest(
   const requesterId = await resolveRequiredProfileId(ownerId);
 
   await submitApprovalDecision(
-    { entityType: 'leave_request', entityId: requestId, reviewerId, reviewerRole, companyId, requesterId, decision, note },
+    { entityType: 'leave_request', entityId: requestId, reviewerId, companyId, requesterId, decision, note },
     async (entityId, dec, rId, n, decidedAt) => {
       const { error } = await supabase
         .from('leave_requests')

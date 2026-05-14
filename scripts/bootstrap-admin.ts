@@ -3,7 +3,7 @@
  * Bootstrap Admin — idempotent day-1 provisioning for a new environment.
  *
  * Solves the chicken-and-egg problem created by handle_new_user():
- *   every new auth user lands as role='analyst' / company_id=NULL /
+ *   every new auth user lands as role='creator_updater' / company_id=NULL /
  *   status='pending', and AuthContext signs such users out. A fresh env
  *   therefore has no admin to activate the first admin.
  *

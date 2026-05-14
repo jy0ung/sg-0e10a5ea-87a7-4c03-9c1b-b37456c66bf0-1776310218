@@ -4,7 +4,7 @@
 -- WHY THIS EXISTS
 --   handle_new_user() (see 20260421100000_phase0_rls_hotfix.sql) intentionally
 --   creates every new auth user with:
---     role='analyst', company_id=NULL, status='pending'
+--     role='creator_updater', company_id=NULL, status='pending'
 --   AuthContext then signs such users out with "pending activation" — this is
 --   correct behaviour for normal users (they must be provisioned by an admin)
 --   but it means a fresh environment has a chicken-and-egg problem: there is

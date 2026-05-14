@@ -4,7 +4,7 @@
 
 - Supabase Auth is the single identity provider.
 - Public signup is disabled in `supabase/config.toml` (`[auth] enable_signup = false`).
-- New users are onboarded via the `invite-user` edge function, which creates an auth user and a `profiles` row with `role='analyst'`, `access_scope='self'`, `company_id=<inviter's company>`.
+- New users are onboarded via the `invite-user` edge function, while `handle_new_user` seeds any unprovisioned auth account as `role='creator_updater'`, `access_scope='self'`, `company_id=NULL`, `status='pending'` until an admin assigns company access.
 - `handle_new_user` (DB trigger) ignores client-supplied `raw_user_meta_data.role|company_id|access_scope`. Privilege escalation via signup metadata is not possible.
 
 ## Authorization layers

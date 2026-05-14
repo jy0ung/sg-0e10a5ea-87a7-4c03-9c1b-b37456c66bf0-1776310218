@@ -38,10 +38,8 @@ import {
   Wallet,
   XCircle,
 } from 'lucide-react';
-import { HRMS_PAYROLL_ROLES } from '@/config/hrmsConfig';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
-
-const MANAGER_ROLES = HRMS_PAYROLL_ROLES;
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const STATUS_COLORS: Record<PayrollRunStatus, string> = {
@@ -56,8 +54,9 @@ function fmt(n: number) {
 
 export default function PayrollSummary() {
   const { user } = useAuth();
+  const hrmsAccess = useHrmsAccess();
   const { toast } = useToast();
-  const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
+  const canManagePayroll = hrmsAccess.canAccessPayroll;
 
   const queryClient = useQueryClient();
   const { data: runs = [], isPending: loading } = useQuery({
@@ -95,18 +94,15 @@ export default function PayrollSummary() {
   }), [latestRun, runs]);
 
   function canReviewRun(run: PayrollRun): boolean {
-    if (!isManager || !user || run.status !== 'draft' || run.approvalInstanceStatus !== 'pending') return false;
+    if (!canManagePayroll || !user || run.status !== 'draft' || run.approvalInstanceStatus !== 'pending') return false;
     if (run.currentApproverUserId) return run.currentApproverUserId === user.id;
-    if (run.currentApproverRole) {
-      const looksLikeHrmsRoleId = /^[0-9a-f-]{24,}$/i.test(run.currentApproverRole);
-      return looksLikeHrmsRoleId ? isManager : run.currentApproverRole === user.role;
-    }
+    if (run.currentApproverRole) return hrmsAccess.matchesApproverRole(run.currentApproverRole);
     return false;
   }
 
   function canResubmitRun(run: PayrollRun): boolean {
     return Boolean(
-      isManager
+      canManagePayroll
       && user
       && run.status === 'draft'
       && run.approvalInstanceStatus === 'rejected'
@@ -184,7 +180,7 @@ export default function PayrollSummary() {
         description="Prepare monthly payroll, monitor approval readiness, and track payout status."
         breadcrumbs={[{ label: 'HRMS' }, { label: 'Payroll' }]}
         actions={
-          isManager ? (
+          canManagePayroll ? (
             <Button size="sm" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4 mr-1" /> New Payroll Run
             </Button>
@@ -303,7 +299,7 @@ export default function PayrollSummary() {
                     {expandedHistory[run.id] ? 'Hide Timeline' : 'Show Timeline'}
                   </Button>
                 )}
-                {isManager && run.status === 'draft' && !run.approvalInstanceId && (
+                {canManagePayroll && run.status === 'draft' && !run.approvalInstanceId && (
                   <Button size="sm" variant="outline" className="text-blue-700 border-blue-300" onClick={() => handleStatusChange(run.id, 'finalised')}>
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Finalise
                   </Button>
@@ -333,7 +329,7 @@ export default function PayrollSummary() {
                     </Button>
                   </>
                 )}
-                {isManager && run.status === 'finalised' && (
+                {canManagePayroll && run.status === 'finalised' && (
                   <Button size="sm" variant="outline" className="text-green-700 border-green-300" onClick={() => handleStatusChange(run.id, 'paid')}>
                     <CreditCard className="h-3.5 w-3.5 mr-1" /> Mark Paid
                   </Button>

@@ -310,13 +310,12 @@ export async function reviewAppraisalActivation(
   input: {
     appraisalId: string;
     reviewerId: string;
-    reviewerRole: string;
     decision: 'approved' | 'rejected';
     note?: string;
   },
   auditAdapter?: ApprovalAuditAdapter,
 ): Promise<void> {
-  const { appraisalId, reviewerId, reviewerRole, decision, note } = input;
+  const { appraisalId, reviewerId, decision, note } = input;
 
   const { data: appraisal, error: appraisalError } = await supabase
     .from('appraisals')
@@ -334,7 +333,7 @@ export async function reviewAppraisalActivation(
   const requesterId = String(appraisal?.created_by ?? '');
 
   await submitApprovalDecision(
-    { entityType: 'appraisal', entityId: appraisalId, reviewerId, reviewerRole, companyId, requesterId, decision, note },
+    { entityType: 'appraisal', entityId: appraisalId, reviewerId, companyId, requesterId, decision, note },
     async (entityId, dec, rId, _n, decidedAt) => {
       if (dec === 'rejected') {
         // Rejected: update timestamp only.

@@ -1,4 +1,4 @@
-import type { Employee, EmployeeStatus, AppRole } from '@flc/types';
+import { DEFAULT_APP_ROLE, type Employee, type EmployeeStatus, type AppRole } from '@flc/types';
 import type { EmployeeRow } from '@flc/supabase';
 import { supabase } from '../shared/supabaseClient';
 
@@ -33,7 +33,7 @@ export function rowToDirectoryEmployee(row: DirectoryEmployeeRow): Employee {
     id:             String(row.id ?? ''),
     email:          String(row.work_email ?? row.personal_email ?? ''),
     name:           String(row.name ?? ''),
-    role:           (row.primary_role as AppRole) ?? 'analyst',
+    role:           (row.primary_role as AppRole) ?? DEFAULT_APP_ROLE,
     companyId:      String(row.company_id ?? ''),
     branchId:       row.branch_id ? String(row.branch_id) : undefined,
     managerId:      row.manager_employee_id

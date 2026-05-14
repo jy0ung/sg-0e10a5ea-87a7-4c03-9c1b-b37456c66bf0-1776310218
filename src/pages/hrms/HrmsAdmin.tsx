@@ -20,9 +20,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
-import { HRMS_ADMIN_ROLES } from '@/config/hrmsConfig';
 import {
   Building2, Briefcase, Calendar, CalendarDays, RefreshCw,
   Plus, Pencil, Trash2, Shield, GitMerge, Users, Settings2,
@@ -41,7 +41,6 @@ import type {
   LeaveType, CreateLeaveTypeInput,
   PublicHoliday, CreateHolidayInput, HolidayType,
   HrmsRole, CreateHrmsRoleInput, HrmsRoleCategory, HrmsRoleScope,
-  AppRole,
 } from '@/types';
 
 import {
@@ -102,8 +101,6 @@ const CATEGORIES: CategoryDef[] = [
 ];
 
 const CONFIG_GROUPS: ConfigGroup[] = ['General', 'HRMS Roles', 'Approval Flows', 'Departments', 'Leave', 'Attendance', 'Employees', 'Payroll', 'Notifications', 'System'];
-
-const SECURITY_ADMIN_ROLES: AppRole[] = ['super_admin', 'company_admin'];
 
 const JOB_LEVELS: { value: JobTitleLevel; label: string }[] = [
   { value: 'junior',    label: 'Junior' },
@@ -1123,7 +1120,7 @@ const HRMS_ROLE_CATEGORIES: { value: HrmsRoleCategory; label: string }[] = [
   { value: 'hr', label: 'HR' },
   { value: 'department', label: 'Department' },
   { value: 'line_management', label: 'Line Management' },
-  { value: 'employee', label: 'Employee' },
+  { value: 'staff', label: 'Staff' },
   { value: 'payroll', label: 'Payroll' },
   { value: 'attendance', label: 'Attendance' },
   { value: 'custom', label: 'Custom' },
@@ -1629,14 +1626,15 @@ function HrmsSettingsPlaceholderPanel({ category }: { category: Category }) {
 
 export default function HrmsAdmin() {
   const { user } = useAuth();
+  const hrmsAccess = useHrmsAccess();
   const companyId = useCompanyId();
   const [activeGroup, setActiveGroup] = useState<ConfigGroup>('General');
   const [activeModule, setActiveModule] = useState<Category | null>(null);
 
-  const canWrite = !!user && (HRMS_ADMIN_ROLES as string[]).includes(user.role);
-  const canManageSecurity = !!user && SECURITY_ADMIN_ROLES.includes(user.role);
+  const canWrite = hrmsAccess.canAccessSettings;
+  const canManageSecurity = hrmsAccess.canAccessSettings;
 
-  if (!user || !(HRMS_ADMIN_ROLES as string[]).includes(user.role)) {
+  if (!user || !hrmsAccess.canAccessSettings) {
     return <UnauthorizedAccess />;
   }
 

@@ -192,13 +192,12 @@ export async function reviewPayrollRunFinalisation(
   input: {
     runId: string;
     reviewerId: string;
-    reviewerRole: string;
     decision: 'approved' | 'rejected';
     note?: string;
   },
   auditAdapter?: ApprovalAuditAdapter,
 ): Promise<void> {
-  const { runId, reviewerId, reviewerRole, decision, note } = input;
+  const { runId, reviewerId, decision, note } = input;
 
   const { data: run, error: runError } = await supabase
     .from('payroll_runs')
@@ -218,7 +217,7 @@ export async function reviewPayrollRunFinalisation(
   const requesterId = ownerId;
 
   await submitApprovalDecision(
-    { entityType: 'payroll_run', entityId: runId, reviewerId, reviewerRole, companyId, requesterId, decision, note },
+    { entityType: 'payroll_run', entityId: runId, reviewerId, companyId, requesterId, decision, note },
     async (entityId, dec, _rId, _n, decidedAt) => {
       // Final approval sets 'finalised', not 'approved', to match domain semantics.
       if (dec === 'approved') {

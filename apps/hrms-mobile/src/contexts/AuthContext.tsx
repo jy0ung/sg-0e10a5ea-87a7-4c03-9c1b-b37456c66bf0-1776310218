@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User }                            from '@supabase/supabase-js';
 import { supabase }                                      from '@flc/supabase';
-import type { Employee, AppRole, EmployeeStatus }        from '@flc/types';
+import { DEFAULT_APP_ROLE, type Employee, type AppRole, type EmployeeStatus } from '@flc/types';
 
 interface AuthContextValue {
   session:  Session | null;
@@ -30,7 +30,7 @@ function rowToDirectoryEmployee(row: Record<string, unknown>): Employee {
     id:             String(row.id ?? ''),
     email:          String(row.work_email ?? row.personal_email ?? ''),
     name:           String(row.name ?? ''),
-    role:           (row.primary_role as AppRole) ?? 'analyst',
+    role:           (row.primary_role as AppRole) ?? DEFAULT_APP_ROLE,
     companyId:      String(row.company_id ?? ''),
     branchId:       row.branch_id ? String(row.branch_id) : undefined,
     managerId:      row.manager_employee_id ? String(row.manager_employee_id) : undefined,
@@ -121,6 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');

@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { Search, Plus, Users, UserCheck, UserMinus, Pencil, SlidersHorizontal } from 'lucide-react';
 import { AppRole, Employee, EmployeeStatus } from '@/types';
 import { getBranches } from '@/services/masterDataService';
@@ -19,7 +20,6 @@ import {
   type CreateEmployeeInput,
   type UpdateEmployeeInput,
 } from '@/services/hrmsService';
-import { HRMS_MANAGER_ROLES, PII_VIEW_ROLES } from '@/config/hrmsConfig';
 import { createEmployeeSchema } from '@/lib/validations';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ const ROLE_LABEL: Record<AppRole, string> = {
   manager:         'Manager',
   sales:           'Sales Advisor',
   accounts:        'Accounts',
-  analyst:         'Analyst',
+  analyst:         'Analyst (Legacy)',
   creator_updater: 'Creator/Updater',
 };
 
@@ -61,8 +61,6 @@ const STATUS_BADGE: Record<EmployeeStatus, string> = {
 
 const NONE_SELECT_VALUE = '__none__';
 
-// Roles that can manage employees (add/edit/deactivate) — sourced from hrmsConfig
-const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 const UNASSIGNED_MANAGER = '__unassigned__';
 
 // ─── Form state ───────────────────────────────────────────────────────────────
@@ -92,6 +90,7 @@ type EditForm = {
 
 export default function EmployeeDirectory() {
   const { user } = useAuth();
+  const hrmsAccess = useHrmsAccess();
   const { toast } = useToast();
 
   const queryClient = useQueryClient();
@@ -137,8 +136,8 @@ export default function EmployeeDirectory() {
   const [editForm, setEditForm]     = useState<EditForm | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
-  const canManage = user && MANAGER_ROLES.includes(user.role);
-  const canViewPii = user && PII_VIEW_ROLES.includes(user.role);
+  const canManage = hrmsAccess.canManageEmployees;
+  const canViewPii = hrmsAccess.canViewPii;
 
   /** Mask IC: show only last 4 digits — e.g. "900101-12-1234" → "••••••-••-1234" */
   function maskIc(ic: string | undefined): string {
@@ -155,7 +154,7 @@ export default function EmployeeDirectory() {
 
   // ── Derived ──
   const employeeById = new Map(employees.map(employee => [employee.id, employee]));
-  const managerOptions = employees.filter(employee => employee.status === 'active' && MANAGER_ROLES.includes(employee.role));
+  const managerOptions = employees.filter(employee => employee.status === 'active');
 
   function getManagerOptions(selectedManagerId?: string) {
     const options = [...managerOptions];

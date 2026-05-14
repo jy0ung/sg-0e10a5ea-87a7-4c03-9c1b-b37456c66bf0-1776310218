@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import type { AppShellNavSection, AppShellRouteChromeMatch } from '@/components/layout/app-shell';
-import type { AppRole } from '@/types';
 import { hrmsNavItems } from './navItems';
 
 const HRMS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
@@ -38,12 +38,15 @@ function groupHrmsItems(items: typeof hrmsNavItems): AppShellNavSection[] {
 }
 
 export function useHrmsShellConfig() {
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout } = useAuth();
+  const hrmsAccess = useHrmsAccess();
   const { branding } = useBranding();
   const sections = useMemo(() => {
-    const visibleItems = hrmsNavItems.filter((item) => !item.roles || hasRole(item.roles as AppRole[]));
+    const visibleItems = hrmsNavItems.filter((item) => !item.access || hrmsAccess.canAccessRoute(item.access));
     return groupHrmsItems(visibleItems);
-  }, [hasRole]);
+  }, [hrmsAccess]);
+
+  const primaryRoleLabel = hrmsAccess.primaryRoleLabel ?? 'No HRMS role';
 
   return {
     brand: {
@@ -55,9 +58,9 @@ export function useHrmsShellConfig() {
     sections,
     routeChrome: HRMS_ROUTE_CHROME,
     fallbackChrome: { title: 'HRMS Workspace', kicker: 'People operations' },
-    user: user ? { name: user.name, email: user.email, role: user.role, profilePath: '/profile' } : undefined,
+    user: user ? { name: user.name, email: user.email, role: `HRMS: ${primaryRoleLabel}`, profilePath: '/profile' } : undefined,
     onSignOut: () => void logout(),
-    topbarActions: [{ label: 'Open announcements', icon: Bell, to: '/announcements' }],
+    topbarActions: hrmsAccess.canAccessRoute('announcements') ? [{ label: 'Open announcements', icon: Bell, to: '/announcements' }] : [],
     searchPlaceholder: 'Search HRMS...',
     widthMode: 'full' as const,
   };

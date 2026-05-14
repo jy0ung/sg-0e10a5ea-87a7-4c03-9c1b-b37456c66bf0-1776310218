@@ -62,7 +62,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AppRole, AccessScope, ROLE_DEFAULT_SCOPE, type Employee, type BranchRecord } from '@/types';
+import { AppRole, AccessScope, DEFAULT_APP_ROLE, ROLE_DEFAULT_SCOPE, type Employee, type BranchRecord } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import { PermissionEditor } from '@/components/admin/PermissionEditor';
 import { userUpdateSchema, inviteUserSchema, type UserUpdateFormData, type InviteUserFormData } from '@/lib/validations';
@@ -81,7 +81,7 @@ const ROLES: { value: AppRole; label: string }[] = [
   { value: 'manager', label: 'Manager' },
   { value: 'sales', label: 'Sales' },
   { value: 'accounts', label: 'Accounts' },
-  { value: 'analyst', label: 'Analyst' },
+  { value: 'analyst', label: 'Analyst (Legacy)' },
   { value: 'creator_updater', label: 'Creator/Updater' },
 ];
 
@@ -155,7 +155,7 @@ export default function UserManagement() {
     resolver: zodResolver(userUpdateSchema),
     defaultValues: {
       name: '',
-      role: 'analyst',
+      role: DEFAULT_APP_ROLE,
       access_scope: 'company',
       branch_id: null,
       employee_id: null,
@@ -172,7 +172,7 @@ export default function UserManagement() {
     defaultValues: {
       email: '',
       name: '',
-      role: 'analyst',
+      role: DEFAULT_APP_ROLE,
       employee_id: null,
       portal_access_only: true,
     },
@@ -386,14 +386,14 @@ export default function UserManagement() {
     }
     toast.success(`Invitation sent to ${data.email}`);
     setSignupUrl(getSignupUrl());
-    inviteForm.reset({ email: '', name: '', role: 'analyst', employee_id: null, portal_access_only: false });
+    inviteForm.reset({ email: '', name: '', role: DEFAULT_APP_ROLE, employee_id: null, portal_access_only: false });
     await refreshProfiles();
   };
 
   const getPendingSelection = (p: ProfileRow) => {
     const current = pendingSelections[p.id];
     return {
-      role: current?.role ?? (p.role || 'analyst'),
+      role: current?.role ?? (p.role || DEFAULT_APP_ROLE),
       company_id:
         current?.company_id
         ?? (p.company_id || (hasRole(['super_admin']) ? (companies[0]?.id ?? '') : (user?.company_id ?? ''))),

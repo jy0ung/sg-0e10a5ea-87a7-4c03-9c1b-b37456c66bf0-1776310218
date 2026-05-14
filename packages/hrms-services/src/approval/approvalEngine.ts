@@ -8,7 +8,7 @@ import {
   type ApprovalAuditAdapter,
   type ApprovalAuditEvent,
 } from './approvalTypes';
-import { resolveStepRouting, userHasAssignedHrmsRole } from './approvalRouting';
+import { resolveStepRouting, userMatchesAssignedApproverRole } from './approvalRouting';
 
 // ─── Approval Step select fragment ─────────────────────────────────────────────
 const APPROVAL_STEP_SELECT =
@@ -98,7 +98,7 @@ export async function bootstrapApprovalInstanceForEntity(
  * Responsibilities:
  * - Guards against self-approval (unless the step allows it).
  * - Verifies the reviewer is the assigned approver for the current step
- *   (by specific user ID, HRMS role UUID, or legacy app-role string).
+ *   (by specific user ID, HRMS role UUID, or legacy approver code mapped to assigned HRMS roles).
  * - Inserts an `approval_decisions` record.
  * - Advances the instance to the next step, or finalises it.
  * - Calls `updateEntityStatus` on rejection or final approval so the caller
@@ -116,7 +116,7 @@ export async function submitApprovalDecision(
   updateEntityStatus: EntityStatusUpdater,
   auditAdapter?: ApprovalAuditAdapter,
 ): Promise<void> {
-  const { entityType, entityId, reviewerId, reviewerRole, companyId, requesterId, decision, note } = input;
+  const { entityType, entityId, reviewerId, companyId, requesterId, decision, note } = input;
 
   // 1. Load the instance — must exist and be pending.
   const { data: instanceRow, error: instanceError } = await untypedSupabase
@@ -165,17 +165,11 @@ export async function submitApprovalDecision(
     Boolean(instance.currentApproverUserId) && instance.currentApproverUserId === reviewerId;
 
   if (!isAssignedApprover && currentStep.approverType === 'role' && instance.currentApproverRole) {
-    const looksLikeHrmsRoleId = /^[0-9a-f-]{24,}$/i.test(instance.currentApproverRole);
-    if (looksLikeHrmsRoleId) {
-      isAssignedApprover = await userHasAssignedHrmsRole(
-        companyId,
-        reviewerId,
-        instance.currentApproverRole,
-      );
-    } else {
-      // Legacy: match against the main-app role string.
-      isAssignedApprover = instance.currentApproverRole === reviewerRole;
-    }
+    isAssignedApprover = await userMatchesAssignedApproverRole(
+      companyId,
+      reviewerId,
+      instance.currentApproverRole,
+    );
   }
 
   if (!isAssignedApprover) {

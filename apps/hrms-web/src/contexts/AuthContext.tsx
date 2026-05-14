@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { AppRole, AccessScope } from '@/types';
+import { AppRole, AccessScope, DEFAULT_APP_ROLE } from '@/types';
 import { useLocation, Navigate } from 'react-router-dom';
 import { loggingService } from '@/services/loggingService';
 import { errorTrackingService } from '@/services/errorTrackingService';
@@ -38,7 +38,7 @@ function rowToProfile(row: Record<string, unknown>): Profile {
     id: String(row.id ?? ''),
     email: String(row.email ?? ''),
     name: String(row.name ?? ''),
-    role: (row.role as AppRole) ?? 'analyst',
+    role: (row.role as AppRole) ?? DEFAULT_APP_ROLE,
     company_id: companyId,
     companyId,
     branch_id: branchId,

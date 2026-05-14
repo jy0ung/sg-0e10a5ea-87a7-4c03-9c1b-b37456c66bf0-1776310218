@@ -3,9 +3,7 @@ import { logUserAction } from '@/services/auditService';
 import * as pkg from '@flc/hrms-services';
 import {
   LeaveType, LeaveBalance, LeaveRequest, CreateLeaveRequestInput,
-  AppRole,
 } from '@/types';
-import { HRMS_LEAVE_APPROVER_ROLES } from '@/config/hrmsConfig';
 import { resolveRequiredProfileId } from './shared';
 
 const LEAVE_ATTACHMENT_BUCKET = 'leave-attachments';
@@ -47,6 +45,41 @@ async function uploadLeaveAttachment(
 
 async function removeLeaveAttachment(filePath: string): Promise<void> {
   await supabase.storage.from(LEAVE_ATTACHMENT_BUCKET).remove([filePath]);
+}
+
+async function reviewerCanApproveLeave(
+  companyId: string,
+  reviewerId: string,
+): Promise<{ data: boolean; error: string | null }> {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('employee_id')
+    .eq('id', reviewerId)
+    .maybeSingle();
+  if (profileError) return { data: false, error: profileError.message };
+
+  const employeeId = (profile as Record<string, unknown> | null)?.employee_id
+    ? String((profile as Record<string, unknown>).employee_id)
+    : null;
+
+  let query = supabase
+    .from('employee_hrms_role_assignments')
+    .select('hrms_role:hrms_roles!employee_hrms_role_assignments_hrms_role_id_fkey(can_approve_requests, is_active)')
+    .eq('company_id', companyId);
+
+  query = employeeId
+    ? query.or(`profile_id.eq.${reviewerId},employee_id.eq.${employeeId}`)
+    : query.eq('profile_id', reviewerId);
+
+  const { data, error } = await query;
+  if (error) return { data: false, error: error.message };
+
+  const canApprove = (data ?? []).some((row: Record<string, unknown>) => {
+    const role = row.hrms_role as Record<string, unknown> | null;
+    return Boolean(role?.is_active) && Boolean(role?.can_approve_requests);
+  });
+
+  return { data: canApprove, error: null };
 }
 
 export async function listLeaveTypes(companyId: string): Promise<{ data: LeaveType[]; error: string | null }> {
@@ -162,14 +195,6 @@ export async function reviewLeaveRequest(
     const requestOwnerId = String((req as Record<string, unknown> | null)?.employee_id ?? '');
     if (!requestOwnerId) return { error: 'Leave request not found.' };
 
-    const { data: reviewer, error: reviewerError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', reviewerId)
-      .single();
-    if (reviewerError) return { error: reviewerError.message };
-    const reviewerRole = String((reviewer as Record<string, unknown> | null)?.role ?? '');
-
     // Check for approval instance
     const { data: approvalInstance, error: approvalError } = await supabase
       .from('approval_instances')
@@ -180,13 +205,15 @@ export async function reviewLeaveRequest(
     if (approvalError) return { error: approvalError.message };
 
     if (!approvalInstance) {
-      // Legacy path: no approval workflow — check role directly
+      // Legacy path: no approval workflow — check assigned HRMS approval roles directly.
       const requesterProfileId = await resolveRequiredProfileId(requestOwnerId);
       if (requesterProfileId.error) return { error: requesterProfileId.error };
       if (requesterProfileId.data === reviewerId) {
         return { error: 'You cannot approve or reject your own leave request.' };
       }
-      if (!HRMS_LEAVE_APPROVER_ROLES.includes(reviewerRole as AppRole)) {
+      const reviewerApprovalAccess = await reviewerCanApproveLeave(String((req as Record<string, unknown> | null)?.company_id ?? ''), reviewerId);
+      if (reviewerApprovalAccess.error) return { error: reviewerApprovalAccess.error };
+      if (!reviewerApprovalAccess.data) {
         return { error: 'You are not allowed to review this leave request.' };
       }
       const { error } = await supabase
@@ -201,7 +228,7 @@ export async function reviewLeaveRequest(
     }
 
     // Approval workflow path
-    await pkg.reviewLeaveRequest({ requestId, reviewerId, reviewerRole, decision: status, note });
+    await pkg.reviewLeaveRequest({ requestId, reviewerId, decision: status, note });
     void logUserAction(reviewerId, 'update', 'leave_request', requestId,
       { status, reviewerNote: note ?? null, approvalMode: 'workflow' });
     return { error: null };

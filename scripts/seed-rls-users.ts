@@ -104,7 +104,7 @@ async function upsertUser(email: string, password: string, companyId: string): P
     id: userId,
     email,
     name: email.split('@')[0],
-    role: 'analyst',
+    role: 'creator_updater',
     access_scope: 'self',
     company_id: companyId,
     status: 'active',

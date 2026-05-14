@@ -275,7 +275,7 @@ describeIfLive('RLS cross-tenant matrix', () => {
           .select('role, company_id, access_scope')
           .eq('id', data.user.id)
           .single();
-        expect(profile?.role).toBe('analyst');
+        expect(profile?.role).toBe('creator_updater');
         expect(profile?.access_scope).toBe('self');
         expect(profile?.company_id).toBeNull();
       } else {

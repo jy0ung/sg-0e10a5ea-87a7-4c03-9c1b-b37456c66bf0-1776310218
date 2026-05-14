@@ -17,13 +17,11 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { listAttendanceRecords, listEmployeeDirectory, upsertAttendance } from '@/services/hrmsService';
 import type { UpsertAttendanceInput, AttendanceStatus } from '@/types';
 import { Plus, Download, SlidersHorizontal } from 'lucide-react';
-import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
 import { upsertAttendanceSchema } from '@/lib/validations';
-
-const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 
 const STATUS_COLORS: Record<AttendanceStatus, string> = {
   present:        'bg-green-100 text-green-700 border-green-200',
@@ -39,8 +37,10 @@ function todayIso() {
 
 export default function AttendanceLog() {
   const { user } = useAuth();
+  const hrmsAccess = useHrmsAccess();
   const { toast } = useToast();
-  const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
+  const canAccessTeamAttendance = hrmsAccess.canAccessAttendance;
+  const canManageAttendance = hrmsAccess.canManageAttendance;
   const selfServiceEmployeeId = user?.employeeId ?? user?.id;
 
   const queryClient = useQueryClient();
@@ -57,23 +57,23 @@ export default function AttendanceLog() {
   });
 
   const { data: records = [], isPending: loading } = useQuery({
-    queryKey: ['attendance-records', user?.companyId, isManager ? empFilter : selfServiceEmployeeId, dateFrom, dateTo],
+    queryKey: ['attendance-records', user?.companyId, canAccessTeamAttendance ? empFilter : selfServiceEmployeeId, dateFrom, dateTo],
     queryFn: async () => {
       const attRes = await listAttendanceRecords(user!.companyId, {
-        employeeId: !isManager ? selfServiceEmployeeId : (empFilter === 'all' ? undefined : empFilter),
+        employeeId: !canAccessTeamAttendance ? selfServiceEmployeeId : (empFilter === 'all' ? undefined : empFilter),
         dateFrom,
         dateTo,
       });
       if (attRes.error) toast({ title: 'Error', description: attRes.error, variant: 'destructive' });
       return attRes.data;
     },
-    enabled: !!user?.companyId && (!!(isManager) || !!selfServiceEmployeeId),
+    enabled: !!user?.companyId && (!!canAccessTeamAttendance || !!selfServiceEmployeeId),
   });
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees-hrms', user?.companyId],
     queryFn: async () => { const res = await listEmployeeDirectory(user!.companyId); return res.data; },
-    enabled: !!user?.companyId && isManager,
+    enabled: !!user?.companyId && canAccessTeamAttendance,
   });
 
   async function handleSave(e: React.FormEvent) {
@@ -119,7 +119,7 @@ export default function AttendanceLog() {
         actions={
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={exportCsv}><Download className="h-4 w-4 mr-1" /> Export</Button>
-            {isManager && (
+            {canManageAttendance && (
               <Button size="sm" onClick={() => setShowForm(true)}><Plus className="h-4 w-4 mr-1" /> Mark Attendance</Button>
             )}
           </div>
@@ -163,7 +163,7 @@ export default function AttendanceLog() {
           <Label className="text-xs">To</Label>
           <Input type="date" className="h-9 w-40" value={dateTo} onChange={e => setDateTo(e.target.value)} />
         </div>
-        {isManager && (
+        {canAccessTeamAttendance && (
           <div className="space-y-1">
             <Label className="text-xs">Employee</Label>
             <Select value={empFilter} onValueChange={setEmpFilter}>
@@ -190,7 +190,7 @@ export default function AttendanceLog() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
                 <TableRow>
-                  {isManager && <TableHead>Employee</TableHead>}
+                  {canAccessTeamAttendance && <TableHead>Employee</TableHead>}
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Clock In</TableHead>
@@ -202,13 +202,13 @@ export default function AttendanceLog() {
               <TableBody>
                 {records.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isManager ? 7 : 6} className="text-center text-muted-foreground h-24">
+                    <TableCell colSpan={canAccessTeamAttendance ? 7 : 6} className="text-center text-muted-foreground h-24">
                       No records found
                     </TableCell>
                   </TableRow>
                 ) : records.map(r => (
                   <TableRow key={r.id}>
-                    {isManager && <TableCell>{r.employeeName ?? '—'}</TableCell>}
+                    {canAccessTeamAttendance && <TableCell>{r.employeeName ?? '—'}</TableCell>}
                     <TableCell>{r.date}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`capitalize text-xs ${STATUS_COLORS[r.status]}`}>

@@ -178,6 +178,7 @@ Deno.serve(async (req: Request) => {
         sales: 'self',
         accounts: 'company',
         analyst: 'company',
+        creator_updater: 'branch',
       };
 
       const finalScope = access_scope || roleDefaultScopes[role] || 'company';

@@ -3,9 +3,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
+  const hrmsAccess = useHrmsAccess();
+  const hrmsRoleLabel = hrmsAccess.roleNames.length ? hrmsAccess.roleNames.join(', ') : 'No HRMS role assigned';
 
   return (
     <div className="w-full space-y-4 animate-fade-in">
@@ -39,9 +42,16 @@ export default function ProfilePage() {
             <div className="rounded-lg border bg-background p-4">
               <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Shield className="h-4 w-4" />
-                Role
+                Main App Role
               </div>
               <p className="text-sm capitalize text-foreground">{user?.role?.replace(/_/g, ' ') ?? '-'}</p>
+            </div>
+            <div className="rounded-lg border bg-background p-4 sm:col-span-2">
+              <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Shield className="h-4 w-4" />
+                HRMS Roles
+              </div>
+              <p className="text-sm text-foreground">{hrmsRoleLabel}</p>
             </div>
           </div>
 

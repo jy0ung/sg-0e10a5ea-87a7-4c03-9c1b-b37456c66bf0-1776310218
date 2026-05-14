@@ -356,11 +356,10 @@ describe('listLeaveRequests', () => {
 
 describe('reviewLeaveRequest', () => {
   it('still blocks self-approval when the leave owner is stored as an employee id', async () => {
-    // Wrapper direct Supabase calls: leave_requests, profiles (reviewer role), approval_instances (null),
+    // Wrapper direct Supabase calls: leave_requests, approval_instances (null),
     // then resolveRequiredProfileId (profiles.id check → null, profiles.employee_id check → profile-1)
     queueResolves(
       { data: { employee_id: 'employee-1', company_id: 'c1' }, error: null },
-      { data: { role: 'manager' }, error: null },
       { data: null, error: null },
       { data: null, error: null },
       { data: { id: 'profile-1' }, error: null },
@@ -372,11 +371,10 @@ describe('reviewLeaveRequest', () => {
   });
 
   it('finalises the leave request on the last approval step', async () => {
-    // Wrapper direct Supabase calls: leave_requests, profiles (reviewer role), approval_instances (instance found)
+    // Wrapper direct Supabase calls: leave_requests and approval_instances (instance found)
     // Then delegates to pkg.reviewLeaveRequest
     queueResolves(
       { data: { employee_id: 'emp-1', company_id: 'c1' }, error: null },
-      { data: { role: 'general_manager' }, error: null },
       { data: { id: 'ai-1' }, error: null },
     );
     vi.mocked(hrmsServicesMock.reviewLeaveRequest).mockResolvedValueOnce(undefined);
@@ -387,7 +385,6 @@ describe('reviewLeaveRequest', () => {
     expect(hrmsServicesMock.reviewLeaveRequest).toHaveBeenCalledWith({
       requestId: 'leave-1',
       reviewerId: 'gm-1',
-      reviewerRole: 'general_manager',
       decision: 'approved',
       note: 'Approved',
     });
@@ -549,10 +546,6 @@ describe('updatePayrollRunStatus', () => {
 
 describe('reviewPayrollRunFinalisation', () => {
   it('finalises the payroll run on the last approval step', async () => {
-    // Wrapper fetches reviewer role from profiles before delegating to pkg
-    queueResolves(
-      { data: { role: 'company_admin' }, error: null },
-    );
     vi.mocked(hrmsServicesMock.reviewPayrollRunFinalisation).mockResolvedValueOnce(undefined);
 
     const result = await reviewPayrollRunFinalisation('run-1', 'admin-2', 'approved', 'Approved');
@@ -561,16 +554,12 @@ describe('reviewPayrollRunFinalisation', () => {
     expect(hrmsServicesMock.reviewPayrollRunFinalisation).toHaveBeenCalledWith({
       runId: 'run-1',
       reviewerId: 'admin-2',
-      reviewerRole: 'company_admin',
       decision: 'approved',
       note: 'Approved',
     });
   });
 
   it('marks the payroll approval as rejected without finalising the run', async () => {
-    queueResolves(
-      { data: { role: 'company_admin' }, error: null },
-    );
     vi.mocked(hrmsServicesMock.reviewPayrollRunFinalisation).mockResolvedValueOnce(undefined);
 
     const result = await reviewPayrollRunFinalisation('run-1', 'admin-2', 'rejected', 'Need corrections');
@@ -713,8 +702,6 @@ describe('createAppraisal', () => {
 
 describe('reviewAppraisalActivation', () => {
   it('opens the appraisal cycle when the last approval step is approved', async () => {
-    // Wrapper fetches reviewer role from profiles before delegating
-    queueResolves({ data: { role: 'general_manager' }, error: null });
     vi.mocked(hrmsServicesMock.reviewAppraisalActivation).mockResolvedValueOnce(undefined);
 
     const result = await reviewAppraisalActivation('app-1', 'gm-1', 'approved', 'Launch the cycle');
@@ -723,14 +710,12 @@ describe('reviewAppraisalActivation', () => {
     expect(hrmsServicesMock.reviewAppraisalActivation).toHaveBeenCalledWith({
       appraisalId: 'app-1',
       reviewerId: 'gm-1',
-      reviewerRole: 'general_manager',
       decision: 'approved',
       note: 'Launch the cycle',
     });
   });
 
   it('marks the appraisal approval as rejected without opening the cycle', async () => {
-    queueResolves({ data: { role: 'company_admin' }, error: null });
     vi.mocked(hrmsServicesMock.reviewAppraisalActivation).mockResolvedValueOnce(undefined);
 
     const result = await reviewAppraisalActivation('app-1', 'admin-2', 'rejected', 'Adjust the cycle scope');

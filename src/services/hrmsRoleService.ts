@@ -160,6 +160,32 @@ export async function listHrmsRoleAssignments(
   return { data: (data ?? []).map((row: Record<string, any>) => rowToAssignment(row)), error: null };
 }
 
+export async function listAssignedHrmsRoles(
+  companyId: string,
+  profileId: string,
+  employeeId?: string | null,
+): Promise<{ data: HrmsRole[]; error: string | null }> {
+  let query = db
+    .from('employee_hrms_role_assignments')
+    .select('hrms_role:hrms_roles!employee_hrms_role_assignments_hrms_role_id_fkey(*)')
+    .eq('company_id', companyId);
+
+  query = employeeId
+    ? query.or(`profile_id.eq.${profileId},employee_id.eq.${employeeId}`)
+    : query.eq('profile_id', profileId);
+
+  const { data, error } = await query;
+  if (error) return { data: [], error: error.message };
+
+  const roles = (data ?? [])
+    .map((row: Record<string, any>) => row.hrms_role as Record<string, any> | null)
+    .filter(Boolean)
+    .map((row: Record<string, any>) => rowToHrmsRole(row));
+
+  const deduped = roles.filter((role, index) => roles.findIndex((candidate) => candidate.id === role.id) === index);
+  return { data: deduped, error: null };
+}
+
 export async function replaceHrmsRoleEmployeeAssignments(
   companyId: string,
   roleId: string,

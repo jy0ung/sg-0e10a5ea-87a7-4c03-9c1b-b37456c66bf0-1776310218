@@ -30,15 +30,14 @@ import {
 import type { LeaveDayPart, LeaveRequest, LeaveStatus, CreateLeaveRequestInput } from '@/types';
 import { AlertCircle, CheckCircle2, XCircle, Clock, Plus, ChevronDown, ChevronUp, FileText, Paperclip, SlidersHorizontal, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { HRMS_LEAVE_APPROVER_ROLES } from '@/config/hrmsConfig';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
+import { matchesHrmsApproverRole, type HrmsApproverIdentity } from '@/lib/hrms/access';
 import { createLeaveRequestSchema } from '@/lib/validations';
 import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
 import {
   getPendingApprovalsForUser,
   submitApprovalDecision,
 } from '@/services/approvalEngineService';
-
-const MANAGER_ROLES = HRMS_LEAVE_APPROVER_ROLES;
 const STATUS_COLORS: Record<LeaveStatus, string> = {
   pending:   'bg-yellow-100 text-yellow-700 border-yellow-200',
   approved:  'bg-green-100 text-green-700 border-green-200',
@@ -137,24 +136,18 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export type LeaveApproverIdentity = {
-  id?: string;
-  role?: string;
-} | null | undefined;
+export type LeaveApproverIdentity = HrmsApproverIdentity;
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function isRequestAssignedToApprover(
   request: LeaveRequest,
   approver: LeaveApproverIdentity,
-  isManager: boolean,
+  canApproveRequests: boolean,
 ): boolean {
   if (request.status !== 'pending' || !approver) return false;
   if (request.currentApproverUserId) return request.currentApproverUserId === approver.id;
-  if (request.currentApproverRole) {
-    const looksLikeHrmsRoleId = /^[0-9a-f-]{24,}$/i.test(request.currentApproverRole);
-    return looksLikeHrmsRoleId ? isManager : request.currentApproverRole === approver.role;
-  }
-  return isManager;
+  if (request.currentApproverRole) return matchesHrmsApproverRole(request.currentApproverRole, approver);
+  return canApproveRequests;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -163,14 +156,14 @@ export function filterLeaveRequestsForView(
   filterStatus: LeaveStatus | 'all',
   viewMode: 'all' | 'my_queue',
   approver: LeaveApproverIdentity,
-  isManager: boolean,
+  canApproveRequests: boolean,
 ): LeaveRequest[] {
   const filteredByStatus = filterStatus === 'all'
     ? requests
     : requests.filter(request => request.status === filterStatus);
 
   return viewMode === 'my_queue'
-    ? filteredByStatus.filter(request => isRequestAssignedToApprover(request, approver, isManager))
+    ? filteredByStatus.filter(request => isRequestAssignedToApprover(request, approver, canApproveRequests))
     : filteredByStatus;
 }
 
@@ -182,8 +175,9 @@ function statusIcon(s: LeaveStatus) {
 
 export default function LeaveManagement() {
   const { user } = useAuth();
+  const hrmsAccess = useHrmsAccess();
   const { toast } = useToast();
-  const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
+  const canApproveRequests = hrmsAccess.canApproveRequests;
   const selfServiceEmployeeId = user?.employeeId ?? user?.id;
   const selectedLeaveYear = useMemo(() => {
     return Number((new Date()).getFullYear());
@@ -192,10 +186,10 @@ export default function LeaveManagement() {
   const queryClient = useQueryClient();
 
   const { data: leaveData, isPending: loading } = useQuery({
-    queryKey: ['leave-management', user?.companyId, user?.id, isManager, selfServiceEmployeeId],
+    queryKey: ['leave-management', user?.companyId, user?.id, canApproveRequests, selfServiceEmployeeId],
     queryFn: async () => {
       const [reqRes, typeRes, balanceRes, holidayRes, employeeInfoRes, approvalPreviewRes, approvalsRes] = await Promise.all([
-        listLeaveRequests(user!.companyId, isManager
+        listLeaveRequests(user!.companyId, canApproveRequests
           ? { includeApprovalHistory: true }
           : { employeeId: selfServiceEmployeeId, includeApprovalHistory: true }),
         listLeaveTypes(user!.companyId),
@@ -203,7 +197,7 @@ export default function LeaveManagement() {
         listLeaveHolidays(user!.companyId),
         selfServiceEmployeeId ? getLeaveEmployeeInfo(user!.companyId, selfServiceEmployeeId) : Promise.resolve({ data: null, error: null }),
         selfServiceEmployeeId ? getLeaveApprovalPreview(user!.companyId, selfServiceEmployeeId) : Promise.resolve({ data: null, error: null }),
-        isManager ? getPendingApprovalsForUser(user!.companyId, user!.id) : Promise.resolve({ data: [], error: null }),
+        canApproveRequests ? getPendingApprovalsForUser(user!.companyId, user!.id) : Promise.resolve({ data: [], error: null }),
       ]);
       if (reqRes.error) toast({ title: 'Error', description: reqRes.error, variant: 'destructive' });
       if (typeRes.error) toast({ title: 'Error', description: typeRes.error, variant: 'destructive' });
@@ -221,7 +215,7 @@ export default function LeaveManagement() {
         pendingApprovals: approvalsRes.data,
       };
     },
-    enabled: !!user?.companyId && (!!(isManager) || !!selfServiceEmployeeId),
+    enabled: !!user?.companyId && (!!canApproveRequests || !!selfServiceEmployeeId),
   });
   const requests       = leaveData?.requests       ?? [];
   const leaveTypes     = leaveData?.leaveTypes     ?? [];
@@ -310,12 +304,20 @@ export default function LeaveManagement() {
   }, [applyForm.dayPart, applyForm.endDate, applyForm.startDate]);
 
   function canReviewRequest(request: LeaveRequest): boolean {
-    return isRequestAssignedToApprover(request, user, isManager);
+    return isRequestAssignedToApprover(request, {
+      id: user?.id,
+      hrmsRoleIds: hrmsAccess.roleIds,
+      hrmsRoleCodes: hrmsAccess.roleCodes,
+    }, canApproveRequests);
   }
 
   const myQueueCount = requests.filter(req => canReviewRequest(req)).length;
   const companyPendingCount = requests.filter(req => req.status === 'pending').length;
-  const filtered = filterLeaveRequestsForView(requests, filterStatus, viewMode, user, isManager);
+  const filtered = filterLeaveRequestsForView(requests, filterStatus, viewMode, {
+    id: user?.id,
+    hrmsRoleIds: hrmsAccess.roleIds,
+    hrmsRoleCodes: hrmsAccess.roleCodes,
+  }, canApproveRequests);
 
   function toggleHistory(requestId: string) {
     setExpandedHistory(prev => ({ ...prev, [requestId]: !prev[requestId] }));
@@ -426,7 +428,7 @@ export default function LeaveManagement() {
       />
 
       {/* Pending approvals queue (managers only) */}
-      {isManager && pendingApprovals.length > 0 && (
+      {canApproveRequests && pendingApprovals.length > 0 && (
         <Card className="overflow-hidden border-amber-200 shadow-sm dark:border-amber-800">
           <CardHeader className="border-b bg-amber-50/70 px-4 py-3 dark:bg-amber-950/20">
             <div className="flex items-center justify-between">
@@ -499,7 +501,7 @@ export default function LeaveManagement() {
           <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{filtered.length} requests</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-        {isManager && (
+        {canApproveRequests && (
           <>
             <Button
               variant={viewMode === 'my_queue' ? 'default' : 'outline'}

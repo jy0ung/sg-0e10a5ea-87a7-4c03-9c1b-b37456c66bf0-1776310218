@@ -20,9 +20,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
-import { HRMS_ADMIN_ROLES } from '@/config/hrmsConfig';
 import { GitMerge, Plus, Pencil, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, X, SlidersHorizontal } from 'lucide-react';
 import {
   listApprovalFlows, createApprovalFlow, updateApprovalFlow,
@@ -76,6 +76,7 @@ interface ApprovalFlowsProps {
 
 export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps = {}) {
   const { user } = useAuth();
+  const hrmsAccess = useHrmsAccess();
   const companyId = useCompanyId();
   const { toast } = useToast();
 
@@ -91,7 +92,7 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [stepErrors, setStepErrors] = useState<Record<number, Record<string, string>>>({});
 
-  const isAuthorized = !!user && (HRMS_ADMIN_ROLES as string[]).includes(user.role);
+  const isAuthorized = !!user && hrmsAccess.canAccessSettings;
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees-for-select', companyId],

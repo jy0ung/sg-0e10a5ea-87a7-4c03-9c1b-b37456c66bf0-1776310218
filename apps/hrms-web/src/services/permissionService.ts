@@ -312,5 +312,5 @@ export function getDefaultPermissionsForRole(role: string): {
     },
   };
 
-  return defaultPerms[role] || defaultPerms.analyst;
+  return defaultPerms[role] || defaultPerms.creator_updater;
 }

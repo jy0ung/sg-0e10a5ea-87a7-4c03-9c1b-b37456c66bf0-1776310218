@@ -1,4 +1,3 @@
-import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
 import * as pkg from '@flc/hrms-services';
 import { Appraisal, AppraisalItem, AppraisalCycle, UpdateAppraisalItemInput } from '@/types';
@@ -41,15 +40,7 @@ export async function reviewAppraisalActivation(
   note?: string,
 ): Promise<{ error: string | null }> {
   try {
-    const { data: reviewer, error: reviewerError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', reviewerId)
-      .single();
-    if (reviewerError) return { error: reviewerError.message };
-    const reviewerRole = String((reviewer as Record<string, unknown> | null)?.role ?? '');
-
-    await pkg.reviewAppraisalActivation({ appraisalId, reviewerId, reviewerRole, decision, note });
+    await pkg.reviewAppraisalActivation({ appraisalId, reviewerId, decision, note });
     void logUserAction(reviewerId, 'update', 'appraisal', appraisalId, {
       approvalDecision: decision,
       reviewerNote: note ?? null,

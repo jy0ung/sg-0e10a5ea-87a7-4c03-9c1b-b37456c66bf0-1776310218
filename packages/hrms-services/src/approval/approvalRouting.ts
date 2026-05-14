@@ -2,6 +2,25 @@ import { supabase, untypedSupabase } from '../shared/supabaseClient';
 import { resolveDirectManagerApproverUserId } from '../shared/identity';
 import type { ApprovalStepRecord } from './approvalTypes';
 
+const LEGACY_APP_ROLE_TO_HRMS_ROLE_CODES: Record<string, string[]> = {
+  super_admin: ['hr_manager'],
+  company_admin: ['hr_manager'],
+  director: ['director'],
+  general_manager: ['general_manager'],
+  manager: ['department_manager', 'line_manager'],
+  accounts: ['payroll_officer'],
+  sales: ['staff'],
+  analyst: ['staff'],
+  creator_updater: ['staff'],
+  employee: ['staff'],
+};
+
+function normalizeHrmsRoleCode(code?: string | null): string {
+  if (!code) return '';
+  const normalized = String(code).trim().toLowerCase();
+  return normalized === 'employee' ? 'staff' : normalized;
+}
+
 /**
  * Resolves the assigned approver for a step at bootstrap or step-advance time.
  *
@@ -84,4 +103,59 @@ export async function userHasAssignedHrmsRole(
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
+}
+
+async function listUserAssignedHrmsRoleCodes(
+  companyId: string,
+  profileId: string,
+): Promise<string[]> {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('employee_id')
+    .eq('id', profileId)
+    .maybeSingle();
+  if (profileError) throw new Error(profileError.message);
+
+  const employeeId = (profile as Record<string, unknown> | null)?.employee_id
+    ? String((profile as Record<string, unknown>).employee_id)
+    : null;
+
+  let query = untypedSupabase
+    .from('employee_hrms_role_assignments')
+    .select('hrms_role:hrms_roles!employee_hrms_role_assignments_hrms_role_id_fkey(code, is_active)')
+    .eq('company_id', companyId);
+
+  query = employeeId
+    ? query.or(`profile_id.eq.${profileId},employee_id.eq.${employeeId}`)
+    : query.eq('profile_id', profileId);
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const codes = (data ?? [])
+    .map((row) => (row as Record<string, unknown>).hrms_role as Record<string, unknown> | null)
+    .filter((role): role is Record<string, unknown> => Boolean(role) && Boolean(role.is_active))
+    .map((role) => normalizeHrmsRoleCode(String(role.code ?? '')))
+    .filter(Boolean);
+
+  return [...new Set(codes)];
+}
+
+export async function userMatchesAssignedApproverRole(
+  companyId: string,
+  profileId: string,
+  approverRole: string,
+): Promise<boolean> {
+  if (!approverRole) return false;
+
+  if (/^[0-9a-f-]{24,}$/i.test(approverRole)) {
+    return userHasAssignedHrmsRole(companyId, profileId, approverRole);
+  }
+
+  const assignedRoleCodes = await listUserAssignedHrmsRoleCodes(companyId, profileId);
+  const normalizedApproverRole = normalizeHrmsRoleCode(approverRole);
+  if (assignedRoleCodes.includes(normalizedApproverRole)) return true;
+
+  const mappedRoleCodes = LEGACY_APP_ROLE_TO_HRMS_ROLE_CODES[normalizedApproverRole] ?? [];
+  return mappedRoleCodes.some((code) => assignedRoleCodes.includes(code));
 }

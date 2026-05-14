@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Loader2, Save, KeyRound, Power, Building2, Upload, Users, Search } from 'lucide-react';
 import { getBranches } from '@/services/masterDataService';
-import type { AppRole, BranchRecord } from '@/types';
+import { DEFAULT_APP_ROLE, type AppRole, type BranchRecord } from '@/types';
 import { profileUpdateSchema, type ProfileUpdateFormData, changePasswordSchema, type ChangePasswordFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -83,7 +83,7 @@ export default function SettingsPage() {
     resolver: zodResolver(profileUpdateSchema),
     defaultValues: {
       name: user?.name || '',
-      role: user?.role || 'analyst',
+      role: user?.role || DEFAULT_APP_ROLE,
       branch_id: user?.branch_id || null,
     },
     mode: 'onChange',
@@ -96,7 +96,7 @@ export default function SettingsPage() {
     if (user && !form.formState.isDirty) {
       form.reset({
         name: user.name || '',
-        role: user.role || 'analyst',
+        role: user.role || DEFAULT_APP_ROLE,
         branch_id: user.branch_id || null,
       });
       setBranchId(user.branch_id || 'none');

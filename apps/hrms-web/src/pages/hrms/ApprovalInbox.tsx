@@ -17,6 +17,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { supabase } from '@/integrations/supabase/client';
 import {
   listAppraisals,
@@ -26,7 +27,6 @@ import {
   reviewLeaveRequest,
   reviewPayrollRunFinalisation,
 } from '@/services/hrmsService';
-import { HRMS_MANAGER_ROLES, HRMS_PAYROLL_ROLES } from '@/config/hrmsConfig';
 import type { ApprovalDecision } from '@/types';
 import {
   buildApprovalInboxItems,
@@ -59,9 +59,10 @@ function getLastDecision(history?: ApprovalDecision[]) {
 export default function ApprovalInbox() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const hrmsAccess = useHrmsAccess();
   const { toast } = useToast();
-  const canOpenPayrollPage = HRMS_PAYROLL_ROLES.includes(user?.role as typeof HRMS_PAYROLL_ROLES[number]);
-  const canOpenAppraisalPage = HRMS_MANAGER_ROLES.includes(user?.role as typeof HRMS_MANAGER_ROLES[number]);
+  const canOpenPayrollPage = hrmsAccess.canAccessRoute('payroll');
+  const canOpenAppraisalPage = hrmsAccess.canAccessRoute('appraisals');
 
   const queryClient = useQueryClient();
 
@@ -120,9 +121,9 @@ export default function ApprovalInbox() {
       inboxData?.leaveRequests ?? [],
       inboxData?.payrollRuns ?? [],
       inboxData?.appraisals ?? [],
-      user,
+      user ? { id: user.id, hrmsRoleIds: hrmsAccess.roleIds, hrmsRoleCodes: hrmsAccess.roleCodes } : null,
     ),
-    [inboxData, user],
+    [hrmsAccess.roleCodes, hrmsAccess.roleIds, inboxData, user],
   );
   const filteredItems = useMemo(() => filterApprovalInboxItems(items, filter), [items, filter]);
 

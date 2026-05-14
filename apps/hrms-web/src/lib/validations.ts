@@ -217,7 +217,7 @@ export type CreateLeaveRequestFormData = z.infer<typeof createLeaveRequestSchema
 
 export const hrmsRoleSchema = z.object({
   name: z.string().min(2, 'Role name must be at least 2 characters').max(80, 'Role name is too long'),
-  category: z.enum(['executive', 'hr', 'department', 'line_management', 'employee', 'payroll', 'attendance', 'custom']),
+  category: z.enum(['executive', 'hr', 'department', 'line_management', 'staff', 'employee', 'payroll', 'attendance', 'custom']),
   scope: z.enum(['company', 'branch', 'department', 'self']),
   authorityLevel: z.coerce.number().int().min(1, 'Authority level must be at least 1').max(999, 'Authority level cannot exceed 999'),
   description: z.string().max(500, 'Description is too long').optional(),

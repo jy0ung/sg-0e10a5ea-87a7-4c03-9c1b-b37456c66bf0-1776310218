@@ -36,10 +36,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { HRMS_MANAGER_ROLES } from '@/config/hrmsConfig';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
-
-const MANAGER_ROLES = HRMS_MANAGER_ROLES;
 
 const STATUS_COLORS: Record<AppraisalStatus, string> = {
   open:        'bg-blue-100 text-blue-700 border-blue-200',
@@ -87,8 +85,9 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
 
 export default function PerformanceAppraisals() {
   const { user } = useAuth();
+  const hrmsAccess = useHrmsAccess();
   const { toast } = useToast();
-  const isManager = MANAGER_ROLES.includes(user?.role as typeof MANAGER_ROLES[number]);
+  const canManageAppraisals = hrmsAccess.canAccessEmployees;
   const selfServiceEmployeeId = user?.employeeId ?? user?.id;
 
   const queryClient = useQueryClient();
@@ -131,7 +130,7 @@ export default function PerformanceAppraisals() {
     queryFn: async () => { const { data } = await listAppraisalItems(viewId!); return data; },
     enabled: !!viewId,
   });
-  const items = isManager || !user?.id
+  const items = canManageAppraisals || !user?.id
     ? rawItems
     : rawItems.filter(item => matchesCurrentEmployee(item.employeeId) || item.reviewerId === user.id);
 
@@ -141,18 +140,15 @@ export default function PerformanceAppraisals() {
   }
 
   function canReviewAppraisal(appraisal: Appraisal): boolean {
-    if (!isManager || !user || appraisal.status !== 'in_progress' || appraisal.approvalInstanceStatus !== 'pending') return false;
+    if (!canManageAppraisals || !user || appraisal.status !== 'in_progress' || appraisal.approvalInstanceStatus !== 'pending') return false;
     if (appraisal.currentApproverUserId) return appraisal.currentApproverUserId === user.id;
-    if (appraisal.currentApproverRole) {
-      const looksLikeHrmsRoleId = /^[0-9a-f-]{24,}$/i.test(appraisal.currentApproverRole);
-      return looksLikeHrmsRoleId ? isManager : appraisal.currentApproverRole === user.role;
-    }
+    if (appraisal.currentApproverRole) return hrmsAccess.matchesApproverRole(appraisal.currentApproverRole);
     return false;
   }
 
   function canResubmitAppraisal(appraisal: Appraisal): boolean {
     return Boolean(
-      isManager
+      canManageAppraisals
       && user
       && appraisal.status === 'in_progress'
       && appraisal.approvalInstanceStatus === 'rejected'
@@ -254,7 +250,7 @@ export default function PerformanceAppraisals() {
 
   function canManagerReviewItem(item: AppraisalItem): boolean {
     return Boolean(
-      isManager
+      canManageAppraisals
       && user?.id
       && viewingAppraisal?.status === 'open'
       && item.reviewerId === user.id
@@ -355,7 +351,7 @@ export default function PerformanceAppraisals() {
         description="Manage appraisal cycles, self reviews, and manager feedback"
         breadcrumbs={[{ label: 'HRMS' }, { label: 'Appraisals' }]}
         actions={
-          isManager ? (
+          canManageAppraisals ? (
             <Button size="sm" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4 mr-1" /> New Cycle
             </Button>
@@ -607,7 +603,7 @@ export default function PerformanceAppraisals() {
                           Acknowledge
                         </Button>
                       )}
-                      {isManager && (
+                      {canManageAppraisals && (
                         <>
                           <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEditItem(item)}>
                             <Pencil className="h-3.5 w-3.5" />
@@ -617,7 +613,7 @@ export default function PerformanceAppraisals() {
                           </Button>
                         </>
                       )}
-                      {!canSelfReviewItem(item) && !canManagerReviewItem(item) && !canAcknowledgeItem(item) && !isManager && (
+                      {!canSelfReviewItem(item) && !canManagerReviewItem(item) && !canAcknowledgeItem(item) && !canManageAppraisals && (
                         <span className="text-xs text-muted-foreground">No action</span>
                       )}
                     </div>
