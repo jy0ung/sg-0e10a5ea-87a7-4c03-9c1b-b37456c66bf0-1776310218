@@ -1,11 +1,15 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { deriveHrmsAccess } from '@/lib/hrms/access';
+import { deriveHrmsAccess, deriveFullHrmsAccess } from '@/lib/hrms/access';
 import { listAssignedHrmsRoles } from '@/services/hrmsRoleService';
+
+const HRMS_ADMIN_APP_ROLES = new Set(['super_admin', 'company_admin']);
 
 export function useHrmsAccess() {
   const { user } = useAuth();
+
+  const isHrmsAdmin = HRMS_ADMIN_APP_ROLES.has(user?.role ?? '');
 
   const query = useQuery({
     queryKey: ['hrms-access', user?.companyId, user?.id, user?.employeeId],
@@ -14,14 +18,17 @@ export function useHrmsAccess() {
       if (result.error) throw new Error(result.error);
       return result.data;
     },
-    enabled: !!user?.companyId && !!user?.id,
+    enabled: !!user?.companyId && !!user?.id && !isHrmsAdmin,
   });
 
-  const access = useMemo(() => deriveHrmsAccess(query.data ?? []), [query.data]);
+  const access = useMemo(
+    () => (isHrmsAdmin ? deriveFullHrmsAccess() : deriveHrmsAccess(query.data ?? [])),
+    [isHrmsAdmin, query.data],
+  );
 
   return {
     ...access,
-    loading: query.isPending,
+    loading: !isHrmsAdmin && query.isPending,
     error: query.error instanceof Error ? query.error.message : null,
     refresh: query.refetch,
   };

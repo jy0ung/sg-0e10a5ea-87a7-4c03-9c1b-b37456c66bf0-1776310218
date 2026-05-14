@@ -201,3 +201,29 @@ export function deriveHrmsAccess(roles: HrmsRole[]): DerivedHrmsAccess {
     }),
   };
 }
+
+/** Returns full HRMS access for super_admin / company_admin — bypasses HRMS role assignments. */
+export function deriveFullHrmsAccess(): DerivedHrmsAccess {
+  return {
+    roles: [],
+    roleIds: [],
+    roleCodes: [],
+    roleNames: [],
+    primaryRole: null,
+    primaryRoleLabel: 'Administrator',
+    hasSelfServiceAccess: true,
+    canApproveRequests: true,
+    canAccessAttendance: true,
+    canManageAttendance: true,
+    canAccessEmployees: true,
+    canManageEmployees: true,
+    canAccessPayroll: true,
+    canAccessSettings: true,
+    canAccessAnnouncements: true,
+    canManageAnnouncements: true,
+    canAccessAppraisals: true,
+    canViewPii: true,
+    canAccessRoute: () => true,
+    matchesApproverRole: () => true,
+  };
+}
