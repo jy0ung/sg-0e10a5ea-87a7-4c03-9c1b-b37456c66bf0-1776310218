@@ -533,6 +533,93 @@ export async function cancelLeaveRequest(requestId: string): Promise<void> {
   if (workflowError) throw new Error(workflowError.message);
 }
 
+// ─── HR leave-decision notification ──────────────────────────────────────────
+
+/**
+ * Sends an informational in-app notification to every user assigned an active
+ * `hr`-category HRMS role in the company when a leave request reaches a final
+ * decision (approved or rejected). Best-effort — callers should swallow errors.
+ */
+async function notifyHrUsersOfLeaveDecision(
+  leaveRequestId: string,
+  companyId: string,
+  decision: 'approved' | 'rejected',
+  requesterProfileId: string | null,
+): Promise<void> {
+  // 1. Fetch leave details for the notification message.
+  const { data: leaveRow } = await supabase
+    .from('leave_requests')
+    .select('start_date, end_date, days, leave_types(name)')
+    .eq('id', leaveRequestId)
+    .maybeSingle();
+  if (!leaveRow) return;
+
+  // 2. Fetch requester's display name.
+  let requesterName = 'An employee';
+  if (requesterProfileId) {
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('name')
+      .eq('id', requesterProfileId)
+      .maybeSingle();
+    if (profileRow?.name) requesterName = String(profileRow.name);
+  }
+
+  // 3. Resolve all HR role IDs for this company.
+  const { data: hrRoles } = await untypedSupabase
+    .from('hrms_roles')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('category', 'hr');
+  const hrRoleIds = (hrRoles ?? []).map((r: Record<string, unknown>) => String(r.id));
+  if (!hrRoleIds.length) return;
+
+  // 4. Collect profile IDs of active HR assignees, excluding the requester.
+  const now = new Date().toISOString();
+  const { data: assignments } = await untypedSupabase
+    .from('employee_hrms_role_assignments')
+    .select('profile_id')
+    .in('hrms_role_id', hrRoleIds)
+    .eq('is_active', true)
+    .or(`expires_at.is.null,expires_at.gt.${now}`);
+
+  const hrProfileIds = [
+    ...new Set(
+      (assignments ?? [])
+        .map((a: Record<string, unknown>) => (a.profile_id ? String(a.profile_id) : null))
+        .filter((id): id is string => Boolean(id) && id !== requesterProfileId),
+    ),
+  ];
+  if (!hrProfileIds.length) return;
+
+  // 5. Build a concise notification message.
+  const leaveTypeName =
+    (leaveRow.leave_types as Record<string, unknown> | null)?.name
+      ? String((leaveRow.leave_types as Record<string, unknown>).name)
+      : 'Leave';
+  const days = Number(leaveRow.days ?? 0);
+  const dayLabel = days === 1 ? '1 day' : `${days} days`;
+  const start = String(leaveRow.start_date ?? '');
+  const end = String(leaveRow.end_date ?? '');
+  const dateRange = start === end ? start : `${start} – ${end}`;
+  const verb = decision === 'approved' ? 'approved' : 'rejected';
+  const title = `Leave ${decision === 'approved' ? 'Approved' : 'Rejected'}`;
+  const message = `${requesterName}'s ${dayLabel} ${leaveTypeName} (${dateRange}) has been ${verb}.`;
+
+  // 6. Insert notifications for all HR users (best-effort — ignore insert errors).
+  await supabase.from('notifications').insert(
+    hrProfileIds.map((userId) => ({
+      user_id: userId,
+      title,
+      message,
+      type: decision === 'approved' ? ('info' as const) : ('warning' as const),
+      read: false,
+    })),
+  );
+}
+
+// ─── Review ───────────────────────────────────────────────────────────────────
+
 /**
  * Submits an approval decision for a leave request.
  *
@@ -574,6 +661,8 @@ export async function reviewLeaveRequest(
         .update({ status: dec, reviewed_by: rId, reviewed_at: decidedAt, reviewer_note: n ?? null, updated_at: decidedAt })
         .eq('id', entityId);
       if (error) throw new Error(error.message);
+      // Best-effort: notify HR users of the final decision without blocking the approval.
+      void notifyHrUsersOfLeaveDecision(entityId, companyId, dec, requesterId).catch(() => undefined);
     },
     auditAdapter,
   );
