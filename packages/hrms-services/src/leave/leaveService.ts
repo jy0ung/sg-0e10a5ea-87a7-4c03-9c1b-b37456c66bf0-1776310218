@@ -583,13 +583,13 @@ async function notifyHrUsersOfLeaveDecision(
     .eq('is_active', true)
     .or(`expires_at.is.null,expires_at.gt.${now}`);
 
-  const hrProfileIds = [
-    ...new Set(
+  const hrProfileIds: string[] = Array.from(
+    new Set<string>(
       (assignments ?? [])
         .map((a: Record<string, unknown>) => (a.profile_id ? String(a.profile_id) : null))
         .filter((id): id is string => Boolean(id) && id !== requesterProfileId),
     ),
-  ];
+  );
   if (!hrProfileIds.length) return;
 
   // 5. Build a concise notification message.
