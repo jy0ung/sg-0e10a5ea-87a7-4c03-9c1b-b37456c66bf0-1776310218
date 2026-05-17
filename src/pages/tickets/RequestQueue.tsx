@@ -36,12 +36,14 @@ import {
 } from '@/components/ui/dialog';
 import {
   addTicketComment,
+  getCompanyTicketStatusCounts,
   listCompanyTicketsPage,
   listTicketActivity,
   type CompanyTicketRecord,
   type TicketActivityRecord,
   type TicketPriority,
   type TicketStatus,
+  type TicketStatusCounts,
   updateTicket,
 } from '@/services/ticketService';
 import { reviewInternalRequestApproval } from '@/services/requestApprovalService';
@@ -112,7 +114,7 @@ export default function RequestQueue() {
   const [assignees, setAssignees] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [slaFilter, setSlaFilter] = useState<SlaFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -123,6 +125,9 @@ export default function RequestQueue() {
   const [metricsExpanded, setMetricsExpanded] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.localStorage.getItem('requestQueue.metricsExpanded') !== 'false';
+  });
+  const [statusCounts, setStatusCounts] = useState<TicketStatusCounts>({
+    all: 0, open: 0, in_progress: 0, awaiting_requester: 0, resolved: 0, closed: 0, cancelled: 0,
   });
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
   const [reviewTarget, setReviewTarget] = useState<ApprovalReviewTarget>(null);
@@ -141,7 +146,7 @@ export default function RequestQueue() {
     setLoading(true);
     setError(null);
 
-    const [{ data, error: fetchError }, profileResult] = await Promise.all([
+    const [{ data, error: fetchError }, profileResult, countsResult] = await Promise.all([
       listCompanyTicketsPage(user.company_id, {
         page,
         pageSize: REQUEST_QUEUE_PAGE_SIZE,
@@ -150,6 +155,7 @@ export default function RequestQueue() {
         search: searchTerm,
       }),
       listProfiles(user.company_id),
+      getCompanyTicketStatusCounts(user.company_id, { priority: priorityFilter, search: searchTerm }),
     ]);
 
     if (fetchError) {
@@ -165,6 +171,7 @@ export default function RequestQueue() {
           .filter((profile) => profile.status === 'active' && requestOwnerRoles.has(profile.role))
           .sort((left, right) => left.name.localeCompare(right.name)),
       );
+      if (countsResult.data) setStatusCounts(countsResult.data);
       setNoteDrafts((prev) => {
         // Preserve any note the user has already started typing for a ticket on
         // the current page.  Only initialize from server data when there is no
@@ -251,16 +258,6 @@ export default function RequestQueue() {
       setSelectedTicketId(selectedTicket.id);
     }
   }, [selectedTicket, selectedTicketId]);
-
-  const counts = useMemo(() => {
-    return tickets.reduce<Record<StatusFilter, number>>(
-      (summary, ticket) => {
-        summary[ticket.status] += 1;
-        return summary;
-      },
-      { all: tickets.length, open: 0, in_progress: 0, awaiting_requester: 0, resolved: 0, closed: 0, cancelled: 0 },
-    );
-  }, [tickets]);
 
   const queueMetrics = useMemo(() => ({
     unassigned: tickets.filter((ticket) => isOpenStatus(ticket.status) && !ticket.assigned_to).length,
@@ -557,7 +554,7 @@ export default function RequestQueue() {
           statusFilter={statusFilter}
           priorityFilter={priorityFilter}
           slaFilter={slaFilter}
-          counts={counts}
+          counts={statusCounts}
           statusOptions={statusOptions}
           priorityOptions={priorityOptions}
           onSearchChange={setSearchTerm}
@@ -603,7 +600,7 @@ export default function RequestQueue() {
           <RequestQueueList
             tickets={filteredTickets}
             selectedTicketId={selectedTicket.id}
-            openCount={counts.open}
+            openCount={statusCounts.open}
             categories={categories}
             subcategories={subcategories}
             attachmentsByTicket={attachmentsByTicket}

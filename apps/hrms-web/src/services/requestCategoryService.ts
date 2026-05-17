@@ -238,6 +238,77 @@ export async function updateRequestCategory(
   return { data: mapRequestCategory(data as RequestCategoryRow), error: null };
 }
 
+export interface DeleteRequestCategoryResult {
+  error: string | null;
+  inUse?: boolean;
+}
+
+/**
+ * Deletes a request category if it is not referenced by any tickets or templates.
+ * If the category is in use, returns { error: ..., inUse: true } — the caller
+ * should offer deactivation instead.
+ */
+export async function deleteRequestCategory(
+  categoryId: string,
+  context: RequestCategoryContext,
+): Promise<DeleteRequestCategoryResult> {
+  // Fetch the category to get its key
+  const { data: categoryRow, error: fetchError } = await supabase
+    .from('request_categories')
+    .select('id, category_key, label')
+    .eq('id', categoryId)
+    .eq('company_id', context.companyId)
+    .single();
+
+  if (fetchError || !categoryRow) {
+    return { error: 'Category not found.' };
+  }
+
+  const categoryKey = (categoryRow as { category_key: string }).category_key;
+
+  // Check ticket usage
+  const { count: ticketCount, error: ticketError } = await supabase
+    .from('tickets')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', context.companyId)
+    .eq('category', categoryKey);
+
+  if (ticketError) return { error: ticketError.message };
+
+  if ((ticketCount ?? 0) > 0) {
+    return { error: 'This category has been used in existing requests. Deactivate it instead.', inUse: true };
+  }
+
+  // Check template usage
+  const { count: templateCount, error: templateError } = await supabase
+    .from('request_templates')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', context.companyId)
+    .eq('category_key', categoryKey);
+
+  if (templateError) return { error: templateError.message };
+
+  if ((templateCount ?? 0) > 0) {
+    return { error: 'This category is used by one or more templates. Deactivate it instead.', inUse: true };
+  }
+
+  // Safe to hard-delete
+  const { error: deleteError } = await supabase
+    .from('request_categories')
+    .delete()
+    .eq('id', categoryId)
+    .eq('company_id', context.companyId);
+
+  if (deleteError) return { error: deleteError.message };
+
+  void logUserAction(context.actorId, 'delete', 'request_category', categoryId, {
+    component: 'RequestCategoryService',
+    category_key: categoryKey,
+  });
+
+  return { error: null };
+}
+
 export async function moveRequestCategory(
   categoryId: string,
   direction: 'up' | 'down',

@@ -8,10 +8,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { TicketPriority, TicketStatus } from '@/services/ticketService';
+import type { TicketPriority, TicketStatus, TicketStatusFilter } from '@/services/ticketService';
 import type { TicketSlaState } from '@/lib/ticketSla';
 
-type StatusFilter = 'all' | TicketStatus;
+type StatusFilter = TicketStatusFilter;
 type PriorityFilter = 'all' | TicketPriority;
 type SlaFilter = 'all' | Exclude<TicketSlaState, 'met' | 'pending'>;
 
@@ -20,7 +20,7 @@ interface RequestQueueFiltersProps {
   statusFilter: StatusFilter;
   priorityFilter: PriorityFilter;
   slaFilter: SlaFilter;
-  counts: Record<StatusFilter, number>;
+  counts: Record<TicketStatus | 'all', number>;
   statusOptions: Array<{ value: TicketStatus; label: string }>;
   priorityOptions: Array<{ value: TicketPriority; label: string }>;
   onSearchChange: (value: string) => void;
@@ -59,6 +59,7 @@ export function RequestQueueFilters({
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="active">Active ({(counts.open ?? 0) + (counts.in_progress ?? 0) + (counts.awaiting_requester ?? 0)})</SelectItem>
             <SelectItem value="all">All statuses ({counts.all})</SelectItem>
             {statusOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>

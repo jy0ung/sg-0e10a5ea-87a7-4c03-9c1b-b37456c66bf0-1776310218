@@ -7,16 +7,18 @@ import { toast } from 'sonner';
 import {
   AlertCircle,
   Check,
+  ChevronRight,
   ChevronsUpDown,
-  FileText,
   Info,
   Loader2,
   Paperclip,
+  Search,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
   Command,
   CommandEmpty,
@@ -35,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,11 +50,17 @@ import { createTicket } from '@/services/ticketService';
 import { uploadTicketAttachment } from '@/services/ticketAttachmentService';
 import { resolveBranchCode } from '@/services/branchService';
 import {
+  getInternalRequestApprovalPlan,
+  type InternalRequestApprovalPlan,
+} from '@/services/requestApprovalService';
+import {
   listRequestFieldOptions,
   type DatabaseFieldOption,
   type RequestFieldDataSource,
   type RequestFormFieldRecord,
 } from '@/services/requestFormFieldService';
+import type { RequestCategoryRecord } from '@/services/requestCategoryService';
+import type { RequestTemplateRecord } from '@/services/requestTemplateService';
 import type { AppRole } from '@/types';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -66,7 +75,7 @@ const ticketSchema = z.object({
 
 type TicketFormData = z.infer<typeof ticketSchema>;
 
-const DEFAULT_TICKET_FORM_VALUES: TicketFormData = {
+const DEFAULT_FORM: TicketFormData = {
   subject: '',
   category: '',
   subcategory: '',
@@ -107,6 +116,12 @@ const PRIORITY_OPTIONS: PriorityOption[] = [
   },
 ];
 
+const PRIORITY_BADGE: Record<string, string> = {
+  low: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200',
+  medium: 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-300',
+  high: 'bg-red-50 text-red-700 border-red-300 dark:bg-red-950/30 dark:text-red-400',
+};
+
 // ── Role-aware context ────────────────────────────────────────────────────────
 
 interface RoleContext {
@@ -117,25 +132,24 @@ interface RoleContext {
 
 const ROLE_CONTEXT: Partial<Record<AppRole, RoleContext>> = {
   sales: {
-    pageTitle: 'Sales Support Request',
+    pageTitle: 'New Sales Support Request',
     pageSubtitle:
-      'Raise a request to the support team for sales, documentation, or customer coordination.',
+      'Submit a request for sales, documentation, or customer coordination.',
     descriptionPlaceholder:
-      'Describe your request in detail. Include customer name, vehicle model, booking or sales order number, and any other relevant information.',
+      'Include customer name, vehicle model, booking or sales order number, and any other relevant information.',
   },
   accounts: {
-    pageTitle: 'Accounts Support Request',
+    pageTitle: 'New Accounts Support Request',
     pageSubtitle:
-      'Raise a request to the support team for invoicing, payments, or finance coordination.',
+      'Submit a request for invoicing, payments, or finance coordination.',
     descriptionPlaceholder:
-      'Describe your request in detail. Include the invoice number, payment reference, transaction amount, and any other relevant information.',
+      'Include the invoice number, payment reference, transaction amount, and any relevant context.',
   },
 };
 
 const DEFAULT_ROLE_CONTEXT: RoleContext = {
-  pageTitle: 'New Internal Request',
-  pageSubtitle:
-    'Submit an internal request to the support team for review and resolution.',
+  pageTitle: 'New Request',
+  pageSubtitle: 'Submit an internal request for review and resolution.',
   descriptionPlaceholder:
     'Describe your request clearly. Provide as much context as possible so the assigned team can respond quickly.',
 };
@@ -243,6 +257,372 @@ function DatabaseFieldSelect({
   );
 }
 
+// ── TemplateChooser ───────────────────────────────────────────────────────────
+
+interface TemplateChooserProps {
+  templates: RequestTemplateRecord[];
+  categories: RequestCategoryRecord[];
+  activeTemplateId: string | null;
+  onSelect: (template: RequestTemplateRecord) => void;
+  onClear: () => void;
+  loading: boolean;
+}
+
+function TemplateChooser({
+  templates,
+  categories,
+  activeTemplateId,
+  onSelect,
+  onClear,
+  loading,
+}: TemplateChooserProps) {
+  const [search, setSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+
+  const activeTemplates = useMemo(
+    () => templates.filter((t) => t.is_active),
+    [templates],
+  );
+
+  const templateCategories = useMemo(() => {
+    const keys = new Set(activeTemplates.map((t) => t.category_key));
+    return categories.filter((c) => keys.has(c.key));
+  }, [activeTemplates, categories]);
+
+  const filtered = useMemo(() => {
+    let list = activeTemplates;
+    if (filterCategory !== 'all') list = list.filter((t) => t.category_key === filterCategory);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (t) =>
+          t.name.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q) ||
+          t.subject.toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [activeTemplates, filterCategory, search]);
+
+  const getCategoryLabel = (key: string) =>
+    categories.find((c) => c.key === key)?.label ?? key;
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading templates...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Search + category filter */}
+      {activeTemplates.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search templates…"
+              className="h-8 pl-8 text-sm"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          {templateCategories.length > 1 && (
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                onClick={() => setFilterCategory('all')}
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+                  filterCategory === 'all'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                )}
+              >
+                All
+              </button>
+              {templateCategories.map((cat) => (
+                <button
+                  type="button"
+                  key={cat.key}
+                  onClick={() => setFilterCategory(cat.key)}
+                  className={cn(
+                    'rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+                    filterCategory === cat.key
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80',
+                  )}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Card grid: custom + templates */}
+      <div className={cn('grid gap-2', activeTemplates.length > 0 ? 'sm:grid-cols-2' : '')}>
+        {/* "Custom request" option — always first */}
+        <button
+          type="button"
+          onClick={onClear}
+          className={cn(
+            'rounded-lg border px-3 py-2.5 text-left transition-colors',
+            !activeTemplateId
+              ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+              : 'border-dashed border-border bg-background hover:bg-muted/40',
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <div
+              className={cn(
+                'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                !activeTemplateId
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-muted-foreground/30',
+              )}
+            >
+              {!activeTemplateId && <Check className="h-3 w-3" />}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Custom request</p>
+              <p className="text-xs text-muted-foreground">Fill in the form manually</p>
+            </div>
+          </div>
+        </button>
+
+        {/* Template cards */}
+        {activeTemplates.length === 0 ? null : filtered.length === 0 ? (
+          <div className="flex items-center justify-center rounded-lg border border-dashed px-3 py-4">
+            <p className="text-xs text-muted-foreground">No templates match your search.</p>
+          </div>
+        ) : (
+          filtered.map((template) => {
+            const isSelected = activeTemplateId === template.id;
+            return (
+              <button
+                type="button"
+                key={template.id}
+                onClick={() => onSelect(template)}
+                className={cn(
+                  'rounded-lg border px-3 py-2.5 text-left transition-colors',
+                  isSelected
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
+                    : 'border-border bg-card hover:bg-muted/40',
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      {isSelected && (
+                        <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      )}
+                      <p
+                        className={cn(
+                          'truncate text-sm font-medium',
+                          isSelected ? 'text-primary' : 'text-foreground',
+                        )}
+                      >
+                        {template.name}
+                      </p>
+                    </div>
+                    {template.description && (
+                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                        {template.description}
+                      </p>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="shrink-0 text-[10px]">
+                    {getCategoryLabel(template.category_key)}
+                  </Badge>
+                </div>
+                <div className="mt-1.5">
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                      PRIORITY_BADGE[template.priority],
+                    )}
+                  >
+                    {template.priority.charAt(0).toUpperCase() + template.priority.slice(1)} priority
+                  </span>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {activeTemplates.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          No templates are configured yet. Continue filling in the form below.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Approval flow types & preview ─────────────────────────────────────────────
+
+type ApprovalPlanState = InternalRequestApprovalPlan | null | 'loading' | 'error';
+
+function ApprovalFlowPreview({ plan }: { plan: ApprovalPlanState }) {
+  if (plan === 'loading') {
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Checking approval route…
+      </div>
+    );
+  }
+  if (plan === 'error') {
+    return (
+      <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-400">
+        <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>No approval flow configured. Contact an admin before submitting.</span>
+      </div>
+    );
+  }
+  if (!plan) {
+    return <p className="text-xs text-muted-foreground">No approval required.</p>;
+  }
+  const stepName =
+    plan.firstStepName ??
+    (plan.approverRole ? plan.approverRole.replace(/_/g, ' ') : 'Approver');
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="rounded bg-muted px-2 py-0.5 font-medium text-foreground">You</span>
+      <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+      <span className="rounded bg-muted px-2 py-0.5 font-medium text-foreground capitalize">
+        {stepName}
+      </span>
+      <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+      <span className="rounded bg-muted px-2 py-0.5 font-medium text-foreground">
+        Support Team
+      </span>
+    </div>
+  );
+}
+
+// ── RequestSummaryPanel ───────────────────────────────────────────────────────
+
+interface SummaryPanelProps {
+  activeTemplate: RequestTemplateRecord | null;
+  categoryLabel: string;
+  subcategoryLabel: string | null;
+  priority: TicketFormData['priority'];
+  attachedFiles: File[];
+  approvalPlan: ApprovalPlanState;
+  canSubmit: boolean;
+  isSubmitting: boolean;
+}
+
+function RequestSummaryPanel({
+  activeTemplate,
+  categoryLabel,
+  subcategoryLabel,
+  priority,
+  attachedFiles,
+  approvalPlan,
+  canSubmit,
+  isSubmitting,
+}: SummaryPanelProps) {
+  return (
+    <div className="space-y-3">
+      {/* Summary card */}
+      <div className="rounded-lg border bg-card p-4 shadow-sm">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Request Summary
+        </p>
+        <div className="space-y-2.5 text-sm">
+          <div className="flex items-start justify-between gap-3">
+            <span className="shrink-0 text-muted-foreground">Template</span>
+            <span className="text-right font-medium text-foreground">
+              {activeTemplate ? activeTemplate.name : 'Custom'}
+            </span>
+          </div>
+          <Separator />
+          <div className="flex items-start justify-between gap-3">
+            <span className="shrink-0 text-muted-foreground">Category</span>
+            <span className="text-right font-medium text-foreground">{categoryLabel || '—'}</span>
+          </div>
+          {subcategoryLabel && (
+            <div className="flex items-start justify-between gap-3">
+              <span className="shrink-0 text-muted-foreground">Subcategory</span>
+              <span className="text-right font-medium text-foreground">{subcategoryLabel}</span>
+            </div>
+          )}
+          <div className="flex items-start justify-between gap-3">
+            <span className="shrink-0 text-muted-foreground">Priority</span>
+            <span
+              className={cn(
+                'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
+                PRIORITY_BADGE[priority],
+              )}
+            >
+              {priority.charAt(0).toUpperCase() + priority.slice(1)}
+            </span>
+          </div>
+          {attachedFiles.length > 0 && (
+            <>
+              <Separator />
+              <div className="flex items-start justify-between gap-3">
+                <span className="shrink-0 text-muted-foreground">Attachments</span>
+                <span className="font-medium text-foreground">
+                  {attachedFiles.length} file{attachedFiles.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Approval route */}
+      <div className="rounded-lg border bg-card p-4 shadow-sm">
+        <div className="mb-2.5 flex items-center gap-1.5">
+          <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Approval Route
+          </p>
+        </div>
+        <ApprovalFlowPreview plan={approvalPlan} />
+      </div>
+
+      {/* Desktop submit CTA */}
+      <Button
+        type="submit"
+        form="new-request-form"
+        className="w-full"
+        disabled={!canSubmit}
+      >
+        {isSubmitting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Submitting…
+          </>
+        ) : (
+          'Submit Request'
+        )}
+      </Button>
+      <p className="text-center text-xs text-muted-foreground">
+        Drafts are saved locally until submitted.
+      </p>
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function NewTicket() {
@@ -252,7 +632,7 @@ export default function NewTicket() {
     useRequestCategories(user?.company_id);
   const { subcategories, loading: subcategoriesLoading } =
     useRequestSubcategories(user?.company_id);
-  const { templates } = useRequestTemplates(user?.company_id);
+  const { templates, loading: templatesLoading } = useRequestTemplates(user?.company_id);
   const { settings: attachmentSettings } = useAttachmentSettings(user?.company_id);
 
   const [submitting, setSubmitting] = useState(false);
@@ -262,6 +642,7 @@ export default function NewTicket() {
   const [fileErrors, setFileErrors] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [approvalPlan, setApprovalPlan] = useState<ApprovalPlanState>('loading');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftRestoredRef = useRef(false);
   const skipDraftSaveRef = useRef(false);
@@ -274,9 +655,18 @@ export default function NewTicket() {
     }
   }, [user?.branch_id]);
 
+  // Fetch approval plan once on mount
+  useEffect(() => {
+    if (!user?.company_id || !user?.id) return;
+    setApprovalPlan('loading');
+    getInternalRequestApprovalPlan(user.company_id, user.id).then(({ data, error }) => {
+      setApprovalPlan(error ? 'error' : data);
+    });
+  }, [user?.company_id, user?.id]);
+
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
-    defaultValues: DEFAULT_TICKET_FORM_VALUES,
+    defaultValues: DEFAULT_FORM,
     mode: 'onChange',
   });
 
@@ -300,7 +690,7 @@ export default function NewTicket() {
         activeTemplateId?: string | null;
       };
       if (parsed.values) {
-        form.reset({ ...DEFAULT_TICKET_FORM_VALUES, ...parsed.values });
+        form.reset({ ...DEFAULT_FORM, ...parsed.values });
       }
       setCustomFieldValues(parsed.customFieldValues ?? {});
       setActiveTemplateId(parsed.activeTemplateId ?? null);
@@ -541,7 +931,7 @@ export default function NewTicket() {
     setAttachedFiles([]);
     setFileErrors([]);
     form.reset({
-      ...DEFAULT_TICKET_FORM_VALUES,
+      ...DEFAULT_FORM,
       category: firstCategoryKey,
       subcategory: firstSubcategoryKey,
     });
@@ -556,24 +946,23 @@ export default function NewTicket() {
 
   // ── Derived state ───────────────────────────────────────────────────────────
 
-  const selectedCategory =
-    categories.find((c) => c.key === selectedCategoryKey) ?? null;
+  const selectedCategory = categories.find((c) => c.key === selectedCategoryKey) ?? null;
   const selectedSubcategory =
     availableSubcategories.find((s) => s.key === selectedSubcategoryKey) ?? null;
   const categorySelectionDisabled = categoriesLoading || categories.length === 0;
   const requiresSubcategory = availableSubcategories.length > 0;
   const activeTemplate = templates.find((t) => t.id === activeTemplateId) ?? null;
-  const categoryTemplates = useMemo(
-    () => templates.filter((t) => t.category_key === selectedCategoryKey && t.is_active),
-    [templates, selectedCategoryKey],
-  );
-  const activeCategoryCount = useMemo(
-    () => categories.filter((category) => category.is_active).length,
-    [categories],
-  );
-  const selectedCategoryLabel = selectedCategory?.label ?? 'Choose a category';
 
-  const applyTemplate = (template: (typeof templates)[number]) => {
+  const canSubmit =
+    !submitting &&
+    form.formState.isValid &&
+    !categorySelectionDisabled &&
+    !(requiresSubcategory && !selectedSubcategoryKey) &&
+    !customFields.some((f) => f.is_required && !customFieldValues[f.key]?.trim());
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
+  const applyTemplate = (template: RequestTemplateRecord) => {
     setActiveTemplateId(template.id);
     form.setValue('category', template.category_key, { shouldValidate: true });
     form.setValue('subcategory', template.subcategory_key ?? '', { shouldValidate: true });
@@ -590,7 +979,7 @@ export default function NewTicket() {
     const firstSubcategoryKey =
       subcategories.find((s) => s.category_key === firstCategoryKey)?.key ?? '';
     form.reset({
-      ...DEFAULT_TICKET_FORM_VALUES,
+      ...DEFAULT_FORM,
       category: firstCategoryKey,
       subcategory: firstSubcategoryKey,
     });
@@ -600,24 +989,28 @@ export default function NewTicket() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-2 animate-fade-in">
+    <div className="flex h-full min-h-0 w-full flex-col gap-3 animate-fade-in">
+      {/* Page header */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
         <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">{roleContext.pageTitle}</h1>
+          <h1 className="text-base font-semibold tracking-tight text-foreground">
+            {roleContext.pageTitle}
+          </h1>
           <p className="text-[11px] text-muted-foreground">{roleContext.pageSubtitle}</p>
         </div>
         {branchCode && (
           <span className="rounded-md border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
-            Branch: <span className="font-medium text-foreground">{branchCode}</span>
+            Branch:{' '}
+            <span className="font-medium text-foreground">{branchCode}</span>
           </span>
         )}
       </div>
 
       {/* Categories not ready banner */}
       {(categoriesError || (!categoriesLoading && categories.length === 0)) && (
-        <div className="shrink-0 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+        <div className="shrink-0 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <p className="font-medium text-foreground">Request categories are not ready</p>
             <p className="text-muted-foreground">
               {categoriesError ||
@@ -627,52 +1020,49 @@ export default function NewTicket() {
         </div>
       )}
 
-      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden shadow-sm">
-        <CardHeader className="shrink-0 border-b bg-muted/30 px-4 py-3">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-base">Request details</CardTitle>
-              <CardDescription>Choose the category, apply a template if useful, then complete the required form fields.</CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="bg-background">{selectedCategoryLabel}</Badge>
-              <Badge variant="secondary">{customFields.length} field{customFields.length === 1 ? '' : 's'}</Badge>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="min-h-0 flex-1 overflow-auto p-4">
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+      {/* ── Main form (two-column on xl) ───────────────────────────────────── */}
+      <form
+        id="new-request-form"
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className="min-h-0 flex-1 overflow-auto"
+      >
+        <div className="grid gap-4 pb-4 xl:grid-cols-[minmax(0,1fr)_300px]">
 
-            <div className="xl:col-span-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="subject">
-                  Request title <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="subject"
-                  placeholder="e.g. Urgent invoice correction for customer delivery"
-                  {...form.register('subject')}
-                  className={form.formState.errors.subject ? 'border-destructive' : ''}
+          {/* Left column: form sections */}
+          <div className="space-y-4">
+
+            {/* ── Section 1: Template chooser ───────────────────────────── */}
+            <Card className="shadow-sm">
+              <CardHeader className="border-b bg-muted/20 px-4 py-3">
+                <p className="text-sm font-semibold text-foreground">Choose a template</p>
+                <p className="text-xs text-muted-foreground">
+                  Templates prefill the form fields. Pick one or start with a custom request.
+                </p>
+              </CardHeader>
+              <CardContent className="p-4">
+                <TemplateChooser
+                  templates={templates}
+                  categories={categories}
+                  activeTemplateId={activeTemplateId}
+                  onSelect={applyTemplate}
+                  onClear={clearTemplate}
+                  loading={templatesLoading}
                 />
-                {form.formState.errors.subject && (
-                  <p className="text-destructive text-xs">
-                    {form.formState.errors.subject.message}
-                  </p>
-                )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 xl:col-span-2 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Category and priority</p>
-                    <p className="text-xs text-muted-foreground">Routing choices drive templates and additional form fields.</p>
-                  </div>
-                  <Badge variant="outline" className="bg-background">{activeCategoryCount} active categories</Badge>
-                </div>
+            {/* ── Section 2: Request routing ────────────────────────────── */}
+            <Card className="shadow-sm">
+              <CardHeader className="border-b bg-muted/20 px-4 py-3">
+                <p className="text-sm font-semibold text-foreground">Request routing</p>
+                <p className="text-xs text-muted-foreground">
+                  Select the category and urgency for this request.
+                </p>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="grid gap-4 sm:grid-cols-2">
 
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(13rem,auto)]">
+                  {/* Category */}
                   <div className="space-y-1.5">
                     <Label htmlFor="category">
                       Category <span className="text-destructive">*</span>
@@ -692,7 +1082,7 @@ export default function NewTicket() {
                       >
                         <SelectValue
                           placeholder={
-                            categoriesLoading ? 'Loading categories...' : 'Select category'
+                            categoriesLoading ? 'Loading categories…' : 'Select a category'
                           }
                         />
                       </SelectTrigger>
@@ -705,12 +1095,19 @@ export default function NewTicket() {
                       </SelectContent>
                     </Select>
                     {form.formState.errors.category && (
-                      <p className="text-destructive text-xs">
+                      <p className="text-xs text-destructive">
                         {form.formState.errors.category.message}
+                      </p>
+                    )}
+                    {selectedCategory?.description && (
+                      <p className="flex items-start gap-1 text-xs text-muted-foreground">
+                        <Info className="mt-0.5 h-3 w-3 shrink-0" />
+                        {selectedCategory.description}
                       </p>
                     )}
                   </div>
 
+                  {/* Priority */}
                   <div className="space-y-1.5">
                     <Label>
                       Priority <span className="text-destructive">*</span>
@@ -740,323 +1137,350 @@ export default function NewTicket() {
                       {PRIORITY_OPTIONS.find((p) => p.value === selectedPriority)?.hint}
                     </p>
                   </div>
-                </div>
 
-                {(availableSubcategories.length > 0 ||
-                  (subcategoriesLoading && selectedCategoryKey)) && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="subcategory">
-                      Subcategory
-                      {requiresSubcategory && <span className="text-destructive"> *</span>}
-                    </Label>
-                    <Select
-                      value={selectedSubcategoryKey}
-                      onValueChange={(v) =>
-                        form.setValue('subcategory', v, { shouldValidate: true })
-                      }
-                      disabled={subcategoriesLoading || availableSubcategories.length === 0}
-                    >
-                      <SelectTrigger
-                        id="subcategory"
-                        className={form.formState.errors.subcategory ? 'border-destructive' : ''}
+                  {/* Subcategory */}
+                  {(availableSubcategories.length > 0 ||
+                    (subcategoriesLoading && selectedCategoryKey)) && (
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label htmlFor="subcategory">
+                        Subcategory
+                        {requiresSubcategory && (
+                          <span className="text-destructive"> *</span>
+                        )}
+                      </Label>
+                      <Select
+                        value={selectedSubcategoryKey}
+                        onValueChange={(v) =>
+                          form.setValue('subcategory', v, { shouldValidate: true })
+                        }
+                        disabled={subcategoriesLoading || availableSubcategories.length === 0}
                       >
-                        <SelectValue
-                          placeholder={subcategoriesLoading ? 'Loading...' : 'Select subcategory'}
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableSubcategories.map(({ key, label }) => (
-                          <SelectItem key={key} value={key}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {form.formState.errors.subcategory && (
-                      <p className="text-destructive text-xs">
-                        {form.formState.errors.subcategory.message}
-                      </p>
-                    )}
-                    {selectedSubcategory?.description && (
-                      <p className="text-xs text-muted-foreground">
-                        {selectedSubcategory.description}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {selectedCategory?.description && !categoriesLoading && (
-                  <div className="flex items-start gap-2 rounded-md border bg-background px-3 py-2">
-                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">{selectedCategory.description}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-3 rounded-md border bg-background p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm font-semibold text-foreground">Templates</p>
-                  </div>
-                  {activeTemplate && (
-                    <button
-                      type="button"
-                      onClick={clearTemplate}
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                      Clear
-                    </button>
-                  )}
-                </div>
-                {categoryTemplates.length > 0 && selectedCategoryKey ? (
-                  <>
-                    <div className="flex flex-wrap gap-2">
-                      {categoryTemplates.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => applyTemplate(t)}
+                        <SelectTrigger
+                          id="subcategory"
                           className={cn(
-                            'inline-flex max-w-full items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors',
-                            activeTemplateId === t.id
-                              ? 'border-primary bg-primary text-primary-foreground'
-                              : 'border-border bg-muted/50 text-foreground hover:bg-muted',
+                            'max-w-sm',
+                            form.formState.errors.subcategory ? 'border-destructive' : '',
                           )}
                         >
-                          <span className="truncate">{t.name}</span>
-                        </button>
-                      ))}
+                          <SelectValue
+                            placeholder={
+                              subcategoriesLoading ? 'Loading…' : 'Select subcategory'
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableSubcategories.map(({ key, label }) => (
+                            <SelectItem key={key} value={key}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {form.formState.errors.subcategory && (
+                        <p className="text-xs text-destructive">
+                          {form.formState.errors.subcategory.message}
+                        </p>
+                      )}
+                      {selectedSubcategory?.description && (
+                        <p className="text-xs text-muted-foreground">
+                          {selectedSubcategory.description}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {activeTemplate?.description ?? 'Templates prefill the subject, priority, description, and routing fields.'}
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ── Section 3: Request details ────────────────────────────── */}
+            <Card className="shadow-sm">
+              <CardHeader className="border-b bg-muted/20 px-4 py-3">
+                <p className="text-sm font-semibold text-foreground">Request details</p>
+                <p className="text-xs text-muted-foreground">
+                  Provide a clear title and a detailed description of your request.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4 p-4">
+                {/* Subject */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="subject">
+                    Request title <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="subject"
+                    placeholder="e.g. Urgent invoice correction for customer delivery"
+                    {...form.register('subject')}
+                    className={form.formState.errors.subject ? 'border-destructive' : ''}
+                  />
+                  {form.formState.errors.subject && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.subject.message}
                     </p>
-                  </>
-                ) : (
-                  <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
-                    No templates are available for this category. Continue with the blank request form.
-                  </p>
-                )}
-              </div>
-            </div>
+                  )}
+                </div>
 
-            {customFields.length > 0 && (
-              <div className="rounded-lg border bg-muted/20 p-3 xl:col-span-2">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Category form fields</p>
-                    <p className="text-xs text-muted-foreground">Extra details required for {selectedCategoryLabel.toLowerCase()} requests.</p>
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="description">
+                      Description <span className="text-destructive">*</span>
+                    </Label>
+                    <span
+                      className={cn(
+                        'text-xs tabular-nums transition-colors',
+                        descriptionValue.length >= 20
+                          ? 'text-muted-foreground'
+                          : 'text-destructive',
+                      )}
+                    >
+                      {descriptionValue.length} / 20 min
+                    </span>
                   </div>
-                  <Badge variant="secondary">{customFields.length}</Badge>
+                  <Textarea
+                    id="description"
+                    placeholder={roleContext.descriptionPlaceholder}
+                    rows={7}
+                    {...form.register('description')}
+                    className={form.formState.errors.description ? 'border-destructive' : ''}
+                  />
+                  {form.formState.errors.description && (
+                    <p className="text-xs text-destructive">
+                      {form.formState.errors.description.message}
+                    </p>
+                  )}
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {customFields.map((field) => {
-                    const value = customFieldValues[field.key] ?? '';
-                    const updateValue = (nextValue: string) => {
-                      setCustomFieldValues((current) => ({ ...current, [field.key]: nextValue }));
-                    };
+              </CardContent>
+            </Card>
 
-                    return (
-                      <div
-                        key={field.id}
-                        className={cn('space-y-1.5', field.field_type === 'textarea' && 'md:col-span-2')}
-                      >
-                        <Label htmlFor={`custom-field-${field.key}`}>
-                          {field.label}
-                          {field.is_required && <span className="text-destructive"> *</span>}
-                        </Label>
-                        {field.field_type === 'textarea' ? (
-                          <Textarea
-                            id={`custom-field-${field.key}`}
-                            value={value}
-                            onChange={(event) => updateValue(event.target.value)}
-                            placeholder={field.placeholder}
-                            rows={3}
-                          />
-                        ) : field.field_type === 'database_select' ? (
-                          <DatabaseFieldSelect
-                            companyId={user?.company_id}
-                            field={field}
-                            value={value}
-                            onChange={updateValue}
-                          />
-                        ) : (
-                          <Input
-                            id={`custom-field-${field.key}`}
-                            type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
-                            value={value}
-                            onChange={(event) => updateValue(event.target.value)}
-                            placeholder={field.placeholder}
-                          />
-                        )}
-                        {field.help_text && <p className="text-xs text-muted-foreground">{field.help_text}</p>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            {/* ── Section 4: Additional information (custom fields) ─────── */}
+            {customFields.length > 0 && (
+              <Card className="shadow-sm">
+                <CardHeader className="border-b bg-muted/20 px-4 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        Additional information
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Extra details required for{' '}
+                        {selectedCategory?.label.toLowerCase() ?? 'this category'} requests.
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className="shrink-0">
+                      {customFields.length} field{customFields.length === 1 ? '' : 's'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {customFields.map((field) => {
+                      const value = customFieldValues[field.key] ?? '';
+                      const updateValue = (nextValue: string) => {
+                        setCustomFieldValues((prev) => ({ ...prev, [field.key]: nextValue }));
+                      };
+                      return (
+                        <div
+                          key={field.id}
+                          className={cn(
+                            'space-y-1.5',
+                            field.field_type === 'textarea' && 'sm:col-span-2',
+                          )}
+                        >
+                          <Label htmlFor={`cf-${field.key}`}>
+                            {field.label}
+                            {field.is_required && (
+                              <span className="text-destructive"> *</span>
+                            )}
+                          </Label>
+                          {field.field_type === 'textarea' ? (
+                            <Textarea
+                              id={`cf-${field.key}`}
+                              value={value}
+                              onChange={(e) => updateValue(e.target.value)}
+                              placeholder={field.placeholder}
+                              rows={3}
+                            />
+                          ) : field.field_type === 'database_select' ? (
+                            <DatabaseFieldSelect
+                              companyId={user?.company_id}
+                              field={field}
+                              value={value}
+                              onChange={updateValue}
+                            />
+                          ) : (
+                            <Input
+                              id={`cf-${field.key}`}
+                              type={
+                                field.field_type === 'number'
+                                  ? 'number'
+                                  : field.field_type === 'date'
+                                    ? 'date'
+                                    : 'text'
+                              }
+                              value={value}
+                              onChange={(e) => updateValue(e.target.value)}
+                              placeholder={field.placeholder}
+                            />
+                          )}
+                          {field.help_text && (
+                            <p className="text-xs text-muted-foreground">{field.help_text}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
-            {/* Description */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="description">
-                  Description <span className="text-destructive">*</span>
-                </Label>
-                <span
+            {/* ── Section 5: Attachments ────────────────────────────────── */}
+            <Card className="shadow-sm">
+              <CardHeader className="border-b bg-muted/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      Attachments
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">
+                        (optional)
+                      </span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      PDF, Word, Excel, images, CSV, TXT — up to{' '}
+                      {attachmentSettings.max_file_size_mb} MB each
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {attachedFiles.length} / {attachmentSettings.max_files_per_ticket}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3 p-4">
+                {/* Drop zone */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Attach files"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click();
+                  }}
                   className={cn(
-                    'text-xs tabular-nums transition-colors',
-                    descriptionValue.length >= 20
-                      ? 'text-muted-foreground'
-                      : 'text-destructive',
+                    'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-5 text-center transition-colors',
+                    dragOver
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border bg-muted/30 hover:bg-muted/60',
+                    attachedFiles.length >= attachmentSettings.max_files_per_ticket &&
+                      'pointer-events-none opacity-50',
                   )}
                 >
-                  {descriptionValue.length} / 20 min
-                </span>
-              </div>
-              <Textarea
-                id="description"
-                placeholder={roleContext.descriptionPlaceholder}
-                rows={8}
-                {...form.register('description')}
-                className={form.formState.errors.description ? 'border-destructive' : ''}
-              />
-              {form.formState.errors.description && (
-                <p className="text-destructive text-xs">
-                  {form.formState.errors.description.message}
-                </p>
-              )}
-
-            </div>
-
-            {/* Attachments */}
-            <div className="space-y-1.5 xl:row-span-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label>
-                  Attachments
-                  <span className="ml-1 text-xs font-normal text-muted-foreground">(optional)</span>
-                </Label>
-                <span className="text-xs text-muted-foreground">
-                  {attachedFiles.length} / {attachmentSettings.max_files_per_ticket} files · max{' '}
-                  {attachmentSettings.max_file_size_mb} MB each
-                </span>
-              </div>
-
-              {/* Drop zone */}
-              <div
-                role="button"
-                tabIndex={0}
-                aria-label="Attach files"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click();
-                }}
-                className={cn(
-                  'flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-4 py-4 text-center transition-colors',
-                  dragOver
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border bg-muted/30 hover:bg-muted/60',
-                  attachedFiles.length >= attachmentSettings.max_files_per_ticket &&
-                    'pointer-events-none opacity-50',
-                )}
-              >
-                <Paperclip className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    Click to browse or drag &amp; drop
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    PDF, Word, Excel, images, CSV, TXT — up to{' '}
-                    {attachmentSettings.max_file_size_mb} MB each
-                  </p>
+                  <Paperclip className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      Click to browse or drag &amp; drop
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Max {attachmentSettings.max_files_per_ticket} files,{' '}
+                      {attachmentSettings.max_file_size_mb} MB each
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept={ACCEPTED_TYPES.join(',')}
-                className="sr-only"
-                onChange={handleFileInputChange}
-              />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={ACCEPTED_TYPES.join(',')}
+                  className="sr-only"
+                  onChange={handleFileInputChange}
+                />
 
-              {/* Attached file list */}
-              {attachedFiles.length > 0 && (
-                <ul className="space-y-1.5">
-                  {attachedFiles.map((file, idx) => (
-                    <li
-                      key={`${file.name}-${file.size}`}
-                      className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2"
-                    >
-                      <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      <span className="flex-1 truncate text-xs text-foreground">{file.name}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                        {formatBytes(file.size)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeFile(idx);
-                        }}
-                        className="ml-1 shrink-0 text-muted-foreground hover:text-destructive transition-colors"
-                        aria-label={`Remove ${file.name}`}
+                {/* Attached file list */}
+                {attachedFiles.length > 0 && (
+                  <ul className="space-y-1.5">
+                    {attachedFiles.map((file, idx) => (
+                      <li
+                        key={`${file.name}-${file.size}`}
+                        className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2"
                       >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                        <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="flex-1 truncate text-xs text-foreground">
+                          {file.name}
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                          {formatBytes(file.size)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(idx)}
+                          className="ml-1 shrink-0 text-muted-foreground transition-colors hover:text-destructive"
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
-              {/* Validation errors */}
-              {fileErrors.length > 0 && (
-                <ul className="space-y-1">
-                  {fileErrors.map((err) => (
-                    <li key={err} className="flex items-start gap-1.5 text-xs text-destructive">
-                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      {err}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+                {/* Validation errors */}
+                {fileErrors.length > 0 && (
+                  <ul className="space-y-1">
+                    {fileErrors.map((err) => (
+                      <li
+                        key={err}
+                        className="flex items-start gap-1.5 text-xs text-destructive"
+                      >
+                        <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        {err}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
 
-            {/* Submit */}
-            <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between xl:col-span-2">
-              <p className="text-xs text-muted-foreground">Drafts are saved locally until the request is submitted.</p>
-              <Button
-                type="submit"
-                className="sm:min-w-40"
-                disabled={
-                  submitting ||
-                  !form.formState.isValid ||
-                  categorySelectionDisabled ||
-                  (requiresSubcategory && !selectedSubcategoryKey) ||
-                  customFields.some((field) => field.is_required && !customFieldValues[field.key]?.trim())
-                }
-              >
+            {/* Mobile submit (hidden on xl) */}
+            <div className="flex flex-col gap-2 rounded-lg border bg-card p-4 shadow-sm xl:hidden">
+              <Button type="submit" className="w-full" disabled={!canSubmit}>
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Submitting...
+                    Submitting…
                   </>
                 ) : (
                   'Submit Request'
                 )}
               </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                Drafts are saved locally until submitted.
+              </p>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+
+          {/* Right column: summary panel (desktop only) */}
+          <div className="hidden xl:block">
+            <div className="sticky top-4">
+              <RequestSummaryPanel
+                activeTemplate={activeTemplate}
+                categoryLabel={selectedCategory?.label ?? ''}
+                subcategoryLabel={selectedSubcategory?.label ?? null}
+                priority={selectedPriority}
+                attachedFiles={attachedFiles}
+                approvalPlan={approvalPlan}
+                canSubmit={canSubmit}
+                isSubmitting={submitting}
+              />
+            </div>
+          </div>
+
+        </div>
+      </form>
     </div>
   );
 }

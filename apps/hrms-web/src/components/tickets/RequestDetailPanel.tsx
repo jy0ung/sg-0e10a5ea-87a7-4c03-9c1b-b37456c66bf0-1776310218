@@ -61,10 +61,6 @@ interface RequestDetailPanelProps {
   onReviewApproval: (ticketId: string, decision: 'approved' | 'rejected') => void;
 }
 
-function _isOpenStatus(status: TicketStatus) {
-  return status === 'open' || status === 'in_progress' || status === 'awaiting_requester';
-}
-
 export function RequestDetailPanel({
   ticket,
   categories,

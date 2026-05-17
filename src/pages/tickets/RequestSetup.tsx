@@ -4,6 +4,16 @@ import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -35,6 +45,7 @@ import { useRequestTemplates } from '@/hooks/useRequestTemplates';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import {
   createRequestCategory,
+  deleteRequestCategory,
   moveRequestCategory,
   updateRequestCategory,
   type RequestCategoryRecord,
@@ -224,7 +235,8 @@ export default function RequestSetup() {
   const [createDescription, setCreateDescription] = useState('');
   const [creating, setCreating] = useState(false);
   const [busyCategoryId, setBusyCategoryId] = useState<string | null>(null);
-  const [activeCategoryKey, setActiveCategoryKey] = useState<string>('');
+  const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
+  const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, CategoryDraft>>({});
   const [creatingSubcategoryKey, setCreatingSubcategoryKey] = useState<string | null>(null);
   const [busySubcategoryId, setBusySubcategoryId] = useState<string | null>(null);
@@ -330,13 +342,6 @@ export default function RequestSetup() {
     }])));
   }, [categories]);
 
-  // Auto-select first category tab when categories load or change
-  useEffect(() => {
-    if (categories.length > 0 && !categories.some((c) => c.key === activeCategoryKey)) {
-      setActiveCategoryKey(categories[0].key);
-    }
-  }, [categories, activeCategoryKey]);
-
   useEffect(() => {
     setSubcategoryDrafts(Object.fromEntries(subcategories.map((subcategory) => [subcategory.id, {
       label: subcategory.label,
@@ -398,6 +403,11 @@ export default function RequestSetup() {
     [subcategories],
   );
 
+  const editCategory = useMemo(
+    () => categories.find((c) => c.id === editCategoryId) ?? null,
+    [categories, editCategoryId],
+  );
+
   const activeTemplateCount = useMemo(
     () => templates.filter((t) => t.is_active).length,
     [templates],
@@ -430,6 +440,12 @@ export default function RequestSetup() {
 
   const setupLoading = loading || subcategoriesLoading;
   const setupError = error ?? subcategoriesError;
+
+  const editCatSubcategories = editCategory ? (subcategoriesByCategory[editCategory.key] ?? []) : [];
+  const editCreateSubDraft = editCategory
+    ? (createSubcategoryDrafts[editCategory.key] ?? { label: '', description: '' })
+    : { label: '', description: '' };
+  const editIsCreatingSub = editCategory ? creatingSubcategoryKey === editCategory.key : false;
 
   const handleRetry = async () => {
     await Promise.all([reload(), reloadSubcategories()]);
@@ -499,10 +515,6 @@ export default function RequestSetup() {
       setCreateDescription('');
       setIsAddingCategory(false);
       await reload();
-      // Switch to the new category's tab once the list reloads
-      // (key is derived from label by the DB trigger, but we can't know it yet;
-      // the auto-select effect will move to first if no match, so just clear)
-      setActiveCategoryKey('');
     }
 
     setCreating(false);
@@ -541,6 +553,7 @@ export default function RequestSetup() {
       toast.success('Category updated', {
         description: 'The Internal Requests module now uses the new category settings.',
       });
+      setEditCategoryId(null);
       await reload();
     }
     setBusyCategoryId(null);
@@ -564,6 +577,31 @@ export default function RequestSetup() {
     }
 
     setBusyCategoryId(null);
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!user || !deleteCategoryId) return;
+
+    setBusyCategoryId(deleteCategoryId);
+    const result = await deleteRequestCategory(deleteCategoryId, {
+      actorId: user.id,
+      companyId: user.company_id,
+    });
+    setBusyCategoryId(null);
+    setDeleteCategoryId(null);
+
+    if (result.error) {
+      if (result.inUse) {
+        toast.warning('Cannot delete — category is in use', {
+          description: result.error + ' Open the Edit dialog to deactivate it instead.',
+        });
+      } else {
+        toast.error('Failed to delete category', { description: result.error });
+      }
+    } else {
+      toast.success('Category deleted');
+      await reload();
+    }
   };
 
   const handleCreateSubcategory = async (categoryKey: string) => {
@@ -1135,6 +1173,196 @@ export default function RequestSetup() {
             </DialogContent>
           </Dialog>
 
+          {/* Edit category dialog */}
+          <Dialog open={editCategoryId !== null} onOpenChange={(open) => {
+            if (!open && !busyCategoryId) setEditCategoryId(null);
+          }}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Edit category</DialogTitle>
+                <DialogDescription>Update this category's details, SLA targets, and subcategories.</DialogDescription>
+              </DialogHeader>
+              {editCategory && (
+                <div className="max-h-[68vh] space-y-4 overflow-y-auto py-2 pr-1">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Name</Label>
+                      <Input
+                        value={drafts[editCategory.id]?.label ?? ''}
+                        onChange={(e) => updateCategoryDraft(editCategory, { label: e.target.value })}
+                        disabled={busyCategoryId === editCategory.id}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <Textarea
+                        value={drafts[editCategory.id]?.description ?? ''}
+                        onChange={(e) => updateCategoryDraft(editCategory, { description: e.target.value })}
+                        rows={2}
+                        disabled={busyCategoryId === editCategory.id}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-4 rounded-lg border border-border px-4 py-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor={`edit-cat-response-sla-${editCategory.id}`}>First response SLA (hours)</Label>
+                      <Input
+                        id={`edit-cat-response-sla-${editCategory.id}`}
+                        type="number"
+                        min={1}
+                        max={720}
+                        value={drafts[editCategory.id]?.response_sla_hours ?? ''}
+                        onChange={(e) => updateCategoryDraft(editCategory, { response_sla_hours: parseSlaHours(e.target.value) })}
+                        disabled={busyCategoryId === editCategory.id}
+                      />
+                      <p className="text-xs text-muted-foreground">Leave blank when this category has no response target.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`edit-cat-resolution-sla-${editCategory.id}`}>Resolution SLA (hours)</Label>
+                      <Input
+                        id={`edit-cat-resolution-sla-${editCategory.id}`}
+                        type="number"
+                        min={1}
+                        max={2160}
+                        value={drafts[editCategory.id]?.resolution_sla_hours ?? ''}
+                        onChange={(e) => updateCategoryDraft(editCategory, { resolution_sla_hours: parseSlaHours(e.target.value) })}
+                        disabled={busyCategoryId === editCategory.id}
+                      />
+                      <p className="text-xs text-muted-foreground">New requests copy this target when they are submitted.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Visible in new requests</p>
+                      <p className="text-xs text-muted-foreground">
+                        Turn off to archive without removing from historical tickets.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={drafts[editCategory.id]?.is_active ?? editCategory.is_active}
+                      onCheckedChange={(checked) => updateCategoryDraft(editCategory, { is_active: checked })}
+                      disabled={busyCategoryId === editCategory.id}
+                    />
+                  </div>
+                  <div className="space-y-3 rounded-xl border border-dashed border-border/70 bg-secondary/10 p-4">
+                    <p className="text-sm font-semibold text-foreground">Subcategories</p>
+                    <div className="grid gap-3 sm:grid-cols-[1fr,1fr,auto] sm:items-end">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Name</Label>
+                        <Input
+                          placeholder="e.g. Stock Transfer"
+                          value={editCreateSubDraft.label}
+                          onChange={(e) => updateCreateSubcategoryDraft(editCategory.key, { label: e.target.value })}
+                          disabled={editIsCreatingSub}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Description</Label>
+                        <Input
+                          placeholder="Optional"
+                          value={editCreateSubDraft.description}
+                          onChange={(e) => updateCreateSubcategoryDraft(editCategory.key, { description: e.target.value })}
+                          disabled={editIsCreatingSub}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => void handleCreateSubcategory(editCategory.key)}
+                        disabled={editIsCreatingSub || editCreateSubDraft.label.trim().length === 0}
+                        className="gap-1.5"
+                      >
+                        {editIsCreatingSub ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        Add
+                      </Button>
+                    </div>
+                    {editCatSubcategories.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No subcategories yet.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {editCatSubcategories.map((sub, subIdx) => {
+                          const subDraft = subcategoryDrafts[sub.id];
+                          const isSubBusy = busySubcategoryId === sub.id;
+                          const isSubDirty = hasSubcategoryChanges(sub, subDraft);
+                          return (
+                            <div
+                              key={sub.id}
+                              className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2.5"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
+                                <Input
+                                  className="h-7 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                                  value={subDraft?.label ?? sub.label}
+                                  onChange={(e) => updateSubcategoryDraft(sub, { label: e.target.value })}
+                                  disabled={isSubBusy}
+                                />
+                                {!sub.is_active && (
+                                  <Badge variant="outline" className="shrink-0 text-xs">Archived</Badge>
+                                )}
+                              </div>
+                              <div className="flex shrink-0 items-center gap-0.5">
+                                <Button
+                                  variant="ghost" size="icon" className="h-7 w-7"
+                                  onClick={() => void handleMoveSubcategory(sub.id, 'up')}
+                                  disabled={isSubBusy || subIdx === 0}
+                                  aria-label="Move up"
+                                >
+                                  <ArrowUp className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost" size="icon" className="h-7 w-7"
+                                  onClick={() => void handleMoveSubcategory(sub.id, 'down')}
+                                  disabled={isSubBusy || subIdx === editCatSubcategories.length - 1}
+                                  aria-label="Move down"
+                                >
+                                  <ArrowDown className="h-3 w-3" />
+                                </Button>
+                                {isSubDirty && (
+                                  <Button
+                                    variant="ghost" size="icon" className="h-7 w-7"
+                                    onClick={() => void handleSaveSubcategory(sub)}
+                                    disabled={isSubBusy}
+                                    aria-label="Save subcategory"
+                                  >
+                                    <Save className="h-3 w-3" />
+                                  </Button>
+                                )}
+                                <Switch
+                                  className="scale-75 origin-right"
+                                  checked={subDraft?.is_active ?? sub.is_active}
+                                  onCheckedChange={(checked) => updateSubcategoryDraft(sub, { is_active: checked })}
+                                  disabled={isSubBusy}
+                                />
+                                {isSubBusy && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setEditCategoryId(null)}
+                  disabled={!!busyCategoryId}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => editCategory && void handleSave(editCategory)}
+                  disabled={!!busyCategoryId || !editCategory || !hasCategoryChanges(editCategory, drafts[editCategory.id])}
+                  className="gap-2"
+                >
+                  {busyCategoryId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           {setupLoading ? (
             <div className="flex items-center justify-center gap-3 rounded-lg border border-border py-12 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -1152,7 +1380,8 @@ export default function RequestSetup() {
               </Button>
             </div>
           ) : categories.length === 0 ? (
-            <div className="flex items-center justify-center py-16">
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+              <p className="text-sm text-muted-foreground">No categories yet. Add one to get started.</p>
               <Button
                 type="button"
                 onClick={() => setIsAddingCategory(true)}
@@ -1163,249 +1392,120 @@ export default function RequestSetup() {
               </Button>
             </div>
           ) : (
-            <>
-              {/* Category tabs */}
-              <Tabs
-                value={activeCategoryKey}
-                onValueChange={setActiveCategoryKey}
-                className="w-full"
-              >
-                <div className="flex items-center gap-2 rounded-lg border bg-card px-2 py-1 shadow-sm">
-                  <TabsList className="h-auto flex-1 justify-start overflow-x-auto rounded-none bg-transparent p-0">
-                    {categories.map((category) => (
-                      <TabsTrigger
-                        key={category.key}
-                        value={category.key}
-                        className="relative rounded-md border border-transparent bg-transparent px-3 py-1.5 text-sm font-medium shadow-none transition-none data-[state=active]:border-border data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-                      >
-                        {category.label}
-                        {!category.is_active && (
-                          <Badge variant="outline" className="ml-1.5 py-0 px-1 text-[10px]">Archived</Badge>
-                        )}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsAddingCategory(true)}
-                    className="shrink-0 gap-1.5 text-muted-foreground hover:text-foreground"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add
-                  </Button>
-                </div>
-
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {categories.length} {categories.length === 1 ? 'category' : 'categories'}
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsAddingCategory(true)}
+                  className="gap-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Category
+                </Button>
+              </div>
+              <div className="divide-y divide-border rounded-lg border">
                 {categories.map((category, index) => {
-                  const draft = drafts[category.id];
-                  const isSaving = busyCategoryId === category.id;
-                  const isDirty = hasCategoryChanges(category, draft);
                   const catSubcategories = subcategoriesByCategory[category.key] ?? [];
-                  const createSubDraft = createSubcategoryDrafts[category.key] ?? { label: '', description: '' };
-                  const isCreatingSub = creatingSubcategoryKey === category.key;
-
+                  const isBusy = busyCategoryId === category.id;
                   return (
-                    <TabsContent key={category.key} value={category.key} className="mt-0 space-y-4 pt-4">
-                      {/* Name + description */}
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label>Name</Label>
-                          <Input
-                            value={draft?.label ?? ''}
-                            onChange={(e) => updateCategoryDraft(category, { label: e.target.value })}
-                            disabled={isSaving}
-                          />
+                    <div key={category.id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-foreground">{category.label}</span>
+                          {!category.is_active && (
+                            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">Archived</Badge>
+                          )}
+                          {catSubcategories.length > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              {catSubcategories.length} {catSubcategories.length === 1 ? 'subcategory' : 'subcategories'}
+                            </span>
+                          )}
                         </div>
-                        <div className="space-y-2">
-                          <Label>Description</Label>
-                          <Textarea
-                            value={draft?.description ?? ''}
-                            onChange={(e) => updateCategoryDraft(category, { description: e.target.value })}
-                            rows={2}
-                            disabled={isSaving}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 rounded-lg border border-border px-4 py-3 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor={`category-response-sla-${category.id}`}>First response SLA (hours)</Label>
-                          <Input
-                            id={`category-response-sla-${category.id}`}
-                            type="number"
-                            min={1}
-                            max={720}
-                            value={draft?.response_sla_hours ?? ''}
-                            onChange={(e) => updateCategoryDraft(category, { response_sla_hours: parseSlaHours(e.target.value) })}
-                            disabled={isSaving}
-                          />
-                          <p className="text-xs text-muted-foreground">Leave blank when this category has no response target.</p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`category-resolution-sla-${category.id}`}>Resolution SLA (hours)</Label>
-                          <Input
-                            id={`category-resolution-sla-${category.id}`}
-                            type="number"
-                            min={1}
-                            max={2160}
-                            value={draft?.resolution_sla_hours ?? ''}
-                            onChange={(e) => updateCategoryDraft(category, { resolution_sla_hours: parseSlaHours(e.target.value) })}
-                            disabled={isSaving}
-                          />
-                          <p className="text-xs text-muted-foreground">New requests copy this target when they are submitted.</p>
-                        </div>
-                      </div>
-
-                      {/* Visibility toggle */}
-                      <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Visible in new requests</p>
-                          <p className="text-xs text-muted-foreground">
-                            Turn off to archive without removing from historical tickets.
-                          </p>
-                        </div>
-                        <Switch
-                          checked={draft?.is_active ?? category.is_active}
-                          onCheckedChange={(checked) => updateCategoryDraft(category, { is_active: checked })}
-                          disabled={isSaving}
-                        />
-                      </div>
-
-                      {/* Subcategories */}
-                      <div className="space-y-3 rounded-xl border border-dashed border-border/70 bg-secondary/10 p-4">
-                        <p className="text-sm font-semibold text-foreground">Subcategories</p>
-                        <div className="grid gap-3 sm:grid-cols-[1fr,1fr,auto] sm:items-end">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">Name</Label>
-                            <Input
-                              placeholder="e.g. Stock Transfer"
-                              value={createSubDraft.label}
-                              onChange={(e) => updateCreateSubcategoryDraft(category.key, { label: e.target.value })}
-                              disabled={isCreatingSub}
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">Description</Label>
-                            <Input
-                              placeholder="Optional"
-                              value={createSubDraft.description}
-                              onChange={(e) => updateCreateSubcategoryDraft(category.key, { description: e.target.value })}
-                              disabled={isCreatingSub}
-                            />
-                          </div>
-                          <Button
-                            type="button"
-                            onClick={() => void handleCreateSubcategory(category.key)}
-                            disabled={isCreatingSub || createSubDraft.label.trim().length === 0}
-                            className="gap-1.5"
-                          >
-                            {isCreatingSub ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                            Add
-                          </Button>
-                        </div>
-                        {catSubcategories.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">No subcategories yet.</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {catSubcategories.map((sub, subIdx) => {
-                              const subDraft = subcategoryDrafts[sub.id];
-                              const isSubBusy = busySubcategoryId === sub.id;
-                              const isSubDirty = hasSubcategoryChanges(sub, subDraft);
-                              return (
-                                <div
-                                  key={sub.id}
-                                  className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2.5"
-                                >
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
-                                    <Input
-                                      className="h-7 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                                      value={subDraft?.label ?? sub.label}
-                                      onChange={(e) => updateSubcategoryDraft(sub, { label: e.target.value })}
-                                      disabled={isSubBusy}
-                                    />
-                                    {!sub.is_active && (
-                                      <Badge variant="outline" className="shrink-0 text-xs">Archived</Badge>
-                                    )}
-                                  </div>
-                                  <div className="flex shrink-0 items-center gap-0.5">
-                                    <Button
-                                      variant="ghost" size="icon" className="h-7 w-7"
-                                      onClick={() => void handleMoveSubcategory(sub.id, 'up')}
-                                      disabled={isSubBusy || subIdx === 0}
-                                      aria-label="Move up"
-                                    >
-                                      <ArrowUp className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost" size="icon" className="h-7 w-7"
-                                      onClick={() => void handleMoveSubcategory(sub.id, 'down')}
-                                      disabled={isSubBusy || subIdx === catSubcategories.length - 1}
-                                      aria-label="Move down"
-                                    >
-                                      <ArrowDown className="h-3 w-3" />
-                                    </Button>
-                                    {isSubDirty && (
-                                      <Button
-                                        variant="ghost" size="icon" className="h-7 w-7"
-                                        onClick={() => void handleSaveSubcategory(sub)}
-                                        disabled={isSubBusy}
-                                        aria-label="Save subcategory"
-                                      >
-                                        <Save className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                    <Switch
-                                      className="scale-75 origin-right"
-                                      checked={subDraft?.is_active ?? sub.is_active}
-                                      onCheckedChange={(checked) => updateSubcategoryDraft(sub, { is_active: checked })}
-                                      disabled={isSubBusy}
-                                    />
-                                    {isSubBusy && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                        {category.description && (
+                          <p className="truncate text-xs text-muted-foreground">{category.description}</p>
                         )}
                       </div>
-
-                      {/* Footer: reorder + save */}
-                      <div className="flex items-center justify-between gap-3 pt-1">
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="outline" size="icon" className="h-8 w-8"
-                            aria-label={`Move ${category.label} left`}
-                            onClick={() => void handleMove(category.id, 'up')}
-                            disabled={isSaving || index === 0}
-                          >
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="outline" size="icon" className="h-8 w-8"
-                            aria-label={`Move ${category.label} right`}
-                            onClick={() => void handleMove(category.id, 'down')}
-                            disabled={isSaving || index === categories.length - 1}
-                          >
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
+                      <div className="flex shrink-0 items-center gap-0.5">
                         <Button
-                          onClick={() => void handleSave(category)}
-                          disabled={isSaving || !isDirty}
-                          className="gap-2"
+                          variant="ghost" size="icon" className="h-7 w-7"
+                          onClick={() => void handleMove(category.id, 'up')}
+                          disabled={isBusy || index === 0}
+                          aria-label={`Move ${category.label} up`}
                         >
-                          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                          Save changes
+                          <ArrowUp className="h-3 w-3" />
                         </Button>
+                        <Button
+                          variant="ghost" size="icon" className="h-7 w-7"
+                          onClick={() => void handleMove(category.id, 'down')}
+                          disabled={isBusy || index === categories.length - 1}
+                          aria-label={`Move ${category.label} down`}
+                        >
+                          <ArrowDown className="h-3 w-3" />
+                        </Button>
+                        {isBusy ? (
+                          <Loader2 className="ml-1 h-4 w-4 animate-spin text-muted-foreground" />
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setEditCategoryId(category.id)}
+                              className="ml-1"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => setDeleteCategoryId(category.id)}
+                              aria-label={`Delete ${category.label}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
                       </div>
-                    </TabsContent>
+                    </div>
                   );
                 })}
-              </Tabs>
-            </>
+              </div>
+            </div>
           )}
+
+          {/* Delete category confirmation dialog */}
+          {(() => {
+            const catToDelete = categories.find((c) => c.id === deleteCategoryId);
+            return (
+              <AlertDialog open={deleteCategoryId !== null} onOpenChange={(open) => { if (!open) setDeleteCategoryId(null); }}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete category</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {catToDelete
+                        ? <>Permanently delete <strong>{catToDelete.label}</strong>? This cannot be undone. If this category is already referenced by requests or templates, you will be asked to deactivate it instead.</>
+                        : 'Permanently delete this category? This cannot be undone.'}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={busyCategoryId !== null}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => void handleDeleteCategory()}
+                      disabled={busyCategoryId !== null}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {busyCategoryId ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            );
+          })()}
           </TabsContent>
 
           {/* ── Templates tab ─────────────────────────────────────────── */}

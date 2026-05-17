@@ -117,5 +117,14 @@ export function isApprovalAssignedToUser(
   user: { id?: string; role?: string } | null | undefined,
 ): boolean {
   if (!user || ticket.approval_status !== 'pending') return false;
-  return ticket.current_approver_user_id === user.id || ticket.current_approver_role === user.role;
+  // Specific user assignment: direct match
+  if (ticket.current_approver_user_id) {
+    return ticket.current_approver_user_id === user.id;
+  }
+  // Role-based assignment: HRMS role membership cannot be checked synchronously here.
+  // Allow admin users to attempt; the backend enforces HRMS role membership.
+  if (ticket.current_approver_role) {
+    return user.role === 'super_admin' || user.role === 'company_admin';
+  }
+  return false;
 }

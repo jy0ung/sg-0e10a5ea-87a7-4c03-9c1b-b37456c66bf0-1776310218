@@ -1,4 +1,4 @@
-import { ArrowLeft, ClipboardList, ListTodo, Settings2, TicketCheck } from 'lucide-react';
+import { ArrowLeft, Archive, ClipboardList, ListTodo, Settings2, TicketCheck } from 'lucide-react';
 import { ADMIN_ONLY } from '@/config/routeRoles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
@@ -13,6 +13,7 @@ const baseNavItems: AppShellNavItem[] = [
 
 const adminNavItems: AppShellNavItem[] = [
   { label: 'Request Queue', path: '/portal/queue', icon: ListTodo },
+  { label: 'Request History', path: '/portal/history', icon: Archive },
   { label: 'Request Setup', path: '/portal/setup', icon: Settings2 },
 ];
 
@@ -22,6 +23,7 @@ const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/portal\/tickets\/new/, title: 'New Request', kicker: 'Submit and track internal support demand' },
   { pattern: /^\/portal\/tickets$/, title: 'My Requests', kicker: 'Requester history and updates' },
   { pattern: /^\/portal\/queue/, title: 'Request Queue', kicker: 'Triage, assign, and resolve requests' },
+  { pattern: /^\/portal\/history/, title: 'Request History', kicker: 'Resolved and closed requests' },
   { pattern: /^\/portal\/setup/, title: 'Request Setup', kicker: 'Configure categories, routing, and forms' },
 ];
 

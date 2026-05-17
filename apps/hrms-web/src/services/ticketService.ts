@@ -6,6 +6,7 @@ import { loggingService } from './loggingService';
 import { createNotifications, type CreateNotificationInput } from './notificationService';
 import { evaluateRoutingRules } from './requestRoutingService';
 import {
+  cancelInternalRequestApprovalInstance,
   createInternalRequestApprovalInstance,
   getInternalRequestApprovalGate,
   getInternalRequestApprovalPlan,
@@ -109,10 +110,16 @@ export interface PaginatedTicketResult<T> {
   pageSize: number;
 }
 
+/** 'active' = open|in_progress|awaiting_requester; 'archived' = resolved|closed|cancelled */
+export type TicketStatusFilter = TicketStatus | 'all' | 'active' | 'archived';
+
+const ACTIVE_STATUSES: TicketStatus[] = ['open', 'in_progress', 'awaiting_requester'];
+const ARCHIVED_STATUSES: TicketStatus[] = ['resolved', 'closed', 'cancelled'];
+
 export interface CompanyTicketListOptions {
   page?: number;
   pageSize?: number;
-  status?: TicketStatus | 'all';
+  status?: TicketStatusFilter;
   priority?: TicketPriority | 'all';
   search?: string;
 }
@@ -499,6 +506,39 @@ function sanitizeTicketSearchTerm(search: string) {
   return search.trim().replace(/[,%]/g, ' ');
 }
 
+/**
+ * Returns the IDs of all profiles in the company whose name or email matches
+ * the (already-sanitized) search term.  Used to include submitted_by/assigned_to
+ * in the server-side OR filter without a schema change.
+ */
+async function findMatchingProfileIds(companyId: string, search: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('company_id', companyId)
+    .or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+  return (data ?? []).map((row: { id: string }) => row.id);
+}
+
+/**
+ * Builds the PostgREST OR filter string for a full-text ticket search.
+ * When profile IDs are supplied the filter also covers submitted_by and
+ * assigned_to so that searching by person name/email works server-side.
+ */
+function buildTicketSearchOrFilter(search: string, profileIds: string[]): string {
+  const parts = [
+    `subject.ilike.%${search}%`,
+    `description.ilike.%${search}%`,
+    `vso_number.ilike.%${search}%`,
+  ];
+  if (profileIds.length > 0) {
+    const ids = profileIds.join(',');
+    parts.push(`submitted_by.in.(${ids})`);
+    parts.push(`assigned_to.in.(${ids})`);
+  }
+  return parts.join(',');
+}
+
 export async function listMyTickets(userId: string, companyId: string): Promise<TicketServiceResult<RequestTicketRecord[]>> {
   try {
     let { data, error } = await ticketsTable()
@@ -567,22 +607,26 @@ export async function listCompanyTicketsPage(
   const search = sanitizeTicketSearchTerm(normalized.search ?? '');
 
   try {
+    const profileIds = search ? await findMatchingProfileIds(companyId, search) : [];
+
     let query = ticketsTable()
       .select(TICKET_SELECT, { count: 'exact' })
       .eq('company_id', companyId);
 
     if (normalized.status && normalized.status !== 'all') {
-      query = query.eq('status', normalized.status);
+      if (normalized.status === 'active') {
+        query = query.in('status', ACTIVE_STATUSES);
+      } else if (normalized.status === 'archived') {
+        query = query.in('status', ARCHIVED_STATUSES);
+      } else {
+        query = query.eq('status', normalized.status);
+      }
     }
     if (normalized.priority && normalized.priority !== 'all') {
       query = query.eq('priority', normalized.priority);
     }
     if (search) {
-      query = query.or([
-        `subject.ilike.%${search}%`,
-        `description.ilike.%${search}%`,
-        `vso_number.ilike.%${search}%`,
-      ].join(','));
+      query = query.or(buildTicketSearchOrFilter(search, profileIds));
     }
 
     let { data, error, count } = await query
@@ -595,17 +639,19 @@ export async function listCompanyTicketsPage(
         .eq('company_id', companyId);
 
       if (normalized.status && normalized.status !== 'all') {
-        legacyQuery = legacyQuery.eq('status', normalized.status);
+        if (normalized.status === 'active') {
+          legacyQuery = legacyQuery.in('status', ACTIVE_STATUSES);
+        } else if (normalized.status === 'archived') {
+          legacyQuery = legacyQuery.in('status', ARCHIVED_STATUSES);
+        } else {
+          legacyQuery = legacyQuery.eq('status', normalized.status);
+        }
       }
       if (normalized.priority && normalized.priority !== 'all') {
         legacyQuery = legacyQuery.eq('priority', normalized.priority);
       }
       if (search) {
-        legacyQuery = legacyQuery.or([
-          `subject.ilike.%${search}%`,
-          `description.ilike.%${search}%`,
-          `vso_number.ilike.%${search}%`,
-        ].join(','));
+        legacyQuery = legacyQuery.or(buildTicketSearchOrFilter(search, profileIds));
       }
 
       const legacyResult = await legacyQuery
@@ -631,6 +677,67 @@ export async function listCompanyTicketsPage(
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to load company tickets');
     loggingService.error('Failed to list company tickets page', { error: error.message, options }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+export interface TicketStatusCounts {
+  all: number;
+  open: number;
+  in_progress: number;
+  awaiting_requester: number;
+  resolved: number;
+  closed: number;
+  cancelled: number;
+}
+
+/**
+ * Returns the count of tickets for each status across the entire company
+ * (not limited to the current page).  Optionally filters by priority and/or
+ * search term so the displayed counts stay consistent with the active filters.
+ */
+export async function getCompanyTicketStatusCounts(
+  companyId: string,
+  options: Pick<CompanyTicketListOptions, 'priority' | 'search'> = {},
+): Promise<TicketServiceResult<TicketStatusCounts>> {
+  const search = sanitizeTicketSearchTerm(options.search ?? '');
+  const statuses: TicketStatus[] = ['open', 'in_progress', 'awaiting_requester', 'resolved', 'closed', 'cancelled'];
+
+  try {
+    const profileIds = search ? await findMatchingProfileIds(companyId, search) : [];
+
+    const perStatus = await Promise.all(
+      statuses.map(async (status) => {
+        let query = ticketsTable()
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .eq('status', status);
+
+        if (options.priority && options.priority !== 'all') {
+          query = query.eq('priority', options.priority);
+        }
+        if (search) {
+          query = query.or(buildTicketSearchOrFilter(search, profileIds));
+        }
+
+        const { count, error } = await query;
+        if (error) throw error;
+        return { status, count: count ?? 0 };
+      }),
+    );
+
+    const result: TicketStatusCounts = {
+      all: 0, open: 0, in_progress: 0, awaiting_requester: 0,
+      resolved: 0, closed: 0, cancelled: 0,
+    };
+    for (const { status, count } of perStatus) {
+      result[status] = count;
+      result.all += count;
+    }
+    return { data: result, error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to get ticket status counts');
+    loggingService.error('Failed to get ticket status counts', { error: error.message }, 'TicketService');
     return { data: null, error };
   }
 }
@@ -748,7 +855,15 @@ export async function createTicket(
         context.userId,
         approvalPlan.data,
       );
-      if (approvalResult.error) throw new Error(approvalResult.error);
+      if (approvalResult.error) {
+        // Compensate: roll back the ticket insert so we don't leave an orphan
+        // without an approval instance.  Best-effort — ignore any delete error.
+        await ticketsTable()
+          .delete()
+          .eq('id', ticketId)
+          .eq('company_id', context.companyId);
+        throw new Error(approvalResult.error);
+      }
     }
 
     void logUserAction(context.userId, 'create', 'ticket', ticketId, { component: 'TicketService' });
@@ -905,6 +1020,8 @@ export async function cancelMyTicket(
         message: 'Request cancelled by requester.',
         metadata: { before: current.status, after: nextTicket.status, reason },
       }),
+      // Cancel any pending approval instance to avoid orphaned workflow records.
+      cancelInternalRequestApprovalInstance(ticketId, context.companyId),
     ]);
 
     void logUserAction(context.userId, 'update', 'ticket', ticketId, {

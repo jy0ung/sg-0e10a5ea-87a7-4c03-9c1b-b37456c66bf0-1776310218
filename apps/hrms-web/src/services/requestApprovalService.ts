@@ -205,12 +205,15 @@ export async function reviewInternalRequestApproval(
   context: { userId: string; companyId: string },
 ): Promise<{ error: string | null }> {
   const { data: ticket, error: ticketError } = await ticketsTable()
-    .select('id, company_id, submitted_by, subject, status')
+    .select('id, company_id, submitted_by, assigned_to, subject, status')
     .eq('company_id', context.companyId)
     .eq('id', ticketId)
     .single();
   if (ticketError) return { error: ticketError.message };
   if (!ticket) return { error: 'Request not found.' };
+  if (ticket.status === 'cancelled' || ticket.status === 'closed' || ticket.status === 'resolved') {
+    return { error: 'This request has already been closed and cannot be approved or rejected.' };
+  }
 
   const { data: approvalRow, error: approvalError } = await approvalInstancesTable()
     .select('id, flow_id, requester_id, status, current_step_id, current_step_order, current_step_name, current_approver_role, current_approver_user_id')
@@ -315,7 +318,7 @@ export async function reviewInternalRequestApproval(
       .eq('id', String(approval.id));
     if (workflowError) return { error: workflowError.message };
   } else {
-    const [{ error: workflowError }, { error: activityError }] = await Promise.all([
+    const [{ error: workflowError }, { error: requestError }, { error: activityError }] = await Promise.all([
       approvalInstancesTable()
         .update({
           status: 'approved',
@@ -327,16 +330,21 @@ export async function reviewInternalRequestApproval(
           updated_at: decidedAt,
         })
         .eq('id', String(approval.id)),
+      ticketsTable()
+        .update({ status: 'in_progress' })
+        .eq('company_id', context.companyId)
+        .eq('id', ticketId),
       ticketActivityTable().insert({
         ticket_id: ticketId,
         company_id: context.companyId,
         actor_id: context.userId,
-        event_type: 'comment_added',
-        message: 'Request approval completed.',
-        metadata: { approvalStep: currentStep.name, note: normalizedNote },
+        event_type: 'status_changed',
+        message: 'Request approval completed. Status advanced to in progress.',
+        metadata: { before: ticket.status, after: 'in_progress', approvalStep: currentStep.name, note: normalizedNote },
       }),
     ]);
     if (workflowError) return { error: workflowError.message };
+    if (requestError) return { error: requestError.message };
     if (activityError) return { error: activityError.message };
   }
 
@@ -349,6 +357,18 @@ export async function reviewInternalRequestApproval(
     }]);
   }
 
+  // Notify the assignee when all approval steps are complete so they know the
+  // request is ready to action.
+  const assignedTo = (ticket as Record<string, unknown>).assigned_to;
+  if (!nextStep && decision === 'approved' && assignedTo && assignedTo !== context.userId) {
+    void createNotifications([{
+      userId: String(assignedTo),
+      title: 'Request ready for action',
+      message: `"${String(ticket.subject)}" has been approved and is now in progress.`,
+      type: 'info',
+    }]);
+  }
+
   void logUserAction(context.userId, 'update', 'internal_request_approval', String(approval.id), {
     ticketId,
     decision,
@@ -358,4 +378,28 @@ export async function reviewInternalRequestApproval(
   });
 
   return { error: null };
+}
+
+/**
+ * Cancels any pending approval instance for a given ticket.
+ * Used when the requester cancels their own request to avoid orphaned pending instances.
+ */
+export async function cancelInternalRequestApprovalInstance(
+  ticketId: string,
+  companyId: string,
+): Promise<void> {
+  await approvalInstancesTable()
+    .update({
+      status: 'cancelled',
+      current_step_id: null,
+      current_step_order: null,
+      current_step_name: null,
+      current_approver_role: null,
+      current_approver_user_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('company_id', companyId)
+    .eq('entity_type', 'internal_request')
+    .eq('entity_id', ticketId)
+    .eq('status', 'pending');
 }
