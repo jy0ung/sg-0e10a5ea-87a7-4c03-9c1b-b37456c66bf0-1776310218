@@ -1,6 +1,6 @@
 import * as pkg from '@flc/hrms-services';
 import { logUserAction } from '@/services/auditService';
-import { inviteUser } from '@/services/profileService';
+import { inviteUser, deleteInvitedUser } from '@/services/profileService';
 import { Employee, EmployeeStatus, AppRole } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -92,4 +92,87 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
 
 export async function resolveNamesToIds(companyId: string, names: string[]): Promise<Map<string, string>> {
   return pkg.resolveNamesToIds(companyId, names);
+}
+
+export async function deleteEmployee(
+  employeeId: string,
+  companyId: string,
+  actorId?: string,
+): Promise<{ error: string | null }> {
+  // 1. Find linked profile (if any)
+  const { data: profileRows } = await supabase
+    .from('profiles')
+    .select('id, status')
+    .eq('employee_id', employeeId)
+    .eq('company_id', companyId)
+    .limit(1);
+  const profile = (profileRows ?? [])[0] as { id: string; status: string } | undefined;
+
+  // 2. Handle linked auth user before deleting the employee record
+  if (profile) {
+    if (profile.status === 'pending') {
+      // Never signed in — hard-delete the auth user
+      const { error: delAuthErr } = await deleteInvitedUser(profile.id);
+      if (delAuthErr) return { error: `Could not remove pending invite: ${delAuthErr}` };
+    } else {
+      // Already signed in — just unlink employee_id from their profile
+      await supabase.from('profiles').update({ employee_id: null }).eq('id', profile.id);
+    }
+  }
+
+  // 3. Delete the employee row
+  const { error } = await supabase
+    .from('employees')
+    .delete()
+    .eq('id', employeeId)
+    .eq('company_id', companyId);
+
+  if (error) {
+    return {
+      error: error.code === '23503'
+        ? 'Cannot delete: this employee has linked records (leave requests, payroll, etc.). Mark them as resigned instead.'
+        : error.message,
+    };
+  }
+
+  if (actorId) void logUserAction(actorId, 'delete', 'employee', employeeId, {});
+  return { error: null };
+}
+
+export async function reInviteEmployee(
+  employee: { id: string; email: string; name: string; role: AppRole },
+  companyId: string,
+  actorId?: string,
+): Promise<{ error: string | null }> {
+  if (!employee.email || employee.email.endsWith('@company.local')) {
+    return { error: 'No valid email address on record for this employee.' };
+  }
+
+  // Check if they already have an active (non-pending) account
+  const { data: profileRows } = await supabase
+    .from('profiles')
+    .select('id, status')
+    .eq('employee_id', employee.id)
+    .eq('company_id', companyId)
+    .limit(1);
+  const profile = (profileRows ?? [])[0] as { id: string; status: string } | undefined;
+
+  if (profile && profile.status !== 'pending') {
+    return { error: 'This employee already has an active account and can sign in.' };
+  }
+
+  const result = await inviteUser({
+    email:            employee.email,
+    name:             employee.name,
+    role:             employee.role,
+    companyId,
+    employeeId:       employee.id,
+    portalAccessOnly: true,
+  });
+
+  if (!result.error && actorId) {
+    void logUserAction(actorId, 're_invite', 'employee', employee.id,
+      { email: employee.email } as unknown as import('@/integrations/supabase/types').Json);
+  }
+  return result;
 }

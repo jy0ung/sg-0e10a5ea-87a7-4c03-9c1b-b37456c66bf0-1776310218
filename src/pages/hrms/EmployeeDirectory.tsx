@@ -5,11 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
-import { Search, Plus, Users, UserCheck, UserMinus, Pencil, SlidersHorizontal } from 'lucide-react';
+import { Search, Plus, Users, UserCheck, UserMinus, Pencil, SlidersHorizontal, Trash2, Send } from 'lucide-react';
 import { AppRole, Employee, EmployeeStatus } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import { listDepartments, listJobTitles } from '@/services/hrmsAdminService';
@@ -17,6 +21,8 @@ import {
   listEmployeeDirectory,
   createEmployee,
   updateEmployee,
+  deleteEmployee,
+  reInviteEmployee,
   type CreateEmployeeInput,
   type UpdateEmployeeInput,
 } from '@/services/hrmsService';
@@ -135,6 +141,13 @@ export default function EmployeeDirectory() {
   const [editTarget, setEditTarget] = useState<Employee | null>(null);
   const [editForm, setEditForm]     = useState<EditForm | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+
+  // Delete dialog
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+  const [deleting, setDeleting]         = useState(false);
+
+  // Re-invite tracking
+  const [reInviting, setReInviting] = useState<string | null>(null);
 
   const canManage = hrmsAccess.canManageEmployees;
   const canViewPii = hrmsAccess.canViewPii;
@@ -269,6 +282,38 @@ export default function EmployeeDirectory() {
       toast({ title: 'Failed to update status', description: error, variant: 'destructive' });
     }
     void queryClient.invalidateQueries({ queryKey: ['employee-directory', user?.companyId] });
+  };
+
+  // ── Delete employee ──
+  const handleDelete = async () => {
+    if (!deleteTarget || !user) return;
+    setDeleting(true);
+    const { error } = await deleteEmployee(deleteTarget.id, user.companyId, user.id);
+    setDeleting(false);
+    if (error) {
+      toast({ title: 'Failed to delete employee', description: error, variant: 'destructive' });
+    } else {
+      toast({ title: 'Employee deleted', description: `${deleteTarget.name} has been removed.` });
+      void queryClient.invalidateQueries({ queryKey: ['employee-directory', user?.companyId] });
+    }
+    setDeleteTarget(null);
+  };
+
+  // ── Re-invite employee ──
+  const handleReInvite = async (emp: Employee) => {
+    if (!user) return;
+    setReInviting(emp.id);
+    const { error } = await reInviteEmployee(
+      { id: emp.id, email: emp.email, name: emp.name, role: emp.role },
+      user.companyId,
+      user.id,
+    );
+    setReInviting(null);
+    if (error) {
+      toast({ title: 'Re-invite failed', description: error, variant: 'destructive' });
+    } else {
+      toast({ title: 'Invite sent', description: `${emp.name} will receive a new invite email.` });
+    }
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────────
@@ -448,6 +493,25 @@ export default function EmployeeDirectory() {
                               onClick={() => openEdit(emp)}
                             >
                               <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            {emp.email && !emp.email.endsWith('@company.local') && (
+                              <Button
+                                variant="ghost" size="sm"
+                                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                                title="Re-send invite"
+                                disabled={reInviting === emp.id}
+                                onClick={() => handleReInvite(emp)}
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost" size="sm"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                              title="Delete employee"
+                              onClick={() => setDeleteTarget(emp)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                             <Button
                               variant="ghost" size="sm"
@@ -821,6 +885,34 @@ export default function EmployeeDirectory() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── Delete Confirmation ────────────────────────────────────────────── */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Employee?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove <strong>{deleteTarget?.name}</strong> ({deleteTarget?.staffCode ?? 'no code'}).
+              {' '}If they have never signed in, their pending invite will also be revoked.
+              {' '}If they have an active account, it will be unlinked but not deleted.
+              <br /><br />
+              <span className="text-destructive font-medium">
+                This action cannot be undone. If the employee has linked leave or payroll records, deletion will be blocked.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={handleDelete}
+            >
+              {deleting ? 'Deleting…' : 'Delete Employee'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
