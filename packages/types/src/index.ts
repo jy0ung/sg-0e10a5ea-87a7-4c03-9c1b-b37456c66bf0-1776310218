@@ -487,6 +487,31 @@ export type FlowEntityType = 'leave_request' | 'payroll_run' | 'appraisal' | 'in
 export type ApprovalInstanceStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 export type ApprovalDecisionStatus = 'approved' | 'rejected';
 
+/**
+ * Condition set stored on an approval flow. All fields are optional — only
+ * fields that are explicitly set are evaluated during flow resolution. A flow
+ * with no conditions (null or empty object) is treated as a universal fallback
+ * (use together with `isDefault: true`).
+ */
+export interface FlowConditions {
+  /** Match requester's profile role (AppRole value). */
+  requesterRole?: string;
+  /** Match requester's department UUID. */
+  departmentId?: string;
+  /** Match requester's branch UUID. */
+  branchId?: string;
+  /** Match the ticket/request category key (for internal_request workflows). */
+  categoryKey?: string;
+  /** Match the ticket/request subcategory key (for internal_request workflows). */
+  subcategoryKey?: string;
+  /** Minimum amount threshold (inclusive). */
+  amountMin?: number;
+  /** Maximum amount threshold (inclusive). */
+  amountMax?: number;
+  /** Match the ticket/request priority ('low' | 'medium' | 'high' | 'critical'). */
+  priority?: string;
+}
+
 export interface ApprovalStep {
   id: string;
   flowId: string;
@@ -517,8 +542,12 @@ export interface ApprovalFlow {
   departmentId?: string | null;
   /** Human-readable department name (joined from departments table). */
   departmentName?: string;
-  /** True when this flow is the preferred fallback for all departments without a specific flow. */
+  /** True when this flow is the preferred fallback for all contexts without a specific match. */
   isDefault: boolean;
+  /** Condition set used for flow matching. null = matches all contexts. */
+  conditions: FlowConditions | null;
+  /** Admin tiebreaker (0–100). Higher value wins when two flows score equally. */
+  matchPriority: number;
   updatedBy?: string;
   steps: ApprovalStep[];
   createdAt: string;
@@ -532,8 +561,12 @@ export interface CreateApprovalFlowInput {
   isActive: boolean;
   /** UUID of the department to scope this flow to, or null/undefined for a company-wide flow. */
   departmentId?: string | null;
-  /** Mark this as the default fallback when no department-specific flow matches. */
+  /** Mark this as the default fallback when no specific condition match is found. */
   isDefault?: boolean;
+  /** Condition set for this flow. null/undefined = matches all contexts. */
+  conditions?: FlowConditions | null;
+  /** Tiebreaker priority (0–100). */
+  matchPriority?: number;
   steps: Omit<ApprovalStep, 'id' | 'flowId' | 'approverUserName'>[];
 }
 export type UpdateApprovalFlowInput = CreateApprovalFlowInput;

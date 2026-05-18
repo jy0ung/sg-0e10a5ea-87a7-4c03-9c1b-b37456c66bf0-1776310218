@@ -30,10 +30,49 @@ import {
   listDepartmentsForSelect,
 } from '@/services/approvalFlowService';
 import { listHrmsRoles } from '@/services/hrmsRoleService';
-import type { ApprovalFlow, ApprovalStep, CreateApprovalFlowInput, FlowEntityType } from '@/types';
+import type { ApprovalFlow, ApprovalStep, CreateApprovalFlowInput, FlowConditions, FlowEntityType } from '@/types';
 import { approvalFlowWithStepsSchema, type ApprovalFlowFormData } from '@/lib/validations';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Remove a key from conditions; returns null when the result is empty. */
+function removeConditionKey<K extends keyof FlowConditions>(
+  conditions: FlowConditions | null | undefined,
+  key: K,
+): FlowConditions | null {
+  if (!conditions) return null;
+  const next = { ...conditions };
+  delete next[key];
+  return Object.keys(next).length ? next : null;
+}
+
+/** Strip empty-string / undefined values so the scorer never matches on blank keys. */
+function sanitizeConditions(c: FlowConditions | null | undefined): FlowConditions | null {
+  if (!c) return null;
+  const next = Object.fromEntries(
+    Object.entries(c).filter(([, v]) => v !== '' && v !== undefined && v !== null),
+  ) as FlowConditions;
+  return Object.keys(next).length ? next : null;
+}
+
+/** Human-readable one-liner summary of a flow's condition set. */
+function formatConditions(flow: ApprovalFlow): string {
+  const c = flow.conditions;
+  if (!c || Object.keys(c).length === 0) return '';
+  const parts: string[] = [];
+  if (c.departmentId) parts.push(flow.departmentName ? `Dept: ${flow.departmentName}` : 'Dept: set');
+  if (c.branchId) parts.push('Branch: set');
+  if (c.requesterRole) parts.push(`Role: ${c.requesterRole}`);
+  if (c.categoryKey) parts.push(`Cat: ${c.categoryKey}`);
+  if (c.subcategoryKey) parts.push(`Sub: ${c.subcategoryKey}`);
+  if (c.priority) parts.push(`Priority: ${c.priority}`);
+  if (c.amountMin !== undefined && c.amountMax !== undefined) parts.push(`Amt: ${c.amountMin}–${c.amountMax}`);
+  else if (c.amountMin !== undefined) parts.push(`Amt ≥${c.amountMin}`);
+  else if (c.amountMax !== undefined) parts.push(`Amt ≤${c.amountMax}`);
+  return parts.join(' · ');
+}
 
 const ENTITY_TYPE_LABELS: Record<FlowEntityType, string> = {
   leave_request: 'Leave Request',
@@ -67,7 +106,7 @@ const EMPTY_STEP: StepDraft = {
 
 const EMPTY_FORM: ApprovalFlowFormData = {
   name: '', description: '', entityType: 'general', isActive: true,
-  departmentId: null, isDefault: true,
+  isDefault: false, matchPriority: 0, conditions: null,
   steps: [],
 };
 
@@ -144,13 +183,15 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
   function openEdit(flow: ApprovalFlow) {
     setEditTarget(flow);
     setForm({
-      name:         flow.name,
-      description:  flow.description ?? '',
-      entityType:   flow.entityType,
-      isActive:     flow.isActive,
-      departmentId: flow.departmentId ?? null,
-      isDefault:    flow.isDefault ?? !flow.departmentId,
-      steps:        [],
+      name:          flow.name,
+      description:   flow.description ?? '',
+      entityType:    flow.entityType,
+      isActive:      flow.isActive,
+      isDefault:     flow.isDefault,
+      matchPriority: flow.matchPriority ?? 0,
+      // Migrate older flows that stored only departmentId (pre-conditions era)
+      conditions:    flow.conditions ?? (flow.departmentId ? { departmentId: flow.departmentId } : null),
+      steps:         [],
     });
     setSteps(flow.steps.map(s => ({
       stepOrder:         s.stepOrder,
@@ -217,14 +258,17 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
     }
 
     setSaving(true);
+    const conds = sanitizeConditions(parsed.data.conditions);
     const input: CreateApprovalFlowInput = {
-      name:         parsed.data.name,
-      description:  parsed.data.description,
-      entityType:   parsed.data.entityType,
-      isActive:     parsed.data.isActive,
-      departmentId: parsed.data.departmentId ?? null,
-      isDefault:    !parsed.data.departmentId,
-      steps:       steps.map((s, i) => ({
+      name:          parsed.data.name,
+      description:   parsed.data.description,
+      entityType:    parsed.data.entityType,
+      isActive:      parsed.data.isActive,
+      isDefault:     parsed.data.isDefault,
+      conditions:    conds,
+      matchPriority: parsed.data.matchPriority,
+      departmentId:  conds?.departmentId ?? null,
+      steps:        steps.map((s, i) => ({
         stepOrder:         i + 1,
         name:              s.name,
         approverType:      s.approverType,
@@ -245,7 +289,7 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
     setSaving(false);
     if (error) {
       const friendlyError = error.includes('uq_approval_flows')
-        ? 'An active flow for this entity type and department scope already exists. Deactivate the existing flow first.'
+        ? 'A default flow for this workflow type already exists. Only one active default is allowed per workflow type.'
         : error;
       toast({ title: 'Error', description: friendlyError, variant: 'destructive' });
       return;
@@ -354,8 +398,8 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
           <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
             <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
               <th className="whitespace-nowrap px-3 py-2 font-semibold">Name</th>
-              <th className="whitespace-nowrap px-3 py-2 font-semibold">Applies To</th>
-              <th className="whitespace-nowrap px-3 py-2 font-semibold">Scope</th>
+              <th className="whitespace-nowrap px-3 py-2 font-semibold">Workflow Type</th>
+              <th className="whitespace-nowrap px-3 py-2 font-semibold">Conditions</th>
               <th className="whitespace-nowrap px-3 py-2 font-semibold">Steps</th>
               <th className="whitespace-nowrap px-3 py-2 font-semibold">Status</th>
               <th className="whitespace-nowrap px-3 py-2 font-semibold">Actions</th>
@@ -376,14 +420,17 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
                     {ENTITY_TYPE_LABELS[flow.entityType]}
                   </Badge>
                 </td>
-                <td className="px-3 py-2">
-                  {flow.departmentId ? (
-                    <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300">
-                      {flow.departmentName ?? 'Department'}
-                    </Badge>
+                <td className="px-3 py-2 max-w-[180px]">
+                  {flow.conditions && Object.keys(flow.conditions).length > 0 ? (
+                    <span className="text-xs text-muted-foreground leading-tight">
+                      {formatConditions(flow)}
+                    </span>
                   ) : (
-                    <Badge className="bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
-                      Default
+                    <Badge className={flow.isDefault
+                      ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300'
+                      : 'bg-secondary text-secondary-foreground'
+                    }>
+                      {flow.isDefault ? 'Default' : 'Unrestricted'}
                     </Badge>
                   )}
                 </td>
@@ -448,7 +495,7 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
                     onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Applies To *</Label>
+                  <Label className="text-xs text-muted-foreground">Workflow Type *</Label>
                   <Select value={form.entityType}
                     onValueChange={v => setForm(f => ({ ...f, entityType: v as FlowEntityType }))}>
                     <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
@@ -459,29 +506,138 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Department Scope</Label>
-                  <Select
-                    value={form.departmentId ?? '__default__'}
-                    onValueChange={v => setForm(f => ({
-                      ...f,
-                      departmentId: v === '__default__' ? null : v,
-                      isDefault: v === '__default__',
-                    }))}
-                  >
-                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__default__">All Departments (Default fallback)</SelectItem>
-                      {departments.map(d => (
-                        <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {form.departmentId
-                      ? 'Applies only to the selected department.'
-                      : 'Fallback for all departments without a specific flow.'}
-                  </p>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Conditions</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Each set condition must match for this flow to activate. Leave all empty to use as a default fallback.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Department</Label>
+                    <Select
+                      value={form.conditions?.departmentId ?? '__any__'}
+                      onValueChange={v => setForm(f => ({
+                        ...f,
+                        conditions: v === '__any__'
+                          ? removeConditionKey(f.conditions, 'departmentId')
+                          : { ...f.conditions, departmentId: v },
+                      }))}
+                    >
+                      <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__any__">Any department</SelectItem>
+                        {departments.map(d => (
+                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Request Priority</Label>
+                    <Select
+                      value={form.conditions?.priority ?? '__any__'}
+                      onValueChange={v => setForm(f => ({
+                        ...f,
+                        conditions: v === '__any__'
+                          ? removeConditionKey(f.conditions, 'priority')
+                          : { ...f.conditions, priority: v as FlowConditions['priority'] },
+                      }))}
+                    >
+                      <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__any__">Any priority</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="critical">Critical</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Category Key</Label>
+                    <Input
+                      className="h-9 text-sm"
+                      value={form.conditions?.categoryKey ?? ''}
+                      onChange={e => setForm(f => ({
+                        ...f,
+                        conditions: e.target.value
+                          ? { ...f.conditions, categoryKey: e.target.value }
+                          : removeConditionKey(f.conditions, 'categoryKey'),
+                      }))}
+                      placeholder="e.g. facilities, it_support"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Subcategory Key</Label>
+                    <Input
+                      className="h-9 text-sm"
+                      value={form.conditions?.subcategoryKey ?? ''}
+                      onChange={e => setForm(f => ({
+                        ...f,
+                        conditions: e.target.value
+                          ? { ...f.conditions, subcategoryKey: e.target.value }
+                          : removeConditionKey(f.conditions, 'subcategoryKey'),
+                      }))}
+                      placeholder="e.g. printer_issue"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Amount Min</Label>
+                      <Input
+                        className="h-9 text-sm"
+                        type="number" min={0}
+                        value={form.conditions?.amountMin ?? ''}
+                        onChange={e => setForm(f => ({
+                          ...f,
+                          conditions: e.target.value
+                            ? { ...f.conditions, amountMin: Number(e.target.value) }
+                            : removeConditionKey(f.conditions, 'amountMin'),
+                        }))}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Amount Max</Label>
+                      <Input
+                        className="h-9 text-sm"
+                        type="number" min={0}
+                        value={form.conditions?.amountMax ?? ''}
+                        onChange={e => setForm(f => ({
+                          ...f,
+                          conditions: e.target.value
+                            ? { ...f.conditions, amountMax: Number(e.target.value) }
+                            : removeConditionKey(f.conditions, 'amountMax'),
+                        }))}
+                        placeholder="unlimited"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Match Priority (0–100)</Label>
+                    <Input
+                      className="h-9 text-sm"
+                      type="number" min={0} max={100}
+                      value={form.matchPriority ?? 0}
+                      onChange={e => setForm(f => ({ ...f, matchPriority: Math.min(100, Math.max(0, Number(e.target.value) || 0)) }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Tiebreaker when two flows score equally. Higher value wins.</p>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
+                    <div>
+                      <Label className="text-sm">Default fallback</Label>
+                      <p className="text-xs text-muted-foreground">Use when no specific condition match is found.</p>
+                    </div>
+                    <Switch checked={form.isDefault ?? false} onCheckedChange={v => setForm(f => ({ ...f, isDefault: v }))} />
+                  </div>
                 </div>
                 <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2">
                   <div>

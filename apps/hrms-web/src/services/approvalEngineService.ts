@@ -18,17 +18,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
 import type { ApprovalFlow, PendingApproval, FlowEntityType } from '@/types';
 import { userHasAssignedHrmsRole } from '@flc/hrms-services';
-import { resolveApprovalFlowId } from '@/services/approvalFlowService';
+import { resolveFlowForContext, type FlowResolutionContext } from '@/services/approvalFlowService';
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
 async function getActiveFlow(
   companyId: string,
   entityType: FlowEntityType,
-  departmentId?: string | null,
-): Promise<ApprovalFlow | null> {
-  const flowId = await resolveApprovalFlowId(companyId, entityType, departmentId);
-  if (!flowId) return null;
+  context: FlowResolutionContext = {},
+): Promise<{ flow: ApprovalFlow | null; error: string | null }> {
+  const { flowId, error } = await resolveFlowForContext(companyId, entityType, context);
+  if (error) return { flow: null, error };
+  if (!flowId) return { flow: null, error: null };
 
   const { data: flow } = await supabase
     .from('approval_flows')
@@ -36,7 +37,7 @@ async function getActiveFlow(
     .eq('id', flowId)
     .maybeSingle();
 
-  if (!flow) return null;
+  if (!flow) return { flow: null, error: null };
 
   const { data: steps } = await supabase
     .from('approval_steps')
@@ -45,33 +46,38 @@ async function getActiveFlow(
     .order('step_order');
 
   return {
-    id:           String(flow.id),
-    companyId:    String(flow.company_id),
-    name:         String(flow.name),
-    description:  flow.description ? String(flow.description) : undefined,
-    entityType:   flow.entity_type as FlowEntityType,
-    isActive:     Boolean(flow.is_active),
-    isDefault:    Boolean(flow.is_default),
-    departmentId: flow.department_id ? String(flow.department_id) : null,
-    steps: (steps ?? []).filter(s => s.is_active !== false).map(s => ({
-      id:               String(s.id),
-      flowId:           String(s.flow_id),
-      stepOrder:        Number(s.step_order),
-      name:             String(s.name),
-      approverType:     s.approver_type as 'role' | 'specific_user' | 'direct_manager',
-      approverRole:     s.approver_role ? String(s.approver_role) : undefined,
-      approverUserId:   s.approver_user_id ? String(s.approver_user_id) : undefined,
-      approverUserName: s.approver_user
-        ? String((s.approver_user as Record<string, unknown>)?.name ?? '')
-        : undefined,
-      fallbackApproverUserId: s.fallback_approver_user_id ? String(s.fallback_approver_user_id) : undefined,
-      escalationRule: s.escalation_rule ? String(s.escalation_rule) : undefined,
-      conditionRule: s.condition_rule ? String(s.condition_rule) : undefined,
-      isActive: s.is_active !== undefined ? Boolean(s.is_active) : true,
-      allowSelfApproval: Boolean(s.allow_self_approval),
-    })),
-    createdAt: String(flow.created_at),
-    updatedAt: String(flow.updated_at),
+    flow: {
+      id:           String(flow.id),
+      companyId:    String(flow.company_id),
+      name:         String(flow.name),
+      description:  flow.description ? String(flow.description) : undefined,
+      entityType:   flow.entity_type as FlowEntityType,
+      isActive:     Boolean(flow.is_active),
+      isDefault:    Boolean(flow.is_default),
+      departmentId: flow.department_id ? String(flow.department_id) : null,
+      conditions:   (flow.conditions as ApprovalFlow['conditions']) ?? null,
+      matchPriority: Number((flow as Record<string, unknown>).match_priority ?? 0),
+      steps: (steps ?? []).filter(s => s.is_active !== false).map(s => ({
+        id:               String(s.id),
+        flowId:           String(s.flow_id),
+        stepOrder:        Number(s.step_order),
+        name:             String(s.name),
+        approverType:     s.approver_type as 'role' | 'specific_user' | 'direct_manager',
+        approverRole:     s.approver_role ? String(s.approver_role) : undefined,
+        approverUserId:   s.approver_user_id ? String(s.approver_user_id) : undefined,
+        approverUserName: s.approver_user
+          ? String((s.approver_user as Record<string, unknown>)?.name ?? '')
+          : undefined,
+        fallbackApproverUserId: s.fallback_approver_user_id ? String(s.fallback_approver_user_id) : undefined,
+        escalationRule: s.escalation_rule ? String(s.escalation_rule) : undefined,
+        conditionRule: s.condition_rule ? String(s.condition_rule) : undefined,
+        isActive: s.is_active !== undefined ? Boolean(s.is_active) : true,
+        allowSelfApproval: Boolean(s.allow_self_approval),
+      })),
+      createdAt: String(flow.created_at),
+      updatedAt: String(flow.updated_at),
+    },
+    error: null,
   };
 }
 
@@ -129,16 +135,24 @@ export async function initiateApprovalRequest(
   entityId: string,
   companyId: string,
   requesterId: string,
+  context?: FlowResolutionContext,
 ): Promise<{ id: string | null; error: string | null }> {
-  // Look up requester's department for department-scoped flow resolution
+  // Build resolution context from the requester's profile + any provided context
   const { data: requesterProfile } = await supabase
     .from('profiles')
-    .select('department_id')
+    .select('department_id, branch_id, role')
     .eq('id', requesterId)
     .maybeSingle();
-  const departmentId = requesterProfile?.department_id ? String(requesterProfile.department_id) : null;
 
-  const flow = await getActiveFlow(companyId, entityType, departmentId);
+  const resolvedContext: FlowResolutionContext = {
+    departmentId: requesterProfile?.department_id ? String(requesterProfile.department_id) : null,
+    branchId: requesterProfile?.branch_id ? String((requesterProfile as Record<string, unknown>).branch_id) : null,
+    requesterRole: requesterProfile?.role ? String(requesterProfile.role) : null,
+    ...context,
+  };
+
+  const { flow, error: flowError } = await getActiveFlow(companyId, entityType, resolvedContext);
+  if (flowError) return { id: null, error: flowError };
   if (!flow || flow.steps.length === 0) {
     return { id: null, error: null }; // No flow configured; proceed without workflow
   }

@@ -790,7 +790,11 @@ export async function createTicket(
   context: { userId: string; companyId: string; submitterRole?: string | null },
 ): Promise<TicketServiceResult<{ id: string }>> {
   try {
-    const approvalPlan = await getInternalRequestApprovalPlan(context.companyId, context.userId);
+    const approvalPlan = await getInternalRequestApprovalPlan(context.companyId, context.userId, {
+      categoryKey: input.category ?? null,
+      subcategoryKey: input.subcategory?.trim() ? input.subcategory.trim() : null,
+      priority: input.priority ?? null,
+    });
     if (approvalPlan.error) throw new Error(approvalPlan.error);
 
     // Evaluate auto-routing rules before insert

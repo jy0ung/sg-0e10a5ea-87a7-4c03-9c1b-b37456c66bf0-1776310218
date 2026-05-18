@@ -1,6 +1,25 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
-import type { ApprovalFlow, ApprovalStep, CreateApprovalFlowInput, FlowEntityType, UpdateApprovalFlowInput } from '@/types';
+import type { ApprovalFlow, ApprovalStep, CreateApprovalFlowInput, FlowConditions, FlowEntityType, UpdateApprovalFlowInput } from '@/types';
+
+// ─── Flow resolution context ─────────────────────────────────────────────────
+
+export interface FlowResolutionContext {
+  /** Requester's profile role (AppRole value). */
+  requesterRole?: string | null;
+  /** UUID of the requester's department. */
+  departmentId?: string | null;
+  /** UUID of the requester's branch. */
+  branchId?: string | null;
+  /** Ticket/request category key (internal_request flows). */
+  categoryKey?: string | null;
+  /** Ticket/request subcategory key (internal_request flows). */
+  subcategoryKey?: string | null;
+  /** Ticket/request numeric amount, if applicable. */
+  amount?: number | null;
+  /** Ticket/request priority string ('low' | 'medium' | 'high' | 'critical'). */
+  priority?: string | null;
+}
 
 // ─── Row mappers ─────────────────────────────────────────────────────────────
 
@@ -41,6 +60,8 @@ function rowToFlow(r: Record<string, unknown>, steps: ApprovalStep[]): ApprovalF
       ? String((r.department as Record<string, unknown>)?.name ?? '')
       : undefined,
     isDefault:      Boolean(r.is_default),
+    conditions:     (r.conditions as FlowConditions | null) ?? null,
+    matchPriority:  Number(r.match_priority ?? 0),
     updatedBy:      r.updated_by ? String(r.updated_by) : undefined,
     steps,
     createdAt:      String(r.created_at ?? ''),
@@ -93,15 +114,17 @@ export async function createApprovalFlow(
   const { data: flow, error: flowError } = await supabase
     .from('approval_flows')
     .insert({
-      company_id:    companyId,
-      name:          input.name,
-      description:   input.description ?? null,
-      entity_type:   input.entityType,
-      is_active:     input.isActive,
-      created_by:    actorId,
-      updated_by:    actorId,
-      department_id: input.departmentId ?? null,
-      is_default:    input.isDefault ?? false,
+      company_id:     companyId,
+      name:           input.name,
+      description:    input.description ?? null,
+      entity_type:    input.entityType,
+      is_active:      input.isActive,
+      created_by:     actorId,
+      updated_by:     actorId,
+      department_id:  input.departmentId ?? null,
+      is_default:     input.isDefault ?? false,
+      conditions:     input.conditions ?? null,
+      match_priority: input.matchPriority ?? 0,
     })
     .select('*')
     .single();
@@ -141,14 +164,16 @@ export async function updateApprovalFlow(
   const { error: flowError } = await supabase
     .from('approval_flows')
     .update({
-      name:          input.name,
-      description:   input.description ?? null,
-      entity_type:   input.entityType,
-      is_active:     input.isActive,
-      updated_by:    actorId,
-      department_id: input.departmentId ?? null,
-      is_default:    input.isDefault ?? false,
-      updated_at:    new Date().toISOString(),
+      name:           input.name,
+      description:    input.description ?? null,
+      entity_type:    input.entityType,
+      is_active:      input.isActive,
+      updated_by:     actorId,
+      department_id:  input.departmentId ?? null,
+      is_default:     input.isDefault ?? false,
+      conditions:     input.conditions ?? null,
+      match_priority: input.matchPriority ?? 0,
+      updated_at:     new Date().toISOString(),
     })
     .eq('company_id', companyId)
     .eq('id', flowId);
@@ -240,44 +265,136 @@ export async function listDepartmentsForSelect(
   };
 }
 
+// ─── Internal condition scorer ───────────────────────────────────────────────
+
+function scoreConditions(
+  conditions: FlowConditions | null,
+  ctx: FlowResolutionContext,
+): { matches: boolean; specificity: number } {
+  if (!conditions || Object.keys(conditions).length === 0) {
+    return { matches: true, specificity: 0 };
+  }
+
+  let specificity = 0;
+
+  if (conditions.requesterRole !== undefined) {
+    if (!ctx.requesterRole || ctx.requesterRole !== conditions.requesterRole) return { matches: false, specificity: 0 };
+    specificity++;
+  }
+  if (conditions.departmentId !== undefined) {
+    if (!ctx.departmentId || ctx.departmentId !== conditions.departmentId) return { matches: false, specificity: 0 };
+    specificity++;
+  }
+  if (conditions.branchId !== undefined) {
+    if (!ctx.branchId || ctx.branchId !== conditions.branchId) return { matches: false, specificity: 0 };
+    specificity++;
+  }
+  if (conditions.categoryKey !== undefined) {
+    if (!ctx.categoryKey || ctx.categoryKey !== conditions.categoryKey) return { matches: false, specificity: 0 };
+    specificity++;
+  }
+  if (conditions.subcategoryKey !== undefined) {
+    if (!ctx.subcategoryKey || ctx.subcategoryKey !== conditions.subcategoryKey) return { matches: false, specificity: 0 };
+    specificity++;
+  }
+  if (conditions.priority !== undefined) {
+    if (!ctx.priority || ctx.priority !== conditions.priority) return { matches: false, specificity: 0 };
+    specificity++;
+  }
+  if (conditions.amountMin !== undefined) {
+    if (ctx.amount == null || ctx.amount < conditions.amountMin) return { matches: false, specificity: 0 };
+    specificity++;
+  }
+  if (conditions.amountMax !== undefined) {
+    if (ctx.amount == null || ctx.amount > conditions.amountMax) return { matches: false, specificity: 0 };
+    specificity++;
+  }
+
+  return { matches: true, specificity };
+}
+
 /**
- * Resolve the ID of the best-matching approval flow for a given entity type
- * and optional department.
+ * Resolve the best-matching active approval flow for a given workflow type
+ * using condition-based scoring.
  *
- * Priority:
- *   1. Active flow scoped to the requester's exact department.
- *   2. Active flow marked as default (is_default = true) with no department.
- *   3. Any active flow with no department (backward compatibility).
- *   4. null — no flow configured; caller handles the fallback case.
+ * Resolution algorithm:
+ *   1. Load all active flows for (company_id, entity_type).
+ *   2. Score each flow: a flow matches only if ALL of its set condition fields
+ *      agree with the context. Unset condition fields are ignored.
+ *   3. Among matching flows, pick the one(s) with the highest specificity score
+ *      (= number of explicitly matched conditions).
+ *   4. Tiebreak by match_priority DESC.
+ *   5. If a single winner emerges → use it.
+ *   6. If multiple flows tie on both specificity and priority → setup error.
+ *   7. If no flows at all are configured → { flowId: null, error: null }
+ *      (no-approval path; caller decides).
+ *   8. If flows are configured but none match the context → setup error.
+ */
+export async function resolveFlowForContext(
+  companyId: string,
+  entityType: FlowEntityType,
+  context: FlowResolutionContext = {},
+): Promise<{ flowId: string | null; error: string | null }> {
+  const { data: rows } = await supabase
+    .from('approval_flows')
+    .select('id, conditions, is_default, match_priority')
+    .eq('company_id', companyId)
+    .eq('entity_type', entityType)
+    .eq('is_active', true);
+
+  // No flows at all → unconfigured, proceed without approval
+  if (!rows?.length) return { flowId: null, error: null };
+
+  // Score each flow
+  const scored = rows.map(r => {
+    const { matches, specificity } = scoreConditions(r.conditions as FlowConditions | null, context);
+    return {
+      id:           String(r.id),
+      matches,
+      specificity,
+      matchPriority: Number(r.match_priority ?? 0),
+      isDefault:    Boolean(r.is_default),
+    };
+  });
+
+  const matching = scored.filter(f => f.matches);
+  if (!matching.length) {
+    return {
+      flowId: null,
+      error: 'No approval flow matches this request. Please ask your administrator to configure a matching flow.',
+    };
+  }
+
+  // Find highest specificity, then highest match_priority
+  const maxSpec = Math.max(...matching.map(f => f.specificity));
+  const topSpec = matching.filter(f => f.specificity === maxSpec);
+  const maxPriority = Math.max(...topSpec.map(f => f.matchPriority));
+  const winners = topSpec.filter(f => f.matchPriority === maxPriority);
+
+  if (winners.length === 1) return { flowId: winners[0].id, error: null };
+
+  // Multiple flows tie — if they're all zero-specificity defaults, prefer the
+  // one explicitly marked is_default=true (DB constraint ensures at most one).
+  if (maxSpec === 0) {
+    const explicitDefault = winners.find(f => f.isDefault);
+    if (explicitDefault) return { flowId: explicitDefault.id, error: null };
+  }
+
+  return {
+    flowId: null,
+    error: 'Multiple approval flows match this request equally. Please ask your administrator to resolve the conflict by adjusting conditions or match priority.',
+  };
+}
+
+/**
+ * @deprecated Use `resolveFlowForContext` instead.
+ * Kept as a backward-compatible shim for callers that only have a departmentId.
  */
 export async function resolveApprovalFlowId(
   companyId: string,
   entityType: FlowEntityType,
   departmentId?: string | null,
 ): Promise<string | null> {
-  const { data: flows } = await supabase
-    .from('approval_flows')
-    .select('id, department_id, is_default')
-    .eq('company_id', companyId)
-    .eq('entity_type', entityType)
-    .eq('is_active', true)
-    .order('created_at', { ascending: true });
-
-  if (!flows?.length) return null;
-
-  // Priority 1: exact department match
-  if (departmentId) {
-    const match = flows.find(f => f.department_id === departmentId);
-    if (match) return String(match.id);
-  }
-
-  // Priority 2: default flow (no department, explicitly marked default)
-  const defaultFlow = flows.find(f => Boolean(f.is_default) && !f.department_id);
-  if (defaultFlow) return String(defaultFlow.id);
-
-  // Priority 3: any flow with no department (backward compat with pre-department flows)
-  const fallback = flows.find(f => !f.department_id);
-  if (fallback) return String(fallback.id);
-
-  return null;
+  const { flowId } = await resolveFlowForContext(companyId, entityType, { departmentId });
+  return flowId;
 }

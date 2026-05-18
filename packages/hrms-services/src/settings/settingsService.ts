@@ -141,6 +141,8 @@ function rowToApprovalFlow(r: Record<string, unknown>): ApprovalFlow {
     isActive:     Boolean(r.is_active),
     isDefault:    Boolean(r.is_default),
     departmentId: r.department_id ? String(r.department_id) : null,
+    conditions:   (r.conditions as ApprovalFlow['conditions']) ?? null,
+    matchPriority: Number(r.match_priority ?? 0),
     createdBy:    r.created_by ? String(r.created_by) : undefined,
     steps:       (steps as Record<string, unknown>[]).map(s => ({
       id:                   String(s.id ?? ''),
@@ -547,12 +549,16 @@ export async function createApprovalFlow(
   const { data: flow, error: flowError } = await supabase
     .from('approval_flows')
     .insert({
-      company_id:  companyId,
-      name:        input.name,
-      description: input.description ?? null,
-      entity_type: input.entityType,
-      is_active:   input.isActive,
-      created_by:  actorId,
+      company_id:    companyId,
+      name:          input.name,
+      description:   input.description ?? null,
+      entity_type:   input.entityType,
+      is_active:     input.isActive,
+      is_default:    input.isDefault ?? false,
+      department_id: input.departmentId ?? null,
+      conditions:    input.conditions ?? null,
+      match_priority: input.matchPriority ?? 0,
+      created_by:    actorId,
     })
     .select('*')
     .single();
@@ -592,11 +598,15 @@ export async function updateApprovalFlow(
   const { error } = await supabase
     .from('approval_flows')
     .update({
-      name:        input.name,
-      description: input.description ?? null,
-      entity_type: input.entityType,
-      is_active:   input.isActive,
-      updated_at:  new Date().toISOString(),
+      name:          input.name,
+      description:   input.description ?? null,
+      entity_type:   input.entityType,
+      is_active:     input.isActive,
+      is_default:    input.isDefault ?? false,
+      department_id: input.departmentId ?? null,
+      conditions:    input.conditions ?? null,
+      match_priority: input.matchPriority ?? 0,
+      updated_at:    new Date().toISOString(),
     })
     .eq('company_id', companyId)
     .eq('id', id);

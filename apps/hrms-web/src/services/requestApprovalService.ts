@@ -3,7 +3,7 @@ import type { ApprovalDecision, ApprovalInstanceStatus } from '@/types';
 import { rowToApprovalDecision, rowToApprovalStep, resolveStepRouting, userHasAssignedHrmsRole } from './hrms/shared';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
-import { resolveApprovalFlowId } from './approvalFlowService';
+import { resolveFlowForContext, type FlowResolutionContext } from './approvalFlowService';
 
 export interface InternalRequestApprovalPlan {
   flowId: string;
@@ -85,17 +85,26 @@ function mapApproval(row: ApprovalInstanceRow): InternalRequestApprovalMetadata 
 export async function getInternalRequestApprovalPlan(
   companyId: string,
   requesterId: string,
+  context?: Omit<FlowResolutionContext, 'departmentId' | 'branchId' | 'requesterRole'>,
 ): Promise<{ data: InternalRequestApprovalPlan | null; error: string | null }> {
-  // Look up requester's department for department-scoped flow resolution
+  // Look up requester's profile for department, branch, and role context
   const { data: requesterProfile } = await profilesTable()
-    .select('department_id')
+    .select('department_id, branch_id, role')
     .eq('id', requesterId)
     .maybeSingle();
-  const departmentId = (requesterProfile as Record<string, unknown>)?.department_id
-    ? String((requesterProfile as Record<string, unknown>).department_id)
-    : null;
+  const profileRow = requesterProfile as Record<string, unknown>;
+  const departmentId = profileRow?.department_id ? String(profileRow.department_id) : null;
+  const branchId = profileRow?.branch_id ? String(profileRow.branch_id) : null;
+  const requesterRole = profileRow?.role ? String(profileRow.role) : null;
 
-  const flowId = await resolveApprovalFlowId(companyId, 'internal_request', departmentId);
+  const { flowId, error: resolveError } = await resolveFlowForContext(companyId, 'internal_request', {
+    departmentId,
+    branchId,
+    requesterRole,
+    ...context,
+  });
+
+  if (resolveError) return { data: null, error: resolveError };
   if (!flowId) return { data: null, error: null };
 
   const { data: steps, error: stepsError } = await approvalStepsTable()
