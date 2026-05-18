@@ -509,7 +509,7 @@ export interface FlowConditions {
   /** Maximum amount threshold (inclusive). */
   amountMax?: number;
   /** Match the ticket/request priority ('low' | 'medium' | 'high' | 'critical'). */
-  priority?: string;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
 }
 
 export interface ApprovalStep {
