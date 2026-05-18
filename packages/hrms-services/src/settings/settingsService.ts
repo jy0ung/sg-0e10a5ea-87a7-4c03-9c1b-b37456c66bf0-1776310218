@@ -27,6 +27,7 @@ import type {
   CreateApprovalFlowInput,
   UpdateApprovalFlowInput,
 } from '@flc/types';
+import type { Json } from '@flc/supabase';
 import { supabase } from '../shared/supabaseClient';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -556,7 +557,7 @@ export async function createApprovalFlow(
       is_active:     input.isActive,
       is_default:    input.isDefault ?? false,
       department_id: input.departmentId ?? null,
-      conditions:    input.conditions ?? null,
+      conditions:    (input.conditions ?? null) as Json | null,
       match_priority: input.matchPriority ?? 0,
       created_by:    actorId,
     })
@@ -604,7 +605,7 @@ export async function updateApprovalFlow(
       is_active:     input.isActive,
       is_default:    input.isDefault ?? false,
       department_id: input.departmentId ?? null,
-      conditions:    input.conditions ?? null,
+      conditions:    (input.conditions ?? null) as Json | null,
       match_priority: input.matchPriority ?? 0,
       updated_at:    new Date().toISOString(),
     })

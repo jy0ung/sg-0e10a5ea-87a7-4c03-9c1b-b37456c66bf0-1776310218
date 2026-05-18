@@ -441,6 +441,7 @@ export type Database = {
       approval_flows: {
         Row: {
           company_id: string
+          conditions: Json | null
           created_at: string
           created_by: string | null
           department_id: string | null
@@ -449,12 +450,14 @@ export type Database = {
           id: string
           is_active: boolean
           is_default: boolean
+          match_priority: number
           name: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           company_id: string
+          conditions?: Json | null
           created_at?: string
           created_by?: string | null
           department_id?: string | null
@@ -463,12 +466,14 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_default?: boolean
+          match_priority?: number
           name: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           company_id?: string
+          conditions?: Json | null
           created_at?: string
           created_by?: string | null
           department_id?: string | null
@@ -477,6 +482,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_default?: boolean
+          match_priority?: number
           name?: string
           updated_at?: string
           updated_by?: string | null
