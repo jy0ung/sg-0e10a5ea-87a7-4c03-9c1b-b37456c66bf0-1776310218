@@ -193,7 +193,7 @@ function rowToJobTitle(r: Record<string, unknown>): JobTitle {
 export async function listJobTitles(companyId: string): Promise<{ data: JobTitle[]; error: string | null }> {
   const { data, error } = await supabase
     .from('job_titles')
-    .select('*, department:departments!profiles_department_id_fkey(name)')
+    .select('*, department:departments!job_titles_department_id_fkey(name)')
     .eq('company_id', companyId)
     .order('name');
   if (error) return { data: [], error: error.message };
@@ -245,14 +245,22 @@ export async function updateJobTitle(
 }
 
 export async function deleteJobTitle(companyId: string, id: string, actorId: string): Promise<{ error: string | null }> {
-  // Check if any employees have this job title
-  const { count } = await supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('company_id', companyId)
-    .eq('job_title_id', id);
-  if ((count ?? 0) > 0) {
-    return { error: `Cannot delete: ${count} employee(s) have this job title. Reassign them first.` };
+  // Check if any profile or employee records reference this job title before deleting.
+  const [profileCheck, employeeCheck] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .eq('job_title_id', id),
+    supabase
+      .from('employees')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .eq('job_title_id', id),
+  ]);
+  const totalCount = (profileCheck.count ?? 0) + (employeeCheck.count ?? 0);
+  if (totalCount > 0) {
+    return { error: `Cannot delete: ${totalCount} employee record(s) reference this job title. Reassign them first.` };
   }
   const { error } = await supabase.from('job_titles').delete().eq('company_id', companyId).eq('id', id);
   if (!error) void logUserAction(actorId, 'delete', 'job_title', id, {});

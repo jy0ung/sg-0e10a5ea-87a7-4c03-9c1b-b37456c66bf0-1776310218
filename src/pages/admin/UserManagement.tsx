@@ -83,6 +83,10 @@ const ROLES: { value: AppRole; label: string }[] = [
   { value: 'accounts', label: 'Accounts' },
   { value: 'analyst', label: 'Analyst (Legacy)' },
   { value: 'creator_updater', label: 'Creator/Updater' },
+  // Portal-only roles
+  { value: 'portal_admin', label: 'Portal Admin' },
+  { value: 'portal_manager', label: 'Portal Manager' },
+  { value: 'portal_staff', label: 'Portal Staff' },
 ];
 
 const SCOPES: { value: AccessScope; label: string }[] = [

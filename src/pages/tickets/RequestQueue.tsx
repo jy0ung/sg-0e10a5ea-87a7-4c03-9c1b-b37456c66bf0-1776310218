@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   AlertCircle,
   ChevronDown,
@@ -10,6 +11,7 @@ import {
   Loader2,
   RefreshCcw,
   ShieldCheck,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +42,7 @@ import {
   listCompanyTicketsPage,
   listTicketActivity,
   type CompanyTicketRecord,
+  type PaginatedTicketResult,
   type TicketActivityRecord,
   type TicketPriority,
   type TicketStatus,
@@ -48,8 +51,8 @@ import {
 } from '@/services/ticketService';
 import { reviewInternalRequestApproval } from '@/services/requestApprovalService';
 import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
-import { listProfiles, type ProfileRow } from '@/services/profileService';
-import { ADMIN_ONLY } from '@/config/routeRoles';
+import { listProfiles } from '@/services/profileService';
+import { PORTAL_QUEUE_ROLES } from '@/config/routeRoles';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
 import { formatSlaState, getTicketSlaSummary } from '@/lib/ticketSla';
@@ -77,7 +80,7 @@ const priorityOptions: Array<{ value: TicketPriority; label: string }> = [
   { value: 'high', label: 'High' },
 ];
 
-const requestOwnerRoles = new Set(ADMIN_ONLY);
+const requestOwnerRoles = new Set<string>(PORTAL_QUEUE_ROLES);
 const REQUEST_QUEUE_PAGE_SIZE = 25;
 
 function useIsLargeScreen() {
@@ -104,109 +107,159 @@ function useIsLargeScreen() {
 
 export default function RequestQueue() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const isLargeScreen = useIsLargeScreen();
   const { categories } = useRequestCategories(user?.company_id, true);
   const { subcategories } = useRequestSubcategories(user?.company_id, { includeInactive: true });
   const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
-  const [tickets, setTickets] = useState<CompanyTicketRecord[]>([]);
   const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
   const [attachmentsByTicket, setAttachmentsByTicket] = useState<Record<string, TicketAttachmentRecord[]>>({});
-  const [assignees, setAssignees] = useState<ProfileRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [slaFilter, setSlaFilter] = useState<SlaFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [metricsExpanded, setMetricsExpanded] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.localStorage.getItem('requestQueue.metricsExpanded') !== 'false';
   });
-  const [statusCounts, setStatusCounts] = useState<TicketStatusCounts>({
-    all: 0, open: 0, in_progress: 0, awaiting_requester: 0, resolved: 0, closed: 0, cancelled: 0,
-  });
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
   const [reviewTarget, setReviewTarget] = useState<ApprovalReviewTarget>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [queueError, setQueueError] = useState<string | null>(null);
 
   const customFieldLabelMap = useMemo(
     () => Object.fromEntries(formFields.map((field) => [`${field.category_key}:${field.key}`, field.label])),
     [formFields],
   );
 
-  const loadTickets = useCallback(async () => {
-    if (!user) return;
+  // ─── React Query: ticket page ──────────────────────────────────────────────
+  const ticketQueryKey = [
+    'ticketQueue',
+    user?.company_id,
+    { page, statusFilter, priorityFilter, slaFilter, searchTerm },
+  ] as const;
 
-    setLoading(true);
-    setError(null);
-
-    const [{ data, error: fetchError }, profileResult, countsResult] = await Promise.all([
-      listCompanyTicketsPage(user.company_id, {
+  const {
+    data: ticketPage,
+    isPending: ticketsLoading,
+    error: ticketQueryError,
+    refetch: refetchTickets,
+    isFetching: ticketsFetching,
+  } = useQuery({
+    queryKey: ticketQueryKey,
+    queryFn: async () => {
+      if (!user?.company_id) throw new Error('Not authenticated');
+      const result = await listCompanyTicketsPage(user.company_id, {
         page,
         pageSize: REQUEST_QUEUE_PAGE_SIZE,
         status: statusFilter,
         priority: priorityFilter,
+        sla: slaFilter,
         search: searchTerm,
-      }),
-      listProfiles(user.company_id),
-      getCompanyTicketStatusCounts(user.company_id, { priority: priorityFilter, search: searchTerm }),
-    ]);
-
-    if (fetchError) {
-      setError(fetchError.message || 'Unable to load the request queue.');
-    } else if (profileResult.error) {
-      setError(profileResult.error || 'Unable to load request owners.');
-    } else {
-      const nextTickets = data?.rows ?? [];
-      setTickets(nextTickets);
-      setTotalCount(data?.totalCount ?? 0);
-      setAssignees(
-        profileResult.data
-          .filter((profile) => profile.status === 'active' && requestOwnerRoles.has(profile.role))
-          .sort((left, right) => left.name.localeCompare(right.name)),
-      );
-      if (countsResult.data) setStatusCounts(countsResult.data);
-      setNoteDrafts((prev) => {
-        // Preserve any note the user has already started typing for a ticket on
-        // the current page.  Only initialize from server data when there is no
-        // existing entry in state (i.e. a ticket newly arriving in the view).
-        const next: Record<string, string> = {};
-        for (const ticket of nextTickets) {
-          next[ticket.id] = prev[ticket.id] !== undefined
-            ? prev[ticket.id]
-            : (ticket.resolution_note ?? '');
-        }
-        return next;
       });
-      setCommentDrafts(
-        Object.fromEntries(nextTickets.map((ticket) => [ticket.id, ''])),
-      );
+      if (result.error) throw result.error;
+      return result.data!;
+    },
+    enabled: !!user?.company_id,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  });
 
-      const ticketIds = nextTickets.map((ticket) => ticket.id);
-      const [{ data: activityData }, { data: attachmentData }] = await Promise.all([
-        listTicketActivity(ticketIds, user.company_id),
-        listAttachmentsForTickets(ticketIds, user.company_id),
-      ]);
-      setActivitiesByTicket(activityData ?? {});
-      setAttachmentsByTicket(attachmentData ?? {});
-    }
+  // ─── React Query: assignee profiles ───────────────────────────────────────
+  const { data: profileRows } = useQuery({
+    queryKey: ['ticketQueueProfiles', user?.company_id],
+    queryFn: async () => {
+      if (!user?.company_id) throw new Error('Not authenticated');
+      const result = await listProfiles(user.company_id);
+      if (result.error) throw new Error(result.error);
+      return result.data;
+    },
+    enabled: !!user?.company_id,
+    staleTime: 5 * 60_000,
+  });
 
-    setLoading(false);
-  }, [page, priorityFilter, searchTerm, statusFilter, user]);
+  // ─── React Query: status counts ───────────────────────────────────────────
+  const statusCountsQueryKey = [
+    'ticketQueueStatusCounts',
+    user?.company_id,
+    { priorityFilter, searchTerm },
+  ] as const;
 
-  useEffect(() => {
-    void loadTickets();
-  }, [loadTickets]);
+  const { data: statusCountsData } = useQuery({
+    queryKey: statusCountsQueryKey,
+    queryFn: async () => {
+      if (!user?.company_id) throw new Error('Not authenticated');
+      const result = await getCompanyTicketStatusCounts(user.company_id, {
+        priority: priorityFilter,
+        search: searchTerm,
+      });
+      if (result.error) throw result.error;
+      return result.data!;
+    },
+    enabled: !!user?.company_id,
+    staleTime: 30_000,
+  });
 
+  // ─── Derived state ─────────────────────────────────────────────────────────
+  const tickets = useMemo(() => ticketPage?.rows ?? [], [ticketPage]);
+  const totalCount = ticketPage?.totalCount ?? 0;
+  const loading = ticketsLoading && !ticketPage; // only hard-loading on the very first fetch
+  const error = queueError ?? (ticketQueryError ? (ticketQueryError as Error).message : null);
+
+  const assignees = useMemo(
+    () =>
+      (profileRows ?? [])
+        .filter((profile) => profile.status === 'active' && requestOwnerRoles.has(profile.role))
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    [profileRows],
+  );
+
+  const statusCounts: TicketStatusCounts = statusCountsData ?? {
+    all: 0, open: 0, in_progress: 0, awaiting_requester: 0, resolved: 0, closed: 0, cancelled: 0,
+  };
+
+  // ─── Reset page when filters change ───────────────────────────────────────
   useEffect(() => {
     setPage(1);
-  }, [priorityFilter, searchTerm, statusFilter]);
+  }, [priorityFilter, searchTerm, statusFilter, slaFilter]);
+
+  // ─── Side effects keyed on incoming ticket data ────────────────────────────
+  useEffect(() => {
+    if (!ticketPage || !user) return;
+    const nextTickets = ticketPage.rows;
+
+    setNoteDrafts((prev) => {
+      const next: Record<string, string> = {};
+      for (const ticket of nextTickets) {
+        next[ticket.id] = prev[ticket.id] !== undefined
+          ? prev[ticket.id]
+          : (ticket.resolution_note ?? '');
+      }
+      return next;
+    });
+    setCommentDrafts(Object.fromEntries(nextTickets.map((ticket) => [ticket.id, ''])));
+
+    const ticketIds = nextTickets.map((ticket) => ticket.id);
+    if (ticketIds.length === 0) {
+      setActivitiesByTicket({});
+      setAttachmentsByTicket({});
+      return;
+    }
+    void Promise.all([
+      listTicketActivity(ticketIds, user.company_id),
+      listAttachmentsForTickets(ticketIds, user.company_id),
+    ]).then(([{ data: activityData }, { data: attachmentData }]) => {
+      setActivitiesByTicket(activityData ?? {});
+      setAttachmentsByTicket(attachmentData ?? {});
+    });
+  // Deliberately omit noteDrafts / commentDrafts from deps — we only want to
+  // sync when server data arrives, not on every local edit.
+  }, [ticketPage, user]);
 
   useEffect(() => {
     if (isLargeScreen) setDetailDrawerOpen(false);
@@ -217,12 +270,10 @@ export default function RequestQueue() {
     window.localStorage.setItem('requestQueue.metricsExpanded', String(metricsExpanded));
   }, [metricsExpanded]);
 
+  // ─── Filtered view (client-side refinement on top of server-filtered page) ─
   const filteredTickets = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
     return tickets.filter((ticket) => {
-      if (statusFilter !== 'all' && ticket.status !== statusFilter) return false;
-      if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;
-      if (slaFilter !== 'all' && getTicketSlaSummary(ticket).overall !== slaFilter) return false;
       if (!normalizedSearch) return true;
 
       const haystack = [
@@ -241,7 +292,7 @@ export default function RequestQueue() {
 
       return haystack.includes(normalizedSearch);
     });
-  }, [categories, priorityFilter, searchTerm, slaFilter, statusFilter, subcategories, tickets]);
+  }, [categories, searchTerm, subcategories, tickets]);
 
   const selectedTicket = useMemo(() => {
     return filteredTickets.find((ticket) => ticket.id === selectedTicketId) ?? filteredTickets[0] ?? null;
@@ -275,11 +326,28 @@ export default function RequestQueue() {
     }
   }, [user]);
 
+  // ─── Helper: optimistic ticket update in React Query cache ────────────────
+  const applyOptimisticTicketUpdate = useCallback(
+    (ticketId: string, updates: Partial<CompanyTicketRecord>) => {
+      queryClient.setQueryData<PaginatedTicketResult<CompanyTicketRecord>>(ticketQueryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          rows: old.rows.map((ticket) =>
+            ticket.id === ticketId ? { ...ticket, ...updates } : ticket,
+          ),
+        };
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [queryClient, ...ticketQueryKey],
+  );
+
   const handleStatusChange = async (ticketId: string, status: TicketStatus) => {
     if (!user) return;
 
     setSavingTicketId(ticketId);
-    setError(null);
+    setQueueError(null);
 
     const { data, error: updateError } = await updateTicket(
       ticketId,
@@ -288,24 +356,20 @@ export default function RequestQueue() {
     );
 
     if (updateError || !data) {
-      setError(updateError?.message || 'Unable to update request status.');
+      setQueueError(updateError?.message || 'Unable to update request status.');
       setSavingTicketId(null);
       return;
     }
 
-    setTickets((current) => current.map((ticket) => {
-      if (ticket.id !== ticketId) return ticket;
-      return {
-        ...ticket,
-        status: data.status,
-        priority: data.priority,
-        assigned_to: data.assigned_to,
-        assigned_at: data.assigned_at,
-        resolved_at: data.resolved_at,
-        resolution_note: data.resolution_note,
-        updated_at: data.updated_at,
-      };
-    }));
+    applyOptimisticTicketUpdate(ticketId, {
+      status: data.status,
+      priority: data.priority,
+      assigned_to: data.assigned_to,
+      assigned_at: data.assigned_at,
+      resolved_at: data.resolved_at,
+      resolution_note: data.resolution_note,
+      updated_at: data.updated_at,
+    });
     setSavingTicketId(null);
     void refreshTicketActivity(ticketId);
   };
@@ -317,7 +381,7 @@ export default function RequestQueue() {
     const assignee = assignees.find((profile) => profile.id === assignedTo) ?? null;
 
     setSavingTicketId(ticketId);
-    setError(null);
+    setQueueError(null);
 
     const { data, error: updateError } = await updateTicket(
       ticketId,
@@ -326,24 +390,20 @@ export default function RequestQueue() {
     );
 
     if (updateError || !data) {
-      setError(updateError?.message || 'Unable to update request owner.');
+      setQueueError(updateError?.message || 'Unable to update request owner.');
       setSavingTicketId(null);
       return;
     }
 
-    setTickets((current) => current.map((ticket) => {
-      if (ticket.id !== ticketId) return ticket;
-      return {
-        ...ticket,
-        assigned_to: data.assigned_to,
-        assigned_at: data.assigned_at,
-        resolved_at: data.resolved_at,
-        resolution_note: data.resolution_note,
-        updated_at: data.updated_at,
-        assigned_to_name: assignee?.name ?? null,
-        assigned_to_email: assignee?.email ?? null,
-      };
-    }));
+    applyOptimisticTicketUpdate(ticketId, {
+      assigned_to: data.assigned_to,
+      assigned_at: data.assigned_at,
+      resolved_at: data.resolved_at,
+      resolution_note: data.resolution_note,
+      updated_at: data.updated_at,
+      assigned_to_name: assignee?.name ?? null,
+      assigned_to_email: assignee?.email ?? null,
+    });
     setSavingTicketId(null);
     void refreshTicketActivity(ticketId);
   };
@@ -352,7 +412,7 @@ export default function RequestQueue() {
     if (!user) return;
 
     setSavingTicketId(ticketId);
-    setError(null);
+    setQueueError(null);
 
     const { data, error: updateError } = await updateTicket(
       ticketId,
@@ -361,19 +421,15 @@ export default function RequestQueue() {
     );
 
     if (updateError || !data) {
-      setError(updateError?.message || 'Unable to update request priority.');
+      setQueueError(updateError?.message || 'Unable to update request priority.');
       setSavingTicketId(null);
       return;
     }
 
-    setTickets((current) => current.map((ticket) => {
-      if (ticket.id !== ticketId) return ticket;
-      return {
-        ...ticket,
-        priority: data.priority,
-        updated_at: data.updated_at,
-      };
-    }));
+    applyOptimisticTicketUpdate(ticketId, {
+      priority: data.priority,
+      updated_at: data.updated_at,
+    });
     setSavingTicketId(null);
     void refreshTicketActivity(ticketId);
   };
@@ -382,7 +438,7 @@ export default function RequestQueue() {
     if (!user) return;
 
     setSavingTicketId(ticketId);
-    setError(null);
+    setQueueError(null);
 
     const { data, error: updateError } = await updateTicket(
       ticketId,
@@ -391,20 +447,16 @@ export default function RequestQueue() {
     );
 
     if (updateError || !data) {
-      setError(updateError?.message || 'Unable to save the resolution note.');
+      setQueueError(updateError?.message || 'Unable to save the resolution note.');
       setSavingTicketId(null);
       return;
     }
 
-    setTickets((current) => current.map((ticket) => {
-      if (ticket.id !== ticketId) return ticket;
-      return {
-        ...ticket,
-        resolution_note: data.resolution_note,
-        resolved_at: data.resolved_at,
-        updated_at: data.updated_at,
-      };
-    }));
+    applyOptimisticTicketUpdate(ticketId, {
+      resolution_note: data.resolution_note,
+      resolved_at: data.resolved_at,
+      updated_at: data.updated_at,
+    });
     setNoteDrafts((current) => ({ ...current, [ticketId]: data.resolution_note ?? '' }));
     setSavingTicketId(null);
     void refreshTicketActivity(ticketId);
@@ -416,7 +468,7 @@ export default function RequestQueue() {
     if (!message) return;
 
     setSavingTicketId(ticketId);
-    setError(null);
+    setQueueError(null);
 
     const { error: commentError } = await addTicketComment(
       ticketId,
@@ -425,7 +477,7 @@ export default function RequestQueue() {
     );
 
     if (commentError) {
-      setError(commentError.message || 'Unable to add comment.');
+      setQueueError(commentError.message || 'Unable to add comment.');
       setSavingTicketId(null);
       return;
     }
@@ -439,7 +491,7 @@ export default function RequestQueue() {
     if (!user || !reviewTarget) return;
 
     setSavingTicketId(reviewTarget.ticketId);
-    setError(null);
+    setQueueError(null);
     const { error: reviewError } = await reviewInternalRequestApproval(
       reviewTarget.ticketId,
       reviewTarget.decision,
@@ -449,14 +501,15 @@ export default function RequestQueue() {
     setSavingTicketId(null);
 
     if (reviewError) {
-      setError(reviewError);
+      setQueueError(reviewError);
       return;
     }
 
     toast.success(reviewTarget.decision === 'approved' ? 'Request approval recorded' : 'Request rejected');
     setReviewTarget(null);
     setReviewNote('');
-    await loadTickets();
+    // Invalidate so the next render fetches fresh data from the server
+    await queryClient.invalidateQueries({ queryKey: ['ticketQueue', user.company_id] });
   };
 
   const handleExportCsv = () => {
@@ -513,6 +566,15 @@ export default function RequestQueue() {
     />
   );
 
+  const hasActiveFilters = statusFilter !== 'active' || priorityFilter !== 'all' || slaFilter !== 'all' || searchTerm.trim() !== '';
+
+  const handleClearFilters = () => {
+    setStatusFilter('active');
+    setPriorityFilter('all');
+    setSlaFilter('all');
+    setSearchTerm('');
+  };
+
   return (
     <div className="flex h-full min-h-[720px] w-full flex-col gap-2 overflow-hidden lg:min-h-0">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
@@ -535,8 +597,14 @@ export default function RequestQueue() {
             <Download className="h-3.5 w-3.5" />
             CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={() => void loadTickets()} className="h-8 gap-1.5 text-xs" disabled={loading}>
-            <RefreshCcw className="h-3.5 w-3.5" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void refetchTickets()}
+            className="h-8 gap-1.5 text-xs"
+            disabled={ticketsFetching}
+          >
+            <RefreshCcw className={`h-3.5 w-3.5 ${ticketsFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -579,7 +647,7 @@ export default function RequestQueue() {
               <p className="font-medium text-foreground">Unable to load the request queue</p>
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
-            <Button onClick={() => void loadTickets()} variant="outline" className="gap-2">
+            <Button onClick={() => void refetchTickets()} variant="outline" className="gap-2">
               <RefreshCcw className="h-4 w-4" />
               Retry
             </Button>
@@ -590,9 +658,24 @@ export default function RequestQueue() {
           <CardContent className="flex flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
             <ShieldCheck className="h-8 w-8 text-muted-foreground" />
             <div className="space-y-1">
-              <p className="font-medium text-foreground">No requests match this view</p>
-              <p className="text-sm text-muted-foreground">Adjust the filters or refresh when new requests arrive.</p>
+              {hasActiveFilters ? (
+                <>
+                  <p className="font-medium text-foreground">No requests match the current filters</p>
+                  <p className="text-sm text-muted-foreground">Try adjusting the filters, or clear them to see all requests.</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium text-foreground">No requests in the queue yet</p>
+                  <p className="text-sm text-muted-foreground">New requests will appear here when submitted.</p>
+                </>
+              )}
             </div>
+            {hasActiveFilters && (
+              <Button variant="outline" size="sm" onClick={handleClearFilters} className="gap-2">
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Clear filters
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : selectedTicket ? (
@@ -626,7 +709,7 @@ export default function RequestQueue() {
               variant="outline"
               size="sm"
               className="h-7 gap-1 text-xs"
-              disabled={page <= 1 || loading}
+              disabled={page <= 1 || ticketsFetching}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
             >
               <ChevronLeft className="h-3.5 w-3.5" />
@@ -639,7 +722,7 @@ export default function RequestQueue() {
               variant="outline"
               size="sm"
               className="h-7 gap-1 text-xs"
-              disabled={page >= totalPages || loading}
+              disabled={page >= totalPages || ticketsFetching}
               onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
             >
               Next

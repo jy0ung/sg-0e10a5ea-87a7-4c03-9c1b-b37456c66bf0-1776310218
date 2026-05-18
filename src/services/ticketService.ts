@@ -116,12 +116,28 @@ export type TicketStatusFilter = TicketStatus | 'all' | 'active' | 'archived';
 const ACTIVE_STATUSES: TicketStatus[] = ['open', 'in_progress', 'awaiting_requester'];
 const ARCHIVED_STATUSES: TicketStatus[] = ['resolved', 'closed', 'cancelled'];
 
+/**
+ * SLA filter values that can be applied server-side before pagination.
+ * Mirrors the TicketSlaState values exposed by RequestQueueFilters,
+ * excluding 'met' and 'pending' which are not useful as filter targets.
+ *   not_configured – tickets where neither SLA target has been set
+ *   at_risk        – unresolved tickets within 4 hours of an SLA deadline
+ *   breached       – unresolved tickets past an SLA deadline
+ */
+export type TicketSlaFilter = 'all' | 'not_configured' | 'at_risk' | 'breached';
+
+/** AT_RISK_WINDOW matches the client-side constant in src/lib/ticketSla.ts */
+const AT_RISK_WINDOW_MS = 4 * 60 * 60 * 1000;
+
 export interface CompanyTicketListOptions {
   page?: number;
   pageSize?: number;
   status?: TicketStatusFilter;
   priority?: TicketPriority | 'all';
   search?: string;
+  /** Server-side SLA filter. When set to anything other than 'all', the filter
+   *  is pushed to the database so pagination totals are accurate. */
+  sla?: TicketSlaFilter;
 }
 
 export type TicketActivityEventType = 'status_changed' | 'owner_changed' | 'resolution_note_updated' | 'priority_changed' | 'comment_added';
@@ -624,6 +640,26 @@ export async function listCompanyTicketsPage(
     }
     if (normalized.priority && normalized.priority !== 'all') {
       query = query.eq('priority', normalized.priority);
+    }
+    if (normalized.sla && normalized.sla !== 'all') {
+      const now = new Date().toISOString();
+      if (normalized.sla === 'not_configured') {
+        // Tickets where neither SLA target has been configured
+        query = query.is('first_response_due_at', null).is('resolution_due_at', null);
+      } else if (normalized.sla === 'breached') {
+        // Unresolved tickets past at least one SLA deadline
+        query = query.or(
+          `and(first_response_due_at.lt.${now},first_responded_at.is.null),` +
+          `and(resolution_due_at.lt.${now},resolved_at.is.null)`,
+        );
+      } else if (normalized.sla === 'at_risk') {
+        // Unresolved tickets approaching an SLA deadline within the 4-hour window
+        const atRiskThreshold = new Date(Date.now() + AT_RISK_WINDOW_MS).toISOString();
+        query = query.or(
+          `and(first_response_due_at.gte.${now},first_response_due_at.lte.${atRiskThreshold},first_responded_at.is.null),` +
+          `and(resolution_due_at.gte.${now},resolution_due_at.lte.${atRiskThreshold},resolved_at.is.null)`,
+        );
+      }
     }
     if (search) {
       query = query.or(buildTicketSearchOrFilter(search, profileIds));

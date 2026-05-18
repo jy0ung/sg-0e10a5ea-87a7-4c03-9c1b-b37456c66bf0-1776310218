@@ -73,3 +73,19 @@ export const HRMS_APPRAISALS: readonly AppRole[] = [
   'analyst',
   'creator_updater',
 ] as const;
+
+// Portal management roles.
+export const PORTAL_QUEUE_ROLES: readonly AppRole[] = [
+  'super_admin',
+  'company_admin',
+  'portal_admin',
+  'portal_manager',
+] as const;
+
+// portal_admin can also manage setup (categories, routing, templates).
+// portal_manager has read-only access to setup so they stay off this list.
+export const PORTAL_SETUP_ROLES: readonly AppRole[] = [
+  'super_admin',
+  'company_admin',
+  'portal_admin',
+] as const;

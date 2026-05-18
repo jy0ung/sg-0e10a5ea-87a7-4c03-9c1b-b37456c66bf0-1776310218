@@ -1,5 +1,18 @@
 // ===== User & Auth =====
-export type AppRole = 'super_admin' | 'company_admin' | 'director' | 'general_manager' | 'manager' | 'sales' | 'accounts' | 'analyst' | 'creator_updater';
+export type AppRole =
+  | 'super_admin'
+  | 'company_admin'
+  | 'director'
+  | 'general_manager'
+  | 'manager'
+  | 'sales'
+  | 'accounts'
+  | 'analyst'
+  | 'creator_updater'
+  // Portal-only roles — users who access the system only via the request portal
+  | 'portal_admin'
+  | 'portal_manager'
+  | 'portal_staff';
 export type AccessScope = 'self' | 'branch' | 'company' | 'global';
 
 export const DEFAULT_APP_ROLE: AppRole = 'creator_updater';
@@ -14,6 +27,10 @@ export const ROLE_DEFAULT_SCOPE: Record<AppRole, AccessScope> = {
   accounts: 'company',
   analyst: 'company',
   creator_updater: 'branch',
+  // Portal roles are scoped to the company; portal_staff can only see their own requests
+  portal_admin: 'company',
+  portal_manager: 'company',
+  portal_staff: 'self',
 };
 
 export interface User {

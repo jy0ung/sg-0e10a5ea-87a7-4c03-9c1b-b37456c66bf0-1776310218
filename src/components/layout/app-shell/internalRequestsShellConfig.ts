@@ -1,9 +1,8 @@
 import { ArrowLeft, Archive, ClipboardList, ListTodo, Settings2, TicketCheck } from 'lucide-react';
-import { ADMIN_ONLY } from '@/config/routeRoles';
+import { PORTAL_QUEUE_ROLES, PORTAL_SETUP_ROLES } from '@/config/routeRoles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { canAccessMainApp } from '@/lib/portalAccess';
-import type { AppRole } from '@/types';
 import type { AppShellNavItem, AppShellRouteChromeMatch } from './types';
 
 const baseNavItems: AppShellNavItem[] = [
@@ -11,13 +10,15 @@ const baseNavItems: AppShellNavItem[] = [
   { label: 'My Requests', path: '/portal/tickets', icon: ClipboardList, end: true },
 ];
 
-const adminNavItems: AppShellNavItem[] = [
+const queueNavItems: AppShellNavItem[] = [
   { label: 'Request Queue', path: '/portal/queue', icon: ListTodo },
   { label: 'Request History', path: '/portal/history', icon: Archive },
-  { label: 'Request Setup', path: '/portal/setup', icon: Settings2 },
 ];
 
-const requestQueueRoles = new Set<AppRole>(ADMIN_ONLY);
+const setupNavItem: AppShellNavItem = { label: 'Request Setup', path: '/portal/setup', icon: Settings2 };
+
+const portalQueueRoles = new Set<string>(PORTAL_QUEUE_ROLES);
+const portalSetupRoles = new Set<string>(PORTAL_SETUP_ROLES);
 
 const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/portal\/tickets\/new/, title: 'New Request', kicker: 'Submit and track internal support demand' },
@@ -30,9 +31,12 @@ const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
 export function useInternalRequestsShellConfig() {
   const { user, logout } = useAuth();
   const { branding } = useBranding();
-  const navItems = requestQueueRoles.has((user?.role ?? '') as AppRole)
-    ? [...baseNavItems, ...adminNavItems]
-    : baseNavItems;
+  const userRole = user?.role ?? '';
+  const navItems = [
+    ...baseNavItems,
+    ...(portalQueueRoles.has(userRole) ? queueNavItems : []),
+    ...(portalSetupRoles.has(userRole) ? [setupNavItem] : []),
+  ];
 
   return {
     brand: {

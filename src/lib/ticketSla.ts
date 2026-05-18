@@ -1,6 +1,16 @@
 import { differenceInMilliseconds, formatDistanceToNow } from 'date-fns';
 import { type TicketStatus } from '@/services/ticketService';
 
+// NOTE: SLA clock pausing / hold tracking is NOT currently implemented.
+// The schema has no `sla_paused_at` column and the `on_hold` status is not part
+// of the TicketStatus union.  All SLA deadlines are fixed at ticket-creation
+// time and count down continuously.
+//
+// TODO (future): Add `sla_paused_at` / `sla_pause_duration_ms` columns,
+// set them when a ticket is moved to an "on_hold" status, and factor the
+// accumulated pause duration into `getTicketSlaSummary` so that time spent
+// waiting for a 3rd-party or on-hold is excluded from SLA calculations.
+
 export type TicketSlaState = 'not_configured' | 'met' | 'pending' | 'at_risk' | 'breached';
 export type TicketSlaTarget = 'response' | 'resolution';
 

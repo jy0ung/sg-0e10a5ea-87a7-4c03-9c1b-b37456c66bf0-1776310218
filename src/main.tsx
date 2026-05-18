@@ -32,6 +32,8 @@ import {
   ADMIN_AND_DIRECTOR,
   EXECUTIVE,
   MANAGER_AND_UP,
+  PORTAL_QUEUE_ROLES,
+  PORTAL_SETUP_ROLES,
 } from "@/config/routeRoles";
 
 errorTrackingService.init({
@@ -55,8 +57,7 @@ const MyTickets = lazy(() => import("./pages/tickets/MyTickets"));
 const NewTicket = lazy(() => import("./pages/tickets/NewTicket"));
 const RequestQueue = lazy(() => import("./pages/tickets/RequestQueue"));
 const RequestSetup = lazy(() => import("./pages/tickets/RequestSetup"));
-const RequestHistory = lazy(() => import("./pages/tickets/RequestHistory"));
-const LoginPage = lazy(() => import("./pages/LoginPage"));
+const RequestHistory = lazy(() => import("./pages/tickets/RequestHistory"));const PortalLanding = lazy(() => import('./pages/tickets/PortalLanding'));const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const SignUpPage = lazy(() => import("./pages/SignUpPage"));
@@ -253,12 +254,12 @@ const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="tickets/new" replace /> },
+      { index: true, element: <S><PortalLanding /></S> },
       { path: "tickets", element: <S><R scope="My Tickets"><MyTickets /></R></S> },
       { path: "tickets/new", element: <S><R scope="New Ticket"><NewTicket /></R></S> },
-      { path: "queue", element: <RequireRole roles={ADMIN_ONLY}><S><R scope="Request Queue"><RequestQueue /></R></S></RequireRole> },
-      { path: "history", element: <RequireRole roles={ADMIN_ONLY}><S><R scope="Request History"><RequestHistory /></R></S></RequireRole> },
-      { path: "setup", element: <RequireRole roles={ADMIN_ONLY}><S><R scope="Request Setup"><RequestSetup /></R></S></RequireRole> },
+      { path: "queue", element: <RequireRole roles={PORTAL_QUEUE_ROLES}><S><R scope="Request Queue"><RequestQueue /></R></S></RequireRole> },
+      { path: "history", element: <RequireRole roles={PORTAL_QUEUE_ROLES}><S><R scope="Request History"><RequestHistory /></R></S></RequireRole> },
+      { path: "setup", element: <RequireRole roles={PORTAL_SETUP_ROLES}><S><R scope="Request Setup"><RequestSetup /></R></S></RequireRole> },
     ],
   },
   {

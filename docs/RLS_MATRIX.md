@@ -46,7 +46,7 @@ This document tracks row-level-security posture per table. Every tenant-scoped t
 | `approval_flows`              | Company           | Admin             | Admin             | Admin             |                                          |
 | `approval_steps`              | Company           | Admin             | Admin             | Admin             |                                          |
 | `role_sections`               | Company           | Admin             | Admin             | Admin             | Replaces localStorage matrix             |
-| `tickets`                     | Company           | Company           | Company or Admin  | Admin             |                                          |
+| `tickets`                     | Company           | Company           | Company or Portal-Admin/Manager | Admin + Portal-Admin/Manager | SELECT/UPDATE admin policies updated in migration 20260517120000 to include `portal_admin` + `portal_manager` |
 | `sales_orders`                | Company           | Company           | Company           | Admin             |                                          |
 | `invoices`                    | Company           | Company           | Company           | Admin             |                                          |
 | `customers`                   | Company           | Company           | Company           | Admin             |                                          |
