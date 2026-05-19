@@ -455,6 +455,9 @@ Internet
 | accounts | ✓ | — | ✓ | — | ✓ | ✓ | ✓ | ✓ |
 | analyst | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ |
 | creator_updater | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| portal_admin | — | — | — | — | — | — | — | ✓ |
+| portal_manager | — | — | — | — | — | — | — | ✓ |
+| portal_staff | — | — | — | — | — | — | — | — |
 
 These defaults are **overridden** by the `role_sections` DB table (loaded by `useRoleSectionMatrix`).
 
@@ -751,7 +754,7 @@ The app has `RouteErrorBoundary` wrapping every major route (Phase 3 #19) so a c
 | 1 | **`noImplicitAny` still disabled** | `tsconfig.app.json` | ~30 implicit-any sites in services; tracked as Phase 2 debt. `strictNullChecks` enabled 2026-05-19. |
 | 2 | **Generated DB types may be stale** | `packages/supabase/src/database.types.ts` (6121 lines) | Regenerated 2026-05-19 from live Supabase schema. |
 | 3 | ~~**`@flc/types` is a 1241-line monolith**~~ | `packages/types/src/` | **Resolved** — split into 8 domain files 2026-05-19. |
-| 4 | **Dual permission administration** | Route `RequireRole` + sidebar `role_sections` + column permissions | Can disagree; maintained independently. |
+| 4 | ~~**Dual permission administration**~~ | Route `RequireRole` + sidebar `role_sections` + column permissions | **Resolved** — 12 sidebar/route role mismatches fixed 2026-05-19. HRMS app already well-aligned (same function for both layers). Remaining gap: route guards do not consult `role_sections` DB table (architectural, not a quick fix). |
 | 5 | **`/admin/settings` has no route guard** | `src/main.tsx:235` | **Intentional** — settings page enforces its own section-level permissions internally; route guard is redundant. |
 
 ### 🟡 Medium Priority
