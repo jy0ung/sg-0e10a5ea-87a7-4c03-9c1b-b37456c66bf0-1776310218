@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { ApprovalDecision, ApprovalInstanceStatus } from '@/types';
+import type { ApprovalStepRecord } from './hrms/shared';
 import { rowToApprovalDecision, rowToApprovalStep, resolveStepRouting, userHasAssignedHrmsRole } from './hrms/shared';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
@@ -133,7 +134,7 @@ export async function getInternalRequestApprovalPlan(
   if (stepsError) return { data: null, error: stepsError.message };
   if (!steps?.length) return { data: null, error: 'The configured approval flow has no steps. Please contact HR/Admin.' };
 
-  const firstStep = (steps ?? []).map((row: Record<string, unknown>) => rowToApprovalStep(row)).find(step => step.isActive);
+  const firstStep = (steps ?? []).map((row: Record<string, unknown>) => rowToApprovalStep(row)).find((step: ApprovalStepRecord) => step.isActive);
   if (!firstStep) return { data: null, error: 'The configured approval flow has no active steps. Please contact HR/Admin.' };
   const routing = await resolveStepRouting(firstStep, requesterId, companyId);
   if (routing.error) return { data: null, error: routing.error };
@@ -268,9 +269,9 @@ export async function reviewInternalRequestApproval(
     .order('step_order');
   if (stepsError) return { error: stepsError.message };
 
-  const steps = (stepRows ?? []).map((row: Record<string, unknown>) => rowToApprovalStep(row)).filter(step => step.isActive);
-  const currentStep = steps.find((step) => step.id === approval.current_step_id)
-    ?? steps.find((step) => step.stepOrder === Number(approval.current_step_order));
+  const steps = (stepRows ?? []).map((row: Record<string, unknown>) => rowToApprovalStep(row)).filter((step: ApprovalStepRecord) => step.isActive);
+  const currentStep = steps.find((step: ApprovalStepRecord) => step.id === approval.current_step_id)
+    ?? steps.find((step: ApprovalStepRecord) => step.stepOrder === Number(approval.current_step_order));
   if (!currentStep) return { error: 'The current approval step could not be resolved.' };
 
   const requesterId = String(approval.requester_id ?? ticket.submitted_by ?? '');
@@ -287,7 +288,7 @@ export async function reviewInternalRequestApproval(
   if (!isAssignedApprover) return { error: 'You are not the assigned approver for the current step.' };
 
   const nextStep = decision === 'approved'
-    ? steps.find((step) => step.stepOrder > currentStep.stepOrder)
+    ? steps.find((step: ApprovalStepRecord) => step.stepOrder > currentStep.stepOrder)
     : undefined;
   const nextRouting = nextStep
     ? await resolveStepRouting(nextStep, requesterId, context.companyId)

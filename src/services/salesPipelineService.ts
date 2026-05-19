@@ -66,9 +66,9 @@ export async function transitionOrderStage(
   if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase.rpc('transition_sales_order_stage', {
     p_order_id: orderId,
-    p_stage_id: stageId ?? null,
+    p_stage_id: (stageId ?? null) as unknown as string,
     p_company_id: companyId,
-    p_actor_id: actorId ?? null,
+    p_actor_id: (actorId ?? null) as unknown as string,
   });
   if (error) return { data: null, error: new Error(error.message) };
   const raw = data as Record<string, unknown>;

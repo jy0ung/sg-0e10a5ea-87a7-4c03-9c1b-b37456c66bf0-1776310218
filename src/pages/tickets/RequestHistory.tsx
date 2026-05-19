@@ -365,7 +365,7 @@ export default function RequestHistory() {
                 onUpdate: (updates: Parameters<typeof handleUpdateTicket>[1]) => void handleUpdateTicket(selectedTicket.id, updates),
               onAddComment: () => void handleAddComment(selectedTicket.id),
               onClose: () => setSelectedTicketId(null),
-            } as ComponentProps<typeof RequestDetailPanel>} />
+            } as unknown as ComponentProps<typeof RequestDetailPanel>} />
           </div>
         )}
       </div>
@@ -393,7 +393,7 @@ export default function RequestHistory() {
               onUpdate: (updates: Parameters<typeof handleUpdateTicket>[1]) => void handleUpdateTicket(selectedTicket.id, updates),
                 onAddComment: () => void handleAddComment(selectedTicket.id),
                 onClose: () => setDetailDrawerOpen(false),
-              } as ComponentProps<typeof RequestDetailPanel>} />
+              } as unknown as ComponentProps<typeof RequestDetailPanel>} />
             </div>
           </DrawerContent>
         </Drawer>

@@ -137,7 +137,7 @@ export async function getTrialBalance(
 ): Promise<{ data: TrialBalanceRow[] | null; error: Error | null }> {
   const { data, error } = await supabase.rpc('get_trial_balance', {
     p_company_id: companyId,
-    p_period_id: periodId ?? null,
+    p_period_id: (periodId ?? null) as unknown as string,
   });
   if (error) {
     loggingService.error('getTrialBalance failed', { companyId, periodId , error }, 'glService');

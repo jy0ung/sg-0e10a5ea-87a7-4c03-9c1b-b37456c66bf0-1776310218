@@ -587,7 +587,7 @@ async function notifyHrUsersOfLeaveDecision(
     new Set<string>(
       (assignments ?? [])
         .map((a: Record<string, unknown>) => (a.profile_id ? String(a.profile_id) : null))
-        .filter((id): id is string => Boolean(id) && id !== requesterProfileId),
+        .filter((id: string | null): id is string => Boolean(id) && id !== requesterProfileId),
     ),
   );
   if (!hrProfileIds.length) return;

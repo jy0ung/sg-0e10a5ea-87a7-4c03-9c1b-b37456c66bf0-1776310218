@@ -134,7 +134,7 @@ export async function updateImportBatch(
 
     const changes: Record<string, { before: unknown; after: unknown }> = {};
     Object.keys(dbUpdates).forEach((key) => {
-      const currentVal = current[key as keyof ImportBatch];
+      const currentVal = (current as Record<string, unknown>)[key];
       const newVal = dbUpdates[key];
       if (currentVal !== newVal) {
         changes[key] = { before: currentVal, after: newVal };

@@ -182,7 +182,7 @@ export async function listAssignedHrmsRoles(
     .filter(Boolean)
     .map((row: Record<string, any>) => rowToHrmsRole(row));
 
-  const deduped = roles.filter((role, index) => roles.findIndex((candidate) => candidate.id === role.id) === index);
+  const deduped = roles.filter((role: HrmsRole, index: number) => roles.findIndex((candidate: HrmsRole) => candidate.id === role.id) === index);
   return { data: deduped, error: null };
 }
 
@@ -208,7 +208,7 @@ export async function replaceHrmsRoleEmployeeAssignments(
       .eq('company_id', companyId)
       .in('employee_id', uniqueEmployeeIds);
     const profileByEmployee = new Map(
-      (profileRows ?? []).map((p) => [String(p.employee_id), String(p.id)]),
+      (profileRows ?? []).map((p: Record<string, unknown>) => [String(p.employee_id), String(p.id)]),
     );
 
     const { error: insertError } = await db

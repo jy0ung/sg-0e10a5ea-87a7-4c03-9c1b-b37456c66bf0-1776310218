@@ -133,10 +133,10 @@ async function listUserAssignedHrmsRoleCodes(
   if (error) throw new Error(error.message);
 
   const codes: string[] = (data ?? [])
-    .map((row) => (row as Record<string, unknown>).hrms_role as Record<string, unknown> | null)
-    .filter((role): role is Record<string, unknown> => Boolean(role) && Boolean(role.is_active))
-    .map((role) => normalizeHrmsRoleCode(String(role.code ?? '')))
-    .filter((c): c is string => Boolean(c));
+    .map((row: Record<string, unknown>) => (row as Record<string, unknown>).hrms_role as Record<string, unknown> | null)
+    .filter((role: Record<string, unknown> | null): role is Record<string, unknown> => role != null && Boolean(role.is_active))
+    .map((role: Record<string, unknown>) => normalizeHrmsRoleCode(String(role.code ?? '')))
+    .filter((c: string): c is string => Boolean(c));
 
   return [...new Set(codes)];
 }

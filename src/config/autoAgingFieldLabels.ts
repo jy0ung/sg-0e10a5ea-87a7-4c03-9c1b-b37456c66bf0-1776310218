@@ -33,7 +33,7 @@ export const AUTO_AGING_FIELD_LABELS = {
 } satisfies Partial<Record<keyof VehicleCanonical, string>>;
 
 export function getAutoAgingFieldLabel(field: keyof VehicleCanonical, fallback: string): string {
-  return AUTO_AGING_FIELD_LABELS[field] ?? fallback;
+  return (AUTO_AGING_FIELD_LABELS as Record<string, string>)[field] ?? fallback;
 }
 
 export const AUTO_AGING_BG_DATE_PERIOD_LABEL = `Date period (${AUTO_AGING_FIELD_LABELS.bg_date})`;
