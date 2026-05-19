@@ -91,8 +91,8 @@ export function ModuleAccessProvider({ children }: { children: React.ReactNode }
         company_id: companyId,
         module_id: moduleId,
         is_active: isActive,
-        updated_at: payload.updated_at ?? null,
-        updated_by: payload.updated_by ?? null,
+        updated_at: payload.updated_at ?? undefined as unknown as string,
+        updated_by: payload.updated_by ?? undefined as unknown as string,
       };
 
       return [

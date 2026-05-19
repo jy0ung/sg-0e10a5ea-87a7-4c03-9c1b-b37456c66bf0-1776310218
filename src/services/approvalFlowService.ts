@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
+import type { Json } from '@/integrations/supabase/types';
 import type { ApprovalFlow, ApprovalStep, CreateApprovalFlowInput, FlowConditions, FlowEntityType, UpdateApprovalFlowInput } from '@/types';
 
 // ─── Flow resolution context ─────────────────────────────────────────────────
@@ -123,9 +124,9 @@ export async function createApprovalFlow(
       updated_by:     actorId,
       department_id:  input.departmentId ?? null,
       is_default:     input.isDefault ?? false,
-      conditions:     input.conditions ?? null,
+      conditions:     (input.conditions ?? null) as unknown as Json,
       match_priority: input.matchPriority ?? 0,
-    })
+    } as never)
     .select('*')
     .single();
   if (flowError) return { data: null, error: flowError.message };
@@ -171,10 +172,10 @@ export async function updateApprovalFlow(
       updated_by:     actorId,
       department_id:  input.departmentId ?? null,
       is_default:     input.isDefault ?? false,
-      conditions:     input.conditions ?? null,
+      conditions:     (input.conditions ?? null) as unknown as Json,
       match_priority: input.matchPriority ?? 0,
       updated_at:     new Date().toISOString(),
-    })
+    } as never)
     .eq('company_id', companyId)
     .eq('id', flowId);
   if (flowError) return { error: flowError.message };

@@ -842,6 +842,7 @@ export default function RequestSetup() {
     setFieldDrafts((current) => ({
       ...current,
       [field.id]: {
+        ...current[field.id],
         label: field.label,
         field_type: field.field_type,
         data_source: field.data_source,
@@ -849,7 +850,6 @@ export default function RequestSetup() {
         help_text: field.help_text,
         is_required: field.is_required,
         is_active: field.is_active,
-        ...current[field.id],
         ...patch,
       },
     }));
@@ -968,13 +968,13 @@ export default function RequestSetup() {
     setRuleDrafts((current) => ({
       ...current,
       [rule.id]: {
+        ...current[rule.id],
         name: rule.name,
         match_category: rule.match_category ?? '',
         match_subcategory: rule.match_subcategory ?? '',
         match_submitter_role: rule.match_submitter_role ?? '',
         match_priority: rule.match_priority ?? '',
         assign_to_user_id: rule.assign_to_user_id,
-        ...current[rule.id],
         ...patch,
       },
     }));

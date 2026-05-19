@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react';
 import { toast } from 'sonner';
 import {
   Archive,
@@ -347,29 +347,25 @@ export default function RequestHistory() {
         {/* Right: detail panel (large screens) */}
         {isLargeScreen && selectedTicket && (
           <div className="flex-1 overflow-y-auto rounded-lg border bg-card shadow-sm">
-            <RequestDetailPanel
-              ticket={selectedTicket}
-              categories={categories}
-              subcategories={subcategories}
-              assignees={assignees}
-              activities={activitiesByTicket[selectedTicket.id] ?? []}
-              attachments={attachmentsByTicket[selectedTicket.id] ?? []}
-              customFieldLabelMap={customFieldLabelMap}
-              statusOptions={statusOptions}
-              priorityOptions={priorityOptions}
-              saving={savingTicketId === selectedTicket.id}
-              noteDraft={noteDrafts[selectedTicket.id] ?? ''}
-              commentDraft={commentDrafts[selectedTicket.id] ?? ''}
-              onNoteDraftChange={(val) =>
-                setNoteDrafts((prev) => ({ ...prev, [selectedTicket.id]: val }))
-              }
-              onCommentDraftChange={(val) =>
-                setCommentDrafts((prev) => ({ ...prev, [selectedTicket.id]: val }))
-              }
-              onUpdate={(updates) => void handleUpdateTicket(selectedTicket.id, updates)}
-              onAddComment={() => void handleAddComment(selectedTicket.id)}
-              onClose={() => setSelectedTicketId(null)}
-            />
+            <RequestDetailPanel {...{
+              ticket: selectedTicket,
+              categories,
+              subcategories,
+              assignees,
+              activities: activitiesByTicket[selectedTicket.id] ?? [],
+              attachments: attachmentsByTicket[selectedTicket.id] ?? [],
+              customFieldLabelMap,
+              statusOptions,
+              priorityOptions,
+              saving: savingTicketId === selectedTicket.id,
+              noteDraft: noteDrafts[selectedTicket.id] ?? '',
+              commentDraft: commentDrafts[selectedTicket.id] ?? '',
+              onNoteDraftChange: (val: string) => setNoteDrafts((prev) => ({ ...prev, [selectedTicket.id]: val })),
+              onCommentDraftChange: (val: string) => setCommentDrafts((prev) => ({ ...prev, [selectedTicket.id]: val })),
+                onUpdate: (updates: Parameters<typeof handleUpdateTicket>[1]) => void handleUpdateTicket(selectedTicket.id, updates),
+              onAddComment: () => void handleAddComment(selectedTicket.id),
+              onClose: () => setSelectedTicketId(null),
+            } as ComponentProps<typeof RequestDetailPanel>} />
           </div>
         )}
       </div>
@@ -379,29 +375,25 @@ export default function RequestHistory() {
         <Drawer open={detailDrawerOpen} onOpenChange={setDetailDrawerOpen}>
           <DrawerContent className="max-h-[90vh]">
             <div className="overflow-y-auto p-4">
-              <RequestDetailPanel
-                ticket={selectedTicket}
-                categories={categories}
-                subcategories={subcategories}
-                assignees={assignees}
-                activities={activitiesByTicket[selectedTicket.id] ?? []}
-                attachments={attachmentsByTicket[selectedTicket.id] ?? []}
-                customFieldLabelMap={customFieldLabelMap}
-                statusOptions={statusOptions}
-                priorityOptions={priorityOptions}
-                saving={savingTicketId === selectedTicket.id}
-                noteDraft={noteDrafts[selectedTicket.id] ?? ''}
-                commentDraft={commentDrafts[selectedTicket.id] ?? ''}
-                onNoteDraftChange={(val) =>
-                  setNoteDrafts((prev) => ({ ...prev, [selectedTicket.id]: val }))
-                }
-                onCommentDraftChange={(val) =>
-                  setCommentDrafts((prev) => ({ ...prev, [selectedTicket.id]: val }))
-                }
-                onUpdate={(updates) => void handleUpdateTicket(selectedTicket.id, updates)}
-                onAddComment={() => void handleAddComment(selectedTicket.id)}
-                onClose={() => setDetailDrawerOpen(false)}
-              />
+              <RequestDetailPanel {...{
+                ticket: selectedTicket,
+                categories,
+                subcategories,
+                assignees,
+                activities: activitiesByTicket[selectedTicket.id] ?? [],
+                attachments: attachmentsByTicket[selectedTicket.id] ?? [],
+                customFieldLabelMap,
+                statusOptions,
+                priorityOptions,
+                saving: savingTicketId === selectedTicket.id,
+                noteDraft: noteDrafts[selectedTicket.id] ?? '',
+                commentDraft: commentDrafts[selectedTicket.id] ?? '',
+                onNoteDraftChange: (val: string) => setNoteDrafts((prev) => ({ ...prev, [selectedTicket.id]: val })),
+                onCommentDraftChange: (val: string) => setCommentDrafts((prev) => ({ ...prev, [selectedTicket.id]: val })),
+              onUpdate: (updates: Parameters<typeof handleUpdateTicket>[1]) => void handleUpdateTicket(selectedTicket.id, updates),
+                onAddComment: () => void handleAddComment(selectedTicket.id),
+                onClose: () => setDetailDrawerOpen(false),
+              } as ComponentProps<typeof RequestDetailPanel>} />
             </div>
           </DrawerContent>
         </Drawer>

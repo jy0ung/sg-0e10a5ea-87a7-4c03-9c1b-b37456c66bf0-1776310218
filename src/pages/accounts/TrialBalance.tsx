@@ -119,9 +119,9 @@ export default function TrialBalance() {
       {tbLoading ? (
         <TableSkeleton />
       ) : isError ? (
-        <PageErrorState message={String(error)} />
+        <PageErrorState error={error} />
       ) : (
-        <ScrollableRegion>
+        <ScrollableRegion label="Trial balance list">
           {rows.length === 0 ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
               No journal entries for this period.

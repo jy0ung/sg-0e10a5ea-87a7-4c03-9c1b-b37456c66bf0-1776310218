@@ -23,7 +23,7 @@ export async function getSalesDashboardSummary(
   if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase.rpc('get_sales_dashboard_summary', {
     p_company_id: companyId,
-    p_branch_code: branchCode ?? null,
+    p_branch_code: (branchCode ?? null) as unknown as string | undefined,
   });
   if (error) return { data: null, error: new Error(error.message) };
   const raw = data as Record<string, unknown>;

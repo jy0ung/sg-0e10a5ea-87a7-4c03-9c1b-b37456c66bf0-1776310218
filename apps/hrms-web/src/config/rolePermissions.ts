@@ -27,6 +27,9 @@ export const DEFAULT_ROLE_SECTIONS: Record<AppRole, SectionName[]> = {
   accounts: ['Platform', 'Sales', 'Purchasing', 'Reports', 'HRMS', 'Admin'],
   analyst: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Reports', 'HRMS', 'Admin'],
   creator_updater: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'HRMS', 'Admin'],
+  portal_admin: ['Admin'],
+  portal_manager: ['Admin'],
+  portal_staff: [],
 };
 
 /** Human-readable label for each role */
@@ -40,4 +43,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   accounts: 'Accounts',
   analyst: 'Analyst (Legacy)',
   creator_updater: 'Creator / Updater',
+  portal_admin: 'Portal Admin',
+  portal_manager: 'Portal Manager',
+  portal_staff: 'Portal Staff',
 };

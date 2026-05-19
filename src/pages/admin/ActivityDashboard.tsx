@@ -87,7 +87,7 @@ export default function ActivityDashboard() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const todayLogs = logs.filter(log => new Date(log.created_at) >= today);
+    const todayLogs = logs.filter(log => new Date(log.created_at ?? '') >= today);
     const uniqueUsers = new Set(todayLogs.map(log => log.user_id)).size;
     const vehicleEdits = todayLogs.filter(log => log.entity_type === 'vehicle').length;
 
@@ -119,7 +119,7 @@ export default function ActivityDashboard() {
     }));
 
     logs.forEach(log => {
-      const hour = new Date(log.created_at).getHours();
+      const hour = new Date(log.created_at ?? '').getHours();
       hourlyData[hour].count++;
     });
 

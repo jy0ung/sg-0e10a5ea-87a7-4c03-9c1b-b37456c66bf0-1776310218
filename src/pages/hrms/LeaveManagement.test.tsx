@@ -24,14 +24,14 @@ describe('LeaveManagement queue helpers', () => {
   it('matches a request assigned to the current approver user', () => {
     const request = makeRequest({ currentApproverUserId: 'manager-1' });
 
-    expect(isRequestAssignedToApprover(request, { id: 'manager-1', role: 'manager' }, true)).toBe(true);
-    expect(isRequestAssignedToApprover(request, { id: 'manager-2', role: 'manager' }, true)).toBe(false);
+    expect(isRequestAssignedToApprover(request, { id: 'manager-1', role: 'manager' } as any, true)).toBe(true);
+    expect(isRequestAssignedToApprover(request, { id: 'manager-2', role: 'manager' } as any, true)).toBe(false);
   });
 
   it('matches a specific-user assignment even when the approver is not in a manager role', () => {
     const request = makeRequest({ currentApproverUserId: 'accounts-1' });
 
-    expect(isRequestAssignedToApprover(request, { id: 'accounts-1', role: 'accounts' }, false)).toBe(true);
+    expect(isRequestAssignedToApprover(request, { id: 'accounts-1', role: 'accounts' } as any, false)).toBe(true);
   });
 
   it('filters the my queue view down to assigned pending requests only', () => {
@@ -45,7 +45,7 @@ describe('LeaveManagement queue helpers', () => {
       requests,
       'all',
       'my_queue',
-      { id: 'manager-1', role: 'manager' },
+      { id: 'manager-1', role: 'manager' } as any,
       true,
     );
 

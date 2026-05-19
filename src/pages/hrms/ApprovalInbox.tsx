@@ -35,6 +35,7 @@ import {
   notifyApprovalInboxChanged,
   type ApprovalInboxEntityType,
   type ApprovalInboxFilter,
+  type ApprovalInboxApproverIdentity,
 } from '@/lib/hrms/approvalInbox';
 
 type ApprovalInboxReviewState = {
@@ -121,7 +122,7 @@ export default function ApprovalInbox() {
       inboxData?.leaveRequests ?? [],
       inboxData?.payrollRuns ?? [],
       inboxData?.appraisals ?? [],
-      user ? { id: user.id, hrmsRoleIds: hrmsAccess.roleIds, hrmsRoleCodes: hrmsAccess.roleCodes } : null,
+      (user ? { id: user.id, hrmsRoleIds: hrmsAccess.roleIds, hrmsRoleCodes: hrmsAccess.roleCodes } : null) as unknown as ApprovalInboxApproverIdentity,
     ),
     [hrmsAccess.roleCodes, hrmsAccess.roleIds, inboxData, user],
   );

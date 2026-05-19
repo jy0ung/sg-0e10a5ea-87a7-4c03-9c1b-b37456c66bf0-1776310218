@@ -1060,7 +1060,7 @@ export async function cancelMyTicket(
 
     const { data, error } = await supabase.rpc('cancel_own_ticket', {
       p_ticket_id: ticketId,
-      p_cancellation_note: reason,
+      p_cancellation_note: reason ?? null as unknown as string | undefined,
     });
 
     if (error) throw error;

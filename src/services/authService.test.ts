@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { authService } from './authService';
 import { supabase } from '@/integrations/supabase/client';
+import type { UserResponse, AuthTokenResponsePassword } from '@supabase/supabase-js';
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -53,7 +54,7 @@ describe('authService', () => {
       vi.mocked(supabase.auth.getUser).mockResolvedValue({
         data: { user: null },
         error: null
-      });
+      } as unknown as UserResponse);
 
       const user = await authService.getCurrentUser();
       expect(user).toBeNull();
@@ -66,7 +67,7 @@ describe('authService', () => {
       vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
         data: { user: mockUser as any, session: null },
         error: null
-      });
+      } as unknown as AuthTokenResponsePassword);
 
       const result = await authService.signIn('test@test.com', 'password123');
       expect(result.error).toBeNull();

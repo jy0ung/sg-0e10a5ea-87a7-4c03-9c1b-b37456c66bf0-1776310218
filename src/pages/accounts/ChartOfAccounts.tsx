@@ -94,7 +94,7 @@ export default function ChartOfAccounts() {
   }
 
   if (isLoading) return <TableSkeleton />;
-  if (isError)   return <PageErrorState message={String(error)} />;
+  if (isError)   return <PageErrorState error={error} />;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -113,7 +113,7 @@ export default function ChartOfAccounts() {
         ) : undefined}
       />
 
-      <ScrollableRegion>
+      <ScrollableRegion label="Chart of accounts list">
         <div className="space-y-8">
           {ACCOUNT_TYPES.map(type => {
             const rows = grouped[type];

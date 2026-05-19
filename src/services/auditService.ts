@@ -68,9 +68,9 @@ export async function logUserAction(
       action: actionType,
       entity_type: entityType,
       entity_id: entityId || null,
-      changes: metadata || {},
+      changes: (metadata || {}) as unknown as Json,
       table_name: "user_actions",
-    });
+    } as never);
 
     performanceService.endQueryTimer(queryId, "log_user_action");
 
@@ -228,7 +228,7 @@ export async function getUserActionHistory(
     loggingService.error("Failed to get user action history", { userId, filters, error }, "AuditService");
   }
 
-  return { data, error: error || null, count };
+  return { data, error: error || null, count: count ?? undefined };
 }
 
 export async function getAllAuditLogs(
@@ -283,7 +283,7 @@ export async function getAllAuditLogs(
     loggingService.error("Failed to get all audit logs", { filters, error }, "AuditService");
   }
 
-  return { data: data as unknown as AuditLogWithProfile[] | null, error: error || null, count };
+  return { data: data as unknown as AuditLogWithProfile[] | null, error: error || null, count: count ?? undefined };
 }
 
 export async function logPermissionChange(

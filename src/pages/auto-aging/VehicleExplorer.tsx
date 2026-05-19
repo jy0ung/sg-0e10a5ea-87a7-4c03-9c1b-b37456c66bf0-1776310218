@@ -86,7 +86,7 @@ export default function VehicleExplorer() {
   const [page, setPage] = useState(1);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleCanonical | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
-  const [userPermissions, setUserPermissions] = useState<UserPermissions>(null);
+  const [userPermissions, setUserPermissions] = useState<UserPermissions>(null as unknown as UserPermissions);
   const [exportLoading, setExportLoading] = useState(false);
   const [readOnlyMode, setReadOnlyMode] = useState(true);
   const [pendingBulkAction, setPendingBulkAction] = useState<{ action: string; vehicles: VehicleCanonical[] } | null>(null);

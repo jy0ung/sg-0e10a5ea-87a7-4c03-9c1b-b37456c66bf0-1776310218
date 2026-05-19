@@ -102,7 +102,7 @@ export async function getVehicles(filters?: {
     loggingService.error("Failed to get vehicles", { filters, error }, "VehicleService");
   }
 
-  return { data: data as unknown as VehicleCanonical[] | null, error: error || null, count };
+  return { data: data as unknown as VehicleCanonical[] | null, error: error || null, count: count ?? undefined };
 }
 
 export async function updateVehicleWithAudit(
@@ -545,14 +545,14 @@ export async function searchVehicles(
   }
 
   const { data, error } = await supabase.rpc('search_vehicles', {
-    p_branch: params.branch ?? null,
-    p_model: params.model ?? null,
-    p_payment: params.payment ?? null,
-    p_stage: params.stage ?? null,
-    p_search: params.search ?? null,
-    p_bg_date_from: params.bgDateFrom ?? null,
-    p_bg_date_to: params.bgDateTo ?? null,
-    p_has_delivery_date: params.hasDeliveryDate ?? null,
+    p_branch: (params.branch ?? null) as unknown as string | undefined,
+    p_model: (params.model ?? null) as unknown as string | undefined,
+    p_payment: (params.payment ?? null) as unknown as string | undefined,
+    p_stage: (params.stage ?? null) as unknown as string | undefined,
+    p_search: (params.search ?? null) as unknown as string | undefined,
+    p_bg_date_from: (params.bgDateFrom ?? null) as unknown as string | undefined,
+    p_bg_date_to: (params.bgDateTo ?? null) as unknown as string | undefined,
+    p_has_delivery_date: (params.hasDeliveryDate ?? null) as unknown as boolean | undefined,
     p_limit: params.limit ?? 50,
     p_offset: params.offset ?? 0,
     p_sort_column: params.sortColumn ?? 'created_at',
@@ -591,7 +591,7 @@ export async function getVehicleKpiSummary(
   }
 
   const { data, error } = await supabase.rpc('vehicle_kpi_summary', {
-    p_branch: branch ?? null,
+    p_branch: (branch ?? null) as unknown as string | undefined,
   });
 
   performanceService.endQueryTimer(queryId, 'vehicle_kpi_summary');
@@ -663,10 +663,10 @@ export async function getAutoAgingDashboardSummary(
   }
 
   const { data, error } = await supabase.rpc('auto_aging_dashboard_summary', {
-    p_branch: params.branch ?? null,
-    p_model: params.model ?? null,
-    p_from: params.bgDateFrom ?? null,
-    p_to: params.bgDateTo ?? null,
+    p_branch: (params.branch ?? null) as unknown as string | undefined,
+    p_model: (params.model ?? null) as unknown as string | undefined,
+    p_from: (params.bgDateFrom ?? null) as unknown as string | undefined,
+    p_to: (params.bgDateTo ?? null) as unknown as string | undefined,
   });
 
   performanceService.endQueryTimer(queryId, 'auto_aging_dashboard_summary');

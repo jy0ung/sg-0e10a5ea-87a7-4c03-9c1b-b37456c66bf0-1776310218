@@ -108,10 +108,10 @@ export async function recordPaymentEvent(
     p_invoice_id: invoiceId,
     p_amount: amount,
     p_payment_date: paymentDate,
-    p_payment_method: opts?.paymentMethod ?? null,
-    p_receipt_reference: opts?.receiptReference ?? null,
-    p_official_receipt_id: opts?.officialReceiptId ?? null,
-    p_notes: opts?.notes ?? null,
+    p_payment_method: (opts?.paymentMethod ?? null) as unknown as string | undefined,
+    p_receipt_reference: (opts?.receiptReference ?? null) as unknown as string | undefined,
+    p_official_receipt_id: (opts?.officialReceiptId ?? null) as unknown as string | undefined,
+    p_notes: (opts?.notes ?? null) as unknown as string | undefined,
   });
   if (error) { loggingService.error('recordPaymentEvent failed', { error }); return { data: null, error: new Error(error.message) }; }
   return { data: data as string, error: null };
@@ -123,7 +123,7 @@ export async function reversePaymentEvent(
 ): Promise<{ data: string | null; error: Error | null }> {
   const { data, error } = await supabase.rpc('reverse_payment_event', {
     p_event_id: eventId,
-    p_reason: reason ?? null,
+    p_reason: (reason ?? null) as unknown as string | undefined,
   });
   if (error) { loggingService.error('reversePaymentEvent failed', { error }); return { data: null, error: new Error(error.message) }; }
   return { data: data as string, error: null };

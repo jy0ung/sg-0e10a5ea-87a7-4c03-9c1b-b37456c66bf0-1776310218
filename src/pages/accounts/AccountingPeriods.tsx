@@ -123,7 +123,7 @@ export default function AccountingPeriods() {
   }
 
   if (isLoading) return <TableSkeleton />;
-  if (isError)   return <PageErrorState message={String(error)} />;
+  if (isError)   return <PageErrorState error={error} />;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -142,7 +142,7 @@ export default function AccountingPeriods() {
         ) : undefined}
       />
 
-      <ScrollableRegion>
+      <ScrollableRegion label="Accounting periods list">
         {periods.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
             <Calendar className="mb-3 h-10 w-10 opacity-30" />

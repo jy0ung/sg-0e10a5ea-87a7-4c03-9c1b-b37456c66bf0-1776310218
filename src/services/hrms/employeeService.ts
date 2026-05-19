@@ -1,5 +1,5 @@
 import * as pkg from '@flc/hrms-services';
-import { logUserAction } from '@/services/auditService';
+import { logUserAction, type UserActionType, type UserActionMetadata } from '@/services/auditService';
 import { inviteUser, deleteInvitedUser } from '@/services/profileService';
 import { Employee, EmployeeStatus, AppRole } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
@@ -171,8 +171,8 @@ export async function reInviteEmployee(
   });
 
   if (!result.error && actorId) {
-    void logUserAction(actorId, 're_invite', 'employee', employee.id,
-      { email: employee.email } as unknown as import('@/integrations/supabase/types').Json);
+    void logUserAction(actorId, 're_invite' as unknown as UserActionType, 'employee', employee.id,
+      { email: employee.email } as unknown as UserActionMetadata);
   }
   return result;
 }

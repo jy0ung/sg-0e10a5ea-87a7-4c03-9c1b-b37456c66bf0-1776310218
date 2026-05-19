@@ -179,10 +179,10 @@ export default function JournalEntries() {
       {isLoading ? (
         <TableSkeleton />
       ) : isError ? (
-        <PageErrorState message={String(error)} />
+        <PageErrorState error={error} />
       ) : (
         <>
-          <ScrollableRegion>
+          <ScrollableRegion label="Journal entries list">
             {paginated.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
                 <FileText className="mb-3 h-10 w-10 opacity-30" />

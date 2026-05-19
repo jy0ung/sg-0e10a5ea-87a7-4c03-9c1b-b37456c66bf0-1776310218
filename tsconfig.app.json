@@ -26,9 +26,11 @@
     },
     "skipLibCheck": true,
     "strict": false,
-    // Incremental strictness — safe flags that give real value without
-    // requiring a sweep of every module. Full `strict: true` + the stricter
-    // index/return flags are tracked as Phase 2 debt.
+    "strictNullChecks": true,
+    // Phase 2 debt (tracked in IMPLEMENTATION_MAP.md):
+    //   - noImplicitAny — requires audit of ~30 implicit-any sites in services
+    //   - noUnusedLocals, noUnusedParameters — deferred until pre-commit tighten
+    // Package-exported flags (already on):
     "noImplicitOverride": true,
     "useUnknownInCatchVariables": true,
     "noFallthroughCasesInSwitch": true,

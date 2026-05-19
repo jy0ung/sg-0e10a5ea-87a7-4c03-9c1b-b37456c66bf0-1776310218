@@ -54,8 +54,8 @@ export default function DealerInvoices() {
   const openEdit = (inv: DealerInvoice) => {
     setEditId(inv.id);
     setForm({
-      invoiceNo: inv.invoiceNo, branch: inv.branch ?? '',
-      dealerName: inv.dealerName, carModel: inv.carModel,
+      invoiceNo: inv.invoiceNo ?? '', branch: inv.branch ?? '',
+      dealerName: inv.dealerName ?? '', carModel: inv.carModel ?? '',
       carColour: inv.carColour ?? '', chassisNo: inv.chassisNo ?? '',
       salesPrice: String(inv.salesPrice ?? ''), invoiceDate: inv.invoiceDate ?? '', status: inv.status,
     });
@@ -109,7 +109,7 @@ export default function DealerInvoices() {
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const filtered = invoices.filter(inv =>
-    !search || [inv.invoiceNo, inv.dealerName, inv.carModel, inv.chassisNo ?? ''].some(v => v.toLowerCase().includes(search.toLowerCase()))
+    !search || [inv.invoiceNo, inv.dealerName, inv.carModel, inv.chassisNo ?? ''].some(v => (v ?? '').toLowerCase().includes(search.toLowerCase()))
   );
 
   if (isError) {

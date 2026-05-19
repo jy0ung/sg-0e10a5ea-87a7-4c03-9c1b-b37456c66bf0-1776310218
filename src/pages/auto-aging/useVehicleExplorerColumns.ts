@@ -45,7 +45,7 @@ export function useVehicleExplorerColumns({
       label: 'NO.',
       width: 80,
       sortable: false,
-      format: (_value, index) => String(startIdx + index + 1),
+      format: (_value, index) => String(startIdx + (index ?? 0) + 1),
     },
     { key: 'chassis_no', label: 'CHASSIS NO.', width: 140, sortable: true, type: 'text', editable: canEdit },
     { key: 'branch_code', label: 'BRCH K1', width: 90, sortable: true, type: 'select', options: branches as string[], editable: canEdit },

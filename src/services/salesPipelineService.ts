@@ -66,7 +66,7 @@ export async function transitionOrderStage(
   if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase.rpc('transition_sales_order_stage', {
     p_order_id: orderId,
-    p_stage_id: stageId,
+    p_stage_id: stageId ?? null,
     p_company_id: companyId,
     p_actor_id: actorId ?? null,
   });
@@ -90,9 +90,9 @@ export async function getSalesPipelineSummary(
   if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase.rpc('get_sales_pipeline_summary', {
     p_company_id: companyId,
-    p_branch_code: opts?.branchCode ?? null,
-    p_from_date: opts?.fromDate ?? null,
-    p_to_date: opts?.toDate ?? null,
+    p_branch_code: (opts?.branchCode ?? null) as unknown as string | undefined,
+    p_from_date: (opts?.fromDate ?? null) as unknown as string | undefined,
+    p_to_date: (opts?.toDate ?? null) as unknown as string | undefined,
   });
   if (error) return { data: null, error: new Error(error.message) };
   const raw = data as Record<string, unknown>;

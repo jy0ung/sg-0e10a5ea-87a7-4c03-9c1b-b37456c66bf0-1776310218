@@ -1,6 +1,6 @@
 # FLC BI — Implementation Map
 
-> **Generated**: 2026-05-19  
+> **Last updated**: 2026-05-19 (Phase 1b fixes applied)  
 > **Scope**: Full structured codebase discovery — entry point, tech stack, module/route map, data flow, permissions, schema, UI architecture, risks, and safe implementation strategy.  
 > **Source of truth**: Actual files in the repository.
 
@@ -40,7 +40,7 @@ This is a **Turborepo monorepo** (`flc-bi`) housing a multi-module enterprise BI
 
 | Package | Location | Purpose |
 |---------|----------|---------|
-| `@flc/types` | `packages/types/` | All domain TypeScript interfaces (1241-line file) |
+| `@flc/types` | `packages/types/` | All domain TypeScript interfaces (split into 8 domain files) |
 | `@flc/supabase` | `packages/supabase/` | Supabase client + auto-generated DB types (6121 lines) |
 | `@flc/hrms-services` | `packages/hrms-services/` | HRMS data-access layer (leave, attendance, payroll, etc.) |
 | `@flc/hrms-hooks` | `packages/hrms-hooks/` | HRMS React Query hooks (built but not yet adopted by apps) |
@@ -748,11 +748,11 @@ The app has `RouteErrorBoundary` wrapping every major route (Phase 3 #19) so a c
 
 | # | Risk | Location | Impact |
 |---|------|----------|--------|
-| 1 | **Type safety disabled** | `tsconfig.json`: `strict: false`, `noImplicitAny: false`, `strictNullChecks: false` | Latent type errors throughout. `typecheck.log` in repo root suggests known issues. |
-| 2 | **Generated DB types may be stale** | `packages/supabase/src/database.types.ts` (6121 lines) | After 107 migrations, types may not reflect current schema. Causes `any` casts in services. |
-| 3 | **`@flc/types` is a 1241-line monolith** | `packages/types/src/index.ts` | Merge conflicts, hard to navigate, no domain segmentation. |
+| 1 | **`noImplicitAny` still disabled** | `tsconfig.app.json` | ~30 implicit-any sites in services; tracked as Phase 2 debt. `strictNullChecks` enabled 2026-05-19. |
+| 2 | **Generated DB types may be stale** | `packages/supabase/src/database.types.ts` (6121 lines) | Regenerated 2026-05-19 from live Supabase schema. |
+| 3 | ~~**`@flc/types` is a 1241-line monolith**~~ | `packages/types/src/` | **Resolved** — split into 8 domain files 2026-05-19. |
 | 4 | **Dual permission administration** | Route `RequireRole` + sidebar `role_sections` + column permissions | Can disagree; maintained independently. |
-| 5 | **`/admin/settings` has no route guard** | `src/main.tsx:235` | Any authenticated user can access admin settings. |
+| 5 | **`/admin/settings` has no route guard** | `src/main.tsx:235` | **Intentional** — settings page enforces its own section-level permissions internally; route guard is redundant. |
 
 ### 🟡 Medium Priority
 

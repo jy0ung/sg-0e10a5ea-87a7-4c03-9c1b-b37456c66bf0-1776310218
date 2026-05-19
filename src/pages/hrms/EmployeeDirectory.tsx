@@ -33,6 +33,7 @@ import { createEmployeeSchema } from '@/lib/validations';
 const ALL_ROLES: AppRole[] = [
   'super_admin', 'company_admin', 'director', 'general_manager',
   'manager', 'sales', 'accounts', 'analyst',
+  'portal_admin', 'portal_manager', 'portal_staff',
 ];
 
 const ROLE_LABEL: Record<AppRole, string> = {
@@ -45,6 +46,9 @@ const ROLE_LABEL: Record<AppRole, string> = {
   accounts:        'Accounts',
   analyst:         'Analyst (Legacy)',
   creator_updater: 'Creator/Updater',
+  portal_admin:    'Portal Admin',
+  portal_manager:  'Portal Manager',
+  portal_staff:    'Portal Staff',
 };
 
 const ROLE_BADGE: Record<AppRole, string> = {
@@ -57,6 +61,9 @@ const ROLE_BADGE: Record<AppRole, string> = {
   accounts:        'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   analyst:         'bg-secondary text-secondary-foreground',
   creator_updater: 'bg-secondary text-secondary-foreground',
+  portal_admin:    'bg-secondary text-secondary-foreground',
+  portal_manager:  'bg-secondary text-secondary-foreground',
+  portal_staff:    'bg-secondary text-secondary-foreground',
 };
 
 const STATUS_BADGE: Record<EmployeeStatus, string> = {
@@ -104,11 +111,12 @@ export default function EmployeeDirectory() {
   const { data: empData, isPending: loading } = useQuery({
     queryKey: ['employee-directory', user?.companyId],
     queryFn: async () => {
+      if (!user) return { employees: [], branches: [], departments: [], jobTitles: [] };
       const [empResult, branchResult, deptResult, jtResult] = await Promise.all([
-        listEmployeeDirectory(user!.companyId),
-        getBranches(user!.companyId),
-        listDepartments(user!.companyId),
-        listJobTitles(user!.companyId),
+        listEmployeeDirectory(user.companyId),
+        getBranches(user.companyId),
+        listDepartments(user.companyId),
+        listJobTitles(user.companyId),
       ]);
       if (empResult.error) toast({ title: 'Failed to load employees', description: empResult.error, variant: 'destructive' });
       return {
@@ -247,6 +255,7 @@ export default function EmployeeDirectory() {
   // ── Save edit ──
   const handleEdit = async () => {
     if (!editTarget || !editForm) return;
+    if (!user) return;
     setEditSaving(true);
     const input: UpdateEmployeeInput = {
       name:         editForm.name,
@@ -276,8 +285,9 @@ export default function EmployeeDirectory() {
 
   // ── Quick status toggle ──
   const toggleStatus = async (emp: Employee) => {
+    if (!user) return;
     const next: EmployeeStatus = emp.status === 'active' ? 'inactive' : 'active';
-    const { error } = await updateEmployee(emp.id, { status: next }, user?.id, user.companyId);
+    const { error } = await updateEmployee(emp.id, { status: next }, user.id, user.companyId);
     if (error) {
       toast({ title: 'Failed to update status', description: error, variant: 'destructive' });
     }

@@ -1645,7 +1645,8 @@ export default function HrmsAdmin() {
   const activeModuleDef = activeModule ? getCategoryDef(activeModule) : null;
 
   function renderModuleContent(module: Category) {
-    if (module === 'roles') return <RoleManagementPanel companyId={companyId} actorId={user.id} canWrite={canManageSecurity} />;
+    const u = user!;
+    if (module === 'roles') return <RoleManagementPanel companyId={companyId} actorId={u.id} canWrite={canManageSecurity} />;
     if (module === 'approval-flows') {
       return (
         <Suspense fallback={<div className="rounded-lg border bg-card p-6 text-sm text-muted-foreground">Loading approval flow designer...</div>}>
@@ -1653,11 +1654,11 @@ export default function HrmsAdmin() {
         </Suspense>
       );
     }
-    if (module === 'departments') return <DepartmentsPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
-    if (module === 'job-titles') return <JobTitlesPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
-    if (module === 'leave-types') return <LeaveTypesPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
-    if (module === 'holidays') return <HolidaysPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
-    if (module === 'rollover') return <RolloverPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
+    if (module === 'departments') return <DepartmentsPanel companyId={companyId} actorId={u.id} canWrite={canWrite} />;
+    if (module === 'job-titles') return <JobTitlesPanel companyId={companyId} actorId={u.id} canWrite={canWrite} />;
+    if (module === 'leave-types') return <LeaveTypesPanel companyId={companyId} actorId={u.id} canWrite={canWrite} />;
+    if (module === 'holidays') return <HolidaysPanel companyId={companyId} actorId={u.id} canWrite={canWrite} />;
+    if (module === 'rollover') return <RolloverPanel companyId={companyId} actorId={u.id} canWrite={canWrite} />;
     if (module === 'system') return <SystemReadinessPanel />;
     return <HrmsSettingsPlaceholderPanel category={module} />;
   }

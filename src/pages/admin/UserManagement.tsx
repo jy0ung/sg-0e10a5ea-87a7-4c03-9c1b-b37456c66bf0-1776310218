@@ -353,7 +353,7 @@ export default function UserManagement() {
         branch_id: data.branch_id,
         employee_id: data.employee_id ?? null,
         portal_access_only: data.portal_access_only ?? false,
-      } : p));
+      } as ProfileRow : p));
       setEditUser(null);
     }
     setSaving(false);
@@ -390,7 +390,7 @@ export default function UserManagement() {
     }
     toast.success(`Invitation sent to ${data.email}`);
     setSignupUrl(getSignupUrl());
-    inviteForm.reset({ email: '', name: '', role: DEFAULT_APP_ROLE, employee_id: null, portal_access_only: false });
+    inviteForm.reset({ email: '', name: '', role: DEFAULT_APP_ROLE, employee_id: null, portal_access_only: false } as InviteUserFormData);
     await refreshProfiles();
   };
 

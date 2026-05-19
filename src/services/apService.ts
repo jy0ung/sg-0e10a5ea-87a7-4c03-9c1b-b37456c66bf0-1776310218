@@ -60,9 +60,9 @@ export async function recordSupplierPaymentEvent(
     p_purchase_invoice_id: purchaseInvoiceId,
     p_amount: amount,
     p_payment_date: paymentDate,
-    p_payment_method: opts.paymentMethod ?? null,
-    p_reference_no: opts.referenceNo ?? null,
-    p_notes: opts.notes ?? null,
+    p_payment_method: opts.paymentMethod ?? null as unknown as string | undefined,
+    p_reference_no: opts.referenceNo ?? null as unknown as string | undefined,
+    p_notes: opts.notes ?? null as unknown as string | undefined,
   });
   if (error) {
     loggingService.error('recordSupplierPaymentEvent failed', { purchaseInvoiceId, error }, 'apService');
@@ -82,7 +82,7 @@ export async function reverseSupplierPaymentEvent(
 ): Promise<{ data: string | null; error: Error | null }> {
   const { data, error } = await supabase.rpc('reverse_supplier_payment_event', {
     p_event_id: eventId,
-    p_reason: reason ?? null,
+    p_reason: reason ?? null as unknown as string | undefined,
   });
   if (error) {
     loggingService.error('reverseSupplierPaymentEvent failed', { eventId, error }, 'apService');
@@ -142,7 +142,7 @@ export async function transitionPiLifecycle(
   const { data, error } = await supabase.rpc('transition_pi_lifecycle', {
     p_id: id,
     p_target_status: targetStatus,
-    p_actor_id: actorId ?? null,
+    p_actor_id: actorId ?? null as unknown as string | undefined,
   });
   if (error) {
     loggingService.error('transitionPiLifecycle failed', { id, targetStatus, error }, 'apService');

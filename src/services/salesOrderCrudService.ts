@@ -109,7 +109,7 @@ export async function createSalesOrder(companyId: string, fields: SalesOrderEdit
       finance_company: fields.financeCompany,
       insurance_company: fields.insuranceCompany,
       plate_no: fields.plateNo,
-    })
+    } as never)
     .select()
     .single();
   if (error) { loggingService.error('createSalesOrder failed', { error }); return { data: null, error: new Error(error.message) }; }

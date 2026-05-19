@@ -213,7 +213,7 @@ export async function updatePurchaseInvoice(
 
   const { error } = await supabase
     .from('purchase_invoices')
-    .update(patch)
+    .update(patch as never)
     .eq('company_id', companyId)
     .eq('id', id);
   if (error) {

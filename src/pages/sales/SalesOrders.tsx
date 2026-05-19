@@ -392,7 +392,7 @@ export default function SalesOrders() {
         confirmLabel="Unlink"
         confirmVariant="destructive"
         loading={creating}
-        onConfirm={() => unlinkTarget && handleUnlinkVehicle(unlinkTarget)}
+        onConfirm={() => { if (unlinkTarget) void handleUnlinkVehicle(unlinkTarget); }}
       />
     </div>
   );

@@ -37,7 +37,7 @@ function normalizeDsn(dsn?: string): string | undefined {
 }
 
 function normalizeSampleRate(value: number | undefined): number {
-  return Number.isFinite(value) && value >= 0 && value <= 1 ? value : 0.1;
+  return Number.isFinite(value) && (value as number) >= 0 && (value as number) <= 1 ? (value as number) : 0.1;
 }
 
 export class ErrorTrackingService {
