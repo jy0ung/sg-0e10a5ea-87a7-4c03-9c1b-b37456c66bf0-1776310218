@@ -232,6 +232,10 @@ const router = createBrowserRouter([
       { path: "admin/activity", element: <RequireRole roles={EXECUTIVE}><R scope="Activity Dashboard"><S><ActivityDashboard /></S></R></RequireRole> },
       { path: "admin/users", element: <RequireRole roles={ADMIN_ONLY}><R scope="Users"><S><UserManagement /></S></R></RequireRole> },
       { path: "admin/audit", element: <RequireRole roles={ADMIN_AND_DIRECTOR}><R scope="Audit Log"><S><AuditLog /></S></R></RequireRole> },
+      // admin/settings intentionally has NO RequireRole guard — it doubles as
+      // the /profile redirect target (personal name/password/branch editing).
+      // Admin-only features (branding, modules, user roles) are gated internally
+      // via isAdmin checks in SettingsPage and by RLS on the backend tables.
       { path: "admin/settings", element: <R scope="Settings"><S><SettingsPage /></S></R> },
       { path: "admin/branches", element: <RequireRole roles={ADMIN_ONLY}><R scope="Branches"><S><BranchManagement /></S></R></RequireRole> },
       { path: "admin/master-data", element: <RequireRole roles={ADMIN_ONLY}><R scope="Master Data"><S><MasterData /></S></R></RequireRole> },
