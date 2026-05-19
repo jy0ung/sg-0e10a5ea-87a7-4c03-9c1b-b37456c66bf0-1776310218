@@ -31,6 +31,15 @@ export const MANAGER_AND_UP: readonly AppRole[] = [
   'manager',
 ] as const;
 
+// Financial reporting: matches the GL RLS policy (accounting_periods_admin_write)
+export const ACCOUNTS_AND_UP: readonly AppRole[] = [
+  'super_admin',
+  'company_admin',
+  'director',
+  'general_manager',
+  'accounts',
+] as const;
+
 export const HRMS_ADMIN: readonly AppRole[] = [
   'super_admin',
   'company_admin',

@@ -30,6 +30,7 @@ import { onCLS, onINP, onLCP } from 'web-vitals';
 import {
   ADMIN_ONLY,
   ADMIN_AND_DIRECTOR,
+  ACCOUNTS_AND_UP,
   EXECUTIVE,
   MANAGER_AND_UP,
   PORTAL_QUEUE_ROLES,
@@ -95,6 +96,10 @@ const VehicleTransfer = lazy(() => import("./pages/inventory/VehicleTransfer"));
 const ChassisMovement = lazy(() => import("./pages/inventory/ChassisMovement"));
 const PurchaseInvoices = lazy(() => import("./pages/purchasing/PurchaseInvoices"));
 const PurchaseInvoiceDetail = lazy(() => import("./pages/purchasing/PurchaseInvoiceDetail"));
+const ChartOfAccounts = lazy(() => import("./pages/accounts/ChartOfAccounts"));
+const AccountingPeriods = lazy(() => import("./pages/accounts/AccountingPeriods"));
+const TrialBalance = lazy(() => import("./pages/accounts/TrialBalance"));
+const JournalEntries = lazy(() => import("./pages/accounts/JournalEntries"));
 const MarginAnalysis = lazy(() => import("./pages/sales/MarginAnalysis"));
 const OutstandingCollection = lazy(() => import("./pages/sales/OutstandingCollection"));
 const BranchManagement = lazy(() => import("./pages/admin/BranchManagement"));
@@ -220,6 +225,10 @@ const router = createBrowserRouter([
       { path: "inventory/chassis", element: withModuleAccess('inventory', <R scope="Chassis Movement"><S><ChassisMovement /></S></R>) },
       { path: "purchasing/invoices", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP}><R scope="Purchase Invoices"><S><PurchaseInvoices /></S></R></RequireRole>) },
       { path: "purchasing/invoices/:id", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP}><R scope="Purchase Invoice Detail"><S><PurchaseInvoiceDetail /></S></R></RequireRole>) },
+      { path: "accounts/chart", element: <RequireRole roles={ACCOUNTS_AND_UP}><R scope="Chart of Accounts"><S><ChartOfAccounts /></S></R></RequireRole> },
+      { path: "accounts/periods", element: <RequireRole roles={ACCOUNTS_AND_UP}><R scope="Accounting Periods"><S><AccountingPeriods /></S></R></RequireRole> },
+      { path: "accounts/trial-balance", element: <RequireRole roles={ACCOUNTS_AND_UP}><R scope="Trial Balance"><S><TrialBalance /></S></R></RequireRole> },
+      { path: "accounts/journal", element: <RequireRole roles={ACCOUNTS_AND_UP}><R scope="Journal Entries"><S><JournalEntries /></S></R></RequireRole> },
       { path: "admin/activity", element: <RequireRole roles={EXECUTIVE}><R scope="Activity Dashboard"><S><ActivityDashboard /></S></R></RequireRole> },
       { path: "admin/users", element: <RequireRole roles={ADMIN_ONLY}><R scope="Users"><S><UserManagement /></S></R></RequireRole> },
       { path: "admin/audit", element: <RequireRole roles={ADMIN_AND_DIRECTOR}><R scope="Audit Log"><S><AuditLog /></S></R></RequireRole> },

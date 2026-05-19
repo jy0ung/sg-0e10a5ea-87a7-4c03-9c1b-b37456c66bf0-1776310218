@@ -193,6 +193,22 @@ export async function createAccountingPeriod(
   return { data: mapPeriod(data as Record<string, unknown>), error: null };
 }
 
+export async function lockAccountingPeriod(
+  periodId: string,
+): Promise<{ data: AccountingPeriod | null; error: Error | null }> {
+  const { data, error } = await supabase
+    .from('accounting_periods')
+    .update({ status: 'locked' })
+    .eq('id', periodId)
+    .select()
+    .single();
+  if (error) {
+    loggingService.error('lockAccountingPeriod failed', { periodId, error }, 'glService');
+    return { data: null, error: new Error(error.message) };
+  }
+  return { data: mapPeriod(data as Record<string, unknown>), error: null };
+}
+
 export async function closeAccountingPeriod(
   periodId: string,
 ): Promise<{ data: AccountingPeriod | null; error: Error | null }> {
