@@ -8,9 +8,7 @@ type QueuedResult = {
 const queuedResults: QueuedResult[] = [];
 const eqCalls: Array<{ table: string; column: string; value: unknown }> = [];
 const inCalls: Array<{ table: string; column: string; values: unknown[] }> = [];
-const { createEmployeeMock, updateEmployeeMock, logErrorMock } = vi.hoisted(() => ({
-  createEmployeeMock: vi.fn(),
-  updateEmployeeMock: vi.fn(),
+const { logErrorMock } = vi.hoisted(() => ({
   logErrorMock: vi.fn(),
 }));
 
@@ -35,6 +33,8 @@ vi.mock('@/integrations/supabase/client', () => {
       inCalls.push({ table, column, values });
       return proxy;
     };
+    proxy.insert = (..._args: unknown[]) => proxy;
+    proxy.update = (..._args: unknown[]) => proxy;
     proxy.order = (..._args: unknown[]) => proxy;
     proxy.then = (
       resolve: (value: QueuedResult) => unknown,
@@ -50,11 +50,6 @@ vi.mock('@/integrations/supabase/client', () => {
     },
   };
 });
-
-vi.mock('./hrmsService', () => ({
-  createEmployee: createEmployeeMock,
-  updateEmployee: updateEmployeeMock,
-}));
 
 vi.mock('./loggingService', () => ({
   loggingService: {
@@ -72,41 +67,33 @@ beforeEach(() => {
   queuedResults.length = 0;
   eqCalls.length = 0;
   inCalls.length = 0;
-  createEmployeeMock.mockReset();
-  updateEmployeeMock.mockReset();
   logErrorMock.mockReset();
   vi.clearAllMocks();
 });
 
 describe('listSalesAdvisors', () => {
-  it('lists sales advisors from employee module assignments', async () => {
-    queueResolves(
-      {
-        data: [{ employee_id: 'employee-1' }],
-        error: null,
-      },
-      {
-        data: [{
-          id: 'employee-1',
-          branch_id: 'b1',
-          staff_code: 'SA001',
-          name: 'Aisyah Rahman',
-          work_email: 'aisyah@company.com',
-          ic_no: '900101-01-1234',
-          contact_no: '0123456789',
-          join_date: '2026-04-01',
-          resign_date: null,
-          status: 'active',
-        }],
-        error: null,
-      },
-    );
+  it('lists sales advisors from the sales_advisors table', async () => {
+    queueResolves({
+      data: [{
+        id: 'advisor-1',
+        code: 'SA001',
+        name: 'Aisyah Rahman',
+        email: 'aisyah@company.com',
+        ic_no: '900101-01-1234',
+        contact_no: '0123456789',
+        branch_code: 'b1',
+        join_date: '2026-04-01',
+        resign_date: null,
+        status: 'active',
+      }],
+      error: null,
+    });
 
     const result = await listSalesAdvisors('c1');
 
     expect(result).toEqual([
       {
-        id: 'employee-1',
+        id: 'advisor-1',
         code: 'SA001',
         name: 'Aisyah Rahman',
         ic: '900101-01-1234',
@@ -119,35 +106,25 @@ describe('listSalesAdvisors', () => {
       },
     ]);
     expect(eqCalls).toEqual(expect.arrayContaining([
-      { table: 'employee_module_assignments', column: 'company_id', value: 'c1' },
-      { table: 'employee_module_assignments', column: 'module_key', value: 'sales' },
-      { table: 'employee_module_assignments', column: 'assignment_role', value: 'sales_advisor' },
-      { table: 'employee_module_assignments', column: 'active', value: true },
-      { table: 'employees', column: 'company_id', value: 'c1' },
+      { table: 'sales_advisors', column: 'company_id', value: 'c1' },
     ]));
-    expect(inCalls).toEqual([
-      { table: 'employees', column: 'id', values: ['employee-1'] },
-    ]);
   });
 
-  it('surfaces an error when workforce assignment tables are unavailable', async () => {
-    queueResolves({ data: null, error: { message: 'relation "employee_module_assignments" does not exist' } });
+  it('surfaces an error when sales_advisors table is unavailable', async () => {
+    queueResolves({ data: null, error: { message: 'relation "sales_advisors" does not exist' } });
 
-    await expect(listSalesAdvisors('c1')).rejects.toThrow('relation "employee_module_assignments" does not exist');
+    await expect(listSalesAdvisors('c1')).rejects.toThrow('relation "sales_advisors" does not exist');
     expect(logErrorMock).toHaveBeenCalledWith(
       'listSalesAdvisors failed',
       expect.objectContaining({ companyId: 'c1' }),
       'SalesAdvisorService',
     );
-    expect(eqCalls).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ table: 'profiles' }),
-    ]));
   });
 });
 
 describe('createSalesAdvisor', () => {
-  it('returns an error when employee creation fails', async () => {
-    createEmployeeMock.mockResolvedValue({ error: 'relation "employees" does not exist' });
+  it('returns an error when the insert fails', async () => {
+    queueResolves({ data: null, error: { message: 'duplicate key value violates unique constraint' } });
 
     const result = await createSalesAdvisor({
       companyId: 'c1',
@@ -156,24 +133,18 @@ describe('createSalesAdvisor', () => {
       branch: 'b1',
     });
 
-    expect(createEmployeeMock).toHaveBeenCalledWith(expect.objectContaining({
-      companyId: 'c1',
-      staffCode: 'SA001',
-      role: 'sales',
-    }));
     expect(result.error).toBeInstanceOf(Error);
-    expect(result.error?.message).toBe('relation "employees" does not exist');
+    expect(result.error?.message).toBe('duplicate key value violates unique constraint');
   });
 });
 
 describe('updateSalesAdvisorStatus', () => {
-  it('returns an error when employee updates fail', async () => {
-    updateEmployeeMock.mockResolvedValue({ error: 'relation "employees" does not exist' });
+  it('returns an error when the update fails', async () => {
+    queueResolves({ data: null, error: { message: 'relation "sales_advisors" does not exist' } });
 
-    const result = await updateSalesAdvisorStatus('c1', 'employee-1', 'inactive');
+    const result = await updateSalesAdvisorStatus('c1', 'advisor-1', 'inactive');
 
-    expect(updateEmployeeMock).toHaveBeenCalledWith('employee-1', { status: 'inactive' }, undefined, 'c1');
     expect(result.error).toBeInstanceOf(Error);
-    expect(result.error?.message).toBe('relation "employees" does not exist');
+    expect(result.error?.message).toBe('relation "sales_advisors" does not exist');
   });
 });
