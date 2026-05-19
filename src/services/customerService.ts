@@ -31,7 +31,8 @@ export async function getCustomers(companyId: string): Promise<{ data: Customer[
     .select('*')
     .eq('company_id', companyId)
     .eq('is_deleted', false)
-    .order('name', { ascending: true });
+    .order('name', { ascending: true })
+    .limit(100_000); // Override PostgREST default max_rows=1000
   performanceService.endQueryTimer('getCustomers', 'getCustomers');
   if (error) { loggingService.error('getCustomers failed', { error }); return { data: [], error: new Error(error.message) }; }
   return { data: (data ?? []).map(mapCustomer), error: null };
