@@ -13,6 +13,16 @@
     "moduleResolution": "bundler",
     "noEmit": true,
     "noImplicitAny": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "resolveJsonModule": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@flc/types": ["./packages/types/src/index.ts"],
+      "@flc/supabase": ["./packages/supabase/src/index.ts"],
+      "@flc/hrms-schemas": ["./packages/hrms-schemas/src/index.ts"]
+    },
+    "skipLibCheck": true,
     "strictNullChecks": true,
     // Phase 2 debt (tracked in IMPLEMENTATION_MAP.md):
     //   - noUnusedLocals, noUnusedParameters — deferred until pre-commit tighten
