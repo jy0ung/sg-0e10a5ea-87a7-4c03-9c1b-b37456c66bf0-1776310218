@@ -754,21 +754,21 @@ The app has `RouteErrorBoundary` wrapping every major route (Phase 3 #19) so a c
 | 1 | **`noImplicitAny` still disabled** | `tsconfig.app.json` | ~30 implicit-any sites in services; tracked as Phase 2 debt. `strictNullChecks` enabled 2026-05-19. |
 | 2 | **Generated DB types may be stale** | `packages/supabase/src/database.types.ts` (6121 lines) | Regenerated 2026-05-19 from live Supabase schema. |
 | 3 | ~~**`@flc/types` is a 1241-line monolith**~~ | `packages/types/src/` | **Resolved** — split into 8 domain files 2026-05-19. |
-| 4 | ~~**Dual permission administration**~~ | Route `RequireRole` + sidebar `role_sections` + column permissions | **Resolved** — 12 sidebar/route role mismatches fixed 2026-05-19. HRMS app already well-aligned (same function for both layers). Remaining gap: route guards do not consult `role_sections` DB table (architectural, not a quick fix). |
-| 5 | **`/admin/settings` has no route guard** | `src/main.tsx:235` | **Intentional** — settings page enforces its own section-level permissions internally; route guard is redundant. |
+| 4 | ~~**Dual permission administration**~~ | Route `RequireRole` + sidebar `role_sections` + column permissions | **Resolved** — 12 sidebar/route role mismatches fixed 2026-05-19. |
+| 5 | **`/admin/settings` has no route guard** | `src/main.tsx:235` | **Intentional** — settings page enforces its own section-level permissions internally. |
 
 ### 🟡 Medium Priority
 
 | # | Risk | Location | Impact |
 |---|------|----------|--------|
 | 6 | **Low test coverage** | Most pages and ~56% of services untested | Regressions go undetected. Key services like `autoAgingDataService`, `importService`, `vehicleService` untested. |
-| 7 | **HRMS page files are dead code** | `src/pages/hrms/` (6+ components) | Routes redirect to HRMS web app; these files are never rendered. |
-| 8 | **`@flc/hrms-hooks` unused** | `packages/hrms-hooks/` | Built but zero imports in either app. Code duplication risk if apps create their own hooks. |
-| 9 | **`demo-data.ts` has empty arrays** | `src/data/demo-data.ts` | Dead demo scaffolding. Only `platformModules` is active. |
+| 7 | ~~**HRMS page files are dead code**~~ | `src/pages/hrms/` (6+ components) | **Resolved** — 12 dead files removed 2026-05-19. Only `HrmsWorkspaceRedirect` kept. |
+| 8 | ~~**`@flc/hrms-hooks` unused**~~ | `packages/hrms-hooks/` | **Resolved** — entire unused package removed 2026-05-19. |
+| 9 | ~~**`demo-data.ts` has empty arrays**~~ | `src/data/demo-data.ts` | **Resolved** — stripped to only `platformModules` export 2026-05-19. |
 | 10 | **No server-side pagination** | Multiple list pages (DataTable) | Large datasets (vehicles, orders) may cause client-side performance issues. |
-| 11 | **Sidebar nav roles hardcoded** | `mainShellConfig.ts` lines 83-128 | Role arrays hardcoded per item instead of using DB-backed role_sections. |
+| 11 | **Sidebar nav roles hardcoded** | `mainShellConfig.ts` | Role arrays hardcoded per item instead of using DB-backed role_sections. (Discrepancies fixed.) |
 | 12 | **Integration specs excluded from CI** | `src/test/*.spec.ts` | RLS and pipeline integration tests not run automatically. |
-| 13 | **`src/App.tsx` is dead code** | `src/App.tsx` | Router renders from `main.tsx`'s own `App` component, not this file. |
+| 13 | ~~**`src/App.tsx` is dead code**~~ | `src/App.tsx` | **Resolved** — removed 2026-05-19. |
 
 ### 🟢 Low Priority
 
