@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { loggingService } from './loggingService';
-import { createEmployee, updateEmployee } from './hrmsService';
+import { logUserAction } from './auditService';
 
 export type SalesAdvisorStatus = 'active' | 'resigned' | 'inactive';
 
@@ -28,86 +28,64 @@ export interface CreateSalesAdvisorInput {
   joinDate?: string | null;
 }
 
+function normalizeStatus(raw: unknown): SalesAdvisorStatus {
+  const s = String(raw ?? '').toLowerCase();
+  if (s === 'resigned') return 'resigned';
+  if (s === 'inactive') return 'inactive';
+  return 'active';
+}
+
 function rowToAdvisor(row: Record<string, unknown>): SalesAdvisorRecord {
   return {
     id: String(row.id ?? ''),
-    code: String(row.staff_code ?? '—'),
+    code: String(row.code ?? '—'),
     name: String(row.name ?? '—'),
     ic: String(row.ic_no ?? '—'),
     email: String(row.email ?? '—'),
     contact: String(row.contact_no ?? '—'),
-    branch: String(row.branch_id ?? '—'),
+    branch: String(row.branch_code ?? '—'),
     joinDate: row.join_date ? String(row.join_date) : '—',
     resignDate: row.resign_date ? String(row.resign_date) : undefined,
-    status: (row.status as SalesAdvisorStatus) ?? 'active',
+    status: normalizeStatus(row.status),
   };
 }
 
 export async function listSalesAdvisors(
   companyId: string,
 ): Promise<SalesAdvisorRecord[]> {
-  const { data: assignments, error: assignmentError } = await supabase
-    .from('employee_module_assignments')
-    .select('employee_id')
+  const { data, error } = await supabase
+    .from('sales_advisors')
+    .select('id, code, name, ic_no, email, contact_no, branch_code, join_date, resign_date, status')
     .eq('company_id', companyId)
-    .eq('module_key', 'sales')
-    .eq('assignment_role', 'sales_advisor')
-    .eq('active', true);
-
-  if (assignmentError) {
-    loggingService.error('listSalesAdvisors failed', { companyId, error: assignmentError }, 'SalesAdvisorService');
-    throw new Error(assignmentError.message);
-  }
-
-  const employeeIds = (assignments ?? [])
-    .map((row: Record<string, unknown>) => String(row.employee_id ?? ''))
-    .filter(Boolean);
-
-  if (!employeeIds.length) return [];
-
-  const { data: employees, error: employeeError } = await supabase
-    .from('employees')
-    .select('id, branch_id, staff_code, name, work_email, ic_no, contact_no, join_date, resign_date, status')
-    .eq('company_id', companyId)
-    .in('id', employeeIds)
     .order('name');
-  if (employeeError) {
-    loggingService.error('listSalesAdvisors failed', { companyId, error: employeeError }, 'SalesAdvisorService');
-    throw new Error(employeeError.message);
+
+  if (error) {
+    loggingService.error('listSalesAdvisors failed', { companyId, error }, 'SalesAdvisorService');
+    throw new Error(error.message);
   }
 
-  return (employees ?? []).map((row: Record<string, unknown>) => rowToAdvisor({
-    id: row.id,
-    staff_code: row.staff_code,
-    name: row.name,
-    ic_no: row.ic_no,
-    email: row.work_email,
-    contact_no: row.contact_no,
-    branch_id: row.branch_id,
-    join_date: row.join_date,
-    resign_date: row.resign_date,
-    status: row.status,
-  }));
+  return (data ?? []).map(row => rowToAdvisor(row as Record<string, unknown>));
 }
 
 export async function createSalesAdvisor(
   input: CreateSalesAdvisorInput,
 ): Promise<{ error: Error | null }> {
-  const { error } = await createEmployee({
-    id: crypto.randomUUID(),
-    email: input.email || `${input.code.toLowerCase()}@flc.local`,
-    name: input.name,
-    role: 'sales',
-    companyId: input.companyId,
-    branchId: input.branch,
-    staffCode: input.code.toUpperCase(),
-    icNo: input.ic ?? undefined,
-    contactNo: input.contact ?? undefined,
-    joinDate: input.joinDate ?? undefined,
-  });
+  const { error } = await supabase
+    .from('sales_advisors')
+    .insert({
+      company_id: input.companyId,
+      code: input.code.toUpperCase(),
+      name: input.name,
+      email: input.email ?? null,
+      ic_no: input.ic ?? null,
+      contact_no: input.contact ?? null,
+      branch_code: input.branch,
+      join_date: input.joinDate ?? null,
+      status: 'active',
+    });
   if (error) {
     loggingService.error('createSalesAdvisor failed', { error }, 'SalesAdvisorService');
-    return { error: new Error(error) };
+    return { error: new Error(error.message) };
   }
   return { error: null };
 }
@@ -116,11 +94,17 @@ export async function updateSalesAdvisorStatus(
   companyId: string,
   id: string,
   status: SalesAdvisorStatus,
+  actorId?: string,
 ): Promise<{ error: Error | null }> {
-  const { error } = await updateEmployee(id, { status }, undefined, companyId);
+  const { error } = await supabase
+    .from('sales_advisors')
+    .update({ status })
+    .eq('company_id', companyId)
+    .eq('id', id);
   if (error) {
     loggingService.error('updateSalesAdvisorStatus failed', { id, error }, 'SalesAdvisorService');
-    return { error: new Error(error) };
+    return { error: new Error(error.message) };
   }
+  if (actorId) void logUserAction(actorId, 'update', 'sales_advisor', id, { status });
   return { error: null };
 }

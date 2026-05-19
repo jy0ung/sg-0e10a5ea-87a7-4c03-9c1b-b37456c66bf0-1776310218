@@ -67,8 +67,16 @@ export async function computeSalesmanActuals(companyId: string, year: number, mo
   const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
   const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
+  // Statuses considered "closed/delivered" in the legacy order_status field.
+  const DELIVERED_STATUSES = new Set(['delivered', 'Delivered', 'DELIVERED', 'completed', 'Completed', 'COMPLETED']);
+
   const [ordersResult, targetsResult] = await Promise.all([
-    supabase.from('sales_orders').select('salesman_id, salesman_name, branch_code, total_price, status, delivery_date').eq('company_id', companyId).gte('booking_date', startDate).lte('booking_date', endDate),
+    supabase
+      .from('sales_orders')
+      .select('salesman_id, salesman_name, branch_code, selling_price, order_status')
+      .eq('company_id', companyId)
+      .gte('booking_date', startDate)
+      .lte('booking_date', endDate),
     getSalesmanTargets(companyId, year, month),
   ]);
 
@@ -76,22 +84,26 @@ export async function computeSalesmanActuals(companyId: string, year: number, mo
 
   const orders = (ordersResult.data ?? []) as Record<string, unknown>[];
 
-  // Group by salesman_name (DB salesman_targets has no salesman_id column)
-  const map = new Map<string, { name: string; branch: string; totalUnits: number; totalRevenue: number; deliveredUnits: number; prices: number[] }>();
+  // Group by salesman_id (UUID) when available, fall back to salesman_name string.
+  // Key format: "id:<uuid>" or "name:<salesman_name>"
+  const map = new Map<string, { id: string | null; name: string; branch: string; totalUnits: number; totalRevenue: number; deliveredUnits: number; prices: number[] }>();
   for (const o of orders) {
+    const sid  = (o.salesman_id  as string | null) ?? null;
     const name = ((o.salesman_name as string) ?? 'unknown').trim() || 'unknown';
-    if (!map.has(name)) {
-      map.set(name, { name, branch: (o.branch_code as string) ?? '', totalUnits: 0, totalRevenue: 0, deliveredUnits: 0, prices: [] });
+    const key  = sid ? `id:${sid}` : `name:${name}`;
+    if (!map.has(key)) {
+      map.set(key, { id: sid, name, branch: (o.branch_code as string) ?? '', totalUnits: 0, totalRevenue: 0, deliveredUnits: 0, prices: [] });
     }
-    const entry = map.get(name)!;
+    const entry = map.get(key)!;
     entry.totalUnits++;
-    const price = (o.total_price as number) ?? 0;
+    const price = Number(o.selling_price ?? 0);
     entry.totalRevenue += price;
     entry.prices.push(price);
-    if (o.status === 'delivered') entry.deliveredUnits++;
+    if (DELIVERED_STATUSES.has(o.order_status as string)) entry.deliveredUnits++;
   }
 
   const targets = targetsResult.data;
+  // Target lookup: by salesmanName string (salesman_id FK on salesman_targets is a future enhancement)
   const targetMap = new Map(targets.map(t => [t.salesmanName, t]));
 
   const result: SalesmanPerformance[] = [];

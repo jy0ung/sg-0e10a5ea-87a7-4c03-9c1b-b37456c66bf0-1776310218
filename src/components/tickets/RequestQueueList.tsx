@@ -25,6 +25,9 @@ interface RequestQueueListProps {
   subcategories: RequestSubcategoryRecord[];
   attachmentsByTicket: Record<string, TicketAttachmentRecord[]>;
   onSelectTicket: (ticketId: string) => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (ticketId: string) => void;
+  onToggleSelectAll?: (allIds: string[]) => void;
 }
 
 export function RequestQueueList({
@@ -35,10 +38,27 @@ export function RequestQueueList({
   subcategories,
   attachmentsByTicket,
   onSelectTicket,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
 }: RequestQueueListProps) {
+  const showCheckboxes = !!(selectedIds && onToggleSelect);
+  const allSelected = tickets.length > 0 && tickets.every((t) => selectedIds?.has(t.id));
+  const someSelected = !allSelected && tickets.some((t) => selectedIds?.has(t.id));
+
   return (
     <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted/30 px-3 py-2">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 py-2">
+        {showCheckboxes && (
+          <input
+            type="checkbox"
+            aria-label="Select all on this page"
+            checked={allSelected}
+            ref={(el) => { if (el) el.indeterminate = someSelected; }}
+            onChange={() => onToggleSelectAll?.(tickets.map((t) => t.id))}
+            className="h-3.5 w-3.5 cursor-pointer rounded"
+          />
+        )}
         <div>
           <h2 className="text-sm font-semibold text-foreground">Queue</h2>
           <p className="text-[11px] text-muted-foreground">{tickets.length} in view · {openCount} open</p>
@@ -53,16 +73,42 @@ export function RequestQueueList({
             ? getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories)
             : null;
           const attachmentCount = attachmentsByTicket[ticket.id]?.length ?? 0;
+          const isChecked = selectedIds?.has(ticket.id) ?? false;
 
           return (
-            <button
+            <div
               key={ticket.id}
-              type="button"
-              onClick={() => onSelectTicket(ticket.id)}
-              className={`w-full border-b border-border px-3 py-2.5 text-left transition-colors last:border-b-0 ${
-                selected ? 'bg-primary/5 shadow-[inset_3px_0_0_hsl(var(--primary))]' : 'hover:bg-muted/50'
+              className={`flex items-stretch border-b border-border last:border-b-0 ${
+                selected ? 'bg-primary/5 shadow-[inset_3px_0_0_hsl(var(--primary))]' : ''
               }`}
             >
+              {showCheckboxes && (
+                <div
+                  role="checkbox"
+                  aria-checked={isChecked}
+                  aria-label={`Select ${ticket.subject}`}
+                  tabIndex={0}
+                  className="flex cursor-pointer items-center px-2"
+                  onClick={(e) => { e.stopPropagation(); onToggleSelect?.(ticket.id); }}
+                  onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.stopPropagation(); onToggleSelect?.(ticket.id); } }}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${ticket.subject}`}
+                    checked={isChecked}
+                    onChange={() => onToggleSelect?.(ticket.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-3.5 w-3.5 cursor-pointer rounded"
+                  />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => onSelectTicket(ticket.id)}
+                className={`min-w-0 flex-1 px-3 py-2.5 text-left transition-colors ${
+                  selected ? '' : 'hover:bg-muted/50'
+                }`}
+              >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 space-y-0.5">
                   <p className="truncate text-sm font-medium text-foreground">{ticket.subject}</p>
@@ -93,7 +139,8 @@ export function RequestQueueList({
                   </span>
                 )}
               </div>
-            </button>
+              </button>
+            </div>
           );
         })}
       </div>

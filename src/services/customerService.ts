@@ -37,6 +37,39 @@ export async function getCustomers(companyId: string): Promise<{ data: Customer[
   return { data: (data ?? []).map(mapCustomer), error: null };
 }
 
+/** Paginated customer fetch with optional full-text search across name/phone/ic_no. */
+export async function getCustomersPage(
+  companyId: string,
+  page: number,
+  pageSize: number,
+  search: string,
+): Promise<{ data: Customer[]; total: number; error: Error | null }> {
+  const from = (page - 1) * pageSize;
+  const to   = from + pageSize - 1;
+  // Escape PostgREST ilike wildcards so literal % and _ are searchable.
+  const term = search.trim().replace(/[%_\\]/g, '\\$&');
+
+  let query = supabase
+    .from('customers')
+    .select('*', { count: 'exact' })
+    .eq('company_id', companyId)
+    .eq('is_deleted', false);
+
+  if (term) {
+    query = query.or(`name.ilike.%${term}%,phone.ilike.%${term}%,ic_no.ilike.%${term}%`);
+  }
+
+  const { data, error, count } = await query
+    .order('name', { ascending: true })
+    .range(from, to);
+
+  if (error) {
+    loggingService.error('getCustomersPage failed', { error });
+    return { data: [], total: 0, error: new Error(error.message) };
+  }
+  return { data: (data ?? []).map(mapCustomer), total: count ?? 0, error: null };
+}
+
 export async function getCustomerById(companyId: string, id: string): Promise<{ data: Customer | null; error: Error | null }> {
   if (!companyId) return { data: null, error: missingCompanyError() };
   const { data, error } = await supabase.from('customers').select('*').eq('company_id', companyId).eq('id', id).single();

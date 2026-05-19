@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ScrollableRegion } from '@/components/shared/ScrollableRegion';
@@ -23,7 +24,7 @@ import {
 } from '@/services/apService';
 import { STALE } from '@/lib/queryClient';
 import { purchaseInvoiceSchema } from '@/lib/validations';
-import { Search, Plus, Truck, CheckCircle, ThumbsUp, CreditCard } from 'lucide-react';
+import { Search, Plus, Truck, CheckCircle, ThumbsUp, CreditCard, ExternalLink } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
 import type { PurchaseInvoiceLifecycleStatus } from '@/types';
@@ -59,6 +60,7 @@ export default function PurchaseInvoices() {
   const companyId = useCompanyId();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatus] = useState<string>('all');
@@ -311,6 +313,9 @@ export default function PurchaseInvoices() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-muted-foreground" onClick={() => navigate(`/purchasing/invoices/${pi.id}`)}>
+                          <ExternalLink className="h-3 w-3 mr-0.5" />View
+                        </Button>
                         {pi.status === 'pending' && (
                           <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-emerald-600" onClick={() => markReceived(pi.id)}>
                             <Truck className="h-3 w-3 mr-0.5" />Receive

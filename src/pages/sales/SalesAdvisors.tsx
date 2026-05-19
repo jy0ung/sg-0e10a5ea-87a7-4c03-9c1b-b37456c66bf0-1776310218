@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData } from '@/contexts/DataContext';
+import { listBranches, type BranchRecord } from '@/services/branchService';
 import {
   listSalesAdvisors,
   createSalesAdvisor,
@@ -31,11 +31,11 @@ const EMPTY_FORM = { code: '', name: '', ic: '', email: '', contact: '', branch:
 
 export default function SalesAdvisors() {
   const { user } = useAuth();
-  const { availableBranches } = useData();
   const { toast } = useToast();
 
-  const [advisors, setAdvisors]   = useState<SalesAdvisor[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [advisors, setAdvisors]         = useState<SalesAdvisor[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [branchRecords, setBranchRecords] = useState<BranchRecord[]>([]);
 
   const [search, setSearch]         = useState('');
   const [statusFilter, setStatus]   = useState<string>('all');
@@ -44,7 +44,11 @@ export default function SalesAdvisors() {
   const [form, setForm]             = useState(EMPTY_FORM);
   const [saving, setSaving]         = useState(false);
 
-  const branches = availableBranches;
+  const branchNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const b of branchRecords) map[b.code] = b.name;
+    return map;
+  }, [branchRecords]);
 
   // Load sales advisors via service
   const loadAdvisors = useCallback(async () => {
@@ -61,6 +65,11 @@ export default function SalesAdvisors() {
   }, [user, toast]);
 
   useEffect(() => { loadAdvisors(); }, [loadAdvisors]);
+
+  useEffect(() => {
+    if (!user) return;
+    listBranches(user.company_id).then(setBranchRecords).catch(() => {});
+  }, [user]);
 
   const filtered = advisors.filter(a => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
@@ -174,7 +183,7 @@ export default function SalesAdvisors() {
             <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Branches" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Branches</SelectItem>
-              {branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+              {branchRecords.map(b => <SelectItem key={b.code} value={b.code}>{b.name} ({b.code})</SelectItem>)}
             </SelectContent>
           </Select>
           <span className="text-xs text-muted-foreground ml-auto">{filtered.length} advisors</span>
@@ -206,7 +215,7 @@ export default function SalesAdvisors() {
                     <td className="py-2 pr-4 text-xs text-muted-foreground">{a.ic}</td>
                     <td className="py-2 pr-4 text-xs text-muted-foreground">{a.contact}</td>
                     <td className="py-2 pr-4 text-xs text-muted-foreground">{a.email}</td>
-                    <td className="py-2 pr-4 text-xs">{a.branch}</td>
+                    <td className="py-2 pr-4 text-xs">{branchNameMap[a.branch] ?? a.branch}</td>
                     <td className="py-2 pr-4 text-xs text-muted-foreground">{a.joinDate}</td>
                     <td className="py-2 pr-4">
                       <Badge className={`text-[10px] capitalize ${STATUS_BADGE[a.status]}`}>{a.status}</Badge>
@@ -238,7 +247,7 @@ export default function SalesAdvisors() {
                 <label htmlFor="sales-advisor-branch" className="text-xs font-medium text-muted-foreground">Branch *</label>
                 <Select value={form.branch} onValueChange={v => setForm(f => ({ ...f, branch: v }))}>
                   <SelectTrigger id="sales-advisor-branch" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
-                  <SelectContent>{branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+                  <SelectContent>{branchRecords.map(b => <SelectItem key={b.code} value={b.code}>{b.name} ({b.code})</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>

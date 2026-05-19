@@ -138,6 +138,8 @@ export interface CompanyTicketListOptions {
   /** Server-side SLA filter. When set to anything other than 'all', the filter
    *  is pushed to the database so pagination totals are accurate. */
   sla?: TicketSlaFilter;
+  /** Filter by assignee. 'unassigned' returns only tickets with null assigned_to. */
+  assignedTo?: string | 'unassigned';
 }
 
 export type TicketActivityEventType = 'status_changed' | 'owner_changed' | 'resolution_note_updated' | 'priority_changed' | 'comment_added';
@@ -661,6 +663,13 @@ export async function listCompanyTicketsPage(
         );
       }
     }
+    if (normalized.assignedTo && normalized.assignedTo !== 'all') {
+      if (normalized.assignedTo === 'unassigned') {
+        query = query.is('assigned_to', null);
+      } else {
+        query = query.eq('assigned_to', normalized.assignedTo);
+      }
+    }
     if (search) {
       query = query.or(buildTicketSearchOrFilter(search, profileIds));
     }
@@ -685,6 +694,13 @@ export async function listCompanyTicketsPage(
       }
       if (normalized.priority && normalized.priority !== 'all') {
         legacyQuery = legacyQuery.eq('priority', normalized.priority);
+      }
+      if (normalized.assignedTo && normalized.assignedTo !== 'all') {
+        if (normalized.assignedTo === 'unassigned') {
+          legacyQuery = legacyQuery.is('assigned_to', null);
+        } else {
+          legacyQuery = legacyQuery.eq('assigned_to', normalized.assignedTo);
+        }
       }
       if (search) {
         legacyQuery = legacyQuery.or(buildTicketSearchOrFilter(search, profileIds));

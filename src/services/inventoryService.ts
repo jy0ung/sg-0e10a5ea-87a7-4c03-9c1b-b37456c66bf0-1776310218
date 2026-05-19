@@ -252,6 +252,7 @@ export interface ChassisFilterRow {
   colour: string | null;
   status: string | null;
   branch_id: string | null;
+  branch_code: string | null;
   owner_name: string | null;
 }
 
@@ -260,7 +261,7 @@ export async function searchChassisFilter(
 ): Promise<{ rows: ChassisFilterRow[]; total: number; error: Error | null }> {
   let q = supabase
     .from('vehicles')
-    .select('id,chassis_no,plate_no,model,engine_no,colour,status,branch_id,owner_name', { count: 'exact' })
+    .select('id,chassis_no,plate_no,model,engine_no,colour,status,branch_id,branch_code,owner_name', { count: 'exact' })
     .eq('company_id', params.companyId);
 
   const ilike = (col: string, value?: string) => {

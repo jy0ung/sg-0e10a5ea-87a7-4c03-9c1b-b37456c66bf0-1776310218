@@ -72,32 +72,123 @@ const supabase = SERVICE_KEY
 type Transformer = (val: string) => string | number | boolean | null;
 
 interface ColMap {
-  [oldHeader: string]: string | [string, Transformer];
+  [oldHeader: string]: string | [string, Transformer] | null;  // null = explicitly skip field
 }
 
-const toDate = (v: string): string | null => {
-  if (!v || v === "-" || v === "N/A") return null;
+// ─────────────────────────────────────────────────────────────────────────────
+// Text normalizers — applied to every row before insert
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Trim + collapse internal whitespace */
+function normStr(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim().replace(/\s+/g, ' ');
+  return s === '' || s === '-' || s === 'N/A' || s === 'n/a' ? null : s;
+}
+
+/** IC / company-reg normalizer: strip non-alphanumeric, uppercase */
+function normIcNo(v: unknown): string | null {
+  const s = String(v ?? '').trim();
+  if (!s || s === '-' || s === 'N/A') return null;
+  return s.replace(/[^A-Za-z0-9]/g, '').toUpperCase() || null;
+}
+
+/** Phone normalizer: strip spaces, dashes, brackets — keep leading + */
+function normPhone(v: unknown): string | null {
+  const s = String(v ?? '').trim();
+  if (!s || s === '-' || s === 'N/A') return null;
+  const digits = s.replace(/[\s\-().]/g, '');
+  return digits || null;
+}
+
+/** Email normalizer: lowercase, trim */
+function normEmail(v: unknown): string | null {
+  const s = String(v ?? '').trim().toLowerCase();
+  if (!s || s === '-' || s === 'n/a' || !s.includes('@')) return null;
+  return s;
+}
+
+/** Invoice / receipt / chassis normalizer: trim + uppercase */
+function normCode(v: unknown): string | null {
+  const s = String(v ?? '').trim().toUpperCase().replace(/\s+/g, '');
+  return s || null;
+}
+
+/**
+ * Apply field-level normalizers based on well-known column names.
+ * All string fields also get trimmed.
+ */
+function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
+  const r: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) {
+    if (v == null) { r[k] = null; continue; }
+    switch (k) {
+      case 'ic_no':      r[k] = normIcNo(v);  break;
+      case 'phone':      r[k] = normPhone(v); break;
+      case 'email':      r[k] = normEmail(v); break;
+      case 'invoice_no': r[k] = normCode(v);  break;
+      case 'receipt_no': r[k] = normCode(v);  break;
+      case 'chassis_no': r[k] = normCode(v);  break;
+      case 'name':       r[k] = normStr(v);   break;
+      default:
+        r[k] = typeof v === 'string' ? normStr(v) ?? null : v;
+    }
+  }
+  return r;
+}
+
+/**
+ * Deduplicate rows in-memory by a single key column.
+ * The first occurrence wins; subsequent identical keys are dropped.
+ * When key is null/empty the row is still kept (no dedup possible).
+ */
+function deduplicateRows(
+  rows: Record<string, unknown>[],
+  key: string,
+): Record<string, unknown>[] {
+  const seen = new Set<string>();
+  const out: Record<string, unknown>[] = [];
+  for (const row of rows) {
+    const v = row[key];
+    if (v == null || v === '') {
+      out.push(row);
+      continue;
+    }
+    const k = String(v).toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(row);
+  }
+  return out;
+}
+
+const toDate = (v: string | null | undefined): string | null => {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s || s === "-" || s === "N/A") return null;
   // Handle dd/mm/yyyy → yyyy-mm-dd
-  const dmy = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
-  const dmyDash = v.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  const dmyDash = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if (dmyDash) return `${dmyDash[3]}-${dmyDash[2].padStart(2, "0")}-${dmyDash[1].padStart(2, "0")}`;
   // Already ISO-ish
-  if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
-  return v || null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return s || null;
 };
 
-const toNum = (v: string): number | null => {
-  const cleaned = v.replace(/[,RM$\s]/g, "");
+const toNum = (v: string | null | undefined): number | null => {
+  if (v == null) return null;
+  const cleaned = String(v).replace(/[,RM$\s]/g, "");
   const n = parseFloat(cleaned);
   return isNaN(n) ? null : n;
 };
 
-const toStatus = (v: string): string =>
-  v.trim() || "Active";
+const toStatus = (v: string | null | undefined): string =>
+  v ? String(v).trim() || "Active" : "Active";
 
 /** Vehicles (viewChassisFilter / viewStockBalance) */
 const VEHICLES_MAP: ColMap = {
+  // ─ HTML-scraped header names (legacy / fallback) ─
   "chassis no":               "chassis_no",
   "chassis number":           "chassis_no",
   "bg date":                  ["bg_date", toDate],
@@ -137,6 +228,31 @@ const VEHICLES_MAP: ColMap = {
   "shipment name":            "shipment_name",
   "lou":                      "lou",
   "status":                   "status",
+  // ─ API / server-side JSON field names (stock_balance.php) ─
+  "chassisno":                "chassis_no",
+  "engineno":                 "engine_no",
+  "plateno":                  "reg_no",
+  "branchcode":               "branch_code",
+  "branchname":               "branch_name",
+  "yearmodel":                "year_model",
+  "colourmodel":              "colour",
+  "invoiceno":                "invoice_no",
+  "invoicedate":              null,               // no invoice_date column — bg_date is used from "date"
+  "amount":                   null,               // no amount column on vehicles
+  "total":                    null,               // no total column on vehicles
+  "sells total":              null,               // no sells_total column on vehicles
+  "sellstotal":               null,
+  "date":                     ["bg_date", toDate],
+  "vmid":                     null,               // no vm_id column on vehicles
+  "code":                     "model_code",       // Phase 1 column
+  "iid":                      "legacy_id",        // Phase 1 column
+  "supplierid":               null,               // no supplier_id_legacy column on vehicles
+  "vm_status":                "status",           // Phase 1 column
+  "carmodel":                 "model",
+  "carcolor":                 "colour",           // Phase 1 column
+  "cno":                      "chassis_no",
+  "eno":                      "engine_no",        // Phase 1 column
+  "amt":                      null,               // no amount column on vehicles
 };
 
 /** Customers */
@@ -162,6 +278,7 @@ const CUSTOMERS_MAP: ColMap = {
 
 /** Sales Orders */
 const SALES_ORDERS_MAP: ColMap = {
+  // ─ HTML-scraped header names ─
   "order no":               "order_no",
   "booking no":             "order_no",
   "customer":               "customer_name",
@@ -187,10 +304,32 @@ const SALES_ORDERS_MAP: ColMap = {
   "status":                 "status",
   "notes":                  "notes",
   "remark":                 "notes",
+  // ─ API / server-side JSON field names (customer_sales.php) ─
+  "vsono":                  "order_no",
+  "cusname":                "customer_name",     // Phase 1 column
+  "cusnric":                "ic_no",             // Phase 1 column
+  "registrationno":         "plate_no",          // maps to existing plate_no column
+  "registrationdate":       null,                // no reg_date on sales_orders
+  "chassisno":              "chassis_no",
+  "invrunning":             null,                // invoice is separate entity — skip
+  "invoicedate":            null,                // no invoice_date on sales_orders
+  "totalamountbank":        ["total_amount_bank", toNum],   // Phase 1 column
+  "balancecustomer":        ["balance_customer", toNum],    // Phase 1 column
+  "name":                   "salesman_name",
+  "overalltotal":           ["overall_total", toNum],       // Phase 1 column
+  "total_refund_amount":    ["total_refund_amount", toNum], // Phase 1 column
+  "total_deposit_amount":   ["booking_amount", toNum],
+  "sb_status":              "order_status",      // Phase 1 column (renamed from 'status')
+  "created_at":             ["booking_date", toDate],
+  "sbid":                   "legacy_id",         // Phase 1 column
+  "lastcancel":             ["last_cancel", toDate],  // Phase 1 column
+  "remarkinvoice":          "notes",
+  "count":                  null,                // computed field — skip
+  "integrated_box":         null,                // skip
 };
 
 /** Invoices */
-const INVOICES_MAP: ColMap = {
+const _INVOICES_MAP: ColMap = {
   "invoice no":       "invoice_no",
   "inv no.":          "invoice_no",
   "invoice number":   "invoice_no",
@@ -252,14 +391,16 @@ const DEALER_INVOICES_MAP: ColMap = {
 
 /** Official Receipts */
 const OFFICIAL_RECEIPTS_MAP: ColMap = {
-  "or no":        "receipt_no",
-  "receipt no":   "receipt_no",
-  "date":         ["receipt_date", toDate],
-  "amount":       ["amount", toNum],
-  "branch":       "branch",
-  "attachment":   "attachment_url",
-  "verified by":  "verified_by",
-  "status":       ["status", toStatus],
+  "or no":                "receipt_no",
+  "receipt no":           "receipt_no",
+  "officialreceipt no":   "receipt_no",
+  "date":                 ["receipt_date", toDate],
+  "amount":               ["amount", toNum],
+  "amount(rm)":           ["amount", toNum],
+  "branch":               "branch",
+  "attachment":           "attachment_url",
+  "verified by":          "verified_by",
+  "status":               ["status", toStatus],
 };
 
 /** Commission Records */
@@ -276,7 +417,7 @@ const COMMISSION_RECORDS_MAP: ColMap = {
 };
 
 /** Staff / Users */
-const STAFF_MAP: ColMap = {
+const _STAFF_MAP: ColMap = {
   "name":       "name",
   "staff name": "name",
   "username":   "username",
@@ -284,7 +425,7 @@ const STAFF_MAP: ColMap = {
   "emailaddress": "email",
   "role":       "role",
   "group":      "role",
-  "branch":     "branch_code",
+  // "branch" maps to branch_id (UUID) on profiles — skipped; resolve manually post-seed
   "status":     ["status", toStatus],
 };
 
@@ -350,31 +491,62 @@ const BANKS_MAP: ColMap = {
 
 /** Suppliers */
 const SUPPLIERS_MAP: ColMap = {
-  "name":             "name",
-  "supplier name":    "name",
-  "code":             "code",
-  "company reg no":   "company_reg_no",
-  "reg no":           "company_reg_no",
-  "address":          "address",
-  "contact no":       "contact_no",
-  "phone":            "contact_no",
-  "email":            "email",
-  "status":           ["status", toStatus],
+  "name":                        "name",
+  "supplier name":               "name",
+  "code":                        "code",
+  "company reg no":              "company_reg_no",
+  "companyregistration no.":     "company_reg_no",
+  "reg no":                      "company_reg_no",
+  "address":                     "company_address",
+  "companyaddress":              "company_address",
+  "mailingaddress":              "mailing_address",
+  "mailing address":             "mailing_address",
+  "attn":                        "attn",
+  "contact no":                  "contact_no",
+  "contact / hp no.":            "contact_no",
+  "phone":                       "contact_no",
+  "email":                       "email",
+  "status":                      ["status", toStatus],
+};
+
+/** Sales Advisors */
+const SALES_ADVISORS_MAP: ColMap = {
+  "id":           "legacy_id",
+  "code":         "code",
+  "name":         "name",
+  "ic no.":       "ic_no",
+  "ic no":        "ic_no",
+  "emailaddress": "email",
+  "email":        "email",
+  "contactno.":   "contact_no",
+  "contact no":   "contact_no",
+  "joindate":     ["join_date", toDate],
+  "join date":    ["join_date", toDate],
+  "resigndate":   ["resign_date", toDate],
+  "resign date":  ["resign_date", toDate],
+  "description":  "description",
+  "status":       ["status", toStatus],
 };
 
 /** Dealers */
 const DEALERS_MAP: ColMap = {
-  "name":             "name",
-  "dealer name":      "name",
-  "acc code":         "acc_code",
-  "account code":     "acc_code",
-  "company reg no":   "company_reg_no",
-  "reg no":           "company_reg_no",
-  "address":          "address",
-  "contact no":       "contact_no",
-  "phone":            "contact_no",
-  "email":            "email",
-  "status":           ["status", toStatus],
+  "name":                        "name",
+  "dealer name":                 "name",
+  "acc code":                    "acc_code",
+  "account code":                "acc_code",
+  "company reg no":              "company_reg_no",
+  "companyregistration no.":     "company_reg_no",
+  "reg no":                      "company_reg_no",
+  "address":                     "company_address",
+  "companyaddress":              "company_address",
+  "mailing address":             "mailing_address",
+  "mailingaddress":              "mailing_address",
+  "attn":                        "attn",
+  "contact no":                  "contact_no",
+  "contact / hp no.":            "contact_no",
+  "phone":                       "contact_no",
+  "email":                       "email",
+  "status":                      ["status", toStatus],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -385,33 +557,102 @@ interface SeedTarget {
   extractFile:   string;           // filename without .json
   table:         string;           // Supabase table name
   colMap:        ColMap;
-  uniqueKey?:    string;           // DB column to use for ON CONFLICT DO NOTHING check
+  uniqueKey?:    string;           // column used for in-memory dedup (first-wins)
+  conflictCols?: string;           // comma-sep columns for ON CONFLICT ... DO NOTHING upsert
   addCompanyId?: boolean;          // whether to inject company_id
   transform?:    (row: Record<string, unknown>) => Record<string, unknown>; // post-map hook
 }
 
+/** Returns a stateful transform that generates sequential codes (FC001, VC001 …)
+ * for tables whose extract data has no explicit code column. */
+function makeCodeGenTransform(prefix: string) {
+  let seq = 0;
+  return (row: Record<string, unknown>) => {
+    if (!row.code) {
+      seq += 1;
+      row.code = `${prefix}${String(seq).padStart(3, "0")}`;
+    }
+    return row;
+  };
+}
+
 const SEED_TARGETS: SeedTarget[] = [
   // Master data first (no FK deps)
-  { extractFile: "branches",           table: "branches",           colMap: BRANCHES_MAP,       uniqueKey: "code",       addCompanyId: true },
-  { extractFile: "finance-companies",  table: "finance_companies",  colMap: FINANCE_MAP,         uniqueKey: "code",       addCompanyId: true },
-  { extractFile: "insurance-companies",table: "insurance_companies",colMap: INSURANCE_MAP,       uniqueKey: "code",       addCompanyId: true },
-  { extractFile: "vehicle-models",     table: "vehicle_models",     colMap: MODELS_MAP,          uniqueKey: "code",       addCompanyId: true },
-  { extractFile: "vehicle-colours",    table: "vehicle_colours",    colMap: COLOURS_MAP,         uniqueKey: "code",       addCompanyId: true },
-  { extractFile: "payment-types",      table: "payment_types",      colMap: PAYMENT_TYPES_MAP,   uniqueKey: "name",       addCompanyId: true },
-  { extractFile: "banks",              table: "banks",              colMap: BANKS_MAP,           uniqueKey: "name",       addCompanyId: true },
-  { extractFile: "suppliers",          table: "suppliers",          colMap: SUPPLIERS_MAP,       uniqueKey: "name",       addCompanyId: true },
-  { extractFile: "dealers",            table: "dealers",            colMap: DEALERS_MAP,         uniqueKey: "name",       addCompanyId: true },
-  // Transactional data (FK deps: vehicles before sales_orders before invoices)
-  { extractFile: "vehicles",           table: "vehicles",           colMap: VEHICLES_MAP,        uniqueKey: "chassis_no", addCompanyId: true },
-  { extractFile: "customers",          table: "customers",          colMap: CUSTOMERS_MAP,       uniqueKey: undefined,    addCompanyId: true },
-  { extractFile: "sales-orders",       table: "sales_orders",       colMap: SALES_ORDERS_MAP,    uniqueKey: undefined,    addCompanyId: true },
-  { extractFile: "invoices",           table: "invoices",           colMap: INVOICES_MAP,        uniqueKey: "invoice_no", addCompanyId: true },
-  { extractFile: "purchase-invoices",  table: "purchase_invoices",  colMap: PURCHASE_INVOICES_MAP, uniqueKey: "invoice_no", addCompanyId: true },
-  { extractFile: "dealer-invoices",    table: "dealer_invoices",    colMap: DEALER_INVOICES_MAP, uniqueKey: "invoice_no", addCompanyId: true },
-  { extractFile: "official-receipts",  table: "official_receipts",  colMap: OFFICIAL_RECEIPTS_MAP, uniqueKey: "receipt_no", addCompanyId: true },
-  { extractFile: "commission-records", table: "commission_records", colMap: COMMISSION_RECORDS_MAP, uniqueKey: undefined, addCompanyId: true },
-  // Staff last (creates profiles; passwords must be reset separately)
-  { extractFile: "staff",              table: "profiles",           colMap: STAFF_MAP,           uniqueKey: "email",      addCompanyId: true },
+  { extractFile: "branches",           table: "branches",           colMap: BRANCHES_MAP,       uniqueKey: "code",       conflictCols: "code,company_id",        addCompanyId: true },
+  { extractFile: "finance-companies",  table: "finance_companies",  colMap: FINANCE_MAP,         uniqueKey: "code",       conflictCols: "code,company_id",        addCompanyId: true,
+    transform: makeCodeGenTransform("FC") },
+  { extractFile: "insurance-companies",table: "insurance_companies",colMap: INSURANCE_MAP,       uniqueKey: "code",       conflictCols: "code,company_id",        addCompanyId: true,
+    transform: makeCodeGenTransform("IC") },
+  { extractFile: "vehicle-models",     table: "vehicle_models",     colMap: MODELS_MAP,          uniqueKey: "code",       conflictCols: "code,company_id",        addCompanyId: true },
+  { extractFile: "vehicle-colours",    table: "vehicle_colours",    colMap: COLOURS_MAP,         uniqueKey: "code",       conflictCols: "code,company_id",        addCompanyId: true,
+    transform: makeCodeGenTransform("VC") },
+  { extractFile: "payment-types",      table: "payment_types",      colMap: PAYMENT_TYPES_MAP,   uniqueKey: "name",       conflictCols: "name,company_id",        addCompanyId: true },
+  { extractFile: "banks",              table: "banks",              colMap: BANKS_MAP,           uniqueKey: "name",                                                               addCompanyId: true },
+  { extractFile: "suppliers",          table: "suppliers",          colMap: SUPPLIERS_MAP,       uniqueKey: "name",                                                               addCompanyId: true },
+  { extractFile: "dealers",            table: "dealers",            colMap: DEALERS_MAP,         uniqueKey: "name",                                                               addCompanyId: true },
+  { extractFile: "sales-advisors",     table: "sales_advisors",     colMap: SALES_ADVISORS_MAP,  uniqueKey: "code",       conflictCols: "code,company_id",        addCompanyId: true },
+  // Transactional data
+  {
+    extractFile: "vehicles",
+    table: "vehicles",
+    colMap: VEHICLES_MAP,
+    uniqueKey: "chassis_no",
+    conflictCols: "chassis_no,company_id",  // unique index idx_vehicles_chassis_company
+    addCompanyId: true,
+    // Strip any mapped keys that still don't exist in the vehicles table schema.
+    transform: (row) => {
+      const VALID_VEHICLES = new Set([
+        "chassis_no","bg_date","shipment_etd_pkg","shipment_eta_kk_twu_sdk",
+        "date_received_by_outlet","reg_date","delivery_date","disb_date",
+        "branch_code","model","payment_method","salesman_name","customer_name",
+        "remark","vaa_date","full_payment_date","variant","shipment_name",
+        "lou","reg_no","invoice_no","company_id","is_d2d","source_row_id",
+        // Phase 1 extended columns:
+        "engine_no","year_model","colour","status","legacy_id","model_code","branch_name",
+      ]);
+      return Object.fromEntries(Object.entries(row).filter(([k]) => VALID_VEHICLES.has(k)));
+    },
+  },
+  // Customers: deduplicate by ic_no when present; partial index (ic_no,company_id) WHERE ic_no IS NOT NULL AND is_deleted=false
+  { extractFile: "customers",          table: "customers",          colMap: CUSTOMERS_MAP,       uniqueKey: "ic_no",                                                              addCompanyId: true },
+  {
+    extractFile: "sales-orders",
+    table: "sales_orders",
+    colMap: SALES_ORDERS_MAP,
+    conflictCols: "order_no,company_id",  // unique index uq_sales_orders_order_no_company (Phase 1)
+    addCompanyId: true,
+    // Strip mapped keys that don't exist in sales_orders, and supply NOT NULL defaults.
+    transform: (row) => {
+      const VALID_SALES_ORDERS = new Set([
+        "order_no","customer_id","salesman_name","branch_code","model",
+        "variant","color","booking_amount","discount","selling_price","payment_method",
+        "booking_date","expected_delivery_date","notes","chassis_no","company_id",
+        "vso_no","deposit_amount","bank_loan_amount","outstanding_amount",
+        "finance_company","insurance_company","plate_no","is_deleted",
+        // Phase 1 extended columns:
+        "customer_name","ic_no","legacy_id","order_status","total_amount_bank",
+        "balance_customer","overall_total","total_refund_amount","last_cancel",
+      ]);
+      const filtered = Object.fromEntries(
+        Object.entries(row).filter(([k]) => VALID_SALES_ORDERS.has(k))
+      ) as Record<string, unknown>;
+      // Ensure required NOT NULL columns have fallback values.
+      if (!filtered.salesman_name) filtered.salesman_name = "UNKNOWN";
+      if (!filtered.branch_code)   filtered.branch_code   = "LEGACY";
+      if (!filtered.model)         filtered.model         = "LEGACY";
+      return filtered;
+    },
+  },
+  // invoices.sales_order_id is NOT NULL FK to sales_orders — skipped until sales-orders are extracted
+  // { extractFile: "invoices",         table: "invoices",           colMap: INVOICES_MAP,        uniqueKey: "invoice_no", conflictCols: "invoice_no,company_id",  addCompanyId: true },
+  { extractFile: "purchase-invoices",  table: "purchase_invoices",  colMap: PURCHASE_INVOICES_MAP, uniqueKey: "invoice_no",                                                         addCompanyId: true,
+    transform: (row) => { if (!row.model) row.model = "IMPORTED"; return row; } },
+  { extractFile: "dealer-invoices",    table: "dealer_invoices",    colMap: DEALER_INVOICES_MAP, uniqueKey: "invoice_no",                                                          addCompanyId: true },
+  { extractFile: "official-receipts",  table: "official_receipts",  colMap: OFFICIAL_RECEIPTS_MAP, uniqueKey: "receipt_no", conflictCols: "receipt_no,company_id", addCompanyId: true },
+  { extractFile: "commission-records", table: "commission_records", colMap: COMMISSION_RECORDS_MAP,                                                             addCompanyId: true },
+  // Staff/profiles: profiles.id REFERENCES auth.users(id) ON DELETE CASCADE.
+  // Cannot insert profiles without a corresponding auth.users entry.
+  // { extractFile: "staff", table: "profiles", colMap: STAFF_MAP, uniqueKey: "email", addCompanyId: true },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -419,33 +660,37 @@ const SEED_TARGETS: SeedTarget[] = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Apply a ColMap to one raw row, returning the mapped DB row. */
-function applyColMap(raw: Record<string, string>, colMap: ColMap): Record<string, unknown> {
+function applyColMap(raw: Record<string, unknown>, colMap: ColMap): Record<string, unknown> {
   const mapped: Record<string, unknown> = {};
-  const unmapped: Record<string, string> = {};
+  const unmapped: Record<string, unknown> = {};
 
   for (const [rawKey, rawVal] of Object.entries(raw)) {
     const normKey = rawKey.toLowerCase().trim();
     const mapping = colMap[normKey];
 
+    // null mapping means "explicitly skip this field"
+    if (mapping === null) continue;
+
     if (!mapping) {
       // Store unrecognised columns in raw_data for later review
-      if (rawVal && rawVal !== "-" && rawVal !== "N/A") {
+      if (rawVal != null && rawVal !== "-" && rawVal !== "N/A") {
         unmapped[rawKey] = rawVal;
       }
       continue;
     }
 
+    const strVal = rawVal == null ? null : String(rawVal);
+
     if (typeof mapping === "string") {
-      mapped[mapping] = rawVal === "-" || rawVal === "N/A" ? null : rawVal || null;
+      mapped[mapping] = strVal === "-" || strVal === "N/A" ? null : rawVal ?? null;
     } else {
       const [col, transform] = mapping;
-      mapped[col] = transform(rawVal);
+      mapped[col] = transform(strVal as string);
     }
   }
 
-  if (Object.keys(unmapped).length > 0) {
-    mapped["raw_data"] = unmapped;
-  }
+  // Unrecognised columns are intentionally dropped — the extract JSON files
+  // in test-results/extract/ remain the authoritative raw source if needed.
 
   return mapped;
 }
@@ -455,49 +700,74 @@ function sleep(ms: number): Promise<void> {
 }
 
 function hasMappedBusinessField(row: Record<string, unknown>): boolean {
-  return Object.keys(row).some(key => key !== "raw_data" && key !== "company_id");
+  return Object.keys(row).some(key => key !== "company_id");
 }
 
-/** Insert rows in chunks, respecting CHUNK_DELAY between chunks. */
+/**
+ * Insert/upsert rows in chunks.
+ * - When `conflictCols` is provided: uses upsert with ignoreDuplicates=true so
+ *   rows that violate the unique constraint are silently skipped (counted as
+ *   "skipped", not "errors"), and other rows in the same chunk still succeed.
+ * - Without `conflictCols`: plain INSERT; unique-violation (23505) on the whole
+ *   chunk is treated as skipped; any other error is counted as an error.
+ */
 async function insertChunked(
   table: string,
   rows: Record<string, unknown>[],
-  dryRun: boolean
+  dryRun: boolean,
+  conflictCols?: string,
 ): Promise<{ inserted: number; skipped: number; errors: number }> {
   let inserted = 0, skipped = 0, errors = 0;
 
   for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
     const chunk = rows.slice(i, i + CHUNK_SIZE);
+    const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
 
     if (dryRun) {
       if (i === 0) {
         console.info(`    [dry-run] Sample row:`, JSON.stringify(chunk[0], null, 2));
       }
       inserted += chunk.length;
-    } else {
-      if (!supabase) {
-        throw new Error("Supabase client is unavailable outside dry-run mode");
-      }
+      continue;
+    }
 
+    if (!supabase) throw new Error("Supabase client is unavailable outside dry-run mode");
+
+    if (conflictCols) {
+      // Upsert: ON CONFLICT (conflictCols) DO NOTHING — row-level idempotency
+      const { error, data } = await supabase
+        .from(table as "vehicles")
+        .upsert(chunk as never[], { onConflict: conflictCols, ignoreDuplicates: true })
+        .select("id");
+
+      if (error) {
+        console.error(`    ✗ Chunk ${chunkNum} error: ${error.message}`);
+        errors += chunk.length;
+      } else {
+        const returned = data?.length ?? 0;
+        inserted += returned;
+        skipped  += chunk.length - returned;
+      }
+    } else {
+      // Plain insert — treat unique-violation as skipped
       const { error, data } = await supabase
         .from(table as "vehicles")
         .insert(chunk as never[])
         .select("id");
 
       if (error) {
-        // Duplicate / unique violation — count as skipped rather than error
         if (error.code === "23505") {
           skipped += chunk.length;
         } else {
-          console.error(`    ✗ Chunk ${Math.floor(i / CHUNK_SIZE) + 1} error: ${error.message}`);
+          console.error(`    ✗ Chunk ${chunkNum} error: ${error.message}`);
           errors += chunk.length;
         }
       } else {
         inserted += (data?.length ?? chunk.length);
       }
-
-      if (i + CHUNK_SIZE < rows.length) await sleep(CHUNK_DELAY);
     }
+
+    if (i + CHUNK_SIZE < rows.length) await sleep(CHUNK_DELAY);
   }
 
   return { inserted, skipped, errors };
@@ -557,17 +827,31 @@ async function main() {
 
     console.info(`\n[${target.table}]  (${rawRows.length} rows extracted)`);
 
-    // Map columns
-    const dbRows = rawRows.map(raw => {
+    // Map columns, normalize values, apply post-map transforms
+    let dbRows = rawRows.map(raw => {
       const mapped = applyColMap(raw, target.colMap);
       if (target.addCompanyId) mapped["company_id"] = COMPANY_ID;
-      if (target.transform) return target.transform(mapped);
-      return mapped;
-    }).filter(hasMappedBusinessField); // drop rows that mapped to nothing
+      const normalized = normalizeRow(mapped);
+      return target.transform ? target.transform(normalized) : normalized;
+    }).filter(hasMappedBusinessField)
+      .filter(row => {
+        // Skip rows where the uniqueKey column is null/empty (NOT NULL constraint)
+        if (!target.uniqueKey) return true;
+        const val = row[target.uniqueKey];
+        return val != null && val !== "";
+      });
+
+    // In-memory deduplication by uniqueKey (first occurrence wins)
+    if (target.uniqueKey) {
+      const before = dbRows.length;
+      dbRows = deduplicateRows(dbRows, target.uniqueKey);
+      const dropped = before - dbRows.length;
+      if (dropped > 0) console.info(`  Deduplicated ${dropped} in-extract duplicate(s) by '${target.uniqueKey}'`);
+    }
 
     console.info(`  Mapped ${dbRows.length} / ${rawRows.length} rows`);
 
-    const { inserted, skipped, errors } = await insertChunked(target.table, dbRows, DRY_RUN);
+    const { inserted, skipped, errors } = await insertChunked(target.table, dbRows, DRY_RUN, target.conflictCols);
     console.info(`  ✓ inserted: ${inserted}  skipped: ${skipped}  errors: ${errors}`);
 
     results.push({ name: target.extractFile, extracted: rawRows.length, inserted, skipped, errors, status: errors > 0 ? "error" : "ok" });

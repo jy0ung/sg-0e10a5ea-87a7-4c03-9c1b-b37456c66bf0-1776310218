@@ -167,6 +167,63 @@ export async function markPurchaseInvoiceReceived(
   return { error: insertError };
 }
 
+export async function getPurchaseInvoiceById(
+  companyId: string,
+  id: string,
+): Promise<PurchaseInvoiceRecord | null> {
+  const { data, error } = await supabase
+    .from('purchase_invoices')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) {
+    loggingService.error('getPurchaseInvoiceById failed', { companyId, id, error }, 'PurchaseInvoiceService');
+    throw new Error(error.message);
+  }
+  return data ? rowToInvoice(data as Record<string, unknown>) : null;
+}
+
+export interface UpdatePurchaseInvoiceInput {
+  invoiceNo?: string;
+  supplier?: string;
+  chassisNo?: string;
+  model?: string;
+  invoiceDate?: string;
+  amount?: number;
+  remark?: string | null;
+  actorId?: string;
+}
+
+export async function updatePurchaseInvoice(
+  companyId: string,
+  id: string,
+  fields: UpdatePurchaseInvoiceInput,
+): Promise<{ error: Error | null }> {
+  const patch: Record<string, unknown> = {};
+  if (fields.invoiceNo   !== undefined) patch['invoice_no']   = fields.invoiceNo;
+  if (fields.supplier    !== undefined) patch['supplier']     = fields.supplier;
+  if (fields.chassisNo   !== undefined) patch['chassis_no']   = fields.chassisNo.toUpperCase();
+  if (fields.model       !== undefined) patch['model']        = fields.model;
+  if (fields.invoiceDate !== undefined) patch['invoice_date'] = fields.invoiceDate;
+  if (fields.amount      !== undefined) patch['amount']       = fields.amount;
+  if (fields.remark      !== undefined) patch['remark']       = fields.remark;
+
+  if (Object.keys(patch).length === 0) return { error: null };
+
+  const { error } = await supabase
+    .from('purchase_invoices')
+    .update(patch)
+    .eq('company_id', companyId)
+    .eq('id', id);
+  if (error) {
+    loggingService.error('updatePurchaseInvoice failed', { companyId, id, error }, 'PurchaseInvoiceService');
+    return { error: new Error(error.message) };
+  }
+  if (fields.actorId) void logUserAction(fields.actorId, 'update', 'purchase_invoice', id, { component: 'PurchaseInvoiceService' });
+  return { error: null };
+}
+
 /**
  * Fetch a chassis → amount map for received purchase invoices within a
  * company. Used by the Margin Analysis page to compute real per-unit cost.

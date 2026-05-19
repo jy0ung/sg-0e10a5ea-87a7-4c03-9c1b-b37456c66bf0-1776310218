@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -141,10 +142,17 @@ function ConfirmDelete({ name, onConfirm, onCancel }: { name: string; onConfirm:
 
 // ── Main page ──────────────────────────────────────────────────────────────
 
+const VALID_TABS = ['finance','insurance','models','colours','tin','regfee','roadtax','inspfee','handfee','additems','paytype','banks'] as const;
+type MasterTab = typeof VALID_TABS[number];
+
 export default function MasterData() {
   const { hasRole } = useAuth();
   const companyId = useCompanyId();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get('tab') as MasterTab | null;
+  const tab: MasterTab = rawTab && (VALID_TABS as readonly string[]).includes(rawTab) ? rawTab : 'finance';
+  const onTabChange = (value: string) => setSearchParams({ tab: value }, { replace: true });
 
   // Finance Companies
   const [finCos, setFinCos] = useState<FinanceCompany[]>([]);
@@ -470,7 +478,7 @@ export default function MasterData() {
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Master Data' }]}
       />
 
-      <Tabs defaultValue="finance">
+      <Tabs value={tab} onValueChange={onTabChange}>
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="finance">Finance Cos</TabsTrigger>
           <TabsTrigger value="insurance">Insurance</TabsTrigger>

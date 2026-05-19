@@ -23,6 +23,7 @@ import {
 } from '@/lib/requestFormatters';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
 import { TicketAttachmentList } from '@/components/tickets/TicketAttachmentList';
+import { TicketApprovalHistory } from '@/components/tickets/TicketApprovalHistory';
 import { TicketApprovalSummary } from '@/components/tickets/TicketApprovalSummary';
 import { TicketSlaSummary } from '@/components/tickets/TicketSlaSummary';
 import type { RequestCategoryRecord } from '@/services/requestCategoryService';
@@ -154,6 +155,7 @@ export function RequestDetailPanel({
                 </div>
               )}
             </div>
+            <TicketApprovalHistory ticketId={ticket.id} />
           </div>
         )}
 

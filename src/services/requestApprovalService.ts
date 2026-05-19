@@ -97,14 +97,32 @@ export async function getInternalRequestApprovalPlan(
   const branchId = profileRow?.branch_id ? String(profileRow.branch_id) : null;
   const requesterRole = profileRow?.role ? String(profileRow.role) : null;
 
-  const { flowId, error: resolveError } = await resolveFlowForContext(companyId, 'internal_request', {
-    departmentId,
-    branchId,
-    requesterRole,
-    ...context,
-  });
+  // ── Category-pinned flow: highest precedence ──────────────────────────────
+  let flowId: string | null = null;
+  if (context?.categoryKey) {
+    const { data: catRow } = await supabase
+      .from('request_categories' as never)
+      .select('approval_flow_id')
+      .eq('company_id', companyId)
+      .eq('category_key', context.categoryKey)
+      .maybeSingle() as { data: { approval_flow_id: string | null } | null };
+    if (catRow?.approval_flow_id) {
+      flowId = catRow.approval_flow_id;
+    }
+  }
 
-  if (resolveError) return { data: null, error: resolveError };
+  // ── Condition-based resolver: fallback ────────────────────────────────────
+  if (!flowId) {
+    const { flowId: resolvedFlowId, error: resolveError } = await resolveFlowForContext(companyId, 'internal_request', {
+      departmentId,
+      branchId,
+      requesterRole,
+      ...context,
+    });
+    if (resolveError) return { data: null, error: resolveError };
+    flowId = resolvedFlowId;
+  }
+
   if (!flowId) return { data: null, error: null };
 
   const { data: steps, error: stepsError } = await approvalStepsTable()
@@ -203,6 +221,14 @@ export async function getInternalRequestApprovalGate(
   ticketId: string,
 ): Promise<{ data: InternalRequestApprovalMetadata | null; error: string | null }> {
   const result = await listInternalRequestApprovalMetadata([ticketId]);
+  if (result.error) return { data: null, error: result.error };
+  return { data: result.data.get(ticketId) ?? null, error: null };
+}
+
+export async function getInternalRequestApprovalWithHistory(
+  ticketId: string,
+): Promise<{ data: InternalRequestApprovalMetadata | null; error: string | null }> {
+  const result = await listInternalRequestApprovalMetadata([ticketId], true);
   if (result.error) return { data: null, error: result.error };
   return { data: result.data.get(ticketId) ?? null, error: null };
 }

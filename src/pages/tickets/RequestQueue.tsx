@@ -3,15 +3,21 @@ import { toast } from 'sonner';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
   AlertCircle,
+  AlertTriangle,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  Clock,
   Download,
+  Inbox,
   Loader2,
   RefreshCcw,
   ShieldCheck,
   SlidersHorizontal,
+  User,
+  UserX,
+  X,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -117,9 +123,12 @@ export default function RequestQueue() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [slaFilter, setSlaFilter] = useState<SlaFilter>('all');
+  const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [metricsExpanded, setMetricsExpanded] = useState(() => {
     if (typeof window === 'undefined') return true;
@@ -137,11 +146,48 @@ export default function RequestQueue() {
     [formFields],
   );
 
+  // ─── Saved view presets ────────────────────────────────────────────────────
+  type SavedViewDef = {
+    id: string;
+    label: string;
+    Icon: React.ComponentType<{ className?: string }>;
+    status: StatusFilter;
+    priority: PriorityFilter;
+    sla: SlaFilter;
+    assignedTo: string;
+  };
+
+  const savedViews = useMemo<SavedViewDef[]>(() => [
+    { id: 'all_active',    label: 'All Active',         Icon: Inbox,          status: 'active',              priority: 'all',  sla: 'all',      assignedTo: 'all' },
+    { id: 'my_queue',      label: 'My Queue',            Icon: User,           status: 'active',              priority: 'all',  sla: 'all',      assignedTo: user?.id ?? 'all' },
+    { id: 'unassigned',    label: 'Unassigned',          Icon: UserX,          status: 'active',              priority: 'all',  sla: 'all',      assignedTo: 'unassigned' },
+    { id: 'high_priority', label: 'High Priority',       Icon: AlertCircle,    status: 'active',              priority: 'high', sla: 'all',      assignedTo: 'all' },
+    { id: 'awaiting',      label: 'Awaiting Requester',  Icon: Clock,          status: 'awaiting_requester',  priority: 'all',  sla: 'all',      assignedTo: 'all' },
+    { id: 'breached',      label: 'Breached SLA',        Icon: AlertTriangle,  status: 'active',              priority: 'all',  sla: 'breached', assignedTo: 'all' },
+  ], [user?.id]);
+
+  const activeSavedView = useMemo(() => {
+    if (searchTerm.trim() !== '') return null;
+    return savedViews.find(
+      (v) => v.status === statusFilter && v.priority === priorityFilter && v.sla === slaFilter && v.assignedTo === assignedToFilter,
+    )?.id ?? null;
+  }, [savedViews, statusFilter, priorityFilter, slaFilter, assignedToFilter, searchTerm]);
+
+  const applyView = useCallback((view: SavedViewDef) => {
+    setStatusFilter(view.status);
+    setPriorityFilter(view.priority);
+    setSlaFilter(view.sla);
+    setAssignedToFilter(view.assignedTo);
+    setSearchTerm('');
+    setPage(1);
+    setSelectedIds(new Set());
+  }, []);
+
   // ─── React Query: ticket page ──────────────────────────────────────────────
   const ticketQueryKey = [
     'ticketQueue',
     user?.company_id,
-    { page, statusFilter, priorityFilter, slaFilter, searchTerm },
+    { page, statusFilter, priorityFilter, slaFilter, searchTerm, assignedToFilter },
   ] as const;
 
   const {
@@ -161,6 +207,7 @@ export default function RequestQueue() {
         priority: priorityFilter,
         sla: slaFilter,
         search: searchTerm,
+        assignedTo: assignedToFilter !== 'all' ? assignedToFilter as 'unassigned' | string : undefined,
       });
       if (result.error) throw result.error;
       return result.data!;
@@ -223,10 +270,11 @@ export default function RequestQueue() {
     all: 0, open: 0, in_progress: 0, awaiting_requester: 0, resolved: 0, closed: 0, cancelled: 0,
   };
 
-  // ─── Reset page when filters change ───────────────────────────────────────
+  // ─── Reset page + clear selection when filters change ──────────────────────
   useEffect(() => {
     setPage(1);
-  }, [priorityFilter, searchTerm, statusFilter, slaFilter]);
+    setSelectedIds(new Set());
+  }, [priorityFilter, searchTerm, statusFilter, slaFilter, assignedToFilter]);
 
   // ─── Side effects keyed on incoming ticket data ────────────────────────────
   useEffect(() => {
@@ -566,13 +614,77 @@ export default function RequestQueue() {
     />
   );
 
-  const hasActiveFilters = statusFilter !== 'active' || priorityFilter !== 'all' || slaFilter !== 'all' || searchTerm.trim() !== '';
+  const hasActiveFilters = statusFilter !== 'active' || priorityFilter !== 'all' || slaFilter !== 'all' || assignedToFilter !== 'all' || searchTerm.trim() !== '';
 
   const handleClearFilters = () => {
     setStatusFilter('active');
     setPriorityFilter('all');
     setSlaFilter('all');
+    setAssignedToFilter('all');
     setSearchTerm('');
+  };
+
+  // ─── Bulk action handlers ───────────────────────────────────────────────────
+  const handleBulkAssign = async (profileIdOrUnassigned: string) => {
+    if (!user || selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const assignedTo = profileIdOrUnassigned === 'unassigned' ? null : profileIdOrUnassigned;
+    setBulkSaving(true);
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map((ticketId) =>
+          updateTicket(ticketId, { assigned_to: assignedTo }, { userId: user.id, companyId: user.company_id }),
+        ),
+      );
+      setSelectedIds(new Set());
+      await queryClient.invalidateQueries({ queryKey: ['ticketQueue', user.company_id] });
+      toast.success(`${count} request${count === 1 ? '' : 's'} assigned`);
+    } catch {
+      toast.error('Failed to assign some requests');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const handleBulkStatus = async (status: TicketStatus) => {
+    if (!user || selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    setBulkSaving(true);
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map((ticketId) =>
+          updateTicket(ticketId, { status }, { userId: user.id, companyId: user.company_id }),
+        ),
+      );
+      setSelectedIds(new Set());
+      await queryClient.invalidateQueries({ queryKey: ['ticketQueue', user.company_id] });
+      toast.success(`${count} request${count === 1 ? '' : 's'} updated`);
+    } catch {
+      toast.error('Failed to update some requests');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const handleBulkExportCsv = () => {
+    const selected = filteredTickets.filter((t) => selectedIds.has(t.id));
+    const rows = [
+      ['ID', 'Subject', 'Status', 'Priority', 'SLA', 'Category', 'Subcategory', 'Requester', 'Owner', 'Requested due date', 'Created at'],
+      ...selected.map((ticket) => [
+        ticket.id,
+        ticket.subject,
+        formatTicketLabel(ticket.status),
+        ticket.priority,
+        formatSlaState(getTicketSlaSummary(ticket).overall),
+        getRequestCategoryLabel(ticket.category, categories),
+        ticket.subcategory ? getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories) : '',
+        ticket.submitted_by_name ?? ticket.submitted_by_email ?? '',
+        ticket.assigned_to_name ?? '',
+        ticket.requested_due_date ?? '',
+        ticket.created_at,
+      ]),
+    ];
+    downloadCsv(`internal-requests-selected-${new Date().toISOString().slice(0, 10)}.csv`, rows);
   };
 
   return (
@@ -613,6 +725,81 @@ export default function RequestQueue() {
       {metricsExpanded && (
         <div className="shrink-0">
           <RequestQueueMetricGrid metrics={queueMetrics} />
+        </div>
+      )}
+
+      {/* Saved views */}
+      <div className="flex shrink-0 gap-1 overflow-x-auto pb-0.5">
+        {savedViews.map((view) => {
+          const ViewIcon = view.Icon;
+          const isActive = activeSavedView === view.id;
+          return (
+            <button
+              key={view.id}
+              type="button"
+              onClick={() => applyView(view)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                isActive
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+              }`}
+            >
+              <ViewIcon className="h-3 w-3" />
+              {view.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Bulk action toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 shadow-sm">
+          <span className="text-xs font-medium text-foreground">{selectedIds.size} selected</span>
+          <div className="h-4 w-px bg-border" />
+          <select
+            disabled={bulkSaving}
+            className="h-7 rounded border border-border bg-background px-1.5 text-xs disabled:opacity-50"
+            value=""
+            onChange={(e) => { if (e.target.value) void handleBulkAssign(e.target.value); }}
+          >
+            <option value="" disabled>Assign to…</option>
+            <option value="unassigned">Unassigned</option>
+            {assignees.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+          <select
+            disabled={bulkSaving}
+            className="h-7 rounded border border-border bg-background px-1.5 text-xs disabled:opacity-50"
+            value=""
+            onChange={(e) => { if (e.target.value) void handleBulkStatus(e.target.value as TicketStatus); }}
+          >
+            <option value="" disabled>Set status…</option>
+            {statusOptions.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+            onClick={handleBulkExportCsv}
+            disabled={bulkSaving}
+          >
+            <Download className="h-3 w-3" />
+            CSV
+          </Button>
+          <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 text-xs text-muted-foreground"
+            onClick={() => setSelectedIds(new Set())}
+            disabled={bulkSaving}
+          >
+            <X className="h-3 w-3" />
+            Clear
+          </Button>
         </div>
       )}
 
@@ -687,6 +874,26 @@ export default function RequestQueue() {
             categories={categories}
             subcategories={subcategories}
             attachmentsByTicket={attachmentsByTicket}
+            selectedIds={selectedIds}
+            onToggleSelect={(ticketId) =>
+              setSelectedIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(ticketId)) next.delete(ticketId);
+                else next.add(ticketId);
+                return next;
+              })
+            }
+            onToggleSelectAll={(allIds) =>
+              setSelectedIds((prev) => {
+                const allSelected = allIds.every((id) => prev.has(id));
+                if (allSelected) {
+                  const next = new Set(prev);
+                  allIds.forEach((id) => next.delete(id));
+                  return next;
+                }
+                return new Set([...prev, ...allIds]);
+              })
+            }
             onSelectTicket={(ticketId) => {
               setSelectedTicketId(ticketId);
               if (!isLargeScreen) setDetailDrawerOpen(true);
@@ -710,7 +917,7 @@ export default function RequestQueue() {
               size="sm"
               className="h-7 gap-1 text-xs"
               disabled={page <= 1 || ticketsFetching}
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              onClick={() => { setPage((current) => Math.max(1, current - 1)); setSelectedIds(new Set()); }}
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               Prev
@@ -723,7 +930,7 @@ export default function RequestQueue() {
               size="sm"
               className="h-7 gap-1 text-xs"
               disabled={page >= totalPages || ticketsFetching}
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              onClick={() => { setPage((current) => Math.min(totalPages, current + 1)); setSelectedIds(new Set()); }}
             >
               Next
               <ChevronRight className="h-3.5 w-3.5" />

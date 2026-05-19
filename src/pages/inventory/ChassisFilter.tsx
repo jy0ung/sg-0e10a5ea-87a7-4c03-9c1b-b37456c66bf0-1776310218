@@ -152,7 +152,7 @@ export default function ChassisFilter() {
                     <td className="px-5 py-3">
                       {v.status ? <Badge variant={v.status === 'Available' ? 'default' : 'secondary'} className="rounded-md font-medium text-[10px] uppercase tracking-wider">{v.status}</Badge> : '—'}
                     </td>
-                    <td className="px-5 py-3 text-muted-foreground">{v.branch_id ?? '—'}</td>
+                    <td className="px-5 py-3 text-muted-foreground">{v.branch_code ?? '—'}</td>
                     <td className="px-5 py-3 text-muted-foreground">{v.owner_name ?? '—'}</td>
                   </tr>
                 ))}

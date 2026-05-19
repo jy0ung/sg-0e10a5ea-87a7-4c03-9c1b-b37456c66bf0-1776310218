@@ -94,6 +94,7 @@ const StockBalance = lazy(() => import("./pages/inventory/StockBalance"));
 const VehicleTransfer = lazy(() => import("./pages/inventory/VehicleTransfer"));
 const ChassisMovement = lazy(() => import("./pages/inventory/ChassisMovement"));
 const PurchaseInvoices = lazy(() => import("./pages/purchasing/PurchaseInvoices"));
+const PurchaseInvoiceDetail = lazy(() => import("./pages/purchasing/PurchaseInvoiceDetail"));
 const MarginAnalysis = lazy(() => import("./pages/sales/MarginAnalysis"));
 const OutstandingCollection = lazy(() => import("./pages/sales/OutstandingCollection"));
 const BranchManagement = lazy(() => import("./pages/admin/BranchManagement"));
@@ -206,7 +207,7 @@ const router = createBrowserRouter([
           { path: "orders", element: <R scope="Sales Orders"><S><SalesOrders /></S></R> },
           { path: "customers", element: <R scope="Customers"><S><Customers /></S></R> },
           { path: "invoices", element: <RequireRole roles={MANAGER_AND_UP}><R scope="Invoices"><S><Invoices /></S></R></RequireRole> },
-          { path: "performance", element: <R scope="Salesman Performance"><S><SalesmanPerformancePage /></S></R> },
+          { path: "performance", element: <RequireRole roles={MANAGER_AND_UP}><R scope="Salesman Performance"><S><SalesmanPerformancePage /></S></R></RequireRole> },
           { path: "advisors", element: <RequireRole roles={MANAGER_AND_UP}><R scope="Sales Advisors"><S><SalesAdvisors /></S></R></RequireRole> },
           { path: "margin", element: <RequireRole roles={EXECUTIVE}><R scope="Margin Analysis"><S><MarginAnalysis /></S></R></RequireRole> },
           { path: "outstanding", element: <R scope="Outstanding"><S><OutstandingCollection /></S></R> },
@@ -218,6 +219,7 @@ const router = createBrowserRouter([
       { path: "inventory/transfers", element: withModuleAccess('inventory', <RequireRole roles={MANAGER_AND_UP}><R scope="Vehicle Transfer"><S><VehicleTransfer /></S></R></RequireRole>) },
       { path: "inventory/chassis", element: withModuleAccess('inventory', <R scope="Chassis Movement"><S><ChassisMovement /></S></R>) },
       { path: "purchasing/invoices", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP}><R scope="Purchase Invoices"><S><PurchaseInvoices /></S></R></RequireRole>) },
+      { path: "purchasing/invoices/:id", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP}><R scope="Purchase Invoice Detail"><S><PurchaseInvoiceDetail /></S></R></RequireRole>) },
       { path: "admin/activity", element: <RequireRole roles={EXECUTIVE}><R scope="Activity Dashboard"><S><ActivityDashboard /></S></R></RequireRole> },
       { path: "admin/users", element: <RequireRole roles={ADMIN_ONLY}><R scope="Users"><S><UserManagement /></S></R></RequireRole> },
       { path: "admin/audit", element: <RequireRole roles={ADMIN_AND_DIRECTOR}><R scope="Audit Log"><S><AuditLog /></S></R></RequireRole> },

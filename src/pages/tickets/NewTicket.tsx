@@ -655,15 +655,6 @@ export default function NewTicket() {
     }
   }, [user?.branch_id]);
 
-  // Fetch approval plan once on mount
-  useEffect(() => {
-    if (!user?.company_id || !user?.id) return;
-    setApprovalPlan('loading');
-    getInternalRequestApprovalPlan(user.company_id, user.id).then(({ data, error }) => {
-      setApprovalPlan(error ? 'error' : data);
-    });
-  }, [user?.company_id, user?.id]);
-
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
     defaultValues: DEFAULT_FORM,
@@ -736,6 +727,18 @@ export default function NewTicket() {
   const { fields: customFields } = useRequestFormFields(user?.company_id, {
     categoryKey: selectedCategoryKey || undefined,
   });
+
+  // Re-evaluate approval plan when category changes (category-pinned flows take priority)
+  useEffect(() => {
+    if (!user?.company_id || !user?.id) return;
+    setApprovalPlan('loading');
+    getInternalRequestApprovalPlan(user.company_id, user.id, {
+      categoryKey: selectedCategoryKey || null,
+    }).then(({ data, error }) => {
+      setApprovalPlan(error ? 'error' : data);
+    });
+  }, [user?.company_id, user?.id, selectedCategoryKey]);
+
   const selectedSubcategoryKey = form.watch('subcategory');
   const selectedPriority = form.watch('priority');
   const descriptionValue = form.watch('description') ?? '';

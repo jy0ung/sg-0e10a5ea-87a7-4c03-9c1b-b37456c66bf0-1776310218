@@ -80,6 +80,8 @@ import {
   type RequestFormFieldRecord,
   type RequestFormFieldType,
 } from '@/services/requestFormFieldService';
+import { listApprovalFlows } from '@/services/approvalFlowService';
+import type { ApprovalFlow } from '@/types';
 
 interface CategoryDraft {
   label: string;
@@ -87,6 +89,7 @@ interface CategoryDraft {
   response_sla_hours: number | null;
   resolution_sla_hours: number | null;
   is_active: boolean;
+  approval_flow_id: string | null;
 }
 
 interface SubcategoryDraft {
@@ -106,7 +109,8 @@ function hasCategoryChanges(category: RequestCategoryRecord, draft: CategoryDraf
     || draft.description !== category.description
     || draft.response_sla_hours !== category.response_sla_hours
     || draft.resolution_sla_hours !== category.resolution_sla_hours
-    || draft.is_active !== category.is_active;
+    || draft.is_active !== category.is_active
+    || draft.approval_flow_id !== category.approval_flow_id;
 }
 
 function hasSubcategoryChanges(subcategory: RequestSubcategoryRecord, draft: SubcategoryDraft | undefined) {
@@ -243,6 +247,15 @@ export default function RequestSetup() {
   const [subcategoryDrafts, setSubcategoryDrafts] = useState<Record<string, SubcategoryDraft>>({});
   const [createSubcategoryDrafts, setCreateSubcategoryDrafts] = useState<Record<string, CreateSubcategoryDraft>>({});
 
+  // ── Approval flows for category pinning ──────────────────────────────────
+  const [approvalFlows, setApprovalFlows] = useState<ApprovalFlow[]>([]);
+  useEffect(() => {
+    if (!user?.company_id) return;
+    void listApprovalFlows(user.company_id).then(({ data }) => setApprovalFlows(data));
+  }, [user?.company_id]);
+  const internalRequestFlows = approvalFlows.filter((f) => f.entityType === 'internal_request' && f.isActive);
+  // ──────────────────────────────────────────────────────────────────────────
+
   // ── Attachment settings state ─────────────────────────────────────────────
   const { settings: attachmentSettings, loading: attachmentSettingsLoading, save: saveAttachmentSettings } =
     useAttachmentSettings(user?.company_id);
@@ -339,6 +352,7 @@ export default function RequestSetup() {
       response_sla_hours: category.response_sla_hours,
       resolution_sla_hours: category.resolution_sla_hours,
       is_active: category.is_active,
+      approval_flow_id: category.approval_flow_id,
     }])));
   }, [categories]);
 
@@ -461,6 +475,7 @@ export default function RequestSetup() {
           response_sla_hours: category.response_sla_hours,
           resolution_sla_hours: category.resolution_sla_hours,
           is_active: category.is_active,
+          approval_flow_id: category.approval_flow_id,
         }),
         ...patch,
       },
@@ -541,6 +556,7 @@ export default function RequestSetup() {
         response_sla_hours: draft.response_sla_hours,
         resolution_sla_hours: draft.resolution_sla_hours,
         is_active: draft.is_active,
+        approval_flow_id: draft.approval_flow_id,
       },
       { actorId: user.id, companyId: user.company_id },
     );
@@ -1243,6 +1259,40 @@ export default function RequestSetup() {
                       onCheckedChange={(checked) => updateCategoryDraft(editCategory, { is_active: checked })}
                       disabled={busyCategoryId === editCategory.id}
                     />
+                  </div>
+                  {/* Approval flow pinning */}
+                  <div className="space-y-2 rounded-lg border border-border px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Approval flow</p>
+                      <p className="text-xs text-muted-foreground">
+                        Pin a specific flow for this category. Overrides the condition-based scorer.
+                        Leave blank to use the default flow matching rules.
+                      </p>
+                    </div>
+                    <Select
+                      value={drafts[editCategory.id]?.approval_flow_id ?? '__none__'}
+                      onValueChange={(value) =>
+                        updateCategoryDraft(editCategory, { approval_flow_id: value === '__none__' ? null : value })
+                      }
+                      disabled={busyCategoryId === editCategory.id}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Use default matching rules" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Use default matching rules</SelectItem>
+                        {internalRequestFlows.map((flow) => (
+                          <SelectItem key={flow.id} value={flow.id}>
+                            {flow.name}
+                          </SelectItem>
+                        ))}
+                        {internalRequestFlows.length === 0 && (
+                          <SelectItem value="__no_flows__" disabled>
+                            No active internal-request flows configured
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-3 rounded-xl border border-dashed border-border/70 bg-secondary/10 p-4">
                     <p className="text-sm font-semibold text-foreground">Subcategories</p>

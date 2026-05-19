@@ -12,6 +12,7 @@ export interface RequestCategoryRecord {
   resolution_sla_hours: number | null;
   is_active: boolean;
   sort_order: number;
+  approval_flow_id: string | null;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
@@ -27,6 +28,7 @@ interface RequestCategoryRow {
   resolution_sla_hours?: number | null;
   is_active: boolean;
   sort_order: number;
+  approval_flow_id?: string | null;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
@@ -50,13 +52,14 @@ export interface UpdateRequestCategoryInput {
   response_sla_hours?: number | null;
   resolution_sla_hours?: number | null;
   is_active?: boolean;
+  approval_flow_id?: string | null;
 }
 
 export interface ListRequestCategoriesOptions {
   includeInactive?: boolean;
 }
 
-const REQUEST_CATEGORY_SELECT = 'id, company_id, category_key, label, description, response_sla_hours, resolution_sla_hours, is_active, sort_order, created_at, updated_at, updated_by';
+const REQUEST_CATEGORY_SELECT = 'id, company_id, category_key, label, description, response_sla_hours, resolution_sla_hours, is_active, sort_order, approval_flow_id, created_at, updated_at, updated_by';
 const LEGACY_REQUEST_CATEGORY_SELECT = 'id, company_id, category_key, label, description, is_active, sort_order, created_at, updated_at, updated_by';
 
 function isMissingSlaColumnError(error: unknown) {
@@ -86,6 +89,7 @@ function mapRequestCategory(row: RequestCategoryRow): RequestCategoryRecord {
     resolution_sla_hours: row.resolution_sla_hours ?? null,
     is_active: row.is_active,
     sort_order: row.sort_order,
+    approval_flow_id: row.approval_flow_id ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     updated_by: row.updated_by,
@@ -218,6 +222,9 @@ export async function updateRequestCategory(
   }
   if (input.is_active !== undefined) {
     patch.is_active = input.is_active;
+  }
+  if ('approval_flow_id' in input) {
+    patch.approval_flow_id = input.approval_flow_id ?? null;
   }
 
   const { data, error } = await supabase

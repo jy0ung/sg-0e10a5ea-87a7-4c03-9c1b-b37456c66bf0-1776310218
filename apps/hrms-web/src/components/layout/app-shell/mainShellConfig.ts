@@ -93,7 +93,7 @@ const navItems: MainNavItem[] = [
   { label: 'Invoices', path: '/sales/invoices', icon: Receipt, section: 'Sales', group: 'Transactions' },
   { label: 'Customers', path: '/sales/customers', icon: Users, section: 'Sales', group: 'Transactions' },
   { label: 'Dealer Invoices', path: '/sales/dealer-invoices', icon: FileText, section: 'Sales', group: 'Operations' },
-  { label: 'Verify OR', path: '/sales/verify-or', icon: Receipt, section: 'Sales', group: 'Operations' },
+  { label: 'Official Receipts', path: '/sales/verify-or', icon: Receipt, section: 'Sales', group: 'Operations' },
   { label: 'Outstanding Collection', path: '/sales/outstanding', icon: Landmark, section: 'Sales', group: 'Operations' },
   { label: 'Sales Advisors', path: '/sales/advisors', icon: UserCheck, section: 'Sales', group: 'Team' },
 

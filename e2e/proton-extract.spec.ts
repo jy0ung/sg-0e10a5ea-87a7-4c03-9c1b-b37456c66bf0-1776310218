@@ -79,6 +79,18 @@ interface Target {
   fallbacks?: string[];
   /** Optional per-target pagination safety cap. */
   maxPages?: number;
+  /**
+   * Optional action to run after landing on the page but before extraction.
+   * Use this for pages that require a filter form submission before showing data.
+   */
+  filterAction?: (page: Page) => Promise<void>;
+  /**
+   * Optional: DataTables server-side API endpoint (relative to BASE).
+   * When set, extraction is done via a direct API call instead of HTML scraping.
+   * The extractor will navigate to `url` first (for auth cookies), then call the API.
+   * The response must be JSON with a `data` array.
+   */
+  apiEndpoint?: string;
 }
 
 const EXTRACT_ONLY = new Set(
@@ -91,9 +103,9 @@ const EXTRACT_ONLY = new Set(
 const TARGETS: Target[] = [
   // ── Vehicles / Stock ────────────────────────────────────────────────────
   {
-    name:     "vehicles",
-    url:      "viewChassisFilter.php",
-    fallbacks: ["viewStockBalance.php", "viewChassis.php", "chassis.php", "stock.php"],
+    name:        "vehicles",
+    url:         "viewInventory.php",
+    apiEndpoint: "server_data/stock_balance.php",
   },
   // ── Customers ───────────────────────────────────────────────────────────
   {
@@ -102,11 +114,11 @@ const TARGETS: Target[] = [
     fallbacks: ["customer.php", "customers.php", "prospect.php"],
     maxPages: 250,
   },
-  // ── Sales Orders ────────────────────────────────────────────────────────
+  // ── Sales Orders ──────────────────────────────────────────────────────
   {
-    name:     "sales-orders",
-    url:      "viewSalesBooking.php",
-    fallbacks: ["viewSalesOrder.php", "salesOrder.php", "booking.php", "so.php"],
+    name:        "sales-orders",
+    url:         "viewSalesBooking.php",
+    apiEndpoint: "server_data/customer_sales.php",
   },
   // ── Invoices ────────────────────────────────────────────────────────────
   {
@@ -334,12 +346,70 @@ async function clickNextPage(page: Page): Promise<boolean> {
 }
 
 /**
+ * Fetch all records from a DataTables server-side JSON API endpoint.
+ * Navigates to `target.url` first (to establish the auth-cookie context),
+ * then calls the API with length=99999 to get all records in one shot.
+ *
+ * Returns the number of rows extracted.
+ */
+async function extractApiTarget(page: Page, target: Target): Promise<number> {
+  // Land on the parent page first (ensures cookies are scoped)
+  await politeDelay();
+  const resp = await page.goto(`${BASE}/${target.url}`, { waitUntil: "domcontentloaded" }).catch(() => null);
+  const finalUrl = page.url();
+  if (finalUrl.includes("sign-in") || finalUrl.includes("login")) {
+    console.log(`  ↩  Session expired — cannot extract ${target.name}`);
+    return 0;
+  }
+  if (resp && resp.status() === 404) {
+    console.log(`  ✗ 404 for ${target.url}`);
+    return 0;
+  }
+  console.log(`  → ${target.url} (${resp?.status() ?? "?"})`);
+
+  // Dismiss any DataTables JS dialogs that may have fired
+  page.once("dialog", d => d.accept().catch(() => undefined));
+  await page.waitForTimeout(1_000);
+
+  // Call the DataTables AJAX endpoint directly from within the page context
+  // (so session cookies are automatically included)
+  const apiUrl = `${BASE}/${target.apiEndpoint}`;
+  const allRows: Record<string, unknown>[] = await page.evaluate(async (url: string) => {
+    // First, get the total record count
+    const r0 = await fetch(`${url}?draw=1&start=0&length=1`, { credentials: "include" });
+    if (!r0.ok) throw new Error(`API returned ${r0.status}`);
+    const j0 = await r0.json() as { recordsTotal?: number; data?: unknown[] };
+    const total = j0.recordsTotal ?? j0.data?.length ?? 0;
+    if (total === 0) return [];
+    // Fetch all records in one request
+    const r1 = await fetch(`${url}?draw=2&start=0&length=${total + 100}`, { credentials: "include" });
+    if (!r1.ok) throw new Error(`API returned ${r1.status} on full fetch`);
+    const j1 = await r1.json() as { data?: unknown[] };
+    return (j1.data ?? []) as Record<string, unknown>[];
+  }, apiUrl);
+
+  console.log(`    api: ${allRows.length} rows`);
+
+  if (allRows.length > 0) {
+    writeExtract(target.name, allRows as Record<string, string>[]);
+  } else {
+    console.log(`  ⚠ No data returned from API for "${target.name}"`);
+  }
+  return allRows.length;
+}
+
+/**
  * Navigate to a target URL (with fallbacks), extract all paginated table data,
  * and write the result to EXTRACT_DIR/{name}.json.
  *
  * Returns the number of rows extracted (0 if page was unreachable or had no table).
  */
 async function extractTarget(page: Page, target: Target): Promise<number> {
+  // If an API endpoint is configured, use it directly — much faster and more complete
+  if (target.apiEndpoint) {
+    return extractApiTarget(page, target);
+  }
+
   const urls = [target.url, ...(target.fallbacks ?? [])];
   let landed = false;
 
@@ -372,6 +442,11 @@ async function extractTarget(page: Page, target: Target): Promise<number> {
   if (!landed) {
     console.log(`  ⚠ No reachable URL found for "${target.name}" — skipping`);
     return 0;
+  }
+
+  // Run the filter action if the page needs it (e.g. filter-form pages)
+  if (target.filterAction) {
+    await target.filterAction(page);
   }
 
   // Click a specific tab if required
