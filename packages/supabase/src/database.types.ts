@@ -2742,6 +2742,66 @@ export type Database = {
         }
         Relationships: []
       }
+      insurance_cover_notes: {
+        Row: {
+          company_id: string
+          cover_note_no: string | null
+          created_at: string
+          expiry_date: string | null
+          id: string
+          insurer: string
+          order_id: string
+          policy_no: string | null
+          premium: number | null
+          start_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          cover_note_no?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          insurer: string
+          order_id: string
+          policy_no?: string | null
+          premium?: number | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          cover_note_no?: string | null
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          insurer?: string
+          order_id?: string
+          policy_no?: string | null
+          premium?: number | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_cover_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_cover_notes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount: number
@@ -3419,6 +3479,69 @@ export type Database = {
             columns: ["sync_run_id"]
             isOneToOne: false
             referencedRelation: "sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loan_applications: {
+        Row: {
+          applied_amount: number | null
+          applied_date: string | null
+          approved_amount: number | null
+          approved_date: string | null
+          company_id: string
+          created_at: string
+          disbursed_date: string | null
+          id: string
+          lender: string
+          notes: string | null
+          order_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          applied_amount?: number | null
+          applied_date?: string | null
+          approved_amount?: number | null
+          approved_date?: string | null
+          company_id: string
+          created_at?: string
+          disbursed_date?: string | null
+          id?: string
+          lender: string
+          notes?: string | null
+          order_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          applied_amount?: number | null
+          applied_date?: string | null
+          approved_amount?: number | null
+          approved_date?: string | null
+          company_id?: string
+          created_at?: string
+          disbursed_date?: string | null
+          id?: string
+          lender?: string
+          notes?: string | null
+          order_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_applications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_applications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -4178,6 +4301,63 @@ export type Database = {
         }
         Relationships: []
       }
+      registration_records: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          jpj_ref: string | null
+          notes: string | null
+          order_id: string
+          plate_no: string | null
+          registered_date: string | null
+          status: string
+          submitted_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          jpj_ref?: string | null
+          notes?: string | null
+          order_id: string
+          plate_no?: string | null
+          registered_date?: string | null
+          status?: string
+          submitted_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          jpj_ref?: string | null
+          notes?: string | null
+          order_id?: string
+          plate_no?: string | null
+          registered_date?: string | null
+          status?: string
+          submitted_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registration_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registration_records_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       request_attachment_settings: {
         Row: {
           company_id: string
@@ -4222,6 +4402,7 @@ export type Database = {
       }
       request_categories: {
         Row: {
+          approval_flow_id: string | null
           category_key: string
           company_id: string
           created_at: string
@@ -4236,6 +4417,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          approval_flow_id?: string | null
           category_key: string
           company_id: string
           created_at?: string
@@ -4250,6 +4432,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          approval_flow_id?: string | null
           category_key?: string
           company_id?: string
           created_at?: string
@@ -4264,6 +4447,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "request_categories_approval_flow_id_fkey"
+            columns: ["approval_flow_id"]
+            isOneToOne: false
+            referencedRelation: "approval_flows"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "request_categories_company_id_fkey"
             columns: ["company_id"]
@@ -4573,8 +4763,317 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_activities: {
+        Row: {
+          activity_type: string
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          due_date: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          activity_type: string
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          activity_type?: string
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_activities_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_activities_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_activities_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_advisors: {
+        Row: {
+          branch_code: string | null
+          code: string | null
+          company_id: string
+          contact_no: string | null
+          created_at: string
+          description: string | null
+          email: string | null
+          ic_no: string | null
+          id: string
+          join_date: string | null
+          legacy_id: string | null
+          name: string
+          resign_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          branch_code?: string | null
+          code?: string | null
+          company_id: string
+          contact_no?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          ic_no?: string | null
+          id?: string
+          join_date?: string | null
+          legacy_id?: string | null
+          name: string
+          resign_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          branch_code?: string | null
+          code?: string | null
+          company_id?: string
+          contact_no?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          ic_no?: string | null
+          id?: string
+          join_date?: string | null
+          legacy_id?: string | null
+          name?: string
+          resign_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_advisors_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_cancellation_reasons: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          company_id: string
+          created_at: string
+          id: string
+          narration: string | null
+          order_id: string
+          reason_code: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          narration?: string | null
+          order_id: string
+          reason_code?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          narration?: string | null
+          order_id?: string
+          reason_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_cancellation_reasons_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_cancellation_reasons_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_cancellation_reasons_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_documents: {
+        Row: {
+          company_id: string
+          created_at: string
+          customer_id: string | null
+          doc_type: string
+          id: string
+          order_id: string | null
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          customer_id?: string | null
+          doc_type: string
+          id?: string
+          order_id?: string | null
+          storage_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          customer_id?: string | null
+          doc_type?: string
+          id?: string
+          order_id?: string | null
+          storage_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_documents_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_documents_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_order_status_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          company_id: string
+          from_status: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          to_status: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          company_id: string
+          from_status?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          to_status: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          company_id?: string
+          from_status?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_order_status_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_order_status_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "sales_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_orders: {
         Row: {
+          balance_customer: number | null
           bank_loan_amount: number | null
           booking_amount: number | null
           booking_date: string
@@ -4584,6 +5083,7 @@ export type Database = {
           company_id: string
           created_at: string
           customer_id: string | null
+          customer_name: string | null
           deleted_at: string | null
           deposit_amount: number | null
           discount: number | null
@@ -4594,24 +5094,33 @@ export type Database = {
           dms_so_no_id: string | null
           expected_delivery_date: string | null
           finance_company: string | null
+          ic_no: string | null
           id: string
           insurance_company: string | null
           is_deleted: boolean
+          last_cancel: string | null
+          legacy_id: string | null
           model: string
           notes: string | null
           order_no: string | null
+          order_status: string | null
           outstanding_amount: number | null
+          overall_total: number | null
           payment_method: string | null
           plate_no: string | null
+          salesman_id: string | null
           salesman_name: string
           selling_price: number | null
           stage_id: string | null
+          total_amount_bank: number | null
+          total_refund_amount: number | null
           updated_at: string
           variant: string | null
           vehicle_id: string | null
           vso_no: string | null
         }
         Insert: {
+          balance_customer?: number | null
           bank_loan_amount?: number | null
           booking_amount?: number | null
           booking_date: string
@@ -4621,6 +5130,7 @@ export type Database = {
           company_id: string
           created_at?: string
           customer_id?: string | null
+          customer_name?: string | null
           deleted_at?: string | null
           deposit_amount?: number | null
           discount?: number | null
@@ -4631,24 +5141,33 @@ export type Database = {
           dms_so_no_id?: string | null
           expected_delivery_date?: string | null
           finance_company?: string | null
+          ic_no?: string | null
           id?: string
           insurance_company?: string | null
           is_deleted?: boolean
+          last_cancel?: string | null
+          legacy_id?: string | null
           model: string
           notes?: string | null
           order_no?: string | null
+          order_status?: string | null
           outstanding_amount?: number | null
+          overall_total?: number | null
           payment_method?: string | null
           plate_no?: string | null
+          salesman_id?: string | null
           salesman_name: string
           selling_price?: number | null
           stage_id?: string | null
+          total_amount_bank?: number | null
+          total_refund_amount?: number | null
           updated_at?: string
           variant?: string | null
           vehicle_id?: string | null
           vso_no?: string | null
         }
         Update: {
+          balance_customer?: number | null
           bank_loan_amount?: number | null
           booking_amount?: number | null
           booking_date?: string
@@ -4658,6 +5177,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           customer_id?: string | null
+          customer_name?: string | null
           deleted_at?: string | null
           deposit_amount?: number | null
           discount?: number | null
@@ -4668,18 +5188,26 @@ export type Database = {
           dms_so_no_id?: string | null
           expected_delivery_date?: string | null
           finance_company?: string | null
+          ic_no?: string | null
           id?: string
           insurance_company?: string | null
           is_deleted?: boolean
+          last_cancel?: string | null
+          legacy_id?: string | null
           model?: string
           notes?: string | null
           order_no?: string | null
+          order_status?: string | null
           outstanding_amount?: number | null
+          overall_total?: number | null
           payment_method?: string | null
           plate_no?: string | null
+          salesman_id?: string | null
           salesman_name?: string
           selling_price?: number | null
           stage_id?: string | null
+          total_amount_bank?: number | null
+          total_refund_amount?: number | null
           updated_at?: string
           variant?: string | null
           vehicle_id?: string | null
@@ -4698,6 +5226,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_orders_salesman_id_fkey"
+            columns: ["salesman_id"]
+            isOneToOne: false
+            referencedRelation: "sales_advisors"
             referencedColumns: ["id"]
           },
           {
@@ -5480,8 +6015,10 @@ export type Database = {
           bg_to_disb: number | null
           bg_to_shipment_etd: number | null
           branch_code: string
+          branch_name: string | null
           chassis_no: string
           color: string | null
+          colour: string | null
           commission_paid: boolean | null
           commission_paid_at: string | null
           commission_remark: string | null
@@ -5499,6 +6036,7 @@ export type Database = {
           dms_last_synced_at: string | null
           dms_so_no: string | null
           dms_vs_stock_id: string | null
+          engine_no: string | null
           etd_to_outlet: number | null
           full_payment_date: string | null
           full_payment_type: string | null
@@ -5507,8 +6045,10 @@ export type Database = {
           invoice_no: string | null
           is_d2d: boolean
           is_deleted: boolean
+          legacy_id: string | null
           lou: string | null
           model: string
+          model_code: string | null
           obr: string | null
           outlet_to_reg: number | null
           payment_method: string
@@ -5524,9 +6064,11 @@ export type Database = {
           source_row_id: string | null
           stage: string | null
           stage_override: string | null
+          status: string | null
           updated_at: string
           vaa_date: string | null
           variant: string | null
+          year_model: string | null
         }
         Insert: {
           assigned_user_id?: string | null
@@ -5535,8 +6077,10 @@ export type Database = {
           bg_to_disb?: number | null
           bg_to_shipment_etd?: number | null
           branch_code?: string
+          branch_name?: string | null
           chassis_no: string
           color?: string | null
+          colour?: string | null
           commission_paid?: boolean | null
           commission_paid_at?: string | null
           commission_remark?: string | null
@@ -5554,6 +6098,7 @@ export type Database = {
           dms_last_synced_at?: string | null
           dms_so_no?: string | null
           dms_vs_stock_id?: string | null
+          engine_no?: string | null
           etd_to_outlet?: number | null
           full_payment_date?: string | null
           full_payment_type?: string | null
@@ -5562,8 +6107,10 @@ export type Database = {
           invoice_no?: string | null
           is_d2d?: boolean
           is_deleted?: boolean
+          legacy_id?: string | null
           lou?: string | null
           model?: string
+          model_code?: string | null
           obr?: string | null
           outlet_to_reg?: number | null
           payment_method?: string
@@ -5579,9 +6126,11 @@ export type Database = {
           source_row_id?: string | null
           stage?: string | null
           stage_override?: string | null
+          status?: string | null
           updated_at?: string
           vaa_date?: string | null
           variant?: string | null
+          year_model?: string | null
         }
         Update: {
           assigned_user_id?: string | null
@@ -5590,8 +6139,10 @@ export type Database = {
           bg_to_disb?: number | null
           bg_to_shipment_etd?: number | null
           branch_code?: string
+          branch_name?: string | null
           chassis_no?: string
           color?: string | null
+          colour?: string | null
           commission_paid?: boolean | null
           commission_paid_at?: string | null
           commission_remark?: string | null
@@ -5609,6 +6160,7 @@ export type Database = {
           dms_last_synced_at?: string | null
           dms_so_no?: string | null
           dms_vs_stock_id?: string | null
+          engine_no?: string | null
           etd_to_outlet?: number | null
           full_payment_date?: string | null
           full_payment_type?: string | null
@@ -5617,8 +6169,10 @@ export type Database = {
           invoice_no?: string | null
           is_d2d?: boolean
           is_deleted?: boolean
+          legacy_id?: string | null
           lou?: string | null
           model?: string
+          model_code?: string | null
           obr?: string | null
           outlet_to_reg?: number | null
           payment_method?: string
@@ -5634,9 +6188,11 @@ export type Database = {
           source_row_id?: string | null
           stage?: string | null
           stage_override?: string | null
+          status?: string | null
           updated_at?: string
           vaa_date?: string | null
           variant?: string | null
+          year_model?: string | null
         }
         Relationships: [
           {
