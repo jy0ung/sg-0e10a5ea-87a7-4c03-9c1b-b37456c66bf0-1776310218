@@ -329,7 +329,7 @@ const SALES_ORDERS_MAP: ColMap = {
 };
 
 /** Invoices */
-const _INVOICES_MAP: ColMap = {
+const INVOICES_MAP: ColMap = {
   "invoice no":       "invoice_no",
   "inv no.":          "invoice_no",
   "invoice number":   "invoice_no",
@@ -416,7 +416,12 @@ const COMMISSION_RECORDS_MAP: ColMap = {
   "status":         ["status", toStatus],
 };
 
-/** Staff / Users */
+/**
+ * Staff / Users — kept for reference but intentionally NOT wired to a seed target.
+ * profiles.id is a FK to auth.users(id) ON DELETE CASCADE; profiles rows must be
+ * created via the Supabase Admin API (or GoTrue) alongside auth.users, not via
+ * direct INSERT. Use bootstrap-admin.ts for admin accounts.
+ */
 const _STAFF_MAP: ColMap = {
   "name":       "name",
   "staff name": "name",
@@ -520,6 +525,10 @@ const SALES_ADVISORS_MAP: ColMap = {
   "email":        "email",
   "contactno.":   "contact_no",
   "contact no":   "contact_no",
+  // Phase 0: branch_code column added to sales_advisors table
+  "branch":       "branch_code",
+  "branchcode":   "branch_code",
+  "branch code":  "branch_code",
   "joindate":     ["join_date", toDate],
   "join date":    ["join_date", toDate],
   "resigndate":   ["resign_date", toDate],
@@ -561,6 +570,18 @@ interface SeedTarget {
   conflictCols?: string;           // comma-sep columns for ON CONFLICT ... DO NOTHING upsert
   addCompanyId?: boolean;          // whether to inject company_id
   transform?:    (row: Record<string, unknown>) => Record<string, unknown>; // post-map hook
+  /**
+   * Async FK-resolution step that runs after transform but before dedup+insert.
+   * Use this when a column must be resolved to a UUID by querying another table
+   * (e.g. resolving order_no → sales_orders.id for invoices).
+   * Receives the full supabase client and must return the modified rows.
+   * Rows that cannot be resolved should be dropped and counted internally.
+   */
+  resolveRows?:  (
+    rows:      Record<string, unknown>[],
+    client:    ReturnType<typeof createClient>,
+    companyId: string,
+  ) => Promise<Record<string, unknown>[]>;
 }
 
 /** Returns a stateful transform that generates sequential codes (FC001, VC001 …)
@@ -643,8 +664,60 @@ const SEED_TARGETS: SeedTarget[] = [
       return filtered;
     },
   },
-  // invoices.sales_order_id is NOT NULL FK to sales_orders — skipped until sales-orders are extracted
-  // { extractFile: "invoices",         table: "invoices",           colMap: INVOICES_MAP,        uniqueKey: "invoice_no", conflictCols: "invoice_no,company_id",  addCompanyId: true },
+  // Customer-sales invoices: sales_order_id (NOT NULL FK) is resolved at seed time by
+  // pre-fetching the order_no → id map from the already-seeded sales_orders table.
+  // Rows whose order_no does not match a seeded sales_order are dropped (logged).
+  {
+    extractFile:  "invoices",
+    table:        "invoices",
+    colMap:       INVOICES_MAP,
+    uniqueKey:    "invoice_no",
+    conflictCols: "invoice_no,company_id",
+    addCompanyId: true,
+    resolveRows: async (rows, client, companyId) => {
+      // Batch-fetch (order_no, id) for this company — may be large; PostgREST default limit is 1000.
+      // Use explicit range to page through if needed; for typical extract sizes one page is sufficient.
+      const { data: orders, error } = await client
+        .from('sales_orders')
+        .select('id, order_no')
+        .eq('company_id', companyId)
+        .not('order_no', 'is', null)
+        .limit(100_000);
+      if (error) {
+        console.error(`  ✗ resolveRows(invoices): failed to fetch sales_orders: ${error.message}`);
+        return [];
+      }
+      const orderMap = new Map<string, string>();
+      for (const r of (orders ?? [])) {
+        if (r.order_no) orderMap.set(String(r.order_no), String(r.id));
+      }
+      const VALID_INVOICES = new Set([
+        'invoice_no', 'sales_order_id', 'invoice_date', 'amount',
+        'tax_amount', 'total_amount', 'payment_status', 'paid_amount',
+        'due_date', 'company_id', 'invoice_type', 'customer_name', 'notes',
+      ]);
+      let unresolved = 0;
+      const resolved: Record<string, unknown>[] = [];
+      for (const row of rows) {
+        const ref = String(row['sales_order_ref'] ?? '').trim();
+        const uuid = ref ? orderMap.get(ref) : undefined;
+        if (!uuid) { unresolved++; continue; }
+        const clean: Record<string, unknown> = Object.fromEntries(
+          Object.entries({ ...row, sales_order_id: uuid })
+            .filter(([k]) => VALID_INVOICES.has(k))
+        );
+        // Supply NOT NULL column defaults for rows with missing data
+        if (!clean.invoice_date) clean.invoice_date = '1970-01-01';
+        if (clean.amount     == null) clean.amount      = 0;
+        if (clean.tax_amount == null) clean.tax_amount  = 0;
+        if (clean.total_amount == null) clean.total_amount = Number(clean.amount ?? 0);
+        resolved.push(clean);
+      }
+      if (unresolved > 0)
+        console.info(`  ⚠  dropped ${unresolved} invoice(s) — order_no not found in sales_orders`);
+      return resolved;
+    },
+  },
   { extractFile: "purchase-invoices",  table: "purchase_invoices",  colMap: PURCHASE_INVOICES_MAP, uniqueKey: "invoice_no",                                                         addCompanyId: true,
     transform: (row) => { if (!row.model) row.model = "IMPORTED"; return row; } },
   { extractFile: "dealer-invoices",    table: "dealer_invoices",    colMap: DEALER_INVOICES_MAP, uniqueKey: "invoice_no",                                                          addCompanyId: true },
@@ -847,6 +920,15 @@ async function main() {
       dbRows = deduplicateRows(dbRows, target.uniqueKey);
       const dropped = before - dbRows.length;
       if (dropped > 0) console.info(`  Deduplicated ${dropped} in-extract duplicate(s) by '${target.uniqueKey}'`);
+    }
+
+    // Async FK resolution (e.g. resolve order_no → sales_orders.id for invoices)
+    if (target.resolveRows) {
+      if (DRY_RUN) {
+        console.info(`  [dry-run] resolveRows: FK resolution would run (skipped in dry-run)`);
+      } else if (supabase) {
+        dbRows = await target.resolveRows(dbRows, supabase, COMPANY_ID);
+      }
     }
 
     console.info(`  Mapped ${dbRows.length} / ${rawRows.length} rows`);
