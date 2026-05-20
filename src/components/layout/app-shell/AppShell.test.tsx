@@ -41,6 +41,10 @@ function renderShell(path = '/', widthMode: 'contained' | 'wide' | 'full' = 'con
         fallbackChrome={{ title: 'Fallback', kicker: 'Fallback workspace' }}
         user={{ name: 'Shell Tester', email: 'shell@example.com', role: 'company_admin', profilePath: '/profile' }}
         searchPlaceholder="Search shell"
+        commandItems={[
+          { id: 'dashboard', label: 'Dashboard', section: 'Navigation', to: '/', icon: LayoutDashboard },
+          { id: 'settings', label: 'Settings', section: 'Navigation', to: '/settings', icon: Settings },
+        ]}
         widthMode={widthMode}
       >
         <div>Shell content</div>
@@ -66,16 +70,30 @@ describe('AppShell', () => {
     expect(resolveRouteChrome('/missing', routeChrome, { title: 'Fallback' })).toEqual({ title: 'Fallback' });
   });
 
-  it('renders shared sidebar, topbar, search, profile, and content', () => {
+  it('renders shared sidebar, topbar, command search, profile, and content', () => {
     renderShell('/settings');
 
     expect(screen.getByText('FLC BI')).toBeInTheDocument();
     expect(screen.getByText('Configuration')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Search shell' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Search shell' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveClass('nav-item-active');
     expect(screen.getByRole('link', { name: 'Open profile' })).toBeInTheDocument();
     expect(screen.getByText('Shell content')).toBeInTheDocument();
+  });
+
+  it('opens the command palette from the search control and Cmd+K', () => {
+    renderShell('/settings');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search shell' }));
+    expect(screen.getByRole('combobox', { name: 'Search shell' })).toBeInTheDocument();
+    expect(screen.getAllByText('Dashboard').length).toBeGreaterThan(0);
+
+    fireEvent.keyDown(document, { key: 'k', metaKey: true });
+    expect(screen.queryByRole('combobox', { name: 'Search shell' })).not.toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'k', metaKey: true });
+    expect(screen.getByRole('combobox', { name: 'Search shell' })).toBeInTheDocument();
   });
 
   it('applies the full-width workbench content mode', () => {

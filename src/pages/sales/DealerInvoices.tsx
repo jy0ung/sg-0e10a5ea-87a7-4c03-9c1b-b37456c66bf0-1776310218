@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ScrollableRegion } from '@/components/shared/ScrollableRegion';
 import { Button } from '@/components/ui/button';
@@ -15,14 +17,13 @@ import { getDealerInvoices, upsertDealerInvoice, deleteDealerInvoice } from '@/s
 import { DealerInvoice } from '@/types';
 import { Plus, Pencil, Search, Trash2 } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
-import { dealerInvoiceSchema } from '@/lib/validations';
+import { dealerInvoiceSchema, type DealerInvoiceFormData } from '@/lib/validations';
 import { PageErrorState } from '@/components/shared/PageState';
 
-type FormState = {
-  invoiceNo: string; branch: string; dealerName: string; carModel: string;
-  carColour: string; chassisNo: string; salesPrice: string; invoiceDate: string; status: string;
+const defaultValues: DealerInvoiceFormData = {
+  invoiceNo: '', dealerName: '', carModel: '', carColour: '', chassisNo: '',
+  salesPrice: undefined, invoiceDate: '', branch: '', status: 'Pending',
 };
-const empty: FormState = { invoiceNo: '', branch: '', dealerName: '', carModel: '', carColour: '', chassisNo: '', salesPrice: '', invoiceDate: '', status: 'Pending' };
 
 const STATUS_COLORS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   Pending: 'outline', Issued: 'default', Cancelled: 'destructive',
@@ -36,10 +37,13 @@ export default function DealerInvoices() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(empty);
-  const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DealerInvoice | null>(null);
   const [search, setSearch] = useState('');
+
+  const form = useForm<DealerInvoiceFormData>({
+    resolver: zodResolver(dealerInvoiceSchema),
+    defaultValues,
+  });
 
   const { data: invoices = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['dealer-invoices', companyId],
@@ -50,48 +54,32 @@ export default function DealerInvoices() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['dealer-invoices', companyId] });
 
-  const openAdd = () => { setEditId(null); setForm(empty); setDialogOpen(true); };
+  const openAdd = () => { setEditId(null); form.reset(defaultValues); setDialogOpen(true); };
   const openEdit = (inv: DealerInvoice) => {
     setEditId(inv.id);
-    setForm({
+    form.reset({
       invoiceNo: inv.invoiceNo ?? '', branch: inv.branch ?? '',
       dealerName: inv.dealerName ?? '', carModel: inv.carModel ?? '',
       carColour: inv.carColour ?? '', chassisNo: inv.chassisNo ?? '',
-      salesPrice: String(inv.salesPrice ?? ''), invoiceDate: inv.invoiceDate ?? '', status: inv.status,
+      salesPrice: inv.salesPrice ? Number(inv.salesPrice) : undefined,
+      invoiceDate: inv.invoiceDate ?? '', status: inv.status,
     });
     setDialogOpen(true);
   };
 
-  const handleSave = async () => {
-    const parsed = dealerInvoiceSchema.safeParse({
-      invoiceNo:   form.invoiceNo,
-      dealerName:  form.dealerName,
-      carModel:    form.carModel || undefined,
-      carColour:   form.carColour || undefined,
-      chassisNo:   form.chassisNo || undefined,
-      salesPrice:  form.salesPrice ? parseFloat(form.salesPrice) : undefined,
-      invoiceDate: form.invoiceDate || undefined,
-      branch:      form.branch || undefined,
-      status:      form.status,
-    });
-    if (!parsed.success) {
-      const first = parsed.error.errors[0];
-      return toast({ title: first.message, variant: 'destructive' });
-    }
-    setSaving(true);
+  const handleSave = async (data: DealerInvoiceFormData) => {
     const { error } = await upsertDealerInvoice(companyId, {
       id: editId ?? undefined,
-      invoiceNo: form.invoiceNo.trim(),
-      branch: form.branch.trim() || undefined,
-      dealerName: form.dealerName.trim(),
-      carModel: form.carModel.trim(),
-      carColour: form.carColour.trim() || undefined,
-      chassisNo: form.chassisNo.trim() || undefined,
-      salesPrice: parseFloat(form.salesPrice) || undefined,
-      invoiceDate: form.invoiceDate || undefined,
-      status: form.status,
+      invoiceNo: data.invoiceNo.trim(),
+      branch: data.branch?.trim() || undefined,
+      dealerName: data.dealerName.trim(),
+      carModel: data.carModel?.trim(),
+      carColour: data.carColour?.trim() || undefined,
+      chassisNo: data.chassisNo?.trim() || undefined,
+      salesPrice: data.salesPrice,
+      invoiceDate: data.invoiceDate || undefined,
+      status: data.status,
     });
-    setSaving(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await invalidate();
     setDialogOpen(false);
@@ -106,7 +94,7 @@ export default function DealerInvoices() {
     toast({ title: 'Invoice deleted' });
   };
 
-  const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
+  const fieldErrors = form.formState.errors;
 
   const filtered = invoices.filter(inv =>
     !search || [inv.invoiceNo, inv.dealerName, inv.carModel, inv.chassisNo ?? ''].some(v => (v ?? '').toLowerCase().includes(search.toLowerCase()))
@@ -187,27 +175,41 @@ export default function DealerInvoices() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>{editId ? 'Edit Dealer Invoice' : 'New Dealer Invoice'}</DialogTitle></DialogHeader>
-          <div className="grid gap-4 py-2">
-            {([
-              ['invoiceNo', 'Invoice No *', 'e.g. DI-2024-001'],
-              ['dealerName', 'Dealer Name *', 'e.g. Best Motors Sdn Bhd'],
-              ['carModel', 'Car Model', 'e.g. Proton X70'],
-              ['carColour', 'Colour', 'e.g. White'],
-              ['chassisNo', 'Chassis No', 'e.g. PM00012345'],
-              ['salesPrice', 'Sales Price (RM)', 'e.g. 98000'],
-              ['invoiceDate', 'Invoice Date', 'YYYY-MM-DD'],
-              ['status', 'Status', 'Pending / Issued / Cancelled'],
-            ] as [keyof FormState, string, string][]).map(([k, label, hint]) => (
-              <div key={k} className="grid grid-cols-3 items-center gap-4">
-                <Label className="text-right">{label}</Label>
-                <Input className="col-span-2" placeholder={hint} value={form[k]} onChange={set(k)} />
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
-          </DialogFooter>
+          <form onSubmit={form.handleSubmit(handleSave)}>
+            <div className="grid gap-4 py-2">
+              {([
+                ['invoiceNo', 'Invoice No *', 'e.g. DI-2024-001'],
+                ['dealerName', 'Dealer Name *', 'e.g. Best Motors Sdn Bhd'],
+                ['carModel', 'Car Model', 'e.g. Proton X70'],
+                ['carColour', 'Colour', 'e.g. White'],
+                ['chassisNo', 'Chassis No', 'e.g. PM00012345'],
+                ['salesPrice', 'Sales Price (RM)', 'e.g. 98000'],
+                ['invoiceDate', 'Invoice Date', 'YYYY-MM-DD'],
+                ['status', 'Status', 'Pending / Issued / Cancelled'],
+              ] as [keyof DealerInvoiceFormData, string, string][]).map(([k, label, hint]) => {
+                const err = fieldErrors[k];
+                return (
+                  <div key={k} className="grid grid-cols-3 items-center gap-4">
+                    <Label className="text-right">{label}</Label>
+                    <div className="col-span-2">
+                      <Input
+                        className={err ? 'border-destructive' : ''}
+                        placeholder={hint}
+                        {...form.register(k, k === 'salesPrice' ? { setValueAs: (v: string) => v === '' ? undefined : Number(v) } : undefined)}
+                      />
+                      {err && <p className="text-xs text-destructive mt-1">{err.message}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Saving…' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

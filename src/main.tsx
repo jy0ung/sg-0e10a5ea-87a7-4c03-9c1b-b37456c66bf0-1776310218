@@ -240,7 +240,7 @@ const router = createBrowserRouter([
       { path: "admin/user-groups", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="User Groups"><S><UserGroups /></S></R></RequireRole> },
       { path: 'admin/role-permissions', element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Role Permissions"><S><RolePermissionsPage /></S></R></RequireRole> },
       { path: "reports", element: withModuleAccess('reports', <R scope="Reports"><S><ReportsCenter /></S></R>) },
-      { path: "inventory/chassis-filter", element: withModuleAccess('inventory', <R scope="Chassis Filter"><S><ChassisFilter /></S></R>) },
+      { path: "inventory/chassis-filter", element: withModuleAccess('inventory', <R scope="Advanced Search"><S><ChassisFilter /></S></R>) },
       { path: "hrms", element: withModuleAccess('hrms', <R scope="HRMS Workspace"><S><HrmsWorkspaceRedirect /></S></R>) },
       { path: "hrms/admin", element: <LocationPreservingNavigate to={HRMS_PATHS.settings} /> },
       { path: "hrms/leave-calendar", element: <LocationPreservingNavigate to={HRMS_PATHS.leaveCalendar} /> },

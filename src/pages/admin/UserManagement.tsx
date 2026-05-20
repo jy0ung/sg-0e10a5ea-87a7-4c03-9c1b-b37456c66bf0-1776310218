@@ -586,7 +586,13 @@ export default function UserManagement() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Users & Roles" description="Manage platform users, roles, and account access" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Users & Roles' }]} />
-        <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading users...</div>
+        <div className="glass-panel p-4 animate-pulse space-y-3">
+          <div className="h-9 w-48 bg-muted rounded" />
+          <div className="border-t border-border" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-12 bg-muted rounded" />
+          ))}
+        </div>
       </div>
     );
   }

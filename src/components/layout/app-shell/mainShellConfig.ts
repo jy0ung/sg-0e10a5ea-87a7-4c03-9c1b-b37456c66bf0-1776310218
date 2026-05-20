@@ -37,16 +37,23 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { useBranding } from '@/contexts/BrandingContext';
+import { useSales } from '@/contexts/SalesContext';
 import { useFocusedMode } from '@/hooks/useFocusedMode';
 import { useRoleSectionMatrix } from '@/hooks/usePermissions';
 import { getDedicatedHrmsWorkspacePath, HRMS_PATHS, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
+import { STALE } from '@/lib/queryClient';
+import { getNotifications } from '@/services/notificationService';
+import { listProfiles } from '@/services/profileService';
+import { searchVehicles } from '@/services/vehicleService';
 import type { AppRole } from '@/types';
-import type { AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from './types';
+import type { AppShellCommandItem, AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from './types';
 
 interface MainNavItem extends AppShellNavItem {
   section: string;
@@ -80,12 +87,12 @@ const navItems: MainNavItem[] = [
 
   { label: 'Auto Aging Overview', path: '/auto-aging', icon: Timer, section: 'Auto Aging', group: 'Overview', end: true },
   { label: 'Vehicle Explorer', path: '/auto-aging/vehicles', icon: Car, section: 'Auto Aging', group: 'Overview' },
-  { label: 'Import Center', path: '/auto-aging/import', icon: Upload, section: 'Auto Aging', group: 'Data Pipeline', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
-  { label: 'Review Queue', path: '/auto-aging/review', icon: Search, section: 'Auto Aging', group: 'Data Pipeline', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
-  { label: 'Import History', path: '/auto-aging/history', icon: History, section: 'Auto Aging', group: 'Data Pipeline' },
-  { label: 'Data Quality', path: '/auto-aging/quality', icon: AlertTriangle, section: 'Auto Aging', group: 'Controls' },
-  { label: 'SLA Policies', path: '/auto-aging/sla', icon: Gauge, section: 'Auto Aging', group: 'Controls', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
-  { label: 'Mappings', path: '/auto-aging/mappings', icon: MapIcon, section: 'Auto Aging', group: 'Controls', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
+  { label: 'Import Center', path: '/auto-aging/import', icon: Upload, section: 'Auto Aging', group: 'Data Import', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { label: 'Review Queue', path: '/auto-aging/review', icon: Search, section: 'Auto Aging', group: 'Data Import', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { label: 'Import History', path: '/auto-aging/history', icon: History, section: 'Auto Aging', group: 'Data Import' },
+  { label: 'Data Quality', path: '/auto-aging/quality', icon: AlertTriangle, section: 'Auto Aging', group: 'Configuration' },
+  { label: 'SLA Policies', path: '/auto-aging/sla', icon: Gauge, section: 'Auto Aging', group: 'Configuration', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
+  { label: 'Mappings', path: '/auto-aging/mappings', icon: MapIcon, section: 'Auto Aging', group: 'Configuration', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
   { label: 'Commissions', path: '/auto-aging/commissions', icon: DollarSign, section: 'Auto Aging', group: 'Insights', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'Aging Reports', path: '/auto-aging/reports', icon: FileSpreadsheet, section: 'Auto Aging', group: 'Insights' },
 
@@ -100,7 +107,7 @@ const navItems: MainNavItem[] = [
   { label: 'Sales Advisors', path: '/sales/advisors', icon: UserCheck, section: 'Sales', group: 'Team', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
 
   { label: 'Stock Balance', path: '/inventory/stock', icon: Package, section: 'Inventory', group: 'Overview' },
-  { label: 'Chassis Filter', path: '/inventory/chassis-filter', icon: KanbanSquare, section: 'Inventory', group: 'Overview' },
+  { label: 'Advanced Search', path: '/inventory/chassis-filter', icon: KanbanSquare, section: 'Inventory', group: 'Overview' },
   { label: 'Vehicle Transfer', path: '/inventory/transfers', icon: ArrowLeftRight, section: 'Inventory', group: 'Movement', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
 
   { label: 'Purchase Invoices', path: '/purchasing/invoices', icon: Truck, section: 'Purchasing', group: 'Operations', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
@@ -166,13 +173,44 @@ function resolveNavigationHref(path: string): string {
   return isHrmsWorkspacePath(path) ? getDedicatedHrmsWorkspacePath(path) : path;
 }
 
+function textMatches(query: string, ...values: Array<string | number | null | undefined>): boolean {
+  const normalizedQuery = query.toLowerCase();
+  return values.some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
+}
+
+function routeCommandItems(sections: AppShellNavSection[]): AppShellCommandItem[] {
+  return sections.flatMap((section) =>
+    section.items.map((item) => ({
+      id: `route:${item.path}`,
+      label: item.label,
+      description: section.name,
+      section: 'Navigation',
+      icon: item.icon,
+      to: item.external ? undefined : item.path,
+      href: item.external ? item.href ?? resolveNavigationHref(item.path) : item.href,
+      external: item.external,
+    })),
+  );
+}
+
 export function useMainAppShellConfig() {
   const { user, logout, hasRole } = useAuth();
   const { branding } = useBranding();
   const { isFocused } = useFocusedMode();
   const { isModuleActive } = useModuleAccess();
   const { pathname } = useLocation();
+  const { customers, salesOrders } = useSales();
   const rolePermissions = useRoleSectionMatrix();
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['notifications', user?.id ?? ''],
+    queryFn: async () => {
+      const result = await getNotifications(user!.id);
+      if (result.error) throw result.error;
+      return result.data;
+    },
+    enabled: !!user?.id,
+    staleTime: STALE.notifications,
+  });
   const allowedSections: string[] = user?.role
     ? (rolePermissions[user.role] ?? sectionDefs.map((section) => section.name))
     : sectionDefs.map((section) => section.name);
@@ -216,6 +254,70 @@ export function useMainAppShellConfig() {
       };
     })
     .filter((section) => section.items.length > 0);
+  const commandItems = useMemo(() => routeCommandItems(sections), [sections]);
+  const unreadCount = notifications.filter((notification) => !notification.read).length;
+  const canSearchUsers = hasRole(['super_admin', 'company_admin']);
+  const onCommandSearch = useCallback(async (query: string): Promise<AppShellCommandItem[]> => {
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 2) return [];
+
+    const vehicleResult = await searchVehicles({
+      search: trimmedQuery,
+      limit: 6,
+      sortColumn: 'chassis_no',
+      sortDirection: 'asc',
+    });
+    const vehicleItems: AppShellCommandItem[] = vehicleResult.data.rows.map((vehicle) => ({
+      id: `vehicle:${vehicle.id}`,
+      label: vehicle.chassis_no || 'Vehicle record',
+      description: [vehicle.model, vehicle.branch_code, vehicle.customer_name].filter(Boolean).join(' - '),
+      section: 'Vehicles',
+      icon: Car,
+      to: `/auto-aging/vehicles?search=${encodeURIComponent(vehicle.chassis_no || trimmedQuery)}`,
+    }));
+
+    const customerItems: AppShellCommandItem[] = customers
+      .filter((customer) => textMatches(trimmedQuery, customer.name, customer.phone, customer.email, customer.icNo, customer.nric))
+      .slice(0, 6)
+      .map((customer) => ({
+        id: `customer:${customer.id}`,
+        label: customer.name,
+        description: [customer.phone, customer.email].filter(Boolean).join(' - ') || 'Customer',
+        section: 'Customers',
+        icon: Users,
+        to: `/sales/customers?search=${encodeURIComponent(customer.name)}`,
+      }));
+
+    const orderItems: AppShellCommandItem[] = salesOrders
+      .filter((order) => textMatches(trimmedQuery, order.orderNo, order.customerName, order.model, order.chassisNo, order.vsoNo, order.plateNo))
+      .slice(0, 6)
+      .map((order) => ({
+        id: `sales-order:${order.id}`,
+        label: order.orderNo,
+        description: [order.customerName, order.model].filter(Boolean).join(' - ') || 'Sales order',
+        section: 'Sales Orders',
+        icon: ShoppingCart,
+        to: `/sales/orders?search=${encodeURIComponent(order.orderNo)}`,
+      }));
+
+    let userItems: AppShellCommandItem[] = [];
+    if (canSearchUsers && user?.company_id) {
+      const profileResult = await listProfiles(user.company_id);
+      userItems = profileResult.data
+        .filter((profile) => textMatches(trimmedQuery, profile.name, profile.email, profile.role, profile.status))
+        .slice(0, 6)
+        .map((profile) => ({
+          id: `profile:${profile.id}`,
+          label: profile.name || profile.email,
+          description: [profile.email, profile.role.replace(/_/g, ' ')].filter(Boolean).join(' - '),
+          section: 'Users',
+          icon: Shield,
+          to: `/admin/users?search=${encodeURIComponent(profile.email)}`,
+        }));
+    }
+
+    return [...vehicleItems, ...customerItems, ...orderItems, ...userItems];
+  }, [canSearchUsers, customers, salesOrders, user?.company_id]);
 
   return {
     brand: {
@@ -229,9 +331,11 @@ export function useMainAppShellConfig() {
     fallbackChrome: MAIN_ROUTE_CHROME[0],
     user: user ? { name: user.name, email: user.email, role: user.role, profilePath: '/profile' } : undefined,
     onSignOut: () => void logout(),
-    topbarActions: [{ label: 'Open notifications', icon: Bell, to: '/notifications', badge: true }],
-    focusedBackLink: isFocused && focusedSection ? { label: 'All modules', to: '/modules', icon: ArrowLeft } : null,
     searchPlaceholder: 'Search workspace...',
+    commandItems,
+    onCommandSearch,
+    topbarActions: [{ label: 'Open notifications', icon: Bell, to: '/notifications', badge: unreadCount || undefined }],
+    focusedBackLink: isFocused && focusedSection ? { label: 'All modules', to: '/modules', icon: ArrowLeft } : null,
     widthMode: 'full' as const,
   };
 }

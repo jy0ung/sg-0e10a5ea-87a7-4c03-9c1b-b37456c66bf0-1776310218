@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -13,10 +15,9 @@ import { createCustomer, updateCustomer, deleteCustomer, getCustomersPage } from
 import { Customer } from '@/types';
 import { Plus, Search, Pencil, Trash2, User, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
-import { customerSchema } from '@/lib/validations';
+import { customerSchema, type CustomerFormData } from '@/lib/validations';
 
 const PAGE_SIZE = 50;
-const EMPTY: Omit<Customer, 'id' | 'companyId' | 'createdAt' | 'updatedAt'> = { name: '', email: '', phone: '', address: '', nric: '' };
 
 export default function Customers() {
   const { user } = useAuth();
@@ -24,14 +25,17 @@ export default function Customers() {
   const { reloadSales } = useSales();
   const queryClient = useQueryClient();
 
+  const form = useForm<CustomerFormData>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: { name: '', email: '', phone: '', address: '', nric: '' },
+  });
+
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
-  const [form, setForm] = useState({ ...EMPTY });
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
-  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   // Debounce search input; reset to page 1 on new search term.
@@ -58,24 +62,17 @@ export default function Customers() {
   const invalidatePage = () =>
     queryClient.invalidateQueries({ queryKey: ['customers-page', companyId] });
 
-  const openAdd = () => { setEditing(null); setForm({ ...EMPTY }); setDialogOpen(true); };
+  const openAdd = () => { setEditing(null); form.reset({ name: '', email: '', phone: '', address: '', nric: '' }); setDialogOpen(true); };
   const openEdit = (c: Customer) => {
     setEditing(c);
-    setForm({ name: c.name, email: c.email ?? '', phone: c.phone ?? '', address: c.address ?? '', nric: c.nric ?? '' });
+    form.reset({ name: c.name, email: c.email ?? '', phone: c.phone ?? '', address: c.address ?? '', nric: c.nric ?? '' });
     setDialogOpen(true);
   };
 
-  const handleSave = async () => {
-    const result = customerSchema.safeParse(form);
-    if (!result.success) {
-      const first = result.error.errors[0];
-      return toast({ title: first.message, variant: 'destructive' });
-    }
-    setSaving(true);
+  const handleSave = async (data: CustomerFormData) => {
     const { error } = editing
-      ? await updateCustomer(companyId, editing.id, form, user?.id)
-      : await createCustomer(companyId, form, user?.id);
-    setSaving(false);
+      ? await updateCustomer(companyId, editing.id, data, user?.id)
+      : await createCustomer(companyId, data, user?.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await Promise.all([invalidatePage(), reloadSales()]);
     setDialogOpen(false);
@@ -92,6 +89,8 @@ export default function Customers() {
     setDeleteTarget(null);
     toast({ title: 'Customer deleted' });
   };
+
+  const fieldErrors = form.formState.errors;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -177,18 +176,30 @@ export default function Customers() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{editing ? 'Edit Customer' : 'Add Customer'}</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            {(['name','phone','email','nric','address'] as const).map(field => (
-              <div key={field} className="space-y-1">
-                <label className="text-xs font-medium capitalize text-muted-foreground">{field}{field === 'name' && ' *'}</label>
-                <Input className="h-8 text-sm" value={form[field]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
-          </DialogFooter>
+          <form onSubmit={form.handleSubmit(handleSave)}>
+            <div className="space-y-3 py-2">
+              {(['name', 'phone', 'email', 'nric', 'address'] as const).map(field => {
+                const err = fieldErrors[field];
+                return (
+                  <div key={field} className="space-y-1">
+                    <label htmlFor={`customer-${field}`} className="text-xs font-medium capitalize text-muted-foreground">{field}{field === 'name' && ' *'}</label>
+                    <Input
+                      id={`customer-${field}`}
+                      className={`h-8 text-sm${err ? ' border-destructive' : ''}`}
+                      {...form.register(field)}
+                    />
+                    {err && <p className="text-xs text-destructive">{err.message}</p>}
+                  </div>
+                );
+              })}
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" type="button" onClick={() => setDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Saving…' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

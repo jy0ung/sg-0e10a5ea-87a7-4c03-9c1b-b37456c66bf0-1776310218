@@ -42,7 +42,7 @@ export interface StandardTableColumn<T> {
   className?: string;
 }
 
-export interface StandardTableProps<T extends Record<string, unknown>> {
+export interface StandardTableProps<T extends object> {
   data: T[];
   columns: StandardTableColumn<T>[];
   /** Placeholder for the global search box. */
@@ -66,15 +66,34 @@ export interface StandardTableProps<T extends Record<string, unknown>> {
   /** Slot rendered above the table when rows are selected (bulk actions bar). */
   bulkActions?: (selected: Set<string>, clearSelection: () => void) => React.ReactNode;
   className?: string;
+
+  // ── Server-side pagination ──────────────────────────────────────────────
+  /** Enable server-side pagination. When true, `data` should contain only the
+   *  current page, and `onPageChange` / `totalCount` control pagination UI. */
+  serverSide?: boolean;
+  /** Total records on the server (required when `serverSide` is true). */
+  totalCount?: number;
+  /** Current page number (1-indexed, required when `serverSide` is true). */
+  currentPage?: number;
+  /** Called when the page changes (required when `serverSide` is true). */
+  onPageChange?: (page: number) => void;
+  /** Called when the sort key or direction changes (server-side only). */
+  onSortChange?: (key: string | null, dir: SortDir) => void;
+  /** Called when the search term changes (server-side only). */
+  onSearchChange?: (term: string) => void;
 }
 
-type SortDir = 'asc' | 'desc';
+export type SortDir = 'asc' | 'desc';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_PAGE_SIZES = [10, 25, 50];
 
-export function StandardTable<T extends Record<string, unknown>>({
+function getValue<T extends object>(item: T, key: string): unknown {
+  return (item as Record<string, unknown>)[key];
+}
+
+export function StandardTable<T extends object>({
   data,
   columns,
   searchPlaceholder = 'Search…',
@@ -88,6 +107,12 @@ export function StandardTable<T extends Record<string, unknown>>({
   onSelectionChange,
   bulkActions,
   className,
+  serverSide = false,
+  totalCount: controlledTotal,
+  currentPage: controlledPage,
+  onPageChange,
+  onSortChange,
+  onSearchChange,
 }: StandardTableProps<T>) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -104,49 +129,60 @@ export function StandardTable<T extends Record<string, unknown>>({
 
   // ── Filter ────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
+    if (serverSide) return data;
     if (!search.trim()) return data;
     const term = search.trim().toLowerCase();
     return data.filter(item =>
       columns.some(col => {
-        const val = item[col.key];
+        const val = getValue(item, col.key);
         return typeof val === 'string' && val.toLowerCase().includes(term);
       }),
     );
-  }, [data, columns, search]);
+  }, [data, columns, search, serverSide]);
 
   // ── Sort ──────────────────────────────────────────────────────────────────
   const sorted = useMemo(() => {
+    if (serverSide) return filtered;
     if (!sortKey) return filtered;
     return [...filtered].sort((a, b) => {
-      const av = a[sortKey] ?? '';
-      const bv = b[sortKey] ?? '';
+      const av = getValue(a, sortKey) ?? '';
+      const bv = getValue(b, sortKey) ?? '';
       const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' });
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [filtered, sortKey, sortDir]);
+  }, [filtered, sortKey, sortDir, serverSide]);
 
   // ── Pagination ────────────────────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const pageData = useMemo(
-    () => sorted.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [sorted, safePage, pageSize],
-  );
+  const displayData = serverSide ? data : sorted;
+  const totalRecords = serverSide ? (controlledTotal ?? displayData.length) : displayData.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+  const safePage = serverSide ? (controlledPage ?? 1) : Math.min(page, totalPages);
+  const pageData = serverSide ? displayData : displayData.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  // Reset to page 1 when filter or sort changes
-  const handleSearch = (value: string) => { setSearch(value); setPage(1); };
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+    onSearchChange?.(value);
+  };
   const handleSort = (key: string) => {
+    let newDir: SortDir;
     if (sortKey === key) {
-      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+      newDir = sortDir === 'asc' ? 'desc' : 'asc';
     } else {
       setSortKey(key);
-      setSortDir('asc');
+      newDir = 'asc';
     }
+    setSortDir(newDir);
     setPage(1);
+    onSortChange?.(key, newDir);
+  };
+  const handlePageChange = (p: number) => {
+    setPage(p);
+    onPageChange?.(p);
   };
 
   // ── Selection ─────────────────────────────────────────────────────────────
-  const pageKeys = pageData.map(item => String(item[rowKey] ?? ''));
+  const pageKeys = pageData.map(item => String(getValue(item, rowKey) ?? ''));
   const allPageSelected = pageKeys.length > 0 && pageKeys.every(k => selected.has(k));
   const toggleAll = () => {
     const next = new Set(selected);
@@ -181,13 +217,14 @@ export function StandardTable<T extends Record<string, unknown>>({
               <Input
                 className="pl-8 h-8 text-sm"
                 placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
                 value={search}
                 onChange={e => handleSearch(e.target.value)}
               />
             </div>
           )}
           <span className="text-xs text-muted-foreground ml-auto">
-            {filtered.length} {filtered.length === 1 ? 'result' : 'results'}
+            {totalRecords} {totalRecords === 1 ? 'result' : 'results'}
           </span>
         </div>
       )}
@@ -220,6 +257,7 @@ export function StandardTable<T extends Record<string, unknown>>({
                         type="checkbox"
                         checked={allPageSelected}
                         onChange={toggleAll}
+                        aria-label="Select all rows on this page"
                         className="h-3.5 w-3.5 accent-primary"
                       />
                     </th>
@@ -244,7 +282,7 @@ export function StandardTable<T extends Record<string, unknown>>({
               </thead>
               <tbody>
                 {pageData.map((item, idx) => {
-                  const key = String(item[rowKey] ?? idx);
+                  const key = String(getValue(item, rowKey) ?? idx);
                   return (
                     <tr
                       key={key}
@@ -256,11 +294,12 @@ export function StandardTable<T extends Record<string, unknown>>({
                       onClick={() => onRowClick?.(item)}
                     >
                       {selectable && (
-                        <td className="w-10 px-3 py-3" onClick={e => { e.stopPropagation(); toggleRow(key); }}>
+                        <td className="w-10 px-3 py-3" onClick={e => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={selected.has(key)}
                             onChange={() => toggleRow(key)}
+                            aria-label="Select row"
                             className="h-3.5 w-3.5 accent-primary"
                           />
                         </td>
@@ -269,7 +308,7 @@ export function StandardTable<T extends Record<string, unknown>>({
                         <td key={col.key} className={cn('px-4 py-3 text-foreground', col.className)}>
                           {col.render
                             ? col.render(item, idx)
-                            : String(item[col.key] ?? '—')}
+                            : String(getValue(item, col.key) ?? '—')}
                         </td>
                       ))}
                     </tr>
@@ -286,7 +325,7 @@ export function StandardTable<T extends Record<string, unknown>>({
                 <span className="text-xs text-muted-foreground">Rows per page</span>
                 <Select
                   value={String(pageSize)}
-                  onValueChange={v => { setPageSize(Number(v)); setPage(1); }}
+                  onValueChange={v => { setPageSize(Number(v)); handlePageChange(1); }}
                 >
                   <SelectTrigger className="h-7 w-16 text-xs">
                     <SelectValue />
@@ -300,12 +339,12 @@ export function StandardTable<T extends Record<string, unknown>>({
               </div>
               <div className="flex items-center gap-1">
                 <span className="text-xs text-muted-foreground mr-2">
-                  {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, sorted.length)} of {sorted.length}
+                  {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, totalRecords)} of {totalRecords}
                 </span>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage <= 1} onClick={() => setPage(1)}>«</Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage <= 1} onClick={() => setPage(p => p - 1)}>‹</Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)}>›</Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage >= totalPages} onClick={() => setPage(totalPages)}>»</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage <= 1} onClick={() => handlePageChange(1)} aria-label="First page">«</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage <= 1} onClick={() => handlePageChange(safePage - 1)} aria-label="Previous page">‹</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage >= totalPages} onClick={() => handlePageChange(safePage + 1)} aria-label="Next page">›</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage >= totalPages} onClick={() => handlePageChange(totalPages)} aria-label="Last page">»</Button>
               </div>
             </div>
           )}

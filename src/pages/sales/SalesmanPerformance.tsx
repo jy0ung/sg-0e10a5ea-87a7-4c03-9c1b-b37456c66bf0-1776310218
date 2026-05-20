@@ -138,7 +138,9 @@ export default function SalesmanPerformancePage() {
                 <Target className="h-3 w-3 text-muted-foreground" />
                 <span className="font-medium">{t.salesmanName}</span>
                 <span className="text-muted-foreground">— {t.targetUnits} units</span>
-                <Button variant="ghost" size="icon" className="h-4 w-4 ml-1" onClick={() => handleDeleteTarget(t.id)}><Trash2 className="h-3 w-3 text-muted-foreground" /></Button>
+                <Button variant="ghost" size="icon" className="h-4 w-4 ml-1" onClick={() => handleDeleteTarget(t.id)} aria-label={`Delete target for ${t.salesmanName}`}>
+                  <Trash2 className="h-3 w-3 text-muted-foreground" />
+                </Button>
               </div>
             ))}
           </div>
@@ -158,8 +160,8 @@ export default function SalesmanPerformancePage() {
               { field: 'targetRevenue', label: 'Target Revenue', type: 'number' },
             ].map(({ field, label, type }) => (
               <div key={field} className="space-y-1">
-                <label className="text-xs text-muted-foreground">{label}</label>
-                <Input type={type ?? 'text'} className="h-8 text-sm" value={form[field as keyof typeof form]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
+                <label htmlFor={`target-${field}`} className="text-xs text-muted-foreground">{label}</label>
+                <Input id={`target-${field}`} type={type ?? 'text'} className="h-8 text-sm" value={form[field as keyof typeof form]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
               </div>
             ))}
           </div>

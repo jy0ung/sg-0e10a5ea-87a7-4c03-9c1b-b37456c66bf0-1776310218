@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useId, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Filter, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { useCompanyId } from '@/hooks/useCompanyId';
 import { DASHBOARD_PERIOD_OPTIONS, getDashboardScopeSummary, type DashboardPeriod } from '@/lib/dashboardFilters';
+import { STALE } from '@/lib/queryClient';
+import { getBranches } from '@/services/masterDataService';
 
 interface BranchPeriodFilterProps {
   branches: string[];
@@ -37,10 +41,31 @@ export function BranchPeriodFilter({
   allBranchLabel = 'All branches',
   allModelLabel = 'All models',
 }: BranchPeriodFilterProps) {
+  const branchSelectId = useId();
+  const periodSelectId = useId();
+  const modelSelectId = useId();
+  const companyId = useCompanyId();
+  const { data: branchRecords = [] } = useQuery({
+    queryKey: ['branches', companyId, 'filter-labels'],
+    queryFn: async () => {
+      const result = await getBranches(companyId);
+      if (result.error) throw result.error;
+      return result.data;
+    },
+    enabled: Boolean(companyId && branches.length > 0),
+    staleTime: STALE.reference,
+  });
+  const branchNameByCode = useMemo(() => {
+    return new Map(branchRecords.map((branchRecord) => [branchRecord.code, branchRecord.name]));
+  }, [branchRecords]);
+  const formatBranch = (branchCode: string) => {
+    const branchName = branchNameByCode.get(branchCode);
+    return branchName ? `${branchCode} - ${branchName}` : branchCode;
+  };
   const hasModelFilter = models.length > 0 && Boolean(onModelChange);
   const activeCount = (branch !== 'all' ? 1 : 0) + (period !== 'all_time' ? 1 : 0) + (hasModelFilter && model !== 'all' ? 1 : 0);
   const summary = getDashboardScopeSummary(
-    { branch, period, model },
+    { branch: branch === 'all' ? 'all' : formatBranch(branch), period, model },
     { allBranchLabel, allModelLabel },
   );
 
@@ -61,24 +86,24 @@ export function BranchPeriodFilter({
 
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">{branchLabel}</label>
+            <label htmlFor={branchSelectId} className="text-xs font-medium text-muted-foreground">{branchLabel}</label>
             <Select value={branch} onValueChange={onBranchChange}>
-              <SelectTrigger>
+              <SelectTrigger id={branchSelectId}>
                 <SelectValue placeholder={allBranchLabel} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{allBranchLabel}</SelectItem>
                 {branches.map(branchCode => (
-                  <SelectItem key={branchCode} value={branchCode}>{branchCode}</SelectItem>
+                  <SelectItem key={branchCode} value={branchCode}>{formatBranch(branchCode)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">{periodLabel}</label>
+            <label htmlFor={periodSelectId} className="text-xs font-medium text-muted-foreground">{periodLabel}</label>
             <Select value={period} onValueChange={(value) => onPeriodChange(value as DashboardPeriod)}>
-              <SelectTrigger>
+              <SelectTrigger id={periodSelectId}>
                 <SelectValue placeholder="All time" />
               </SelectTrigger>
               <SelectContent>
@@ -91,9 +116,9 @@ export function BranchPeriodFilter({
 
           {hasModelFilter && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">{modelLabel}</label>
+              <label htmlFor={modelSelectId} className="text-xs font-medium text-muted-foreground">{modelLabel}</label>
               <Select value={model} onValueChange={onModelChange}>
-                <SelectTrigger>
+                <SelectTrigger id={modelSelectId}>
                   <SelectValue placeholder={allModelLabel} />
                 </SelectTrigger>
                 <SelectContent>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Clock3, Loader2, Settings2 } from 'lucide-react';
+import { Clock3, Settings2 } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
@@ -16,8 +16,13 @@ export function RequireActiveModule({ moduleId, children }: RequireActiveModuleP
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <div className="space-y-4 animate-fade-in p-4 lg:p-6">
+        <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+        <div className="glass-panel p-4 animate-pulse space-y-3">
+          <div className="h-6 w-3/4 bg-muted rounded" />
+          <div className="h-6 w-1/2 bg-muted rounded" />
+          <div className="h-6 w-2/3 bg-muted rounded" />
+        </div>
       </div>
     );
   }

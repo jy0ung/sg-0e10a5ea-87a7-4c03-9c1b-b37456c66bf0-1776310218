@@ -3,16 +3,31 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { useSales } from '@/contexts/SalesContext';
 import { SalesOrder } from '@/types';
-import { GripVertical, Loader2 } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 
 export default function DealPipeline() {
   const { salesOrders, dealStages, moveOrderStage, loading } = useSales();
   const [dragging, setDragging] = useState<string | null>(null);
 
   if (loading) {
+    const SKELETON_STAGES = ['Stage 1', 'Stage 2', 'Stage 3', 'Stage 4', 'Stage 5'];
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      <div className="space-y-4 animate-fade-in overflow-hidden">
+        <div className="h-8 w-48 bg-muted rounded animate-pulse mb-4" />
+        <div className="flex gap-3 overflow-x-auto pb-4">
+          {SKELETON_STAGES.map((s, i) => (
+            <div key={i} className="flex-shrink-0 w-60 rounded-xl border border-border bg-secondary/20 animate-pulse">
+              <div className="px-3 py-2 border-b border-border">
+                <div className="h-4 w-20 bg-muted rounded" />
+              </div>
+              <div className="p-2 space-y-2">
+                {Array.from({ length: 3 }).map((_, j) => (
+                  <div key={j} className="h-20 bg-muted rounded-lg" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -63,6 +78,11 @@ export default function DealPipeline() {
                 <Badge variant="secondary" className="text-[10px] h-4 px-1">{orders.length}</Badge>
               </div>
               <div className="flex flex-col gap-2 p-2 min-h-24 flex-1">
+                {orders.length === 0 && (
+                  <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
+                    No deals in this stage
+                  </div>
+                )}
                 {orders.map(o => (
                   <OrderCard key={o.id} order={o} dragging={dragging === o.id} onDragStart={handleDragStart} />
                 ))}

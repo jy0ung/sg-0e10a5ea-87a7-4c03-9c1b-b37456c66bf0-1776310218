@@ -130,7 +130,13 @@ export default function SalesAdvisors() {
           description="Sales advisor profiles and branch assignments"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Sales Advisors' }]}
         />
-        <div className="glass-panel p-12 text-center text-sm text-muted-foreground">Loading advisors…</div>
+        <div className="glass-panel p-4 animate-pulse space-y-3">
+          <div className="h-9 w-48 bg-muted rounded" />
+          <div className="border-t border-border" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-12 bg-muted rounded" />
+          ))}
+        </div>
       </div>
     );
   }

@@ -512,7 +512,7 @@ export default function AutoAgingDashboard() {
               <DialogTitle>
                 {detailKpiId && KPI_DEFINITIONS.find(k => k.id === detailKpiId)?.label} — Vehicle Details
               </DialogTitle>
-              <Button variant="ghost" size="icon" onClick={() => setVehicleDetailsOpen(false)}>
+              <Button variant="ghost" size="icon" onClick={() => setVehicleDetailsOpen(false)} aria-label="Close vehicle details">
                 <X className="h-4 w-4" />
               </Button>
             </div>

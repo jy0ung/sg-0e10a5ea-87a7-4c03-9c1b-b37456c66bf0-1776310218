@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ScrollableRegion } from '@/components/shared/ScrollableRegion';
 import { Button } from '@/components/ui/button';
@@ -13,12 +15,12 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { createSalesOrder, linkExistingVehicle, unlinkExistingVehicle } from '@/services/salesOrderService';
 import { searchVehicles } from '@/services/vehicleService';
 import { SalesOrder, SalesOrderStatus, VehicleCanonical } from '@/types';
-import { Loader2, Plus, Search, Link2, FileText } from 'lucide-react';
+import { Plus, Search, Link2, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { MobileCardList } from '@/components/shared/MobileCardList';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
-import { salesOrderSchema } from '@/lib/validations';
+import { salesOrderSchema, type SalesOrderFormData } from '@/lib/validations';
 
 const STATUS_COLORS: Record<SalesOrderStatus, string> = {
   enquiry: 'bg-secondary text-secondary-foreground',
@@ -31,12 +33,28 @@ const STATUS_COLORS: Record<SalesOrderStatus, string> = {
 
 const STATUSES: SalesOrderStatus[] = ['enquiry','quoted','confirmed','booked','delivered','cancelled'];
 
+const defaultValues: SalesOrderFormData = {
+  orderNo: '', customerId: '', branchCode: '', salesmanName: '', model: '',
+  variant: '', colour: '', bookingDate: new Date().toISOString().split('T')[0],
+  bookingAmount: undefined, totalPrice: undefined, status: 'enquiry',
+  vsoNo: '', depositAmount: undefined, bankLoanAmount: undefined,
+  financeCompany: '', insuranceCompany: '', plateNo: '',
+};
+
+const NUMBER_FIELDS = new Set(['bookingAmount', 'totalPrice', 'depositAmount', 'bankLoanAmount']);
+
 export default function SalesOrders() {
   const { user } = useAuth();
   const companyId = useCompanyId();
   const { salesOrders, customers, invoices, reloadSales, loading } = useSales();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const form = useForm<SalesOrderFormData>({
+    resolver: zodResolver(salesOrderSchema),
+    defaultValues,
+  });
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [addOpen, setAddOpen] = useState(false);
@@ -47,7 +65,6 @@ export default function SalesOrders() {
   const [vehicleSearchLoading, setVehicleSearchLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [unlinkTarget, setUnlinkTarget] = useState<SalesOrder | null>(null);
-  const [form, setForm] = useState({ orderNo: '', customerId: '', branchCode: '', salesmanName: '', model: '', variant: '', colour: '', bookingDate: new Date().toISOString().split('T')[0], bookingAmount: '', totalPrice: '', status: 'enquiry' as SalesOrderStatus, vsoNo: '', depositAmount: '', bankLoanAmount: '', financeCompany: '', insuranceCompany: '', plateNo: '' });
 
   const filtered = salesOrders.filter(o =>
     (statusFilter === 'all' || o.status === statusFilter) &&
@@ -56,53 +73,28 @@ export default function SalesOrders() {
 
   const invoicedOrderIds = new Set(invoices.map(inv => inv.salesOrderId).filter(Boolean));
 
-  const handleCreate = async () => {
-    const result = salesOrderSchema.safeParse({
-      orderNo:      form.orderNo,
-      customerId:   form.customerId,
-      model:        form.model,
-      branchCode:   form.branchCode || undefined,
-      salesmanName: form.salesmanName || undefined,
-      variant:      form.variant || undefined,
-      colour:       form.colour || undefined,
-      bookingDate:  form.bookingDate,
-      bookingAmount: form.bookingAmount ? parseFloat(form.bookingAmount) : undefined,
-      totalPrice:   form.totalPrice ? parseFloat(form.totalPrice) : undefined,
-      status:       form.status,
-      vsoNo:        form.vsoNo || undefined,
-      depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : undefined,
-      bankLoanAmount: form.bankLoanAmount ? parseFloat(form.bankLoanAmount) : undefined,
-      financeCompany: form.financeCompany || undefined,
-      insuranceCompany: form.insuranceCompany || undefined,
-      plateNo:      form.plateNo || undefined,
-    });
-    if (!result.success) {
-      const first = result.error.errors[0];
-      return toast({ title: first.message, variant: 'destructive' });
-    }
-    setCreating(true);
-    const customer = customers.find(c => c.id === form.customerId);
+  const handleCreate = async (data: SalesOrderFormData) => {
+    const customer = customers.find(c => c.id === data.customerId);
     const { error } = await createSalesOrder(companyId, {
-      orderNo: form.orderNo,
-      customerId: form.customerId,
+      orderNo: data.orderNo,
+      customerId: data.customerId,
       customerName: customer?.name,
-      branchCode: form.branchCode,
-      salesmanName: form.salesmanName || undefined,
-      model: form.model,
-      variant: form.variant || undefined,
-      colour: form.colour || undefined,
-      bookingDate: form.bookingDate,
-      bookingAmount: form.bookingAmount ? parseFloat(form.bookingAmount) : undefined,
-      totalPrice: form.totalPrice ? parseFloat(form.totalPrice) : undefined,
-      status: form.status,
-      vsoNo: form.vsoNo || undefined,
-      depositAmount: form.depositAmount ? parseFloat(form.depositAmount) : undefined,
-      bankLoanAmount: form.bankLoanAmount ? parseFloat(form.bankLoanAmount) : undefined,
-      financeCompany: form.financeCompany || undefined,
-      insuranceCompany: form.insuranceCompany || undefined,
-      plateNo: form.plateNo || undefined,
+      branchCode: data.branchCode,
+      salesmanName: data.salesmanName || undefined,
+      model: data.model,
+      variant: data.variant || undefined,
+      colour: data.colour || undefined,
+      bookingDate: data.bookingDate,
+      bookingAmount: data.bookingAmount,
+      totalPrice: data.totalPrice,
+      status: data.status,
+      vsoNo: data.vsoNo || undefined,
+      depositAmount: data.depositAmount,
+      bankLoanAmount: data.bankLoanAmount,
+      financeCompany: data.financeCompany || undefined,
+      insuranceCompany: data.insuranceCompany || undefined,
+      plateNo: data.plateNo || undefined,
     }, user?.id);
-    setCreating(false);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await reloadSales();
     setAddOpen(false);
@@ -155,13 +147,15 @@ export default function SalesOrders() {
     toast({ title: 'Vehicle unlinked', description: order.chassisNo ? `Chassis: ${order.chassisNo}` : undefined });
   };
 
+  const fieldErrors = form.formState.errors;
+
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
       <PageHeader
         title="Sales Orders"
         description="Track orders from enquiry to delivery"
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Orders' }]}
-        actions={<Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" />New Order</Button>}
+        actions={<Button size="sm" onClick={() => { form.reset(defaultValues); setAddOpen(true); }}><Plus className="h-4 w-4 mr-1" />New Order</Button>}
       />
 
       {loading ? (
@@ -293,50 +287,79 @@ export default function SalesOrders() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>New Sales Order</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-2 gap-3 py-2">
-            {[
-              { field: 'orderNo', label: 'Order No *' },
-              { field: 'branchCode', label: 'Branch Code *' },
-              { field: 'model', label: 'Model *' },
-              { field: 'variant', label: 'Variant' },
-              { field: 'colour', label: 'Colour' },
-              { field: 'salesmanName', label: 'Salesman' },
-              { field: 'bookingDate', label: 'Booking Date', type: 'date' },
-              { field: 'bookingAmount', label: 'Booking Amt', type: 'number' },
-              { field: 'totalPrice', label: 'Total Price', type: 'number' },
-              { field: 'vsoNo', label: 'VSO No' },
-              { field: 'depositAmount', label: 'Deposit Amt', type: 'number' },
-              { field: 'bankLoanAmount', label: 'Bank Loan', type: 'number' },
-              { field: 'financeCompany', label: 'Finance Co' },
-              { field: 'insuranceCompany', label: 'Insurance Co' },
-              { field: 'plateNo', label: 'Plate No' },
-            ].map(({ field, label, type }) => (
-              <div key={field} className="space-y-1">
-                <label htmlFor={`sales-order-${field}`} className="text-xs text-muted-foreground">{label}</label>
-                <Input id={`sales-order-${field}`} type={type ?? 'text'} className="h-8 text-sm" value={form[field as keyof typeof form]} onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))} />
+          <form onSubmit={form.handleSubmit(handleCreate)}>
+            <div className="grid grid-cols-2 gap-3 py-2">
+              {[
+                { field: 'orderNo', label: 'Order No *' },
+                { field: 'branchCode', label: 'Branch Code *' },
+                { field: 'model', label: 'Model *' },
+                { field: 'variant', label: 'Variant' },
+                { field: 'colour', label: 'Colour' },
+                { field: 'salesmanName', label: 'Salesman' },
+                { field: 'bookingDate', label: 'Booking Date', type: 'date' },
+                { field: 'bookingAmount', label: 'Booking Amt', type: 'number' },
+                { field: 'totalPrice', label: 'Total Price', type: 'number' },
+                { field: 'vsoNo', label: 'VSO No' },
+                { field: 'depositAmount', label: 'Deposit Amt', type: 'number' },
+                { field: 'bankLoanAmount', label: 'Bank Loan', type: 'number' },
+                { field: 'financeCompany', label: 'Finance Co' },
+                { field: 'insuranceCompany', label: 'Insurance Co' },
+                { field: 'plateNo', label: 'Plate No' },
+              ].map(({ field, label, type }) => {
+                const isNumber = NUMBER_FIELDS.has(field);
+                const err = fieldErrors[field as keyof typeof fieldErrors];
+                return (
+                  <div key={field} className="space-y-1">
+                    <label htmlFor={`sales-order-${field}`} className="text-xs text-muted-foreground">{label}</label>
+                    <Input
+                      id={`sales-order-${field}`}
+                      type={type ?? 'text'}
+                      className={`h-8 text-sm${err ? ' border-destructive' : ''}`}
+                      {...form.register(field as keyof SalesOrderFormData, isNumber ? { setValueAs: (v: string) => v === '' ? undefined : Number(v) } : undefined)}
+                    />
+                    {err && <p className="text-xs text-destructive">{err.message}</p>}
+                  </div>
+                );
+              })}
+              <div className="space-y-1">
+                <label htmlFor="sales-order-customer" className="text-xs text-muted-foreground">Customer *</label>
+                <Controller
+                  control={form.control}
+                  name="customerId"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="sales-order-customer" className={`h-8 text-sm${fieldErrors.customerId ? ' border-destructive' : ''}`}>
+                        <SelectValue placeholder="Select…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {fieldErrors.customerId && <p className="text-xs text-destructive">{fieldErrors.customerId.message}</p>}
               </div>
-            ))}
-            <div className="space-y-1">
-              <label htmlFor="sales-order-customer" className="text-xs text-muted-foreground">Customer *</label>
-              <Select value={form.customerId} onValueChange={v => setForm(f => ({ ...f, customerId: v }))}>
-                <SelectTrigger id="sales-order-customer" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
-                <SelectContent>
-                  {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="space-y-1">
+                <label htmlFor="sales-order-status" className="text-xs text-muted-foreground">Status</label>
+                <Controller
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="sales-order-status" className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <label htmlFor="sales-order-status" className="text-xs text-muted-foreground">Status</label>
-              <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v as SalesOrderStatus }))}>
-                <SelectTrigger id="sales-order-status" className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={creating}>{creating ? 'Creating…' : 'Create'}</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button variant="ghost" type="button" onClick={() => setAddOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Creating…' : 'Create'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -351,7 +374,7 @@ export default function SalesOrders() {
               <div className="flex gap-2">
                 <Input id="sales-order-link-chassis-no" className="h-8 text-sm font-mono" placeholder="e.g. PM00A1234" value={chassisNo} onChange={e => setChassisNo(e.target.value)} />
                 <Button type="button" variant="outline" size="sm" className="h-8" aria-label="Search vehicles" onClick={handleVehicleSearch} disabled={vehicleSearchLoading}>
-                  {vehicleSearchLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                  <Search className="h-3.5 w-3.5" />
                 </Button>
               </div>
             </div>

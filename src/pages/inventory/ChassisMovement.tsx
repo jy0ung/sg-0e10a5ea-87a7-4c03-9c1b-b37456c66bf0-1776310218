@@ -151,11 +151,11 @@ export default function ChassisMovement() {
             </h3>
             {totalAuditPages > 1 && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Button variant="outline" size="icon" className="h-7 w-7" disabled={auditPage === 0 || loading} onClick={() => currentVehicleId && loadAuditPage(currentVehicleId, auditPage - 1)}>
+                <Button variant="outline" size="icon" className="h-7 w-7" disabled={auditPage === 0 || loading} onClick={() => currentVehicleId && loadAuditPage(currentVehicleId, auditPage - 1)} aria-label="Previous audit page">
                   <ChevronLeft className="h-3 w-3" />
                 </Button>
                 <span className="px-2">Page {auditPage + 1} of {totalAuditPages}</span>
-                <Button variant="outline" size="icon" className="h-7 w-7" disabled={auditPage >= totalAuditPages - 1 || loading} onClick={() => currentVehicleId && loadAuditPage(currentVehicleId, auditPage + 1)}>
+                <Button variant="outline" size="icon" className="h-7 w-7" disabled={auditPage >= totalAuditPages - 1 || loading} onClick={() => currentVehicleId && loadAuditPage(currentVehicleId, auditPage + 1)} aria-label="Next audit page">
                   <ChevronRight className="h-3 w-3" />
                 </Button>
               </div>

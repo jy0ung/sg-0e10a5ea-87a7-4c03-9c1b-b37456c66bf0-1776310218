@@ -95,10 +95,10 @@ function MappingTable<T extends { id: string; rawValue: string; notes?: string }
               <td className="px-3 py-2"><Input className="h-7 text-xs" value={editRow.notes} onChange={e => setEditRow(r => r && { ...r, notes: e.target.value })} placeholder="Notes" /></td>
               <td className="px-3 py-2">
                 <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={save} disabled={saving}>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={save} disabled={saving} aria-label="Save mapping">
                     {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5 text-green-500" />}
                   </Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={cancel}><X className="h-3.5 w-3.5 text-muted-foreground" /></Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={cancel} aria-label="Cancel mapping edit"><X className="h-3.5 w-3.5 text-muted-foreground" /></Button>
                 </div>
               </td>
             </tr>
@@ -112,10 +112,10 @@ function MappingTable<T extends { id: string; rawValue: string; notes?: string }
                 <td className="px-3 py-2"><Input className="h-7 text-xs" value={editRow.notes} onChange={e => setEditRow(r => r && { ...r, notes: e.target.value })} /></td>
                 <td className="px-3 py-2">
                   <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={save} disabled={saving}>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={save} disabled={saving} aria-label="Save mapping">
                       {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5 text-green-500" />}
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={cancel}><X className="h-3.5 w-3.5 text-muted-foreground" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={cancel} aria-label="Cancel mapping edit"><X className="h-3.5 w-3.5 text-muted-foreground" /></Button>
                   </div>
                 </td>
               </tr>
@@ -127,8 +127,8 @@ function MappingTable<T extends { id: string; rawValue: string; notes?: string }
                 {canEdit && (
                   <td className="px-4 py-2">
                     <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(item)} disabled={!!editRow}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => onDelete(item.id)} disabled={!!editRow}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(item)} disabled={!!editRow} aria-label={`Edit mapping ${item.rawValue}`}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => onDelete(item.id)} disabled={!!editRow} aria-label={`Delete mapping ${item.rawValue}`}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </td>
                 )}

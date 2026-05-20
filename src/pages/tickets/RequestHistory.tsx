@@ -227,7 +227,7 @@ export default function RequestHistory() {
               {loading ? '…' : `${totalCount.toLocaleString()} record${totalCount !== 1 ? 's' : ''}`}
             </span>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void loadTickets()} disabled={loading}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void loadTickets()} disabled={loading} aria-label="Refresh request history">
             <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>

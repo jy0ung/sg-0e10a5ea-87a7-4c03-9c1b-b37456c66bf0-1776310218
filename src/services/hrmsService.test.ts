@@ -110,6 +110,21 @@ vi.mock('@flc/hrms-services', () => ({
   upsertAttendance: vi.fn().mockResolvedValue(undefined),
   listEmployeeDirectory: vi.fn().mockResolvedValue([]),
   updateEmployee: vi.fn().mockResolvedValue(undefined),
+  resolveRequiredProfileId: vi.fn(async (employeeId: string) => {
+    const directProfile = drainResolve();
+    if (directProfile.error) throw new Error(directProfile.error.message);
+    if (directProfile.data && typeof directProfile.data === 'object' && 'id' in directProfile.data) {
+      return String((directProfile.data as { id: string }).id);
+    }
+
+    const linkedProfile = drainResolve();
+    if (linkedProfile.error) throw new Error(linkedProfile.error.message);
+    if (linkedProfile.data && typeof linkedProfile.data === 'object' && 'id' in linkedProfile.data) {
+      return String((linkedProfile.data as { id: string }).id);
+    }
+
+    return employeeId;
+  }),
   resolveNamesToIds: vi.fn().mockResolvedValue(new Map()),
 }));
 

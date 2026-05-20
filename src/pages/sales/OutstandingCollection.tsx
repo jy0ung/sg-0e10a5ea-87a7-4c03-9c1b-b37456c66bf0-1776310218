@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/contexts/SalesContext';
 import { Invoice } from '@/types';
-import { AlertTriangle, Clock, DollarSign, Loader2 } from 'lucide-react';
+import { AlertTriangle, Clock, DollarSign } from 'lucide-react';
 
 type AgingBucket = '0-30' | '31-60' | '61-90' | '90+';
 
@@ -51,8 +51,20 @@ export default function OutstandingCollection() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      <div className="space-y-6 animate-fade-in">
+        <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="glass-panel p-4 animate-pulse">
+              <div className="h-4 w-24 bg-muted rounded mb-2" />
+              <div className="h-8 w-28 bg-muted rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="glass-panel p-4 animate-pulse">
+          <div className="h-8 w-32 bg-muted rounded mb-4" />
+          <div className="h-64 bg-muted rounded" />
+        </div>
       </div>
     );
   }

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useData } from '@/contexts/DataContext';
 import { searchVehicles, type VehicleSearchParams } from '@/services/vehicleService';
-import { Search, Package, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Package, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
 
 const PAGE_SIZE = 50;
@@ -120,8 +120,10 @@ export default function StockBalance() {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
         {loading ? (
-          <div className="flex min-h-[240px] flex-1 items-center justify-center">
-            <Loader2 className="h-6 w-6 text-primary animate-spin" />
+          <div className="min-h-[240px] flex-1 p-4 space-y-2 animate-pulse">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-10 bg-muted rounded" />
+            ))}
           </div>
         ) : (
           <>

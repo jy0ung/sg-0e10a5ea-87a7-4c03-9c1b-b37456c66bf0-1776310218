@@ -5,7 +5,7 @@ import { getVehicleKpiSummary } from '@/services/vehicleService';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
-import { ShoppingCart, DollarSign, TrendingUp, Loader2 } from 'lucide-react';
+import { ShoppingCart, DollarSign, TrendingUp } from 'lucide-react';
 import { resolveBranchCode } from '@/services/branchService';
 
 export default function SalesDashboard() {
@@ -43,8 +43,30 @@ export default function SalesDashboard() {
 
   if (summaryLoading || kpiLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      <div className="w-full space-y-4 animate-fade-in">
+        <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="glass-panel p-4 animate-pulse">
+              <div className="h-4 w-20 bg-muted rounded mb-2" />
+              <div className="h-8 w-24 bg-muted rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]">
+          <div className="glass-panel p-4 animate-pulse">
+            <div className="h-4 w-48 bg-muted rounded mb-3" />
+            <div className="h-64 bg-muted rounded" />
+          </div>
+          <div className="glass-panel p-4 animate-pulse">
+            <div className="h-4 w-36 bg-muted rounded mb-3" />
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-6 bg-muted rounded" />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

@@ -181,8 +181,8 @@ export default function CommissionDashboard() {
                   {canManage && (
                     <td className="px-4 py-2">
                       <div className="flex gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditRule(rule)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteRuleId(rule.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditRule(rule)} aria-label={`Edit commission rule ${rule.ruleName}`}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteRuleId(rule.id)} aria-label={`Delete commission rule ${rule.ruleName}`}><Trash2 className="h-3.5 w-3.5" /></Button>
                       </div>
                     </td>
                   )}

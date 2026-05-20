@@ -66,9 +66,9 @@ export default function ChassisFilter() {
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
       <PageHeader
-        title="Chassis Filter"
+        title="Advanced Search"
         description="Advanced search for vehicles by chassis, plate, model, engine, colour, or owner"
-        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Chassis Filter' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Advanced Search' }]}
       />
 
       <div className="shrink-0 rounded-lg border bg-card px-4 py-3 shadow-sm">

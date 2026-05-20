@@ -32,10 +32,23 @@ export interface AppShellAction {
   href?: string;
   external?: boolean;
   onClick?: () => void;
-  badge?: boolean | ReactNode;
+  badge?: boolean | number | ReactNode;
   className?: string;
   render?: ReactNode;
 }
+
+export interface AppShellCommandItem {
+  id: string;
+  label: string;
+  description?: string;
+  section?: string;
+  icon?: ElementType;
+  to?: string;
+  href?: string;
+  external?: boolean;
+}
+
+export type AppShellCommandSearch = (query: string) => AppShellCommandItem[] | Promise<AppShellCommandItem[]>;
 
 export interface AppShellNavItem {
   label: string;

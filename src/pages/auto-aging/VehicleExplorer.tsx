@@ -6,7 +6,7 @@ import { VehicleDetailPanel } from '@/components/vehicles/VehicleDetailPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Button } from '@/components/ui/button';
-import { Download, Edit, Eye, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Download, Edit, Eye, AlertCircle, RefreshCw } from 'lucide-react';
 import { updateVehicleWithAudit, invalidateVehicleCaches, searchVehicles } from '@/services/vehicleService';
 import { getUserPermissions } from '@/services/permissionService';
 import type { VehicleCanonical } from '@/types';
@@ -298,8 +298,19 @@ export default function VehicleExplorer() {
 
   if (loading && !serverQuery.data && !serverQuery.isFetching) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" aria-label="Loading vehicles" />
+      <div className="space-y-4 animate-fade-in p-4 lg:p-6">
+        <div className="h-8 w-48 bg-muted rounded animate-pulse mb-4" />
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-9 w-64 bg-muted rounded animate-pulse" />
+          <div className="h-9 w-32 bg-muted rounded animate-pulse" />
+          <div className="h-9 w-20 bg-muted rounded animate-pulse ml-auto" />
+        </div>
+        <div className="glass-panel p-4 animate-pulse">
+          <div className="h-6 w-24 bg-muted rounded mb-3" />
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-10 bg-muted rounded mb-2 last:mb-0" />
+          ))}
+        </div>
       </div>
     );
   }
