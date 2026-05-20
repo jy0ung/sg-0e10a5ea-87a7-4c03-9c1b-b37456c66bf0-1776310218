@@ -78,6 +78,8 @@ const MappingAdmin = lazy(() => import("./pages/auto-aging/MappingAdmin"));
 const VehicleDetail = lazy(() => import("./pages/auto-aging/VehicleDetail"));
 const CommissionDashboard = lazy(() => import("./pages/auto-aging/CommissionDashboard"));
 const ReportCenter = lazy(() => import("./pages/auto-aging/ReportCenter"));
+const DataQuality = lazy(() => import("./pages/auto-aging/DataQuality"));
+const ImportHistory = lazy(() => import("./pages/auto-aging/ImportHistory"));
 const ActivityDashboard = lazy(() => import("./pages/admin/ActivityDashboard"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
@@ -198,6 +200,8 @@ const router = createBrowserRouter([
       { path: "auto-aging/sla", element: withModuleAccess('auto-aging', <RequireRole roles={EXECUTIVE} section="Auto Aging"><R scope="SLA Admin"><S><SLAAdmin /></S></R></RequireRole>) },
       { path: "auto-aging/mappings", element: withModuleAccess('auto-aging', <RequireRole roles={EXECUTIVE} section="Auto Aging"><R scope="Mapping Admin"><S><MappingAdmin /></S></R></RequireRole>) },
       { path: "auto-aging/commissions", element: withModuleAccess('auto-aging', <RequireRole roles={MANAGER_AND_UP} section="Auto Aging"><R scope="Commissions"><S><CommissionDashboard /></S></R></RequireRole>) },
+      { path: "auto-aging/quality", element: withModuleAccess('auto-aging', <R scope="Data Quality"><S><DataQuality /></S></R>) },
+      { path: "auto-aging/history", element: withModuleAccess('auto-aging', <R scope="Import History"><S><ImportHistory /></S></R>) },
       { path: "auto-aging/reports", element: withModuleAccess('auto-aging', <R scope="Auto-Aging Reports"><S><ReportCenter /></S></R>) },
       {
         path: "sales",

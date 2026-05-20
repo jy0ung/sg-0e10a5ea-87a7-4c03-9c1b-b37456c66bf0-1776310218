@@ -54,8 +54,13 @@ export async function fetchRoleSections(
 
     if (error) throw error;
 
+    // No rows means the company hasn't configured role sections yet — return
+    // null so callers fall back to DEFAULT_ROLE_SECTIONS instead of treating
+    // every section as denied.
+    if (!data || data.length === 0) return { data: null, error: null };
+
     const matrix: Partial<RoleSectionsMatrix> = {};
-    for (const row of data ?? []) {
+    for (const row of data) {
       if (!row.allowed) continue;
       if (!matrix[row.role]) matrix[row.role] = [];
       matrix[row.role]!.push(row.section);
