@@ -230,8 +230,8 @@ export default function Announcements() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Expires At (optional)</Label>
-              <Input type="date" value={form.expiresAt ?? ''} onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value || undefined }))} />
+              <Label htmlFor="announcement-expires-at">Expires At (optional)</Label>
+              <Input id="announcement-expires-at" type="date" value={form.expiresAt ?? ''} onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value || undefined }))} />
             </div>
             <div className="flex items-center gap-2">
               <input

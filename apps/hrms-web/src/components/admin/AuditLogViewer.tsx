@@ -178,7 +178,12 @@ export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerP
                   <React.Fragment key={log.id}>
                     <tr className="border-b border-border/50 hover:bg-secondary/30 cursor-pointer" onClick={() => toggleRow(log.id)}>
                       <td className="px-4 py-3">
-                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          aria-label={isExpanded ? 'Collapse audit log details' : 'Expand audit log details'}
+                        >
                           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </Button>
                       </td>

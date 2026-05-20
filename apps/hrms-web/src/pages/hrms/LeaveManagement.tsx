@@ -807,10 +807,12 @@ export default function LeaveManagement() {
               <Textarea value={applyForm.reason ?? ''} onChange={e => setApplyForm(f => ({ ...f, reason: e.target.value }))} rows={3} />
             </div>
             <div className="space-y-2">
-              <Label>Supporting Document</Label>
+              <Label htmlFor="leave-supporting-document">Supporting Document</Label>
               <input
+                id="leave-supporting-document"
                 ref={fileInputRef}
                 type="file"
+                aria-label="Upload supporting document"
                 accept={ATTACHMENT_ACCEPT}
                 className="sr-only"
                 onChange={handleAttachmentChange}

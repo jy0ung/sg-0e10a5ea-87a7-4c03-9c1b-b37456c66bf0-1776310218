@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppRole, User } from '@/types';
@@ -14,6 +15,12 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 vi.mock('@/hooks/useHrmsAccess', () => ({
   useHrmsAccess: () => mockUseHrmsAccess(),
+}));
+
+vi.mock('@/services/hrmsService', () => ({
+  listAppraisals: vi.fn(async () => ({ data: [], error: null })),
+  listLeaveRequests: vi.fn(async () => ({ data: [], error: null })),
+  listPayrollRuns: vi.fn(async () => ({ data: [], error: null })),
 }));
 
 vi.mock('@/components/theme/ThemeToggle', () => ({
@@ -41,6 +48,9 @@ const SELF_SERVICE_ROUTES = new Set(['leave', 'approvals', 'appraisals', 'announ
 
 function renderLayout(role: AppRole, initialPath = '/leave') {
   const user = makeUser(role);
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   mockUseAuth.mockReturnValue({
     user,
     logout: vi.fn(),
@@ -75,16 +85,18 @@ function renderLayout(role: AppRole, initialPath = '/leave') {
   });
 
   render(
-    <MemoryRouter
-      initialEntries={[initialPath]}
-      future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
-    >
-      <Routes>
-        <Route element={<HrmsLayout />}>
-          <Route path="*" element={<div>Route content</div>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter
+        initialEntries={[initialPath]}
+        future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+      >
+        <Routes>
+          <Route element={<HrmsLayout />}>
+            <Route path="*" element={<div>Route content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

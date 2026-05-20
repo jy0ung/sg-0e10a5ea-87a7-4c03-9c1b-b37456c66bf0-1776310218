@@ -181,6 +181,7 @@ export function StandardTable<T extends Record<string, unknown>>({
               <Input
                 className="pl-8 h-8 text-sm"
                 placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
                 value={search}
                 onChange={e => handleSearch(e.target.value)}
               />
@@ -220,6 +221,7 @@ export function StandardTable<T extends Record<string, unknown>>({
                         type="checkbox"
                         checked={allPageSelected}
                         onChange={toggleAll}
+                        aria-label="Select all rows on this page"
                         className="h-3.5 w-3.5 accent-primary"
                       />
                     </th>
@@ -256,11 +258,12 @@ export function StandardTable<T extends Record<string, unknown>>({
                       onClick={() => onRowClick?.(item)}
                     >
                       {selectable && (
-                        <td className="w-10 px-3 py-3" onClick={e => { e.stopPropagation(); toggleRow(key); }}>
+                        <td className="w-10 px-3 py-3" onClick={e => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={selected.has(key)}
                             onChange={() => toggleRow(key)}
+                            aria-label="Select row"
                             className="h-3.5 w-3.5 accent-primary"
                           />
                         </td>
@@ -302,10 +305,10 @@ export function StandardTable<T extends Record<string, unknown>>({
                 <span className="text-xs text-muted-foreground mr-2">
                   {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, sorted.length)} of {sorted.length}
                 </span>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage <= 1} onClick={() => setPage(1)}>«</Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage <= 1} onClick={() => setPage(p => p - 1)}>‹</Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)}>›</Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage >= totalPages} onClick={() => setPage(totalPages)}>»</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage <= 1} onClick={() => setPage(1)} aria-label="First page">«</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage <= 1} onClick={() => setPage(p => p - 1)} aria-label="Previous page">‹</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage >= totalPages} onClick={() => setPage(p => p + 1)} aria-label="Next page">›</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={safePage >= totalPages} onClick={() => setPage(totalPages)} aria-label="Last page">»</Button>
               </div>
             </div>
           )}

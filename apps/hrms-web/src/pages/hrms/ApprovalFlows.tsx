@@ -444,13 +444,13 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(flow)} title="Edit">
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(flow)} title="Edit" aria-label={`Edit approval flow ${flow.name}`}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => handleToggleActive(flow)} title={flow.isActive ? 'Deactivate' : 'Activate'}>
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => handleToggleActive(flow)} title={flow.isActive ? 'Deactivate' : 'Activate'} aria-label={`${flow.isActive ? 'Deactivate' : 'Activate'} approval flow ${flow.name}`}>
                       {flow.isActive ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(flow)} title="Delete">
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(flow)} title="Delete" aria-label={`Delete approval flow ${flow.name}`}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -674,13 +674,13 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
                           </div>
                         </div>
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => moveStep(idx, -1)} disabled={idx === 0}>
+                          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => moveStep(idx, -1)} disabled={idx === 0} aria-label={`Move ${step.name || `approval level ${idx + 1}`} up`}>
                             <ChevronUp className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => moveStep(idx, 1)} disabled={idx === steps.length - 1}>
+                          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => moveStep(idx, 1)} disabled={idx === steps.length - 1} aria-label={`Move ${step.name || `approval level ${idx + 1}`} down`}>
                             <ChevronDown className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => removeStep(idx)}>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => removeStep(idx)} aria-label={`Remove ${step.name || `approval level ${idx + 1}`}`}>
                             <X className="h-3.5 w-3.5" />
                           </Button>
                         </div>

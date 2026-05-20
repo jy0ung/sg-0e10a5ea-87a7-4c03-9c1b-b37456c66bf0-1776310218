@@ -37,14 +37,17 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { useFocusedMode } from '@/hooks/useFocusedMode';
 import { useRoleSectionMatrix } from '@/hooks/usePermissions';
+import { STALE } from '@/lib/queryClient';
 import { getDedicatedHrmsWorkspacePath, HRMS_PATHS, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
+import { getNotifications } from '@/services/notificationService';
 import type { AppRole } from '@/types';
 import type { AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from './types';
 
@@ -80,12 +83,12 @@ const navItems: MainNavItem[] = [
 
   { label: 'Auto Aging Overview', path: '/auto-aging', icon: Timer, section: 'Auto Aging', group: 'Overview', end: true },
   { label: 'Vehicle Explorer', path: '/auto-aging/vehicles', icon: Car, section: 'Auto Aging', group: 'Overview' },
-  { label: 'Import Center', path: '/auto-aging/import', icon: Upload, section: 'Auto Aging', group: 'Data Pipeline', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
-  { label: 'Review Queue', path: '/auto-aging/review', icon: Search, section: 'Auto Aging', group: 'Data Pipeline', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
-  { label: 'Import History', path: '/auto-aging/history', icon: History, section: 'Auto Aging', group: 'Data Pipeline' },
-  { label: 'Data Quality', path: '/auto-aging/quality', icon: AlertTriangle, section: 'Auto Aging', group: 'Controls' },
-  { label: 'SLA Policies', path: '/auto-aging/sla', icon: Gauge, section: 'Auto Aging', group: 'Controls', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
-  { label: 'Mappings', path: '/auto-aging/mappings', icon: MapIcon, section: 'Auto Aging', group: 'Controls', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
+  { label: 'Import Center', path: '/auto-aging/import', icon: Upload, section: 'Auto Aging', group: 'Data Import', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { label: 'Review Queue', path: '/auto-aging/review', icon: Search, section: 'Auto Aging', group: 'Data Import', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { label: 'Import History', path: '/auto-aging/history', icon: History, section: 'Auto Aging', group: 'Data Import' },
+  { label: 'Data Quality', path: '/auto-aging/quality', icon: AlertTriangle, section: 'Auto Aging', group: 'Configuration' },
+  { label: 'SLA Policies', path: '/auto-aging/sla', icon: Gauge, section: 'Auto Aging', group: 'Configuration', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
+  { label: 'Mappings', path: '/auto-aging/mappings', icon: MapIcon, section: 'Auto Aging', group: 'Configuration', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
   { label: 'Commissions', path: '/auto-aging/commissions', icon: DollarSign, section: 'Auto Aging', group: 'Insights', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'Aging Reports', path: '/auto-aging/reports', icon: FileSpreadsheet, section: 'Auto Aging', group: 'Insights' },
 
@@ -100,7 +103,7 @@ const navItems: MainNavItem[] = [
   { label: 'Sales Advisors', path: '/sales/advisors', icon: UserCheck, section: 'Sales', group: 'Team', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
 
   { label: 'Stock Balance', path: '/inventory/stock', icon: Package, section: 'Inventory', group: 'Overview' },
-  { label: 'Chassis Filter', path: '/inventory/chassis-filter', icon: KanbanSquare, section: 'Inventory', group: 'Overview' },
+  { label: 'Advanced Search', path: '/inventory/chassis-filter', icon: KanbanSquare, section: 'Inventory', group: 'Overview' },
   { label: 'Vehicle Transfer', path: '/inventory/transfers', icon: ArrowLeftRight, section: 'Inventory', group: 'Movement', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
 
   { label: 'Purchase Invoices', path: '/purchasing/invoices', icon: Truck, section: 'Purchasing', group: 'Operations', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
@@ -173,6 +176,16 @@ export function useMainAppShellConfig() {
   const { isModuleActive } = useModuleAccess();
   const { pathname } = useLocation();
   const rolePermissions = useRoleSectionMatrix();
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['notifications', user?.id ?? ''],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await getNotifications(user.id);
+      return data;
+    },
+    enabled: Boolean(user?.id),
+    staleTime: STALE.notifications,
+  });
   const allowedSections: string[] = user?.role
     ? (rolePermissions[user.role] ?? sectionDefs.map((section) => section.name))
     : sectionDefs.map((section) => section.name);
@@ -216,6 +229,7 @@ export function useMainAppShellConfig() {
       };
     })
     .filter((section) => section.items.length > 0);
+  const unreadCount = notifications.filter((notification) => !notification.read).length;
 
   return {
     brand: {
@@ -229,7 +243,7 @@ export function useMainAppShellConfig() {
     fallbackChrome: MAIN_ROUTE_CHROME[0],
     user: user ? { name: user.name, email: user.email, role: user.role, profilePath: '/profile' } : undefined,
     onSignOut: () => void logout(),
-    topbarActions: [{ label: 'Open notifications', icon: Bell, to: '/notifications', badge: true }],
+    topbarActions: [{ label: 'Open notifications', icon: Bell, to: '/notifications', badge: unreadCount || undefined }],
     focusedBackLink: isFocused && focusedSection ? { label: 'All modules', to: '/modules', icon: ArrowLeft } : null,
     searchPlaceholder: 'Search workspace...',
     widthMode: 'full' as const,

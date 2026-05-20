@@ -116,9 +116,9 @@ export default function LeaveCalendar() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={prevMonth} aria-label="Previous month"><ChevronLeft className="h-4 w-4" /></Button>
           <span className="w-40 text-center text-sm font-semibold tabular-nums">{MONTHS[viewMonth]} {viewYear}</span>
-          <Button variant="outline" size="icon" onClick={nextMonth}><ChevronRight className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={nextMonth} aria-label="Next month"><ChevronRight className="h-4 w-4" /></Button>
         </div>
         <Select value={empFilter} onValueChange={setEmpFilter}>
           <SelectTrigger className="h-9 w-52"><SelectValue placeholder="All employees" /></SelectTrigger>

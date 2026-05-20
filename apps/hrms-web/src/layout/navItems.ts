@@ -18,6 +18,7 @@ export interface HrmsNavItem {
   icon: ElementType;
   group: string;
   access?: HrmsRouteAccessKey;
+  badgeCount?: number;
 }
 
 export const hrmsNavItems: HrmsNavItem[] = [

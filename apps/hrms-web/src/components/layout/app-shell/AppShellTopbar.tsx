@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, Search } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
@@ -10,9 +11,22 @@ function getInitial(name?: string | null): string {
   return name?.charAt(0) || '?';
 }
 
+function badgeContent(badge: AppShellAction['badge']): string | number | ReactNode | null {
+  if (badge === true) return '';
+  if (typeof badge === 'number') {
+    if (badge <= 0) return null;
+    return badge > 99 ? '99+' : badge;
+  }
+  return badge ?? null;
+}
+
 function TopbarAction({ action }: { action: AppShellAction }) {
   if (action.render) return <>{action.render}</>;
   const Icon = action.icon;
+  const contentBadge = badgeContent(action.badge);
+  const ariaLabel = typeof action.badge === 'number' && action.badge > 0
+    ? `${action.label} (${action.badge} unread)`
+    : action.label;
   const className = cn(
     'relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
     action.className,
@@ -21,17 +35,21 @@ function TopbarAction({ action }: { action: AppShellAction }) {
     <>
       {Icon && <Icon className="h-4 w-4" />}
       {action.badge === true && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary" />}
-      {action.badge && action.badge !== true && <span className="absolute -right-1 -top-1">{action.badge}</span>}
+      {contentBadge !== null && action.badge !== true && (
+        <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+          {contentBadge}
+        </span>
+      )}
     </>
   );
 
   if (action.href || action.external) {
-    return <a href={action.href ?? action.to ?? '#'} className={className} aria-label={action.label}>{content}</a>;
+    return <a href={action.href ?? action.to ?? '#'} className={className} aria-label={ariaLabel}>{content}</a>;
   }
   if (action.to) {
-    return <Link to={action.to} className={className} aria-label={action.label}>{content}</Link>;
+    return <Link to={action.to} className={className} aria-label={ariaLabel}>{content}</Link>;
   }
-  return <button type="button" className={className} onClick={action.onClick} aria-label={action.label}>{content}</button>;
+  return <button type="button" className={className} onClick={action.onClick} aria-label={ariaLabel}>{content}</button>;
 }
 
 interface AppShellTopbarProps {

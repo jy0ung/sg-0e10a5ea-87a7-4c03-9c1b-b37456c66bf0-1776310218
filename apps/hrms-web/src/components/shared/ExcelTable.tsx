@@ -113,6 +113,7 @@ const EditableGridCell = React.memo(function EditableGridCell({
           {column.type === 'number' && (
             <Input
               type="number"
+              aria-label={`Edit ${column.label}`}
               value={editValue as string}
               onChange={(event) => onEditValueChange(parseFloat(event.target.value))}
               onBlur={() => void onSave(rowId, column.key, column)}
@@ -128,7 +129,9 @@ const EditableGridCell = React.memo(function EditableGridCell({
           {column.type === 'date' && (
             <input
               type="date"
+              aria-label={`Edit ${column.label}`}
               value={editValue as string}
+              aria-label={`Edit ${column.label}`}
               onChange={(event) => onEditValueChange(event.target.value)}
               onBlur={() => void onSave(rowId, column.key, column)}
               className={cn('h-8 px-2 rounded border border-input bg-background text-foreground', validationError && 'border-destructive')}
@@ -139,6 +142,7 @@ const EditableGridCell = React.memo(function EditableGridCell({
           {column.type === 'select' && (
             <select
               value={editValue as string}
+              aria-label={`Edit ${column.label}`}
               onChange={(event) => onEditValueChange(event.target.value)}
               onBlur={() => void onSave(rowId, column.key, column)}
               className={cn('h-8 px-2 rounded border border-input bg-background text-foreground', validationError && 'border-destructive')}
@@ -178,6 +182,7 @@ const EditableGridCell = React.memo(function EditableGridCell({
               variant="ghost"
               className="h-6 w-6 p-0"
               onClick={() => void onSave(rowId, column.key, column)}
+              aria-label={`Save ${column.label}`}
             >
               <Check className="h-3.5 w-3.5 text-success" />
             </Button>
@@ -186,6 +191,7 @@ const EditableGridCell = React.memo(function EditableGridCell({
               variant="ghost"
               className="h-6 w-6 p-0"
               onClick={onCancel}
+              aria-label={`Cancel editing ${column.label}`}
             >
               <X className="h-3.5 w-3.5 text-destructive" />
             </Button>
@@ -261,6 +267,7 @@ const EditableGridRow = React.memo(function EditableGridRow({
         <TableCell onClick={(event) => event.stopPropagation()}>
           <input
             type="checkbox"
+            aria-label="Select row"
             className="rounded border-input"
             checked={isSelected}
             onChange={(event) => onSelectRow(rowId, event.target.checked)}
@@ -470,6 +477,7 @@ export function ExcelTable<T>({
                   <TableHead className="w-10">
                     <input 
                       type="checkbox" 
+                      aria-label="Select all rows"
                       className="rounded border-input"
                       checked={selectedRows.size === data.length && data.length > 0}
                       onChange={(e) => handleSelectAll(e.target.checked)}

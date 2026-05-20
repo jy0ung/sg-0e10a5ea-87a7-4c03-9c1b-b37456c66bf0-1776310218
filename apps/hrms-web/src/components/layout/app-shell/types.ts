@@ -32,7 +32,7 @@ export interface AppShellAction {
   href?: string;
   external?: boolean;
   onClick?: () => void;
-  badge?: boolean | ReactNode;
+  badge?: boolean | number | ReactNode;
   className?: string;
   render?: ReactNode;
 }

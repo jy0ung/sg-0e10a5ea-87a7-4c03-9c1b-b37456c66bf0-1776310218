@@ -312,10 +312,10 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
                   {canWrite && (
                     <td className="px-3 py-2">
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(dept)}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(dept)} aria-label={`Edit department ${dept.name}`}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(dept)}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(dept)} aria-label={`Delete department ${dept.name}`}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -527,10 +527,10 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
                   {canWrite && (
                     <td className="px-3 py-2">
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(jt)}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(jt)} aria-label={`Edit job title ${jt.name}`}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(jt)}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(jt)} aria-label={`Delete job title ${jt.name}`}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -766,10 +766,10 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
                   {canWrite && (
                     <td className="px-3 py-2">
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(lt)}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(lt)} aria-label={`Edit leave type ${lt.name}`}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(lt)}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(lt)} aria-label={`Delete leave type ${lt.name}`}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -1001,10 +1001,10 @@ function HolidaysPanel({ companyId, actorId, canWrite }: HolidaysPanelProps) {
                   {canWrite && (
                     <td className="px-3 py-2">
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(h)}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEdit(h)} aria-label={`Edit holiday ${h.name}`}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(h)}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(h)} aria-label={`Delete holiday ${h.name}`}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -1334,8 +1334,8 @@ function RoleManagementPanel({ companyId, actorId, canWrite }: SecurityPanelProp
                 <p className="text-[11px] text-muted-foreground">Updated {role.updatedAt ? new Date(role.updatedAt).toLocaleDateString() : '—'}</p>
                 {canWrite && (
                   <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => void openEdit(role)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    {role.isActive && <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeactivateTarget(role)}><Trash2 className="h-3.5 w-3.5" /></Button>}
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => void openEdit(role)} aria-label={`Edit HRMS role ${role.name}`}><Pencil className="h-3.5 w-3.5" /></Button>
+                    {role.isActive && <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeactivateTarget(role)} aria-label={`Deactivate HRMS role ${role.name}`}><Trash2 className="h-3.5 w-3.5" /></Button>}
                   </div>
                 )}
               </div>
@@ -1392,12 +1392,15 @@ function RoleManagementPanel({ companyId, actorId, canWrite }: SecurityPanelProp
                 ['canManageEmployeeRecords', 'Can manage employee records'],
                 ['canViewHrmsReports', 'Can view HRMS reports'],
                 ['isActive', 'Role is active'],
-              ].map(([key, label]) => (
-                <label key={key} className="flex items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2">
-                  <span className="text-sm font-medium">{label}</span>
-                  <Switch checked={Boolean(form[key as keyof CreateHrmsRoleInput])} onCheckedChange={value => setForm(f => ({ ...f, [key]: value }))} />
-                </label>
-              ))}
+              ].map(([key, label]) => {
+                const fieldId = `hrms-role-${key}`;
+                return (
+                  <label key={key} htmlFor={fieldId} className="flex items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2">
+                    <span className="text-sm font-medium">{label}</span>
+                    <Switch id={fieldId} checked={Boolean(form[key as keyof CreateHrmsRoleInput])} onCheckedChange={value => setForm(f => ({ ...f, [key]: value }))} />
+                  </label>
+                );
+              })}
             </div>
             <div className="rounded-lg border bg-card">
               <div className="border-b px-4 py-3">
@@ -1406,9 +1409,8 @@ function RoleManagementPanel({ companyId, actorId, canWrite }: SecurityPanelProp
               </div>
               <div className="grid max-h-56 gap-2 overflow-y-auto p-4 sm:grid-cols-2">
                 {employees.map(employee => (
-                  // eslint-disable-next-line jsx-a11y/label-has-associated-control
-                  <label key={employee.id} className="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2">
-                    <Checkbox checked={assignedEmployeeIds.includes(employee.id)} onCheckedChange={() => toggleEmployee(employee.id)} />
+                  <label key={employee.id} htmlFor={`hrms-role-employee-${employee.id}`} className="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2">
+                    <Checkbox id={`hrms-role-employee-${employee.id}`} checked={assignedEmployeeIds.includes(employee.id)} onCheckedChange={() => toggleEmployee(employee.id)} />
                     <span>
                       <span className="block text-sm font-medium">{employee.name}</span>
                       <span className="block text-xs text-muted-foreground">{employee.departmentName ?? 'No department'} · {employee.jobTitleName ?? 'No position'}</span>
