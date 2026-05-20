@@ -5,6 +5,7 @@ import { z } from 'zod';
 import {
   AlertCircle,
   Check,
+  CheckCircle2,
   ChevronRight,
   ChevronsUpDown,
   Info,
@@ -13,6 +14,7 @@ import {
   Search,
   ShieldCheck,
   X,
+  XCircle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -665,7 +667,10 @@ export function RequestRoutingSection({
             >
               <SelectTrigger
                 id="category"
-                className={form.formState.errors.category ? 'border-destructive' : ''}
+                className={cn(
+                  form.formState.errors.category ? 'border-destructive' : '',
+                  !form.formState.errors.category && form.formState.touchedFields.category && 'border-success/50',
+                )}
               >
                 <SelectValue
                   placeholder={
@@ -681,17 +686,17 @@ export function RequestRoutingSection({
                 ))}
               </SelectContent>
             </Select>
-            {form.formState.errors.category && (
-              <p className="text-xs text-destructive">
+            {form.formState.errors.category ? (
+              <p className="flex items-center gap-1 text-xs text-destructive">
+                <AlertCircle className="h-3 w-3" />
                 {form.formState.errors.category.message}
               </p>
-            )}
-            {selectedCategory?.description && (
+            ) : selectedCategory?.description ? (
               <p className="flex items-start gap-1 text-xs text-muted-foreground">
                 <Info className="mt-0.5 h-3 w-3 shrink-0" />
                 {selectedCategory.description}
               </p>
-            )}
+            ) : null}
           </div>
 
           <div className="space-y-1.5">
@@ -751,6 +756,7 @@ export function RequestRoutingSection({
                   className={cn(
                     'max-w-sm',
                     form.formState.errors.subcategory ? 'border-destructive' : '',
+                    !form.formState.errors.subcategory && form.formState.touchedFields.subcategory && 'border-success/50',
                   )}
                 >
                   <SelectValue
@@ -767,16 +773,17 @@ export function RequestRoutingSection({
                   ))}
                 </SelectContent>
               </Select>
-              {form.formState.errors.subcategory && (
-                <p className="text-xs text-destructive">
+              {form.formState.errors.subcategory ? (
+                <p className="flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle className="h-3 w-3" />
                   {form.formState.errors.subcategory.message}
                 </p>
-              )}
-              {selectedSubcategory?.description && (
-                <p className="text-xs text-muted-foreground">
+              ) : selectedSubcategory?.description ? (
+                <p className="flex items-start gap-1 text-xs text-muted-foreground">
+                  <Info className="mt-0.5 h-3 w-3 shrink-0" />
                   {selectedSubcategory.description}
                 </p>
-              )}
+              ) : null}
             </div>
           )}
         </div>
@@ -789,12 +796,18 @@ interface RequestDetailsSectionProps {
   form: UseFormReturn<TicketFormData>;
   roleContext: RoleContext;
   descriptionValue: string;
+  subjectValue: string;
+  subjectStatus: 'valid' | 'invalid' | 'untouched';
+  descriptionStatus: 'valid' | 'invalid' | 'untouched';
 }
 
 export function RequestDetailsSection({
   form,
   roleContext,
   descriptionValue,
+  subjectValue,
+  subjectStatus,
+  descriptionStatus,
 }: RequestDetailsSectionProps) {
   return (
     <Card className="shadow-sm">
@@ -806,18 +819,36 @@ export function RequestDetailsSection({
       </CardHeader>
       <CardContent className="space-y-4 p-4">
         <div className="space-y-1.5">
-          <Label htmlFor="subject">
-            Request title <span className="text-destructive">*</span>
-          </Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="subject">
+              Request title <span className="text-destructive">*</span>
+            </Label>
+            {subjectStatus === 'valid' && (
+              <CheckCircle2 className="h-4 w-4 text-success" />
+            )}
+            {subjectStatus === 'invalid' && (
+              <XCircle className="h-4 w-4 text-destructive" />
+            )}
+          </div>
           <Input
             id="subject"
             placeholder="e.g. Urgent invoice correction for customer delivery"
             {...form.register('subject')}
-            className={form.formState.errors.subject ? 'border-destructive' : ''}
+            className={cn(
+              'transition-colors',
+              subjectStatus === 'valid' && 'border-success/50 focus-visible:ring-success/50',
+              subjectStatus === 'invalid' && 'border-destructive',
+            )}
           />
           {form.formState.errors.subject && (
-            <p className="text-xs text-destructive">
+            <p className="flex items-center gap-1 text-xs text-destructive">
+              <AlertCircle className="h-3 w-3" />
               {form.formState.errors.subject.message}
+            </p>
+          )}
+          {subjectValue.length > 0 && subjectStatus !== 'invalid' && (
+            <p className="text-xs text-muted-foreground">
+              {subjectValue.length} character{subjectValue.length !== 1 ? 's' : ''}
             </p>
           )}
         </div>
@@ -829,12 +860,15 @@ export function RequestDetailsSection({
             </Label>
             <span
               className={cn(
-                'text-xs tabular-nums transition-colors',
-                descriptionValue.length >= 20
-                  ? 'text-muted-foreground'
-                  : 'text-destructive',
+                'flex items-center gap-1 text-xs tabular-nums transition-colors',
+                descriptionStatus === 'valid'
+                  ? 'text-success'
+                  : descriptionStatus === 'invalid'
+                    ? 'text-destructive'
+                    : 'text-muted-foreground',
               )}
             >
+              {descriptionStatus === 'valid' && <CheckCircle2 className="h-3 w-3" />}
               {descriptionValue.length} / 20 min
             </span>
           </div>
@@ -843,10 +877,15 @@ export function RequestDetailsSection({
             placeholder={roleContext.descriptionPlaceholder}
             rows={7}
             {...form.register('description')}
-            className={form.formState.errors.description ? 'border-destructive' : ''}
+            className={cn(
+              'transition-colors',
+              descriptionStatus === 'valid' && 'border-success/50 focus-visible:ring-success/50',
+              descriptionStatus === 'invalid' && 'border-destructive',
+            )}
           />
           {form.formState.errors.description && (
-            <p className="text-xs text-destructive">
+            <p className="flex items-center gap-1 text-xs text-destructive">
+              <AlertCircle className="h-3 w-3" />
               {form.formState.errors.description.message}
             </p>
           )}
@@ -896,6 +935,7 @@ export function CustomFieldsSection({
           {customFields.map((field) => {
             const inputId = `cf-${field.key}`;
             const value = customFieldValues[field.key] ?? '';
+            const hasValue = value.trim().length > 0;
             const updateValue = (nextValue: string) => {
               setCustomFieldValues((prev) => ({ ...prev, [field.key]: nextValue }));
             };
@@ -920,6 +960,9 @@ export function CustomFieldsSection({
                     onChange={(event) => updateValue(event.target.value)}
                     placeholder={field.placeholder}
                     rows={3}
+                    className={cn(
+                      field.is_required && hasValue && 'border-success/50',
+                    )}
                   />
                 ) : field.field_type === 'database_select' ? (
                   <DatabaseFieldSelect
@@ -942,6 +985,9 @@ export function CustomFieldsSection({
                     value={value}
                     onChange={(event) => updateValue(event.target.value)}
                     placeholder={field.placeholder}
+                    className={cn(
+                      field.is_required && hasValue && 'border-success/50',
+                    )}
                   />
                 )}
                 {field.help_text && (
@@ -1064,7 +1110,7 @@ export function AttachmentsSection({
                 <button
                   type="button"
                   onClick={() => onRemoveFile(index)}
-                  className="ml-1 shrink-0 text-muted-foreground transition-colors hover:text-destructive"
+                  className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   aria-label={`Remove ${file.name}`}
                 >
                   <X className="h-3.5 w-3.5" />
@@ -1075,17 +1121,17 @@ export function AttachmentsSection({
         )}
 
         {fileErrors.length > 0 && (
-          <ul className="space-y-1">
-            {fileErrors.map((error) => (
-              <li
-                key={error}
-                className="flex items-start gap-1.5 text-xs text-destructive"
+          <div className="space-y-1.5">
+            {fileErrors.map((error, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
               >
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                {error}
-              </li>
+                <span>{error}</span>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </CardContent>
     </Card>

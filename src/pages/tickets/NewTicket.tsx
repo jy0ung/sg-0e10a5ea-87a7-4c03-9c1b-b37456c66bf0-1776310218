@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Loader2, Save } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
@@ -24,11 +24,10 @@ import {
   ticketSchema,
   AttachmentsSection,
   CustomFieldsSection,
-  MobileSubmitPanel,
   RequestDetailsSection,
   RequestRoutingSection,
   RequestSummaryPanel,
-  TemplateChooserSection,
+  TemplateChooser,
   type ApprovalPlanState,
   type TicketFormData,
 } from './new-ticket/NewTicketSections';
@@ -51,6 +50,8 @@ export default function NewTicket() {
   const [dragOver, setDragOver] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [approvalPlan, setApprovalPlan] = useState<ApprovalPlanState>('loading');
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const [templateExpanded, setTemplateExpanded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftRestoredRef = useRef(false);
   const skipDraftSaveRef = useRef(false);
@@ -108,6 +109,7 @@ export default function NewTicket() {
           draftKey,
           JSON.stringify({ values, customFieldValues, activeTemplateId, updatedAt: new Date().toISOString() }),
         );
+        setDraftSavedAt(new Date());
       } catch {
         // Ignore storage quota/private-mode errors; the live form state still works.
       }
@@ -148,6 +150,7 @@ export default function NewTicket() {
   const selectedSubcategoryKey = form.watch('subcategory');
   const selectedPriority = form.watch('priority');
   const descriptionValue = form.watch('description') ?? '';
+  const subjectValue = form.watch('subject') ?? '';
 
   const availableSubcategories = useMemo(
     () => subcategories.filter((subcategory) => subcategory.category_key === selectedCategoryKey),
@@ -384,25 +387,59 @@ export default function NewTicket() {
     setCustomFieldValues({});
   };
 
+  const draftSavedLabel = draftSavedAt
+    ? `Draft saved ${draftSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : null;
+
+  const fieldValidationStatus = useMemo(() => {
+    const status: Record<string, 'valid' | 'invalid' | 'untouched'> = {};
+    const touched = form.formState.touchedFields;
+    const errors = form.formState.errors;
+
+    if (touched.subject) {
+      status.subject = errors.subject ? 'invalid' : 'valid';
+    } else {
+      status.subject = 'untouched';
+    }
+
+    if (touched.description) {
+      status.description = errors.description ? 'invalid' : 'valid';
+    } else {
+      status.description = 'untouched';
+    }
+
+    return status;
+  }, [form.formState.touchedFields, form.formState.errors]);
+
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-3 animate-fade-in">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
+    <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
+      {/* Header */}
+      <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
             {roleContext.pageTitle}
           </h1>
-          <p className="text-[11px] text-muted-foreground">{roleContext.pageSubtitle}</p>
+          <p className="text-sm text-muted-foreground">{roleContext.pageSubtitle}</p>
         </div>
-        {branchCode && (
-          <span className="rounded-md border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
-            Branch:{' '}
-            <span className="font-medium text-foreground">{branchCode}</span>
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {branchCode && (
+            <span className="rounded-md border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
+              Branch:{' '}
+              <span className="font-medium text-foreground">{branchCode}</span>
+            </span>
+          )}
+          {draftSavedLabel && (
+            <span className="flex items-center gap-1 rounded-md border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
+              <Save className="h-3 w-3" />
+              {draftSavedLabel}
+            </span>
+          )}
+        </div>
       </div>
 
+      {/* Error state */}
       {(categoriesError || (!categoriesLoading && categories.length === 0)) && (
-        <div className="shrink-0 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm">
+        <div className="shrink-0 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
           <div className="space-y-0.5">
             <p className="font-medium text-foreground">Request categories are not ready</p>
@@ -419,16 +456,50 @@ export default function NewTicket() {
         onSubmit={form.handleSubmit(handleSubmit)}
         className="min-h-0 flex-1 overflow-auto"
       >
-        <div className="grid gap-4 pb-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="grid gap-5 pb-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          {/* Main form content */}
           <div className="space-y-4">
-            <TemplateChooserSection
-              templates={templates}
-              categories={categories}
-              activeTemplateId={activeTemplateId}
-              onSelect={applyTemplate}
-              onClear={clearTemplate}
-              loading={templatesLoading}
-            />
+            {/* Template chooser - collapsible */}
+            {templates.length > 0 && (
+              <div className="rounded-lg border bg-card shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setTemplateExpanded(!templateExpanded)}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-semibold text-foreground">Use a template</span>
+                    {activeTemplate && (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        {activeTemplate.name}
+                      </span>
+                    )}
+                  </div>
+                  <svg
+                    className={`h-4 w-4 text-muted-foreground transition-transform ${templateExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {templateExpanded && (
+                  <div className="border-t p-4">
+                    <TemplateChooser
+                      templates={templates}
+                      categories={categories}
+                      activeTemplateId={activeTemplateId}
+                      onSelect={applyTemplate}
+                      onClear={clearTemplate}
+                      loading={templatesLoading}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             <RequestRoutingSection
               form={form}
@@ -449,6 +520,9 @@ export default function NewTicket() {
               form={form}
               roleContext={roleContext}
               descriptionValue={descriptionValue}
+              subjectValue={subjectValue}
+              subjectStatus={fieldValidationStatus.subject}
+              descriptionStatus={fieldValidationStatus.description}
             />
 
             <CustomFieldsSection
@@ -470,10 +544,9 @@ export default function NewTicket() {
               onFileInputChange={handleFileInputChange}
               onRemoveFile={removeFile}
             />
-
-            <MobileSubmitPanel canSubmit={canSubmit} submitting={submitting} />
           </div>
 
+          {/* Sticky sidebar */}
           <div className="hidden xl:block">
             <div className="sticky top-4">
               <RequestSummaryPanel
@@ -490,6 +563,39 @@ export default function NewTicket() {
           </div>
         </div>
       </form>
+
+      {/* Mobile submit bar */}
+      <div className="shrink-0 border-t bg-card/95 px-4 py-3 backdrop-blur xl:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            {canSubmit ? (
+              <div className="flex items-center gap-1.5 text-xs text-success">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                <span>Ready to submit</span>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Fill in all required fields to submit
+              </p>
+            )}
+          </div>
+          <button
+            type="submit"
+            form="new-request-form"
+            disabled={!canSubmit}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              'Submit'
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
