@@ -5,16 +5,15 @@ import { z } from 'zod';
 import {
   AlertCircle,
   Check,
-  CheckCircle2,
   ChevronRight,
   ChevronsUpDown,
+  FileText,
   Info,
   Loader2,
   Paperclip,
   Search,
   ShieldCheck,
   X,
-  XCircle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -473,6 +472,134 @@ export function TemplateChooserSection(props: TemplateChooserProps) {
   );
 }
 
+interface TemplateDropdownProps {
+  templates: RequestTemplateRecord[];
+  categories: RequestCategoryRecord[];
+  activeTemplateId: string | null;
+  onSelect: (template: RequestTemplateRecord) => void;
+  onClear: () => void;
+  loading: boolean;
+}
+
+export function TemplateDropdown({
+  templates,
+  categories,
+  activeTemplateId,
+  onSelect,
+  onClear,
+  loading,
+}: TemplateDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const activeTemplates = useMemo(
+    () => templates.filter((t) => t.is_active),
+    [templates],
+  );
+
+  const filtered = useMemo(() => {
+    let list = activeTemplates;
+    if (search.trim()) {
+      const query = search.toLowerCase();
+      list = list.filter(
+        (t) =>
+          t.name.toLowerCase().includes(query) ||
+          t.description.toLowerCase().includes(query) ||
+          t.subject.toLowerCase().includes(query),
+      );
+    }
+    return list;
+  }, [activeTemplates, search]);
+
+  const getCategoryLabel = (key: string) =>
+    categories.find((c) => c.key === key)?.label ?? key;
+
+  const selectedTemplate = activeTemplates.find((t) => t.id === activeTemplateId) ?? null;
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm text-muted-foreground shadow-sm">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading templates...
+      </div>
+    );
+  }
+
+  if (activeTemplates.length === 0) {
+    return null;
+  }
+
+  return (
+    <Popover open={open} onOpenChange={(nextOpen) => {
+      setOpen(nextOpen);
+      if (!nextOpen) setSearch('');
+    }}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-9 w-full justify-between font-normal shadow-sm"
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="truncate">
+              {selectedTemplate ? selectedTemplate.name : 'Use a template...'}
+            </span>
+          </div>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search templates..."
+          />
+          <CommandList>
+            <CommandEmpty>No templates found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="custom-request"
+                onSelect={() => {
+                  onClear();
+                  setOpen(false);
+                }}
+              >
+                <Check className={cn('mr-2 h-4 w-4 shrink-0', !activeTemplateId ? 'opacity-100' : 'opacity-0')} />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Custom request</p>
+                  <p className="text-xs text-muted-foreground">Fill in the form manually</p>
+                </div>
+              </CommandItem>
+              {filtered.map((template) => (
+                <CommandItem
+                  key={template.id}
+                  value={`${template.name} ${template.description} ${template.subject}`}
+                  onSelect={() => {
+                    onSelect(template);
+                    setOpen(false);
+                  }}
+                >
+                  <Check className={cn('mr-2 h-4 w-4 shrink-0', activeTemplateId === template.id ? 'opacity-100' : 'opacity-0')} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm">{template.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {getCategoryLabel(template.category_key)} · {template.priority}
+                    </p>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function ApprovalFlowPreview({ plan }: { plan: ApprovalPlanState }) {
   if (plan === 'loading') {
     return (
@@ -518,8 +645,6 @@ interface SummaryPanelProps {
   priority: TicketFormData['priority'];
   attachedFiles: File[];
   approvalPlan: ApprovalPlanState;
-  canSubmit: boolean;
-  isSubmitting: boolean;
 }
 
 export function RequestSummaryPanel({
@@ -529,8 +654,6 @@ export function RequestSummaryPanel({
   priority,
   attachedFiles,
   approvalPlan,
-  canSubmit,
-  isSubmitting,
 }: SummaryPanelProps) {
   return (
     <div className="space-y-3">
@@ -591,21 +714,6 @@ export function RequestSummaryPanel({
         <ApprovalFlowPreview plan={approvalPlan} />
       </div>
 
-      <Button
-        type="submit"
-        form="new-request-form"
-        className="w-full"
-        disabled={!canSubmit}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Submitting...
-          </>
-        ) : (
-          'Submit Request'
-        )}
-      </Button>
       <p className="text-center text-xs text-muted-foreground">
         Drafts are saved locally until submitted.
       </p>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { AlertCircle, FileText, Loader2, Paperclip, Save, X } from 'lucide-react';
+import { AlertCircle, Loader2, Paperclip, Save, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
@@ -26,7 +26,7 @@ import {
   RequestDetailsSection,
   RequestRoutingSection,
   RequestSummaryPanel,
-  TemplateChooser,
+  TemplateDropdown,
   type ApprovalPlanState,
   type TicketFormData,
 } from './new-ticket/NewTicketSections';
@@ -56,7 +56,6 @@ export default function NewTicket() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [approvalPlan, setApprovalPlan] = useState<ApprovalPlanState>('loading');
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
-  const [templateExpanded, setTemplateExpanded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftRestoredRef = useRef(false);
   const skipDraftSaveRef = useRef(false);
@@ -466,46 +465,16 @@ export default function NewTicket() {
         <div className="grid gap-5 pb-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           {/* Main form content */}
           <div className="space-y-4">
-            {/* Template chooser - collapsible */}
+            {/* Template dropdown */}
             {templates.length > 0 && (
-              <div className="rounded-lg border bg-card shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setTemplateExpanded(!templateExpanded)}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/40"
-                >
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-semibold text-foreground">Use a template</span>
-                    {activeTemplate && (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                        {activeTemplate.name}
-                      </span>
-                    )}
-                  </div>
-                  <svg
-                    className={`h-4 w-4 text-muted-foreground transition-transform ${templateExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {templateExpanded && (
-                  <div className="border-t p-4">
-                    <TemplateChooser
-                      templates={templates}
-                      categories={categories}
-                      activeTemplateId={activeTemplateId}
-                      onSelect={applyTemplate}
-                      onClear={clearTemplate}
-                      loading={templatesLoading}
-                    />
-                  </div>
-                )}
-              </div>
+              <TemplateDropdown
+                templates={templates}
+                categories={categories}
+                activeTemplateId={activeTemplateId}
+                onSelect={applyTemplate}
+                onClear={clearTemplate}
+                loading={templatesLoading}
+              />
             )}
 
             <RequestRoutingSection
@@ -643,8 +612,6 @@ export default function NewTicket() {
                 priority={selectedPriority}
                 attachedFiles={attachedFiles}
                 approvalPlan={approvalPlan}
-                canSubmit={canSubmit}
-                isSubmitting={submitting}
               />
 
               {/* Minimal attachment widget */}
