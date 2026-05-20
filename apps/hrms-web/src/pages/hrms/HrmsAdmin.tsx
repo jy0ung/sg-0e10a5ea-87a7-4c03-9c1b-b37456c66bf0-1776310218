@@ -26,7 +26,7 @@ import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import {
   Building2, Briefcase, Calendar, CalendarDays, RefreshCw,
   Plus, Pencil, Trash2, Shield, GitMerge, Users, Settings2,
-  Boxes, Clock, Mail, DollarSign, UserCog,
+  Boxes, Clock, Mail, DollarSign, UserCog, Gauge,
 } from 'lucide-react';
 import {
   listDepartments, createDepartment, updateDepartment, deleteDepartment,
@@ -55,6 +55,7 @@ import {
 } from '@/services/hrmsRoleService';
 
 const ApprovalFlowsWorkspace = lazy(() => import('./ApprovalFlows'));
+const LeaveQuotaPanel = lazy(() => import('./LeaveQuotaPanel'));
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ type Category =
   | 'leave-types'
   | 'holidays'
   | 'rollover'
+  | 'leave-quota'
   | 'attendance-policies'
   | 'employee-categories'
   | 'payroll-defaults'
@@ -93,6 +95,7 @@ const CATEGORIES: CategoryDef[] = [
   { id: 'leave-types',    label: 'Leave Types',      icon: Calendar,    description: 'Configure leave types, entitlements, carry-forward rules, and paid/unpaid status.', summary: 'Entitlements and rules', group: 'Leave' },
   { id: 'holidays',       label: 'Holiday Calendar', icon: CalendarDays, description: 'Manage public and company holidays used by leave calculations.', summary: 'Company calendar', group: 'Leave' },
   { id: 'rollover',       label: 'Leave Rollover',   icon: RefreshCw,   description: 'Roll over employee leave balances from one year to the next.', summary: 'Year-end operation', group: 'Leave' },
+  { id: 'leave-quota',    label: 'Leave Quota',      icon: Gauge,       description: 'Configure maximum simultaneous leave allowances per leave type, branch, department, and time period.', summary: 'Concurrent leave limits', group: 'Leave' },
   { id: 'attendance-policies', label: 'Attendance Policies', icon: Clock, description: 'Review attendance operational rules, correction workflows, and officer responsibilities.', summary: 'Attendance rules', group: 'Attendance', status: 'Planning' },
   { id: 'employee-categories', label: 'Employee Categories', icon: Users, description: 'Prepare HRMS categories for employee grouping, visibility rules, and workforce reporting.', summary: 'Workforce grouping', group: 'Employees', status: 'Planning' },
   { id: 'payroll-defaults', label: 'Payroll Defaults', icon: DollarSign, description: 'Review payroll role ownership and default approval governance for payroll operations.', summary: 'Payroll controls', group: 'Payroll', status: 'Planning' },
@@ -139,7 +142,7 @@ function getWorkspaceDialogClass(module: Category | null) {
   if (module === 'approval-flows') {
     return 'flex h-[92vh] max-w-[1200px] flex-col overflow-hidden p-0';
   }
-  if (['departments', 'job-titles', 'leave-types', 'holidays'].includes(module)) {
+  if (['departments', 'job-titles', 'leave-types', 'holidays', 'leave-quota'].includes(module)) {
     return 'flex max-h-[88vh] max-w-5xl flex-col overflow-hidden p-0';
   }
   if (module === 'roles') return 'flex max-h-[88vh] max-w-4xl flex-col overflow-hidden p-0';
@@ -1691,6 +1694,13 @@ export default function HrmsAdmin() {
     if (module === 'leave-types') return <LeaveTypesPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
     if (module === 'holidays') return <HolidaysPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
     if (module === 'rollover') return <RolloverPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />;
+    if (module === 'leave-quota') {
+      return (
+        <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading quota rules…</div>}>
+          <LeaveQuotaPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />
+        </Suspense>
+      );
+    }
     if (module === 'system') return <SystemReadinessPanel />;
     return <HrmsSettingsPlaceholderPanel category={module} />;
   }

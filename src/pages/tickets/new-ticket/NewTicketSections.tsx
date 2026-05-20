@@ -5,15 +5,19 @@ import { z } from 'zod';
 import {
   AlertCircle,
   Check,
+  CheckCircle2,
   ChevronRight,
   ChevronsUpDown,
   FileText,
   Info,
   Loader2,
   Paperclip,
+  Save,
   Search,
   ShieldCheck,
+  UploadCloud,
   X,
+  XCircle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -543,9 +547,9 @@ export function TemplateDropdown({
           className="h-9 w-full justify-between font-normal shadow-sm"
         >
           <div className="flex min-w-0 items-center gap-2">
-            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span className="truncate">
-              {selectedTemplate ? selectedTemplate.name : 'Use a template...'}
+            <FileText className={cn('h-3.5 w-3.5 shrink-0', selectedTemplate ? 'text-primary' : 'text-muted-foreground')} />
+            <span className={cn('truncate', !selectedTemplate && 'text-muted-foreground')}>
+              {selectedTemplate ? selectedTemplate.name : 'Custom request'}
             </span>
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -600,6 +604,68 @@ export function TemplateDropdown({
   );
 }
 
+export function TemplateSelectorCard({
+  templates,
+  categories,
+  activeTemplateId,
+  onSelect,
+  onClear,
+  loading,
+}: TemplateDropdownProps) {
+  const activeTemplates = templates.filter((t) => t.is_active);
+  const activeTemplate = activeTemplates.find((t) => t.id === activeTemplateId) ?? null;
+  const getCategoryLabel = (key: string) =>
+    categories.find((c) => c.key === key)?.label ?? key;
+
+  if (!loading && activeTemplates.length === 0) return null;
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="border-b bg-muted/20 px-4 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">Template</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {loading
+                ? 'Loading available templates…'
+                : activeTemplate
+                  ? `${getCategoryLabel(activeTemplate.category_key)} · ${activeTemplate.priority} priority`
+                  : 'Custom request — optionally start from a template'}
+            </p>
+          </div>
+          {activeTemplate && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <X className="h-3 w-3" />
+              Clear
+            </button>
+          )}
+        </div>
+      </CardHeader>
+      {loading ? (
+        <CardContent className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading templates…
+        </CardContent>
+      ) : (
+        <CardContent className="p-3">
+          <TemplateDropdown
+            templates={templates}
+            categories={categories}
+            activeTemplateId={activeTemplateId}
+            onSelect={onSelect}
+            onClear={onClear}
+            loading={false}
+          />
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 function ApprovalFlowPreview({ plan }: { plan: ApprovalPlanState }) {
   if (plan === 'loading') {
     return (
@@ -647,6 +713,7 @@ interface SummaryPanelProps {
   approvalPlan: ApprovalPlanState;
 }
 
+/** @deprecated Use RequestSummaryCard + ApprovalRouteCard instead. */
 export function RequestSummaryPanel({
   activeTemplate,
   categoryLabel,
@@ -717,6 +784,138 @@ export function RequestSummaryPanel({
       <p className="text-center text-xs text-muted-foreground">
         Drafts are saved locally until submitted.
       </p>
+    </div>
+  );
+}
+
+// ─── Standalone sidebar components ───────────────────────────────────────────
+
+interface RequestSummaryCardProps {
+  activeTemplate: RequestTemplateRecord | null;
+  categoryLabel: string;
+  subcategoryLabel: string | null;
+  priority: TicketFormData['priority'];
+  attachedFiles: File[];
+  maxFiles: number;
+  branchCode?: string | null;
+  draftSavedAt?: Date | null;
+}
+
+export function RequestSummaryCard({
+  activeTemplate,
+  categoryLabel,
+  subcategoryLabel,
+  priority,
+  attachedFiles,
+  maxFiles,
+  branchCode,
+  draftSavedAt,
+}: RequestSummaryCardProps) {
+  const draftLabel = draftSavedAt
+    ? `Saved ${draftSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : null;
+
+  return (
+    <div className="rounded-lg border bg-card p-4 shadow-sm">
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Request Summary
+      </p>
+      <div className="space-y-2.5 text-sm">
+        <div className="flex items-start justify-between gap-3">
+          <span className="shrink-0 text-muted-foreground">Template</span>
+          <span className="text-right font-medium text-foreground">
+            {activeTemplate ? activeTemplate.name : 'Custom'}
+          </span>
+        </div>
+        <Separator />
+        <div className="flex items-start justify-between gap-3">
+          <span className="shrink-0 text-muted-foreground">Category</span>
+          <span className="text-right font-medium text-foreground">{categoryLabel || '—'}</span>
+        </div>
+        {subcategoryLabel && (
+          <div className="flex items-start justify-between gap-3">
+            <span className="shrink-0 text-muted-foreground">Subcategory</span>
+            <span className="text-right font-medium text-foreground">{subcategoryLabel}</span>
+          </div>
+        )}
+        <div className="flex items-start justify-between gap-3">
+          <span className="shrink-0 text-muted-foreground">Priority</span>
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
+              PRIORITY_BADGE[priority],
+            )}
+          >
+            {priority.charAt(0).toUpperCase() + priority.slice(1)}
+          </span>
+        </div>
+        {branchCode && (
+          <div className="flex items-start justify-between gap-3">
+            <span className="shrink-0 text-muted-foreground">Branch</span>
+            <span className="text-right font-medium text-foreground">{branchCode}</span>
+          </div>
+        )}
+        <Separator />
+        <div className="flex items-start justify-between gap-3">
+          <span className="shrink-0 text-muted-foreground">Attachments</span>
+          <span className="font-medium tabular-nums text-foreground">
+            {attachedFiles.length} / {maxFiles}
+          </span>
+        </div>
+        {draftLabel && (
+          <div className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2.5 py-1.5">
+            <Save className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Draft {draftLabel}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ApprovalRouteCard({ plan }: { plan: ApprovalPlanState }) {
+  return (
+    <div className="rounded-lg border bg-card p-4 shadow-sm">
+      <div className="mb-2.5 flex items-center gap-1.5">
+        <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Approval Route
+        </p>
+      </div>
+      <ApprovalFlowPreview plan={plan} />
+    </div>
+  );
+}
+
+interface StickySubmitPanelProps {
+  canSubmit: boolean;
+  submitting: boolean;
+  draftSavedLabel?: string | null;
+}
+
+export function StickySubmitPanel({ canSubmit, submitting, draftSavedLabel }: StickySubmitPanelProps) {
+  return (
+    <div className="space-y-2">
+      <Button type="submit" className="w-full" disabled={!canSubmit}>
+        {submitting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Submitting…
+          </>
+        ) : (
+          'Submit Request'
+        )}
+      </Button>
+      {draftSavedLabel ? (
+        <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+          <Save className="h-3 w-3" />
+          {draftSavedLabel}
+        </p>
+      ) : (
+        <p className="text-center text-xs text-muted-foreground">
+          Drafts are saved locally until submitted.
+        </p>
+      )}
     </div>
   );
 }
@@ -1115,7 +1314,9 @@ interface AttachmentsSectionProps {
   attachedFiles: File[];
   fileErrors: string[];
   dragOver: boolean;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  /** Compact mode for sidebar placement: smaller drop zone, tighter padding. */
+  compact?: boolean;
   setDragOver: (dragOver: boolean) => void;
   onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -1128,6 +1329,7 @@ export function AttachmentsSection({
   fileErrors,
   dragOver,
   fileInputRef,
+  compact = false,
   setDragOver,
   onDrop,
   onFileInputChange,
@@ -1147,16 +1349,23 @@ export function AttachmentsSection({
               </span>
             </p>
             <p className="text-xs text-muted-foreground">
-              PDF, Word, Excel, images, CSV, TXT - up to{' '}
+              PDF, Word, Excel, images, CSV, TXT · up to{' '}
               {attachmentSettings.max_file_size_mb} MB each
             </p>
           </div>
-          <span className="shrink-0 text-xs text-muted-foreground">
+          <span
+            className={cn(
+              'shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums',
+              attachedFiles.length > 0
+                ? 'border-primary/30 bg-primary/5 text-primary'
+                : 'border-border bg-muted/40 text-muted-foreground',
+            )}
+          >
             {attachedFiles.length} / {attachmentSettings.max_files_per_ticket}
           </span>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 p-4">
+      <CardContent className={cn('space-y-3', compact ? 'p-3' : 'p-4')}>
         <div
           role="button"
           tabIndex={0}
@@ -1172,23 +1381,35 @@ export function AttachmentsSection({
             if (event.key === 'Enter' || event.key === ' ') fileInputRef.current?.click();
           }}
           className={cn(
-            'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-5 text-center transition-colors',
+            'flex cursor-pointer items-center justify-center gap-2.5 rounded-lg border border-dashed transition-colors',
+            compact ? 'px-3 py-3' : 'flex-col px-4 py-5',
             dragOver
               ? 'border-primary bg-primary/5'
               : 'border-border bg-muted/30 hover:bg-muted/60',
             isLimitReached && 'pointer-events-none opacity-50',
           )}
         >
-          <Paperclip className="h-5 w-5 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-medium text-foreground">
-              Click to browse or drag &amp; drop
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Max {attachmentSettings.max_files_per_ticket} files,{' '}
-              {attachmentSettings.max_file_size_mb} MB each
-            </p>
-          </div>
+          {compact ? (
+            <>
+              <UploadCloud className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                {isLimitReached ? 'File limit reached' : 'Click or drag to attach files'}
+              </span>
+            </>
+          ) : (
+            <>
+              <Paperclip className="h-5 w-5 text-muted-foreground" />
+              <div className="text-center">
+                <p className="text-sm font-medium text-foreground">
+                  Click to browse or drag &amp; drop
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Max {attachmentSettings.max_files_per_ticket} files,{' '}
+                  {attachmentSettings.max_file_size_mb} MB each
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         <input
@@ -1202,26 +1423,29 @@ export function AttachmentsSection({
         />
 
         {attachedFiles.length > 0 && (
-          <ul className="space-y-1.5">
+          <ul className="space-y-1">
             {attachedFiles.map((file, index) => (
               <li
                 key={`${file.name}-${file.size}`}
-                className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2"
+                className={cn(
+                  'group flex items-center gap-2 rounded-lg border bg-card transition-colors hover:bg-muted/40',
+                  compact ? 'px-2.5 py-1.5' : 'px-3 py-2',
+                )}
               >
-                <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
                 <span className="flex-1 truncate text-xs text-foreground">
                   {file.name}
                 </span>
-                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
                   {formatBytes(file.size)}
                 </span>
                 <button
                   type="button"
                   onClick={() => onRemoveFile(index)}
-                  className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  className="ml-0.5 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                   aria-label={`Remove ${file.name}`}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3 w-3" />
                 </button>
               </li>
             ))}
@@ -1235,7 +1459,7 @@ export function AttachmentsSection({
                 key={i}
                 className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"
               >
-                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
                 <span>{error}</span>
               </div>
             ))}

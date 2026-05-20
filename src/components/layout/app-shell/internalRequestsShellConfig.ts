@@ -1,4 +1,4 @@
-import { ArrowLeft, Archive, ClipboardList, ListTodo, Settings2, TicketCheck } from 'lucide-react';
+import { ArrowLeft, Archive, ClipboardList, FolderOpen, ListTodo, Megaphone, Settings2, TicketCheck } from 'lucide-react';
 import { PORTAL_QUEUE_ROLES, PORTAL_SETUP_ROLES } from '@/config/routeRoles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
@@ -8,6 +8,8 @@ import type { AppShellNavItem, AppShellRouteChromeMatch } from './types';
 const baseNavItems: AppShellNavItem[] = [
   { label: 'New Request', path: '/portal/tickets/new', icon: TicketCheck, end: true },
   { label: 'My Requests', path: '/portal/tickets', icon: ClipboardList, end: true },
+  { label: 'Announcements', path: '/portal/announcements', icon: Megaphone },
+  { label: 'Documents & Forms', path: '/portal/documents', icon: FolderOpen },
 ];
 
 const queueNavItems: AppShellNavItem[] = [
@@ -26,6 +28,8 @@ const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/portal\/queue/, title: 'Request Queue', kicker: 'Triage, assign, and resolve requests' },
   { pattern: /^\/portal\/history/, title: 'Request History', kicker: 'Resolved and closed requests' },
   { pattern: /^\/portal\/setup/, title: 'Request Setup', kicker: 'Configure categories, routing, and forms' },
+  { pattern: /^\/portal\/announcements/, title: 'Announcements', kicker: 'Internal Request notices, process updates, and memos' },
+  { pattern: /^\/portal\/documents/, title: 'Documents & Forms', kicker: 'Downloadable forms, templates, SOPs, and supporting documents' },
 ];
 
 export function useInternalRequestsShellConfig() {

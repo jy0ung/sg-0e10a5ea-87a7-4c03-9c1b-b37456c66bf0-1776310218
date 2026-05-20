@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Archive, ClipboardList, PlusCircle, Settings2 } from 'lucide-react';
+import { Archive, ClipboardList, FolderOpen, Megaphone, PlusCircle, Settings2 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -85,6 +85,26 @@ export default function PortalLanding() {
               />
             </>
           )}
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Resources
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <QuickLinkCard
+            to="/portal/announcements"
+            icon={Megaphone}
+            title="Announcements"
+            description="Notices, process updates, and memos for this workspace"
+          />
+          <QuickLinkCard
+            to="/portal/documents"
+            icon={FolderOpen}
+            title="Documents & Forms"
+            description="Download forms, templates, SOPs, and reference documents"
+          />
         </div>
       </div>
 

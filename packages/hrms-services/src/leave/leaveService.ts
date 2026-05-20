@@ -455,6 +455,151 @@ export async function getMyLeaveRequests(
   }));
 }
 
+// ─── Quota validation ─────────────────────────────────────────────────────────
+
+/**
+ * Validates that a proposed leave request does not exceed any active quota
+ * rules for the company.  Throws with a human-readable message if quota is
+ * exceeded.  Does NOT throw on transient DB errors — quota check failures
+ * are treated as non-blocking so that a temporary error never prevents an
+ * employee from submitting leave.
+ *
+ * Priority when multiple rules match:
+ *   1. branch + department  (most specific)
+ *   2. department only
+ *   3. branch only
+ *   4. company-wide
+ */
+async function validateLeaveQuotaOrThrow(
+  companyId: string,
+  employeeId: string,
+  leaveTypeId: string,
+  startDate: string,
+  endDate: string,
+  dayPart: LeaveDayPart,
+): Promise<void> {
+  try {
+    // 1. Active quota rules for this leave type
+    const { data: rulesData, error: rulesErr } = await untypedSupabase
+      .from('leave_quota_rules')
+      .select(
+        'id, rule_name, branch_id, department_id, period_type, ' +
+        'effective_from, effective_to, max_requests, count_pending, half_day_weight',
+      )
+      .eq('company_id', companyId)
+      .eq('leave_type_id', leaveTypeId)
+      .eq('is_active', true);
+    if (rulesErr || !rulesData || (rulesData as unknown[]).length === 0) return;
+
+    // 2. Employee branch + department
+    const { data: empRow } = await untypedSupabase
+      .from('employees')
+      .select('branch_id, department_id')
+      .eq('id', employeeId)
+      .maybeSingle();
+    const empBranchId: string | null = empRow?.branch_id    ? String(empRow.branch_id)    : null;
+    const empDeptId:   string | null = empRow?.department_id ? String(empRow.department_id) : null;
+
+    // 3. Filter to rules that scope-match this employee
+    type RawRule = Record<string, unknown>;
+    const matching = (rulesData as RawRule[]).filter(r => {
+      if (r.branch_id    && String(r.branch_id)    !== empBranchId) return false;
+      if (r.department_id && String(r.department_id) !== empDeptId)  return false;
+      return true;
+    });
+    if (!matching.length) return;
+
+    const effectiveEnd = dayPart === 'full_day' ? endDate : startDate;
+
+    // 4. Check each date in the requested range
+    for (const dateStr of eachDate(startDate, effectiveEnd)) {
+      // Pick the highest-priority rule covering this date
+      const covering = matching
+        .filter(r => {
+          if (dateStr < String(r.effective_from ?? '')) return false;
+          if (r.effective_to && dateStr > String(r.effective_to)) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          const specA = (a.branch_id ? 2 : 0) + (a.department_id ? 1 : 0);
+          const specB = (b.branch_id ? 2 : 0) + (b.department_id ? 1 : 0);
+          return specB !== specA ? specB - specA : Number(a.max_requests) - Number(b.max_requests);
+        });
+      if (!covering.length) continue;
+
+      const rule = covering[0];
+      const periodType    = String(rule.period_type ?? 'daily');
+      const countPending  = Boolean(rule.count_pending ?? true);
+      const halfDayWeight = Number(rule.half_day_weight ?? 0.5);
+      const maxRequests   = Number(rule.max_requests ?? 1);
+
+      // Compute quota window for this date
+      let windowStart = dateStr;
+      let windowEnd   = dateStr;
+      if (periodType === 'weekly') {
+        const d   = new Date(`${dateStr}T00:00:00`);
+        const day = d.getDay();
+        const mon = new Date(d.getTime() + (day === 0 ? -6 : 1 - day) * 86400000);
+        const sun = new Date(mon.getTime() + 6 * 86400000);
+        windowStart = mon.toISOString().slice(0, 10);
+        windowEnd   = sun.toISOString().slice(0, 10);
+      } else if (periodType === 'monthly') {
+        const yr  = parseInt(dateStr.slice(0, 4), 10);
+        const mo  = parseInt(dateStr.slice(5, 7), 10);
+        windowStart = `${dateStr.slice(0, 7)}-01`;
+        windowEnd   = `${dateStr.slice(0, 7)}-${String(new Date(yr, mo, 0).getDate()).padStart(2, '0')}`;
+      } else if (periodType === 'date_range') {
+        windowStart = String(rule.effective_from ?? dateStr);
+        windowEnd   = rule.effective_to ? String(rule.effective_to) : '9999-12-31';
+      }
+
+      // 5. Count existing usage in the window (with scope filter via join)
+      const statuses = ['approved', ...(countPending ? ['pending'] : [])];
+      const { data: existingLeaves } = await untypedSupabase
+        .from('leave_requests')
+        .select(
+          'id, day_part, status, ' +
+          'employee:employees!leave_requests_employee_id_fkey(branch_id, department_id)',
+        )
+        .eq('company_id', companyId)
+        .eq('leave_type_id', leaveTypeId)
+        .in('status', statuses)
+        .lte('start_date', windowEnd)
+        .gte('end_date',   windowStart);
+
+      let usage = 0;
+      for (const leave of (existingLeaves ?? []) as RawRule[]) {
+        const empData = leave.employee as RawRule | null;
+        if (rule.branch_id) {
+          const lb = empData?.branch_id ? String(empData.branch_id) : null;
+          if (lb !== String(rule.branch_id)) continue;
+        }
+        if (rule.department_id) {
+          const ld = empData?.department_id ? String(empData.department_id) : null;
+          if (ld !== String(rule.department_id)) continue;
+        }
+        const ldp = String(leave.day_part ?? 'full_day');
+        usage += ldp === 'full_day' ? 1.0 : halfDayWeight;
+      }
+
+      const newContrib = dayPart === 'full_day' ? 1.0 : halfDayWeight;
+      if (usage + newContrib > maxRequests) {
+        throw new Error(
+          `Leave quota is full for ${dateStr}. ` +
+          `Maximum ${maxRequests} concurrent leave slot${maxRequests === 1 ? '' : 's'} allowed` +
+          (rule.rule_name ? ` (${String(rule.rule_name)})` : '') +
+          '. Please select another date or contact HR/GM.',
+        );
+      }
+    }
+  } catch (e) {
+    // Re-throw quota violations; swallow infrastructure errors.
+    if (e instanceof Error && e.message.startsWith('Leave quota is full')) throw e;
+    // Log and continue — a transient DB error should not prevent leave submission.
+    console.error('[leaveService] validateLeaveQuotaOrThrow error (non-blocking):', e);
+  }
+}
+
 /**
  * Creates a leave request and bootstraps an approval instance if a flow is
  * configured. The attachment must be uploaded by the caller before this is
@@ -474,6 +619,9 @@ export async function createLeaveRequest(
   if (days <= 0) {
     throw new Error('The selected date range does not include any working leave days.');
   }
+
+  // Quota check — throws with a user-readable message if a quota rule is violated.
+  await validateLeaveQuotaOrThrow(companyId, employeeId, payload.leaveTypeId, payload.startDate, endDate, dayPart);
 
   // TODO: Replace untypedSupabase after leave_requests Insert type is verified (status enum).
   const { data, error } = await untypedSupabase.from('leave_requests').insert({

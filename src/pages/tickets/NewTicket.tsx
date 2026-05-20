@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { AlertCircle, Loader2, Paperclip, Save, X } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
@@ -22,20 +22,17 @@ import {
   DEFAULT_ROLE_CONTEXT,
   ROLE_CONTEXT,
   ticketSchema,
+  ApprovalRouteCard,
+  AttachmentsSection,
   CustomFieldsSection,
   RequestDetailsSection,
   RequestRoutingSection,
-  RequestSummaryPanel,
-  TemplateDropdown,
+  RequestSummaryCard,
+  StickySubmitPanel,
+  TemplateSelectorCard,
   type ApprovalPlanState,
   type TicketFormData,
 } from './new-ticket/NewTicketSections';
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export default function NewTicket() {
   const navigate = useNavigate();
@@ -415,11 +412,9 @@ export default function NewTicket() {
     return status;
   }, [form.formState.touchedFields, form.formState.errors]);
 
-  const isLimitReached = attachedFiles.length >= attachmentSettings.max_files_per_ticket;
-
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
-      {/* Header */}
+      {/* ── Page header ──────────────────────────────────────── */}
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
@@ -427,23 +422,9 @@ export default function NewTicket() {
           </h1>
           <p className="text-sm text-muted-foreground">{roleContext.pageSubtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
-          {branchCode && (
-            <span className="rounded-md border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
-              Branch:{' '}
-              <span className="font-medium text-foreground">{branchCode}</span>
-            </span>
-          )}
-          {draftSavedLabel && (
-            <span className="flex items-center gap-1 rounded-md border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
-              <Save className="h-3 w-3" />
-              {draftSavedLabel}
-            </span>
-          )}
-        </div>
       </div>
 
-      {/* Error state */}
+      {/* ── Error state ──────────────────────────────────────── */}
       {(categoriesError || (!categoriesLoading && categories.length === 0)) && (
         <div className="shrink-0 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
@@ -457,25 +438,24 @@ export default function NewTicket() {
         </div>
       )}
 
+      {/* ── Two-column form ──────────────────────────────────── */}
       <form
         id="new-request-form"
         onSubmit={form.handleSubmit(handleSubmit)}
         className="min-h-0 flex-1 overflow-auto"
       >
-        <div className="grid gap-5 pb-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-          {/* Main form content */}
+        <div className="grid gap-5 pb-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
+
+          {/* ── Left: main form ──────────────────────────────── */}
           <div className="space-y-4">
-            {/* Template dropdown */}
-            {templates.length > 0 && (
-              <TemplateDropdown
-                templates={templates}
-                categories={categories}
-                activeTemplateId={activeTemplateId}
-                onSelect={applyTemplate}
-                onClear={clearTemplate}
-                loading={templatesLoading}
-              />
-            )}
+            <TemplateSelectorCard
+              templates={templates}
+              categories={categories}
+              activeTemplateId={activeTemplateId}
+              onSelect={applyTemplate}
+              onClear={clearTemplate}
+              loading={templatesLoading}
+            />
 
             <RequestRoutingSection
               form={form}
@@ -508,193 +488,50 @@ export default function NewTicket() {
               companyId={user?.company_id}
               setCustomFieldValues={setCustomFieldValues}
             />
-
-            {/* Mobile-only attachments (shown below form on small screens) */}
-            <div className="xl:hidden">
-              <div className="rounded-lg border bg-card p-4 shadow-sm">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Attachments</p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  aria-label="Upload attachments"
-                  accept={ACCEPTED_TYPES.join(',')}
-                  className="sr-only"
-                  onChange={handleFileInputChange}
-                />
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Attach files"
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragOver(true);
-                  }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') fileInputRef.current?.click();
-                  }}
-                  className={`flex cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 transition-colors ${
-                    dragOver ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/40'
-                  } ${isLimitReached ? 'pointer-events-none opacity-50' : ''}`}
-                >
-                  <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 text-sm text-muted-foreground">
-                    {attachedFiles.length > 0
-                      ? `Add more files (${attachedFiles.length}/${attachmentSettings.max_files_per_ticket})`
-                      : 'Attach files'}
-                  </span>
-                </div>
-                {attachedFiles.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {attachedFiles.map((file, index) => (
-                      <li
-                        key={`${file.name}-${file.size}`}
-                        className="flex items-center gap-2 rounded-md bg-muted/30 px-2.5 py-1.5"
-                      >
-                        <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        <span className="flex-1 truncate text-xs text-foreground">{file.name}</span>
-                        <span className="text-[10px] text-muted-foreground tabular-nums">{formatBytes(file.size)}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(index)}
-                          className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                          aria-label={`Remove ${file.name}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {fileErrors.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {fileErrors.map((error, i) => (
-                      <li key={i} className="flex items-start gap-1.5 text-xs text-destructive">
-                        <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
-                        <span>{error}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Mobile submit button */}
-              <button
-                type="submit"
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-                disabled={!canSubmit}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  'Submit Request'
-                )}
-              </button>
-              <p className="mt-2 text-center text-xs text-muted-foreground">
-                Drafts are saved locally until submitted.
-              </p>
-            </div>
           </div>
 
-          {/* Sticky sidebar */}
-          <div className="hidden xl:block">
-            <div className="sticky top-4 space-y-4">
-              <RequestSummaryPanel
+          {/* ── Right: operational sidebar ───────────────────── */}
+          <div className="lg:self-start">
+            <div className="sticky top-4 flex flex-col gap-4">
+
+              {/* 1. Request Summary */}
+              <RequestSummaryCard
                 activeTemplate={activeTemplate}
                 categoryLabel={selectedCategory?.label ?? ''}
                 subcategoryLabel={selectedSubcategory?.label ?? null}
                 priority={selectedPriority}
                 attachedFiles={attachedFiles}
-                approvalPlan={approvalPlan}
+                maxFiles={attachmentSettings.max_files_per_ticket}
+                branchCode={branchCode}
+                draftSavedAt={draftSavedAt}
               />
 
-              {/* Minimal attachment widget */}
-              <div className="rounded-lg border bg-card p-3 shadow-sm">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Attachments
-                </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  aria-label="Upload attachments"
-                  accept={ACCEPTED_TYPES.join(',')}
-                  className="sr-only"
-                  onChange={handleFileInputChange}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLimitReached}
-                  className="flex w-full items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-50"
-                >
-                  <Paperclip className="h-3.5 w-3.5" />
-                  <span className="flex-1 text-left">
-                    {attachedFiles.length > 0
-                      ? `Add more (${attachedFiles.length}/${attachmentSettings.max_files_per_ticket})`
-                      : 'Attach files'}
-                  </span>
-                </button>
-                {attachedFiles.length > 0 && (
-                  <ul className="mt-2 space-y-0.5">
-                    {attachedFiles.map((file, index) => (
-                      <li
-                        key={`${file.name}-${file.size}`}
-                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-muted/40"
-                      >
-                        <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        <span className="flex-1 truncate text-xs text-foreground">{file.name}</span>
-                        <span className="text-[10px] text-muted-foreground tabular-nums">{formatBytes(file.size)}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(index)}
-                          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                          aria-label={`Remove ${file.name}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {fileErrors.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {fileErrors.map((error, i) => (
-                      <li key={i} className="flex items-start gap-1.5 text-[11px] text-destructive">
-                        <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
-                        <span>{error}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              {/* 2. Attachments */}
+              <AttachmentsSection
+                attachmentSettings={attachmentSettings}
+                attachedFiles={attachedFiles}
+                fileErrors={fileErrors}
+                dragOver={dragOver}
+                fileInputRef={fileInputRef}
+                compact
+                setDragOver={setDragOver}
+                onDrop={handleDrop}
+                onFileInputChange={handleFileInputChange}
+                onRemoveFile={removeFile}
+              />
 
-              {/* Submit button */}
-              <button
-                type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
-                disabled={!canSubmit}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  'Submit Request'
-                )}
-              </button>
-              <p className="text-center text-xs text-muted-foreground">
-                Drafts are saved locally until submitted.
-              </p>
+              {/* 3. Approval Route */}
+              <ApprovalRouteCard plan={approvalPlan} />
+
+              {/* 4. Submit */}
+              <StickySubmitPanel
+                canSubmit={canSubmit}
+                submitting={submitting}
+                draftSavedLabel={draftSavedLabel}
+              />
             </div>
           </div>
+
         </div>
       </form>
     </div>

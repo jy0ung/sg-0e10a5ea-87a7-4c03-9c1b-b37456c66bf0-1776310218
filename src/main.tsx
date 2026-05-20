@@ -58,7 +58,7 @@ const MyTickets = lazy(() => import("./pages/tickets/MyTickets"));
 const NewTicket = lazy(() => import("./pages/tickets/NewTicket"));
 const RequestQueue = lazy(() => import("./pages/tickets/RequestQueue"));
 const RequestSetup = lazy(() => import("./pages/tickets/RequestSetup"));
-const RequestHistory = lazy(() => import("./pages/tickets/RequestHistory"));const PortalLanding = lazy(() => import('./pages/tickets/PortalLanding'));const LoginPage = lazy(() => import("./pages/LoginPage"));
+const RequestHistory = lazy(() => import("./pages/tickets/RequestHistory"));const PortalLanding = lazy(() => import('./pages/tickets/PortalLanding'));const PortalAnnouncements = lazy(() => import('./pages/tickets/PortalAnnouncements'));const PortalDocuments = lazy(() => import('./pages/tickets/PortalDocuments'));const LoginPage = lazy(() => import("./pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const SignUpPage = lazy(() => import("./pages/SignUpPage"));
@@ -271,6 +271,8 @@ const router = createBrowserRouter([
       { path: "queue", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Request Queue"><RequestQueue /></R></S></RequireRole> },
       { path: "history", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Request History"><RequestHistory /></R></S></RequireRole> },
       { path: "setup", element: <RequireRole roles={PORTAL_SETUP_ROLES} section="Platform"><S><R scope="Request Setup"><RequestSetup /></R></S></RequireRole> },
+      { path: "announcements", element: <S><R scope="Portal Announcements"><PortalAnnouncements /></R></S> },
+      { path: "documents", element: <S><R scope="Portal Documents"><PortalDocuments /></R></S> },
     ],
   },
   {
