@@ -2,6 +2,7 @@ import {
   Calendar,
   Clock,
   CreditCard,
+  Gauge,
   Megaphone,
   Settings2,
   Star,
@@ -31,5 +32,6 @@ export const hrmsNavItems: HrmsNavItem[] = [
   { label: 'Leave Calendar', path: '/leave/calendar', icon: Calendar, group: 'Workforce', access: 'leaveCalendar' },
   { label: 'Employees', path: '/employees', icon: Users, group: 'Workforce', access: 'employees' },
   { label: 'Payroll', path: '/payroll', icon: CreditCard, group: 'Administration', access: 'payroll' },
+  { label: 'Leave Quota', path: '/settings/leave-quota', icon: Gauge, group: 'Administration', access: 'leaveQuota' },
   { label: 'Settings', path: '/settings', icon: Settings2, group: 'Administration', access: 'settings' },
 ];
