@@ -92,7 +92,7 @@ export const PORTAL_QUEUE_ROLES: readonly AppRole[] = [
 ] as const;
 
 // portal_admin can also manage setup (categories, routing, templates).
-// portal_manager has read-only access to setup so they stay off this list.
+// portal_manager stays off this write-capable setup route until a read-only setup view exists.
 export const PORTAL_SETUP_ROLES: readonly AppRole[] = [
   'super_admin',
   'company_admin',

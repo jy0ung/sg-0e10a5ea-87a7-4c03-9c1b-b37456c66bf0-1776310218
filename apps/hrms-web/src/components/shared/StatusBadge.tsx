@@ -33,6 +33,25 @@ const statusStyles: Record<string, string> = {
   duplicate: 'bg-muted text-muted-foreground',
   invalid: 'bg-destructive/15 text-destructive',
   format_error: 'bg-warning/15 text-warning',
+  // ── HRMS attendance ──────────────────────────────────────────────────────
+  present:        'bg-success/15 text-success',
+  absent:         'bg-destructive/15 text-destructive',
+  half_day:       'bg-warning/15 text-warning',
+  on_leave:       'bg-info/15 text-info',
+  public_holiday: 'bg-primary/15 text-primary',
+  // ── HRMS payroll run ─────────────────────────────────────────────────────
+  draft:      'bg-muted text-muted-foreground',
+  finalised:  'bg-info/15 text-info',
+  paid:       'bg-success/15 text-success',
+  // ── HRMS appraisal cycle ─────────────────────────────────────────────────
+  open:        'bg-info/15 text-info',
+  in_progress: 'bg-warning/15 text-warning',
+  // completed already mapped above
+  archived: 'bg-muted text-muted-foreground',
+  // ── HRMS appraisal item ──────────────────────────────────────────────────
+  self_reviewed: 'bg-info/15 text-info',
+  reviewed:      'bg-warning/15 text-warning',
+  acknowledged:  'bg-success/15 text-success',
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {

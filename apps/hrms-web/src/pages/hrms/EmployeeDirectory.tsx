@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +46,9 @@ const ROLE_LABEL: Record<AppRole, string> = {
   accounts:        'Accounts',
   analyst:         'Analyst (Legacy)',
   creator_updater: 'Creator/Updater',
+  portal_admin:    'Portal Admin',
+  portal_manager:  'Portal Manager',
+  portal_staff:    'Portal Staff',
 };
 
 const ROLE_BADGE: Record<AppRole, string> = {
@@ -57,6 +61,9 @@ const ROLE_BADGE: Record<AppRole, string> = {
   accounts:        'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
   analyst:         'bg-secondary text-secondary-foreground',
   creator_updater: 'bg-secondary text-secondary-foreground',
+  portal_admin:    'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  portal_manager:  'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+  portal_staff:    'bg-secondary text-secondary-foreground',
 };
 
 const STATUS_BADGE: Record<EmployeeStatus, string> = {
@@ -90,6 +97,12 @@ type EditForm = {
   status: EmployeeStatus;
   departmentId: string;
   jobTitleId: string;
+};
+
+type EmployeeDirectoryRow = Employee & Record<string, unknown> & {
+  branchCode: string;
+  managerName: string;
+  roleLabel: string;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -186,6 +199,79 @@ export default function EmployeeDirectory() {
     const managerName = e.managerId ? employeeById.get(e.managerId)?.name ?? '' : '';
     return !q || [e.staffCode, e.name, e.email, e.branchId, managerName].join(' ').toLowerCase().includes(q);
   });
+  const tableRows: EmployeeDirectoryRow[] = filtered.map(emp => ({
+    ...emp,
+    branchCode: branches.find(b => b.id === emp.branchId)?.code ?? emp.branchId ?? '—',
+    managerName: emp.managerId ? employeeById.get(emp.managerId)?.name ?? emp.managerId : '—',
+    roleLabel: ROLE_LABEL[emp.role],
+  }));
+  const columns: StandardTableColumn<EmployeeDirectoryRow>[] = [
+    { key: 'staffCode', label: 'Code', className: 'whitespace-nowrap font-mono text-xs font-medium', render: emp => emp.staffCode ?? '—' },
+    { key: 'name', label: 'Name', className: 'whitespace-nowrap font-medium' },
+    {
+      key: 'roleLabel',
+      label: 'Role',
+      className: 'whitespace-nowrap',
+      render: emp => <Badge className={`text-xs capitalize ${ROLE_BADGE[emp.role]}`}>{ROLE_LABEL[emp.role]}</Badge>,
+    },
+    { key: 'icNo', label: 'IC', className: 'whitespace-nowrap text-xs text-muted-foreground', render: emp => canViewPii ? (emp.icNo ?? '—') : maskIc(emp.icNo) },
+    { key: 'contactNo', label: 'Contact', className: 'whitespace-nowrap text-xs text-muted-foreground', render: emp => canViewPii ? (emp.contactNo ?? '—') : maskContact(emp.contactNo) },
+    { key: 'email', label: 'Email', className: 'max-w-[16rem] truncate text-xs text-muted-foreground', render: emp => <span title={emp.email}>{emp.email}</span> },
+    { key: 'departmentName', label: 'Department', className: 'whitespace-nowrap text-xs text-muted-foreground', render: emp => emp.departmentName ?? '—' },
+    { key: 'jobTitleName', label: 'Job Title', className: 'whitespace-nowrap text-xs text-muted-foreground', render: emp => emp.jobTitleName ?? '—' },
+    { key: 'managerName', label: 'Manager', className: 'whitespace-nowrap text-xs text-muted-foreground' },
+    { key: 'branchCode', label: 'Branch', className: 'whitespace-nowrap text-xs' },
+    { key: 'joinDate', label: 'Join Date', className: 'whitespace-nowrap text-xs text-muted-foreground', render: emp => emp.joinDate ?? '—' },
+    {
+      key: 'status',
+      label: 'Status',
+      className: 'whitespace-nowrap',
+      render: emp => <Badge className={`text-xs capitalize ${STATUS_BADGE[emp.status]}`}>{emp.status}</Badge>,
+    },
+    ...(canManage ? [{
+      key: 'actions',
+      label: '',
+      sortable: false,
+      className: 'whitespace-nowrap',
+      render: (emp: EmployeeDirectoryRow) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Edit" onClick={() => openEdit(emp)}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          {emp.email && !emp.email.endsWith('@company.local') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              title="Re-send invite"
+              disabled={reInviting === emp.id}
+              onClick={() => handleReInvite(emp)}
+            >
+              <Send className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+            title="Delete employee"
+            onClick={() => setDeleteTarget(emp)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => toggleStatus(emp)}
+            disabled={emp.status === 'resigned'}
+          >
+            {emp.status === 'active' ? 'Deactivate' : 'Activate'}
+          </Button>
+        </div>
+      ),
+    } satisfies StandardTableColumn<EmployeeDirectoryRow>] : []),
+  ];
 
   const activeCount   = employees.filter(e => e.status === 'active').length;
   const inactiveCount = employees.filter(e => e.status === 'inactive').length;
@@ -430,106 +516,14 @@ export default function EmployeeDirectory() {
         </div>
         </div>
 
-        {/* Table */}
-        <div className="max-h-[70vh] overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
-              <tr className="border-b border-border text-left text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Code</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Name</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Role</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">IC</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Contact</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Email</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Department</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Job Title</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Manager</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Branch</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Join Date</th>
-                <th className="whitespace-nowrap px-3 py-2 font-semibold">Status</th>
-                {canManage && <th className="whitespace-nowrap px-3 py-2 font-semibold"></th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={canManage ? 13 : 12} className="py-8 text-center text-muted-foreground text-sm">
-                    No employees found
-                  </td>
-                </tr>
-              ) : (
-                filtered.map(emp => {
-                  const branchCode = branches.find(b => b.id === emp.branchId)?.code ?? emp.branchId ?? '—';
-                  const managerName = emp.managerId ? employeeById.get(emp.managerId)?.name ?? emp.managerId : '—';
-                  return (
-                    <tr key={emp.id} className="border-b border-border/40 transition-colors hover:bg-muted/40">
-                      <td className="whitespace-nowrap px-3 py-2 font-mono text-xs font-medium">{emp.staffCode ?? '—'}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-sm font-medium">{emp.name}</td>
-                      <td className="whitespace-nowrap px-3 py-2">
-                        <Badge className={`text-[10px] capitalize ${ROLE_BADGE[emp.role]}`}>
-                          {ROLE_LABEL[emp.role]}
-                        </Badge>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{canViewPii ? (emp.icNo ?? '—') : maskIc(emp.icNo)}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{canViewPii ? (emp.contactNo ?? '—') : maskContact(emp.contactNo)}</td>
-                      <td className="max-w-[16rem] truncate px-3 py-2 text-xs text-muted-foreground" title={emp.email}>{emp.email}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{emp.departmentName ?? '—'}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{emp.jobTitleName ?? '—'}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{managerName}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-xs">{branchCode}</td>
-                      <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">{emp.joinDate ?? '—'}</td>
-                      <td className="whitespace-nowrap px-3 py-2">
-                        <Badge className={`text-[10px] capitalize ${STATUS_BADGE[emp.status]}`}>
-                          {emp.status}
-                        </Badge>
-                      </td>
-                      {canManage && (
-                        <td className="whitespace-nowrap px-3 py-2">
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost" size="sm"
-                              className="h-6 w-6 p-0"
-                              title="Edit"
-                              onClick={() => openEdit(emp)}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            {emp.email && !emp.email.endsWith('@company.local') && (
-                              <Button
-                                variant="ghost" size="sm"
-                                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                                title="Re-send invite"
-                                disabled={reInviting === emp.id}
-                                onClick={() => handleReInvite(emp)}
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost" size="sm"
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                              title="Delete employee"
-                              onClick={() => setDeleteTarget(emp)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost" size="sm"
-                              className="h-6 text-[10px] px-2"
-                              onClick={() => toggleStatus(emp)}
-                              disabled={emp.status === 'resigned'}
-                            >
-                              {emp.status === 'active' ? 'Deactivate' : 'Activate'}
-                            </Button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+        <div className="p-3">
+          <StandardTable
+            data={tableRows}
+            columns={columns}
+            hideSearch
+            pageSizes={[25, 50, 100]}
+            emptyMessage="No employees found."
+          />
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +27,7 @@ import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import {
   Building2, Briefcase, Calendar, CalendarDays, RefreshCw,
   Plus, Pencil, Trash2, Shield, GitMerge, Users, Settings2,
-  Boxes, Clock, Mail, DollarSign, UserCog, Gauge,
+  Boxes, Clock, Mail, DollarSign, UserCog, Gauge, ArrowLeft,
 } from 'lucide-react';
 import {
   listDepartments, createDepartment, updateDepartment, deleteDepartment,
@@ -103,6 +104,8 @@ const CATEGORIES: CategoryDef[] = [
   { id: 'system',         label: 'System Controls',  icon: Boxes,       description: 'Review HRMS configuration standards, access guardrails, and operational readiness notes.', summary: 'Readiness checklist', group: 'System' },
 ];
 
+const HIDDEN_MODULE_STATUSES = new Set(['Planning']);
+
 const CONFIG_GROUPS: ConfigGroup[] = ['General', 'HRMS Roles', 'Approval Flows', 'Departments', 'Leave', 'Attendance', 'Employees', 'Payroll', 'Notifications', 'System'];
 
 const JOB_LEVELS: { value: JobTitleLevel; label: string }[] = [
@@ -130,6 +133,10 @@ function getGroupModuleCount(group: ConfigGroup, modules: CategoryDef[]) {
   return modules.filter(module => module.group === group).length;
 }
 
+function isConfigGroup(value: string | null): value is ConfigGroup {
+  return CONFIG_GROUPS.includes(value as ConfigGroup);
+}
+
 function getModulePattern(module: Category) {
   if (module === 'approval-flows') return 'Full workspace';
   if (['departments', 'job-titles', 'leave-types', 'holidays'].includes(module)) return 'Data drawer';
@@ -137,7 +144,7 @@ function getModulePattern(module: Category) {
   return 'Compact dialog';
 }
 
-function getWorkspaceDialogClass(module: Category | null) {
+function _getWorkspaceDialogClass(module: Category | null) {
   if (!module) return 'flex max-h-[86vh] max-w-3xl flex-col overflow-hidden p-0';
   if (module === 'approval-flows') {
     return 'flex h-[92vh] max-w-[1200px] flex-col overflow-hidden p-0';
@@ -1329,9 +1336,9 @@ function RoleManagementPanel({ companyId, actorId, canWrite }: SecurityPanelProp
                 <div className="rounded-md border bg-muted/20 px-2 py-1.5"><span className="block font-semibold">{role.canApproveRequests ? 'Yes' : 'No'}</span><span className="text-muted-foreground">Approves</span></div>
               </div>
               <div className="mt-3 flex flex-wrap gap-1">
-                {role.canManageEmployeeRecords && <Badge variant="outline" className="text-[10px]">Employee records</Badge>}
-                {role.canViewHrmsReports && <Badge variant="outline" className="text-[10px]">Reports</Badge>}
-                {role.isSystemDefault && <Badge variant="secondary" className="text-[10px]">Default</Badge>}
+                {role.canManageEmployeeRecords && <Badge variant="outline" className="text-xs">Employee records</Badge>}
+                {role.canViewHrmsReports && <Badge variant="outline" className="text-xs">Reports</Badge>}
+                {role.isSystemDefault && <Badge variant="secondary" className="text-xs">Default</Badge>}
               </div>
               <div className="mt-4 flex justify-between gap-2">
                 <p className="text-[11px] text-muted-foreground">Updated {role.updatedAt ? new Date(role.updatedAt).toLocaleDateString() : '—'}</p>
@@ -1490,7 +1497,7 @@ function AdminConsoleOverview({
   onOpenModule,
   onOpenGroup,
 }: AdminConsoleOverviewProps) {
-  const recommendedIds: Category[] = ['roles', 'approval-flows', 'departments', 'leave-types', 'attendance-policies'];
+  const recommendedIds: Category[] = ['roles', 'approval-flows', 'departments', 'leave-types', 'holidays'];
   const recommended = recommendedIds
     .map(id => modules.find(module => module.id === id))
     .filter((module): module is CategoryDef => !!module);
@@ -1525,9 +1532,9 @@ function AdminConsoleOverview({
     },
     {
       title: 'Operational Defaults',
-      description: 'Attendance, payroll, employee categories, notifications, and system readiness.',
+      description: 'System readiness checks and HRMS guardrails that are ready for administrator review.',
       group: 'System' as ConfigGroup,
-      ids: ['attendance-policies', 'employee-categories', 'payroll-defaults', 'notification-templates', 'system'] as Category[],
+      ids: ['system'] as Category[],
       icon: UserCog,
     },
   ];
@@ -1664,8 +1671,9 @@ export default function HrmsAdmin() {
   const { user } = useAuth();
   const hrmsAccess = useHrmsAccess();
   const companyId = useCompanyId();
-  const [activeGroup, setActiveGroup] = useState<ConfigGroup>('General');
-  const [activeModule, setActiveModule] = useState<Category | null>(null);
+  const navigate = useNavigate();
+  const { module: routeModule } = useParams<{ module?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const canWrite = hrmsAccess.canAccessSettings;
   const canManageSecurity = hrmsAccess.canAccessSettings;
@@ -1674,11 +1682,30 @@ export default function HrmsAdmin() {
     return <UnauthorizedAccess />;
   }
 
-  const visibleModules = CATEGORIES.filter(module => !module.adminOnly || canManageSecurity);
+  const visibleModules = CATEGORIES.filter(module =>
+    !HIDDEN_MODULE_STATUSES.has(module.status ?? '') && (!module.adminOnly || canManageSecurity),
+  );
+  const activeGroup: ConfigGroup = isConfigGroup(searchParams.get('group')) ? searchParams.get('group') as ConfigGroup : 'General';
+  const activeModuleDef = routeModule
+    ? visibleModules.find(module => module.id === routeModule)
+    : null;
+  const activeModule = activeModuleDef?.id ?? null;
   const modulesForActiveGroup = activeGroup === 'General'
     ? []
     : visibleModules.filter(module => module.group === activeGroup);
-  const activeModuleDef = activeModule ? getCategoryDef(activeModule) : null;
+
+  function openGroup(group: ConfigGroup) {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (group === 'General') next.delete('group');
+      else next.set('group', group);
+      return next;
+    });
+  }
+
+  function openModule(module: Category) {
+    navigate(`/settings/${module}`);
+  }
 
   function renderModuleContent(module: Category) {
     if (module === 'roles') return <RoleManagementPanel companyId={companyId} actorId={user.id} canWrite={canManageSecurity} />;
@@ -1705,6 +1732,30 @@ export default function HrmsAdmin() {
     return <HrmsSettingsPlaceholderPanel category={module} />;
   }
 
+  if (routeModule && !activeModuleDef) {
+    return <UnauthorizedAccess />;
+  }
+
+  if (activeModule && activeModuleDef) {
+    return (
+      <div className="w-full space-y-4">
+        <PageHeader
+          title={activeModuleDef.label}
+          description={activeModuleDef.description}
+          breadcrumbs={[{ label: 'HRMS' }, { label: 'HRMS Settings' }, { label: activeModuleDef.label }]}
+          actions={
+            <Button size="sm" variant="outline" onClick={() => navigate('/settings')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Settings
+            </Button>
+          }
+        />
+        <div className="space-y-4">
+          {renderModuleContent(activeModule)}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full space-y-4">
       <PageHeader
@@ -1723,7 +1774,7 @@ export default function HrmsAdmin() {
               <button
                 key={group}
                 type="button"
-                onClick={() => setActiveGroup(group)}
+                onClick={() => openGroup(group)}
                 className={cn(
                   'shrink-0 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   active
@@ -1759,8 +1810,8 @@ export default function HrmsAdmin() {
           <AdminConsoleOverview
             modules={visibleModules}
             canManageSecurity={canManageSecurity}
-            onOpenModule={setActiveModule}
-            onOpenGroup={setActiveGroup}
+            onOpenModule={openModule}
+            onOpenGroup={openGroup}
           />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1770,7 +1821,7 @@ export default function HrmsAdmin() {
                 <button
                   key={module.id}
                   type="button"
-                  onClick={() => setActiveModule(module.id)}
+                  onClick={() => openModule(module.id)}
                   className="group flex min-h-[142px] flex-col rounded-lg border bg-background/80 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -1778,9 +1829,9 @@ export default function HrmsAdmin() {
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="flex flex-wrap justify-end gap-1">
-                      {module.adminOnly && <Badge variant="outline" className="text-[10px]">Admin</Badge>}
-                      <Badge variant="secondary" className="text-[10px]">{getModulePattern(module.id)}</Badge>
-                      {module.status && <Badge variant="secondary" className="text-[10px]">{module.status}</Badge>}
+                      {module.adminOnly && <Badge variant="outline" className="text-xs">Admin</Badge>}
+                      <Badge variant="secondary" className="text-xs">{getModulePattern(module.id)}</Badge>
+                      {module.status && <Badge variant="secondary" className="text-xs">{module.status}</Badge>}
                     </div>
                   </div>
                   <div className="mt-4">
@@ -1795,30 +1846,6 @@ export default function HrmsAdmin() {
         )}
       </section>
 
-      <Dialog open={!!activeModule} onOpenChange={open => !open && setActiveModule(null)}>
-        <DialogContent className={getWorkspaceDialogClass(activeModule)}>
-          {activeModuleDef && (
-            <DialogHeader className="border-b px-6 py-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                  {React.createElement(activeModuleDef.icon, { className: 'h-5 w-5' })}
-                </div>
-                <div>
-                  <DialogTitle>{activeModuleDef.label}</DialogTitle>
-                  <DialogDescription>{activeModuleDef.description}</DialogDescription>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Badge variant="secondary">{getModulePattern(activeModuleDef.id)}</Badge>
-                    {activeModuleDef.adminOnly && <Badge variant="outline">Admin only</Badge>}
-                  </div>
-                </div>
-              </div>
-            </DialogHeader>
-          )}
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-            {activeModule && renderModuleContent(activeModule)}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

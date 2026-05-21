@@ -124,7 +124,7 @@ describe('HrmsLayout', () => {
   it('shows self-service navigation for an accounts user and hides admin-only items', () => {
     renderLayout('accounts');
 
-    expect(screen.getByRole('link', { name: 'Leave' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Leave Management' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Approvals' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Employees' })).not.toBeInTheDocument();

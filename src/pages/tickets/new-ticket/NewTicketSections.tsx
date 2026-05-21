@@ -62,6 +62,9 @@ export const ticketSchema = z.object({
   subcategory: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high']),
   description: z.string().min(20, 'Description must be at least 20 characters'),
+  requested_due_date: z.string().optional(),
+  desired_outcome: z.string().optional(),
+  business_impact: z.string().optional(),
 });
 
 export type TicketFormData = z.infer<typeof ticketSchema>;
@@ -72,6 +75,9 @@ export const DEFAULT_FORM: TicketFormData = {
   subcategory: '',
   priority: 'medium',
   description: '',
+  requested_due_date: '',
+  desired_outcome: '',
+  business_impact: '',
 };
 
 interface PriorityOption {
@@ -782,7 +788,7 @@ export function RequestSummaryPanel({
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Drafts are saved locally until submitted.
+        Text is saved locally; re-attach files after reload.
       </p>
     </div>
   );
@@ -891,9 +897,10 @@ interface StickySubmitPanelProps {
   canSubmit: boolean;
   submitting: boolean;
   draftSavedLabel?: string | null;
+  submitBlocker?: string | null;
 }
 
-export function StickySubmitPanel({ canSubmit, submitting, draftSavedLabel }: StickySubmitPanelProps) {
+export function StickySubmitPanel({ canSubmit, submitting, draftSavedLabel, submitBlocker }: StickySubmitPanelProps) {
   return (
     <div className="space-y-2">
       <Button type="submit" className="w-full" disabled={!canSubmit}>
@@ -906,14 +913,25 @@ export function StickySubmitPanel({ canSubmit, submitting, draftSavedLabel }: St
           'Submit Request'
         )}
       </Button>
-      {draftSavedLabel ? (
-        <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-          <Save className="h-3 w-3" />
-          {draftSavedLabel}
+      {!canSubmit && submitBlocker ? (
+        <p className="flex items-start justify-center gap-1.5 text-xs text-destructive">
+          <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>{submitBlocker}</span>
         </p>
+      ) : null}
+      {draftSavedLabel ? (
+        <div className="space-y-1">
+          <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+            <Save className="h-3 w-3" />
+            {draftSavedLabel}
+          </p>
+          <p className="text-center text-xs text-muted-foreground">
+            Text is saved locally; re-attach files after reload.
+          </p>
+        </div>
       ) : (
         <p className="text-center text-xs text-muted-foreground">
-          Drafts are saved locally until submitted.
+          Text is saved locally; re-attach files after reload.
         </p>
       )}
     </div>
@@ -1196,6 +1214,53 @@ export function RequestDetailsSection({
               {form.formState.errors.description.message}
             </p>
           )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface OperationalContextSectionProps {
+  form: UseFormReturn<TicketFormData>;
+}
+
+export function OperationalContextSection({ form }: OperationalContextSectionProps) {
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="border-b bg-muted/20 px-4 py-3">
+        <p className="text-sm font-semibold text-foreground">Operational context</p>
+        <p className="text-xs text-muted-foreground">
+          Add timing, outcome, and impact details for assignees.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4 p-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="requested_due_date">Requested due date</Label>
+            <Input
+              id="requested_due_date"
+              type="date"
+              {...form.register('requested_due_date')}
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="desired_outcome">Desired outcome</Label>
+            <Textarea
+              id="desired_outcome"
+              rows={3}
+              placeholder="What result should this request produce?"
+              {...form.register('desired_outcome')}
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="business_impact">Business impact</Label>
+            <Textarea
+              id="business_impact"
+              rows={3}
+              placeholder="Who or what is affected if this is delayed?"
+              {...form.register('business_impact')}
+            />
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -1490,7 +1555,7 @@ export function MobileSubmitPanel({
         )}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        Drafts are saved locally until submitted.
+        Text is saved locally; re-attach files after reload.
       </p>
     </div>
   );

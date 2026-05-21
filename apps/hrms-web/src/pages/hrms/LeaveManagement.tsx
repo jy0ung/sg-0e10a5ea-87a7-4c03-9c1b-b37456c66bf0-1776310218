@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,20 +24,15 @@ import {
   getLeaveApprovalPreview,
   getLeaveEmployeeInfo,
   createLeaveRequest,
-  reviewLeaveRequest,
   validateLeaveAttachment,
 } from '@/services/hrmsService';
 import type { LeaveDayPart, LeaveRequest, LeaveStatus, CreateLeaveRequestInput, LeaveType, LeaveBalance } from '@/types';
-import { AlertCircle, AlertTriangle, CheckCircle2, XCircle, Clock, Plus, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FileText, Paperclip, X, Calendar, Users, Inbox, Search, Settings, CalendarDays, TrendingUp } from 'lucide-react';
-import { format, parseISO, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
+import { AlertCircle, AlertTriangle, CheckCircle2, XCircle, Clock, Plus, ChevronDown, ChevronUp, FileText, Paperclip, X, Calendar, Users, Search, TrendingUp, ExternalLink } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { matchesHrmsApproverRole, type HrmsApproverIdentity } from '@/lib/hrms/access';
 import { createLeaveRequestSchema } from '@/lib/validations';
-import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
-import {
-  getPendingApprovalsForUser,
-  submitApprovalDecision,
-} from '@/services/approvalEngineService';
+import { getApprovalInboxReviewPath } from '@/lib/hrms/approvalInbox';
 import { checkLeaveQuotaAvailability } from '@/services/leaveQuotaService';
 const LEAVE_DRAFT_STORAGE_PREFIX = 'flc.hrms.leave-draft';
 const ATTACHMENT_ACCEPT = '.pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png';
@@ -135,12 +131,12 @@ export type LeaveApproverIdentity = HrmsApproverIdentity;
 export function isRequestAssignedToApprover(
   request: LeaveRequest,
   approver: LeaveApproverIdentity,
-  canApproveRequests: boolean,
+  _canApproveRequests: boolean,
 ): boolean {
   if (request.status !== 'pending' || !approver) return false;
   if (request.currentApproverUserId) return request.currentApproverUserId === approver.id;
   if (request.currentApproverRole) return matchesHrmsApproverRole(request.currentApproverRole, approver);
-  return canApproveRequests;
+  return false;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -162,7 +158,7 @@ export function filterLeaveRequestsForView(
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type LeaveTab = 'my-leave' | 'team-leave' | 'approval-queue' | 'leave-calendar' | 'leave-settings';
+type LeaveTab = 'my-leave' | 'team-leave';
 
 type StatusConfig = {
   label: string;
@@ -352,10 +348,9 @@ function ApprovalTimeline({ req, fmtTs }: { req: LeaveRequest; fmtTs: (v?: strin
   );
 }
 
-function LeaveRequestRow({ req, isMyLeave, canReview, expanded, onToggleExpand, onApprove, onReject, fmtTs }: {
+function LeaveRequestRow({ req, isMyLeave, canReview, expanded, onToggleExpand, fmtTs }: {
   req: LeaveRequest; isMyLeave: boolean; canReview: boolean;
   expanded: boolean; onToggleExpand: () => void;
-  onApprove: () => void; onReject: () => void;
   fmtTs: (v?: string) => string;
 }) {
   const hasTimeline = !!(req.approvalInstanceId || req.approvalHistory?.length);
@@ -406,11 +401,10 @@ function LeaveRequestRow({ req, isMyLeave, canReview, expanded, onToggleExpand, 
           <span className="flex-1 text-xs text-muted-foreground">
             {req.currentApprovalStepName ? `Stage: ${req.currentApprovalStepName}` : 'Direct review'}
           </span>
-          <Button size="sm" className="h-7 bg-emerald-600 px-3 text-xs text-white hover:bg-emerald-700" onClick={onApprove}>
-            <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Approve
-          </Button>
-          <Button size="sm" variant="outline" className="h-7 border-red-300 px-3 text-xs text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400" onClick={onReject}>
-            <XCircle className="mr-1 h-3.5 w-3.5" /> Reject
+          <Button asChild size="sm" variant="outline" className="h-7 border-amber-300 px-3 text-xs text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300">
+            <Link to={getApprovalInboxReviewPath('leave_request', req.id)}>
+              <ExternalLink className="mr-1 h-3.5 w-3.5" /> Review in Approval Inbox
+            </Link>
           </Button>
         </div>
       )}
@@ -457,9 +451,9 @@ export default function LeaveManagement() {
   const { user } = useAuth();
   const hrmsAccess = useHrmsAccess();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const canApproveRequests = hrmsAccess.canApproveRequests;
   const canViewTeam        = canApproveRequests || hrmsAccess.canAccessEmployees;
-  const canViewSettings    = hrmsAccess.canAccessSettings;
   const selfServiceEmployeeId = user?.employeeId ?? user?.id;
   const selectedLeaveYear = useMemo(() => new Date().getFullYear(), []);
 
@@ -468,7 +462,7 @@ export default function LeaveManagement() {
   const { data: leaveData, isPending: loading } = useQuery({
     queryKey: ['leave-management', user?.companyId, user?.id, canApproveRequests, selfServiceEmployeeId],
     queryFn: async () => {
-      const [reqRes, typeRes, balanceRes, holidayRes, employeeInfoRes, approvalPreviewRes, approvalsRes] = await Promise.all([
+      const [reqRes, typeRes, balanceRes, holidayRes, employeeInfoRes, approvalPreviewRes] = await Promise.all([
         listLeaveRequests(user!.companyId, canApproveRequests
           ? { includeApprovalHistory: true }
           : { employeeId: selfServiceEmployeeId, includeApprovalHistory: true }),
@@ -477,7 +471,6 @@ export default function LeaveManagement() {
         listLeaveHolidays(user!.companyId),
         selfServiceEmployeeId ? getLeaveEmployeeInfo(user!.companyId, selfServiceEmployeeId) : Promise.resolve({ data: null, error: null }),
         selfServiceEmployeeId ? getLeaveApprovalPreview(user!.companyId, selfServiceEmployeeId) : Promise.resolve({ data: null, error: null }),
-        canApproveRequests ? getPendingApprovalsForUser(user!.companyId, user!.id) : Promise.resolve({ data: [], error: null }),
       ]);
       if (reqRes.error) toast({ title: 'Error', description: reqRes.error, variant: 'destructive' });
       if (typeRes.error) toast({ title: 'Error', description: typeRes.error, variant: 'destructive' });
@@ -492,7 +485,6 @@ export default function LeaveManagement() {
         holidays: holidayRes.data,
         employeeInfo: employeeInfoRes.data,
         approvalPreview: approvalPreviewRes.data,
-        pendingApprovals: approvalsRes.data,
       };
     },
     enabled: !!user?.companyId && (!!canApproveRequests || !!selfServiceEmployeeId),
@@ -503,22 +495,23 @@ export default function LeaveManagement() {
   const holidays        = leaveData?.holidays       ?? [];
   const employeeInfo    = leaveData?.employeeInfo   ?? null;
   const approvalPreview = leaveData?.approvalPreview ?? null;
-  const pendingApprovals = leaveData?.pendingApprovals ?? [];
 
   // ── Navigation ──────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<LeaveTab>('my-leave');
-  const [calMonth,  setCalMonth]  = useState<Date>(() => new Date());
+  const requestedTab = searchParams.get('tab') as LeaveTab | null;
+  const activeTab: LeaveTab = requestedTab === 'team-leave' && canViewTeam ? 'team-leave' : 'my-leave';
+  function setActiveTab(tab: LeaveTab) {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'my-leave') next.delete('tab');
+      else next.set('tab', tab);
+      return next;
+    });
+  }
 
   // ── Team leave filter state ──────────────────────────────────────────────────
   const [teamFilterStatus, setTeamFilterStatus] = useState<LeaveStatus | 'all'>('all');
   const [teamSearch, setTeamSearch] = useState('');
   const [teamViewMode, setTeamViewMode] = useState<'all' | 'my_queue'>('all');
-
-  // ── Review dialog state ─────────────────────────────────────────────────────
-  const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [reviewingApprovalId, setReviewingApprovalId] = useState<string | null>(null);
-  const [reviewAction, setReviewAction] = useState<'approved' | 'rejected'>('approved');
-  const [reviewNote, setReviewNote] = useState('');
 
   // ── Expanded timelines ───────────────────────────────────────────────────────
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
@@ -656,14 +649,6 @@ export default function LeaveManagement() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requests, teamViewMode, teamFilterStatus, teamSearch, canApproveRequests]);
 
-  const directQueueRequests = useMemo(
-    () => requests.filter(r => canReviewRequest(r) && !pendingApprovals.some(pa => pa.entityId === r.id)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [requests, pendingApprovals, canApproveRequests],
-  );
-
-  const approvalQueueTotal = pendingApprovals.length + directQueueRequests.length;
-
   function toggleHistory(requestId: string) {
     setExpandedHistory(prev => ({ ...prev, [requestId]: !prev[requestId] }));
   }
@@ -740,34 +725,6 @@ export default function LeaveManagement() {
     void queryClient.invalidateQueries({ queryKey: ['leave-management', user?.companyId] });
   }
 
-  function openReview(requestId: string, action: 'approved' | 'rejected', approvalId?: string) {
-    setReviewingId(requestId);
-    setReviewingApprovalId(approvalId ?? null);
-    setReviewAction(action);
-    setReviewNote('');
-  }
-
-  function closeReview() {
-    setReviewingId(null);
-    setReviewingApprovalId(null);
-    setReviewNote('');
-  }
-
-  async function handleReview() {
-    if (!user?.id) return;
-    let error: string | null = null;
-    if (reviewingApprovalId) {
-      ({ error } = await submitApprovalDecision(reviewingApprovalId, user.id, reviewAction, reviewNote));
-    } else if (reviewingId) {
-      ({ error } = await reviewLeaveRequest(reviewingId, user.id, reviewAction, reviewNote));
-    }
-    if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
-    toast({ title: reviewAction === 'approved' ? 'Request approved' : 'Request rejected' });
-    notifyApprovalInboxChanged();
-    closeReview();
-    void queryClient.invalidateQueries({ queryKey: ['leave-management', user?.companyId] });
-  }
-
   // ── Tab config ────────────────────────────────────────────────────────────────
 
   // Snapshot metrics
@@ -796,26 +753,6 @@ export default function LeaveManagement() {
         icon: <Users className="h-3.5 w-3.5" />,
       },
     ] : []),
-    ...(canApproveRequests ? [
-      {
-        id: 'approval-queue' as LeaveTab,
-        label: 'Approval Queue',
-        icon: <Inbox className="h-3.5 w-3.5" />,
-        badge: approvalQueueTotal > 0 ? approvalQueueTotal : undefined,
-      },
-    ] : []),
-    {
-      id: 'leave-calendar',
-      label: 'Calendar',
-      icon: <CalendarDays className="h-3.5 w-3.5" />,
-    },
-    ...(canViewSettings ? [
-      {
-        id: 'leave-settings' as LeaveTab,
-        label: 'Settings',
-        icon: <Settings className="h-3.5 w-3.5" />,
-      },
-    ] : []),
   ];
 
   return (
@@ -841,30 +778,12 @@ export default function LeaveManagement() {
             subLabel={annualLeaveType?.name ?? 'Annual leave'}
           />
           <LeaveSnapshotMetric
-            icon={<Clock className="h-3 w-3" />}
-            label="My Pending Requests"
-            value={myActivePending.length}
-            subLabel={myActivePending.length === 1 ? 'awaiting approval' : 'awaiting approval'}
-            colorClass={myActivePending.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}
-            onClick={myActivePending.length > 0 ? () => setActiveTab('my-leave') : undefined}
-          />
-          <LeaveSnapshotMetric
             icon={<Calendar className="h-3 w-3" />}
             label="Upcoming Leave"
             value={myUpcoming.length}
             subLabel={myUpcoming.length === 1 ? 'approved, upcoming' : 'approved, upcoming'}
             colorClass={myUpcoming.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}
           />
-          {canApproveRequests && (
-            <LeaveSnapshotMetric
-              icon={<Inbox className="h-3 w-3" />}
-              label="Pending My Approval"
-              value={approvalQueueTotal}
-              subLabel={approvalQueueTotal === 1 ? 'action required' : 'action required'}
-              colorClass={approvalQueueTotal > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}
-              onClick={approvalQueueTotal > 0 ? () => setActiveTab('approval-queue') : undefined}
-            />
-          )}
           {canViewTeam && (
             <LeaveSnapshotMetric
               icon={<Users className="h-3 w-3" />}
@@ -973,7 +892,7 @@ export default function LeaveManagement() {
                 myActivePending.map(req => (
                   <LeaveRequestRow key={req.id} req={req} isMyLeave canReview={false}
                     expanded={!!expandedHistory[req.id]} onToggleExpand={() => toggleHistory(req.id)}
-                    onApprove={() => {}} onReject={() => {}} fmtTs={fmtTs} />
+                    fmtTs={fmtTs} />
                 ))
               )}
             </div>
@@ -986,7 +905,7 @@ export default function LeaveManagement() {
                 {loading ? <LoadingRow /> : myUpcoming.map(req => (
                   <LeaveRequestRow key={req.id} req={req} isMyLeave canReview={false}
                     expanded={!!expandedHistory[req.id]} onToggleExpand={() => toggleHistory(req.id)}
-                    onApprove={() => {}} onReject={() => {}} fmtTs={fmtTs} />
+                    fmtTs={fmtTs} />
                 ))}
               </div>
             </section>
@@ -1004,7 +923,7 @@ export default function LeaveManagement() {
                 myHistory.map(req => (
                   <LeaveRequestRow key={req.id} req={req} isMyLeave canReview={false}
                     expanded={!!expandedHistory[req.id]} onToggleExpand={() => toggleHistory(req.id)}
-                    onApprove={() => {}} onReject={() => {}} fmtTs={fmtTs} />
+                    fmtTs={fmtTs} />
                 ))
               )}
             </div>
@@ -1060,7 +979,7 @@ export default function LeaveManagement() {
                 ) : upcoming.map(req => (
                   <LeaveRequestRow key={req.id} req={req} isMyLeave={false} canReview={false}
                     expanded={!!expandedHistory[req.id]} onToggleExpand={() => toggleHistory(req.id)}
-                    onApprove={() => {}} onReject={() => {}} fmtTs={fmtTs} />
+                    fmtTs={fmtTs} />
                 ));
               })()}
             </div>
@@ -1083,241 +1002,11 @@ export default function LeaveManagement() {
                 filteredTeamRequests.map(req => (
                   <LeaveRequestRow key={req.id} req={req} isMyLeave={false} canReview={canApproveRequests && canReviewRequest(req)}
                     expanded={!!expandedHistory[req.id]} onToggleExpand={() => toggleHistory(req.id)}
-                    onApprove={() => openReview(req.id, 'approved')} onReject={() => openReview(req.id, 'rejected')} fmtTs={fmtTs} />
+                    fmtTs={fmtTs} />
                 ))
               )}
             </div>
           </section>
-        </div>
-      )}
-
-      {/* APPROVAL QUEUE TAB */}
-      {activeTab === 'approval-queue' && canApproveRequests && (
-        <div className="space-y-5">
-          <div className={['rounded-xl border px-4 py-3 shadow-sm', approvalQueueTotal > 0 ? 'border-amber-200 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/20' : 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20'].join(' ')}>
-            <div className="flex items-center gap-2">
-              {approvalQueueTotal > 0
-                ? <Inbox className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                : <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />}
-              <p className={`text-sm font-medium ${approvalQueueTotal > 0 ? 'text-amber-800 dark:text-amber-300' : 'text-emerald-800 dark:text-emerald-300'}`}>
-                {approvalQueueTotal > 0
-                  ? `${approvalQueueTotal} leave request${approvalQueueTotal === 1 ? '' : 's'} awaiting your decision`
-                  : 'Approval queue is clear — no action required'}
-              </p>
-            </div>
-          </div>
-
-          {(loading || pendingApprovals.length > 0) && (
-            <section>
-              <SectionHeading title="Workflow Queue" count={pendingApprovals.length} colorClass="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" />
-              <div className="mt-3 space-y-3">
-                {loading ? <LoadingRow /> : pendingApprovals.map(pa => (
-                  <div key={pa.id} className="overflow-hidden rounded-xl border border-amber-200 bg-card shadow-sm dark:border-amber-800">
-                    <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold">{pa.requesterName ?? pa.requesterId}</p>
-                          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400">Action Required</Badge>
-                        </div>
-                        {pa.leaveRequest && (
-                          <p className="text-sm text-muted-foreground">
-                            {pa.leaveRequest.leaveTypeName}{' · '}{formatDays(pa.leaveRequest.days)} day{pa.leaveRequest.days !== 1 ? 's' : ''}{' · '}{pa.leaveRequest.startDate} → {pa.leaveRequest.endDate}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-medium">Stage:</span> {pa.currentStepName}{' · '}
-                          <span className="font-medium">Flow:</span> {pa.flowName}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-2">
-                        <Button size="sm" className="h-8 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => openReview(pa.entityId, 'approved', pa.id)}>
-                          <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Approve
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-8 border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400" onClick={() => openReview(pa.entityId, 'rejected', pa.id)}>
-                          <XCircle className="mr-1 h-3.5 w-3.5" /> Reject
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {(loading || directQueueRequests.length > 0) && (
-            <section>
-              <div className="flex items-center gap-2">
-                <SectionHeading title="Direct Review" count={directQueueRequests.length} colorClass="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" />
-                <span className="text-xs text-muted-foreground">(no workflow assigned)</span>
-              </div>
-              <div className="mt-3 space-y-2">
-                {loading ? <LoadingRow /> : directQueueRequests.map(req => (
-                  <LeaveRequestRow key={req.id} req={req} isMyLeave={false} canReview
-                    expanded={!!expandedHistory[req.id]} onToggleExpand={() => toggleHistory(req.id)}
-                    onApprove={() => openReview(req.id, 'approved')} onReject={() => openReview(req.id, 'rejected')} fmtTs={fmtTs} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {!loading && approvalQueueTotal === 0 && (
-            <EmptyState
-              title="All caught up"
-              description="No leave requests require your action right now."
-            />
-          )}
-        </div>
-      )}
-
-      {/* LEAVE CALENDAR TAB */}
-      {activeTab === 'leave-calendar' && (
-        <div className="space-y-4">
-          {/* Calendar navigation */}
-          <div className="flex items-center justify-between rounded-xl border bg-card px-4 py-3 shadow-sm">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setCalMonth(m => subMonths(m, 1))}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <h3 className="text-sm font-semibold">{format(calMonth, 'MMMM yyyy')}</h3>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setCalMonth(m => addMonths(m, 1))}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Calendar grid */}
-          {(() => {
-            const monthStart  = startOfMonth(calMonth);
-            const monthEnd    = endOfMonth(calMonth);
-            const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-            const startPad    = getDay(monthStart); // 0 = Sunday
-            const todayStr    = today;
-            const dayNames    = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-            // Collect my approved leave days
-            const myApprovedDays = new Set(
-              requests
-                .filter(r => r.employeeId === selfServiceEmployeeId && r.status === 'approved')
-                .flatMap(r => {
-                  try {
-                    return eachDayOfInterval({ start: parseISO(r.startDate), end: parseISO(r.endDate) }).map(d => format(d, 'yyyy-MM-dd'));
-                  } catch { return []; }
-                })
-            );
-
-            // Count team members on leave per day
-            const teamLeaveCounts: Record<string, number> = {};
-            if (canViewTeam) {
-              requests
-                .filter(r => r.status === 'approved' && r.employeeId !== selfServiceEmployeeId)
-                .forEach(r => {
-                  try {
-                    eachDayOfInterval({ start: parseISO(r.startDate), end: parseISO(r.endDate) }).forEach(d => {
-                      const k = format(d, 'yyyy-MM-dd');
-                      teamLeaveCounts[k] = (teamLeaveCounts[k] ?? 0) + 1;
-                    });
-                  } catch { /* skip */ }
-                });
-            }
-
-            return (
-              <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-                {/* Day-of-week headers */}
-                <div className="grid grid-cols-7 border-b bg-muted/30">
-                  {dayNames.map(d => (
-                    <div key={d} className="py-2 text-center text-xs font-medium text-muted-foreground">{d}</div>
-                  ))}
-                </div>
-                {/* Calendar cells */}
-                <div className="grid grid-cols-7">
-                  {Array.from({ length: startPad }).map((_, i) => (
-                    <div key={`pad-${i}`} className="min-h-14 border-b border-r bg-muted/10 p-1 last:border-r-0" />
-                  ))}
-                  {daysInMonth.map(day => {
-                    const dayStr    = format(day, 'yyyy-MM-dd');
-                    const isToday   = dayStr === todayStr;
-                    const isMyLeave = myApprovedDays.has(dayStr);
-                    const teamCount = teamLeaveCounts[dayStr] ?? 0;
-                    const colIdx    = (getDay(monthStart) + daysInMonth.indexOf(day)) % 7;
-                    const isWeekend = colIdx === 0 || colIdx === 6;
-
-                    return (
-                      <div
-                        key={dayStr}
-                        className={[
-                          'relative min-h-14 border-b border-r p-1 text-xs last:border-r-0',
-                          isToday ? 'bg-primary/5 ring-1 ring-inset ring-primary' : '',
-                          isWeekend ? 'bg-muted/20' : '',
-                          isMyLeave ? 'bg-blue-50 dark:bg-blue-950/20' : '',
-                        ].join(' ')}
-                      >
-                        <span className={[
-                          'flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium',
-                          isToday ? 'bg-primary text-primary-foreground' : 'text-foreground',
-                        ].join(' ')}>
-                          {format(day, 'd')}
-                        </span>
-                        {isMyLeave && (
-                          <span className="mt-0.5 block truncate rounded px-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400">
-                            My Leave
-                          </span>
-                        )}
-                        {teamCount > 0 && (
-                          <span className="mt-0.5 block truncate rounded bg-amber-100 px-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                            {teamCount} away
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Legend */}
-          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded bg-blue-200 dark:bg-blue-800" />
-              My approved leave
-            </div>
-            {canViewTeam && (
-              <div className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded bg-amber-100 dark:bg-amber-900/30" />
-                Team on leave
-              </div>
-            )}
-            <div className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded bg-primary/20 ring-1 ring-primary" />
-              Today
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* LEAVE SETTINGS TAB */}
-      {activeTab === 'leave-settings' && canViewSettings && (
-        <div className="space-y-4">
-          <div className="rounded-xl border bg-card p-5 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <Settings className="h-4 w-4 text-muted-foreground" />
-              <h3 className="text-sm font-semibold">Leave Configuration</h3>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Leave types, entitlements, approval workflows, and balance initialization are managed through the HRMS Administration panel.
-            </p>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {[
-                { label: 'Leave Types', description: `${leaveTypes.length} configured` },
-                { label: 'Active Employees', description: 'Manage leave balances' },
-                { label: 'Approval Workflows', description: 'Route leave requests' },
-                { label: 'Public Holidays', description: `${holidays.length} holidays loaded` },
-              ].map(item => (
-                <div key={item.label} className="rounded-lg border bg-muted/20 px-3 py-2.5">
-                  <p className="text-xs font-medium text-foreground">{item.label}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
@@ -1497,40 +1186,6 @@ export default function LeaveManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* REVIEW DIALOG */}
-      <Dialog open={!!reviewingId} onOpenChange={open => { if (!open) closeReview(); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className={reviewAction === 'approved' ? 'text-emerald-700' : 'text-red-700'}>
-              {reviewAction === 'approved' ? 'Approve Leave Request' : 'Reject Leave Request'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-1">
-            <p className="text-sm text-muted-foreground">
-              {reviewAction === 'approved'
-                ? 'Confirm approval. The employee will be notified.'
-                : 'Please provide a reason for the rejection.'}
-            </p>
-            <div className="space-y-1.5">
-              <Label>
-                Note{' '}
-                {reviewAction === 'rejected' && <span className="text-destructive">*</span>}
-                {reviewAction === 'approved' && <span className="text-xs font-normal text-muted-foreground">(optional)</span>}
-              </Label>
-              <Textarea value={reviewNote} onChange={e => setReviewNote(e.target.value)} rows={3}
-                placeholder={reviewAction === 'approved' ? 'Optional note for the employee…' : 'Reason for rejection…'} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeReview}>Cancel</Button>
-            <Button onClick={handleReview}
-              disabled={reviewAction === 'rejected' && !reviewNote.trim()}
-              className={reviewAction === 'approved' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-red-600 text-white hover:bg-red-700'}>
-              {reviewAction === 'approved' ? 'Confirm Approve' : 'Confirm Reject'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

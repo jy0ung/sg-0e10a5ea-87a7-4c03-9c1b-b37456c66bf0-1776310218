@@ -22,7 +22,7 @@ export interface HrmsNavItem {
 }
 
 export const hrmsNavItems: HrmsNavItem[] = [
-  { label: 'Leave', path: '/leave', icon: Calendar, group: 'Self Service', access: 'leave' },
+  { label: 'Leave Management', path: '/leave', icon: Calendar, group: 'Self Service', access: 'leave' },
   { label: 'Approvals', path: '/approvals', icon: UserCheck, group: 'Self Service', access: 'approvals' },
   { label: 'Appraisals', path: '/appraisals', icon: Star, group: 'Self Service', access: 'appraisals' },
   { label: 'Announcements', path: '/announcements', icon: Megaphone, group: 'Self Service', access: 'announcements' },

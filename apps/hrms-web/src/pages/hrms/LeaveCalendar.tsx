@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { FilterBar } from '@/components/shared/FilterBar';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PageSpinner } from '@/components/shared/PageSpinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { listLeaveRequests, listEmployeeDirectory } from '@/services/hrmsService';
 import type { LeaveRequest, Employee } from '@/types';
-import { ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -101,19 +103,7 @@ export default function LeaveCalendar() {
       />
 
       {/* Controls */}
-      <div className="rounded-lg border bg-card p-3 shadow-sm">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight text-foreground">Calendar controls</p>
-              <p className="text-[11px] leading-tight text-muted-foreground">Switch month and focus the team view</p>
-            </div>
-          </div>
-          <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{requests.length} approved requests</span>
-        </div>
+      <FilterBar title="Calendar controls" description="Switch month and focus the team view" countLabel={`${requests.length} approved requests`}>
         <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={prevMonth} aria-label="Previous month"><ChevronLeft className="h-4 w-4" /></Button>
@@ -128,12 +118,10 @@ export default function LeaveCalendar() {
           </SelectContent>
         </Select>
         </div>
-      </div>
+      </FilterBar>
 
       {loading ? (
-        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
-          <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        </div>
+        <PageSpinner />
       ) : (
         <Card className="overflow-hidden shadow-sm">
           <CardContent className="p-3 sm:p-4">
@@ -159,12 +147,12 @@ export default function LeaveCalendar() {
                         <span className={`text-xs font-semibold tabular-nums ${isToday ? 'text-primary' : 'text-foreground'}`}>{day}</span>
                         <div className="mt-1 space-y-0.5">
                           {items.slice(0, 3).map((item, j) => (
-                            <div key={j} className={`text-[10px] leading-tight px-1 py-0.5 rounded text-white truncate ${STATUS_COLORS[item.status] ?? 'bg-blue-400'}`}>
+                            <div key={j} className={`text-xs leading-tight px-1 py-0.5 rounded text-white truncate ${STATUS_COLORS[item.status] ?? 'bg-blue-400'}`}>
                               {item.name.split(' ')[0]}
                             </div>
                           ))}
                           {items.length > 3 && (
-                            <Badge variant="outline" className="text-[9px] px-1 py-0">+{items.length - 3} more</Badge>
+                            <Badge variant="outline" className="text-xs px-1 py-0">+{items.length - 3} more</Badge>
                           )}
                         </div>
                       </>

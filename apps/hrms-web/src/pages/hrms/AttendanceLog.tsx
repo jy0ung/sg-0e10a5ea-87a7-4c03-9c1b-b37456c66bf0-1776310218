@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { FilterBar } from '@/components/shared/FilterBar';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
+import { StatusBadge } from '@/components/shared/StatusBadge';
+import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,24 +15,15 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { listAttendanceRecords, listEmployeeDirectory, upsertAttendance } from '@/services/hrmsService';
-import type { UpsertAttendanceInput, AttendanceStatus } from '@/types';
-import { Plus, Download, SlidersHorizontal } from 'lucide-react';
+import type { AttendanceRecord, UpsertAttendanceInput, AttendanceStatus } from '@/types';
+import { Plus, Download } from 'lucide-react';
 import { upsertAttendanceSchema } from '@/lib/validations';
 
-const STATUS_COLORS: Record<AttendanceStatus, string> = {
-  present:        'bg-green-100 text-green-700 border-green-200',
-  absent:         'bg-red-100 text-red-700 border-red-200',
-  half_day:       'bg-orange-100 text-orange-700 border-orange-200',
-  on_leave:       'bg-blue-100 text-blue-700 border-blue-200',
-  public_holiday: 'bg-purple-100 text-purple-700 border-purple-200',
-};
+type AttendanceRow = AttendanceRecord & Record<string, unknown>;
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -98,6 +92,21 @@ export default function AttendanceLog() {
     { present: 0, absent: 0, half_day: 0, on_leave: 0, public_holiday: 0 },
   );
 
+  const columns: StandardTableColumn<AttendanceRow>[] = [
+    ...(canAccessTeamAttendance ? [{
+      key: 'employeeName',
+      label: 'Employee',
+      render: (r: AttendanceRow) => r.employeeName ?? '—',
+    } satisfies StandardTableColumn<AttendanceRow>] : []),
+    { key: 'date', label: 'Date' },
+    { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status as string} className="capitalize" /> },
+    { key: 'clockIn', label: 'Clock In', sortable: false, render: (r) => r.clockIn ?? '—' },
+    { key: 'clockOut', label: 'Clock Out', sortable: false, render: (r) => r.clockOut ?? '—' },
+    { key: 'hoursWorked', label: 'Hours', render: (r) => r.hoursWorked != null ? `${r.hoursWorked as number}h` : '—' },
+    { key: 'notes', label: 'Notes', sortable: false, render: (r) => r.notes ?? '' },
+  ];
+  const tableRows: AttendanceRow[] = records.map(r => ({ ...r }));
+
   function exportCsv() {
     const header = 'Employee,Date,Status,Clock In,Clock Out,Hours\n';
     const rows = records.map(r =>
@@ -141,19 +150,7 @@ export default function AttendanceLog() {
       </div>
 
       {/* Filters */}
-      <div className="rounded-lg border bg-card p-3 shadow-sm">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight text-foreground">Attendance filters</p>
-              <p className="text-[11px] leading-tight text-muted-foreground">Review records by period and employee scope</p>
-            </div>
-          </div>
-          <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{records.length} records</span>
-        </div>
+      <FilterBar title="Attendance filters" description="Review records by period and employee scope" countLabel={`${records.length} records`}>
         <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label className="text-xs">From</Label>
@@ -176,56 +173,18 @@ export default function AttendanceLog() {
           </div>
         )}
         </div>
-      </div>
+      </FilterBar>
 
       {/* Table */}
       {loading ? (
-        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
-          <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        </div>
+        <TableSkeleton cols={canAccessTeamAttendance ? 7 : 6} />
       ) : (
-        <Card className="overflow-hidden shadow-sm">
-          <CardContent className="p-0">
-            <div className="max-h-[70vh] overflow-auto">
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted/90 backdrop-blur">
-                <TableRow>
-                  {canAccessTeamAttendance && <TableHead>Employee</TableHead>}
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Clock In</TableHead>
-                  <TableHead>Clock Out</TableHead>
-                  <TableHead>Hours</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {records.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={canAccessTeamAttendance ? 7 : 6} className="text-center text-muted-foreground h-24">
-                      No records found
-                    </TableCell>
-                  </TableRow>
-                ) : records.map(r => (
-                  <TableRow key={r.id}>
-                    {canAccessTeamAttendance && <TableCell>{r.employeeName ?? '—'}</TableCell>}
-                    <TableCell>{r.date}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={`capitalize text-xs ${STATUS_COLORS[r.status]}`}>
-                        {r.status.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{r.clockIn ?? '—'}</TableCell>
-                    <TableCell>{r.clockOut ?? '—'}</TableCell>
-                    <TableCell>{r.hoursWorked != null ? `${r.hoursWorked}h` : '—'}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs">{r.notes ?? ''}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            </div>
-          </CardContent>
-        </Card>
+        <StandardTable
+          data={tableRows}
+          columns={columns}
+          searchPlaceholder="Search records…"
+          emptyMessage="No records found"
+        />
       )}
 
       {/* Mark attendance dialog */}

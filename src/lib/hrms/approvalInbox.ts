@@ -1,12 +1,10 @@
 import { format } from 'date-fns';
 import type { Appraisal, ApprovalDecision, LeaveRequest, PayrollRun } from '@/types';
+import { matchesHrmsApproverRole, type HrmsApproverIdentity } from '@/lib/hrms/access';
 
 export const HRMS_APPROVAL_INBOX_CHANGED_EVENT = 'hrms-approval-inbox-changed';
 
-export type ApprovalInboxApproverIdentity = {
-  id?: string;
-  role?: string;
-} | null | undefined;
+export type ApprovalInboxApproverIdentity = HrmsApproverIdentity;
 
 export type ApprovalInboxEntityType = 'leave_request' | 'payroll_run' | 'appraisal';
 export type ApprovalInboxFilter = 'all' | ApprovalInboxEntityType;
@@ -47,7 +45,7 @@ export function isApprovalAssignedToApprover(
 ): boolean {
   if (!approver || item.approvalInstanceStatus !== 'pending') return false;
   if (item.currentApproverUserId) return item.currentApproverUserId === approver.id;
-  if (item.currentApproverRole) return item.currentApproverRole === approver.role;
+  if (item.currentApproverRole) return matchesHrmsApproverRole(item.currentApproverRole, approver);
   return false;
 }
 
@@ -102,7 +100,14 @@ export function buildApprovalInboxItems(
   }));
 
   return [...leaveItems, ...payrollItems, ...appraisalItems]
-    .filter(item => isApprovalAssignedToApprover(item, approver))
+    .filter(item => {
+      if (isApprovalAssignedToApprover(item, approver)) return true;
+      return item.entityType === 'leave_request'
+        && item.entity.status === 'pending'
+        && !item.currentApproverUserId
+        && !item.currentApproverRole
+        && Boolean(approver?.canApproveRequests);
+    })
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 }
 
@@ -122,6 +127,20 @@ export function getApprovalInboxSourcePath(
   const dedicatedHrmsApp = options.dedicatedHrmsApp ?? import.meta.env.VITE_HRMS_WEB_APP === 'true';
   const prefix = dedicatedHrmsApp ? '' : '/hrms';
   return `${prefix}/${sourcePaths[entityType]}`;
+}
+
+export function getApprovalInboxReviewPath(
+  entityType?: ApprovalInboxFilter,
+  targetId?: string,
+  options: ApprovalInboxSourcePathOptions = {},
+): string {
+  const dedicatedHrmsApp = options.dedicatedHrmsApp ?? import.meta.env.VITE_HRMS_WEB_APP === 'true';
+  const prefix = dedicatedHrmsApp ? '' : '/hrms';
+  const params = new URLSearchParams();
+  if (entityType && entityType !== 'all') params.set('type', entityType);
+  if (targetId) params.set('target', targetId);
+  const query = params.toString();
+  return `${prefix}/approvals${query ? `?${query}` : ''}`;
 }
 
 export function notifyApprovalInboxChanged() {

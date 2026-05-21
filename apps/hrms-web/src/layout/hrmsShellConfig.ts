@@ -3,6 +3,7 @@ import { Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
+import { useApprovalInboxItems } from '@/hooks/useApprovalInboxItems';
 import type { AppShellNavSection, AppShellRouteChromeMatch } from '@/components/layout/app-shell';
 import { hrmsNavItems } from './navItems';
 
@@ -30,6 +31,7 @@ function groupHrmsItems(items: typeof hrmsNavItems): AppShellNavSection[] {
       path: item.path,
       icon: item.icon,
       end: item.path === '/leave',
+      badgeCount: item.badgeCount,
     })),
     showHeader: true,
     showItems: true,
@@ -41,10 +43,17 @@ export function useHrmsShellConfig() {
   const { user, logout } = useAuth();
   const hrmsAccess = useHrmsAccess();
   const { branding } = useBranding();
+  const { items: approvalInboxItems } = useApprovalInboxItems({
+    enabled: hrmsAccess.canAccessRoute('approvals'),
+  });
   const sections = useMemo(() => {
-    const visibleItems = hrmsNavItems.filter((item) => !item.access || hrmsAccess.canAccessRoute(item.access));
+    const visibleItems = hrmsNavItems
+      .filter((item) => !item.access || hrmsAccess.canAccessRoute(item.access))
+      .map((item) => item.access === 'approvals'
+        ? { ...item, badgeCount: approvalInboxItems.length || undefined }
+        : item);
     return groupHrmsItems(visibleItems);
-  }, [hrmsAccess]);
+  }, [approvalInboxItems.length, hrmsAccess]);
 
   const primaryRoleLabel = hrmsAccess.primaryRoleLabel ?? 'No HRMS role';
 

@@ -5,6 +5,16 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useRequestTemplates } from '@/hooks/useRequestTemplates';
@@ -25,6 +35,7 @@ import {
   ApprovalRouteCard,
   AttachmentsSection,
   CustomFieldsSection,
+  OperationalContextSection,
   RequestDetailsSection,
   RequestRoutingSection,
   RequestSummaryCard,
@@ -52,6 +63,7 @@ export default function NewTicket() {
   const [dragOver, setDragOver] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [approvalPlan, setApprovalPlan] = useState<ApprovalPlanState>('loading');
+  const [approvalConfirmData, setApprovalConfirmData] = useState<TicketFormData | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftRestoredRef = useRef(false);
@@ -233,7 +245,7 @@ export default function NewTicket() {
     validateAndAddFiles(Array.from(event.dataTransfer.files));
   };
 
-  const handleSubmit = async (data: TicketFormData) => {
+  const submitTicket = async (data: TicketFormData) => {
     if (!user) return;
 
     const missingRequiredField = customFields.find((field) =>
@@ -293,9 +305,9 @@ export default function NewTicket() {
         subcategory: matchingSubcategories.length > 0 ? (data.subcategory ?? null) : null,
         priority: data.priority,
         description: data.description,
-        requested_due_date: null,
-        business_impact: null,
-        desired_outcome: null,
+        requested_due_date: data.requested_due_date ?? null,
+        business_impact: data.business_impact ?? null,
+        desired_outcome: data.desired_outcome ?? null,
         custom_fields: Object.fromEntries(
           customFields
             .map((field) => [field.key, customFieldValues[field.key]?.trim() ?? ''])
@@ -350,19 +362,36 @@ export default function NewTicket() {
     setSubmitting(false);
   };
 
+  const handleValidatedSubmit = async (data: TicketFormData) => {
+    if (approvalPlan && approvalPlan !== 'loading' && approvalPlan !== 'error') {
+      setApprovalConfirmData(data);
+      return;
+    }
+
+    await submitTicket(data);
+  };
+
   const selectedCategory = categories.find((category) => category.key === selectedCategoryKey) ?? null;
   const selectedSubcategory =
     availableSubcategories.find((subcategory) => subcategory.key === selectedSubcategoryKey) ?? null;
   const categorySelectionDisabled = categoriesLoading || categories.length === 0;
   const requiresSubcategory = availableSubcategories.length > 0;
   const activeTemplate = templates.find((template) => template.id === activeTemplateId) ?? null;
+  const missingRequiredCustomFields = customFields.filter(
+    (field) => field.is_required && !customFieldValues[field.key]?.trim(),
+  );
+  const approvalRouteBlocked = approvalPlan === 'loading' || approvalPlan === 'error';
+  const approvalStepName = approvalPlan && approvalPlan !== 'loading' && approvalPlan !== 'error'
+    ? approvalPlan.firstStepName || approvalPlan.approverRole?.replace(/_/g, ' ') || 'approval'
+    : null;
 
   const canSubmit =
     !submitting &&
     form.formState.isValid &&
     !categorySelectionDisabled &&
     !(requiresSubcategory && !selectedSubcategoryKey) &&
-    !customFields.some((field) => field.is_required && !customFieldValues[field.key]?.trim());
+    missingRequiredCustomFields.length === 0 &&
+    !approvalRouteBlocked;
 
   const applyTemplate = (template: RequestTemplateRecord) => {
     setActiveTemplateId(template.id);
@@ -390,6 +419,15 @@ export default function NewTicket() {
 
   const draftSavedLabel = draftSavedAt
     ? `Draft saved ${draftSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : null;
+  const submitBlocker = missingRequiredCustomFields.length > 0
+    ? `${missingRequiredCustomFields.length} required field${missingRequiredCustomFields.length === 1 ? '' : 's'} remaining: ${missingRequiredCustomFields
+      .map((field) => field.label)
+      .join(', ')}`
+    : approvalPlan === 'loading'
+      ? 'Approval route is still being checked.'
+      : approvalPlan === 'error'
+        ? 'Approval route could not be verified. Contact an admin.'
     : null;
 
   const fieldValidationStatus = useMemo(() => {
@@ -441,7 +479,7 @@ export default function NewTicket() {
       {/* ── Two-column form ──────────────────────────────────── */}
       <form
         id="new-request-form"
-        onSubmit={form.handleSubmit(handleSubmit)}
+        onSubmit={form.handleSubmit(handleValidatedSubmit)}
         className="min-h-0 flex-1 overflow-auto"
       >
         <div className="grid gap-5 pb-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -480,6 +518,8 @@ export default function NewTicket() {
               subjectStatus={fieldValidationStatus.subject}
               descriptionStatus={fieldValidationStatus.description}
             />
+
+            <OperationalContextSection form={form} />
 
             <CustomFieldsSection
               customFields={customFields}
@@ -528,12 +568,43 @@ export default function NewTicket() {
                 canSubmit={canSubmit}
                 submitting={submitting}
                 draftSavedLabel={draftSavedLabel}
+                submitBlocker={submitBlocker}
               />
             </div>
           </div>
 
         </div>
       </form>
+
+      <AlertDialog
+        open={Boolean(approvalConfirmData)}
+        onOpenChange={(open) => {
+          if (!open) setApprovalConfirmData(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Submit for approval?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This request will be routed to {approvalStepName ?? 'the configured approver'} before the support team can resolve it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={submitting}
+              onClick={() => {
+                if (!approvalConfirmData) return;
+                const data = approvalConfirmData;
+                setApprovalConfirmData(null);
+                void submitTicket(data);
+              }}
+            >
+              Submit for approval
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -16,6 +16,7 @@ export type HrmsApproverIdentity = {
   id?: string | null;
   hrmsRoleIds?: string[];
   hrmsRoleCodes?: string[];
+  canApproveRequests?: boolean;
 } | null | undefined;
 
 type DerivedHrmsAccess = {

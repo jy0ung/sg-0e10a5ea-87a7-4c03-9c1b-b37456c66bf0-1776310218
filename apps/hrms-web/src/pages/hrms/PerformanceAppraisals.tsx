@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PageSpinner } from '@/components/shared/PageSpinner';
+import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,19 +13,12 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   listAppraisals,
   createAppraisal,
   listAppraisalItems,
-  reviewAppraisalActivation,
   resubmitAppraisalActivation,
   submitAppraisalSelfReview,
   reviewAppraisalItem,
@@ -30,21 +26,17 @@ import {
   updateAppraisalItem,
   deleteAppraisalItem,
 } from '@/services/hrmsService';
-import type { Appraisal, AppraisalItem, AppraisalCycle, AppraisalStatus, UpdateAppraisalItemInput } from '@/types';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import type { Appraisal, AppraisalItem, AppraisalCycle, UpdateAppraisalItemInput } from '@/types';
 import { Plus, Eye, Star, CheckCircle2, ChevronDown, ChevronUp, Clock, RotateCcw, XCircle, Pencil, Trash2 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
-import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
-
-const STATUS_COLORS: Record<AppraisalStatus, string> = {
-  open:        'bg-blue-100 text-blue-700 border-blue-200',
-  in_progress: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  completed:   'bg-green-100 text-green-700 border-green-200',
-  archived:    'bg-gray-100 text-gray-500 border-gray-200',
-};
+import { getApprovalInboxReviewPath, notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
 
 const ITEM_STATUS_COLORS: Record<AppraisalItem['status'], string> = {
   pending:       'bg-gray-100 text-gray-600',
@@ -52,6 +44,8 @@ const ITEM_STATUS_COLORS: Record<AppraisalItem['status'], string> = {
   reviewed:      'bg-yellow-100 text-yellow-700',
   acknowledged:  'bg-green-100 text-green-700',
 };
+
+type AppraisalItemRow = AppraisalItem & Record<string, unknown>;
 
 function StarRating({ rating }: { rating?: number }) {
   if (!rating) return <span className="text-muted-foreground text-xs">—</span>;
@@ -102,9 +96,6 @@ export default function PerformanceAppraisals() {
   });
   const [viewId, setViewId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [reviewingAppraisalId, setReviewingAppraisalId] = useState<string | null>(null);
-  const [reviewAction, setReviewAction] = useState<'approved' | 'rejected'>('approved');
-  const [reviewNote, setReviewNote] = useState('');
   const [itemActionTarget, setItemActionTarget] = useState<AppraisalItemActionState>(null);
   const [itemForm, setItemForm] = useState({
     goals: '',
@@ -183,20 +174,6 @@ export default function PerformanceAppraisals() {
     setShowCreate(false);
     setForm({ title: '', cycle: 'annual', periodStart: '', periodEnd: '' });
     void queryClient.invalidateQueries({ queryKey: ['appraisals', user?.companyId] });
-  }
-
-  async function handleReview() {
-    if (!reviewingAppraisalId || !user?.id) return;
-    const { error } = await reviewAppraisalActivation(reviewingAppraisalId, user.id, reviewAction, reviewNote);
-    if (error) {
-      toast({ title: 'Error', description: error, variant: 'destructive' });
-      return;
-    }
-    toast({ title: `Appraisal activation ${reviewAction}` });
-    notifyApprovalInboxChanged();
-    setReviewingAppraisalId(null);
-    setReviewNote('');
-    await queryClient.invalidateQueries({ queryKey: ['appraisals', user?.companyId] });
   }
 
   async function handleResubmit(appraisalId: string) {
@@ -344,6 +321,44 @@ export default function PerformanceAppraisals() {
     completed: appraisals.filter(a => a.status === 'completed').length,
   };
 
+  const appraisalItemColumns: StandardTableColumn<AppraisalItemRow>[] = [
+    { key: 'employeeName', label: 'Employee', render: (item) => item.employeeName ?? '—' },
+    { key: 'reviewerName', label: 'Reviewer', render: (item) => item.reviewerName ?? '—' },
+    { key: 'rating', label: 'Rating', sortable: false, render: (item) => <StarRating rating={item.rating} /> },
+    { key: 'status', label: 'Status', render: (item) => (
+      <Badge variant="secondary" className={`capitalize text-xs ${ITEM_STATUS_COLORS[item.status]}`}>
+        {item.status.replace('_', ' ')}
+      </Badge>
+    )},
+    { key: 'goals', label: 'Notes', sortable: false, render: (item) => (
+      <div className="space-y-1 whitespace-normal text-xs text-muted-foreground max-w-xs">
+        {item.goals && <p>Goals: {item.goals}</p>}
+        {item.achievements && <p>Achievements: {item.achievements}</p>}
+        {item.areasToImprove && <p>Improve: {item.areasToImprove}</p>}
+        {item.reviewerComments && <p>Manager: {item.reviewerComments}</p>}
+        {item.employeeComments && <p>Employee: {item.employeeComments}</p>}
+        {!item.goals && !item.achievements && !item.areasToImprove && !item.reviewerComments && !item.employeeComments && '—'}
+      </div>
+    )},
+    { key: 'reviewedAt', label: 'Reviewed At', render: (item) => item.reviewedAt ? item.reviewedAt.slice(0, 10) : '—' },
+    { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: (item) => (
+      <div className="flex justify-end gap-2 flex-wrap">
+        {canSelfReviewItem(item) && <Button size="sm" variant="outline" onClick={() => openItemAction(item, 'self_review')}>Self Review</Button>}
+        {canManagerReviewItem(item) && <Button size="sm" variant="outline" onClick={() => openItemAction(item, 'manager_review')}>Manager Review</Button>}
+        {canAcknowledgeItem(item) && <Button size="sm" variant="outline" onClick={() => openItemAction(item, 'acknowledge')}>Acknowledge</Button>}
+        {canManageAppraisals && (
+          <>
+            <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEditItem(item)}><Pencil className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteItem(item)}><Trash2 className="h-3.5 w-3.5" /></Button>
+          </>
+        )}
+        {!canSelfReviewItem(item) && !canManagerReviewItem(item) && !canAcknowledgeItem(item) && !canManageAppraisals && (
+          <span className="text-xs text-muted-foreground">No action</span>
+        )}
+      </div>
+    )},
+  ];
+
   return (
     <div className="w-full space-y-4">
       <PageHeader
@@ -381,9 +396,7 @@ export default function PerformanceAppraisals() {
       )}
 
       {loading ? (
-        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
-          <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        </div>
+        <PageSpinner />
       ) : appraisals.length === 0 ? (
         <Card className="shadow-sm"><CardContent className="flex h-32 items-center justify-center text-muted-foreground">No appraisal cycles yet.</CardContent></Card>
       ) : (
@@ -398,9 +411,7 @@ export default function PerformanceAppraisals() {
                       {a.cycle.replace('_', ' ')} · {a.periodStart} → {a.periodEnd}
                     </p>
                   </div>
-                  <Badge variant="outline" className={`capitalize text-xs ${STATUS_COLORS[a.status]}`}>
-                    {a.status.replace('_', ' ')}
-                  </Badge>
+                  <Badge variant="outline" className="capitalize text-xs">{a.status.replace('_', ' ')}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center gap-2 p-4">
@@ -436,24 +447,11 @@ export default function PerformanceAppraisals() {
                   </Button>
                 )}
                 {canReviewAppraisal(a) && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-blue-700 border-blue-300"
-                      onClick={() => { setReviewingAppraisalId(a.id); setReviewAction('approved'); }}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve Activation
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-red-700 border-red-300"
-                      onClick={() => { setReviewingAppraisalId(a.id); setReviewAction('rejected'); }}
-                    >
-                      <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
-                    </Button>
-                  </>
+                  <Button asChild size="sm" variant="outline" className="text-blue-700 border-blue-300">
+                    <Link to={getApprovalInboxReviewPath('appraisal', a.id)}>
+                      <Eye className="h-3.5 w-3.5 mr-1" /> Review in Approval Inbox
+                    </Link>
+                  </Button>
                 )}
                 {expandedHistory[a.id] && (
                   <div className="w-full mt-1 space-y-3 border-l border-border pl-4">
@@ -548,80 +546,11 @@ export default function PerformanceAppraisals() {
           <DialogHeader>
             <DialogTitle>{viewingAppraisal?.title ?? 'Reviews'}</DialogTitle>
           </DialogHeader>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead>Reviewer</TableHead>
-                <TableHead>Rating</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead>Reviewed At</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground h-20">No reviews assigned</TableCell>
-                </TableRow>
-              ) : items.map(item => (
-                <TableRow key={item.id}>
-                  <TableCell>{item.employeeName ?? '—'}</TableCell>
-                  <TableCell>{item.reviewerName ?? '—'}</TableCell>
-                  <TableCell><StarRating rating={item.rating} /></TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className={`capitalize text-xs ${ITEM_STATUS_COLORS[item.status]}`}>
-                      {item.status.replace('_', ' ')}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="max-w-xs text-xs text-muted-foreground align-top">
-                    <div className="space-y-1 whitespace-normal">
-                      {item.goals && <p>Goals: {item.goals}</p>}
-                      {item.achievements && <p>Achievements: {item.achievements}</p>}
-                      {item.areasToImprove && <p>Improve: {item.areasToImprove}</p>}
-                      {item.reviewerComments && <p>Manager: {item.reviewerComments}</p>}
-                      {item.employeeComments && <p>Employee: {item.employeeComments}</p>}
-                      {!item.goals && !item.achievements && !item.areasToImprove && !item.reviewerComments && !item.employeeComments && '—'}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">{item.reviewedAt ? item.reviewedAt.slice(0, 10) : '—'}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2 flex-wrap">
-                      {canSelfReviewItem(item) && (
-                        <Button size="sm" variant="outline" onClick={() => openItemAction(item, 'self_review')}>
-                          Self Review
-                        </Button>
-                      )}
-                      {canManagerReviewItem(item) && (
-                        <Button size="sm" variant="outline" onClick={() => openItemAction(item, 'manager_review')}>
-                          Manager Review
-                        </Button>
-                      )}
-                      {canAcknowledgeItem(item) && (
-                        <Button size="sm" variant="outline" onClick={() => openItemAction(item, 'acknowledge')}>
-                          Acknowledge
-                        </Button>
-                      )}
-                      {canManageAppraisals && (
-                        <>
-                          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => openEditItem(item)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => setDeleteItem(item)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </>
-                      )}
-                      {!canSelfReviewItem(item) && !canManagerReviewItem(item) && !canAcknowledgeItem(item) && !canManageAppraisals && (
-                        <span className="text-xs text-muted-foreground">No action</span>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <StandardTable
+            data={items.map(i => ({ ...i }))}
+            columns={appraisalItemColumns}
+            emptyMessage="No reviews assigned"
+          />
         </DialogContent>
       </Dialog>
 
@@ -699,35 +628,6 @@ export default function PerformanceAppraisals() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!reviewingAppraisalId} onOpenChange={v => {
-        if (!v) {
-          setReviewingAppraisalId(null);
-          setReviewNote('');
-        }
-      }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle className="capitalize">{reviewAction} Appraisal Activation</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <label htmlFor="appraisal-review-note" className="text-sm font-medium">Note (optional)</label>
-            <Textarea
-              id="appraisal-review-note"
-              value={reviewNote}
-              onChange={e => setReviewNote(e.target.value)}
-              rows={3}
-              placeholder="Add a note for the cycle owner..."
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReviewingAppraisalId(null)}>Cancel</Button>
-            <Button
-              onClick={handleReview}
-              className={reviewAction === 'approved' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}
-            >
-              Confirm {reviewAction}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       {/* Edit item dialog */}
       <Dialog open={!!editItem} onOpenChange={v => !v && setEditItem(null)}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">

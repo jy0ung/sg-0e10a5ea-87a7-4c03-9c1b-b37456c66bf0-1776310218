@@ -1,29 +1,27 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PageSpinner } from '@/components/shared/PageSpinner';
+import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   listPayrollRuns,
   createPayrollRun,
   resubmitPayrollRunFinalisation,
-  reviewPayrollRunFinalisation,
   updatePayrollRunStatus,
   listPayrollItems,
 } from '@/services/hrmsService';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import type { PayrollRun, PayrollItem, PayrollRunStatus } from '@/types';
 import {
   CheckCircle2,
@@ -39,14 +37,20 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
-import { notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
+import { getApprovalInboxReviewPath, notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const STATUS_COLORS: Record<PayrollRunStatus, string> = {
-  draft:      'bg-gray-100 text-gray-600 border-gray-200',
-  finalised:  'bg-blue-100 text-blue-700 border-blue-200',
-  paid:       'bg-green-100 text-green-700 border-green-200',
-};
+type PayrollItemRow = PayrollItem & Record<string, unknown>;
+
+const PAYROLL_ITEM_COLUMNS: StandardTableColumn<PayrollItemRow>[] = [
+  { key: 'employeeName', label: 'Employee', render: (i) => (i.employeeName as string | undefined) ?? '—' },
+  { key: 'basicSalary', label: 'Basic', className: 'text-right', render: (i) => fmt(i.basicSalary as number) },
+  { key: 'allowances', label: 'Allowances', className: 'text-right', render: (i) => fmt(i.allowances as number) },
+  { key: 'overtime', label: 'OT', className: 'text-right', render: (i) => fmt(i.overtime as number) },
+  { key: 'grossPay', label: 'Gross', className: 'text-right font-medium', render: (i) => fmt(i.grossPay as number) },
+  { key: 'totalDeductions', label: 'Deductions', className: 'text-right text-red-600', render: (i) => `(${fmt(i.totalDeductions as number)})` },
+  { key: 'netPay', label: 'Net Pay', className: 'text-right font-bold', render: (i) => fmt(i.netPay as number) },
+];
 
 function fmt(n: number) {
   return n.toLocaleString('en-MY', { minimumFractionDigits: 2 });
@@ -73,9 +77,6 @@ export default function PayrollSummary() {
   const [showCreate, setShowCreate] = useState(false);
   const [newYear, setNewYear]   = useState(String(new Date().getFullYear()));
   const [newMonth, setNewMonth] = useState(String(new Date().getMonth() + 1));
-  const [reviewingRunId, setReviewingRunId] = useState<string | null>(null);
-  const [reviewAction, setReviewAction] = useState<'approved' | 'rejected'>('approved');
-  const [reviewNote, setReviewNote] = useState('');
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
 
   const sortedRuns = useMemo(
@@ -141,17 +142,6 @@ export default function PayrollSummary() {
     const { error } = await updatePayrollRunStatus(runId, status, user?.id);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
     toast({ title: `Status updated to ${status}` });
-    void queryClient.invalidateQueries({ queryKey: ['payroll-runs', user?.companyId] });
-  }
-
-  async function handleReview() {
-    if (!reviewingRunId || !user?.id) return;
-    const { error } = await reviewPayrollRunFinalisation(reviewingRunId, user.id, reviewAction, reviewNote);
-    if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); return; }
-    toast({ title: `Payroll finalisation ${reviewAction}` });
-    notifyApprovalInboxChanged();
-    setReviewingRunId(null);
-    setReviewNote('');
     void queryClient.invalidateQueries({ queryKey: ['payroll-runs', user?.companyId] });
   }
 
@@ -236,9 +226,7 @@ export default function PayrollSummary() {
       )}
 
       {loading ? (
-        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
-          <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        </div>
+        <PageSpinner />
       ) : runs.length === 0 ? (
         <Card className="shadow-sm">
           <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
@@ -267,7 +255,7 @@ export default function PayrollSummary() {
                     </CardTitle>
                     <p className="truncate text-sm text-muted-foreground">{run.totalHeadcount} employees · RM {fmt(run.totalGross)} gross · RM {fmt(run.totalNet)} net</p>
                   </div>
-                  <Badge variant="outline" className={`capitalize text-xs ${STATUS_COLORS[run.status]}`}>{run.status}</Badge>
+                <Badge variant="outline" className="capitalize text-xs">{run.status}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center gap-2 p-4">
@@ -310,24 +298,11 @@ export default function PayrollSummary() {
                   </Button>
                 )}
                 {canReviewRun(run) && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-blue-700 border-blue-300"
-                      onClick={() => { setReviewingRunId(run.id); setReviewAction('approved'); }}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve Finalisation
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-red-700 border-red-300"
-                      onClick={() => { setReviewingRunId(run.id); setReviewAction('rejected'); }}
-                    >
-                      <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
-                    </Button>
-                  </>
+                  <Button asChild size="sm" variant="outline" className="text-blue-700 border-blue-300">
+                    <Link to={getApprovalInboxReviewPath('payroll_run', run.id)}>
+                      <Eye className="h-3.5 w-3.5 mr-1" /> Review in Approval Inbox
+                    </Link>
+                  </Button>
                 )}
                 {canManagePayroll && run.status === 'finalised' && (
                   <Button size="sm" variant="outline" className="text-green-700 border-green-300" onClick={() => handleStatusChange(run.id, 'paid')}>
@@ -424,64 +399,14 @@ export default function PayrollSummary() {
               Payroll Items — {viewingRun ? `${MONTHS[viewingRun.periodMonth - 1]} ${viewingRun.periodYear}` : ''}
             </DialogTitle>
           </DialogHeader>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead className="text-right">Basic</TableHead>
-                <TableHead className="text-right">Allowances</TableHead>
-                <TableHead className="text-right">OT</TableHead>
-                <TableHead className="text-right">Gross</TableHead>
-                <TableHead className="text-right">Deductions</TableHead>
-                <TableHead className="text-right">Net Pay</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground h-20">No items in this run</TableCell>
-                </TableRow>
-              ) : items.map(item => (
-                <TableRow key={item.id}>
-                  <TableCell>{item.employeeName ?? '—'}</TableCell>
-                  <TableCell className="text-right">{fmt(item.basicSalary)}</TableCell>
-                  <TableCell className="text-right">{fmt(item.allowances)}</TableCell>
-                  <TableCell className="text-right">{fmt(item.overtime)}</TableCell>
-                  <TableCell className="text-right font-medium">{fmt(item.grossPay)}</TableCell>
-                  <TableCell className="text-right text-red-600">({fmt(item.totalDeductions)})</TableCell>
-                  <TableCell className="text-right font-bold">{fmt(item.netPay)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <StandardTable
+            data={items.map(i => ({ ...i }))}
+            columns={PAYROLL_ITEM_COLUMNS}
+            emptyMessage="No items in this run"
+          />
         </DialogContent>
       </Dialog>
 
-      {/* Review dialog */}
-      <Dialog open={!!reviewingRunId} onOpenChange={v => { if (!v) setReviewingRunId(null); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle className="capitalize">{reviewAction} Payroll Finalisation</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <label htmlFor="payroll-review-note" className="text-sm font-medium">Note (optional)</label>
-            <Textarea
-              id="payroll-review-note"
-              value={reviewNote}
-              onChange={e => setReviewNote(e.target.value)}
-              rows={3}
-              placeholder="Add a note for the payroll owner..."
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReviewingRunId(null)}>Cancel</Button>
-            <Button
-              onClick={handleReview}
-              className={reviewAction === 'approved' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'}
-            >
-              Confirm {reviewAction}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

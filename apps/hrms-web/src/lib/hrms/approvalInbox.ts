@@ -100,7 +100,14 @@ export function buildApprovalInboxItems(
   }));
 
   return [...leaveItems, ...payrollItems, ...appraisalItems]
-    .filter(item => isApprovalAssignedToApprover(item, approver))
+    .filter(item => {
+      if (isApprovalAssignedToApprover(item, approver)) return true;
+      return item.entityType === 'leave_request'
+        && item.entity.status === 'pending'
+        && !item.currentApproverUserId
+        && !item.currentApproverRole
+        && Boolean(approver?.canApproveRequests);
+    })
     .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
 }
 
@@ -120,6 +127,20 @@ export function getApprovalInboxSourcePath(
   const dedicatedHrmsApp = options.dedicatedHrmsApp ?? import.meta.env.VITE_HRMS_WEB_APP === 'true';
   const prefix = dedicatedHrmsApp ? '' : '/hrms';
   return `${prefix}/${sourcePaths[entityType]}`;
+}
+
+export function getApprovalInboxReviewPath(
+  entityType?: ApprovalInboxFilter,
+  targetId?: string,
+  options: ApprovalInboxSourcePathOptions = {},
+): string {
+  const dedicatedHrmsApp = options.dedicatedHrmsApp ?? import.meta.env.VITE_HRMS_WEB_APP === 'true';
+  const prefix = dedicatedHrmsApp ? '' : '/hrms';
+  const params = new URLSearchParams();
+  if (entityType && entityType !== 'all') params.set('type', entityType);
+  if (targetId) params.set('target', targetId);
+  const query = params.toString();
+  return `${prefix}/approvals${query ? `?${query}` : ''}`;
 }
 
 export function notifyApprovalInboxChanged() {

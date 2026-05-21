@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
-import { Calendar, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, Eye, Inbox, SlidersHorizontal, Star, XCircle } from 'lucide-react';
+import { Calendar, CheckCircle2, ChevronDown, ChevronUp, Clock, CreditCard, Eye, Inbox, Star, XCircle } from 'lucide-react';
+import { FilterBar } from '@/components/shared/FilterBar';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { PageSpinner } from '@/components/shared/PageSpinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,18 +20,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
+import { approvalInboxQueryKey, useApprovalInboxItems } from '@/hooks/useApprovalInboxItems';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  listAppraisals,
-  listLeaveRequests,
-  listPayrollRuns,
   reviewAppraisalActivation,
   reviewLeaveRequest,
   reviewPayrollRunFinalisation,
 } from '@/services/hrmsService';
 import type { ApprovalDecision } from '@/types';
 import {
-  buildApprovalInboxItems,
   filterApprovalInboxItems,
   getApprovalInboxSourcePath,
   notifyApprovalInboxChanged,
@@ -42,6 +41,14 @@ type ApprovalInboxReviewState = {
   entityId: string;
   action: 'approved' | 'rejected';
 } | null;
+
+const APPROVAL_FILTERS: ApprovalInboxFilter[] = ['all', 'leave_request', 'payroll_run', 'appraisal'];
+
+function parseApprovalFilter(value: string | null): ApprovalInboxFilter {
+  return APPROVAL_FILTERS.includes(value as ApprovalInboxFilter)
+    ? value as ApprovalInboxFilter
+    : 'all';
+}
 
 function formatTimestamp(value?: string) {
   if (!value) return 'Unknown time';
@@ -58,6 +65,7 @@ function getLastDecision(history?: ApprovalDecision[]) {
 
 export default function ApprovalInbox() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const hrmsAccess = useHrmsAccess();
   const { toast } = useToast();
@@ -65,30 +73,21 @@ export default function ApprovalInbox() {
   const canOpenAppraisalPage = hrmsAccess.canAccessRoute('appraisals');
 
   const queryClient = useQueryClient();
+  const { errors: inboxErrors, isPending: loading, items } = useApprovalInboxItems();
 
-  const { data: inboxData, isPending: loading } = useQuery({
-    queryKey: ['approval-inbox', user?.companyId],
-    queryFn: async () => {
-      const [leaveResult, payrollResult, appraisalResult] = await Promise.all([
-        listLeaveRequests(user!.companyId, { includeApprovalHistory: true }),
-        listPayrollRuns(user!.companyId, { includeApprovalHistory: true }),
-        listAppraisals(user!.companyId, { includeApprovalHistory: true }),
-      ]);
-      if (leaveResult.error) toast({ title: 'Error', description: leaveResult.error, variant: 'destructive' });
-      if (payrollResult.error) toast({ title: 'Error', description: payrollResult.error, variant: 'destructive' });
-      if (appraisalResult.error) toast({ title: 'Error', description: appraisalResult.error, variant: 'destructive' });
-      return { leaveRequests: leaveResult.data, payrollRuns: payrollResult.data, appraisals: appraisalResult.data };
-    },
-    enabled: !!user?.companyId,
-  });
-
-  const [filter, setFilter] = useState<ApprovalInboxFilter>('all');
+  const filter = parseApprovalFilter(searchParams.get('type'));
+  const targetId = searchParams.get('target');
   const [reviewTarget, setReviewTarget] = useState<ApprovalInboxReviewState>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
 
-  // Real-time: reload inbox when any approval-related table changes for this company
-  // Note: leaveRequests/payrollRuns/appraisals are derived from inboxData — use inboxData as dep
+  useEffect(() => {
+    inboxErrors.forEach(error => {
+      toast({ title: 'Error', description: error, variant: 'destructive' });
+    });
+  }, [inboxErrors, toast]);
+
+  // Real-time: reload inbox when any approval-related table changes for this company.
   useEffect(() => {
     if (!user?.companyId) return;
 
@@ -97,17 +96,17 @@ export default function ApprovalInbox() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'leave_requests', filter: `company_id=eq.${user.companyId}` },
-        () => void queryClient.invalidateQueries({ queryKey: ['approval-inbox', user.companyId] }),
+        () => void queryClient.invalidateQueries({ queryKey: approvalInboxQueryKey(user.companyId) }),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'payroll_runs', filter: `company_id=eq.${user.companyId}` },
-        () => void queryClient.invalidateQueries({ queryKey: ['approval-inbox', user.companyId] }),
+        () => void queryClient.invalidateQueries({ queryKey: approvalInboxQueryKey(user.companyId) }),
       )
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'appraisals', filter: `company_id=eq.${user.companyId}` },
-        () => void queryClient.invalidateQueries({ queryKey: ['approval-inbox', user.companyId] }),
+        () => void queryClient.invalidateQueries({ queryKey: approvalInboxQueryKey(user.companyId) }),
       )
       .subscribe();
 
@@ -116,16 +115,15 @@ export default function ApprovalInbox() {
     };
   }, [user?.companyId, queryClient]);
 
-  const items = useMemo(
-    () => buildApprovalInboxItems(
-      inboxData?.leaveRequests ?? [],
-      inboxData?.payrollRuns ?? [],
-      inboxData?.appraisals ?? [],
-      user ? { id: user.id, hrmsRoleIds: hrmsAccess.roleIds, hrmsRoleCodes: hrmsAccess.roleCodes } : null,
-    ),
-    [hrmsAccess.roleCodes, hrmsAccess.roleIds, inboxData, user],
-  );
-  const filteredItems = useMemo(() => filterApprovalInboxItems(items, filter), [items, filter]);
+  const filteredItems = useMemo(() => {
+    const filtered = filterApprovalInboxItems(items, filter);
+    if (!targetId) return filtered;
+    return [...filtered].sort((left, right) => {
+      if (left.entityId === targetId) return -1;
+      if (right.entityId === targetId) return 1;
+      return 0;
+    });
+  }, [filter, items, targetId]);
 
   const leaveCount = items.filter(item => item.entityType === 'leave_request').length;
   const payrollCount = items.filter(item => item.entityType === 'payroll_run').length;
@@ -133,6 +131,16 @@ export default function ApprovalInbox() {
 
   function toggleHistory(itemKey: string) {
     setExpandedHistory(prev => ({ ...prev, [itemKey]: !prev[itemKey] }));
+  }
+
+  function setFilter(nextFilter: ApprovalInboxFilter) {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (nextFilter === 'all') next.delete('type');
+      else next.set('type', nextFilter);
+      next.delete('target');
+      return next;
+    });
   }
 
   async function handleReview() {
@@ -159,7 +167,7 @@ export default function ApprovalInbox() {
     notifyApprovalInboxChanged();
     setReviewTarget(null);
     setReviewNote('');
-    await queryClient.invalidateQueries({ queryKey: ['approval-inbox', user?.companyId] });
+    await queryClient.invalidateQueries({ queryKey: approvalInboxQueryKey(user?.companyId) });
   }
 
   return (
@@ -209,19 +217,7 @@ export default function ApprovalInbox() {
         </Card>
       </div>
 
-      <div className="rounded-lg border bg-card p-3 shadow-sm">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight text-foreground">Approval filters</p>
-              <p className="text-[11px] leading-tight text-muted-foreground">Focus the decision queue by HRMS source</p>
-            </div>
-          </div>
-          <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{filteredItems.length} visible</span>
-        </div>
+      <FilterBar title="Approval filters" description="Focus the decision queue by HRMS source" countLabel={`${filteredItems.length} visible`}>
         <div className="flex flex-wrap gap-2">
         {([
           ['all', `All (${items.length})`],
@@ -240,12 +236,10 @@ export default function ApprovalInbox() {
           </Button>
         ))}
         </div>
-      </div>
+      </FilterBar>
 
       {loading ? (
-        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
-          <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        </div>
+        <PageSpinner />
       ) : filteredItems.length === 0 ? (
         <Card className="shadow-sm">
           <CardContent className="flex h-40 flex-col items-center justify-center gap-3 text-center">
@@ -264,9 +258,14 @@ export default function ApprovalInbox() {
             const isPayrollItem = item.entityType === 'payroll_run';
             const canOpenSource = isLeaveItem || (isPayrollItem ? canOpenPayrollPage : canOpenAppraisalPage);
             const itemKey = `${item.entityType}:${item.entityId}`;
+            const isTarget = targetId === item.entityId;
+            const isUnassigned = !item.currentApproverUserId && !item.currentApproverRole;
 
             return (
-              <Card key={itemKey} className="overflow-hidden shadow-sm">
+              <Card
+                key={itemKey}
+                className={`overflow-hidden shadow-sm ${isTarget ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}
+              >
                 <CardHeader className="border-b bg-muted/30 px-4 py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 space-y-2">
@@ -282,6 +281,9 @@ export default function ApprovalInbox() {
                         <Badge variant="outline">
                           {isLeaveItem ? 'Leave' : item.entityType === 'appraisal' ? 'Appraisal' : 'Payroll'}
                         </Badge>
+                        {isUnassigned && (
+                          <Badge variant="secondary">Unassigned</Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">{item.subtitle}</p>
                       {item.summary && (
@@ -293,7 +295,7 @@ export default function ApprovalInbox() {
                 </CardHeader>
                 <CardContent className="space-y-3 p-4">
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                    <p>Current step: {item.currentApprovalStepName ?? 'Awaiting review'}</p>
+                    <p>Current step: {isUnassigned ? 'Unassigned shared queue' : item.currentApprovalStepName ?? 'Awaiting review'}</p>
                     <p>Updated: {formatTimestamp(item.updatedAt)}</p>
                   </div>
 
@@ -366,7 +368,9 @@ export default function ApprovalInbox() {
                             <span>pending</span>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            Waiting for {item.currentApproverRole ? 'assigned HRMS role' : 'assigned approver'}
+                            {isUnassigned
+                              ? 'Waiting for an HRMS approver to take this shared item'
+                              : `Waiting for ${item.currentApproverRole ? 'assigned HRMS role' : 'assigned approver'}`}
                           </p>
                         </div>
                       )}

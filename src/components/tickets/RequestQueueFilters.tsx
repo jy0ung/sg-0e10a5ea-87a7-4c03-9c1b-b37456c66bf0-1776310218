@@ -14,12 +14,20 @@ import type { TicketSlaState } from '@/lib/ticketSla';
 type StatusFilter = TicketStatusFilter;
 type PriorityFilter = 'all' | TicketPriority;
 type SlaFilter = 'all' | Exclude<TicketSlaState, 'met' | 'pending'>;
+type AssigneeFilter = 'all' | 'unassigned' | string;
+
+interface AssigneeOption {
+  id: string;
+  name: string;
+}
 
 interface RequestQueueFiltersProps {
   searchTerm: string;
   statusFilter: StatusFilter;
   priorityFilter: PriorityFilter;
   slaFilter: SlaFilter;
+  assignedToFilter: AssigneeFilter;
+  assignees: AssigneeOption[];
   counts: Record<TicketStatus | 'all', number>;
   statusOptions: Array<{ value: TicketStatus; label: string }>;
   priorityOptions: Array<{ value: TicketPriority; label: string }>;
@@ -27,6 +35,7 @@ interface RequestQueueFiltersProps {
   onStatusChange: (value: StatusFilter) => void;
   onPriorityChange: (value: PriorityFilter) => void;
   onSlaChange: (value: SlaFilter) => void;
+  onAssignedToChange: (value: AssigneeFilter) => void;
 }
 
 export function RequestQueueFilters({
@@ -34,6 +43,8 @@ export function RequestQueueFilters({
   statusFilter,
   priorityFilter,
   slaFilter,
+  assignedToFilter,
+  assignees,
   counts,
   statusOptions,
   priorityOptions,
@@ -41,6 +52,7 @@ export function RequestQueueFilters({
   onStatusChange,
   onPriorityChange,
   onSlaChange,
+  onAssignedToChange,
 }: RequestQueueFiltersProps) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border bg-card p-2.5 shadow-sm lg:flex-row lg:items-center">
@@ -90,9 +102,21 @@ export function RequestQueueFilters({
             <SelectItem value="not_configured">No SLA</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={assignedToFilter} onValueChange={(value) => onAssignedToChange(value as AssigneeFilter)}>
+          <SelectTrigger className="h-9 w-[180px]">
+            <SelectValue placeholder="Assignee" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All assignees</SelectItem>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
+            {assignees.map((assignee) => (
+              <SelectItem key={assignee.id} value={assignee.id}>{assignee.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );
 }
 
-export type { PriorityFilter, SlaFilter, StatusFilter };
+export type { AssigneeFilter, PriorityFilter, SlaFilter, StatusFilter };

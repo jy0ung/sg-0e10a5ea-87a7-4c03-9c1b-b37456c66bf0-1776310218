@@ -1,4 +1,4 @@
-import { ArrowLeft, Archive, ClipboardList, FolderOpen, ListTodo, Megaphone, Settings2, TicketCheck } from 'lucide-react';
+import { ArrowLeft, Archive, ClipboardList, FolderOpen, Home, ListTodo, Megaphone, Settings2, TicketCheck } from 'lucide-react';
 import { PORTAL_QUEUE_ROLES, PORTAL_SETUP_ROLES } from '@/config/routeRoles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
@@ -6,23 +6,25 @@ import { canAccessMainApp } from '@/lib/portalAccess';
 import type { AppShellNavItem, AppShellRouteChromeMatch } from './types';
 
 const baseNavItems: AppShellNavItem[] = [
-  { label: 'New Request', path: '/portal/tickets/new', icon: TicketCheck, end: true },
-  { label: 'My Requests', path: '/portal/tickets', icon: ClipboardList, end: true },
-  { label: 'Announcements', path: '/portal/announcements', icon: Megaphone },
-  { label: 'Documents & Forms', path: '/portal/documents', icon: FolderOpen },
+  { label: 'Overview', path: '/portal', icon: Home, group: 'My Work', end: true },
+  { label: 'New Request', path: '/portal/tickets/new', icon: TicketCheck, group: 'My Work', end: true },
+  { label: 'My Requests', path: '/portal/tickets', icon: ClipboardList, group: 'My Work', end: true },
+  { label: 'Announcements', path: '/portal/announcements', icon: Megaphone, group: 'Resources' },
+  { label: 'Documents & Forms', path: '/portal/documents', icon: FolderOpen, group: 'Resources' },
 ];
 
 const queueNavItems: AppShellNavItem[] = [
-  { label: 'Request Queue', path: '/portal/queue', icon: ListTodo },
-  { label: 'Request History', path: '/portal/history', icon: Archive },
+  { label: 'Request Queue', path: '/portal/queue', icon: ListTodo, group: 'Operations' },
+  { label: 'Request History', path: '/portal/history', icon: Archive, group: 'Operations' },
 ];
 
-const setupNavItem: AppShellNavItem = { label: 'Request Setup', path: '/portal/setup', icon: Settings2 };
+const setupNavItem: AppShellNavItem = { label: 'Request Setup', path: '/portal/setup', icon: Settings2, group: 'Administration' };
 
 const portalQueueRoles = new Set<string>(PORTAL_QUEUE_ROLES);
 const portalSetupRoles = new Set<string>(PORTAL_SETUP_ROLES);
 
 const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
+  { pattern: /^\/portal\/?$/, title: 'Overview', kicker: 'Internal requests workspace' },
   { pattern: /^\/portal\/tickets\/new/, title: 'New Request', kicker: 'Submit and track internal support demand' },
   { pattern: /^\/portal\/tickets$/, title: 'My Requests', kicker: 'Requester history and updates' },
   { pattern: /^\/portal\/queue/, title: 'Request Queue', kicker: 'Triage, assign, and resolve requests' },
@@ -55,7 +57,7 @@ export function useInternalRequestsShellConfig() {
         items: navItems,
         showHeader: true,
         showItems: true,
-        showGroupLabels: false,
+        showGroupLabels: true,
       },
     ],
     routeChrome: INTERNAL_REQUESTS_ROUTE_CHROME,

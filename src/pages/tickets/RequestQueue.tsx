@@ -24,10 +24,23 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { RequestDetailPanel } from '@/components/tickets/RequestDetailPanel';
-import { RequestQueueFilters, type PriorityFilter, type SlaFilter, type StatusFilter } from '@/components/tickets/RequestQueueFilters';
+import {
+  RequestQueueFilters,
+  type AssigneeFilter,
+  type PriorityFilter,
+  type SlaFilter,
+  type StatusFilter,
+} from '@/components/tickets/RequestQueueFilters';
 import { RequestQueueList } from '@/components/tickets/RequestQueueList';
 import { RequestQueueMetricGrid } from '@/components/tickets/RequestQueueMetricGrid';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
@@ -58,9 +71,9 @@ import {
 import { reviewInternalRequestApproval } from '@/services/requestApprovalService';
 import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
 import { listProfiles } from '@/services/profileService';
-import { PORTAL_QUEUE_ROLES } from '@/config/routeRoles';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
+import { getRequestAssignees } from '@/lib/requestAssignees';
 import { formatSlaState, getTicketSlaSummary } from '@/lib/ticketSla';
 import {
   downloadCsv,
@@ -86,7 +99,6 @@ const priorityOptions: Array<{ value: TicketPriority; label: string }> = [
   { value: 'high', label: 'High' },
 ];
 
-const requestOwnerRoles = new Set<string>(PORTAL_QUEUE_ROLES);
 const REQUEST_QUEUE_PAGE_SIZE = 25;
 
 function useIsLargeScreen() {
@@ -123,7 +135,7 @@ export default function RequestQueue() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [slaFilter, setSlaFilter] = useState<SlaFilter>('all');
-  const [assignedToFilter, setAssignedToFilter] = useState<string>('all');
+  const [assignedToFilter, setAssignedToFilter] = useState<AssigneeFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -259,10 +271,7 @@ export default function RequestQueue() {
   const error = queueError ?? (ticketQueryError ? (ticketQueryError as Error).message : null);
 
   const assignees = useMemo(
-    () =>
-      (profileRows ?? [])
-        .filter((profile) => profile.status === 'active' && requestOwnerRoles.has(profile.role))
-        .sort((left, right) => left.name.localeCompare(right.name)),
+    () => getRequestAssignees(profileRows ?? []),
     [profileRows],
   );
 
@@ -691,7 +700,7 @@ export default function RequestQueue() {
     <div className="flex h-full min-h-[720px] w-full flex-col gap-2 overflow-hidden lg:min-h-0">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
         <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">Request Workbench</h1>
+          <h1 className="text-base font-semibold tracking-tight text-foreground">Request Queue</h1>
           <p className="text-[11px] text-muted-foreground">Triage, assign, and resolve internal requests</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -756,29 +765,27 @@ export default function RequestQueue() {
         <div className="flex shrink-0 items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 shadow-sm">
           <span className="text-xs font-medium text-foreground">{selectedIds.size} selected</span>
           <div className="h-4 w-px bg-border" />
-          <select
-            disabled={bulkSaving}
-            className="h-7 rounded border border-border bg-background px-1.5 text-xs disabled:opacity-50"
-            value=""
-            onChange={(e) => { if (e.target.value) void handleBulkAssign(e.target.value); }}
-          >
-            <option value="" disabled>Assign to…</option>
-            <option value="unassigned">Unassigned</option>
-            {assignees.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
-          <select
-            disabled={bulkSaving}
-            className="h-7 rounded border border-border bg-background px-1.5 text-xs disabled:opacity-50"
-            value=""
-            onChange={(e) => { if (e.target.value) void handleBulkStatus(e.target.value as TicketStatus); }}
-          >
-            <option value="" disabled>Set status…</option>
-            {statusOptions.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
+          <Select value="" onValueChange={(value) => void handleBulkAssign(value)} disabled={bulkSaving}>
+            <SelectTrigger className="h-7 w-[150px] text-xs">
+              <SelectValue placeholder="Assign to..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              {assignees.map((assignee) => (
+                <SelectItem key={assignee.id} value={assignee.id}>{assignee.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value="" onValueChange={(value) => void handleBulkStatus(value as TicketStatus)} disabled={bulkSaving}>
+            <SelectTrigger className="h-7 w-[150px] text-xs">
+              <SelectValue placeholder="Set status..." />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((status) => (
+                <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="sm"
@@ -809,6 +816,8 @@ export default function RequestQueue() {
           statusFilter={statusFilter}
           priorityFilter={priorityFilter}
           slaFilter={slaFilter}
+          assignedToFilter={assignedToFilter}
+          assignees={assignees}
           counts={statusCounts}
           statusOptions={statusOptions}
           priorityOptions={priorityOptions}
@@ -816,6 +825,7 @@ export default function RequestQueue() {
           onStatusChange={setStatusFilter}
           onPriorityChange={setPriorityFilter}
           onSlaChange={setSlaFilter}
+          onAssignedToChange={setAssignedToFilter}
         />
       </div>
 
