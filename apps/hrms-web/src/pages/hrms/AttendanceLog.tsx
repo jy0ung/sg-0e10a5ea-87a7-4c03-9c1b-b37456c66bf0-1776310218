@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -120,10 +120,10 @@ export default function AttendanceLog() {
   }
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-5">
       <PageHeader
-        title="Attendance Log"
-        description="Track daily attendance records"
+        title="Attendance"
+        description={canAccessTeamAttendance ? 'Daily workforce attendance and exceptions' : 'Your daily attendance records'}
         breadcrumbs={[{ label: 'HRMS' }, { label: 'Attendance' }]}
         actions={
           <div className="flex gap-2">
@@ -135,19 +135,39 @@ export default function AttendanceLog() {
         }
       />
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {(Object.entries(counts) as [AttendanceStatus, number][]).map(([status, cnt]) => (
-          <Card key={status} className="shadow-sm">
-            <CardHeader className="px-3 pb-1 pt-3">
-              <CardTitle className="text-xs capitalize text-muted-foreground">{status.replace('_', ' ')}</CardTitle>
-            </CardHeader>
-            <CardContent className="px-3 pb-3">
-              <p className="text-2xl font-semibold tabular-nums">{cnt}</p>
+      {/* Summary strip — colour-coded by exception severity */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        {([
+          { status: 'present',        label: 'Present',        icon: '✓',  bg: 'bg-emerald-100 dark:bg-emerald-900/20', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-200/60 dark:border-emerald-800/40' },
+          { status: 'absent',         label: 'Absent',         icon: '✕',  bg: 'bg-red-100 dark:bg-red-900/20',         text: 'text-red-700 dark:text-red-400',         border: 'border-red-200/60 dark:border-red-800/40' },
+          { status: 'half_day',       label: 'Half Day',       icon: '½',  bg: 'bg-amber-100 dark:bg-amber-900/20',     text: 'text-amber-700 dark:text-amber-400',     border: 'border-amber-200/60 dark:border-amber-800/40' },
+          { status: 'on_leave',       label: 'On Leave',       icon: '↗',  bg: 'bg-blue-100 dark:bg-blue-900/20',       text: 'text-blue-700 dark:text-blue-400',       border: 'border-blue-200/60 dark:border-blue-800/40' },
+          { status: 'public_holiday', label: 'Public Holiday', icon: '★',  bg: 'bg-violet-100 dark:bg-violet-900/20',   text: 'text-violet-700 dark:text-violet-400',   border: 'border-violet-200/60 dark:border-violet-800/40' },
+        ] as const).map(({ status, label, icon, bg, text, border }) => (
+          <Card key={status} className={`shadow-sm border ${border}`}>
+            <CardContent className="flex items-center gap-3 p-3.5">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-bold ${bg} ${text}`}>
+                {icon}
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+                <p className={`text-2xl font-bold leading-none tabular-nums ${text}`}>{counts[status]}</p>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {/* Exception banner — shown if >0 absent in range */}
+      {counts.absent > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-200/60 bg-red-50/60 px-4 py-3 dark:border-red-800/30 dark:bg-red-900/10">
+          <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">
+            {counts.absent} absent record{counts.absent !== 1 ? 's' : ''} in this period
+            {counts.half_day > 0 && ` · ${counts.half_day} half-day${counts.half_day !== 1 ? 's' : ''}`}
+          </p>
+        </div>
+      )}
 
       {/* Filters */}
       <FilterBar title="Attendance filters" description="Review records by period and employee scope" countLabel={`${records.length} records`}>
@@ -175,15 +195,19 @@ export default function AttendanceLog() {
         </div>
       </FilterBar>
 
-      {/* Table */}
+      {/* Table — exceptions (absent/half_day) sorted first */}
       {loading ? (
         <TableSkeleton cols={canAccessTeamAttendance ? 7 : 6} />
       ) : (
         <StandardTable
-          data={tableRows}
+          data={[
+            ...tableRows.filter(r => r.status === 'absent'),
+            ...tableRows.filter(r => r.status === 'half_day'),
+            ...tableRows.filter(r => r.status !== 'absent' && r.status !== 'half_day'),
+          ]}
           columns={columns}
           searchPlaceholder="Search records…"
-          emptyMessage="No records found"
+          emptyMessage="No records found for this period"
         />
       )}
 

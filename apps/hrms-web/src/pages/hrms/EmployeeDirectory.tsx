@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
@@ -14,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
-import { Search, Plus, Users, UserCheck, UserMinus, Pencil, SlidersHorizontal, Trash2, Send } from 'lucide-react';
+import { Search, Plus, Users, UserCheck, UserMinus, Pencil, SlidersHorizontal, Trash2, Send, Eye } from 'lucide-react';
 import { AppRole, Employee, EmployeeStatus } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import { listDepartments, listJobTitles } from '@/services/hrmsAdminService';
@@ -111,6 +112,7 @@ export default function EmployeeDirectory() {
   const { user } = useAuth();
   const hrmsAccess = useHrmsAccess();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const queryClient = useQueryClient();
 
@@ -235,6 +237,10 @@ export default function EmployeeDirectory() {
       className: 'whitespace-nowrap',
       render: (emp: EmployeeDirectoryRow) => (
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground" title="View profile" onClick={() => navigate(`/employees/${emp.id}`)}
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </Button>
           <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title="Edit" onClick={() => openEdit(emp)}>
             <Pencil className="h-3.5 w-3.5" />
           </Button>
@@ -434,28 +440,23 @@ export default function EmployeeDirectory() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="glass-panel min-w-0 p-4">
-          <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
-            <UserCheck className="h-3.5 w-3.5" /> Active
-          </p>
-          <p className="text-2xl font-semibold tabular-nums text-emerald-500">{activeCount}</p>
-        </div>
-        <div className="glass-panel min-w-0 p-4">
-          <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
-            <UserMinus className="h-3.5 w-3.5" /> Inactive
-          </p>
-          <p className="text-2xl font-semibold tabular-nums text-foreground">{inactiveCount}</p>
-        </div>
-        <div className="glass-panel min-w-0 p-4">
-          <p className="mb-2 text-xs text-muted-foreground">Resigned</p>
-          <p className="text-2xl font-semibold tabular-nums text-red-500">{resignedCount}</p>
-        </div>
-        <div className="glass-panel min-w-0 p-4">
-          <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
-            <Users className="h-3.5 w-3.5" /> Total
-          </p>
-          <p className="text-2xl font-semibold tabular-nums text-foreground">{employees.length}</p>
-        </div>
+        {[
+          { label: 'Active', value: activeCount, icon: UserCheck, bg: 'bg-emerald-100 dark:bg-emerald-900/30', fg: 'text-emerald-600 dark:text-emerald-400', helper: 'Currently employed' },
+          { label: 'Inactive', value: inactiveCount, icon: UserMinus, bg: 'bg-muted', fg: 'text-muted-foreground', helper: 'On hold / suspended' },
+          { label: 'Resigned', value: resignedCount, icon: UserMinus, bg: resignedCount > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-muted', fg: resignedCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground', helper: 'Departed staff' },
+          { label: 'Total Headcount', value: employees.length, icon: Users, bg: 'bg-blue-100 dark:bg-blue-900/30', fg: 'text-blue-600 dark:text-blue-400', helper: 'All employees on record' },
+        ].map(({ label, value, icon: Icon, bg, fg, helper }) => (
+          <div key={label} className="flex items-start gap-3 overflow-hidden rounded-lg border bg-card p-4 shadow-sm">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+              <Icon className={`h-5 w-5 ${fg}`} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-muted-foreground">{label}</p>
+              <p className={`text-2xl font-bold tabular-nums ${fg}`}>{value}</p>
+              <p className="text-xs text-muted-foreground">{helper}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Table panel */}

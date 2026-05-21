@@ -180,47 +180,55 @@ export default function PayrollSummary() {
 
       {!loading && (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
-              <CardTitle className="text-sm font-medium">Latest headcount</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="px-3 pb-3">
-              <p className="text-2xl font-semibold tabular-nums">{payrollMetrics.latestHeadcount}</p>
-              <p className="text-xs text-muted-foreground">
-                {latestRun ? `${MONTHS[latestRun.periodMonth - 1]} ${latestRun.periodYear}` : 'No run yet'}
-              </p>
-            </CardContent>
+          <Card className="shadow-sm overflow-hidden">
+            <div className="flex items-start gap-3 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-muted-foreground">Latest headcount</p>
+                <p className="text-2xl font-bold tabular-nums">{payrollMetrics.latestHeadcount}</p>
+                <p className="text-xs text-muted-foreground">
+                  {latestRun ? `${MONTHS[latestRun.periodMonth - 1]} ${latestRun.periodYear}` : 'No run yet'}
+                </p>
+              </div>
+            </div>
           </Card>
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
-              <CardTitle className="text-sm font-medium">Net payroll</CardTitle>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="px-3 pb-3">
-              <p className="truncate text-2xl font-semibold tabular-nums" title={`RM ${fmt(payrollMetrics.totalNet)}`}>RM {fmt(payrollMetrics.totalNet)}</p>
-              <p className="text-xs text-muted-foreground">Across visible runs</p>
-            </CardContent>
+          <Card className="shadow-sm overflow-hidden">
+            <div className="flex items-start gap-3 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                <Wallet className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-muted-foreground">Net payroll</p>
+                <p className="truncate text-2xl font-bold tabular-nums" title={`RM ${fmt(payrollMetrics.totalNet)}`}>RM {fmt(payrollMetrics.totalNet)}</p>
+                <p className="text-xs text-muted-foreground">Across visible runs</p>
+              </div>
+            </div>
           </Card>
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
-              <CardTitle className="text-sm font-medium">Pending approval</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="px-3 pb-3">
-              <p className="text-2xl font-semibold tabular-nums">{payrollMetrics.pendingApprovals}</p>
-              <p className="text-xs text-muted-foreground">Runs waiting for review</p>
-            </CardContent>
+          <Card className="shadow-sm overflow-hidden">
+            <div className="flex items-start gap-3 p-4">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${payrollMetrics.pendingApprovals > 0 ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted'}`}>
+                <Clock className={`h-5 w-5 ${payrollMetrics.pendingApprovals > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-muted-foreground">Pending approval</p>
+                <p className={`text-2xl font-bold tabular-nums ${payrollMetrics.pendingApprovals > 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>{payrollMetrics.pendingApprovals}</p>
+                <p className="text-xs text-muted-foreground">Runs waiting for review</p>
+              </div>
+            </div>
           </Card>
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 px-3 pb-1 pt-3">
-              <CardTitle className="text-sm font-medium">Paid runs</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="px-3 pb-3">
-              <p className="text-2xl font-semibold tabular-nums">{payrollMetrics.paidRuns}</p>
-              <p className="text-xs text-muted-foreground">Completed payroll cycles</p>
-            </CardContent>
+          <Card className="shadow-sm overflow-hidden">
+            <div className="flex items-start gap-3 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30">
+                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-muted-foreground">Paid runs</p>
+                <p className="text-2xl font-bold tabular-nums">{payrollMetrics.paidRuns}</p>
+                <p className="text-xs text-muted-foreground">Completed payroll cycles</p>
+              </div>
+            </div>
           </Card>
         </div>
       )}
@@ -255,7 +263,12 @@ export default function PayrollSummary() {
                     </CardTitle>
                     <p className="truncate text-sm text-muted-foreground">{run.totalHeadcount} employees · RM {fmt(run.totalGross)} gross · RM {fmt(run.totalNet)} net</p>
                   </div>
-                <Badge variant="outline" className="capitalize text-xs">{run.status}</Badge>
+                <Badge variant="outline" className={`capitalize text-xs ${
+                  run.status === 'paid'      ? 'bg-green-50 text-green-700 border-green-200' :
+                  run.status === 'finalised' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                  run.status === 'draft'     ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                  'bg-red-50 text-red-700 border-red-200'
+                }`}>{run.status}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center gap-2 p-4">

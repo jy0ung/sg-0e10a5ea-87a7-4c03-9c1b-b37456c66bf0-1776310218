@@ -34,6 +34,7 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const SignUpPage = lazy(() => import('./pages/SignUpPage'));
 const AccountPending = lazy(() => import('./pages/AccountPending'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const HrmsDashboard = lazy(() => import('./pages/hrms/HrmsDashboard'));
 const ApprovalInbox = lazy(() => import('./pages/hrms/ApprovalInbox'));
 const LeaveManagement = lazy(() => import('./pages/hrms/LeaveManagement'));
 const LeaveCalendar = lazy(() => import('./pages/hrms/LeaveCalendar'));
@@ -42,6 +43,7 @@ const PayrollSummary = lazy(() => import('./pages/hrms/PayrollSummary'));
 const PerformanceAppraisals = lazy(() => import('./pages/hrms/PerformanceAppraisals'));
 const HrmsAnnouncements = lazy(() => import('./pages/hrms/Announcements'));
 const EmployeeDirectory = lazy(() => import('./pages/hrms/EmployeeDirectory'));
+const EmployeeProfile = lazy(() => import('./pages/hrms/employee/EmployeeProfile'));
 const HrmsAdmin = lazy(() => import('./pages/hrms/HrmsAdmin'));
 
 const queryClient = createAppQueryClient();
@@ -93,7 +95,8 @@ const router = createBrowserRouter([
     path: '/',
     element: <ProtectedHrmsShell />,
     children: [
-      { index: true, element: <Navigate to="leave" replace /> },
+      { index: true, element: <Navigate to="dashboard" replace /> },
+      { path: 'dashboard', element: <RequireHrmsRouteAccess access="dashboard"><R scope="Dashboard"><S><HrmsDashboard /></S></R></RequireHrmsRouteAccess> },
       { path: 'profile', element: <RequireHrmsRouteAccess access="profile"><R scope="Profile"><ProfilePage /></R></RequireHrmsRouteAccess> },
       { path: 'leave', element: <RequireHrmsRouteAccess access="leave"><R scope="Leave"><S><LeaveManagement /></S></R></RequireHrmsRouteAccess> },
       { path: 'leave/calendar', element: <RequireHrmsRouteAccess access="leaveCalendar"><R scope="Leave Calendar"><S><LeaveCalendar /></S></R></RequireHrmsRouteAccess> },
@@ -102,6 +105,7 @@ const router = createBrowserRouter([
       { path: 'appraisals', element: <RequireHrmsRouteAccess access="appraisals"><R scope="Appraisals"><S><PerformanceAppraisals /></S></R></RequireHrmsRouteAccess> },
       { path: 'announcements', element: <RequireHrmsRouteAccess access="announcements"><R scope="Announcements"><S><HrmsAnnouncements /></S></R></RequireHrmsRouteAccess> },
       { path: 'employees', element: <RequireHrmsRouteAccess access="employees"><R scope="Employees"><S><EmployeeDirectory /></S></R></RequireHrmsRouteAccess> },
+      { path: 'employees/:id', element: <RequireHrmsRouteAccess access="employees"><R scope="Employee Profile"><S><EmployeeProfile /></S></R></RequireHrmsRouteAccess> },
       { path: 'payroll', element: <RequireHrmsRouteAccess access="payroll"><R scope="Payroll"><S><PayrollSummary /></S></R></RequireHrmsRouteAccess> },
       { path: 'settings', element: <RequireHrmsRouteAccess access="settings"><R scope="Settings"><S><HrmsAdmin /></S></R></RequireHrmsRouteAccess> },
       { path: 'settings/leave-quota', element: <RequireHrmsRouteAccess access="leaveQuota"><R scope="Leave Quota Settings"><S><HrmsAdmin /></S></R></RequireHrmsRouteAccess> },

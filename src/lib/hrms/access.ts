@@ -1,6 +1,7 @@
 import type { HrmsRole, HrmsRoleCategory } from '@/types';
 
 export type HrmsRouteAccessKey =
+  | 'dashboard'
   | 'profile'
   | 'leave'
   | 'leaveCalendar'
@@ -10,7 +11,8 @@ export type HrmsRouteAccessKey =
   | 'announcements'
   | 'employees'
   | 'payroll'
-  | 'settings';
+  | 'settings'
+  | 'leaveQuota';
 
 export type HrmsApproverIdentity = {
   id?: string | null;
@@ -152,9 +154,12 @@ export function deriveHrmsAccess(roles: HrmsRole[]): DerivedHrmsAccess {
 
   const canAccessRoute = (route: HrmsRouteAccessKey) => {
     switch (route) {
+      case 'dashboard':
       case 'profile':
       case 'leave':
         return hasSelfServiceAccess;
+      case 'leaveQuota':
+        return canAccessSettings;
       case 'leaveCalendar':
         return hasSupervisoryRole;
       case 'attendance':

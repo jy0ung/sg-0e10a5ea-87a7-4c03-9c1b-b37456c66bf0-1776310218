@@ -7,10 +7,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CalendarDays, ChevronLeft, ChevronRight, TrendingUp, User, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { listLeaveRequests, listEmployeeDirectory } from '@/services/hrmsService';
 import type { Employee } from '@/types';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -78,6 +78,18 @@ export default function LeaveCalendar() {
     }
   }
 
+  // Derived stats
+  const today = now.toISOString().slice(0, 10);
+  const uniqueOnLeave = new Set(
+    requests
+      .filter(r => empFilter === 'all' || r.employeeId === empFilter)
+      .map(r => r.employeeId)
+  ).size;
+  const totalLeaveDays = Array.from(leaveMap.values()).reduce((sum, v) => sum + v.length, 0);
+  const todayCount = leaveMap.get(today)?.length ?? 0;
+  let peakDay = 0;
+  leaveMap.forEach(v => { if (v.length > peakDay) peakDay = v.length; });
+
   function prevMonth() {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
     else setViewMonth(m => m - 1);
@@ -98,9 +110,34 @@ export default function LeaveCalendar() {
     <div className="w-full space-y-4">
       <PageHeader
         title="Leave Calendar"
-        description="Visual overview of approved leave"
+        description={`Team leave overview for ${MONTHS[viewMonth]} ${viewYear}`}
         breadcrumbs={[{ label: 'HRMS' }, { label: 'Leave Calendar' }]}
       />
+
+      {/* Stats strip */}
+      {!loading && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: 'Employees on Leave', value: uniqueOnLeave, helper: `This month`, icon: Users, bg: 'bg-blue-100 dark:bg-blue-900/30', fg: 'text-blue-600 dark:text-blue-400' },
+            { label: 'Total Leave-Days', value: totalLeaveDays, helper: 'Across all leave requests', icon: CalendarDays, bg: 'bg-indigo-100 dark:bg-indigo-900/30', fg: 'text-indigo-600 dark:text-indigo-400' },
+            { label: 'On Leave Today', value: todayCount, helper: todayCount > 0 ? 'Currently absent' : 'Full team in', icon: User, bg: todayCount > 0 ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted', fg: todayCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground' },
+            { label: 'Peak Day', value: peakDay, helper: 'Max concurrent leave', icon: TrendingUp, bg: peakDay >= 3 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-muted', fg: peakDay >= 3 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground' },
+          ].map(({ label, value, helper, icon: Icon, bg, fg }) => (
+            <Card key={label} className="overflow-hidden shadow-sm">
+              <div className="flex items-start gap-3 p-4">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+                  <Icon className={`h-5 w-5 ${fg}`} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-muted-foreground">{label}</p>
+                  <p className={`text-2xl font-bold tabular-nums ${fg}`}>{value}</p>
+                  <p className="text-xs text-muted-foreground">{helper}</p>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Controls */}
       <FilterBar title="Calendar controls" description="Switch month and focus the team view" countLabel={`${requests.length} approved requests`}>

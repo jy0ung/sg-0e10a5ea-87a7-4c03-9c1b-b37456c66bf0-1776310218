@@ -377,19 +377,22 @@ export default function PerformanceAppraisals() {
       {!loading && (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: 'Cycles', value: appraisalMetrics.total, helper: 'All appraisal cycles' },
-            { label: 'Open', value: appraisalMetrics.open, helper: 'Ready for review work' },
-            { label: 'Activation', value: appraisalMetrics.inProgress, helper: 'Waiting or in progress' },
-            { label: 'Completed', value: appraisalMetrics.completed, helper: 'Closed review cycles' },
+            { label: 'Cycles', value: appraisalMetrics.total, helper: 'All appraisal cycles', icon: '📋', bg: 'bg-blue-100 dark:bg-blue-900/30', fg: 'text-blue-600 dark:text-blue-400' },
+            { label: 'Open', value: appraisalMetrics.open, helper: 'Ready for review work', icon: '✏️', bg: 'bg-indigo-100 dark:bg-indigo-900/30', fg: 'text-indigo-600 dark:text-indigo-400' },
+            { label: 'Activation', value: appraisalMetrics.inProgress, helper: 'Waiting or in progress', icon: '⏳', bg: appraisalMetrics.inProgress > 0 ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted', fg: appraisalMetrics.inProgress > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground' },
+            { label: 'Completed', value: appraisalMetrics.completed, helper: 'Closed review cycles', icon: '✅', bg: 'bg-green-100 dark:bg-green-900/30', fg: 'text-green-600 dark:text-green-400' },
           ].map(metric => (
-            <Card key={metric.label} className="shadow-sm">
-              <CardHeader className="px-3 pb-1 pt-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{metric.label}</CardTitle>
-              </CardHeader>
-              <CardContent className="px-3 pb-3">
-                <p className="text-2xl font-semibold tabular-nums">{metric.value}</p>
-                <p className="text-xs text-muted-foreground">{metric.helper}</p>
-              </CardContent>
+            <Card key={metric.label} className="shadow-sm overflow-hidden">
+              <div className="flex items-start gap-3 p-4">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg ${metric.bg}`}>
+                  {metric.icon}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-muted-foreground">{metric.label}</p>
+                  <p className={`text-2xl font-bold tabular-nums ${metric.fg}`}>{metric.value}</p>
+                  <p className="text-xs text-muted-foreground">{metric.helper}</p>
+                </div>
+              </div>
             </Card>
           ))}
         </div>
@@ -411,7 +414,12 @@ export default function PerformanceAppraisals() {
                       {a.cycle.replace('_', ' ')} · {a.periodStart} → {a.periodEnd}
                     </p>
                   </div>
-                  <Badge variant="outline" className="capitalize text-xs">{a.status.replace('_', ' ')}</Badge>
+                  <Badge variant="outline" className={`capitalize text-xs ${
+                    a.status === 'completed'   ? 'bg-green-50 text-green-700 border-green-200' :
+                    a.status === 'open'        ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
+                    a.status === 'in_progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    'bg-muted text-muted-foreground'
+                  }`}>{a.status.replace('_', ' ')}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center gap-2 p-4">

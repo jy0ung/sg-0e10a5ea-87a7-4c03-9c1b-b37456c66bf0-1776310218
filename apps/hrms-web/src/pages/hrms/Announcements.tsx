@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { listAnnouncements, createAnnouncement, deleteAnnouncement } from '@/services/hrmsService';
 import type { CreateAnnouncementInput, AnnouncementCategory, AnnouncementPriority } from '@/types';
-import { Pin, Plus, Trash2, Megaphone, SlidersHorizontal } from 'lucide-react';
+import { Pin, Plus, Trash2, Megaphone } from 'lucide-react';
 
 const PRIORITY_COLORS: Record<AnnouncementPriority, string> = {
   low:    'bg-gray-100 text-gray-500 border-gray-200',
@@ -90,8 +90,12 @@ export default function Announcements() {
     void queryClient.invalidateQueries({ queryKey: ['announcements', user?.companyId] });
   }
 
+  const pinned = filtered.filter((a) => a.pinned);
+  const regular = filtered.filter((a) => !a.pinned);
+  const sorted = [...pinned, ...regular];
+
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-5">
       <PageHeader
         title="Announcements"
         description="Company-wide communications and notices"
@@ -105,87 +109,107 @@ export default function Announcements() {
         }
       />
 
-      {/* Category filters */}
-      <div className="rounded-lg border bg-card p-3 shadow-sm">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight text-foreground">Announcement filters</p>
-              <p className="text-[11px] leading-tight text-muted-foreground">Segment notices by category and urgency</p>
-            </div>
-          </div>
-          <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground tabular-nums">{filtered.length} notices</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-        {(['all', 'general', 'policy', 'event', 'emergency', 'holiday'] as const).map(cat => (
-          <Button
+      {/* Category filter pills */}
+      <div className="flex flex-wrap items-center gap-2">
+        {(['all', 'general', 'policy', 'event', 'emergency', 'holiday'] as const).map((cat) => (
+          <button
             key={cat}
-            variant={catFilter === cat ? 'default' : 'outline'}
-            size="sm"
+            type="button"
             onClick={() => setCatFilter(cat)}
-            className="capitalize"
+            className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              catFilter === cat
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'border bg-card text-muted-foreground hover:bg-muted hover:text-foreground'
+            }`}
           >
-            {cat === 'all' ? 'All' : CATEGORY_LABELS[cat as AnnouncementCategory]}
-          </Button>
+            {cat === 'all' ? `All (${announcements.length})` : CATEGORY_LABELS[cat as AnnouncementCategory]}
+          </button>
         ))}
-        </div>
       </div>
 
       {loading ? (
-        <div className="flex h-40 items-center justify-center rounded-lg border bg-card shadow-sm">
-          <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded-xl border bg-card p-5 space-y-2 shadow-sm">
+              <div className="flex gap-2 mb-3">
+                <div className="h-5 w-16 rounded-full bg-muted animate-pulse" />
+                <div className="h-5 w-12 rounded-full bg-muted animate-pulse" />
+              </div>
+              <div className="h-5 w-3/4 rounded bg-muted animate-pulse" />
+              <div className="h-3 w-full rounded bg-muted/60 animate-pulse" />
+              <div className="h-3 w-2/3 rounded bg-muted/60 animate-pulse" />
+            </div>
+          ))}
         </div>
-      ) : filtered.length === 0 ? (
-        <Card className="shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
-            <Megaphone className="h-8 w-8 opacity-30" />
-            <p>No announcements</p>
-          </CardContent>
-        </Card>
+      ) : sorted.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed bg-muted/20 py-16 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+            <Megaphone className="h-6 w-6 text-muted-foreground/40" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">No announcements</p>
+            <p className="text-sm text-muted-foreground">
+              {catFilter === 'all' ? 'There are no announcements yet.' : `No ${CATEGORY_LABELS[catFilter as AnnouncementCategory]} announcements.`}
+            </p>
+          </div>
+          {canManageAnnouncements && (
+            <Button size="sm" variant="outline" onClick={() => setShowCreate(true)}>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Post first announcement
+            </Button>
+          )}
+        </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map(ann => (
-            <Card key={ann.id} data-pinned={ann.pinned ? 'true' : 'false'} className={`overflow-hidden shadow-sm ${ann.pinned ? 'border-primary/50' : ''}`}>
-              <CardHeader className="border-b bg-muted/30 px-4 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                      <Megaphone className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <CardTitle className="flex items-center gap-1.5 truncate text-base">
-                        {ann.pinned && <Pin aria-label="Pinned announcement" className="h-3.5 w-3.5 text-primary" />}
-                        {ann.title}
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground">
-                        {ann.authorName ?? 'HR'} · {timeAgo(ann.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant="outline" className={`capitalize text-xs ${PRIORITY_COLORS[ann.priority]}`}>
-                      {ann.priority}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {sorted.map((ann) => (
+            <Card
+              key={ann.id}
+              className={`group overflow-hidden shadow-sm transition-all hover:shadow-md ${
+                ann.pinned
+                  ? 'border-primary/40 bg-gradient-to-br from-primary/4 via-background to-background'
+                  : ann.priority === 'urgent'
+                    ? 'border-red-200/60 dark:border-red-800/30'
+                    : ''
+              }`}
+            >
+              <CardContent className="p-5">
+                {/* Meta row */}
+                <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                  {ann.pinned && (
+                    <Badge className="gap-1 bg-primary/10 text-primary border-primary/20 text-[10px] px-1.5">
+                      <Pin className="h-2.5 w-2.5" /> Pinned
                     </Badge>
-                    {canManageAnnouncements && (
-                      <Button
-                        size="icon" variant="ghost"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleting(ann.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
+                  )}
+                  <Badge variant="outline" className="text-[10px] capitalize px-1.5 bg-muted/50">
+                    {CATEGORY_LABELS[ann.category]}
+                  </Badge>
+                  <Badge variant="outline" className={`text-[10px] capitalize px-1.5 ${PRIORITY_COLORS[ann.priority]}`}>
+                    {ann.priority}
+                  </Badge>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="whitespace-pre-wrap text-sm leading-5 text-foreground/80">{ann.body}</p>
-                {ann.expiresAt && (
-                  <p className="text-xs text-muted-foreground mt-2">Expires: {ann.expiresAt.slice(0, 10)}</p>
-                )}
+
+                {/* Title */}
+                <h3 className="mb-1.5 font-semibold leading-snug text-foreground">{ann.title}</h3>
+
+                {/* Body */}
+                <p className="line-clamp-4 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap">{ann.body}</p>
+
+                {/* Footer */}
+                <div className="mt-4 flex items-center justify-between border-t pt-3">
+                  <div className="text-xs text-muted-foreground/70">
+                    <span className="font-medium text-muted-foreground">{ann.authorName ?? 'HR'}</span>
+                    {' · '}{timeAgo(ann.createdAt)}
+                    {ann.expiresAt && ` · Expires ${ann.expiresAt.slice(0, 10)}`}
+                  </div>
+                  {canManageAnnouncements && (
+                    <Button
+                      size="icon" variant="ghost"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                      onClick={() => setDeleting(ann.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}

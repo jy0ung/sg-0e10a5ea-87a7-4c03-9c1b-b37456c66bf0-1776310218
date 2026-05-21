@@ -179,42 +179,25 @@ export default function ApprovalInbox() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="shadow-sm">
-          <CardHeader className="px-3 pb-1 pt-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Assigned Now</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <div className="text-2xl font-semibold tabular-nums">{items.length}</div>
-            <p className="text-xs text-muted-foreground">Items currently waiting for your decision.</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="px-3 pb-1 pt-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Leave Queue</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <div className="text-2xl font-semibold tabular-nums">{leaveCount}</div>
-            <p className="text-xs text-muted-foreground">Pending leave approvals assigned to you.</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="px-3 pb-1 pt-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Payroll Queue</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <div className="text-2xl font-semibold tabular-nums">{payrollCount}</div>
-            <p className="text-xs text-muted-foreground">Pending payroll approvals assigned to you.</p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardHeader className="px-3 pb-1 pt-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Appraisal Queue</CardTitle>
-          </CardHeader>
-          <CardContent className="px-3 pb-3">
-            <div className="text-2xl font-semibold tabular-nums">{appraisalCount}</div>
-            <p className="text-xs text-muted-foreground">Pending appraisal activations assigned to you.</p>
-          </CardContent>
-        </Card>
+        {[
+          { label: 'Assigned Now', value: items.length, helper: 'Items waiting for your decision', bg: items.length > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-muted', fg: items.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground', icon: Inbox },
+          { label: 'Leave Queue', value: leaveCount, helper: 'Pending leave approvals', bg: 'bg-blue-100 dark:bg-blue-900/30', fg: 'text-blue-600 dark:text-blue-400', icon: Calendar },
+          { label: 'Payroll Queue', value: payrollCount, helper: 'Pending payroll reviews', bg: 'bg-emerald-100 dark:bg-emerald-900/30', fg: 'text-emerald-600 dark:text-emerald-400', icon: CreditCard },
+          { label: 'Appraisal Queue', value: appraisalCount, helper: 'Pending activation approvals', bg: 'bg-violet-100 dark:bg-violet-900/30', fg: 'text-violet-600 dark:text-violet-400', icon: Star },
+        ].map(({ label, value, helper, bg, fg, icon: Icon }) => (
+          <Card key={label} className="overflow-hidden shadow-sm">
+            <div className="flex items-start gap-3 p-4">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${bg}`}>
+                <Icon className={`h-5 w-5 ${fg}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-muted-foreground">{label}</p>
+                <p className={`text-2xl font-bold tabular-nums ${fg}`}>{value}</p>
+                <p className="text-xs text-muted-foreground">{helper}</p>
+              </div>
+            </div>
+          </Card>
+        ))}
       </div>
 
       <FilterBar title="Approval filters" description="Focus the decision queue by HRMS source" countLabel={`${filteredItems.length} visible`}>
