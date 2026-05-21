@@ -191,6 +191,18 @@ async function sendApnsNotification(
   return results;
 }
 
+// ---------------------------------------------------------------------------
+// Startup assertion — warn once on cold start if FCM key is absent so the
+// issue surfaces in function logs rather than silently dropping notifications.
+// ---------------------------------------------------------------------------
+if (!Deno.env.get('FCM_SERVER_KEY')) {
+  console.warn(
+    '[push:startup] FCM_SERVER_KEY is not configured — Android push ' +
+    'notifications will be silently skipped. Set the secret in Supabase ' +
+    'Dashboard → Settings → Edge Functions and redeploy.',
+  );
+}
+
 Deno.serve(async (req: Request) => {
   const corsHeaders = buildCorsHeaders(req);
   const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
