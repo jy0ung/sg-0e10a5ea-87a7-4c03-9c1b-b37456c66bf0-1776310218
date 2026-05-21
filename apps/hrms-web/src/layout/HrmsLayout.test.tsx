@@ -117,6 +117,7 @@ describe('HrmsLayout', () => {
       '/leave/calendar',
       '/employees',
       '/payroll',
+      '/settings/leave-quota',
       '/settings',
     ]);
   });

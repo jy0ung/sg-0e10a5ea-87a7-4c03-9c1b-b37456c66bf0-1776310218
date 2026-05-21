@@ -1677,13 +1677,16 @@ export default function HrmsAdmin() {
 
   const canWrite = hrmsAccess.canAccessSettings;
   const canManageSecurity = hrmsAccess.canAccessSettings;
+  const isLeaveQuotaOnlyAccess = !hrmsAccess.canAccessSettings && hrmsAccess.canManageLeaveQuota;
 
-  if (!user || !hrmsAccess.canAccessSettings) {
+  if (!user || (!hrmsAccess.canAccessSettings && !hrmsAccess.canManageLeaveQuota)) {
     return <UnauthorizedAccess />;
   }
 
   const visibleModules = CATEGORIES.filter(module =>
-    !HIDDEN_MODULE_STATUSES.has(module.status ?? '') && (!module.adminOnly || canManageSecurity),
+    !HIDDEN_MODULE_STATUSES.has(module.status ?? '')
+    && (!module.adminOnly || canManageSecurity)
+    && (!isLeaveQuotaOnlyAccess || module.id === 'leave-quota'),
   );
   const activeGroup: ConfigGroup = isConfigGroup(searchParams.get('group')) ? searchParams.get('group') as ConfigGroup : 'General';
   const activeModuleDef = routeModule
@@ -1724,7 +1727,7 @@ export default function HrmsAdmin() {
     if (module === 'leave-quota') {
       return (
         <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading quota rules…</div>}>
-          <LeaveQuotaPanel companyId={companyId} actorId={user.id} canWrite={canWrite} />
+          <LeaveQuotaPanel companyId={companyId} actorId={user.id} canWrite={canWrite || hrmsAccess.canManageLeaveQuota} />
         </Suspense>
       );
     }

@@ -10,7 +10,8 @@ export type HrmsRouteAccessKey =
   | 'announcements'
   | 'employees'
   | 'payroll'
-  | 'settings';
+  | 'settings'
+  | 'leaveQuota';
 
 export type HrmsApproverIdentity = {
   id?: string | null;
@@ -34,6 +35,7 @@ type DerivedHrmsAccess = {
   canManageEmployees: boolean;
   canAccessPayroll: boolean;
   canAccessSettings: boolean;
+  canManageLeaveQuota: boolean;
   canAccessAnnouncements: boolean;
   canManageAnnouncements: boolean;
   canAccessAppraisals: boolean;
@@ -148,6 +150,8 @@ export function deriveHrmsAccess(roles: HrmsRole[]): DerivedHrmsAccess {
   const canAccessEmployees = hasSupervisoryRole;
   const canManageEmployees = activeRoles.some((role) => role.canManageEmployeeRecords) || hasHrmsAdminRole;
   const canAccessSettings = hasHrmsAdminRole;
+  const canManageLeaveQuota = hasHrmsAdminRole
+    || activeRoles.some((role) => role.canApproveRequests && SUPERVISORY_CATEGORIES.includes(role.category));
   const canViewPii = hasHrmsAdminRole;
 
   const canAccessRoute = (route: HrmsRouteAccessKey) => {
@@ -171,6 +175,8 @@ export function deriveHrmsAccess(roles: HrmsRole[]): DerivedHrmsAccess {
         return canAccessPayroll;
       case 'settings':
         return canAccessSettings;
+      case 'leaveQuota':
+        return canManageLeaveQuota;
       default:
         return false;
     }
@@ -191,6 +197,7 @@ export function deriveHrmsAccess(roles: HrmsRole[]): DerivedHrmsAccess {
     canManageEmployees,
     canAccessPayroll,
     canAccessSettings,
+    canManageLeaveQuota,
     canAccessAnnouncements,
     canManageAnnouncements,
     canAccessAppraisals,
@@ -220,6 +227,7 @@ export function deriveFullHrmsAccess(): DerivedHrmsAccess {
     canManageEmployees: true,
     canAccessPayroll: true,
     canAccessSettings: true,
+    canManageLeaveQuota: true,
     canAccessAnnouncements: true,
     canManageAnnouncements: true,
     canAccessAppraisals: true,

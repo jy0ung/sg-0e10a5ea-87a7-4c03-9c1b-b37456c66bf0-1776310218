@@ -104,6 +104,7 @@ const router = createBrowserRouter([
       { path: 'employees', element: <RequireHrmsRouteAccess access="employees"><R scope="Employees"><S><EmployeeDirectory /></S></R></RequireHrmsRouteAccess> },
       { path: 'payroll', element: <RequireHrmsRouteAccess access="payroll"><R scope="Payroll"><S><PayrollSummary /></S></R></RequireHrmsRouteAccess> },
       { path: 'settings', element: <RequireHrmsRouteAccess access="settings"><R scope="Settings"><S><HrmsAdmin /></S></R></RequireHrmsRouteAccess> },
+      { path: 'settings/leave-quota', element: <RequireHrmsRouteAccess access="leaveQuota"><R scope="Leave Quota Settings"><S><HrmsAdmin /></S></R></RequireHrmsRouteAccess> },
       { path: 'settings/:module', element: <RequireHrmsRouteAccess access="settings"><R scope="Settings Module"><S><HrmsAdmin /></S></R></RequireHrmsRouteAccess> },
       { path: 'unauthorized', element: <UnauthorizedAccess /> },
       ...hrmsCompatibilityRedirects.map((route) => ({
