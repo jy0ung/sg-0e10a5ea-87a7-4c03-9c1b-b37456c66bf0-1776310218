@@ -69,6 +69,9 @@ export const HRMS_LEAVE: readonly AppRole[] = [
   'general_manager',
   'manager',
   'accounts',
+  'sales',
+  'analyst',
+  'creator_updater',
 ] as const;
 
 export const HRMS_APPRAISALS: readonly AppRole[] = [
