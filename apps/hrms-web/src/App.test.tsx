@@ -24,6 +24,7 @@ describe('HRMS web route metadata', () => {
       'employees',
       'payroll',
       'settings',
+      'settings/:module',
       'unauthorized',
     ]);
   });
