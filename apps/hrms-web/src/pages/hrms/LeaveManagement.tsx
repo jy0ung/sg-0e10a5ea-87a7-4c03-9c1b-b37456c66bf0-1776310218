@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
@@ -100,16 +100,28 @@ export default function LeaveManagement() {
 
   return (
     <div className="w-full space-y-4">
-      <PageHeader
-        title="Leave Control Center"
-        description="Manage your leave requests, balances, and team approvals"
-        breadcrumbs={[{ label: 'HRMS' }, { label: 'Leave' }]}
-        actions={
-          <Button size="sm" onClick={() => setShowApply(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Apply for Leave
-          </Button>
-        }
-      />
+      {/* Command Center Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight">Leave Control Center</h1>
+            <Badge className="shrink-0 rounded-md border border-gold/30 bg-gold/10 px-2 py-0.5 text-xs font-semibold text-gold">
+              {new Date().getFullYear()}
+            </Badge>
+          </div>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Manage requests, balances, and team approvals.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          className="shrink-0 gap-1.5 self-start shadow-sm"
+          onClick={() => setShowApply(true)}
+        >
+          <Plus className="h-4 w-4" />
+          Apply for Leave
+        </Button>
+      </div>
 
       <SnapshotStrip
         leaveBalances={leaveData.leaveBalances}
@@ -129,7 +141,6 @@ export default function LeaveManagement() {
             onTabChange={setActiveTab}
             leaveTypes={leaveData.leaveTypes}
             leaveBalances={leaveData.leaveBalances}
-            holidays={leaveData.holidays}
             myActivePending={leaveData.myActivePending}
             myUpcoming={leaveData.myUpcoming}
             myHistory={leaveData.myHistory}
@@ -147,7 +158,7 @@ export default function LeaveManagement() {
         </div>
 
         {/* Context panel (desktop) */}
-        <div className="hidden w-72 shrink-0 lg:block xl:w-80">
+        <div className="hidden w-80 shrink-0 lg:block xl:w-[22rem]">
           <ContextPanel
             leaveTypes={leaveData.leaveTypes}
             leaveBalances={leaveData.leaveBalances}

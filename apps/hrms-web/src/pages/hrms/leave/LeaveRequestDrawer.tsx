@@ -16,7 +16,6 @@ interface LeaveRequestDrawerProps {
   open: boolean;
   onClose: () => void;
   canReview?: boolean;
-  isOwn?: boolean;
   onReview?: (req: LeaveRequest) => void;
 }
 

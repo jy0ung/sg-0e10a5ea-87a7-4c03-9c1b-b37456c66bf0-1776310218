@@ -1,7 +1,8 @@
 import React from 'react';
-import { CalendarDays, Clock, Users, Bell } from 'lucide-react';
 import type { LeaveBalance, LeaveRequest } from '@/types';
 import { formatDays, fmtDateRange } from './utils';
+
+// ── SnapshotStrip ────────────────────────────────────────────────────────────
 
 interface SnapshotStripProps {
   leaveBalances: LeaveBalance[];
@@ -13,24 +14,34 @@ interface SnapshotStripProps {
   isLoading: boolean;
 }
 
-function Pill({
-  icon,
+function KpiStat({
   label,
   value,
-  accentClass,
+  valueClass = 'text-foreground',
+  sub,
+  compact = false,
 }: {
-  icon: React.ReactNode;
   label: string;
-  value: string | number;
-  accentClass?: string;
+  value: React.ReactNode;
+  valueClass?: string;
+  sub?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className={`flex items-center gap-2 border-l-2 pl-3 ${accentClass ?? 'border-primary/30'}`}>
-      <span className="shrink-0 text-muted-foreground">{icon}</span>
-      <div className="min-w-0">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="text-sm font-semibold tabular-nums leading-tight">{value}</p>
-      </div>
+    <div className="flex flex-1 flex-col items-center px-4 py-4 text-center sm:px-5">
+      <span
+        className={`font-bold leading-none tabular-nums ${
+          compact ? 'text-base' : 'text-2xl'
+        } ${valueClass}`}
+      >
+        {value}
+      </span>
+      <span className="mt-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      {sub && (
+        <span className="mt-0.5 max-w-[10rem] truncate text-xs text-muted-foreground">{sub}</span>
+      )}
     </div>
   );
 }
@@ -46,65 +57,80 @@ export function SnapshotStrip({
 }: SnapshotStripProps) {
   if (isLoading) {
     return (
-      <div className="flex h-14 animate-pulse items-center gap-6 rounded-lg border bg-card/50 px-4">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="h-8 w-24 rounded bg-muted/50" />
-        ))}
-      </div>
+      <div className="flex h-[4.5rem] animate-pulse items-center rounded-xl border bg-card/50 shadow-sm" />
     );
   }
 
-  // Primary balance (first balance that requires a balance type)
   const primaryBalance = leaveBalances.find(b => b.remainingDays != null);
   const upcomingLeave = myUpcoming[0];
+  const pendingValue = myActivePending.length;
+  const actionValue = pendingForMeCount;
+  const teamValue = teamOnLeaveToday.length;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border bg-card/60 px-4 py-3 shadow-sm">
-      {primaryBalance && (
-        <Pill
-          icon={<CalendarDays className="h-4 w-4" />}
-          label="Leave Available"
-          value={`${formatDays(primaryBalance.remainingDays)} days`}
-          accentClass="border-emerald-400/50"
-        />
-      )}
-      <Pill
-        icon={<Clock className="h-4 w-4" />}
-        label="My Pending"
-        value={myActivePending.length}
-        accentClass={myActivePending.length > 0 ? 'border-amber-400/60' : 'border-primary/30'}
-      />
-      {upcomingLeave ? (
-        <Pill
-          icon={<CalendarDays className="h-4 w-4" />}
-          label="Next Leave"
-          value={fmtDateRange(upcomingLeave.startDate, upcomingLeave.endDate)}
-          accentClass="border-blue-400/50"
-        />
-      ) : (
-        <Pill
-          icon={<CalendarDays className="h-4 w-4" />}
-          label="Next Leave"
-          value="None scheduled"
-          accentClass="border-primary/20"
-        />
-      )}
-      {isManager && (
-        <>
-          <Pill
-            icon={<Bell className="h-4 w-4" />}
-            label="Needs My Action"
-            value={pendingForMeCount}
-            accentClass={pendingForMeCount > 0 ? 'border-red-400/60' : 'border-primary/30'}
+    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+      <div className="grid grid-cols-2 divide-x divide-y sm:flex sm:flex-nowrap sm:divide-y-0">
+        {primaryBalance != null && (
+          <KpiStat
+            label="Leave Available"
+            value={formatDays(primaryBalance.remainingDays)}
+            valueClass={
+              primaryBalance.remainingDays <= 0
+                ? 'text-red-600 dark:text-red-400'
+                : primaryBalance.remainingDays <= 3
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-emerald-600 dark:text-emerald-400'
+            }
+            sub="days remaining"
           />
-          <Pill
-            icon={<Users className="h-4 w-4" />}
-            label="Team On Leave Today"
-            value={teamOnLeaveToday.length}
-            accentClass="border-violet-400/50"
-          />
-        </>
-      )}
+        )}
+        <KpiStat
+          label="My Pending"
+          value={pendingValue}
+          valueClass={
+            pendingValue > 0
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-muted-foreground'
+          }
+        />
+        <KpiStat
+          label="Next Leave"
+          value={
+            upcomingLeave ? fmtDateRange(upcomingLeave.startDate, upcomingLeave.endDate) : '\u2014'
+          }
+          valueClass={
+            upcomingLeave
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-muted-foreground'
+          }
+          sub={
+            upcomingLeave
+              ? `${formatDays(upcomingLeave.days)} day${upcomingLeave.days !== 1 ? 's' : ''}`
+              : 'None scheduled'
+          }
+          compact
+        />
+        {isManager && (
+          <>
+            <KpiStat
+              label="Needs My Action"
+              value={actionValue}
+              valueClass={
+                actionValue > 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
+              }
+            />
+            <KpiStat
+              label="Team Away Today"
+              value={teamValue}
+              valueClass={
+                teamValue > 0
+                  ? 'text-violet-600 dark:text-violet-400'
+                  : 'text-muted-foreground'
+              }
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 }

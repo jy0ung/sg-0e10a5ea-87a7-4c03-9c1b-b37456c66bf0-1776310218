@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { LeaveRequest, LeaveType, LeaveBalance } from '@/types';
-import type { LeaveApprovalPreview, LeaveHoliday } from '@/services/hrmsService';
+import type { LeaveApprovalPreview } from '@/services/hrmsService';
 import type { LeaveApproverIdentity } from '../LeaveManagement';
 import { MyLeaveTab } from './MyLeaveTab';
 import { TeamLeaveTab } from './TeamLeaveTab';
@@ -13,15 +13,12 @@ export type LeaveTabId = 'my-leave' | 'team-leave' | 'approval-inbox' | 'calenda
 interface LeaveTabSystemProps {
   activeTab: LeaveTabId;
   onTabChange: (tab: LeaveTabId) => void;
-  // My Leave props
   leaveTypes: LeaveType[];
   leaveBalances: LeaveBalance[];
-  holidays: LeaveHoliday[];
   myActivePending: LeaveRequest[];
   myUpcoming: LeaveRequest[];
   myHistory: LeaveRequest[];
   approvalPreview: LeaveApprovalPreview | null;
-  // Team Leave props
   allRequests: LeaveRequest[];
   selfServiceEmployeeId: string | undefined;
   approverIdentity: LeaveApproverIdentity;
@@ -33,12 +30,14 @@ interface LeaveTabSystemProps {
   onRefresh: () => void;
 }
 
+const triggerClass =
+  'h-10 rounded-none border-b-2 border-transparent bg-transparent px-4 pb-2.5 pt-1 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none';
+
 export function LeaveTabSystem({
   activeTab,
   onTabChange,
   leaveTypes,
   leaveBalances,
-  holidays,
   myActivePending,
   myUpcoming,
   myHistory,
@@ -55,8 +54,8 @@ export function LeaveTabSystem({
 }: LeaveTabSystemProps) {
   return (
     <Tabs value={activeTab} onValueChange={v => onTabChange(v as LeaveTabId)}>
-      <TabsList className="h-auto flex-wrap gap-1 bg-card border rounded-lg p-1.5 justify-start">
-        <TabsTrigger value="my-leave" className="relative text-sm">
+      <TabsList className="h-auto w-full justify-start gap-0 rounded-none border-b bg-transparent p-0">
+        <TabsTrigger value="my-leave" className={triggerClass}>
           My Leave
           {myActivePending.length > 0 && (
             <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
@@ -65,10 +64,12 @@ export function LeaveTabSystem({
           )}
         </TabsTrigger>
         {canViewTeam && (
-          <TabsTrigger value="team-leave" className="text-sm">Team Leave</TabsTrigger>
+          <TabsTrigger value="team-leave" className={triggerClass}>
+            Team Leave
+          </TabsTrigger>
         )}
         {canApproveRequests && (
-          <TabsTrigger value="approval-inbox" className="relative text-sm">
+          <TabsTrigger value="approval-inbox" className={triggerClass}>
             Approval Inbox
             {pendingForMeCount > 0 && (
               <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-red-700 dark:bg-red-900/40 dark:text-red-400">
@@ -78,49 +79,52 @@ export function LeaveTabSystem({
           </TabsTrigger>
         )}
         {canViewTeam && (
-          <TabsTrigger value="calendar" className="text-sm">Leave Calendar</TabsTrigger>
+          <TabsTrigger value="calendar" className={triggerClass}>
+            Calendar
+          </TabsTrigger>
         )}
       </TabsList>
 
-      <TabsContent value="my-leave" className="mt-4 animate-in fade-in-0 duration-150">
-        <MyLeaveTab
-          leaveTypes={leaveTypes}
-          leaveBalances={leaveBalances}
-          holidays={holidays}
-          myActivePending={myActivePending}
-          myUpcoming={myUpcoming}
-          myHistory={myHistory}
-          approvalPreview={approvalPreview}
-          isLoading={isLoading}
-          onApplyLeave={onApplyLeave}
-          onRefresh={onRefresh}
-        />
-      </TabsContent>
-
-      {canViewTeam && (
-        <TabsContent value="team-leave" className="mt-4 animate-in fade-in-0 duration-150">
-          <TeamLeaveTab
-            requests={allRequests}
-            selfServiceEmployeeId={selfServiceEmployeeId}
-            approverIdentity={approverIdentity}
-            canApproveRequests={canApproveRequests}
+      <div className="pt-5">
+        <TabsContent value="my-leave" className="mt-0 animate-in fade-in-0 duration-150">
+          <MyLeaveTab
+            leaveTypes={leaveTypes}
+            leaveBalances={leaveBalances}
+            myActivePending={myActivePending}
+            myUpcoming={myUpcoming}
+            myHistory={myHistory}
+            approvalPreview={approvalPreview}
             isLoading={isLoading}
+            onApplyLeave={onApplyLeave}
             onRefresh={onRefresh}
           />
         </TabsContent>
-      )}
 
-      {canApproveRequests && (
-        <TabsContent value="approval-inbox" className="mt-4 animate-in fade-in-0 duration-150">
-          <ApprovalInboxTab onRefresh={onRefresh} />
-        </TabsContent>
-      )}
+        {canViewTeam && (
+          <TabsContent value="team-leave" className="mt-0 animate-in fade-in-0 duration-150">
+            <TeamLeaveTab
+              requests={allRequests}
+              selfServiceEmployeeId={selfServiceEmployeeId}
+              approverIdentity={approverIdentity}
+              canApproveRequests={canApproveRequests}
+              isLoading={isLoading}
+              onRefresh={onRefresh}
+            />
+          </TabsContent>
+        )}
 
-      {canViewTeam && (
-        <TabsContent value="calendar" className="mt-4 animate-in fade-in-0 duration-150">
-          <LeaveCalendarTab />
-        </TabsContent>
-      )}
+        {canApproveRequests && (
+          <TabsContent value="approval-inbox" className="mt-0 animate-in fade-in-0 duration-150">
+            <ApprovalInboxTab onRefresh={onRefresh} />
+          </TabsContent>
+        )}
+
+        {canViewTeam && (
+          <TabsContent value="calendar" className="mt-0 animate-in fade-in-0 duration-150">
+            <LeaveCalendarTab />
+          </TabsContent>
+        )}
+      </div>
     </Tabs>
   );
 }

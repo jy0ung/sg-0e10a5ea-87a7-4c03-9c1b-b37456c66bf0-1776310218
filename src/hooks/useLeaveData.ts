@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { useToast } from '@/hooks/use-toast';
+import { matchesHrmsApproverRole } from '@/lib/hrms/access';
 import {
   listLeaveRequests,
   listLeaveTypes,
@@ -118,9 +119,14 @@ export function useLeaveData(): UseLeaveDataResult {
     () => requests.filter(r => {
       if (r.status !== 'pending') return false;
       if (r.currentApproverUserId) return r.currentApproverUserId === user?.id;
+      if (r.currentApproverRole) return matchesHrmsApproverRole(r.currentApproverRole, {
+        id: user?.id,
+        hrmsRoleIds: hrmsAccess.roleIds,
+        hrmsRoleCodes: hrmsAccess.roleCodes,
+      });
       return false;
     }).length,
-    [requests, user?.id],
+    [requests, user?.id, hrmsAccess.roleIds, hrmsAccess.roleCodes],
   );
 
   function invalidate() {

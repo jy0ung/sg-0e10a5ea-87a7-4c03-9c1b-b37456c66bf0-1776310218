@@ -2,13 +2,17 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { LeaveRequest } from '@/types';
-import { getStatusConfig } from './utils';
+import { formatDays, fmtDateRange, getStatusConfig } from './utils';
+
+// ── StatusBadge ─────────────────────────────────────────────────────────────
 
 export function StatusBadge({ req }: { req: LeaveRequest }) {
   const { label, stage, className, stageClassName } = getStatusConfig(req);
   return (
     <div className="flex min-w-0 flex-col items-end gap-0.5">
-      <Badge variant="outline" className={`shrink-0 text-xs font-medium ${className}`}>{label}</Badge>
+      <Badge variant="outline" className={`shrink-0 text-xs font-medium ${className}`}>
+        {label}
+      </Badge>
       {stage && (
         <span className={`hidden max-w-32 truncate text-right text-xs sm:block ${stageClassName}`}>
           {stage}
@@ -17,6 +21,61 @@ export function StatusBadge({ req }: { req: LeaveRequest }) {
     </div>
   );
 }
+
+// ── RequestCard ──────────────────────────────────────────────────────────────
+
+export function RequestCard({
+  req,
+  onSelect,
+}: {
+  req: LeaveRequest;
+  onSelect: (r: LeaveRequest) => void;
+}) {
+  const { label, stage, className, stageClassName } = getStatusConfig(req);
+  const accentColor =
+    req.status === 'pending'
+      ? 'border-l-amber-400'
+      : req.status === 'approved'
+        ? 'border-l-emerald-500'
+        : req.status === 'rejected'
+          ? 'border-l-red-400'
+          : 'border-l-border';
+
+  return (
+    <button type="button" className="w-full text-left" onClick={() => onSelect(req)}>
+      <div
+        className={[
+          'flex items-center gap-3 rounded-lg border border-l-4 bg-card px-3 py-2.5 shadow-sm transition-all hover:shadow-md',
+          accentColor,
+        ].join(' ')}
+      >
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+          {(req.leaveTypeName ?? 'L').charAt(0).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium leading-tight">{req.leaveTypeName ?? 'Leave'}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {fmtDateRange(req.startDate, req.endDate)}
+            <span className="mx-1.5 opacity-40">·</span>
+            <span className="tabular-nums">
+              {formatDays(req.days)} day{req.days !== 1 ? 's' : ''}
+            </span>
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <Badge variant="outline" className={`text-xs font-medium ${className}`}>
+            {label}
+          </Badge>
+          {stage && (
+            <span className={`hidden text-right text-xs sm:block ${stageClassName}`}>{stage}</span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// ── SectionHeading ───────────────────────────────────────────────────────────
 
 export function SectionHeading({
   title,
@@ -29,15 +88,21 @@ export function SectionHeading({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{title}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        {title}
+      </h3>
       {count != null && count > 0 && (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${colorClass ?? 'bg-muted text-muted-foreground'}`}>
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${colorClass ?? 'bg-muted text-muted-foreground'}`}
+        >
           {count}
         </span>
       )}
     </div>
   );
 }
+
+// ── EmptyState ───────────────────────────────────────────────────────────────
 
 export function EmptyState({
   icon,
@@ -49,23 +114,27 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-      {icon ?? <span className="text-base">📋</span>}
+    <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+      {icon ?? <span className="text-base opacity-40">—</span>}
       <span>{title}</span>
       {action && <span className="ml-1">{action}</span>}
     </div>
   );
 }
 
+// ── LoadingSkeleton ──────────────────────────────────────────────────────────
+
 export function LoadingSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-16 animate-pulse rounded-lg border bg-muted/30" />
+        <div key={i} className="h-14 animate-pulse rounded-lg border bg-muted/30" />
       ))}
     </div>
   );
 }
+
+// ── InlineAlert ──────────────────────────────────────────────────────────────
 
 export function InlineAlert({
   variant = 'info',
@@ -76,8 +145,10 @@ export function InlineAlert({
 }) {
   const styles = {
     info: 'border-blue-200 bg-blue-50/50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-300',
-    warning: 'border-amber-200 bg-amber-50/60 text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-400',
-    error: 'border-red-200 bg-red-50/60 text-red-800 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400',
+    warning:
+      'border-amber-200 bg-amber-50/60 text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-400',
+    error:
+      'border-red-200 bg-red-50/60 text-red-800 dark:border-red-800 dark:bg-red-950/20 dark:text-red-400',
   };
   return (
     <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${styles[variant]}`}>
