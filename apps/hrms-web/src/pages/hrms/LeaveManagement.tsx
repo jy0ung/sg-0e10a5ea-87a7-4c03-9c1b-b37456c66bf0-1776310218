@@ -27,7 +27,7 @@ import {
   validateLeaveAttachment,
 } from '@/services/hrmsService';
 import type { LeaveDayPart, LeaveRequest, LeaveStatus, CreateLeaveRequestInput, LeaveType, LeaveBalance } from '@/types';
-import { AlertCircle, AlertTriangle, CheckCircle2, XCircle, Clock, Plus, ChevronDown, ChevronUp, FileText, Paperclip, X, Calendar, Users, Search, TrendingUp, ExternalLink } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, XCircle, Clock, Plus, ChevronDown, ChevronUp, FileText, Paperclip, X, Calendar, Users, Search, ExternalLink } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { matchesHrmsApproverRole, type HrmsApproverIdentity } from '@/lib/hrms/access';
@@ -284,32 +284,6 @@ function StatusBadge({ req }: { req: LeaveRequest }) {
     <div className="flex min-w-0 flex-col items-end gap-0.5">
       <Badge variant="outline" className={`shrink-0 text-xs font-medium ${className}`}>{label}</Badge>
       {stage && <span className={`hidden max-w-32 truncate text-right text-xs sm:block ${stageClassName}`}>{stage}</span>}
-    </div>
-  );
-}
-
-function LeaveSnapshotMetric({
-  icon, label, value, subLabel, colorClass, onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  subLabel?: string;
-  colorClass?: string;
-  onClick?: () => void;
-}) {
-  const base = 'flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl border bg-card p-3 shadow-sm transition-shadow hover:shadow';
-  return onClick ? (
-    <button type="button" onClick={onClick} className={`${base} cursor-pointer text-left`}>
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div>
-      <p className={`text-xl font-bold tabular-nums leading-tight ${colorClass ?? 'text-foreground'}`}>{value}</p>
-      {subLabel && <p className="truncate text-xs text-muted-foreground">{subLabel}</p>}
-    </button>
-  ) : (
-    <div className={base}>
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">{icon}{label}</div>
-      <p className={`text-xl font-bold tabular-nums leading-tight ${colorClass ?? 'text-foreground'}`}>{value}</p>
-      {subLabel && <p className="truncate text-xs text-muted-foreground">{subLabel}</p>}
     </div>
   );
 }
@@ -727,14 +701,6 @@ export default function LeaveManagement() {
 
   // ── Tab config ────────────────────────────────────────────────────────────────
 
-  // Snapshot metrics
-  const annualLeaveType   = leaveTypes.find(lt => lt.active && /annual/i.test(lt.name));
-  const annualBalance     = annualLeaveType ? (leaveBalances.find(b => b.leaveTypeId === annualLeaveType.id) ?? null) : null;
-  const annualAvailable   = annualBalance?.remainingDays ?? null;
-  const teamOnLeaveToday  = canViewTeam
-    ? requests.filter(r => r.status === 'approved' && r.startDate <= today && r.endDate >= today && r.employeeId !== selfServiceEmployeeId).length
-    : 0;
-
   // Consolidated balance-initialization warning (once, not per-card)
   const activeLeaveTypes  = leaveTypes.filter(lt => lt.active && lt.requiresBalance);
   const uninitializedCount = activeLeaveTypes.filter(lt => !leaveBalances.some(b => b.leaveTypeId === lt.id)).length;
@@ -767,34 +733,6 @@ export default function LeaveManagement() {
           </Button>
         }
       />
-
-      {/* ── Leave Snapshot Row ───────────────────────────────────────────── */}
-      {!loading && (
-        <div className="flex flex-wrap gap-2.5">
-          <LeaveSnapshotMetric
-            icon={<TrendingUp className="h-3 w-3" />}
-            label="Annual Leave Available"
-            value={annualAvailable !== null ? formatDays(annualAvailable) : '—'}
-            subLabel={annualLeaveType?.name ?? 'Annual leave'}
-          />
-          <LeaveSnapshotMetric
-            icon={<Calendar className="h-3 w-3" />}
-            label="Upcoming Leave"
-            value={myUpcoming.length}
-            subLabel={myUpcoming.length === 1 ? 'approved, upcoming' : 'approved, upcoming'}
-            colorClass={myUpcoming.length > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}
-          />
-          {canViewTeam && (
-            <LeaveSnapshotMetric
-              icon={<Users className="h-3 w-3" />}
-              label="Team On Leave Today"
-              value={teamOnLeaveToday}
-              subLabel={teamOnLeaveToday === 1 ? 'member absent' : 'members absent'}
-              colorClass={teamOnLeaveToday > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-foreground'}
-            />
-          )}
-        </div>
-      )}
 
       {/* ── Tab navigation ──────────────────────────────────────────────── */}
       <div className="rounded-xl border bg-card p-1.5 shadow-sm">

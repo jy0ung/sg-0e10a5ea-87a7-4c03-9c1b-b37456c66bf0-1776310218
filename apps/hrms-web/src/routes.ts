@@ -29,6 +29,7 @@ export const hrmsProtectedRoutePaths = [
   'employees',
   'payroll',
   'settings',
+  'settings/leave-quota',
   'settings/:module',
   'unauthorized',
 ] as const;
