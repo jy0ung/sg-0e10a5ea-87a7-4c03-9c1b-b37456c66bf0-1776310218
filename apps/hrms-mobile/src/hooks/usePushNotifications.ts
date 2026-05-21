@@ -41,7 +41,7 @@ export function usePushNotifications() {
       void cleanupRef.current?.remove();
       cleanupRef.current = null;
     };
-  }, [user?.id]);
+  }, [user?.id, navigate]);
 
   return { permissionState };
 }

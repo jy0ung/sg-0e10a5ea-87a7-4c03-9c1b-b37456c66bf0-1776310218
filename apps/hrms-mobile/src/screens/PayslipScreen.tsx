@@ -17,6 +17,7 @@ export default function PayslipScreen() {
       .then(setPayslips)
       .catch(() => {})
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally re-runs only when employee.id changes
   }, [employee?.id]);
 
   const fmt = (n: number) =>
