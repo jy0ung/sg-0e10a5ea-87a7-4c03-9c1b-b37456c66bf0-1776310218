@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { FilterBar } from '@/components/shared/FilterBar';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageSpinner } from '@/components/shared/PageSpinner';
@@ -6,10 +7,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { listLeaveRequests, listEmployeeDirectory } from '@/services/hrmsService';
-import type { LeaveRequest, Employee } from '@/types';
+import type { Employee } from '@/types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -31,36 +31,36 @@ function isoDate(year: number, month: number, day: number) {
 
 export default function LeaveCalendar() {
   const { user } = useAuth();
-  const { toast } = useToast();
 
   const now   = new Date();
   const [viewYear, setViewYear]   = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [requests, setRequests]   = useState<LeaveRequest[]>([]);
-  const [loading, setLoading]     = useState(true);
   const [empFilter, setEmpFilter] = useState<string>('all');
 
-  // One-time: load employee list for the filter dropdown
-  useEffect(() => {
-    if (!user?.companyId) return;
-    listEmployeeDirectory(user.companyId).then(res => { if (!res.error) setEmployees(res.data); });
-  }, [user?.companyId]);
+  const dateFrom = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-01`;
+  const dateTo   = new Date(viewYear, viewMonth + 1, 0).toISOString().slice(0, 10);
 
-  // Reload leave requests whenever the viewed month changes
-  const loadRequests = useCallback(async () => {
-    if (!user?.companyId) return;
-    setLoading(true);
-    // Fetch a window covering the full displayed month (with small ±1 day buffer)
-    const dateFrom = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-01`;
-    const dateTo   = new Date(viewYear, viewMonth + 1, 0).toISOString().slice(0, 10);
-    const reqRes = await listLeaveRequests(user.companyId, { status: 'approved', dateFrom, dateTo });
-    setRequests(reqRes.data);
-    setLoading(false);
-    if (reqRes.error) toast({ title: 'Error', description: reqRes.error, variant: 'destructive' });
-  }, [user?.companyId, viewYear, viewMonth, toast]);
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ['employees-directory', user?.companyId],
+    queryFn: async () => {
+      if (!user?.companyId) return [];
+      const res = await listEmployeeDirectory(user.companyId);
+      return res.error ? [] : res.data;
+    },
+    enabled: !!user?.companyId,
+    staleTime: 5 * 60_000,
+  });
 
-  useEffect(() => { loadRequests(); }, [loadRequests]);
+  const { data: requests = [], isLoading: loading } = useQuery({
+    queryKey: ['leave-calendar', user?.companyId, viewYear, viewMonth],
+    queryFn: async () => {
+      if (!user?.companyId) return [];
+      const res = await listLeaveRequests(user.companyId, { status: 'approved', dateFrom, dateTo });
+      return res.data;
+    },
+    enabled: !!user?.companyId,
+    staleTime: 30_000,
+  });
 
   const totalDays = daysInMonth(viewYear, viewMonth);
   const firstDow  = new Date(viewYear, viewMonth, 1).getDay(); // 0=Sun

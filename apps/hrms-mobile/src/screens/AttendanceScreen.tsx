@@ -33,6 +33,7 @@ export default function AttendanceScreen() {
       .finally(() => setLoading(false));
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally re-runs only when employee.id changes; today is stable within a session
   useEffect(load, [employee?.id]);
 
   async function handleClockIn() {

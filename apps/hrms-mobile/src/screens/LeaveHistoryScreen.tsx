@@ -25,6 +25,7 @@ export default function LeaveHistoryScreen() {
       .finally(() => setLoading(false));
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally re-runs only when employee.id changes
   useEffect(load, [employee?.id]);
 
   async function handleCancel(id: string) {
@@ -51,7 +52,7 @@ export default function LeaveHistoryScreen() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      {(req as any).leaveTypeName ?? 'Leave'}
+                      {(req as LeaveRequest & { leaveTypeName?: string }).leaveTypeName ?? 'Leave'}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {req.startDate} → {req.endDate}
