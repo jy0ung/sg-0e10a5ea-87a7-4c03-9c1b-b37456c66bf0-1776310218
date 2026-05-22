@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { CheckCircle2, Clock } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { CheckCircle2, Clock, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApprovalInboxItems } from '@/hooks/useApprovalInboxItems';
 import { reviewLeaveRequest } from '@/services/hrmsService';
@@ -29,11 +29,21 @@ export function ApprovalInboxTab({ onRefresh }: ApprovalInboxTabProps) {
       item.entityType === 'leave_request',
   );
 
-  // Oldest first — longest waiting get priority
   const sorted = [...leaveItems].sort(
     (a, b) =>
       new Date(a.entity.createdAt).getTime() - new Date(b.entity.createdAt).getTime(),
   );
+
+  const waitingStats = useMemo(() => {
+    const now = Date.now();
+    const waits = sorted.map(item => {
+      const submitted = new Date(item.entity.createdAt).getTime();
+      return Math.max(0, Math.floor((now - submitted) / (1000 * 60 * 60 * 24)));
+    });
+    const maxDays = waits.length > 0 ? Math.max(...waits) : 0;
+    const urgent = waits.filter(days => days >= 5).length;
+    return { maxDays, urgent };
+  }, [sorted]);
 
   async function handleDecision(entityId: string, decision: 'approved' | 'rejected') {
     if (!user?.id) return;
@@ -60,22 +70,44 @@ export function ApprovalInboxTab({ onRefresh }: ApprovalInboxTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header count */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {sorted.length === 0
-            ? 'No requests awaiting your decision'
-            : `${sorted.length} request${sorted.length !== 1 ? 's' : ''} awaiting your decision`}
-        </p>
-        {sorted.length > 0 && (
-          <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-red-700 dark:bg-red-900/30 dark:text-red-400">
-            {sorted.length}
-          </span>
-        )}
-      </div>
+      <section className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Approval Inbox Triage</h3>
+            <p className="text-xs text-muted-foreground">
+              Review oldest requests first, clear urgent items, and keep SLA response time stable.
+            </p>
+          </div>
+          {sorted.length > 0 && (
+            <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-red-700 dark:bg-red-900/30 dark:text-red-400">
+              {sorted.length} pending
+            </span>
+          )}
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Awaiting decision</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-red-600 dark:text-red-400">
+              {sorted.length}
+            </p>
+          </div>
+          <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Urgent (5d+)</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+              {waitingStats.urgent}
+            </p>
+          </div>
+          <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Longest waiting</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
+              {waitingStats.maxDays}d
+            </p>
+          </div>
+        </div>
+      </section>
 
       {sorted.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-12 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-xl border bg-card py-12 text-center shadow-sm">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
             <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
           </div>
@@ -95,13 +127,13 @@ export function ApprovalInboxTab({ onRefresh }: ApprovalInboxTabProps) {
             const daysWaiting = Math.floor(
               (Date.now() - submittedDate.getTime()) / (1000 * 60 * 60 * 24),
             );
+            const isUrgent = daysWaiting >= 5;
 
             return (
               <div
                 key={item.entityId}
                 className="overflow-hidden rounded-xl border bg-card shadow-sm transition-shadow hover:shadow"
               >
-                {/* Main row — click to open drawer */}
                 <button
                   type="button"
                   className="flex w-full items-center gap-3 px-4 py-3 text-left"
@@ -118,10 +150,16 @@ export function ApprovalInboxTab({ onRefresh }: ApprovalInboxTabProps) {
                       <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium">
                         {request.leaveTypeName ?? 'Leave'}
                       </span>
+                      {isUrgent && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                          <ShieldAlert className="h-3 w-3" />
+                          Escalating
+                        </span>
+                      )}
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {fmtDateRange(request.startDate, request.endDate)}
-                      <span className="mx-1.5 opacity-40">\u00b7</span>
+                      <span className="mx-1.5 opacity-40">-</span>
                       <span className="tabular-nums">
                         {formatDays(request.days)} day{request.days !== 1 ? 's' : ''}
                       </span>
@@ -140,14 +178,12 @@ export function ApprovalInboxTab({ onRefresh }: ApprovalInboxTabProps) {
                   </div>
                 </button>
 
-                {/* Reason preview */}
                 {request.reason && (
                   <p className="line-clamp-1 border-t px-4 py-2 text-xs italic text-muted-foreground">
-                    &ldquo;{request.reason}&rdquo;
+                    "{request.reason}"
                   </p>
                 )}
 
-                {/* Action bar */}
                 <div className="flex items-center justify-end gap-2 border-t bg-muted/20 px-4 py-2.5">
                   <Button
                     size="sm"

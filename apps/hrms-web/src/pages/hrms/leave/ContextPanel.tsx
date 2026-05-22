@@ -25,12 +25,28 @@ export function ContextPanel({
   const [legendOpen, setLegendOpen] = useState(false);
 
   return (
-    <aside className="flex flex-col gap-4 rounded-xl border bg-card/50 p-4 shadow-sm">
-      {/* Apply for leave CTA */}
-      <Button className="w-full gap-2 shadow-sm transition-shadow hover:shadow-md" onClick={onApplyLeave}>
-        <Plus className="h-4 w-4" />
-        Apply for Leave
-      </Button>
+    <aside className="flex flex-col gap-4 rounded-xl border bg-card/50 p-4 shadow-sm lg:sticky lg:top-4">
+      <div className="space-y-3 rounded-xl border bg-background/80 p-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Quick Actions</p>
+          <p className="text-xs text-muted-foreground">Start a request, review policy readiness, and check approval routing.</p>
+        </div>
+        <Button className="w-full gap-2 shadow-sm transition-shadow hover:shadow-md" onClick={onApplyLeave}>
+          <Plus className="h-4 w-4" />
+          Apply for Leave
+        </Button>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-2 rounded-xl border bg-muted/20 p-3 text-xs text-muted-foreground">
+        <p className="text-[10px] font-semibold uppercase tracking-widest">Policy & Alerts</p>
+        <ul className="space-y-1.5">
+          <li>Advance notice rules are validated before submission.</li>
+          <li>Quota limits are checked live where team caps are configured.</li>
+          <li>Unpaid leave stays requestable even without an entitlement balance.</li>
+        </ul>
+      </div>
 
       <Separator />
 

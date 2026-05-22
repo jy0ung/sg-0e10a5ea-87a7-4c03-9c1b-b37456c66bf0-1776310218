@@ -71,7 +71,10 @@ export function useHrmsShellConfig() {
     fallbackChrome: { title: 'HRMS Workspace', kicker: 'People operations' },
     user: user ? { name: user.name, email: user.email, role: `HRMS: ${primaryRoleLabel}`, profilePath: '/profile' } : undefined,
     onSignOut: () => void logout(),
-    topbarActions: hrmsAccess.canAccessRoute('announcements') ? [{ label: 'Open announcements', icon: Bell, to: '/announcements' }] : [],
+    topbarActions: [
+      ...(hrmsAccess.canAccessRoute('approvals') ? [{ label: 'Open approvals', icon: Bell, to: '/approvals', badge: approvalInboxItems.length || undefined }] : []),
+      ...(hrmsAccess.canAccessRoute('announcements') ? [{ label: 'Open announcements', icon: Bell, to: '/announcements' }] : []),
+    ],
     searchPlaceholder: 'Search HRMS...',
     widthMode: 'full' as const,
   };

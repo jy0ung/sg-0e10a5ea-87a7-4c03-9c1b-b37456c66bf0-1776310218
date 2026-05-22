@@ -20,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { listAttendanceRecords, listEmployeeDirectory, upsertAttendance } from '@/services/hrmsService';
 import type { AttendanceRecord, UpsertAttendanceInput, AttendanceStatus } from '@/types';
-import { Plus, Download } from 'lucide-react';
+import { CalendarDays, Download, FilterX, Plus, Users } from 'lucide-react';
 import { upsertAttendanceSchema } from '@/lib/validations';
 
 type AttendanceRow = AttendanceRecord & Record<string, unknown>;
@@ -91,6 +91,17 @@ export default function AttendanceLog() {
     (acc, r) => { acc[r.status] = (acc[r.status] ?? 0) + 1; return acc; },
     { present: 0, absent: 0, half_day: 0, on_leave: 0, public_holiday: 0 },
   );
+  const totalActive = counts.present + counts.half_day + counts.on_leave + counts.public_holiday;
+  const presenceRate = totalActive > 0 ? Math.round((counts.present / totalActive) * 100) : 0;
+
+  function resetFilters() {
+    setDateFrom(() => {
+      const d = new Date(); d.setDate(1);
+      return d.toISOString().slice(0, 10);
+    });
+    setDateTo(todayIso());
+    setEmpFilter('all');
+  }
 
   const columns: StandardTableColumn<AttendanceRow>[] = [
     ...(canAccessTeamAttendance ? [{
@@ -134,6 +145,27 @@ export default function AttendanceLog() {
           </div>
         }
       />
+
+      <section className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Attendance Control Center</h2>
+            <p className="text-xs text-muted-foreground">
+              Review operational attendance, exception patterns, and the current period scope.
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={resetFilters}>
+            <FilterX className="mr-1.5 h-3.5 w-3.5" />
+            Reset filters
+          </Button>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="shadow-sm"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30"><CalendarDays className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /></div><div><p className="text-sm text-muted-foreground">Presence rate</p><p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{presenceRate}%</p><p className="text-xs text-muted-foreground">Of all active attendance records</p></div></CardContent></Card>
+          <Card className="shadow-sm"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/30"><span className="text-lg font-bold text-red-600 dark:text-red-400">✕</span></div><div><p className="text-sm text-muted-foreground">Absent</p><p className="text-2xl font-bold tabular-nums text-red-600 dark:text-red-400">{counts.absent}</p><p className="text-xs text-muted-foreground">Requires follow-up</p></div></CardContent></Card>
+          <Card className="shadow-sm"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30"><Users className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div><div><p className="text-sm text-muted-foreground">Tracked records</p><p className="text-2xl font-bold tabular-nums">{records.length}</p><p className="text-xs text-muted-foreground">Current date range</p></div></CardContent></Card>
+          <Card className="shadow-sm"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30"><span className="text-lg font-bold text-violet-600 dark:text-violet-400">★</span></div><div><p className="text-sm text-muted-foreground">Half-day / leave</p><p className="text-2xl font-bold tabular-nums text-violet-600 dark:text-violet-400">{counts.half_day + counts.on_leave}</p><p className="text-xs text-muted-foreground">Exceptions and approved leave</p></div></CardContent></Card>
+        </div>
+      </section>
 
       {/* Summary strip — colour-coded by exception severity */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
@@ -192,6 +224,9 @@ export default function AttendanceLog() {
             </Select>
           </div>
         )}
+        <Button type="button" variant="outline" size="sm" className="h-9" onClick={resetFilters}>
+          Clear
+        </Button>
         </div>
       </FilterBar>
 

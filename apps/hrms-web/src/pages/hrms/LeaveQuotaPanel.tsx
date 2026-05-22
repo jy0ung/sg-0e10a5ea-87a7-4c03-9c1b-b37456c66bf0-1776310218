@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Plus, Pencil, PowerOff, Trash2, AlertTriangle, Gauge, Info,
+  Plus, Pencil, PowerOff, Trash2, AlertTriangle, Gauge, Info, FilterX,
 } from 'lucide-react';
 import {
   listLeaveQuotaRules,
@@ -38,7 +38,7 @@ import {
   type LeaveQuotaRule,
   type CreateLeaveQuotaRuleInput,
   type LeaveQuotaRulePeriodType,
-} from '@/services/leaveQuotaService';
+} from '../../services/leaveQuotaService';
 import { listAllLeaveTypes, listDepartments } from '@/services/hrmsAdminService';
 import { getBranches } from '@/services/masterDataService';
 
@@ -184,6 +184,11 @@ export default function LeaveQuotaPanel({ companyId, actorId, canWrite }: LeaveQ
     return true;
   });
 
+  const activeRuleCount = rules.filter(r => getRuleStatus(r) === 'active').length;
+  const inactiveRuleCount = rules.filter(r => getRuleStatus(r) === 'inactive').length;
+  const expiredRuleCount = rules.filter(r => getRuleStatus(r) === 'expired').length;
+  const scopedRuleCount = rules.filter(r => r.branchId || r.departmentId).length;
+
   // ── Dialog helpers ──────────────────────────────────────────────────────────
   function openCreate() {
     setEditTarget(null);
@@ -321,6 +326,11 @@ export default function LeaveQuotaPanel({ companyId, actorId, canWrite }: LeaveQ
     setDeleteTarget(null);
   }
 
+  function resetFilters() {
+    setFilterActive('all');
+    setFilterLeaveType('');
+  }
+
   const colCount = canWrite ? 9 : 8;
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -347,8 +357,27 @@ export default function LeaveQuotaPanel({ companyId, actorId, canWrite }: LeaveQ
           )}
         </div>
 
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Total rules</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{rules.length}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Active</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{activeRuleCount}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Inactive / expired</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">{inactiveRuleCount + expiredRuleCount}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Scoped rules</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-blue-600 dark:text-blue-400">{scopedRuleCount}</p>
+          </div>
+        </div>
+
         {/* Filters */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-2.5 shadow-sm">
           <Select value={filterLeaveType || NONE} onValueChange={v => setFilterLeaveType(v === NONE ? '' : v)}>
             <SelectTrigger className="h-8 w-44 text-xs">
               <SelectValue placeholder="All leave types" />
@@ -369,6 +398,18 @@ export default function LeaveQuotaPanel({ companyId, actorId, canWrite }: LeaveQ
               <SelectItem value="inactive">Inactive only</SelectItem>
             </SelectContent>
           </Select>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2 text-xs"
+            onClick={resetFilters}
+            disabled={filterActive === 'all' && !filterLeaveType}
+          >
+            <FilterX className="mr-1 h-3.5 w-3.5" />
+            Reset
+          </Button>
 
           <div className="ml-auto text-xs text-muted-foreground self-center">
             {filteredRules.length} rule{filteredRules.length !== 1 ? 's' : ''}

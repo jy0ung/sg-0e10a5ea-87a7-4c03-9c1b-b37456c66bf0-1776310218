@@ -178,6 +178,26 @@ export default function PayrollSummary() {
         }
       />
 
+      <section className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Payroll Control Center</h2>
+            <p className="text-xs text-muted-foreground">
+              Track monthly payroll state, approval readiness, and payout completion from one workspace.
+            </p>
+          </div>
+          <Badge variant="outline" className="text-xs">
+            {runs.length} runs tracked
+          </Badge>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="shadow-sm overflow-hidden"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30"><Users className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div><div className="min-w-0"><p className="text-sm font-medium text-muted-foreground">Latest headcount</p><p className="text-2xl font-bold tabular-nums">{payrollMetrics.latestHeadcount}</p><p className="text-xs text-muted-foreground">{latestRun ? `${MONTHS[latestRun.periodMonth - 1]} ${latestRun.periodYear}` : 'No run yet'}</p></div></CardContent></Card>
+          <Card className="shadow-sm overflow-hidden"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30"><Wallet className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /></div><div className="min-w-0"><p className="text-sm font-medium text-muted-foreground">Net payroll</p><p className="truncate text-2xl font-bold tabular-nums" title={`RM ${fmt(payrollMetrics.totalNet)}`}>RM {fmt(payrollMetrics.totalNet)}</p><p className="text-xs text-muted-foreground">Across visible runs</p></div></CardContent></Card>
+          <Card className="shadow-sm overflow-hidden"><CardContent className="flex items-start gap-3 p-4"><div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${payrollMetrics.pendingApprovals > 0 ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted'}`}><Clock className={`h-5 w-5 ${payrollMetrics.pendingApprovals > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`} /></div><div className="min-w-0"><p className="text-sm font-medium text-muted-foreground">Pending approval</p><p className={`text-2xl font-bold tabular-nums ${payrollMetrics.pendingApprovals > 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>{payrollMetrics.pendingApprovals}</p><p className="text-xs text-muted-foreground">Runs waiting for review</p></div></CardContent></Card>
+          <Card className="shadow-sm overflow-hidden"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/30"><CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" /></div><div className="min-w-0"><p className="text-sm font-medium text-muted-foreground">Paid runs</p><p className="text-2xl font-bold tabular-nums">{payrollMetrics.paidRuns}</p><p className="text-xs text-muted-foreground">Completed payroll cycles</p></div></CardContent></Card>
+        </div>
+      </section>
+
       {!loading && (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Card className="shadow-sm overflow-hidden">

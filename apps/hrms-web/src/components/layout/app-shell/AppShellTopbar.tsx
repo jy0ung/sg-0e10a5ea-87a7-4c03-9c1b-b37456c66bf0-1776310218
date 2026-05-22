@@ -101,16 +101,27 @@ export function AppShellTopbar({
             <Menu className="h-5 w-5" />
           </Button>
         )}
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold leading-tight text-foreground">{chrome.title}</div>
-          {chrome.kicker && <div className="hidden truncate text-[11px] leading-tight text-muted-foreground sm:block">{chrome.kicker}</div>}
+        <div className="min-w-0 space-y-0.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <div className="truncate text-sm font-semibold leading-tight text-foreground">{chrome.title}</div>
+            {chrome.kicker && (
+              <span className="hidden max-w-[26rem] truncate rounded-full border border-border/70 bg-muted/50 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground sm:inline-flex">
+                {chrome.kicker}
+              </span>
+            )}
+          </div>
+          {chrome.kicker && <div className="truncate text-[11px] leading-tight text-muted-foreground sm:hidden">{chrome.kicker}</div>}
         </div>
       </div>
       {searchPlaceholder && (
         <div className="hidden min-w-[220px] max-w-md flex-1 lg:block">
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input className="h-8 border-border/80 bg-background pl-8 text-xs" placeholder={searchPlaceholder} aria-label={searchPlaceholder} />
+            <Input
+              className="h-8 border-border/80 bg-background/90 pl-8 text-xs shadow-sm"
+              placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
+            />
           </div>
         </div>
       )}

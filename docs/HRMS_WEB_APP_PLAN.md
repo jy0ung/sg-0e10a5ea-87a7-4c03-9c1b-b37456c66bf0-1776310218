@@ -375,6 +375,47 @@ After HRMS web launch, extend `apps/hrms-mobile` with the next employee-first fl
 
 Keep web as the primary channel for admin-heavy HRMS workflows unless mobile usage proves necessary.
 
+### Post-Launch Enterprise UX Redesign
+
+Status: Completed core slice on 2026-05-21 via commit `2dfa3bc`.
+
+Objective:
+
+Evolve the already-deployed dedicated HRMS app from a functional standalone workspace into a more role-aware enterprise SaaS product without changing the underlying services, approval logic, or RLS behavior.
+
+Delivered redesign areas:
+
+- Discovery and implementation mapping of HRMS routes, layout, shared components, services, access logic, and workflow risks before edits.
+- Updated dedicated HRMS navigation to clearer enterprise groupings and aligned route-access keys for `dashboard` and `leaveQuota`.
+- Added a role-aware HRMS dashboard/command center in `apps/hrms-web/src/pages/hrms/HrmsDashboard.tsx`.
+- Added shared shell and page primitives in root `src/components/shared/`: `FilterBar`, `HrmsEmptyState`, and `RequireHrmsRouteAccess`.
+- Added a dedicated employee profile page at `/employees/:id` and wired directory access to it.
+- Upgraded the signed-in profile page into a richer personal profile center with access, identity, and leave summaries.
+- Upgraded high-use workflow pages to a more action-first enterprise layout: Attendance, Announcements, Approval Inbox, Payroll Summary, Performance Appraisals, Leave Calendar, Leave Quota, and Employee Directory.
+- Added approvals-aware HRMS topbar actions in the dedicated shell so pending workflow entry points are available from the chrome.
+- Preserved existing data services, approval routing, permissions, and backend behavior; route visibility stays aligned with `useHrmsAccess` and `deriveHrmsAccess()`.
+
+Completed redesign phases from the enterprise UX brief:
+
+- Discovery and implementation map.
+- New HRMS information architecture.
+- Global HRMS shell redesign.
+- HRMS dashboard redesign.
+- Employee module redesign foundation.
+- Attendance redesign.
+- Payroll redesign foundation.
+- Personal profile center redesign.
+- HRMS shell/topbar polish.
+- Appraisals redesign.
+- Announcements redesign.
+- Design-system foundation and workflow/status polish.
+- QA/typecheck/lint for the redesign slice.
+
+Remaining follow-up UX work:
+
+- Leave Management, Apply Leave, Leave Calendar, and Leave Quota workspace shell redesign are now complete, including command-center layout, sheet-based Apply Leave flow, richer tab internals, and more operational leave management framing.
+- HRMS Settings, Approval Flows, dedicated search, richer notification center UX, and broader settings/master-data cleanup remain future shell/product work.
+
 ## Migration Sequence From The Current Main App
 
 Recommended migration order:
