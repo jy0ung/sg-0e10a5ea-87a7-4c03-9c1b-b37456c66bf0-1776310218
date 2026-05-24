@@ -75,7 +75,6 @@ AS $$
         AND (
           v.chassis_no    ILIKE '%' || q.term || '%'
           OR v.customer_name ILIKE '%' || q.term || '%'
-          OR v.owner_name    ILIKE '%' || q.term || '%'
           OR v.model         ILIKE '%' || q.term || '%'
           OR v.branch_code   ILIKE '%' || q.term || '%'
         )
@@ -178,7 +177,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE INDEX IF NOT EXISTS idx_vehicles_search_trgm
   ON public.vehicles
-  USING gin (chassis_no gin_trgm_ops, customer_name gin_trgm_ops, owner_name gin_trgm_ops, model gin_trgm_ops);
+  USING gin (chassis_no gin_trgm_ops, customer_name gin_trgm_ops, model gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS idx_customers_search_trgm
   ON public.customers
