@@ -4,7 +4,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { getNotifications, markAsRead, markAllAsRead, NotificationRow } from '@/services/notificationService';
-import { useSupabaseChannel, type SupabasePayload } from '@/hooks/useSupabaseChannel';
+import { useSupabaseChannel, type SupabasePayload } from '@flc/supabase';
 import { STALE } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { CheckCheck, Bell } from 'lucide-react';
