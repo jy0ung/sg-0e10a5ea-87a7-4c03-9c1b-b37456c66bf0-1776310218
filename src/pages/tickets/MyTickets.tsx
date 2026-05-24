@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { STALE } from '@/lib/queryClient';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -61,7 +63,6 @@ import {
   cancelMyTicket,
   listMyTickets,
   listTicketActivity,
-  type RequestTicketRecord,
   type TicketActivityRecord,
 } from '@/services/ticketService';
 import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
@@ -70,13 +71,10 @@ type MyStatusFilter = 'all' | 'active' | 'resolved' | 'cancelled';
 
 export default function MyTickets() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { categories } = useRequestCategories(user?.company_id, true);
   useRequestSubcategories(user?.company_id, { includeInactive: true });
   const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
-  const [tickets, setTickets] = useState<RequestTicketRecord[]>([]);
-  const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
-  const [attachmentsByTicket, setAttachmentsByTicket] = useState<Record<string, TicketAttachmentRecord[]>>({});
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [savingCommentId, setSavingCommentId] = useState<string | null>(null);
@@ -90,37 +88,48 @@ export default function MyTickets() {
     [formFields],
   );
 
-  const refreshTickets = async () => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
+  const myTicketsKey = ['my-tickets', user?.id, user?.company_id] as const;
 
-    const { data, error: fetchError } = await listMyTickets(user.id, user.company_id);
-    if (fetchError) {
-      setError(fetchError.message || 'Unable to load requests.');
-    } else {
+  const { data: ticketsData, isLoading: loading } = useQuery({
+    queryKey: myTicketsKey,
+    queryFn: async () => {
+      const { data, error: fetchError } = await listMyTickets(user!.id, user!.company_id);
+      if (fetchError) throw new Error(fetchError.message || 'Unable to load requests.');
       const nextTickets = data ?? [];
-      setTickets(nextTickets);
-      setCommentDrafts(Object.fromEntries(nextTickets.map((ticket) => [ticket.id, ''])));
-
-      const ticketIds = nextTickets.map((ticket) => ticket.id);
+      const ticketIds = nextTickets.map((t) => t.id);
       const [{ data: activityData }, { data: attachmentData }] = await Promise.all([
-        listTicketActivity(ticketIds, user.company_id),
-        listAttachmentsForTickets(ticketIds, user.company_id),
+        listTicketActivity(ticketIds, user!.company_id),
+        listAttachmentsForTickets(ticketIds, user!.company_id),
       ]);
-      setActivitiesByTicket(activityData ?? {});
-      setAttachmentsByTicket(attachmentData ?? {});
-    }
-    setLoading(false);
-  };
+      return {
+        tickets: nextTickets,
+        activitiesByTicket: activityData ?? {} as Record<string, TicketActivityRecord[]>,
+        attachmentsByTicket: attachmentData ?? {} as Record<string, TicketAttachmentRecord[]>,
+      };
+    },
+    enabled: !!user,
+    staleTime: STALE.transactional,
+  });
 
-  const refreshTicketActivity = async (ticketId: string) => {
-    if (!user) return;
-    const { data } = await listTicketActivity([ticketId], user.company_id);
-    if (data) {
-      setActivitiesByTicket((current) => ({ ...current, ...data }));
-    }
-  };
+  const tickets = useMemo(() => ticketsData?.tickets ?? [], [ticketsData]);
+  const activitiesByTicket = useMemo(() => ticketsData?.activitiesByTicket ?? {}, [ticketsData]);
+  const attachmentsByTicket = useMemo(() => ticketsData?.attachmentsByTicket ?? {}, [ticketsData]);
+
+  // Initialise comment drafts when new tickets arrive; preserve in-progress drafts.
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setCommentDrafts((prev) => {
+      const next = { ...prev };
+      for (const t of tickets) {
+        if (!(t.id in next)) next[t.id] = '';
+      }
+      return next;
+    });
+  // setCommentDrafts is a stable React state setter; excluding it is intentional
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets]);
+
+  const refreshTickets = () => void queryClient.invalidateQueries({ queryKey: myTicketsKey });
 
   const handleAddComment = async (ticketId: string) => {
     if (!user) return;
@@ -162,62 +171,19 @@ export default function MyTickets() {
       return;
     }
 
-    setTickets((current) => current.map((ticket) => (
-      ticket.id === ticketId
-        ? {
-          ...ticket,
-          status: data.status,
-          resolved_at: data.resolved_at,
-          resolution_note: data.resolution_note,
-          updated_at: data.updated_at,
-        }
-        : ticket
-    )));
-    await refreshTicketActivity(ticketId);
+    queryClient.setQueryData<typeof ticketsData>(myTicketsKey, (old) => old ? {
+      ...old,
+      tickets: old.tickets.map((ticket) => ticket.id === ticketId ? {
+        ...ticket,
+        status: data.status,
+        resolved_at: data.resolved_at,
+        resolution_note: data.resolution_note,
+        updated_at: data.updated_at,
+      } : ticket),
+    } : old);
+    refreshTickets();
   };
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadTickets = async () => {
-      if (!user) {
-        if (!cancelled) {
-          setTickets([]);
-          setLoading(false);
-        }
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      const { data, error: fetchError } = await listMyTickets(user.id, user.company_id);
-      if (cancelled) return;
-      if (fetchError) {
-        setError(fetchError.message || 'Unable to load requests.');
-      } else {
-        const nextTickets = data ?? [];
-        setTickets(nextTickets);
-        setCommentDrafts(Object.fromEntries(nextTickets.map((ticket) => [ticket.id, ''])));
-
-        const ticketIds = nextTickets.map((ticket) => ticket.id);
-        const [{ data: activityData }, { data: attachmentData }] = await Promise.all([
-          listTicketActivity(ticketIds, user.company_id),
-          listAttachmentsForTickets(ticketIds, user.company_id),
-        ]);
-        if (cancelled) return;
-        setActivitiesByTicket(activityData ?? {});
-        setAttachmentsByTicket(attachmentData ?? {});
-      }
-      setLoading(false);
-    };
-
-    void loadTickets();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
 
   // ── Derived state ─────────────────────────────────────────────────────────
 

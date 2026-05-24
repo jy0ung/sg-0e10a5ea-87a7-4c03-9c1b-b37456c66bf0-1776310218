@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { STALE } from '@/lib/queryClient';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -56,13 +58,11 @@ export default function NewTicket() {
   const { settings: attachmentSettings } = useAttachmentSettings(user?.company_id);
 
   const [submitting, setSubmitting] = useState(false);
-  const [branchCode, setBranchCode] = useState<string | null>(null);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
-  const [approvalPlan, setApprovalPlan] = useState<ApprovalPlanState>('loading');
   const [approvalConfirmData, setApprovalConfirmData] = useState<TicketFormData | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,11 +71,13 @@ export default function NewTicket() {
 
   const roleContext = ROLE_CONTEXT[user?.role as AppRole] ?? DEFAULT_ROLE_CONTEXT;
 
-  useEffect(() => {
-    if (user?.branch_id) {
-      resolveBranchCode(user.branch_id).then(setBranchCode);
-    }
-  }, [user?.branch_id]);
+  const { data: resolvedBranchCode = null } = useQuery({
+    queryKey: ['branch-code', user?.branch_id],
+    queryFn: () => resolveBranchCode(user!.branch_id!),
+    enabled: !!user?.branch_id,
+    staleTime: STALE.reference,
+  });
+  const branchCode = resolvedBranchCode;
 
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
@@ -150,15 +152,15 @@ export default function NewTicket() {
     categoryKey: selectedCategoryKey || undefined,
   });
 
-  useEffect(() => {
-    if (!user?.company_id || !user?.id) return;
-    setApprovalPlan('loading');
-    getInternalRequestApprovalPlan(user.company_id, user.id, {
-      categoryKey: selectedCategoryKey || null,
-    }).then(({ data, error }) => {
-      setApprovalPlan(error ? 'error' : data);
-    });
-  }, [user?.company_id, user?.id, selectedCategoryKey]);
+  const { data: approvalPlan = 'loading' } = useQuery({
+    queryKey: ['approval-plan', user?.company_id, user?.id, selectedCategoryKey],
+    queryFn: () =>
+      getInternalRequestApprovalPlan(user!.company_id, user!.id, { categoryKey: selectedCategoryKey || null })
+        .then(({ data, error }) => (error ? ('error' as const) : data)),
+    enabled: !!user?.company_id && !!user?.id,
+    staleTime: STALE.reference,
+    placeholderData: 'loading' as ApprovalPlanState,
+  });
 
   const selectedSubcategoryKey = form.watch('subcategory');
   const selectedPriority = form.watch('priority');

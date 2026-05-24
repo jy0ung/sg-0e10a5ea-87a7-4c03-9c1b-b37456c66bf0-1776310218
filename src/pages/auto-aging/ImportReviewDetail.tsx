@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getImportReviewRows, reviewRow } from '@/services/importReviewService';
 import type { ImportReviewRow } from '@/types';
 import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, XCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { STALE } from '@/lib/queryClient';
+import { toast } from 'sonner';
 
 export default function ImportReviewDetail() {
   const navigate = useNavigate();
@@ -17,48 +19,19 @@ export default function ImportReviewDetail() {
   const companyId = useCompanyId();
   const { importBatches } = useData();
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [rows, setRows] = useState<ImportReviewRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   const batch = useMemo(() => importBatches.find((candidate) => candidate.id === batchId) ?? null, [batchId, importBatches]);
 
-  async function loadRows() {
-    if (!batchId || !companyId) {
-      setRows([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const data = await getImportReviewRows(batchId, companyId);
-    setRows(data);
-    setLoading(false);
-  }
+  const rowsKey = ['import-review-rows', batchId, companyId] as const;
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      if (!batchId || !companyId) {
-        setRows([]);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      const data = await getImportReviewRows(batchId, companyId);
-      if (!cancelled) {
-        setRows(data);
-        setLoading(false);
-      }
-    }
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [batchId, companyId]);
+  const { data: rows = [], isLoading: loading } = useQuery({
+    queryKey: rowsKey,
+    queryFn: () => getImportReviewRows(batchId, companyId),
+    enabled: !!batchId && !!companyId,
+    staleTime: STALE.transactional,
+  });
 
   async function handleReview(row: ImportReviewRow, status: 'resolved' | 'discarded') {
     setReviewingId(row.id);
@@ -66,10 +39,10 @@ export default function ImportReviewDetail() {
     setReviewingId(null);
 
     if (result.error) {
-      toast({ title: 'Action failed', description: result.error, variant: 'destructive' });
+      toast.error('Action failed', { description: result.error });
     } else {
-      toast({ title: status === 'resolved' ? 'Row accepted' : 'Row discarded' });
-      void loadRows();
+      toast.success(status === 'resolved' ? 'Row accepted' : 'Row discarded');
+      void queryClient.invalidateQueries({ queryKey: rowsKey });
     }
   }
 
