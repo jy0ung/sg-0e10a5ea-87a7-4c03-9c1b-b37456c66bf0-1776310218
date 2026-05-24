@@ -22,6 +22,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     resolve: {
       alias: {
+        '@/components/ui': path.resolve(rootDir, 'packages/ui/src'),
+        '@/hooks/use-toast': path.resolve(rootDir, 'packages/ui/src/hooks/use-toast.ts'),
+        '@/hooks/use-mobile': path.resolve(rootDir, 'packages/ui/src/hooks/use-mobile.tsx'),
         '@': path.resolve(__dirname, 'src'),
         '@hrms-web': path.resolve(__dirname, 'src'),
         '@flc/types': path.resolve(rootDir, 'packages/types/src/index.ts'),
@@ -29,6 +32,7 @@ export default defineConfig(({ mode }) => {
         '@flc/shell': path.resolve(rootDir, 'packages/shell/src/index.ts'),
         '@flc/hrms-schemas': path.resolve(rootDir, 'packages/hrms-schemas/src/index.ts'),
         '@flc/hrms-services': path.resolve(rootDir, 'packages/hrms-services/src/index.ts'),
+        '@flc/ui': path.resolve(rootDir, 'packages/ui/src'),
       },
       dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
     },
