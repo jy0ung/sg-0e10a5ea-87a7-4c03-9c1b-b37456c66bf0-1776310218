@@ -1,7 +1,6 @@
 import React from 'react';
 import { AlertCircle, Inbox } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useTranslation } from 'react-i18next';
 
 interface EmptyStateProps {
   title: string;
@@ -42,9 +41,8 @@ export function PageErrorState({
   error,
   onRetry,
 }: PageErrorStateProps) {
-  const { t } = useTranslation();
-  const heading = title ?? t('page.errorTitle');
-  const detail = description ?? t('page.errorDescription');
+  const heading = title ?? 'Unable to load data';
+  const detail = description ?? 'Retry the request. If the problem persists, sign out and sign back in.';
   const message = getErrorMessage(error);
 
   return (
@@ -56,7 +54,7 @@ export function PageErrorState({
       </p>
       {onRetry && (
         <Button type="button" variant="outline" className="mt-5" onClick={onRetry}>
-          {t('common.retry')}
+          Retry
         </Button>
       )}
     </div>

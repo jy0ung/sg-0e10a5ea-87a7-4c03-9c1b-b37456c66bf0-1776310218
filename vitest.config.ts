@@ -26,7 +26,6 @@ export default defineConfig({
         "src/**/*.spec.{ts,tsx}",
         "src/vite-env.d.ts",
         "src/main.tsx",
-        "src/i18n/**",
         "src/components/ui/**",
       ],
       // Baseline thresholds — ratchet upward as coverage grows. Target per

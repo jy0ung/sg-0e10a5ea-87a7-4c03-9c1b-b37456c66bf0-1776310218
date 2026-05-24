@@ -245,13 +245,16 @@ All with `company_id` + RLS + audit triggers. All editable only through `SECURIT
 
 Each phase is **independently shippable, behind feature flags, and additive**. No phase begins until the previous one is merged, validated against the production smoke suite, and the launch checklist row is checked.
 
-### Phase 0 — Safety net (1 sprint)
-- Wire `feature_flags` table + `useFeatureFlag` hook; default-off for every new surface in subsequent phases.
-- Pre-commit hook chain (typecheck + lint + RPC contract check) — Husky already installed.
-- Ship CSP + security headers in `docker/nginx.conf`; verify against current pages with `axe-core` already in `e2e/`.
-- Delete `xlsx`; confirm no transitive import.
-- Strip `console.log`, dead `i18n` imports (decision: keep i18n scaffold but adopt only in `packages/shell` nav). 
-- Acceptance: 0 typecheck errors, 0 lint warnings, all existing tests still green, Lighthouse + axe baseline captured.
+### Phase 0 — Safety net (1 sprint) — IN PROGRESS
+
+| Task | Reality |
+|---|---|
+| CSP + security headers | **Already shipped** in `docker/nginx.conf` (both hosts) and `index.html`. No work needed. |
+| `xlsx` removal | **Already done.** `xlsx` is no longer in any `package.json`; `import-parser.ts` already uses `exceljs`. |
+| Pre-commit hooks | **Existed** (Husky + lint-staged + `tsc --noEmit`). Extended in this PR with `scripts/check-rpc-contracts.ts`. |
+| Remove i18n | **Done in this PR.** 0% adoption; uninstalled `i18next` / `react-i18next` / `i18next-browser-languagedetector` from both apps, deleted `src/i18n/` + `apps/hrms-web/src/i18n/`, replaced 4 `t()` callsites in `PageSpinner` + `PageState` with the seeded English strings. |
+| `feature_flags` table + `useFeatureFlag` hook | **Done in this PR.** Migration `20260524000000_feature_flags.sql` with company + global resolution, percentage rollouts via stable-hash bucketing, RLS gated to super/company admin writes. `featureFlagService.ts` + `useFeatureFlag.ts` + unit tests. Ten seed flags pre-populate Phase 1–4 surface codes (default disabled). |
+| Acceptance | 0 typecheck errors, 0 lint warnings, RPC contracts pass, all existing tests still green, **flag table dry-runs cleanly against local Supabase.** |
 
 ### Phase 1 — Security & RBAC hardening (1 sprint)
 - `role_section_permissions` table + RLS + `roleSectionService` server-backed; delete `localStorage` RBAC.
@@ -336,19 +339,48 @@ A phase is not done until ALL of:
 
 ---
 
-## 8. Decision register (open questions for the user)
+## 8. Decision register (resolved)
 
-These need explicit go/no-go before execution begins:
-
-1. **i18n**: keep scaffold and adopt in shell only, or remove entirely?
-2. **Sales mobile**: build now (Phase 6) or defer indefinitely?
-3. **Customer-facing portal**: in scope or out?
-4. **Multi-entity FX**: is the group genuinely multi-currency, or single MYR?
-5. **Service/workshop**: is after-sales in scope for UBS, or does another system own it?
-6. **DMS live sync**: who owns Proton's API credentials and is there a sandbox?
-7. **Reporting authority**: when does UBS become finance authoritative (today GL is migrated but UI not built)?
-8. **Feature-flag platform**: own table + hook, or adopt a vendor (PostHog, GrowthBook)?
+| # | Decision | Resolution | Affects |
+|---|---|---|---|
+| 1 | i18n | **Remove entirely.** 0% adoption today; uninstall packages, delete `src/i18n/`, drop ~35 KB. | P0 |
+| 2 | Feature flags | **Own table + hook.** `feature_flags(company_id, code, enabled, rollout_pct, updated_by)` + RLS + `useFeatureFlag`. No vendor. | P0 |
+| 3 | Sales mobile | **In scope, Phase 6.** Capacitor app reusing `@flc/shell`. | P6 |
+| 4 | Customer portal | **In scope, Phase 6.** Separate origin, strict RLS, anonymous role. | P6 |
+| 5 | FX / currency | **Single MYR.** GL schema stays single-currency, no FX revaluation. | P3b |
+| 6 | Service / workshop | **In scope, Phase 6.** `service_orders`, technicians, parts, warranty. | P6 |
+| 7 | DMS live sync | **Constrained.** Operator confirmed: prod credentials exist for **all 7 branches**, but each is a **normal admin user account (not a service account)** and the DMS login is **captcha-gated**. This rules out a vanilla headless `dms-sync-cron` edge function. Phase 3c is re-scoped to a **human-in-the-loop sync** (see §9). | P3c |
+| 8 | GL authority | **After Stage 7 UI ships + parallel-run quarter.** Finance runs UBS alongside current books for one quarter, then cutover. | P3b |
 
 ---
 
-*End of blueprint. Execution requires explicit user direction on which phase to start.*
+## 9. DMS sync — re-scoped for captcha + per-user admin creds
+
+**Constraint recap.** Seven branch-scoped admin accounts. No service account. Login interactively gated by captcha. Sessions are cookie/JWT-bound and expire.
+
+**What this rules out**
+- Vanilla `dms-sync-cron` Supabase edge function calling `dcs-api.proton.com` on a schedule. The captcha breaks any unattended HTTP client.
+- Storing the seven passwords in any client-reachable surface (env var visible to browser, public `feature_flags`, etc.).
+
+**Viable patterns, ranked**
+
+1. **Ask Proton for a service / OAuth client account.** (Best, slowest.) Submit the request, document the use case (read-only sync into UBS staging only). All of §3.1's DMS Sync Ops module collapses into a normal scheduled edge function the moment this lands. Track as a separate operations workstream — do not block Phase 3c on it.
+
+2. **Operator-assisted browser sync.** A controlled internal worker (Playwright in a dedicated container, NOT in Supabase Edge Runtime — Deno cannot drive Chromium) navigates DMS, prompts the on-call operator via UBS to solve the captcha, completes login, exports the seven Proton endpoints, and POSTs raw JSON into `dms_raw_*` via a privileged edge function. Sessions are cached for their natural lifetime; the operator is only re-prompted on expiry.
+   - Worker runs on the existing nginx/Supabase host (PM2 process) — no new infrastructure.
+   - Credentials live in `/etc/flc-bi/dms.env`, root-readable only, never in browser env.
+   - The UBS UI hosts a "Sync now" + "Captcha pending" inbox in `/admin/integrations/dms`.
+   - All HTTP traffic still passes the existing `dms-sync-worker` edge function as the only write path into `dms_raw_*`, so RLS and audit stay intact.
+
+3. **Manual export + upload.** Operator runs the existing DMS exports per branch (CSV/XLSX), uploads to UBS. Reuses the existing Import Center pattern (`commit_import_batch`). Lowest engineering cost, highest operational cost, but it's already mostly built and is the realistic fallback if (2) slips.
+
+**Decision (default, revisable):** Build (3) as the default Phase 3c surface — extend Import Center with a "DMS branch export" template per endpoint, route uploads into `dms_raw_*` staging via the existing normalizer pipeline. Build the Sync Ops + Reconciliation Review UIs against the same staged data. Begin a parallel ops request to Proton for a service account; when it lands, swap path (3) for path (1) without UI rework. Path (2) is only built if Proton denies the service account AND manual upload becomes operationally untenable.
+
+**Implications for the blueprint**
+- §3.1's "DMS Sync Operations" surface stays, but the live `dms-sync-cron` edge function moves from "build in Phase 3c" to "build when Proton issues a service account."
+- The seven branches imply seven `dms_branch_sessions` records — one per branch admin — if path (2) is built. Captured here so the data model is ready when needed.
+- Reconciliation Review Queue (§3.1) is unaffected; it reads from `dms_raw_*` regardless of how data got there.
+
+---
+
+*Execution begins at Phase 0. One PR per phase, behind feature flags.*

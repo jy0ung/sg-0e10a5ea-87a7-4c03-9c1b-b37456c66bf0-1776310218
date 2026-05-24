@@ -1,3 +1,4 @@
 #!/usr/bin/env sh
 npx lint-staged
 npx tsc --noEmit
+npx tsx scripts/check-rpc-contracts.ts
