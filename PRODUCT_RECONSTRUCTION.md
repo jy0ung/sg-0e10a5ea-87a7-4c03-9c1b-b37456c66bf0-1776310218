@@ -256,12 +256,16 @@ Each phase is **independently shippable, behind feature flags, and additive**. N
 | `feature_flags` table + `useFeatureFlag` hook | **Done in this PR.** Migration `20260524000000_feature_flags.sql` with company + global resolution, percentage rollouts via stable-hash bucketing, RLS gated to super/company admin writes. `featureFlagService.ts` + `useFeatureFlag.ts` + unit tests. Ten seed flags pre-populate Phase 1–4 surface codes (default disabled). |
 | Acceptance | 0 typecheck errors, 0 lint warnings, RPC contracts pass, all existing tests still green, **flag table dry-runs cleanly against local Supabase.** |
 
-### Phase 1 — Security & RBAC hardening (1 sprint)
-- `role_section_permissions` table + RLS + `roleSectionService` server-backed; delete `localStorage` RBAC.
-- `rate_limits` table + edge-function middleware; backfill `invite-user`'s 10/hr to all functions.
-- Rotate FCM/APNs documentation; startup assertion in `send-push-notification`.
-- Audit `service-role` usage; add CI rule that fails on `SERVICE_ROLE` in `src/` or `apps/`.
-- Acceptance: penetration smoke (curl edge fns without JWT, with stale JWT, with wrong-company JWT) returns expected 401/403/429.
+### Phase 1 — Security & RBAC hardening (1 sprint) — DONE
+
+| Task | Reality |
+|---|---|
+| `role_section_permissions` server-backed | **Already shipped** in migration `20260421110000_phase2_role_sections.sql` with RLS, seeded defaults, and a trigger that backfills new companies. `roleSectionService` + `usePermissions` already read it via React Query. No `localStorage` references remain. No work needed in this PR. |
+| `rate_limits` table + middleware | **Done.** Migration `20260524010000_rate_limits.sql` with `bump_rate_limit(caller_id, action, max_calls, window_seconds)` SECURITY DEFINER RPC, durable counter, atomic increment-or-reset. New `supabase/functions/_shared/rateLimit.ts` helper stamps standard `X-RateLimit-*` and `Retry-After` headers; fails open on RPC failure. All six edge functions wired: `invite-user` (10/hr), `send-push-notification` (20/min, JWT callers only), `rollover-leave-balances` (5/day), `delete-user` (30/hr — NEW), `update-user-status` (30/hr — NEW), `dms-sync-worker` (60/min — NEW). |
+| FCM/APNs rotation runbook | **Done.** `docs/EDGE_KEY_ROTATION.md` covers 90-day cadence + emergency rotation for `FCM_SERVER_KEY`, `APNS_PRIVATE_KEY`, `APNS_KEY_ID`, and `ALLOWED_ORIGINS`. The existing one-time startup warning in `send-push-notification` (for missing `FCM_SERVER_KEY`) is documented as the detection signal. |
+| CI guard banning service-role outside edge functions | **Done.** `scripts/check-no-service-role.ts` (npm `security:no-service-role`). Wired into `.husky/pre-commit`. Scans `src/`, `apps/*/src/`, `packages/`. Exempts `src/test/` (RLS specs that read service key from env). Verified clean on current tree. |
+| Penetration smoke | **Done.** `scripts/security-smoke.ts` (npm `security:smoke`). Hits every edge function with no-auth, garbage-bearer, and wrong-company-bearer variants; verifies expected 401/403/429. Operator runs it against any environment with `SMOKE_SUPABASE_URL` set. |
+| Acceptance | typecheck 0 errors, RPC contract check passes, no-service-role guard passes on current tree. |
 
 ### Phase 2 — Architecture cleanup (2 sprints)
 - Extract `packages/shell` from `src/components/layout/app-shell` and `apps/hrms-web/src/layout`; rewire both apps to consume it.

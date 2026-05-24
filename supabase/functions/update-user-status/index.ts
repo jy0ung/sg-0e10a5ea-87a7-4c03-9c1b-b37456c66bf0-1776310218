@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { checkRateLimit } from '../_shared/rateLimit.ts';
 
 interface UpdateUserStatusPayload {
   user_id: string;
@@ -9,6 +10,10 @@ interface UpdateUserStatusPayload {
 
 const ADMIN_ROLES = ['super_admin', 'company_admin'];
 const LONG_BAN_DURATION = '876000h';
+
+// Durable rate limit: 30 status changes per caller per hour.
+const RATE_MAX_CALLS = 30;
+const RATE_WINDOW_SECONDS = 60 * 60;
 
 interface AuthBanResult {
   attempted: boolean;
@@ -55,6 +60,21 @@ Deno.serve(async (req: Request) => {
     const { data: { user: caller }, error: callerError } = await callerClient.auth.getUser();
     if (callerError || !caller) {
       return jsonResponse({ error: 'Unauthorized' }, 401, corsHeaders);
+    }
+
+    const limit = await checkRateLimit({
+      callerId: caller.id,
+      action: 'update-user-status',
+      maxCalls: RATE_MAX_CALLS,
+      windowSeconds: RATE_WINDOW_SECONDS,
+      supabaseUrl,
+      serviceRoleKey,
+    });
+    if (!limit.allowed) {
+      return new Response(
+        JSON.stringify({ error: limit.message }),
+        { status: 429, headers: { ...corsHeaders, ...limit.headers } },
+      );
     }
 
     const body: UpdateUserStatusPayload = await req.json();

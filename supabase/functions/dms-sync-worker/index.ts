@@ -9,6 +9,13 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { checkRateLimit } from '../_shared/rateLimit.ts';
+
+// Durable rate limit for non-service-role callers: 60 staging POSTs per
+// minute. Tuned for batched operator-driven uploads (up to 1000 records
+// per request, see `records.length > 1000` guard below).
+const RATE_MAX_CALLS = 60;
+const RATE_WINDOW_SECONDS = 60;
 
 type DmsTarget =
   | 'sales_orders'
@@ -277,6 +284,21 @@ Deno.serve(async (req: Request) => {
 
     if (!DMS_SYNC_ROLES.has(callerProfile.role)) {
       return jsonResponse(req, 403, { error: 'Insufficient role for DMS sync staging' });
+    }
+
+    const limit = await checkRateLimit({
+      callerId: callerProfile.id,
+      action: 'dms-sync-worker',
+      maxCalls: RATE_MAX_CALLS,
+      windowSeconds: RATE_WINDOW_SECONDS,
+      supabaseUrl,
+      serviceRoleKey,
+    });
+    if (!limit.allowed) {
+      return new Response(
+        JSON.stringify({ error: limit.message }),
+        { status: 429, headers: { ...corsHeaders, ...limit.headers } },
+      );
     }
   }
 

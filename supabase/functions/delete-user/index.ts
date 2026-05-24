@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { checkRateLimit } from '../_shared/rateLimit.ts';
 
 interface DeleteUserPayload {
   user_id: string;
@@ -9,6 +10,12 @@ interface DeleteUserPayload {
 }
 
 const ADMIN_ROLES = ['super_admin', 'company_admin'];
+
+// Durable rate limit: 30 user-management actions per caller per hour.
+// Covers delete + Deactivate/Reactivate (which currently call this same
+// function with action='update_status').
+const RATE_MAX_CALLS = 30;
+const RATE_WINDOW_SECONDS = 60 * 60;
 const LONG_BAN_DURATION = '876000h';
 const ARCHIVED_EMAIL_DOMAIN = 'archived.local';
 
@@ -61,6 +68,21 @@ Deno.serve(async (req: Request) => {
     const { data: { user: caller }, error: callerError } = await callerClient.auth.getUser();
     if (callerError || !caller) {
       return jsonResponse({ error: 'Unauthorized' }, 401, corsHeaders);
+    }
+
+    const limit = await checkRateLimit({
+      callerId: caller.id,
+      action: 'delete-user',
+      maxCalls: RATE_MAX_CALLS,
+      windowSeconds: RATE_WINDOW_SECONDS,
+      supabaseUrl,
+      serviceRoleKey,
+    });
+    if (!limit.allowed) {
+      return new Response(
+        JSON.stringify({ error: limit.message }),
+        { status: 429, headers: { ...corsHeaders, ...limit.headers } },
+      );
     }
 
     const body: DeleteUserPayload = await req.json();

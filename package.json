@@ -20,6 +20,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check:rpc-contracts": "tsx scripts/check-rpc-contracts.ts",
+    "security:no-service-role": "tsx scripts/check-no-service-role.ts",
+    "security:smoke": "tsx scripts/security-smoke.ts",
     "test:rls:seed": "tsx scripts/seed-rls-users.ts",
     "test:rls:cleanup": "tsx scripts/seed-rls-users.ts --cleanup",
     "test:rls": "RLS_E2E=1 vitest run --config vitest.rls.config.ts",
