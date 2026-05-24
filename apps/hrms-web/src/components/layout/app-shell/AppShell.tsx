@@ -5,8 +5,8 @@ import { useIsMobile, useIsTablet } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { AppShellSidebar } from './AppShellSidebar';
 import { AppShellTopbar } from './AppShellTopbar';
-import { resolveRouteChrome } from './routeChrome';
-import type { AppShellAction, AppShellBackLink, AppShellBrand, AppShellNavSection, AppShellRouteChrome, AppShellRouteChromeMatch, AppShellUser, AppShellWidthMode } from './types';
+import { resolveRouteChrome } from '@flc/shell';
+import type { AppShellAction, AppShellBackLink, AppShellBrand, AppShellNavSection, AppShellRouteChrome, AppShellRouteChromeMatch, AppShellUser, AppShellWidthMode } from '@flc/shell';
 
 const contentWidthClasses: Record<AppShellWidthMode, string> = {
   contained: 'mx-auto min-h-full w-full max-w-[1680px] p-3 sm:p-4 md:p-5 lg:p-6',

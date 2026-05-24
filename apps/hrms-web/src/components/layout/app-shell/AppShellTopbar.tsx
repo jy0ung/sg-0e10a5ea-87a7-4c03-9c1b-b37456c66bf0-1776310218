@@ -5,7 +5,7 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import type { AppShellAction, AppShellRouteChrome, AppShellUser } from './types';
+import type { AppShellAction, AppShellRouteChrome, AppShellUser } from '@flc/shell';
 
 function getInitial(name?: string | null): string {
   return name?.charAt(0) || '?';

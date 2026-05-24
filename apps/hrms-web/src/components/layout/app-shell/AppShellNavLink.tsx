@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { isAppShellNavItemActive } from './navUtils';
-import type { AppShellNavItem } from './types';
+import { isAppShellNavItemActive } from '@flc/shell';
+import type { AppShellNavItem } from '@flc/shell';
 
 interface AppShellNavLinkProps {
   item: AppShellNavItem;

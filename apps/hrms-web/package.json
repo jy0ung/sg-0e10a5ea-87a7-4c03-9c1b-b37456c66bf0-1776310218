@@ -12,6 +12,7 @@
   "dependencies": {
     "@flc/hrms-schemas": "*",
     "@flc/hrms-services": "*",
+    "@flc/shell": "*",
     "@flc/supabase": "*",
     "@flc/types": "*",
     "@hookform/resolvers": "^3.10.0",

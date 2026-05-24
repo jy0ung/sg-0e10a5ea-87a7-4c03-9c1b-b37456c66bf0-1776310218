@@ -51,7 +51,7 @@ import { STALE } from '@/lib/queryClient';
 import { getNotifications } from '@/services/notificationService';
 import { globalSearch, type GlobalSearchHit } from '@/services/globalSearchService';
 import type { AppRole } from '@/types';
-import type { AppShellCommandItem, AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from './types';
+import type { AppShellCommandItem, AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from '@flc/shell';
 
 interface MainNavItem extends AppShellNavItem {
   section: string;
