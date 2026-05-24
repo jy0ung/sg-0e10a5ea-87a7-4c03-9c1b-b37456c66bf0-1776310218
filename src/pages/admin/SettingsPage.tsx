@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { STALE } from '@/lib/queryClient';
 import { useBlocker } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,7 +65,6 @@ export default function SettingsPage() {
 
   // Users / Roles state
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
-  const [profilesLoading, setProfilesLoading] = useState(false);
   const [pendingRoles, setPendingRoles] = useState<Record<string, AppRole>>({});
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState('');
@@ -109,18 +110,29 @@ export default function SettingsPage() {
       form.formState.isDirty && currentLocation.pathname !== nextLocation.pathname,
   );
 
-  useEffect(() => {
-    getBranches(user?.company_id || '').then(res => setBranches(res.data));
-  }, [user?.company_id]);
+  const { data: fetchedBranches = [] } = useQuery({
+    queryKey: ['branches', user?.company_id],
+    queryFn: () => getBranches(user!.company_id || '').then(r => r.data),
+    enabled: !!user?.company_id,
+    staleTime: STALE.reference,
+  });
 
-  // Load company users when admin tab is available
   useEffect(() => {
-    if (!isAdmin || !user?.company_id) return;
-    setProfilesLoading(true);
-    listProfiles(user.role === 'super_admin' ? undefined : user.company_id)
-      .then(({ data }) => setProfiles(data))
-      .finally(() => setProfilesLoading(false));
-  }, [isAdmin, user?.company_id, user?.role]);
+    setBranches(fetchedBranches);
+  }, [fetchedBranches]);
+
+  const { data: fetchedProfiles = [], isLoading: profilesLoading } = useQuery({
+    queryKey: ['profiles', isAdmin ? (user?.role === 'super_admin' ? 'all' : user?.company_id) : null],
+    queryFn: () =>
+      listProfiles(user?.role === 'super_admin' ? undefined : user?.company_id ?? undefined)
+        .then(r => r.data),
+    enabled: isAdmin && !!user?.company_id,
+    staleTime: STALE.reference,
+  });
+
+  useEffect(() => {
+    setProfiles(fetchedProfiles);
+  }, [fetchedProfiles]);
 
   // Sync branding DB values into local form state when branding loads
   useEffect(() => {

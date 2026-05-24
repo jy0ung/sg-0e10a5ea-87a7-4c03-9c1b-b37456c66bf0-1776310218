@@ -1,31 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Activity, 
-  Users, 
-  Car, 
-  TrendingUp, 
-  RefreshCw, 
+import {
+  Activity,
+  Users,
+  Car,
+  TrendingUp,
+  RefreshCw,
   Download,
   ChevronRight,
   Trash2
 } from 'lucide-react';
-import { getAllAuditLogs, AuditLogWithProfile } from '@/services/auditService';
+import { getAllAuditLogs } from '@/services/auditService';
 import { formatDate, formatTime } from '@/lib/utils';
 import { loggingService } from '@/services/loggingService';
 import { useAuth } from '@/contexts/AuthContext';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { useToast } from '@/hooks/use-toast';
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Line, LineChart, Pie, PieChart, Cell, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { useQuery } from '@tanstack/react-query';
+import { STALE } from '@/lib/queryClient';
 
 const COLORS = {
   create: '#22c55e',
@@ -35,53 +36,39 @@ const COLORS = {
   other: '#8b5cf6'
 };
 
+function getFromDate(range: 'today' | 'week' | 'month'): Date {
+  const now = new Date();
+  switch (range) {
+    case 'today':
+      return new Date(now.setHours(0, 0, 0, 0));
+    case 'week':
+      return new Date(now.setDate(now.getDate() - 7));
+    case 'month':
+      return new Date(now.setMonth(now.getMonth() - 1));
+    default:
+      return new Date(now.setHours(0, 0, 0, 0));
+  }
+}
+
 export default function ActivityDashboard() {
   const { hasRole } = useAuth();
-  const { toast } = useToast();
-
-  const [logs, setLogs] = useState<AuditLogWithProfile[]>([]);
-  const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('today');
-  const [actionFilter] = useState<string>('all');
 
-  const loadLogs = useCallback(async () => {
-    setLoading(true);
-    try {
+  const { data: logs = [], isLoading, refetch } = useQuery({
+    queryKey: ['audit-logs', timeRange],
+    queryFn: async () => {
       const fromDate = getFromDate(timeRange);
-      const result = await getAllAuditLogs(200, 0, {
-        fromDate,
-        entityType: actionFilter === 'all' ? undefined : actionFilter,
-      });
-      if (result.data) {
-        setLogs(result.data);
+      const result = await getAllAuditLogs(200, 0, { fromDate });
+      if (result.error) {
+        loggingService.error('Error loading activity logs', { error: result.error }, 'ActivityDashboard');
+        throw new Error(result.error);
       }
-    } catch (error) {
-      loggingService.error('Error loading activity logs', { error }, 'ActivityDashboard');
-      toast({ title: 'Failed to load activity logs', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [timeRange, actionFilter, toast]);
-
-  useEffect(() => {
-    loadLogs();
-  }, [timeRange, actionFilter, loadLogs]);
+      return result.data ?? [];
+    },
+    staleTime: STALE.transactional,
+  });
 
   if (!hasRole(['super_admin', 'company_admin', 'director', 'general_manager'])) return <UnauthorizedAccess />;
-
-  const getFromDate = (range: 'today' | 'week' | 'month'): Date => {
-    const now = new Date();
-    switch (range) {
-      case 'today':
-        return new Date(now.setHours(0, 0, 0, 0));
-      case 'week':
-        return new Date(now.setDate(now.getDate() - 7));
-      case 'month':
-        return new Date(now.setMonth(now.getMonth() - 1));
-      default:
-        return new Date(now.setHours(0, 0, 0, 0));
-    }
-  };
 
   const calculateStats = () => {
     const today = new Date();
@@ -171,7 +158,7 @@ export default function ActivityDashboard() {
   const leaderboard = getUserActivityLeaderboard();
   const recentActions = getRecentActions();
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -200,7 +187,7 @@ export default function ActivityDashboard() {
               </Button>
             ))}
           </div>
-          <Button variant="outline" size="sm" onClick={loadLogs}>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-2" />Refresh
           </Button>
           <Button variant="outline" size="sm">
@@ -288,8 +275,8 @@ export default function ActivityDashboard() {
             <div className="mt-4 grid grid-cols-2 gap-2">
               {actionDistribution.map((item) => (
                 <div key={item.name} className="flex items-center gap-2 text-sm">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
+                  <div
+                    className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
                   <span className="capitalize">{item.name}</span>
@@ -310,23 +297,23 @@ export default function ActivityDashboard() {
             <ChartContainer config={{}} className="h-[200px]">
               <LineChart data={hourlyActivity}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="hour" 
+                <XAxis
+                  dataKey="hour"
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12 }}
                   tickFormatter={(value) => `${value}:00`}
                 />
-                <YAxis 
+                <YAxis
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12 }}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Line 
-                  type="monotone" 
-                  dataKey="count" 
-                  stroke="hsl(var(--primary))" 
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="hsl(var(--primary))"
                   strokeWidth={2}
                   dot={{ r: 3 }}
                 />
@@ -348,11 +335,11 @@ export default function ActivityDashboard() {
             <ScrollArea className="h-[400px]">
               <div className="space-y-3">
                 {leaderboard.map((user, index) => (
-                  <div 
+                  <div
                     key={user.userId}
                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors"
                   >
-                    <div 
+                    <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                         index === 0 ? 'bg-yellow-100 text-yellow-800' :
                         index === 1 ? 'bg-gray-100 text-gray-800' :
@@ -389,7 +376,7 @@ export default function ActivityDashboard() {
             <ScrollArea className="h-[400px]">
               <div className="space-y-3">
                 {recentActions.map((log) => (
-                  <div 
+                  <div
                     key={log.id}
                     className="flex items-start gap-3 p-3 rounded-lg hover:bg-secondary/50 transition-colors"
                   >

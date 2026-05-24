@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Shield, RotateCcw, Save, CheckSquare, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchRoleSections, saveRoleSections } from '@/services/roleSectionService';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { STALE } from '@/lib/queryClient';
 
 const ALL_ROLES: AppRole[] = [
   'super_admin',
@@ -34,24 +36,43 @@ export default function RolePermissionsPage() {
     () => ({ ...DEFAULT_ROLE_SECTIONS })
   );
   const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  // Hydrate from DB on mount.
-  useEffect(() => {
-    if (!user?.company_id) return;
-    let cancelled = false;
-    (async () => {
-      const { data } = await fetchRoleSections(user.company_id);
-      if (cancelled || !data) return;
-      // Merge with defaults so newly-added sections show up until persisted.
-      const merged: Record<AppRole, SectionName[]> = { ...DEFAULT_ROLE_SECTIONS };
-      for (const role of Object.keys(data) as AppRole[]) {
-        merged[role] = data[role];
+  useQuery({
+    queryKey: ['role-sections', user?.company_id],
+    queryFn: async () => {
+      const { data } = await fetchRoleSections(user!.company_id);
+      if (data) {
+        const merged: Record<AppRole, SectionName[]> = { ...DEFAULT_ROLE_SECTIONS };
+        for (const role of Object.keys(data) as AppRole[]) {
+          merged[role] = data[role];
+        }
+        setPermissions(merged);
       }
-      setPermissions(merged);
-    })();
-    return () => { cancelled = true; };
-  }, [user?.company_id]);
+      return data;
+    },
+    enabled: !!user?.company_id,
+    staleTime: STALE.reference,
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.company_id) throw new Error('No company');
+      const results = await Promise.all(
+        (Object.keys(permissions) as AppRole[]).map((role) =>
+          saveRoleSections(user.company_id, role, permissions[role] ?? []),
+        ),
+      );
+      const failed = results.find((r) => r.error);
+      if (failed?.error) throw failed.error;
+    },
+    onSuccess: () => {
+      setDirty(false);
+      toast({ title: 'Permissions saved', description: 'Role permissions updated. Changes apply on next navigation.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to save permissions', description: error.message, variant: 'destructive' });
+    },
+  });
 
   const toggle = (role: AppRole, section: SectionName) => {
     setPermissions((prev) => {
@@ -67,31 +88,7 @@ export default function RolePermissionsPage() {
   const isAllowed = (role: AppRole, section: SectionName) =>
     (permissions[role] ?? []).includes(section);
 
-  const handleSave = async () => {
-    if (!user?.company_id) return;
-    setSaving(true);
-    try {
-      // Persist every role's allowed sections in parallel.
-      const results = await Promise.all(
-        (Object.keys(permissions) as AppRole[]).map((role) =>
-          saveRoleSections(user.company_id, role, permissions[role] ?? []),
-        ),
-      );
-      const failed = results.find((r) => r.error);
-      if (failed?.error) {
-        toast({
-          title: 'Failed to save permissions',
-          description: failed.error.message,
-          variant: 'destructive',
-        });
-        return;
-      }
-      setDirty(false);
-      toast({ title: 'Permissions saved', description: 'Role permissions updated. Changes apply on next navigation.' });
-    } finally {
-      setSaving(false);
-    }
-  };
+  const handleSave = () => saveMutation.mutate();
 
   const handleReset = () => {
     setPermissions({ ...DEFAULT_ROLE_SECTIONS });
@@ -148,9 +145,9 @@ export default function RolePermissionsPage() {
             <RotateCcw className="h-4 w-4 mr-1.5" />
             Reset defaults
           </Button>
-          <Button size="sm" onClick={handleSave} disabled={!dirty || saving}>
+          <Button size="sm" onClick={handleSave} disabled={!dirty || saveMutation.isPending}>
             <Save className="h-4 w-4 mr-1.5" />
-            {saving ? 'Saving…' : 'Save changes'}
+            {saveMutation.isPending ? 'Saving…' : 'Save changes'}
           </Button>
         </div>
       </div>
