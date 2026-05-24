@@ -88,6 +88,26 @@ const targets: FunctionTarget[] = [
       },
     ],
   },
+  {
+    functionName: 'public.global_search',
+    checks: [
+      {
+        kind: 'required',
+        pattern: /security\s+invoker/i,
+        message: 'global_search must remain SECURITY INVOKER so RLS does the company / role filtering',
+      },
+      {
+        kind: 'required',
+        pattern: /returns\s+table\s*\([\s\S]*?\bentity_type\s+text\b/i,
+        message: 'global_search must return a row set including an entity_type column the client switches on',
+      },
+      {
+        kind: 'forbidden',
+        pattern: /security\s+definer/i,
+        message: 'global_search must NOT be SECURITY DEFINER — that would bypass per-table RLS and leak rows across companies',
+      },
+    ],
+  },
 ];
 
 for (const target of targets) {
