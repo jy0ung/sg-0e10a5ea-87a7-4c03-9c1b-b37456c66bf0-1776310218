@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => {
         '@hrms-web': path.resolve(__dirname, 'src'),
         '@flc/types': path.resolve(rootDir, 'packages/types/src/index.ts'),
         '@flc/supabase': path.resolve(rootDir, 'packages/supabase/src/index.ts'),
+        '@flc/shell': path.resolve(rootDir, 'packages/shell/src/index.ts'),
         '@flc/hrms-schemas': path.resolve(rootDir, 'packages/hrms-schemas/src/index.ts'),
         '@flc/hrms-services': path.resolve(rootDir, 'packages/hrms-services/src/index.ts'),
       },

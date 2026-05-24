@@ -3,7 +3,7 @@ import { PORTAL_QUEUE_ROLES, PORTAL_SETUP_ROLES } from '@/config/routeRoles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { canAccessMainApp } from '@/lib/portalAccess';
-import type { AppShellNavItem, AppShellRouteChromeMatch } from './types';
+import type { AppShellNavItem, AppShellRouteChromeMatch } from '@flc/shell';
 
 const baseNavItems: AppShellNavItem[] = [
   { label: 'Overview', path: '/portal', icon: Home, group: 'My Work', end: true },

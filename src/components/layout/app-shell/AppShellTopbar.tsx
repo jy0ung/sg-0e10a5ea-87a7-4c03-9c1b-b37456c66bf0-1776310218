@@ -12,7 +12,7 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
-import type { AppShellAction, AppShellCommandItem, AppShellCommandSearch, AppShellRouteChrome, AppShellUser } from './types';
+import type { AppShellAction, AppShellCommandItem, AppShellCommandSearch, AppShellRouteChrome, AppShellUser } from '@flc/shell';
 
 const COMMAND_SEARCH_MIN_LENGTH = 2;
 const COMMAND_SEARCH_DEBOUNCE_MS = 250;

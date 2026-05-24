@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { canAccessMainApp } from '@/lib/portalAccess';
 import type { AppRole } from '@/types';
-import type { AppShellNavItem, AppShellRouteChromeMatch } from './types';
+import type { AppShellNavItem, AppShellRouteChromeMatch } from '@flc/shell';
 
 const baseNavItems: AppShellNavItem[] = [
   { label: 'New Request', path: '/portal/tickets/new', icon: TicketCheck, end: true },

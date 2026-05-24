@@ -53,7 +53,7 @@ import { getNotifications } from '@/services/notificationService';
 import { listProfiles } from '@/services/profileService';
 import { searchVehicles } from '@/services/vehicleService';
 import type { AppRole } from '@/types';
-import type { AppShellCommandItem, AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from './types';
+import type { AppShellCommandItem, AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from '@flc/shell';
 
 interface MainNavItem extends AppShellNavItem {
   section: string;
