@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { STALE } from '@/lib/queryClient';
 import { listBranches, type BranchRecord } from '@/services/branchService';
 import {
   listSalesAdvisors,
@@ -29,20 +31,30 @@ const STATUS_BADGE: Record<SAStatus, string> = {
 
 const EMPTY_FORM = { code: '', name: '', ic: '', email: '', contact: '', branch: '', joinDate: new Date().toISOString().split('T')[0] };
 
+const advisorsKey = (companyId: string) => ['sales-advisors', companyId] as const;
+const branchesKey = (companyId: string) => ['branches', companyId] as const;
+
 export default function SalesAdvisors() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const companyId = user?.company_id ?? '';
 
-  const [advisors, setAdvisors]         = useState<SalesAdvisor[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [branchRecords, setBranchRecords] = useState<BranchRecord[]>([]);
+  const advisorsQuery = useQuery({
+    queryKey: advisorsKey(companyId),
+    queryFn: () => listSalesAdvisors(companyId),
+    enabled: !!companyId,
+    staleTime: STALE.reference,
+  });
+  const advisors: SalesAdvisor[] = advisorsQuery.data ?? [];
 
-  const [search, setSearch]         = useState('');
-  const [statusFilter, setStatus]   = useState<string>('all');
-  const [branchFilter, setBranch]   = useState('all');
-  const [addOpen, setAddOpen]       = useState(false);
-  const [form, setForm]             = useState(EMPTY_FORM);
-  const [saving, setSaving]         = useState(false);
+  const branchesQuery = useQuery({
+    queryKey: branchesKey(companyId),
+    queryFn: () => listBranches(companyId),
+    enabled: !!companyId,
+    staleTime: STALE.reference,
+  });
+  const branchRecords: BranchRecord[] = branchesQuery.data ?? [];
 
   const branchNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -50,26 +62,11 @@ export default function SalesAdvisors() {
     return map;
   }, [branchRecords]);
 
-  // Load sales advisors via service
-  const loadAdvisors = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const list = await listSalesAdvisors(user.company_id);
-      setAdvisors(list);
-    } catch {
-      toast({ title: 'Failed to load sales advisors', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  }, [user, toast]);
-
-  useEffect(() => { loadAdvisors(); }, [loadAdvisors]);
-
-  useEffect(() => {
-    if (!user) return;
-    listBranches(user.company_id).then(setBranchRecords).catch(() => {});
-  }, [user]);
+  const [search, setSearch]       = useState('');
+  const [statusFilter, setStatus] = useState<string>('all');
+  const [branchFilter, setBranch] = useState('all');
+  const [addOpen, setAddOpen]     = useState(false);
+  const [form, setForm]           = useState(EMPTY_FORM);
 
   const filtered = advisors.filter(a => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
@@ -78,51 +75,76 @@ export default function SalesAdvisors() {
     return !q || [a.code, a.name, a.email, a.branch].join(' ').toLowerCase().includes(q);
   });
 
-  const handleCreate = async () => {
+  const createMutation = useMutation({
+    mutationFn: async (input: typeof form) => {
+      if (!companyId) throw new Error('Not authenticated');
+      const { error } = await createSalesAdvisor({
+        companyId,
+        code: input.code,
+        name: input.name,
+        email: input.email || null,
+        ic: input.ic || null,
+        contact: input.contact || null,
+        branch: input.branch,
+        joinDate: input.joinDate || null,
+      });
+      if (error) throw new Error(error.message);
+      return input;
+    },
+    onSuccess: (input) => {
+      toast({ title: 'Sales Advisor created', description: `${input.code.toUpperCase()} — ${input.name}` });
+      setForm(EMPTY_FORM);
+      setAddOpen(false);
+      void queryClient.invalidateQueries({ queryKey: advisorsKey(companyId) });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Failed to create advisor', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async (args: { id: string; nextStatus: SAStatus }) => {
+      if (!companyId) throw new Error('Not authenticated');
+      const { error } = await updateSalesAdvisorStatus(companyId, args.id, args.nextStatus);
+      if (error) throw new Error(error.message);
+      return args;
+    },
+    // Optimistic update: flip the status in the cache before the request
+    // completes; restore on error.
+    onMutate: async ({ id, nextStatus }) => {
+      await queryClient.cancelQueries({ queryKey: advisorsKey(companyId) });
+      const previous = queryClient.getQueryData<SalesAdvisor[]>(advisorsKey(companyId));
+      queryClient.setQueryData<SalesAdvisor[]>(advisorsKey(companyId), prev =>
+        (prev ?? []).map(a => a.id === id ? { ...a, status: nextStatus } : a),
+      );
+      return { previous };
+    },
+    onError: (err: Error, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(advisorsKey(companyId), ctx.previous);
+      toast({ title: 'Failed to update status', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  const handleCreate = () => {
     if (!form.code || !form.name || !form.branch) {
       return toast({ title: 'Code, Name, and Branch are required', variant: 'destructive' });
     }
     if (advisors.some(a => a.code === form.code.toUpperCase())) {
       return toast({ title: 'SA Code already exists', variant: 'destructive' });
     }
-    if (!user) return;
-    setSaving(true);
-    const { error } = await createSalesAdvisor({
-      companyId: user.company_id,
-      code: form.code,
-      name: form.name,
-      email: form.email || null,
-      ic: form.ic || null,
-      contact: form.contact || null,
-      branch: form.branch,
-      joinDate: form.joinDate || null,
-    });
-    setSaving(false);
-    if (error) {
-      toast({ title: 'Failed to create advisor', description: error.message, variant: 'destructive' });
-      return;
-    }
-    toast({ title: 'Sales Advisor created', description: `${form.code.toUpperCase()} — ${form.name}` });
-    setForm(EMPTY_FORM);
-    setAddOpen(false);
-    loadAdvisors();
+    createMutation.mutate(form);
   };
 
-  const toggleStatus = async (id: string) => {
+  const toggleStatus = (id: string) => {
     const advisor = advisors.find(a => a.id === id);
     if (!advisor) return;
-    const newStatus: SAStatus = advisor.status === 'active' ? 'inactive' : 'active';
-    // Optimistic update
-    setAdvisors(prev => prev.map(a => a.id !== id ? a : { ...a, status: newStatus }));
-    const { error } = await updateSalesAdvisorStatus(user!.company_id, id, newStatus);
-    if (error) {
-      // Revert on failure
-      setAdvisors(prev => prev.map(a => a.id !== id ? a : { ...a, status: advisor.status }));
-      toast({ title: 'Failed to update status', description: error.message, variant: 'destructive' });
-    }
+    const nextStatus: SAStatus = advisor.status === 'active' ? 'inactive' : 'active';
+    statusMutation.mutate({ id, nextStatus });
   };
 
-  if (loading) {
+  const advisorsLoading = advisorsQuery.isLoading && !advisorsQuery.data;
+
+  if (advisorsLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader
@@ -227,7 +249,7 @@ export default function SalesAdvisors() {
                       <Badge className={`text-[10px] capitalize ${STATUS_BADGE[a.status]}`}>{a.status}</Badge>
                     </td>
                     <td className="py-2">
-                      <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => toggleStatus(a.id)}>
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => toggleStatus(a.id)} disabled={statusMutation.isPending}>
                         {a.status === 'active' ? 'Deactivate' : 'Activate'}
                       </Button>
                     </td>
@@ -284,7 +306,7 @@ export default function SalesAdvisors() {
           </div>
           <DialogFooter className="mt-4">
             <Button variant="outline" size="sm" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleCreate} disabled={saving}>Create Advisor</Button>
+            <Button size="sm" onClick={handleCreate} disabled={createMutation.isPending}>Create Advisor</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
