@@ -140,11 +140,18 @@ export default defineConfig(({ mode }) => {
   ].filter(Boolean),
   resolve: {
     alias: {
+      // More-specific aliases must come first. Vite resolves in declared order,
+      // and `@/components/ui/*` and `@/hooks/use-toast`/`use-mobile` are now
+      // owned by the `@flc/ui` package.
+      "@/components/ui": path.resolve(__dirname, "./packages/ui/src"),
+      "@/hooks/use-toast": path.resolve(__dirname, "./packages/ui/src/hooks/use-toast.ts"),
+      "@/hooks/use-mobile": path.resolve(__dirname, "./packages/ui/src/hooks/use-mobile.tsx"),
       "@": path.resolve(__dirname, "./src"),
       "@flc/types": path.resolve(__dirname, "./packages/types/src/index.ts"),
       "@flc/supabase": path.resolve(__dirname, "./packages/supabase/src/index.ts"),
       "@flc/shell": path.resolve(__dirname, "./packages/shell/src/index.ts"),
       "@flc/hrms-schemas": path.resolve(__dirname, "./packages/hrms-schemas/src/index.ts"),
+      "@flc/ui": path.resolve(__dirname, "./packages/ui/src"),
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
   },
