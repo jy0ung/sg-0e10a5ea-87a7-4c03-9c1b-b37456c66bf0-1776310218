@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { approvalInboxQueryKey, useApprovalInboxItems } from '@/hooks/useApprovalInboxItems';
-import { useSupabaseChannel } from '@/hooks/useSupabaseChannel';
+import { useSupabaseChannel } from '@flc/supabase';
 import {
   reviewAppraisalActivation,
   reviewLeaveRequest,

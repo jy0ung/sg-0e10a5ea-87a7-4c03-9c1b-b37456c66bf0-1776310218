@@ -1,28 +1,27 @@
 import { useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from './client';
 
 // One hook to replace the inline supabase.channel(...).on(...).subscribe()
-// boilerplate currently duplicated in ApprovalInbox, Notifications,
-// SalesContext, and several Auto Aging surfaces. Reduces three concerns to
-// one: name the channel, declare the subscriptions, handle the events.
-//
-// Each subscription is a postgres_changes binding. The handler is called
-// for every event that matches its (event, schema, table, filter). The
-// subscription auto-cleans on unmount.
+// boilerplate previously duplicated across both apps. Reduces three
+// concerns to one: name the channel, declare the subscriptions, handle
+// the events.
 //
 //   useSupabaseChannel({
 //     name: `approval-inbox:${companyId}`,
 //     enabled: !!companyId,
 //     subscriptions: [
 //       { event: '*', table: 'leave_requests', filter: `company_id=eq.${companyId}` },
-//       { event: '*', table: 'payroll_runs',   filter: `company_id=eq.${companyId}` },
-//       { event: '*', table: 'appraisals',     filter: `company_id=eq.${companyId}` },
 //     ],
 //     onChange: () => queryClient.invalidateQueries({ queryKey }),
 //   });
 //
 // Per-subscription onChange is also supported when an INSERT needs a
 // different optimistic update than an UPDATE (see Notifications.tsx).
+//
+// Lives in @flc/supabase because (a) it depends on the shared client
+// and (b) it is consumed by both the main app and the hrms-web app —
+// keeping it in either app's src/hooks/ would re-introduce the
+// drift the Phase 2a duplicate was meant to retire.
 
 export type RealtimeEvent = 'INSERT' | 'UPDATE' | 'DELETE' | '*';
 
@@ -79,8 +78,7 @@ export function useSupabaseChannel<TRow = Record<string, unknown>>(
       // The supabase-js typings narrow the second arg by event literal,
       // so we cast through unknown to keep the call site one-shot.
       channel = channel.on(
-        // deno-lint-ignore no-explicit-any
-        'postgres_changes' as unknown as any,
+        'postgres_changes' as unknown as Parameters<typeof channel.on>[0],
         {
           event: sub.event ?? '*',
           schema: sub.schema ?? 'public',
