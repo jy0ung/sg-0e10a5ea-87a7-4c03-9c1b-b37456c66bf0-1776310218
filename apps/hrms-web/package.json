@@ -15,6 +15,7 @@
     "@flc/shell": "*",
     "@flc/supabase": "*",
     "@flc/types": "*",
+    "@flc/ui": "*",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-label": "^2.1.7",
