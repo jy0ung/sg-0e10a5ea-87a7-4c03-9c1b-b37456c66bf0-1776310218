@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { STALE } from '@/lib/queryClient';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useData } from '@/contexts/DataContext';
 import { getAutoAgingDashboardSummary, getAutoAgingReport, searchVehicles } from '@/services/vehicleService';
@@ -78,30 +79,32 @@ export default function ExecutiveDashboard() {
   const bgDateTo = periodRange.to?.toISOString().slice(0, 10) ?? null;
 
   // Load preferences
-  useEffect(() => {
-    async function loadPrefs() {
-      if (!user?.id) { setPrefsLoaded(true); return; }
-      const userId = user.id;
-      const localDashboard = loadPersonalDashboardState('company-overview');
-      const { data } = await fetchDashboardPreferences(userId);
+  const { data: remotePrefs } = useQuery({
+    queryKey: ['dashboard-preferences', user?.id],
+    queryFn: () => fetchDashboardPreferences(user!.id).then(r => r.data ?? null),
+    enabled: !!user?.id,
+    staleTime: STALE.reference,
+  });
 
-      if (data) {
-        setSelectedKpis(data.selected_kpis ?? ADVANCED_KPIS);
-        setShowAdvanced(data.show_advanced_kpis ?? true);
-        const remoteDashboard = sanitizeDashboardPreferences(data.personal_dashboard);
-        setPersonalDashboard(
-          isSameDashboardPreferences(remoteDashboard, sanitizeDashboardPreferences(DEFAULT_PERSONAL_DASHBOARD))
-            && !isSameDashboardPreferences(localDashboard, sanitizeDashboardPreferences(DEFAULT_PERSONAL_DASHBOARD))
-            ? localDashboard
-            : remoteDashboard,
-        );
-      } else {
-        setPersonalDashboard(localDashboard);
-      }
-      setPrefsLoaded(true);
+  useEffect(() => {
+    if (!user?.id) { setPrefsLoaded(true); return; }
+    if (remotePrefs === undefined) return;
+    const localDashboard = loadPersonalDashboardState('company-overview');
+    if (remotePrefs) {
+      setSelectedKpis(remotePrefs.selected_kpis ?? ADVANCED_KPIS);
+      setShowAdvanced(remotePrefs.show_advanced_kpis ?? true);
+      const remoteDashboard = sanitizeDashboardPreferences(remotePrefs.personal_dashboard);
+      setPersonalDashboard(
+        isSameDashboardPreferences(remoteDashboard, sanitizeDashboardPreferences(DEFAULT_PERSONAL_DASHBOARD))
+          && !isSameDashboardPreferences(localDashboard, sanitizeDashboardPreferences(DEFAULT_PERSONAL_DASHBOARD))
+          ? localDashboard
+          : remoteDashboard,
+      );
+    } else {
+      setPersonalDashboard(localDashboard);
     }
-    loadPrefs();
-  }, [user?.id]);
+    setPrefsLoaded(true);
+  }, [user?.id, remotePrefs]);
 
   useEffect(() => {
     saveDashboardFilterState('company-overview', dashboardFilter);

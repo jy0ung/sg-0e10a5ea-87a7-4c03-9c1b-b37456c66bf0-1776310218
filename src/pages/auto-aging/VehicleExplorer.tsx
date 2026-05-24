@@ -17,8 +17,6 @@ import { useVehicleExplorerColumns, type VehicleRow } from './useVehicleExplorer
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250] as const;
 
-type UserPermissions = Awaited<ReturnType<typeof getUserPermissions>>;
-
 const DEFAULT_FILTERS: VehicleFilterState = {
   search: '',
   branch: 'all',
@@ -86,7 +84,6 @@ export default function VehicleExplorer() {
   const [page, setPage] = useState(1);
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleCanonical | null>(null);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
-  const [userPermissions, setUserPermissions] = useState<UserPermissions>(null as unknown as UserPermissions);
   const [exportLoading, setExportLoading] = useState(false);
   const [readOnlyMode, setReadOnlyMode] = useState(true);
   const [pendingBulkAction, setPendingBulkAction] = useState<{ action: string; vehicles: VehicleCanonical[] } | null>(null);
@@ -130,11 +127,12 @@ export default function VehicleExplorer() {
     [serverQuery.data?.rows],
   );
 
-  useEffect(() => {
-    if (user?.id) {
-      getUserPermissions(user.id).then(setUserPermissions);
-    }
-  }, [user?.id]);
+  const { data: userPermissions = null } = useQuery({
+    queryKey: ['user-permissions', user?.id],
+    queryFn: () => getUserPermissions(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60_000,
+  });
 
   useEffect(() => {
     if (chassisParam && serverQuery.data) {
