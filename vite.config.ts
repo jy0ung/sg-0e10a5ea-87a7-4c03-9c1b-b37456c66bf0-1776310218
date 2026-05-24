@@ -147,6 +147,7 @@ export default defineConfig(({ mode }) => {
       "@/hooks/use-toast": path.resolve(__dirname, "./packages/ui/src/hooks/use-toast.ts"),
       "@/hooks/use-mobile": path.resolve(__dirname, "./packages/ui/src/hooks/use-mobile.tsx"),
       "@": path.resolve(__dirname, "./src"),
+      "@flc/auth": path.resolve(__dirname, "./packages/auth/src/index.ts"),
       "@flc/types": path.resolve(__dirname, "./packages/types/src/index.ts"),
       "@flc/supabase": path.resolve(__dirname, "./packages/supabase/src/index.ts"),
       "@flc/shell": path.resolve(__dirname, "./packages/shell/src/index.ts"),

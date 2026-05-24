@@ -33,6 +33,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@flc/auth": "*",
     "@flc/hrms-schemas": "*",
     "@flc/hrms-services": "*",
     "@flc/shell": "*",

@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => {
         '@/hooks/use-mobile': path.resolve(rootDir, 'packages/ui/src/hooks/use-mobile.tsx'),
         '@': path.resolve(__dirname, 'src'),
         '@hrms-web': path.resolve(__dirname, 'src'),
+        '@flc/auth': path.resolve(rootDir, 'packages/auth/src/index.ts'),
         '@flc/types': path.resolve(rootDir, 'packages/types/src/index.ts'),
         '@flc/supabase': path.resolve(rootDir, 'packages/supabase/src/index.ts'),
         '@flc/shell': path.resolve(rootDir, 'packages/shell/src/index.ts'),

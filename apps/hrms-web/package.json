@@ -10,6 +10,7 @@
     "test:e2e": "playwright test --config playwright.config.ts"
   },
   "dependencies": {
+    "@flc/auth": "*",
     "@flc/hrms-schemas": "*",
     "@flc/hrms-services": "*",
     "@flc/shell": "*",

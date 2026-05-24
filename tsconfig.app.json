@@ -21,6 +21,7 @@
       "@/hooks/use-toast": ["./packages/ui/src/hooks/use-toast.ts"],
       "@/hooks/use-mobile": ["./packages/ui/src/hooks/use-mobile.tsx"],
       "@/*": ["./src/*"],
+      "@flc/auth": ["./packages/auth/src/index.ts"],
       "@flc/types": ["./packages/types/src/index.ts"],
       "@flc/supabase": ["./packages/supabase/src/index.ts"],
       "@flc/shell": ["./packages/shell/src/index.ts"],
