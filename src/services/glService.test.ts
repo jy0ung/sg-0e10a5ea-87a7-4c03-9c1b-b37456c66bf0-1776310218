@@ -6,6 +6,7 @@ import {
   getTrialBalance,
   getProfitLoss,
   getBalanceSheet,
+  getCashPosition,
   listAccountingPeriods,
   createAccountingPeriod,
   closeAccountingPeriod,
@@ -321,6 +322,64 @@ describe('getBalanceSheet', () => {
     const result = await getBalanceSheet('company-1', 'period-uuid-1');
 
     expect(result.data![0].balance).toBe(-5_000);
+  });
+});
+
+// ── getCashPosition ───────────────────────────────────────────────────────────
+
+describe('getCashPosition', () => {
+  it('calls get_cash_position RPC with company and date range and maps rows', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: [
+        { position_date: '2026-05-01', daily_debit: 10_000, daily_credit: 2_000, daily_net: 8_000,  running_balance: 108_000 },
+        { position_date: '2026-05-02', daily_debit: 0,      daily_credit: 0,     daily_net: 0,      running_balance: 108_000 },
+        { position_date: '2026-05-03', daily_debit: 5_000,  daily_credit: 7_500, daily_net: -2_500, running_balance: 105_500 },
+      ],
+      error: null,
+    } as never);
+
+    const result = await getCashPosition('company-1', '2026-05-01', '2026-05-03');
+
+    expect(supabase.rpc).toHaveBeenCalledWith('get_cash_position', {
+      p_company_id: 'company-1',
+      p_from_date:  '2026-05-01',
+      p_to_date:    '2026-05-03',
+    });
+    expect(result.data).toHaveLength(3);
+    expect(result.data![0]).toMatchObject({
+      positionDate:   '2026-05-01',
+      dailyDebit:     10_000,
+      dailyCredit:    2_000,
+      dailyNet:       8_000,
+      runningBalance: 108_000,
+    });
+    // Flat day with zero activity
+    expect(result.data![1].dailyNet).toBe(0);
+    // Net outflow day
+    expect(result.data![2].dailyNet).toBe(-2_500);
+    expect(result.error).toBeNull();
+  });
+
+  it('returns an Error when RPC fails', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: null,
+      error: { message: 'p_from_date must not be after p_to_date' },
+    } as never);
+
+    const result = await getCashPosition('company-1', '2026-05-31', '2026-05-01');
+
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error!.message).toContain('must not be after');
+  });
+
+  it('returns empty array when no cash account is seeded', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: [], error: null } as never);
+
+    const result = await getCashPosition('company-1', '2026-05-01', '2026-05-31');
+
+    expect(result.data).toEqual([]);
+    expect(result.error).toBeNull();
   });
 });
 

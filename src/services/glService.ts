@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { loggingService } from './loggingService';
 import type {
   BalanceSheetRow,
+  CashPositionRow,
   GlAccount,
   GlAccountType,
   AccountingPeriod,
@@ -96,6 +97,16 @@ function mapBalanceSheetRow(row: Record<string, unknown>): BalanceSheetRow {
     accountName: String(row.account_name ?? ''),
     accountType: (row.account_type as BalanceSheetRow['accountType']) ?? 'asset',
     balance:     Number(row.balance ?? 0),
+  };
+}
+
+function mapCashPositionRow(row: Record<string, unknown>): CashPositionRow {
+  return {
+    positionDate:   String(row.position_date ?? ''),
+    dailyDebit:     Number(row.daily_debit ?? 0),
+    dailyCredit:    Number(row.daily_credit ?? 0),
+    dailyNet:       Number(row.daily_net ?? 0),
+    runningBalance: Number(row.running_balance ?? 0),
   };
 }
 
@@ -219,6 +230,33 @@ export async function getBalanceSheet(
   }
   return {
     data: (data as Record<string, unknown>[]).map(mapBalanceSheetRow),
+    error: null,
+  };
+}
+
+// ── Cash Position ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetch the daily cash position series over a date range. Returns a dense
+ * series — every day in [fromDate, toDate] is included even with zero
+ * activity — so consumers can render flat segments rather than gaps.
+ */
+export async function getCashPosition(
+  companyId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<{ data: CashPositionRow[] | null; error: Error | null }> {
+  const { data, error } = await supabase.rpc('get_cash_position', {
+    p_company_id: companyId,
+    p_from_date:  fromDate,
+    p_to_date:    toDate,
+  });
+  if (error) {
+    loggingService.error('getCashPosition failed', { companyId, fromDate, toDate, error }, 'glService');
+    return { data: null, error: new Error(error.message) };
+  }
+  return {
+    data: (data as Record<string, unknown>[]).map(mapCashPositionRow),
     error: null,
   };
 }

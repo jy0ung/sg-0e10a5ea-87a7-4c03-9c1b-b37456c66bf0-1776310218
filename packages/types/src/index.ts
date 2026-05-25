@@ -1192,6 +1192,14 @@ export interface BalanceSheetRow {
   balance: number;
 }
 
+export interface CashPositionRow {
+  positionDate: string;     // ISO date (YYYY-MM-DD)
+  dailyDebit: number;
+  dailyCredit: number;
+  dailyNet: number;
+  runningBalance: number;
+}
+
 export type AgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
 
 export interface AgingByBranchRow {
