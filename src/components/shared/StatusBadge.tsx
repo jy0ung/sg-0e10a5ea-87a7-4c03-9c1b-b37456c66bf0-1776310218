@@ -33,6 +33,14 @@ const statusStyles: Record<string, string> = {
   duplicate: 'bg-muted text-muted-foreground',
   invalid: 'bg-destructive/15 text-destructive',
   format_error: 'bg-warning/15 text-warning',
+  // Import review statuses
+  in_review: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  resolved: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+  discarded: 'bg-red-600/15 text-red-700 dark:text-red-400',
+  // Import review reasons
+  incomplete: 'bg-orange-500/15 text-orange-600 dark:text-orange-400',
+  blocking: 'bg-red-600/15 text-red-700 dark:text-red-400',
+  mixed: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {

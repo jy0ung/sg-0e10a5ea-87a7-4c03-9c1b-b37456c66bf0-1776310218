@@ -8,6 +8,7 @@ import { ValidationSummaryModal } from '@/components/shared/ValidationSummaryMod
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -262,6 +263,7 @@ export default function ImportCenter() {
   const { user } = useAuth();
   const companyId = useCompanyId();
   const { toast } = useToast();
+  const canUseReviewQueue = useFeatureFlag('phase3a.import-review-v2', false);
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');
   const [rawRows, setRawRows] = useState<VehicleRaw[]>([]);
@@ -873,9 +875,16 @@ export default function ImportCenter() {
         _insertedVehicleCount = result.inserted;
       }
 
-      const reviewInsertResult = await insertImportReviewRows(reviewRows);
-      if (reviewInsertResult.error) {
-        throw new Error(`Review queue insert failed: ${reviewInsertResult.error.message}`);
+      // If review queue feature is disabled, discard review rows (legacy behavior: publish all)
+      if (canUseReviewQueue && reviewRows.length > 0) {
+        const reviewInsertResult = await insertImportReviewRows(reviewRows);
+        if (reviewInsertResult.error) {
+          throw new Error(`Review queue insert failed: ${reviewInsertResult.error.message}`);
+        }
+      } else if (!canUseReviewQueue && reviewRows.length > 0) {
+        // Feature disabled: merge review rows into clean rows for immediate publish
+        cleanRows.push(...reviewRows);
+        reviewRows.length = 0;
       }
 
       if (cleanRows.length > 0) {
@@ -931,7 +940,7 @@ export default function ImportCenter() {
       updateImportBatch(batchId, { status: 'failed' });
       setStep('review');
     }
-  }, [addQualityIssues, batchId, companyId, isPreviewValidating, mergedRawRows, missingCols.length, rawRows, reloadFromDb, runReviewValidation, savedBranchMappings, toast, updateImportBatch, user]);
+  }, [addQualityIssues, batchId, canUseReviewQueue, companyId, isPreviewValidating, mergedRawRows, missingCols.length, rawRows, reloadFromDb, runReviewValidation, savedBranchMappings, toast, updateImportBatch, user]);
 
   const handleExportErrors = useCallback(() => {
     const errorsText = serverErrors.map(e => 

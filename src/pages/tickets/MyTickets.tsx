@@ -116,7 +116,6 @@ export default function MyTickets() {
   const attachmentsByTicket = useMemo(() => ticketsData?.attachmentsByTicket ?? {}, [ticketsData]);
 
   // Initialise comment drafts when new tickets arrive; preserve in-progress drafts.
-  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   useEffect(() => {
     setCommentDrafts((prev) => {
       const next = { ...prev };
@@ -125,8 +124,6 @@ export default function MyTickets() {
       }
       return next;
     });
-  // setCommentDrafts is a stable React state setter; excluding it is intentional
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets]);
 
   const refreshTickets = () => void queryClient.invalidateQueries({ queryKey: myTicketsKey });

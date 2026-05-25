@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useData } from '@/contexts/DataContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getImportReviewRows, reviewRow } from '@/services/importReviewService';
 import type { ImportReviewRow } from '@/types';
 import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, XCircle } from 'lucide-react';
@@ -21,6 +22,7 @@ export default function ImportReviewDetail() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const canUseReviewQueue = useFeatureFlag('phase3a.import-review-v2', false);
 
   const batch = useMemo(() => importBatches.find((candidate) => candidate.id === batchId) ?? null, [batchId, importBatches]);
 
@@ -44,6 +46,23 @@ export default function ImportReviewDetail() {
       toast.success(status === 'resolved' ? 'Row accepted' : 'Row discarded');
       void queryClient.invalidateQueries({ queryKey: rowsKey });
     }
+  }
+
+  if (!canUseReviewQueue) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader
+          title="Review Batch"
+          description="Inspect queued import rows and their validation issues"
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Review Queue' }]}
+        />
+        <div className="glass-panel p-12 text-center max-w-md mx-auto">
+          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
+          <p className="text-sm text-muted-foreground">The Import Review Queue is not enabled for your company. Contact your administrator for access.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

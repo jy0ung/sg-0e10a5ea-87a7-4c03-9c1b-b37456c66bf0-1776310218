@@ -4,11 +4,30 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/contexts/DataContext';
-import { Clock, Eye } from 'lucide-react';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
+import { Clock, Eye, AlertTriangle } from 'lucide-react';
 
 export default function ImportReviewQueue() {
   const navigate = useNavigate();
   const { importBatches } = useData();
+  const canUseReviewQueue = useFeatureFlag('phase3a.import-review-v2', false);
+
+  if (!canUseReviewQueue) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <PageHeader
+          title="Review Queue"
+          description="Review rows held back from Auto Aging imports"
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Review Queue' }]}
+        />
+        <div className="glass-panel p-12 text-center max-w-md mx-auto">
+          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
+          <p className="text-sm text-muted-foreground">The Import Review Queue is not enabled for your company. Contact your administrator for access.</p>
+        </div>
+      </div>
+    );
+  }
 
   const queuedBatches = importBatches.filter(batch => (batch.reviewRows ?? 0) > 0);
 

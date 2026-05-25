@@ -66,7 +66,7 @@ export async function getImportReviewRows(batchId: string, companyId: string): P
 export async function reviewRow(
   id: string,
   status: ImportReviewStatus,
-  opts?: { comment?: string; reviewedBy?: string },
+  opts?: { reviewedBy?: string },
 ): Promise<{ error: string | null }> {
   const payload: Record<string, unknown> = {
     review_status: status,
