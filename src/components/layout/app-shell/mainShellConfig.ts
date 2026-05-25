@@ -113,6 +113,7 @@ const navItems: MainNavItem[] = [
   { label: 'Chart of Accounts', path: '/accounts/chart', icon: BookOpen, section: 'Accounts', group: 'Ledger', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
   { label: 'Accounting Periods', path: '/accounts/periods', icon: Calendar, section: 'Accounts', group: 'Ledger', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
   { label: 'Trial Balance', path: '/accounts/trial-balance', icon: Scale, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
+  { label: 'Profit & Loss', path: '/accounts/profit-loss', icon: TrendingUp, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
   { label: 'Journal Entries', path: '/accounts/journal', icon: FileText, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
 
   { label: 'Business Reports', path: '/reports', icon: BarChart3, section: 'Reports', group: 'Workspace', end: true },

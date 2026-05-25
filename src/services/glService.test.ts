@@ -4,6 +4,7 @@ import {
   postArPaymentToGl,
   postApPaymentToGl,
   getTrialBalance,
+  getProfitLoss,
   listAccountingPeriods,
   createAccountingPeriod,
   closeAccountingPeriod,
@@ -157,6 +158,74 @@ describe('getTrialBalance', () => {
 
     expect(result.data).toBeNull();
     expect(result.error).toBeInstanceOf(Error);
+  });
+});
+
+// ── getProfitLoss ─────────────────────────────────────────────────────────────
+
+describe('getProfitLoss', () => {
+  it('calls get_profit_loss RPC with company and period and maps rows', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: [
+        {
+          account_id:   'acc-rev-1',
+          account_code: '4100',
+          account_name: 'Sales Revenue',
+          account_type: 'revenue',
+          amount:       250_000,
+        },
+        {
+          account_id:   'acc-exp-1',
+          account_code: '5100',
+          account_name: 'Cost of Goods Sold',
+          account_type: 'expense',
+          amount:       180_000,
+        },
+      ],
+      error: null,
+    } as never);
+
+    const result = await getProfitLoss('company-1', 'period-uuid-1');
+
+    expect(supabase.rpc).toHaveBeenCalledWith('get_profit_loss', {
+      p_company_id: 'company-1',
+      p_period_id:  'period-uuid-1',
+    });
+    expect(result.data).toHaveLength(2);
+    expect(result.data![0]).toMatchObject({
+      accountId:   'acc-rev-1',
+      accountCode: '4100',
+      accountName: 'Sales Revenue',
+      accountType: 'revenue',
+      amount:      250_000,
+    });
+    expect(result.data![1]).toMatchObject({
+      accountType: 'expense',
+      amount:      180_000,
+    });
+    expect(result.error).toBeNull();
+  });
+
+  it('returns an Error when RPC fails', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: null,
+      error: { message: 'access denied' },
+    } as never);
+
+    const result = await getProfitLoss('company-bad', 'period-x');
+
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error!.message).toBe('access denied');
+  });
+
+  it('returns empty array when no revenue or expense activity', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: [], error: null } as never);
+
+    const result = await getProfitLoss('company-1', 'period-uuid-1');
+
+    expect(result.data).toEqual([]);
+    expect(result.error).toBeNull();
   });
 });
 

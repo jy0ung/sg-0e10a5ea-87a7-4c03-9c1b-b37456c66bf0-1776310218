@@ -8,6 +8,7 @@ import type {
   JournalEntry,
   JournalEntryLine,
   JournalEntrySourceType,
+  ProfitLossRow,
   TrialBalanceRow,
   CreateAccountingPeriodInput,
   CreateGlAccountInput,
@@ -74,6 +75,16 @@ function mapJournalEntryLine(row: Record<string, unknown>): JournalEntryLine {
     debit:          Number(row.debit ?? 0),
     credit:         Number(row.credit ?? 0),
     createdAt:      String(row.created_at ?? ''),
+  };
+}
+
+function mapProfitLossRow(row: Record<string, unknown>): ProfitLossRow {
+  return {
+    accountId:   String(row.account_id ?? ''),
+    accountCode: String(row.account_code ?? ''),
+    accountName: String(row.account_name ?? ''),
+    accountType: (row.account_type as ProfitLossRow['accountType']) ?? 'revenue',
+    amount:      Number(row.amount ?? 0),
   };
 }
 
@@ -145,6 +156,32 @@ export async function getTrialBalance(
   }
   return {
     data: (data as Record<string, unknown>[]).map(mapTrialBalanceRow),
+    error: null,
+  };
+}
+
+// ── Profit & Loss ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetch the Profit & Loss report for a company and accounting period.
+ * Returns one row per active revenue/expense account; `amount` is the natural
+ * P&L impact (credit-net for revenue, debit-net for expense). Net income is
+ * computed client-side as sum(revenue) - sum(expense).
+ */
+export async function getProfitLoss(
+  companyId: string,
+  periodId: string,
+): Promise<{ data: ProfitLossRow[] | null; error: Error | null }> {
+  const { data, error } = await supabase.rpc('get_profit_loss', {
+    p_company_id: companyId,
+    p_period_id: periodId,
+  });
+  if (error) {
+    loggingService.error('getProfitLoss failed', { companyId, periodId, error }, 'glService');
+    return { data: null, error: new Error(error.message) };
+  }
+  return {
+    data: (data as Record<string, unknown>[]).map(mapProfitLossRow),
     error: null,
   };
 }

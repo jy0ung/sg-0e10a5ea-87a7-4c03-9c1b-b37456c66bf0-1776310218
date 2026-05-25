@@ -1175,6 +1175,14 @@ export interface TrialBalanceRow {
   netBalance: number;
 }
 
+export interface ProfitLossRow {
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  accountType: Extract<GlAccountType, 'revenue' | 'expense'>;
+  amount: number;
+}
+
 export interface CreateAccountingPeriodInput {
   name: string;
   periodYear: number;
