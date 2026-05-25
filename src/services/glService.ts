@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { loggingService } from './loggingService';
 import type {
+  BalanceSheetRow,
   GlAccount,
   GlAccountType,
   AccountingPeriod,
@@ -85,6 +86,16 @@ function mapProfitLossRow(row: Record<string, unknown>): ProfitLossRow {
     accountName: String(row.account_name ?? ''),
     accountType: (row.account_type as ProfitLossRow['accountType']) ?? 'revenue',
     amount:      Number(row.amount ?? 0),
+  };
+}
+
+function mapBalanceSheetRow(row: Record<string, unknown>): BalanceSheetRow {
+  return {
+    accountId:   row.account_id ? String(row.account_id) : null,
+    accountCode: String(row.account_code ?? ''),
+    accountName: String(row.account_name ?? ''),
+    accountType: (row.account_type as BalanceSheetRow['accountType']) ?? 'asset',
+    balance:     Number(row.balance ?? 0),
   };
 }
 
@@ -182,6 +193,32 @@ export async function getProfitLoss(
   }
   return {
     data: (data as Record<string, unknown>[]).map(mapProfitLossRow),
+    error: null,
+  };
+}
+
+// ── Balance Sheet ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetch the Balance Sheet snapshot as of the selected period's end_date.
+ * Returns asset/liability/equity rows with cumulative balances, plus one
+ * synthetic equity row carrying the period's unclosed net income so the
+ * sheet balances before period close.
+ */
+export async function getBalanceSheet(
+  companyId: string,
+  periodId: string,
+): Promise<{ data: BalanceSheetRow[] | null; error: Error | null }> {
+  const { data, error } = await supabase.rpc('get_balance_sheet', {
+    p_company_id: companyId,
+    p_period_id: periodId,
+  });
+  if (error) {
+    loggingService.error('getBalanceSheet failed', { companyId, periodId, error }, 'glService');
+    return { data: null, error: new Error(error.message) };
+  }
+  return {
+    data: (data as Record<string, unknown>[]).map(mapBalanceSheetRow),
     error: null,
   };
 }

@@ -5,6 +5,7 @@ import {
   postApPaymentToGl,
   getTrialBalance,
   getProfitLoss,
+  getBalanceSheet,
   listAccountingPeriods,
   createAccountingPeriod,
   closeAccountingPeriod,
@@ -226,6 +227,100 @@ describe('getProfitLoss', () => {
 
     expect(result.data).toEqual([]);
     expect(result.error).toBeNull();
+  });
+});
+
+// ── getBalanceSheet ───────────────────────────────────────────────────────────
+
+describe('getBalanceSheet', () => {
+  it('calls get_balance_sheet RPC and maps rows including the synthetic earnings row', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: [
+        {
+          account_id:   'acc-asset-1',
+          account_code: '1000',
+          account_name: 'Cash and Bank',
+          account_type: 'asset',
+          balance:      150_000,
+        },
+        {
+          account_id:   'acc-liab-1',
+          account_code: '2100',
+          account_name: 'Accounts Payable',
+          account_type: 'liability',
+          balance:      40_000,
+        },
+        {
+          account_id:   'acc-eq-1',
+          account_code: '3100',
+          account_name: 'Retained Earnings',
+          account_type: 'equity',
+          balance:      90_000,
+        },
+        {
+          account_id:   null,
+          account_code: '9999',
+          account_name: 'Current Period Earnings (unclosed)',
+          account_type: 'equity',
+          balance:      20_000,
+        },
+      ],
+      error: null,
+    } as never);
+
+    const result = await getBalanceSheet('company-1', 'period-uuid-1');
+
+    expect(supabase.rpc).toHaveBeenCalledWith('get_balance_sheet', {
+      p_company_id: 'company-1',
+      p_period_id:  'period-uuid-1',
+    });
+    expect(result.data).toHaveLength(4);
+    expect(result.data![0]).toMatchObject({
+      accountId:   'acc-asset-1',
+      accountCode: '1000',
+      accountType: 'asset',
+      balance:     150_000,
+    });
+    // Synthetic earnings row has null accountId
+    expect(result.data![3]).toMatchObject({
+      accountId:   null,
+      accountCode: '9999',
+      accountType: 'equity',
+      balance:     20_000,
+    });
+    expect(result.error).toBeNull();
+  });
+
+  it('returns an Error when RPC fails', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: null,
+      error: { message: 'period not found' },
+    } as never);
+
+    const result = await getBalanceSheet('company-1', 'bad-period');
+
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error!.message).toBe('period not found');
+  });
+
+  it('handles negative balances (debit-balanced liability or asset overdraft)', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: [
+        {
+          account_id:   'acc-asset-1',
+          account_code: '1000',
+          account_name: 'Cash and Bank',
+          account_type: 'asset',
+          balance:      -5_000,
+        },
+      ],
+      error: null,
+    } as never);
+
+    const result = await getBalanceSheet('company-1', 'period-uuid-1');
+
+    expect(result.data![0].balance).toBe(-5_000);
   });
 });
 

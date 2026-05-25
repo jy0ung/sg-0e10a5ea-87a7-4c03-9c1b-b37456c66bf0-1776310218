@@ -1183,6 +1183,15 @@ export interface ProfitLossRow {
   amount: number;
 }
 
+export interface BalanceSheetRow {
+  // accountId is null for the synthetic "Current Period Earnings" row.
+  accountId: string | null;
+  accountCode: string;
+  accountName: string;
+  accountType: Extract<GlAccountType, 'asset' | 'liability' | 'equity'>;
+  balance: number;
+}
+
 export interface CreateAccountingPeriodInput {
   name: string;
   periodYear: number;

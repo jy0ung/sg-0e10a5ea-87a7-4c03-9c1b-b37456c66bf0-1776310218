@@ -99,6 +99,7 @@ const ChartOfAccounts = lazy(() => import("./pages/accounts/ChartOfAccounts"));
 const AccountingPeriods = lazy(() => import("./pages/accounts/AccountingPeriods"));
 const TrialBalance = lazy(() => import("./pages/accounts/TrialBalance"));
 const ProfitLoss = lazy(() => import("./pages/accounts/ProfitLoss"));
+const BalanceSheet = lazy(() => import("./pages/accounts/BalanceSheet"));
 const JournalEntries = lazy(() => import("./pages/accounts/JournalEntries"));
 const MarginAnalysis = lazy(() => import("./pages/sales/MarginAnalysis"));
 const OutstandingCollection = lazy(() => import("./pages/sales/OutstandingCollection"));
@@ -229,6 +230,7 @@ const router = createBrowserRouter([
       { path: "accounts/periods", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Accounting Periods"><S><AccountingPeriods /></S></R></RequireRole> },
       { path: "accounts/trial-balance", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Trial Balance"><S><TrialBalance /></S></R></RequireRole> },
       { path: "accounts/profit-loss", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Profit & Loss"><S><ProfitLoss /></S></R></RequireRole> },
+      { path: "accounts/balance-sheet", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Balance Sheet"><S><BalanceSheet /></S></R></RequireRole> },
       { path: "accounts/journal", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Journal Entries"><S><JournalEntries /></S></R></RequireRole> },
       { path: "admin/activity", element: <RequireRole roles={EXECUTIVE} section="Admin"><R scope="Activity Dashboard"><S><ActivityDashboard /></S></R></RequireRole> },
       { path: "admin/users", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Users"><S><UserManagement /></S></R></RequireRole> },
