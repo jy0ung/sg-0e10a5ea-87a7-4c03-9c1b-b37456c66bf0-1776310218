@@ -1200,6 +1200,32 @@ export interface CashPositionRow {
   runningBalance: number;
 }
 
+export interface PeriodCloseSummary {
+  periodStatus: AccountingPeriodStatus;
+  periodStartDate: string;
+  periodEndDate: string;
+  journalEntryCount: number;
+  totalDebit: number;
+  totalCredit: number;
+  unpostedArPaymentCount: number;
+  unpostedArPaymentAmount: number;
+  unpostedApPaymentCount: number;
+  unpostedApPaymentAmount: number;
+  openArInvoiceCount: number;
+  openArInvoiceOutstanding: number;
+  openApInvoiceCount: number;
+  openApInvoiceOutstanding: number;
+}
+
+export interface PeriodCloseUnpostedRow {
+  kind: 'ar_payment' | 'ap_payment';
+  eventId: string;
+  documentId: string;
+  paymentDate: string;
+  amount: number;
+  reference: string | null;
+}
+
 export type AgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
 
 export interface AgingByBranchRow {

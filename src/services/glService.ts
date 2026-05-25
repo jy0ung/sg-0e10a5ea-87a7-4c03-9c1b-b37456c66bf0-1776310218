@@ -10,6 +10,8 @@ import type {
   JournalEntry,
   JournalEntryLine,
   JournalEntrySourceType,
+  PeriodCloseSummary,
+  PeriodCloseUnpostedRow,
   ProfitLossRow,
   TrialBalanceRow,
   CreateAccountingPeriodInput,
@@ -107,6 +109,36 @@ function mapCashPositionRow(row: Record<string, unknown>): CashPositionRow {
     dailyCredit:    Number(row.daily_credit ?? 0),
     dailyNet:       Number(row.daily_net ?? 0),
     runningBalance: Number(row.running_balance ?? 0),
+  };
+}
+
+function mapPeriodCloseSummary(row: Record<string, unknown>): PeriodCloseSummary {
+  return {
+    periodStatus:             (row.period_status as AccountingPeriodStatus) ?? 'open',
+    periodStartDate:          String(row.period_start_date ?? ''),
+    periodEndDate:            String(row.period_end_date ?? ''),
+    journalEntryCount:        Number(row.journal_entry_count ?? 0),
+    totalDebit:               Number(row.total_debit ?? 0),
+    totalCredit:              Number(row.total_credit ?? 0),
+    unpostedArPaymentCount:   Number(row.unposted_ar_payment_count ?? 0),
+    unpostedArPaymentAmount:  Number(row.unposted_ar_payment_amount ?? 0),
+    unpostedApPaymentCount:   Number(row.unposted_ap_payment_count ?? 0),
+    unpostedApPaymentAmount:  Number(row.unposted_ap_payment_amount ?? 0),
+    openArInvoiceCount:       Number(row.open_ar_invoice_count ?? 0),
+    openArInvoiceOutstanding: Number(row.open_ar_invoice_outstanding ?? 0),
+    openApInvoiceCount:       Number(row.open_ap_invoice_count ?? 0),
+    openApInvoiceOutstanding: Number(row.open_ap_invoice_outstanding ?? 0),
+  };
+}
+
+function mapPeriodCloseUnpostedRow(row: Record<string, unknown>): PeriodCloseUnpostedRow {
+  return {
+    kind:        (row.kind as PeriodCloseUnpostedRow['kind']) ?? 'ar_payment',
+    eventId:     String(row.event_id ?? ''),
+    documentId:  String(row.document_id ?? ''),
+    paymentDate: String(row.payment_date ?? ''),
+    amount:      Number(row.amount ?? 0),
+    reference:   row.reference ? String(row.reference) : null,
   };
 }
 
@@ -257,6 +289,53 @@ export async function getCashPosition(
   }
   return {
     data: (data as Record<string, unknown>[]).map(mapCashPositionRow),
+    error: null,
+  };
+}
+
+// ── Period Close Drilldown ────────────────────────────────────────────────────
+
+/**
+ * Fetch the period-close readiness summary: counts and amounts of GL postings,
+ * unposted source payments (the gaps), and open invoices with due dates in
+ * the period. Returns null when the period exists but the company has no
+ * activity — never throws on empty.
+ */
+export async function getPeriodCloseSummary(
+  companyId: string,
+  periodId: string,
+): Promise<{ data: PeriodCloseSummary | null; error: Error | null }> {
+  const { data, error } = await supabase.rpc('get_period_close_summary', {
+    p_company_id: companyId,
+    p_period_id:  periodId,
+  });
+  if (error) {
+    loggingService.error('getPeriodCloseSummary failed', { companyId, periodId, error }, 'glService');
+    return { data: null, error: new Error(error.message) };
+  }
+  const rows = data as Record<string, unknown>[] | null;
+  if (!rows || rows.length === 0) return { data: null, error: null };
+  return { data: mapPeriodCloseSummary(rows[0]), error: null };
+}
+
+/**
+ * Drilldown list of unposted AR/AP payment events for the period — the
+ * actual rows behind unposted_*_payment_count on the summary.
+ */
+export async function getPeriodCloseUnposted(
+  companyId: string,
+  periodId: string,
+): Promise<{ data: PeriodCloseUnpostedRow[] | null; error: Error | null }> {
+  const { data, error } = await supabase.rpc('get_period_close_unposted', {
+    p_company_id: companyId,
+    p_period_id:  periodId,
+  });
+  if (error) {
+    loggingService.error('getPeriodCloseUnposted failed', { companyId, periodId, error }, 'glService');
+    return { data: null, error: new Error(error.message) };
+  }
+  return {
+    data: (data as Record<string, unknown>[]).map(mapPeriodCloseUnpostedRow),
     error: null,
   };
 }

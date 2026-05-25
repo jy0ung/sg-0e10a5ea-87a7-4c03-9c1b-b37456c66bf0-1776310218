@@ -7,6 +7,8 @@ import {
   getProfitLoss,
   getBalanceSheet,
   getCashPosition,
+  getPeriodCloseSummary,
+  getPeriodCloseUnposted,
   listAccountingPeriods,
   createAccountingPeriod,
   closeAccountingPeriod,
@@ -380,6 +382,112 @@ describe('getCashPosition', () => {
 
     expect(result.data).toEqual([]);
     expect(result.error).toBeNull();
+  });
+});
+
+// ── getPeriodCloseSummary ─────────────────────────────────────────────────────
+
+describe('getPeriodCloseSummary', () => {
+  it('calls get_period_close_summary and maps the first row', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: [{
+        period_status: 'open',
+        period_start_date: '2026-05-01',
+        period_end_date:   '2026-05-31',
+        journal_entry_count: 12,
+        total_debit:  100_000,
+        total_credit: 100_000,
+        unposted_ar_payment_count: 2,
+        unposted_ar_payment_amount: 4_500,
+        unposted_ap_payment_count: 0,
+        unposted_ap_payment_amount: 0,
+        open_ar_invoice_count: 5,
+        open_ar_invoice_outstanding: 25_000,
+        open_ap_invoice_count: 3,
+        open_ap_invoice_outstanding: 18_000,
+      }],
+      error: null,
+    } as never);
+
+    const result = await getPeriodCloseSummary('company-1', 'period-uuid-1');
+
+    expect(supabase.rpc).toHaveBeenCalledWith('get_period_close_summary', {
+      p_company_id: 'company-1',
+      p_period_id:  'period-uuid-1',
+    });
+    expect(result.data).toMatchObject({
+      periodStatus: 'open',
+      periodStartDate: '2026-05-01',
+      journalEntryCount: 12,
+      totalDebit: 100_000,
+      unpostedArPaymentCount: 2,
+      unpostedArPaymentAmount: 4_500,
+      openArInvoiceCount: 5,
+      openApInvoiceCount: 3,
+    });
+    expect(result.error).toBeNull();
+  });
+
+  it('returns null data when the RPC returns an empty array', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: [], error: null } as never);
+
+    const result = await getPeriodCloseSummary('company-1', 'period-uuid-1');
+
+    expect(result.data).toBeNull();
+    expect(result.error).toBeNull();
+  });
+
+  it('returns an Error when RPC fails', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Accounting period not found' },
+    } as never);
+
+    const result = await getPeriodCloseSummary('company-1', 'bad-period');
+
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error!.message).toContain('not found');
+  });
+});
+
+// ── getPeriodCloseUnposted ────────────────────────────────────────────────────
+
+describe('getPeriodCloseUnposted', () => {
+  it('maps unposted rows across AR and AP kinds', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: [
+        { kind: 'ar_payment', event_id: 'pe-1',  document_id: 'inv-1', payment_date: '2026-05-15', amount: 1_500, reference: 'RCPT-001' },
+        { kind: 'ap_payment', event_id: 'spe-1', document_id: 'pi-1',  payment_date: '2026-05-10', amount: 3_000, reference: null },
+      ],
+      error: null,
+    } as never);
+
+    const result = await getPeriodCloseUnposted('company-1', 'period-uuid-1');
+
+    expect(supabase.rpc).toHaveBeenCalledWith('get_period_close_unposted', {
+      p_company_id: 'company-1',
+      p_period_id:  'period-uuid-1',
+    });
+    expect(result.data).toHaveLength(2);
+    expect(result.data![0]).toMatchObject({
+      kind: 'ar_payment', eventId: 'pe-1', documentId: 'inv-1', amount: 1_500, reference: 'RCPT-001',
+    });
+    expect(result.data![1]).toMatchObject({
+      kind: 'ap_payment', reference: null,
+    });
+  });
+
+  it('returns null on RPC error', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Unauthorized' },
+    } as never);
+
+    const result = await getPeriodCloseUnposted('company-bad', 'p1');
+
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(Error);
   });
 });
 

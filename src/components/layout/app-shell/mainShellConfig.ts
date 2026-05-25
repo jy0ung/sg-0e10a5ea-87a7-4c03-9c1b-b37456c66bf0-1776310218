@@ -8,6 +8,7 @@ import {
   Briefcase,
   Calendar,
   Car,
+  CheckSquare,
   Database,
   DollarSign,
   FileSpreadsheet,
@@ -117,6 +118,7 @@ const navItems: MainNavItem[] = [
   { label: 'Balance Sheet', path: '/accounts/balance-sheet', icon: Landmark, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
   { label: 'Aging by Branch', path: '/accounts/aging-by-branch', icon: GitBranch, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
   { label: 'Cash Position', path: '/accounts/cash-position', icon: DollarSign, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
+  { label: 'Period Close', path: '/accounts/period-close', icon: CheckSquare, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
   { label: 'Journal Entries', path: '/accounts/journal', icon: FileText, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
 
   { label: 'Business Reports', path: '/reports', icon: BarChart3, section: 'Reports', group: 'Workspace', end: true },
