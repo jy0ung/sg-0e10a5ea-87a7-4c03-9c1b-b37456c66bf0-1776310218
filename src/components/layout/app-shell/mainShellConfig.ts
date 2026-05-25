@@ -115,6 +115,7 @@ const navItems: MainNavItem[] = [
   { label: 'Trial Balance', path: '/accounts/trial-balance', icon: Scale, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
   { label: 'Profit & Loss', path: '/accounts/profit-loss', icon: TrendingUp, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
   { label: 'Balance Sheet', path: '/accounts/balance-sheet', icon: Landmark, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
+  { label: 'Aging by Branch', path: '/accounts/aging-by-branch', icon: GitBranch, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
   { label: 'Journal Entries', path: '/accounts/journal', icon: FileText, section: 'Accounts', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
 
   { label: 'Business Reports', path: '/reports', icon: BarChart3, section: 'Reports', group: 'Workspace', end: true },

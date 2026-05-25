@@ -5,6 +5,7 @@ import {
   reverseSupplierPaymentEvent,
   getSupplierPaymentEvents,
   getApAgingSummary,
+  getApAgingByBranch,
   transitionPiLifecycle,
 } from './apService';
 
@@ -180,6 +181,50 @@ describe('getApAgingSummary', () => {
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'DB error' } } as never);
 
     const { data, error } = await getApAgingSummary('co-bad');
+
+    expect(data).toEqual([]);
+    expect(error).toBeInstanceOf(Error);
+  });
+});
+
+// ── getApAgingByBranch ─────────────────────────────────────────────────────────
+
+describe('getApAgingByBranch', () => {
+  it('calls get_ap_aging_by_branch and maps rows including branch_code', async () => {
+    const rows = [
+      { branch_code: 'KCH', bucket: 'current',    invoice_count: 4, total_outstanding: 120_000, overdue_amount: 0 },
+      { branch_code: 'BTU', bucket: '61_90_days', invoice_count: 2, total_outstanding: 30_000,  overdue_amount: 30_000 },
+    ];
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: rows, error: null } as never);
+
+    const { data, error } = await getApAgingByBranch('co-1');
+
+    expect(supabase.rpc).toHaveBeenCalledWith('get_ap_aging_by_branch', { p_company_id: 'co-1' });
+    expect(error).toBeNull();
+    expect(data).toHaveLength(2);
+    expect(data[0]).toMatchObject({
+      branchCode: 'KCH', bucket: 'current', invoiceCount: 4, totalOutstanding: 120_000, overdueAmount: 0,
+    });
+    expect(data[1]).toMatchObject({
+      branchCode: 'BTU', bucket: '61_90_days', overdueAmount: 30_000,
+    });
+  });
+
+  it('coerces missing branch_code to "unassigned"', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: [{ branch_code: null, bucket: 'current', invoice_count: 1, total_outstanding: 100, overdue_amount: 0 }],
+      error: null,
+    } as never);
+
+    const { data } = await getApAgingByBranch('co-1');
+
+    expect(data[0].branchCode).toBe('unassigned');
+  });
+
+  it('returns empty array on RPC error', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'Unauthorized' } } as never);
+
+    const { data, error } = await getApAgingByBranch('co-bad');
 
     expect(data).toEqual([]);
     expect(error).toBeInstanceOf(Error);

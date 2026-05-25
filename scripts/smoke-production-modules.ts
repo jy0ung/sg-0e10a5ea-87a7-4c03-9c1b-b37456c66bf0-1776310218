@@ -71,6 +71,7 @@ const mainRoutes: RouteCheck[] = [
   { module: 'Purchasing', name: 'Purchase Invoices', path: '/purchasing/invoices' },
   { module: 'Accounts', name: 'Profit & Loss', path: '/accounts/profit-loss' },
   { module: 'Accounts', name: 'Balance Sheet', path: '/accounts/balance-sheet' },
+  { module: 'Accounts', name: 'Aging by Branch', path: '/accounts/aging-by-branch' },
   { module: 'Reports', name: 'Business Reports', path: '/reports' },
   { module: 'Admin', name: 'Settings', path: '/admin/settings' },
   { module: 'Admin', name: 'Activity Overview', path: '/admin/activity' },

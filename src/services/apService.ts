@@ -5,6 +5,8 @@ import type {
   SupplierPaymentEventType,
   ApAgingSummary,
   ApAgingBucket,
+  AgingByBranchRow,
+  AgingBucket,
   PurchaseInvoiceLifecycleStatus,
 } from '@/types';
 
@@ -123,6 +125,32 @@ export async function getApAgingSummary(
   }
   return {
     data: ((data as unknown[]) ?? []).map(r => mapAgingRow(r as Record<string, unknown>)),
+    error: null,
+  };
+}
+
+/** AP aging buckets broken down by branch (derived via purchase_invoices → vehicles.chassis_no). */
+export async function getApAgingByBranch(
+  companyId: string,
+): Promise<{ data: AgingByBranchRow[]; error: Error | null }> {
+  const { data, error } = await supabase.rpc('get_ap_aging_by_branch', {
+    p_company_id: companyId,
+  });
+  if (error) {
+    loggingService.error('getApAgingByBranch failed', { companyId, error }, 'apService');
+    return { data: [], error: new Error(error.message) };
+  }
+  return {
+    data: ((data as unknown[]) ?? []).map(r => {
+      const row = r as Record<string, unknown>;
+      return {
+        branchCode:       String(row.branch_code ?? 'unassigned'),
+        bucket:           row.bucket as AgingBucket,
+        invoiceCount:     Number(row.invoice_count ?? 0),
+        totalOutstanding: Number(row.total_outstanding ?? 0),
+        overdueAmount:    Number(row.overdue_amount ?? 0),
+      };
+    }),
     error: null,
   };
 }

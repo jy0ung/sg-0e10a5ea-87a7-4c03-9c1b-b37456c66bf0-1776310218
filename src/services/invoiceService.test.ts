@@ -5,6 +5,7 @@ import {
   reversePaymentEvent,
   getPaymentEvents,
   getArAgingSummary,
+  getArAgingByBranch,
 } from './invoiceService';
 
 vi.mock('@/integrations/supabase/client', () => ({
@@ -192,5 +193,50 @@ describe('getArAgingSummary', () => {
     expect(result.data).toEqual([]);
     expect(result.error).toBeInstanceOf(Error);
     expect(result.error!.message).toBe('Company not found');
+  });
+});
+
+// ── getArAgingByBranch ────────────────────────────────────────────────────────
+
+describe('getArAgingByBranch', () => {
+  it('calls get_ar_aging_by_branch and maps rows including branch_code', async () => {
+    const rawRows = [
+      { branch_code: 'KCH', bucket: 'current',     invoice_count: 3, total_outstanding: 15000, overdue_amount: 0 },
+      { branch_code: 'KCH', bucket: '31_60_days',  invoice_count: 1, total_outstanding: 8000,  overdue_amount: 8000 },
+      { branch_code: 'BTU', bucket: 'over_90_days', invoice_count: 2, total_outstanding: 22000, overdue_amount: 22000 },
+    ];
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: rawRows, error: null } as never);
+
+    const result = await getArAgingByBranch('company-1');
+
+    expect(supabase.rpc).toHaveBeenCalledWith('get_ar_aging_by_branch', { p_company_id: 'company-1' });
+    expect(result.error).toBeNull();
+    expect(result.data).toHaveLength(3);
+    expect(result.data[0]).toMatchObject({
+      branchCode: 'KCH', bucket: 'current', invoiceCount: 3, totalOutstanding: 15000, overdueAmount: 0,
+    });
+    expect(result.data[2]).toMatchObject({
+      branchCode: 'BTU', bucket: 'over_90_days', invoiceCount: 2, overdueAmount: 22000,
+    });
+  });
+
+  it('coerces missing branch_code to "unassigned"', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: [{ branch_code: null, bucket: 'current', invoice_count: 1, total_outstanding: 500, overdue_amount: 0 }],
+      error: null,
+    } as never);
+
+    const result = await getArAgingByBranch('company-1');
+
+    expect(result.data[0].branchCode).toBe('unassigned');
+  });
+
+  it('returns empty array on RPC error', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'Unauthorized' } } as never);
+
+    const result = await getArAgingByBranch('company-bad');
+
+    expect(result.data).toEqual([]);
+    expect(result.error).toBeInstanceOf(Error);
   });
 });

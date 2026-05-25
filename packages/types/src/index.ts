@@ -1192,6 +1192,16 @@ export interface BalanceSheetRow {
   balance: number;
 }
 
+export type AgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
+
+export interface AgingByBranchRow {
+  branchCode: string;
+  bucket: AgingBucket;
+  invoiceCount: number;
+  totalOutstanding: number;
+  overdueAmount: number;
+}
+
 export interface CreateAccountingPeriodInput {
   name: string;
   periodYear: number;

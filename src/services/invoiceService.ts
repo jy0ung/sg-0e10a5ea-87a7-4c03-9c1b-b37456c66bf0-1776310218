@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Invoice, InvoicePaymentStatus, InvoiceReconciliationStatus, InvoiceSourceType, InvoiceType, PaymentEvent, PaymentEventType, ArAgingSummary, ArAgingBucket } from '@/types';
+import { AgingByBranchRow, AgingBucket, Invoice, InvoicePaymentStatus, InvoiceReconciliationStatus, InvoiceSourceType, InvoiceType, PaymentEvent, PaymentEventType, ArAgingSummary, ArAgingBucket } from '@/types';
 import { loggingService } from './loggingService';
 import { performanceService } from './performanceService';
 
@@ -165,6 +165,26 @@ export async function getArAgingSummary(
       invoiceCount: r.invoice_count as number,
       totalOutstanding: r.total_outstanding as number,
       overdueAmount: r.overdue_amount as number,
+    })),
+    error: null,
+  };
+}
+
+export async function getArAgingByBranch(
+  companyId: string,
+): Promise<{ data: AgingByBranchRow[]; error: Error | null }> {
+  const { data, error } = await supabase.rpc('get_ar_aging_by_branch', { p_company_id: companyId });
+  if (error) {
+    loggingService.error('getArAgingByBranch failed', { companyId, error }, 'invoiceService');
+    return { data: [], error: new Error(error.message) };
+  }
+  return {
+    data: (data ?? []).map((r: Record<string, unknown>) => ({
+      branchCode:       String(r.branch_code ?? 'unassigned'),
+      bucket:           r.bucket as AgingBucket,
+      invoiceCount:     Number(r.invoice_count ?? 0),
+      totalOutstanding: Number(r.total_outstanding ?? 0),
+      overdueAmount:    Number(r.overdue_amount ?? 0),
     })),
     error: null,
   };
