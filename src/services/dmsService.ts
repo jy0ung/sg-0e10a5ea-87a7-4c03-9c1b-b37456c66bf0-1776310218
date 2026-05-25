@@ -94,6 +94,29 @@ export async function getDmsRawStagingCounts(
 }
 
 /**
+ * Reset a failed/cancelled sync_run back to 'pending' so the next worker
+ * pass can pick it up. RPC enforces:
+ *   • caller belongs to the company (or has global scope)
+ *   • caller has admin/director role
+ *   • current status is failed or cancelled (no retry of succeeded/running)
+ * Writes an audit_logs entry on success.
+ */
+export async function markSyncRunForRetry(
+  companyId: string,
+  runId: string,
+): Promise<{ data: string | null; error: Error | null }> {
+  const { data, error } = await supabase.rpc('mark_sync_run_for_retry', {
+    p_company_id: companyId,
+    p_run_id:     runId,
+  });
+  if (error) {
+    loggingService.error('markSyncRunForRetry failed', { companyId, runId, error }, 'dmsService');
+    return { data: null, error: new Error(error.message) };
+  }
+  return { data: data as string, error: null };
+}
+
+/**
  * Paged sync_runs list with optional source_system / status filters. Default
  * limit 50, ordered newest-first.
  */

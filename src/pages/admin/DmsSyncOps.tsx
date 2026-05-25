@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ScrollableRegion } from '@/components/shared/ScrollableRegion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
-import { getDmsSyncRunsSummary, getDmsRawStagingCounts, listSyncRuns } from '@/services/dmsService';
+import { getDmsSyncRunsSummary, getDmsRawStagingCounts, listSyncRuns, markSyncRunForRetry } from '@/services/dmsService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, CheckCircle2, Clock, Loader2, XCircle, Database } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Loader2, XCircle, Database, KeyRound, RotateCw, ShieldAlert } from 'lucide-react';
+import { toast } from 'sonner';
 import type { SyncRunStatus, SyncSourceSystem } from '@/types';
 
 const SOURCE_LABELS: Record<SyncSourceSystem, string> = {
@@ -46,8 +48,23 @@ export default function DmsSyncOps() {
   const companyId = useCompanyId();
   const canUseSyncOps = useFeatureFlag('phase3c.dms-sync-ops-v2', false);
 
+  const queryClient = useQueryClient();
   const [sourceFilter, setSourceFilter] = useState<SyncSourceSystem | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<SyncRunStatus | 'all'>('all');
+  const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
+
+  async function handleRetry(runId: string) {
+    setRetryingRunId(runId);
+    const result = await markSyncRunForRetry(companyId, runId);
+    setRetryingRunId(null);
+    if (result.error) {
+      toast.error('Retry failed', { description: result.error.message });
+      return;
+    }
+    toast.success('Sync run reset to pending', { description: 'The next worker pass will pick it up.' });
+    void queryClient.invalidateQueries({ queryKey: ['sync_runs', companyId] });
+    void queryClient.invalidateQueries({ queryKey: ['dms_sync_summary', companyId] });
+  }
 
   const summaryQuery = useQuery({
     queryKey: ['dms_sync_summary', companyId],
@@ -121,6 +138,33 @@ export default function DmsSyncOps() {
           { label: 'DMS Sync Ops' },
         ]}
       />
+
+      {/* Credential rotation guidance */}
+      <div className="glass-panel p-4 border-l-4 border-l-amber-500" data-testid="credential-rotation-card">
+        <div className="flex items-start gap-3">
+          <KeyRound className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-foreground">Credential rotation & sync architecture</h3>
+              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                <ShieldAlert className="h-3 w-3 mr-1" />Operator runbook
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Proton DMS uses per-branch admin user accounts with captcha-gated login (see Decision #7).
+              Headless cron is parked until Proton issues a service / OAuth client account; until then
+              data flows through manual export uploads.
+            </p>
+            <ul className="text-xs space-y-1 text-muted-foreground list-disc ml-4">
+              <li>Branch credentials live at <code className="font-mono text-foreground bg-muted/50 px-1 rounded">/etc/flc-bi/dms.env</code> on the worker host (root-readable only, never in browser env).</li>
+              <li>Rotate per-branch passwords every 90 days; reseed the env file then run <code className="font-mono text-foreground bg-muted/50 px-1 rounded">systemctl reload flc-bi-worker</code>.</li>
+              <li>For a failed sync run, click <span className="font-medium text-foreground">Retry</span> in the table below to reset state to <code className="font-mono text-foreground bg-muted/50 px-1 rounded">pending</code>. The action is audit-logged.</li>
+              <li>For schema or endpoint changes, file a ticket in <code className="font-mono text-foreground bg-muted/50 px-1 rounded">INGEST</code> (Linear) and link the affected sync_run id.</li>
+              <li>Proton service-account request status: <span className="font-medium text-amber-600 dark:text-amber-400">pending operator follow-up</span>.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
       {/* Per-source summary cards */}
       <div>
@@ -254,10 +298,14 @@ export default function DmsSyncOps() {
                       <th className="px-4 py-2 text-right font-medium text-muted-foreground">Records</th>
                       <th className="px-4 py-2 text-left font-medium text-muted-foreground">Started</th>
                       <th className="px-4 py-2 text-right font-medium text-muted-foreground">Duration</th>
+                      <th className="px-4 py-2 text-right font-medium text-muted-foreground">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {runs.map(run => (
+                    {runs.map(run => {
+                      const isRetryable = run.status === 'failed' || run.status === 'cancelled';
+                      const isRetrying = retryingRunId === run.id;
+                      return (
                       <tr key={run.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors" data-testid={`sync-run-${run.id}`}>
                         <td className="px-4 py-2.5 text-xs">{SOURCE_LABELS[run.sourceSystem]}</td>
                         <td className="px-4 py-2.5 text-xs font-mono">{run.syncType}</td>
@@ -279,8 +327,28 @@ export default function DmsSyncOps() {
                         <td className="px-4 py-2.5 text-right tabular-nums">{run.recordCount.toLocaleString('en-MY')}</td>
                         <td className="px-4 py-2.5 text-xs text-muted-foreground">{fmtDateTime(run.startedAt)}</td>
                         <td className="px-4 py-2.5 text-right text-xs text-muted-foreground tabular-nums">{fmtDuration(run.startedAt, run.finishedAt)}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          {isRetryable ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs"
+                              disabled={isRetrying}
+                              onClick={() => void handleRetry(run.id)}
+                              data-testid={`retry-${run.id}`}
+                            >
+                              {isRetrying
+                                ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                : <RotateCw className="h-3 w-3 mr-1" />}
+                              Retry
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

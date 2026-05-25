@@ -4,6 +4,7 @@ import {
   getDmsSyncRunsSummary,
   getDmsRawStagingCounts,
   listSyncRuns,
+  markSyncRunForRetry,
 } from './dmsService';
 
 vi.mock('@/integrations/supabase/client', () => ({
@@ -89,6 +90,52 @@ describe('getDmsRawStagingCounts', () => {
       tableName: 'dms_raw_sales_orders', totalRows: 1000, normalizedRows: 980, pendingRows: 20,
     });
     expect(result.data![1].latestFetchedAt).toBeNull();
+  });
+});
+
+// ── markSyncRunForRetry ───────────────────────────────────────────────────────
+
+describe('markSyncRunForRetry', () => {
+  it('calls mark_sync_run_for_retry RPC with company and run ids', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: 'run-uuid-1',
+      error: null,
+    } as never);
+
+    const result = await markSyncRunForRetry('company-1', 'run-uuid-1');
+
+    expect(supabase.rpc).toHaveBeenCalledWith('mark_sync_run_for_retry', {
+      p_company_id: 'company-1',
+      p_run_id:     'run-uuid-1',
+    });
+    expect(result.data).toBe('run-uuid-1');
+    expect(result.error).toBeNull();
+  });
+
+  it('returns an Error when caller lacks permission or run is not retryable', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Sync run abc is in status succeeded and cannot be retried' },
+    } as never);
+
+    const result = await markSyncRunForRetry('company-1', 'abc');
+
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error!.message).toContain('cannot be retried');
+  });
+
+  it('returns an Error when caller is unauthorized', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Insufficient role for sync run retry: accounts' },
+    } as never);
+
+    const result = await markSyncRunForRetry('company-1', 'run-1');
+
+    expect(result.data).toBeNull();
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error!.message).toContain('Insufficient role');
   });
 });
 

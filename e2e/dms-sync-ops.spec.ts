@@ -58,6 +58,11 @@ async function setupSyncOpsMocks(page: Page, opts: {
     await fulfillJson(route, staging ?? defaultStaging);
   });
 
+  await page.route(`${SUPABASE_URL}/rest/v1/rpc/mark_sync_run_for_retry*`, async route => {
+    // Default: succeed. Specific tests can override via page.route with higher priority.
+    await fulfillJson(route, JSON.parse(route.request().postData() ?? '{}').p_run_id ?? null);
+  });
+
   await page.route(`${SUPABASE_URL}/rest/v1/sync_runs*`, async route => {
     if (route.request().method() === 'GET') {
       const defaultRuns = [
@@ -127,4 +132,48 @@ test('DMS Sync Ops shows empty state when no runs exist', async ({ page }) => {
   await page.goto('/admin/dms-sync', { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByText(/no sync runs recorded yet/i)).toBeVisible({ timeout: 30_000 });
+});
+
+test('DMS Sync Ops renders credential rotation guidance card', async ({ page }) => {
+  await setupSyncOpsMocks(page);
+
+  await page.goto('/admin/dms-sync', { waitUntil: 'domcontentloaded' });
+
+  await expect(page.getByTestId('credential-rotation-card')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('credential-rotation-card')).toContainText(/credential rotation/i);
+  await expect(page.getByTestId('credential-rotation-card')).toContainText(/dms\.env/i);
+  await expect(page.getByTestId('credential-rotation-card')).toContainText(/decision #7/i);
+});
+
+test('DMS Sync Ops shows Retry button on failed runs and posts to retry RPC', async ({ page }) => {
+  let retryCalled = false;
+  await setupSyncOpsMocks(page);
+
+  // Override the retry mock to track calls and assert the payload
+  await page.route(`${SUPABASE_URL}/rest/v1/rpc/mark_sync_run_for_retry*`, async route => {
+    const body = JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>;
+    retryCalled = true;
+    expect(body.p_run_id).toBe('run-2');
+    await fulfillJson(route, 'run-2');
+  });
+
+  await page.goto('/admin/dms-sync', { waitUntil: 'domcontentloaded' });
+
+  // run-2 is failed in the default mock, so the Retry button is rendered
+  const retryBtn = page.getByTestId('retry-run-2');
+  await expect(retryBtn).toBeVisible({ timeout: 30_000 });
+  await retryBtn.click();
+
+  await expect(page.getByText(/sync run reset to pending/i)).toBeVisible({ timeout: 30_000 });
+  expect(retryCalled).toBe(true);
+});
+
+test('DMS Sync Ops does not show Retry for succeeded runs', async ({ page }) => {
+  await setupSyncOpsMocks(page);
+
+  await page.goto('/admin/dms-sync', { waitUntil: 'domcontentloaded' });
+
+  // run-1 is succeeded in the default mock — no retry button
+  await expect(page.getByTestId('sync-run-run-1')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('retry-run-1')).toHaveCount(0);
 });
