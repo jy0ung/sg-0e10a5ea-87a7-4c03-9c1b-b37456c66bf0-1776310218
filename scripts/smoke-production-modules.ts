@@ -78,6 +78,7 @@ const mainRoutes: RouteCheck[] = [
   { module: 'Admin', name: 'Settings', path: '/admin/settings' },
   { module: 'Admin', name: 'Activity Overview', path: '/admin/activity' },
   { module: 'Admin', name: 'DMS Sync Ops', path: '/admin/dms-sync' },
+  { module: 'Admin', name: 'Reconciliation Queue', path: '/admin/reconciliation' },
   { module: 'Admin', name: 'Audit Log', path: '/admin/audit' },
   { module: 'Admin', name: 'Users & Roles', path: '/admin/users' },
   { module: 'Admin', name: 'User Groups', path: '/admin/user-groups' },

@@ -126,6 +126,7 @@ const navItems: MainNavItem[] = [
 
   { label: 'Activity Overview', path: '/admin/activity', icon: BarChart3, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
   { label: 'DMS Sync Ops', path: '/admin/dms-sync', icon: Database, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
+  { label: 'Reconciliation Queue', path: '/admin/reconciliation', icon: ArrowLeftRight, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
   { label: 'Audit Log', path: '/admin/audit', icon: FileText, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
   { label: 'Users & Roles', path: '/admin/users', icon: Shield, section: 'Admin', group: 'Access', roles: ['super_admin', 'company_admin'] },
   { label: 'User Groups', path: '/admin/user-groups', icon: Shield, section: 'Admin', group: 'Access', roles: ['super_admin', 'company_admin'] },

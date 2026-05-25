@@ -81,6 +81,8 @@ const DataQuality = lazy(() => import("./pages/auto-aging/DataQuality"));
 const ImportHistory = lazy(() => import("./pages/auto-aging/ImportHistory"));
 const ActivityDashboard = lazy(() => import("./pages/admin/ActivityDashboard"));
 const DmsSyncOps = lazy(() => import("./pages/admin/DmsSyncOps"));
+const ReconciliationQueue = lazy(() => import("./pages/admin/ReconciliationQueue"));
+const ReconciliationDetail = lazy(() => import("./pages/admin/ReconciliationDetail"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
 const SettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
@@ -241,6 +243,8 @@ const router = createBrowserRouter([
       { path: "accounts/journal", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Journal Entries"><S><JournalEntries /></S></R></RequireRole> },
       { path: "admin/activity", element: <RequireRole roles={EXECUTIVE} section="Admin"><R scope="Activity Dashboard"><S><ActivityDashboard /></S></R></RequireRole> },
       { path: "admin/dms-sync", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="DMS Sync Ops"><S><DmsSyncOps /></S></R></RequireRole> },
+      { path: "admin/reconciliation", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Reconciliation Queue"><S><ReconciliationQueue /></S></R></RequireRole> },
+      { path: "admin/reconciliation/:matchId", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Reconciliation Match"><S><ReconciliationDetail /></S></R></RequireRole> },
       { path: "admin/users", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Users"><S><UserManagement /></S></R></RequireRole> },
       { path: "admin/audit", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Audit Log"><S><AuditLog /></S></R></RequireRole> },
       // admin/settings intentionally has NO RequireRole guard — it doubles as

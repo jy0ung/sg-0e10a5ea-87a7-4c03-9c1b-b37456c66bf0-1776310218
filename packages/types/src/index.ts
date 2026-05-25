@@ -1268,6 +1268,55 @@ export interface DmsRawStagingCount {
   latestFetchedAt: string | null;
 }
 
+// ===== Reconciliation Review Queue (Phase 3d) =====
+
+export type ReconciliationObjectType =
+  | 'sales_order'
+  | 'vehicle'
+  | 'customer'
+  | 'invoice_payment_evidence';
+
+export type ReconciliationMatchStatus =
+  | 'candidate'
+  | 'auto_matched'
+  | 'accepted'
+  | 'conflict'
+  | 'ignored'
+  | 'rejected';
+
+export type ReconciliationDecision = 'accepted' | 'rejected' | 'ignored';
+
+export interface ReconciliationMatch {
+  id: string;
+  objectType: ReconciliationObjectType;
+  sourceSystem: SyncSourceSystem | 'ubs';
+  sourceTable: string;
+  sourceRecordId: string;
+  canonicalTable: string | null;
+  canonicalRecordId: string | null;
+  matchStatus: ReconciliationMatchStatus;
+  confidenceScore: number | null;
+  matchRule: string | null;
+  sourcePriority: number;
+  reviewOwner: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReconciliationMatchDetail extends ReconciliationMatch {
+  matchBasis: Record<string, unknown>;
+  conflictPayload: Record<string, unknown>;
+  reviewNotes: string | null;
+  sourcePayload: Record<string, unknown>;
+  canonicalPayload: Record<string, unknown>;
+}
+
+export interface ReconciliationStatusCount {
+  matchStatus: ReconciliationMatchStatus;
+  total: number;
+}
+
 export type AgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
 
 export interface AgingByBranchRow {
