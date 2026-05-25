@@ -125,6 +125,7 @@ const navItems: MainNavItem[] = [
   { label: 'Open HRMS Workspace', path: `${HRMS_PATHS.root}/`, href: getDedicatedHrmsWorkspacePath(HRMS_PATHS.root), icon: Briefcase, section: 'HRMS', group: 'Workspace', external: true },
 
   { label: 'Activity Overview', path: '/admin/activity', icon: BarChart3, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
+  { label: 'DMS Sync Ops', path: '/admin/dms-sync', icon: Database, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
   { label: 'Audit Log', path: '/admin/audit', icon: FileText, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
   { label: 'Users & Roles', path: '/admin/users', icon: Shield, section: 'Admin', group: 'Access', roles: ['super_admin', 'company_admin'] },
   { label: 'User Groups', path: '/admin/user-groups', icon: Shield, section: 'Admin', group: 'Access', roles: ['super_admin', 'company_admin'] },

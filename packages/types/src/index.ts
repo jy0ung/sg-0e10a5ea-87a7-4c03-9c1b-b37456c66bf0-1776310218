@@ -1226,6 +1226,48 @@ export interface PeriodCloseUnpostedRow {
   reference: string | null;
 }
 
+// ===== DMS Sync Ops (Phase 3c) =====
+
+export type SyncSourceSystem = 'dms' | 'legacy_fookloi' | 'google_sheets' | 'manual';
+export type SyncRunStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
+export interface SyncRun {
+  id: string;
+  companyId: string;
+  sourceSystem: SyncSourceSystem;
+  syncType: string;
+  sourceEndpoint: string | null;
+  requestFilters: Record<string, unknown>;
+  status: SyncRunStatus;
+  recordCount: number;
+  startedAt: string;
+  finishedAt: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SyncRunSummaryRow {
+  sourceSystem: SyncSourceSystem;
+  totalRuns: number;
+  succeededRuns: number;
+  failedRuns: number;
+  runningRuns: number;
+  pendingRuns: number;
+  lastRunAt: string | null;
+  lastRunStatus: SyncRunStatus | null;
+  totalRecordCount: number;
+}
+
+export interface DmsRawStagingCount {
+  tableName: string;
+  totalRows: number;
+  normalizedRows: number;
+  pendingRows: number;
+  latestFetchedAt: string | null;
+}
+
 export type AgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
 
 export interface AgingByBranchRow {
