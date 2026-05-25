@@ -17,28 +17,14 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { checkRateLimit } from '../_shared/rateLimit.ts';
 
 const MAX_CARRY_DEFAULT = 5;
 
-// ---------------------------------------------------------------------------
-// In-memory sliding-window rate limiter
-// Max 5 rollovers per caller per 24 hours. Resets on isolate restart.
-// ---------------------------------------------------------------------------
-const RATE_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+// Durable rate limit: 5 rollovers per caller per 24 hours. Backed by the
+// `rate_limits` table via bump_rate_limit().
 const RATE_MAX_CALLS = 5;
-const rateLimitStore = new Map<string, number[]>();
-
-function isRateLimited(callerId: string): boolean {
-  const now = Date.now();
-  const timestamps = (rateLimitStore.get(callerId) ?? []).filter(
-    (t) => now - t < RATE_WINDOW_MS,
-  );
-  if (timestamps.length >= RATE_MAX_CALLS) return true;
-  timestamps.push(now);
-  rateLimitStore.set(callerId, timestamps);
-  return false;
-}
-// ---------------------------------------------------------------------------
+const RATE_WINDOW_SECONDS = 24 * 60 * 60;
 
 interface RolloverPayload {
   company_id: string;
@@ -99,10 +85,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // Rate limit: 5 rollovers per caller per 24 hours
-    if (isRateLimited(caller.id)) {
+    const limit = await checkRateLimit({
+      callerId: caller.id,
+      action: 'rollover-leave-balances',
+      maxCalls: RATE_MAX_CALLS,
+      windowSeconds: RATE_WINDOW_SECONDS,
+      supabaseUrl,
+      serviceRoleKey,
+    });
+    if (!limit.allowed) {
       return new Response(
-        JSON.stringify({ error: 'Too many requests — rollover is limited to 5 times per 24 hours per user' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        JSON.stringify({ error: limit.message }),
+        { status: 429, headers: { ...corsHeaders, ...limit.headers } },
       );
     }
 

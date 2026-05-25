@@ -3,8 +3,8 @@ import { ArrowLeft, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { AppShellNavLink } from './AppShellNavLink';
-import { isAppShellNavItemActive } from './navUtils';
-import type { AppShellAction, AppShellBackLink, AppShellBrand, AppShellNavItem, AppShellNavSection, AppShellUser } from './types';
+import { isAppShellNavItemActive } from '@flc/shell';
+import type { AppShellAction, AppShellBackLink, AppShellBrand, AppShellNavItem, AppShellNavSection, AppShellUser } from '@flc/shell';
 
 function getInitials(name?: string | null): string {
   if (!name) return '?';

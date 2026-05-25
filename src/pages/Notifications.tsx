@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { getNotifications, markAsRead, markAllAsRead, NotificationRow } from '@/services/notificationService';
-import { supabase } from '@/integrations/supabase/client';
+import { useSupabaseChannel, type SupabasePayload } from '@flc/supabase';
 import { STALE } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { CheckCheck, Bell } from 'lucide-react';
@@ -25,32 +25,32 @@ export default function Notifications() {
   });
 
   // Realtime: prepend new notifications live without a full refetch.
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel(`realtime:notifications:${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-        (payload) => {
+  useSupabaseChannel<NotificationRow>({
+    name: `realtime:notifications:${user?.id ?? 'anon'}`,
+    enabled: !!user?.id,
+    subscriptions: [
+      {
+        event: 'INSERT',
+        table: 'notifications',
+        filter: `user_id=eq.${user?.id ?? ''}`,
+        onChange: (payload: SupabasePayload<NotificationRow>) => {
           queryClient.setQueryData<NotificationRow[]>(notifKey, prev =>
-            [payload.new as NotificationRow, ...(prev ?? [])]
+            [payload.new, ...(prev ?? [])]
           );
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-        (payload) => {
+        },
+      },
+      {
+        event: 'UPDATE',
+        table: 'notifications',
+        filter: `user_id=eq.${user?.id ?? ''}`,
+        onChange: (payload: SupabasePayload<NotificationRow>) => {
           queryClient.setQueryData<NotificationRow[]>(notifKey, prev =>
-            (prev ?? []).map(n => n.id === (payload.new as NotificationRow).id ? payload.new as NotificationRow : n)
+            (prev ?? []).map(n => n.id === payload.new.id ? payload.new : n)
           );
-        }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+        },
+      },
+    ],
+  });
 
   const handleMarkRead = async (id: string) => {
     if (!user?.id) return;

@@ -3,8 +3,8 @@ import { LayoutDashboard, Settings } from 'lucide-react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from './AppShell';
-import { resolveRouteChrome } from './routeChrome';
-import type { AppShellRouteChromeMatch } from './types';
+import { resolveRouteChrome } from '@flc/shell';
+import type { AppShellRouteChromeMatch } from '@flc/shell';
 
 let isMobile = false;
 let isTablet = false;

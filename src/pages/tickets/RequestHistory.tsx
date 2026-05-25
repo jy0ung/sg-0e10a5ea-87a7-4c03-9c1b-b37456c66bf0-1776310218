@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { STALE } from '@/lib/queryClient';
 import { toast } from 'sonner';
 import {
   Archive,
@@ -39,7 +41,7 @@ import {
   addTicketComment,
 } from '@/services/ticketService';
 import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
-import { listProfiles, type ProfileRow } from '@/services/profileService';
+import { listProfiles } from '@/services/profileService';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { formatTicketLabel, priorityColorMap, statusColorMap } from '@/lib/requestFormatters';
 import { getRequestAssignees } from '@/lib/requestAssignees';
@@ -89,82 +91,87 @@ function useIsLargeScreen() {
 
 export default function RequestHistory() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const isLargeScreen = useIsLargeScreen();
   const { categories } = useRequestCategories(user?.company_id, true);
   const { subcategories } = useRequestSubcategories(user?.company_id, { includeInactive: true });
   const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
 
-  const [tickets, setTickets] = useState<CompanyTicketRecord[]>([]);
-  const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
-  const [attachmentsByTicket, setAttachmentsByTicket] = useState<Record<string, TicketAttachmentRecord[]>>({});
-  const [assignees, setAssignees] = useState<ProfileRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>('archived');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
-  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
-  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
 
   const customFieldLabelMap = useMemo(
     () => Object.fromEntries(formFields.map((f) => [`${f.category_key}:${f.key}`, f.label])),
     [formFields],
   );
 
-  const loadTickets = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
-
-    const statusParam: TicketStatusFilter = statusFilter === 'archived' ? 'archived' : statusFilter;
-
-    const [{ data, error: fetchError }, profileResult] = await Promise.all([
-      listCompanyTicketsPage(user.company_id, {
-        page,
-        pageSize: HISTORY_PAGE_SIZE,
-        status: statusParam,
-        search: searchTerm,
-      }),
-      listProfiles(user.company_id),
-    ]);
-
-    if (fetchError) {
-      setError(fetchError.message || 'Unable to load request history.');
-    } else if (profileResult.error) {
-      setError(profileResult.error || 'Unable to load profiles.');
-    } else {
-      const nextTickets = data?.rows ?? [];
-      setTickets(nextTickets);
-      setTotalCount(data?.totalCount ?? 0);
-      setAssignees(getRequestAssignees(profileResult.data));
-      setNoteDrafts(
-        Object.fromEntries(nextTickets.map((t) => [t.id, t.resolution_note ?? ''])),
-      );
-      setCommentDrafts(Object.fromEntries(nextTickets.map((t) => [t.id, ''])));
-
-      const ticketIds = nextTickets.map((t) => t.id);
-      const [{ data: activityData }, { data: attachmentData }] = await Promise.all([
-        listTicketActivity(ticketIds, user.company_id),
-        listAttachmentsForTickets(ticketIds, user.company_id),
-      ]);
-      setActivitiesByTicket(activityData ?? {});
-      setAttachmentsByTicket(attachmentData ?? {});
-    }
-    setLoading(false);
-  }, [user, page, statusFilter, searchTerm]);
-
-  useEffect(() => {
-    void loadTickets();
-  }, [loadTickets]);
-
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
   }, [statusFilter, searchTerm]);
+
+  const historyKey = ['request-history', user?.company_id, page, statusFilter, searchTerm] as const;
+
+  const { data: historyData, isLoading: loading, error: queryError } = useQuery({
+    queryKey: historyKey,
+    queryFn: async () => {
+      const statusParam: TicketStatusFilter = statusFilter === 'archived' ? 'archived' : statusFilter;
+      const [{ data, error: fetchError }, profileResult] = await Promise.all([
+        listCompanyTicketsPage(user!.company_id, { page, pageSize: HISTORY_PAGE_SIZE, status: statusParam, search: searchTerm }),
+        listProfiles(user!.company_id),
+      ]);
+      if (fetchError) throw new Error(fetchError.message || 'Unable to load request history.');
+      if (profileResult.error) throw new Error(profileResult.error || 'Unable to load profiles.');
+      const nextTickets = data?.rows ?? [];
+      const ticketIds = nextTickets.map((t) => t.id);
+      const [{ data: activityData }, { data: attachmentData }] = await Promise.all([
+        listTicketActivity(ticketIds, user!.company_id),
+        listAttachmentsForTickets(ticketIds, user!.company_id),
+      ]);
+      return {
+        tickets: nextTickets,
+        totalCount: data?.totalCount ?? 0,
+        assignees: getRequestAssignees(profileResult.data),
+        activitiesByTicket: activityData ?? {} as Record<string, TicketActivityRecord[]>,
+        attachmentsByTicket: attachmentData ?? {} as Record<string, TicketAttachmentRecord[]>,
+      };
+    },
+    enabled: !!user,
+    staleTime: STALE.transactional,
+  });
+
+  const error = queryError ? (queryError as Error).message : null;
+  const tickets = useMemo(() => historyData?.tickets ?? [], [historyData]);
+  const totalCount = historyData?.totalCount ?? 0;
+  const assignees = useMemo(() => historyData?.assignees ?? [], [historyData]);
+  const activitiesByTicket = useMemo(() => historyData?.activitiesByTicket ?? {}, [historyData]);
+  const attachmentsByTicket = useMemo(() => historyData?.attachmentsByTicket ?? {}, [historyData]);
+
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setNoteDrafts((prev) => {
+      const next = { ...prev };
+      for (const t of tickets) {
+        if (!(t.id in next)) next[t.id] = t.resolution_note ?? '';
+      }
+      return next;
+    });
+    setCommentDrafts((prev) => {
+      const next = { ...prev };
+      for (const t of tickets) {
+        if (!(t.id in next)) next[t.id] = '';
+      }
+      return next;
+    });
+  }, [tickets]);
+
+  const loadTickets = () => void queryClient.invalidateQueries({ queryKey: historyKey });
 
   const selectedTicket = useMemo(
     () => tickets.find((t) => t.id === selectedTicketId) ?? null,

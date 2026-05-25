@@ -49,7 +49,7 @@ import { getDedicatedHrmsWorkspacePath, HRMS_PATHS, isHrmsWorkspacePath } from '
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
 import { getNotifications } from '@/services/notificationService';
 import type { AppRole } from '@/types';
-import type { AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from './types';
+import type { AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from '@flc/shell';
 
 interface MainNavItem extends AppShellNavItem {
   section: string;

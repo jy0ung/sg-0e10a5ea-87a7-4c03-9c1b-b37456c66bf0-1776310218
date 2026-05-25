@@ -11,7 +11,6 @@
   src/lib              → pure utilities (no supabase)
   src/hooks            → reusable hooks
   src/integrations/supabase → generated types + client
-  src/i18n             → i18next scaffold + en bundle
 
 apps/hrms-mobile       → Capacitor + Vite HRMS employee app
 packages/

@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { resolveInviteSiteUrl } from '../_shared/publicSiteUrl.ts';
+import { checkRateLimit } from '../_shared/rateLimit.ts';
 
 interface InvitePayload {
   email: string;
@@ -17,25 +18,11 @@ function isMissingEmployeeLinkColumnError(message: string | null | undefined): b
   return text.includes('column profiles.employee_id does not exist') || text.includes('employee_id');
 }
 
-// ---------------------------------------------------------------------------
-// In-memory sliding-window rate limiter
-// Max 10 invites per caller per hour. Resets on isolate restart (acceptable).
-// ---------------------------------------------------------------------------
-const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+// Durable rate limit: 10 invites per caller per hour. Backed by the
+// `rate_limits` table via bump_rate_limit() so the budget survives isolate
+// cold starts and is shared across replicas.
 const RATE_MAX_CALLS = 10;
-const rateLimitStore = new Map<string, number[]>();
-
-function isRateLimited(callerId: string): boolean {
-  const now = Date.now();
-  const timestamps = (rateLimitStore.get(callerId) ?? []).filter(
-    (t) => now - t < RATE_WINDOW_MS,
-  );
-  if (timestamps.length >= RATE_MAX_CALLS) return true;
-  timestamps.push(now);
-  rateLimitStore.set(callerId, timestamps);
-  return false;
-}
-// ---------------------------------------------------------------------------
+const RATE_WINDOW_SECONDS = 60 * 60;
 
 Deno.serve(async (req: Request) => {
   const corsHeaders = buildCorsHeaders(req);
@@ -72,11 +59,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Rate-limit: max 10 invites per authenticated user per hour
-    if (isRateLimited(caller.id)) {
+    // Rate-limit: max 10 invites per authenticated user per hour.
+    const limit = await checkRateLimit({
+      callerId: caller.id,
+      action: 'invite-user',
+      maxCalls: RATE_MAX_CALLS,
+      windowSeconds: RATE_WINDOW_SECONDS,
+      supabaseUrl,
+      serviceRoleKey,
+    });
+    if (!limit.allowed) {
       return new Response(
-        JSON.stringify({ error: 'Too many invite requests. Please wait before trying again.' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '3600' } },
+        JSON.stringify({ error: limit.message }),
+        { status: 429, headers: { ...corsHeaders, ...limit.headers } },
       );
     }
 

@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -6,7 +7,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { listLeaveRequests, listEmployeeDirectory } from '@/services/hrmsService';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import type { LeaveRequest, Employee } from '@/types';
+import { STALE } from '@/lib/queryClient';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -31,29 +32,23 @@ export default function LeaveCalendarTab() {
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [requests, setRequests] = useState<LeaveRequest[]>([]);
-  const [loading, setLoading] = useState(true);
   const [empFilter, setEmpFilter] = useState<string>('all');
 
-  useEffect(() => {
-    if (!user?.companyId) return;
-    listEmployeeDirectory(user.companyId).then(res => {
-      if (!res.error) setEmployees(res.data);
-    });
-  }, [user?.companyId]);
+  const { data: employees = [] } = useQuery({
+    queryKey: ['hrms-employees', user?.companyId],
+    queryFn: () => listEmployeeDirectory(user!.companyId).then(r => r.data),
+    enabled: !!user?.companyId,
+    staleTime: STALE.reference,
+  });
 
-  const loadRequests = useCallback(async () => {
-    if (!user?.companyId) return;
-    setLoading(true);
-    const dateFrom = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-01`;
-    const dateTo = new Date(viewYear, viewMonth + 1, 0).toISOString().slice(0, 10);
-    const reqRes = await listLeaveRequests(user.companyId, { status: 'approved', dateFrom, dateTo });
-    setRequests(reqRes.data);
-    setLoading(false);
-  }, [user?.companyId, viewYear, viewMonth]);
-
-  useEffect(() => { loadRequests(); }, [loadRequests]);
+  const dateFrom = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-01`;
+  const dateTo = new Date(viewYear, viewMonth + 1, 0).toISOString().slice(0, 10);
+  const { data: requests = [], isLoading: loading } = useQuery({
+    queryKey: ['hrms-leave-requests', user?.companyId, viewYear, viewMonth],
+    queryFn: () => listLeaveRequests(user!.companyId, { status: 'approved', dateFrom, dateTo }).then(r => r.data),
+    enabled: !!user?.companyId,
+    staleTime: STALE.transactional,
+  });
 
   const totalDays = daysInMonth(viewYear, viewMonth);
   const firstDow = new Date(viewYear, viewMonth, 1).getDay();

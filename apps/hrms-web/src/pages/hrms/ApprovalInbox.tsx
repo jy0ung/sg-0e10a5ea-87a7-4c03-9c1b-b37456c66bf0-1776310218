@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { approvalInboxQueryKey, useApprovalInboxItems } from '@/hooks/useApprovalInboxItems';
-import { supabase } from '@/integrations/supabase/client';
+import { useSupabaseChannel } from '@flc/supabase';
 import {
   reviewAppraisalActivation,
   reviewLeaveRequest,
@@ -88,32 +88,20 @@ export default function ApprovalInbox() {
   }, [inboxErrors, toast]);
 
   // Real-time: reload inbox when any approval-related table changes for this company.
-  useEffect(() => {
-    if (!user?.companyId) return;
-
-    const channel = supabase
-      .channel(`approval-inbox:${user.companyId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'leave_requests', filter: `company_id=eq.${user.companyId}` },
-        () => void queryClient.invalidateQueries({ queryKey: approvalInboxQueryKey(user.companyId) }),
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'payroll_runs', filter: `company_id=eq.${user.companyId}` },
-        () => void queryClient.invalidateQueries({ queryKey: approvalInboxQueryKey(user.companyId) }),
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'appraisals', filter: `company_id=eq.${user.companyId}` },
-        () => void queryClient.invalidateQueries({ queryKey: approvalInboxQueryKey(user.companyId) }),
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [user?.companyId, queryClient]);
+  useSupabaseChannel({
+    name: `approval-inbox:${user?.companyId ?? 'anon'}`,
+    enabled: !!user?.companyId,
+    subscriptions: [
+      { event: '*', table: 'leave_requests', filter: `company_id=eq.${user?.companyId ?? ''}` },
+      { event: '*', table: 'payroll_runs',   filter: `company_id=eq.${user?.companyId ?? ''}` },
+      { event: '*', table: 'appraisals',     filter: `company_id=eq.${user?.companyId ?? ''}` },
+    ],
+    onChange: () => {
+      if (user?.companyId) {
+        void queryClient.invalidateQueries({ queryKey: approvalInboxQueryKey(user.companyId) });
+      }
+    },
+  });
 
   const filteredItems = useMemo(() => {
     const filtered = filterApprovalInboxItems(items, filter);

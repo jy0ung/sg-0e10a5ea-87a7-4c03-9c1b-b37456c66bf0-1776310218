@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { STALE } from '@/lib/queryClient';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,7 +13,6 @@ import {
   reactivateUser,
   setPortalAccess,
   updateProfile,
-  type CompanyOption,
   type ProfileRow,
 } from '@/services/profileService';
 import {
@@ -62,7 +63,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AppRole, AccessScope, DEFAULT_APP_ROLE, ROLE_DEFAULT_SCOPE, type Employee, type BranchRecord } from '@/types';
+import { AppRole, AccessScope, DEFAULT_APP_ROLE, ROLE_DEFAULT_SCOPE, type Employee } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import { PermissionEditor } from '@/components/admin/PermissionEditor';
 import { userUpdateSchema, inviteUserSchema, type UserUpdateFormData, type InviteUserFormData } from '@/lib/validations';
@@ -125,12 +126,10 @@ function isArchivedAccountProfile(profile: ProfileRow): boolean {
 
 export default function UserManagement() {
   const { user, hasRole } = useAuth();
-  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [editUser, setEditUser] = useState<ProfileRow | null>(null);
   const [editBranch, setEditBranch] = useState<string>('none');
   const [saving, setSaving] = useState(false);
-  const [branches, setBranches] = useState<BranchRecord[]>([]);
   const [permissionUserId, setPermissionUserId] = useState<string>('');
   const [permissionUserName, setPermissionUserName] = useState<string>('');
   const [permissionUserRole, setPermissionUserRole] = useState<string>('');
@@ -138,13 +137,11 @@ export default function UserManagement() {
   const [inviting, setInviting] = useState(false);
   const [signupUrl, setSignupUrl] = useState('');
   const [copied, setCopied] = useState(false);
-  const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [activating, setActivating] = useState<string>('');
   const [grantingAccess, setGrantingAccess] = useState<string>('');
   const [resettingPassword, setResettingPassword] = useState<string>('');
   const [deletingUser, setDeletingUser] = useState<string>('');
   const [updatingAccountStatus, setUpdatingAccountStatus] = useState<string>('');
-  const [employeesByCompany, setEmployeesByCompany] = useState<Record<string, Employee[]>>({});
   const [pendingSelections, setPendingSelections] = useState<
     Record<string, { role: AppRole; company_id: string; employee_id: string | null }>
   >({});
@@ -171,6 +168,47 @@ export default function UserManagement() {
   const canManage = hasRole(['super_admin', 'company_admin']);
   const isSuperAdmin = user?.role === 'super_admin';
 
+  const { data: profiles = [], isLoading: loading } = useQuery({
+    queryKey: ['profiles'],
+    queryFn: () => listProfiles().then(r => { if (r.error) throw new Error(r.error); return r.data; }),
+    staleTime: STALE.reference,
+  });
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches', user?.company_id],
+    queryFn: () => getBranches(user!.company_id || '').then(r => r.data),
+    enabled: !!user?.company_id,
+    staleTime: STALE.reference,
+  });
+
+  const { data: companies = [] } = useQuery({
+    queryKey: ['company-options'],
+    queryFn: () => listCompanyOptions().then(r => r.data),
+    staleTime: STALE.reference,
+  });
+
+  const companyIdsForEmployees = useMemo(() => [
+    ...new Set(
+      profiles.map(p => p.company_id).concat(user?.company_id ?? null).filter((id): id is string => Boolean(id)),
+    ),
+  ], [profiles, user?.company_id]);
+
+  const { data: employeesByCompany = {} } = useQuery({
+    queryKey: ['employees-by-company', companyIdsForEmployees],
+    queryFn: async () => {
+      const results = await Promise.all(
+        companyIdsForEmployees.map(async (companyId) => ({ companyId, result: await listEmployeeDirectory(companyId) })),
+      );
+      const map: Record<string, Employee[]> = {};
+      for (const { companyId, result } of results) {
+        if (!result.error) map[companyId] = result.data;
+      }
+      return map;
+    },
+    enabled: companyIdsForEmployees.length > 0,
+    staleTime: STALE.reference,
+  });
+
   const inviteForm = useForm<InviteUserFormData>({
     resolver: zodResolver(inviteUserSchema),
     defaultValues: {
@@ -183,42 +221,6 @@ export default function UserManagement() {
     mode: 'onChange',
   });
 
-  useEffect(() => {
-    async function load() {
-      const [profileRes, branchRes, companyRes] = await Promise.all([
-        listProfiles(),
-        getBranches(user?.company_id || ''),
-        listCompanyOptions(),
-      ]);
-      if (profileRes.error) {
-        toast.error('Failed to load users: ' + profileRes.error);
-      }
-      setProfiles(profileRes.data);
-      setBranches(branchRes.data);
-      setCompanies(companyRes.data);
-
-      const companyIds = [...new Set(
-        profileRes.data
-          .map(profile => profile.company_id)
-          .concat(user?.company_id ?? null)
-          .filter((companyId): companyId is string => Boolean(companyId)),
-      )];
-
-      const employeeResults = await Promise.all(companyIds.map(async (companyId) => ({
-        companyId,
-        result: await listEmployeeDirectory(companyId),
-      })));
-
-      const nextEmployeesByCompany: Record<string, Employee[]> = {};
-      for (const { companyId, result } of employeeResults) {
-        if (!result.error) nextEmployeesByCompany[companyId] = result.data;
-      }
-      setEmployeesByCompany(nextEmployeesByCompany);
-
-      setLoading(false);
-    }
-    load();
-  }, [user?.company_id]);
 
   const linkedEmployeeProfileIdByEmployeeId = useMemo(() => {
     const map = new Map<string, string>();
@@ -300,10 +302,7 @@ export default function UserManagement() {
 
   if (!canManage) return <UnauthorizedAccess />;
 
-  const refreshProfiles = async () => {
-    const refreshed = await listProfiles();
-    if (!refreshed.error) setProfiles(refreshed.data);
-  };
+  const refreshProfiles = () => queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
   const openEdit = (p: ProfileRow) => {
     setEditUser(p);
@@ -345,15 +344,17 @@ export default function UserManagement() {
       toast.error('Failed to update user: ' + error);
     } else {
       toast.success('User updated successfully');
-      setProfiles(prev => prev.map(p => p.id === editUser.id ? {
-        ...p,
-        name: data.name,
-        role: data.role,
-        access_scope: data.access_scope,
-        branch_id: data.branch_id,
-        employee_id: data.employee_id ?? null,
-        portal_access_only: data.portal_access_only ?? false,
-      } as ProfileRow : p));
+      queryClient.setQueryData<ProfileRow[]>(['profiles'], (prev = []) =>
+        prev.map(p => p.id === editUser.id ? {
+          ...p,
+          name: data.name,
+          role: data.role,
+          access_scope: data.access_scope,
+          branch_id: data.branch_id,
+          employee_id: data.employee_id ?? null,
+          portal_access_only: data.portal_access_only ?? false,
+        } as ProfileRow : p)
+      );
       setEditUser(null);
     }
     setSaving(false);

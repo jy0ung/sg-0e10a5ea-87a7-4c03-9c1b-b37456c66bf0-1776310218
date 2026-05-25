@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { STALE } from '@/lib/queryClient';
 import { AlertCircle, ArrowDown, ArrowUp, Loader2, Plus, Route, Save, Settings2, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -64,7 +66,7 @@ import {
   type RequestTemplateRecord,
   type TemplatePriority,
 } from '@/services/requestTemplateService';
-import { listProfiles, type ProfileRow } from '@/services/profileService';
+import { listProfiles } from '@/services/profileService';
 import {
   createRoutingRule,
   deleteRoutingRule,
@@ -81,7 +83,6 @@ import {
   type RequestFormFieldType,
 } from '@/services/requestFormFieldService';
 import { listApprovalFlows } from '@/services/approvalFlowService';
-import type { ApprovalFlow } from '@/types';
 
 interface CategoryDraft {
   label: string;
@@ -248,11 +249,12 @@ export default function RequestSetup() {
   const [createSubcategoryDrafts, setCreateSubcategoryDrafts] = useState<Record<string, CreateSubcategoryDraft>>({});
 
   // ── Approval flows for category pinning ──────────────────────────────────
-  const [approvalFlows, setApprovalFlows] = useState<ApprovalFlow[]>([]);
-  useEffect(() => {
-    if (!user?.company_id) return;
-    void listApprovalFlows(user.company_id).then(({ data }) => setApprovalFlows(data));
-  }, [user?.company_id]);
+  const { data: approvalFlows = [] } = useQuery({
+    queryKey: ['approval-flows', user?.company_id],
+    queryFn: () => listApprovalFlows(user!.company_id).then(r => r.data),
+    enabled: !!user?.company_id,
+    staleTime: STALE.reference,
+  });
   const internalRequestFlows = approvalFlows.filter((f) => f.entityType === 'internal_request' && f.isActive);
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -320,8 +322,6 @@ export default function RequestSetup() {
   // ── Routing rules state ───────────────────────────────────────────────────
   const { rules: routingRules, loading: routingRulesLoading, error: routingRulesError, reload: reloadRoutingRules } =
     useRoutingRules(user?.company_id);
-  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
-  const [profilesLoading, setProfilesLoading] = useState(true);
   const [isAddingRule, setIsAddingRule] = useState(false);
   const [ruleCreateName, setRuleCreateName] = useState('');
   const [ruleCreateCategory, setRuleCreateCategory] = useState('');
@@ -334,15 +334,12 @@ export default function RequestSetup() {
   const [expandedRuleId, setExpandedRuleId] = useState<string | null>(null);
   const [ruleDrafts, setRuleDrafts] = useState<Record<string, RoutingRuleDraft>>({});
 
-  useEffect(() => {
-    if (!user?.company_id) return;
-    void (async () => {
-      setProfilesLoading(true);
-      const { data } = await listProfiles(user.company_id ?? undefined);
-      setProfiles(data);
-      setProfilesLoading(false);
-    })();
-  }, [user?.company_id]);
+  const { data: profiles = [], isLoading: profilesLoading } = useQuery({
+    queryKey: ['profiles', user?.company_id],
+    queryFn: () => listProfiles(user!.company_id ?? undefined).then(r => r.data),
+    enabled: !!user?.company_id,
+    staleTime: STALE.reference,
+  });
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {

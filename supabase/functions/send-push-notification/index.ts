@@ -36,6 +36,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
+import { checkRateLimit } from '../_shared/rateLimit.ts';
 
 interface RequestBody {
   user_ids: string[];
@@ -57,26 +58,14 @@ const NOTIFY_ROLES = new Set([
   'manager',
 ]);
 
-// ---------------------------------------------------------------------------
-// In-memory sliding-window rate limiter (non-service-role callers only)
-// Max 20 push-notification requests per caller per minute.
-// ---------------------------------------------------------------------------
-const RATE_WINDOW_MS = 60 * 1000; // 1 minute
+// Durable rate limit for non-service-role callers: 20 push requests per
+// minute. Service-role callers (DB webhooks, edge functions calling this
+// function) are exempt. Backed by the `rate_limits` table via
+// bump_rate_limit().
 const RATE_MAX_CALLS = 20;
-const rateLimitStore = new Map<string, number[]>();
-let cachedApnsJwt: { token: string; issuedAtSeconds: number } | null = null;
+const RATE_WINDOW_SECONDS = 60;
 
-function isRateLimited(callerId: string): boolean {
-  const now = Date.now();
-  const timestamps = (rateLimitStore.get(callerId) ?? []).filter(
-    (t) => now - t < RATE_WINDOW_MS,
-  );
-  if (timestamps.length >= RATE_MAX_CALLS) return true;
-  timestamps.push(now);
-  rateLimitStore.set(callerId, timestamps);
-  return false;
-}
-// ---------------------------------------------------------------------------
+let cachedApnsJwt: { token: string; issuedAtSeconds: number } | null = null;
 
 function base64Url(input: string | ArrayBuffer): string {
   const bytes = typeof input === 'string'
@@ -281,10 +270,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // Rate limit user JWT callers — DB webhooks (service role) are exempt
-    if (isRateLimited(caller.id)) {
-      return new Response(JSON.stringify({ error: 'Too many requests' }), {
+    const limit = await checkRateLimit({
+      callerId: caller.id,
+      action: 'send-push-notification',
+      maxCalls: RATE_MAX_CALLS,
+      windowSeconds: RATE_WINDOW_SECONDS,
+      supabaseUrl,
+      serviceRoleKey,
+    });
+    if (!limit.allowed) {
+      return new Response(JSON.stringify({ error: limit.message }), {
         status: 429,
-        headers: jsonHeaders,
+        headers: { ...corsHeaders, ...limit.headers },
       });
     }
 

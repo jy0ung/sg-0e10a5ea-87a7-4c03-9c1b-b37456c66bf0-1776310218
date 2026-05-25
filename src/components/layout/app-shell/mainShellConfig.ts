@@ -43,17 +43,15 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { useBranding } from '@/contexts/BrandingContext';
-import { useSales } from '@/contexts/SalesContext';
 import { useFocusedMode } from '@/hooks/useFocusedMode';
 import { useRoleSectionMatrix } from '@/hooks/usePermissions';
 import { getDedicatedHrmsWorkspacePath, HRMS_PATHS, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
 import { STALE } from '@/lib/queryClient';
 import { getNotifications } from '@/services/notificationService';
-import { listProfiles } from '@/services/profileService';
-import { searchVehicles } from '@/services/vehicleService';
+import { globalSearch, type GlobalSearchHit } from '@/services/globalSearchService';
 import type { AppRole } from '@/types';
-import type { AppShellCommandItem, AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from './types';
+import type { AppShellCommandItem, AppShellNavItem, AppShellNavSection, AppShellRouteChromeMatch } from '@flc/shell';
 
 interface MainNavItem extends AppShellNavItem {
   section: string;
@@ -173,9 +171,23 @@ function resolveNavigationHref(path: string): string {
   return isHrmsWorkspacePath(path) ? getDedicatedHrmsWorkspacePath(path) : path;
 }
 
-function textMatches(query: string, ...values: Array<string | number | null | undefined>): boolean {
-  const normalizedQuery = query.toLowerCase();
-  return values.some((value) => String(value ?? '').toLowerCase().includes(normalizedQuery));
+const HIT_TYPE_META: Record<GlobalSearchHit['entityType'], { section: string; icon: typeof Car }> = {
+  vehicle:     { section: 'Vehicles',     icon: Car },
+  customer:    { section: 'Customers',    icon: Users },
+  sales_order: { section: 'Sales Orders', icon: ShoppingCart },
+  profile:     { section: 'Users',        icon: Shield },
+};
+
+function toCommandItem(hit: GlobalSearchHit): AppShellCommandItem {
+  const meta = HIT_TYPE_META[hit.entityType];
+  return {
+    id: `${hit.entityType}:${hit.entityId}`,
+    label: hit.label,
+    description: hit.description ?? meta.section,
+    section: meta.section,
+    icon: meta.icon,
+    to: hit.href,
+  };
 }
 
 function routeCommandItems(sections: AppShellNavSection[]): AppShellCommandItem[] {
@@ -199,7 +211,6 @@ export function useMainAppShellConfig() {
   const { isFocused } = useFocusedMode();
   const { isModuleActive } = useModuleAccess();
   const { pathname } = useLocation();
-  const { customers, salesOrders } = useSales();
   const rolePermissions = useRoleSectionMatrix();
   const { data: notifications = [] } = useQuery({
     queryKey: ['notifications', user?.id ?? ''],
@@ -256,68 +267,10 @@ export function useMainAppShellConfig() {
     .filter((section) => section.items.length > 0);
   const commandItems = useMemo(() => routeCommandItems(sections), [sections]);
   const unreadCount = notifications.filter((notification) => !notification.read).length;
-  const canSearchUsers = hasRole(['super_admin', 'company_admin']);
   const onCommandSearch = useCallback(async (query: string): Promise<AppShellCommandItem[]> => {
-    const trimmedQuery = query.trim();
-    if (trimmedQuery.length < 2) return [];
-
-    const vehicleResult = await searchVehicles({
-      search: trimmedQuery,
-      limit: 6,
-      sortColumn: 'chassis_no',
-      sortDirection: 'asc',
-    });
-    const vehicleItems: AppShellCommandItem[] = vehicleResult.data.rows.map((vehicle) => ({
-      id: `vehicle:${vehicle.id}`,
-      label: vehicle.chassis_no || 'Vehicle record',
-      description: [vehicle.model, vehicle.branch_code, vehicle.customer_name].filter(Boolean).join(' - '),
-      section: 'Vehicles',
-      icon: Car,
-      to: `/auto-aging/vehicles?search=${encodeURIComponent(vehicle.chassis_no || trimmedQuery)}`,
-    }));
-
-    const customerItems: AppShellCommandItem[] = customers
-      .filter((customer) => textMatches(trimmedQuery, customer.name, customer.phone, customer.email, customer.icNo, customer.nric))
-      .slice(0, 6)
-      .map((customer) => ({
-        id: `customer:${customer.id}`,
-        label: customer.name,
-        description: [customer.phone, customer.email].filter(Boolean).join(' - ') || 'Customer',
-        section: 'Customers',
-        icon: Users,
-        to: `/sales/customers?search=${encodeURIComponent(customer.name)}`,
-      }));
-
-    const orderItems: AppShellCommandItem[] = salesOrders
-      .filter((order) => textMatches(trimmedQuery, order.orderNo, order.customerName, order.model, order.chassisNo, order.vsoNo, order.plateNo))
-      .slice(0, 6)
-      .map((order) => ({
-        id: `sales-order:${order.id}`,
-        label: order.orderNo,
-        description: [order.customerName, order.model].filter(Boolean).join(' - ') || 'Sales order',
-        section: 'Sales Orders',
-        icon: ShoppingCart,
-        to: `/sales/orders?search=${encodeURIComponent(order.orderNo)}`,
-      }));
-
-    let userItems: AppShellCommandItem[] = [];
-    if (canSearchUsers && user?.company_id) {
-      const profileResult = await listProfiles(user.company_id);
-      userItems = profileResult.data
-        .filter((profile) => textMatches(trimmedQuery, profile.name, profile.email, profile.role, profile.status))
-        .slice(0, 6)
-        .map((profile) => ({
-          id: `profile:${profile.id}`,
-          label: profile.name || profile.email,
-          description: [profile.email, profile.role.replace(/_/g, ' ')].filter(Boolean).join(' - '),
-          section: 'Users',
-          icon: Shield,
-          to: `/admin/users?search=${encodeURIComponent(profile.email)}`,
-        }));
-    }
-
-    return [...vehicleItems, ...customerItems, ...orderItems, ...userItems];
-  }, [canSearchUsers, customers, salesOrders, user?.company_id]);
+    const hits = await globalSearch(query, 6);
+    return hits.map(toCommandItem);
+  }, []);
 
   return {
     brand: {
