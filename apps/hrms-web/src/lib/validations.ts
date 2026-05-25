@@ -315,22 +315,12 @@ export const approvalStepSchema = z.object({
 });
 
 export const approvalFlowSchema = z.object({
-  name:          z.string().min(2, 'Name must be at least 2 characters').max(80),
-  description:   z.string().max(300).optional(),
-  entityType:    z.enum(['leave_request','payroll_run','appraisal','internal_request','general']),
-  isActive:      z.boolean().default(true),
-  isDefault:     z.boolean().default(false),
-  matchPriority: z.number().int().min(0).max(100).default(0),
-  conditions:    z.object({
-    requesterRole:  z.string().optional(),
-    departmentId:   z.string().optional(),
-    branchId:       z.string().optional(),
-    categoryKey:    z.string().optional(),
-    subcategoryKey: z.string().optional(),
-    amountMin:      z.number().optional(),
-    amountMax:      z.number().optional(),
-    priority:       z.enum(['low','medium','high','critical']).optional(),
-  }).optional().nullable(),
+  name:         z.string().min(2, 'Name must be at least 2 characters').max(80),
+  description:  z.string().max(300).optional(),
+  entityType:   z.enum(['leave_request','payroll_run','appraisal','internal_request','general']),
+  isActive:     z.boolean().default(true),
+  departmentId: z.string().nullable().optional(),
+  isDefault:    z.boolean().default(true),
 });
 
 export const approvalFlowWithStepsSchema = approvalFlowSchema.extend({

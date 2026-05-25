@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main, dev]
 
 # Cancel older runs on the same ref to keep queue times sane.
 concurrency:
@@ -17,8 +17,8 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -37,9 +37,9 @@ jobs:
       VITE_SUPABASE_ANON_KEY: ci_placeholder_anon_key_do_not_use_in_production
       VITE_APP_ENV: development
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -67,9 +67,9 @@ jobs:
       VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
       VITE_SUPABASE_ANON_KEY: ci_placeholder_anon_key_do_not_use_in_production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -87,8 +87,8 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -109,8 +109,8 @@ jobs:
       VITE_SUPABASE_ANON_KEY: ci_placeholder_anon_key_do_not_use_in_production
       VITE_APP_ENV: development
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -152,7 +152,7 @@ jobs:
       RLS_USER_B_EMAIL: ${{ secrets.RLS_USER_B_EMAIL }}
       RLS_USER_B_PASSWORD: ${{ secrets.RLS_USER_B_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Check RLS credentials
         id: rls-env
         shell: bash
@@ -173,7 +173,7 @@ jobs:
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         if: steps.rls-env.outputs.ready == 'true'
         with:
           node-version: '20'

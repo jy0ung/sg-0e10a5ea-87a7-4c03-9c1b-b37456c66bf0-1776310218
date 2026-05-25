@@ -53,14 +53,6 @@ describe('ticketService', () => {
     return { select };
   }
 
-  function mockNoCategoryPinnedApprovalFlow() {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const categoryKeyEq = vi.fn(() => ({ maybeSingle }));
-    const companyEq = vi.fn(() => ({ eq: categoryKeyEq }));
-    const select = vi.fn(() => ({ eq: companyEq }));
-    return { select };
-  }
-
   function mockNoInternalRequestApprovalMetadata() {
     const inFn = vi.fn().mockResolvedValue({ data: [], error: null });
     const entityEq = vi.fn(() => ({ in: inFn }));
@@ -88,10 +80,8 @@ describe('ticketService', () => {
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-1' }, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
-    const categoryPinned = mockNoCategoryPinnedApprovalFlow();
     vi.mocked(supabase.from)
       .mockImplementationOnce(() => ({ select: profilesLookup.select }) as never)
-      .mockImplementationOnce(() => ({ select: categoryPinned.select }) as never)
       .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
       .mockImplementationOnce(() => ({ insert }) as never);
 
@@ -239,10 +229,8 @@ describe('ticketService', () => {
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-2' }, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
-    const categoryPinned = mockNoCategoryPinnedApprovalFlow();
     vi.mocked(supabase.from)
       .mockImplementationOnce(() => ({ select: profilesLookup.select }) as never)
-      .mockImplementationOnce(() => ({ select: categoryPinned.select }) as never)
       .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
       .mockImplementationOnce(() => ({ insert }) as never);
 

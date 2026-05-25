@@ -137,7 +137,7 @@ export async function getTrialBalance(
 ): Promise<{ data: TrialBalanceRow[] | null; error: Error | null }> {
   const { data, error } = await supabase.rpc('get_trial_balance', {
     p_company_id: companyId,
-    p_period_id: (periodId ?? null) as unknown as string,
+    p_period_id: periodId ?? null,
   });
   if (error) {
     loggingService.error('getTrialBalance failed', { companyId, periodId , error }, 'glService');
@@ -204,22 +204,6 @@ export async function closeAccountingPeriod(
     .single();
   if (error) {
     loggingService.error('closeAccountingPeriod failed', { periodId , error }, 'glService');
-    return { data: null, error: new Error(error.message) };
-  }
-  return { data: mapPeriod(data as Record<string, unknown>), error: null };
-}
-
-export async function lockAccountingPeriod(
-  periodId: string,
-): Promise<{ data: AccountingPeriod | null; error: Error | null }> {
-  const { data, error } = await supabase
-    .from('accounting_periods')
-    .update({ status: 'locked' })
-    .eq('id', periodId)
-    .select()
-    .single();
-  if (error) {
-    loggingService.error('lockAccountingPeriod failed', { periodId, error }, 'glService');
     return { data: null, error: new Error(error.message) };
   }
   return { data: mapPeriod(data as Record<string, unknown>), error: null };

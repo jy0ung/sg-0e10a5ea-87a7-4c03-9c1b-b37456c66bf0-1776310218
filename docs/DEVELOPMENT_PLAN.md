@@ -2,7 +2,7 @@
 
 Status: Active consolidated source of planning truth
 
-Last consolidated: 2026-05-18
+Last consolidated: 2026-05-14
 
 This document summarizes the active development plan across the repo. It does not replace the detailed phase docs, runbooks, or historical closeout notes. Use this file for current status, immediate priorities, and the next implementation direction; use the linked source documents for evidence and operational detail.
 
@@ -107,9 +107,6 @@ Phase closeouts and validated milestones:
 | Stage 5 AP Foundation | Committed `b1a7d4b` 2026-05-11 | `supplier_payment_events` immutable ledger on `purchase_invoices` with same pattern as AR. Five SECURITY DEFINER RPCs: `record_supplier_payment_event`, `reverse_supplier_payment_event`, `get_supplier_payment_events`, `get_ap_aging_summary`, `transition_pi_lifecycle`. Lifecycle state machine: received → verified → approved → scheduled/paid; any → cancelled. `apService.ts` created; `purchaseInvoiceService` extended; `PurchaseInvoices.tsx` gains AP aging cards, lifecycle and payment badges, Verify/Approve/Pay action buttons, and Record Payment dialog. 12 new tests (413 total). |
 | HRMS feature batch (2026-05-13) | Committed across multiple commits | Six migrations applied: (1) `20260513090000` — half-day leave metadata (`day_part` column on `leave_requests`: `full_day/half_day_morning/half_day_afternoon`) and leave attachments. (2) `20260513103000` — `hrms_roles` and `employee_hrms_role_assignments` tables, RLS policies, system-default role seeding per company; approval routing updated to use HRMS role assignments. (3) `20260513120000` — `company_branding` table and `company-assets` storage bucket. (4) `20260513140000` — `requires_balance` and `min_advance_notice_days` rule columns on `leave_types`. (5) `20260513150000` — adds `staff` category to `hrms_roles_category_check`; consolidates legacy `employee` role into `staff`; seeds `staff` system-default for all companies; annotates `profiles.role` comment that `analyst` should not gate HRMS access. (6) `20260514113000` — `profiles.role` and `employees.primary_role` column defaults changed to `'creator_updater'`; pending `analyst` profiles with no company migrated; `handle_new_user()` rewritten to create pending accounts with `creator_updater` role. |
 | HRMS role-based access system | Committed `940f6d3` — CI fix `5f9d68f` — admin bypass `e61a4ec` 2026-05-14 | `useHrmsAccess` hook (in both root `src/hooks/` and `apps/hrms-web/src/hooks/`) queries `employee_hrms_role_assignments` and derives access via `deriveHrmsAccess()`. `HrmsLayout` and `RequireHrmsRouteAccess` consume the hook for fine-grained route visibility. `deriveFullHrmsAccess()` added to both `src/lib/hrms/access.ts` copies; `super_admin` and `company_admin` bypass the assignment query entirely and receive full access. `listUserAssignedHrmsRoleCodes()` added to `packages/hrms-services` (mobile use). CI failures resolved: TS2322 explicit `string[]` type in `approvalRouting.ts`; `useHrmsAccess` mock in `HrmsLayout.test.tsx` to avoid `QueryClientProvider` requirement. |
-| HRMS enterprise UX redesign | Committed `2dfa3bc` 2026-05-21 | Post-launch redesign of the dedicated HRMS workspace in `apps/hrms-web`: discovery and IA pass, grouped role-aware navigation, dashboard command center, shared shell primitives (`FilterBar`, `HrmsEmptyState`, `RequireHrmsRouteAccess`), employee profile route, and workflow-focused upgrades for attendance, announcements, approval inbox, payroll, appraisals, leave calendar, and employee directory. Root `src/lib/hrms/access.ts` was aligned with the dedicated app route contract (`dashboard`, `leaveQuota`). Validation confirmed no new TypeScript errors in redesign files; project errors dropped from 35 to 22, with remaining errors pre-existing outside the redesign slice. |
-| Internal Request enterprise slice — Phase 2 | Implemented 2026-05-18 | Approval flow conditions: `approval_flows.conditions` JSONB and `match_priority` integer (migration `20260518000000`) enable condition-based multi-flow matching with specificity scoring. Category-level flow pin: `request_categories.approval_flow_id` FK (migration `20260518030000`) pins a specific flow to a category, bypassing the scorer. `TicketApprovalHistory` component ships approval decision timeline in ticket detail. Request Queue Scale: 6 saved-view presets (My Open, Unassigned, Overdue, High Priority, Closed This Week, All Active), `assignedTo` filter in `ticketService`, bulk assign/status-change/CSV-export actions, checkbox selection in `RequestQueueList`. `PurchaseInvoiceDetail.tsx` page live at `/purchasing/invoices/:id`. |
-| `fookloi.net` legacy data seeding | Applied 2026-05-18 | Five migrations applied: `20260518010000` (RLS policies for master-data tables with DROP IF EXISTS guards), `20260518020000` (customer dedup — normalize `ic_no`, partial index clean-up, unique indexes on seeded master tables), `20260518040000` (`sales_advisors` table with RLS + `update_updated_at_column()` trigger + unique on `(code, company_id)`). `scripts/seed-from-extract.ts` updated: correct column maps for `suppliers`/`dealers` (PascalCase header normalization), new `SALES_ADVISORS_MAP` + seed target; `conflictCols` removed for tables with functional or partial unique indexes. **26,254 rows seeded across 14 tables**: customers (22,345), official_receipts (1,919), purchase_invoices (438), sales_advisors (195), finance_companies (106), dealer_invoices (79), branches (17), vehicle_colours (32), banks (15), insurance_companies (22), dealers (12), suppliers (12), payment_types (7), vehicle_models (8). |
 
 Relevant evidence:
 
@@ -123,12 +120,7 @@ Relevant evidence:
 
 ## Current Phase
 
-Current phase: Phase 5 / Stages 0–6 complete as of 2026-05-14. Internal Request Phase 2, Purchase Invoice detail page, and `fookloi.net` legacy data seeding are complete as of 2026-05-18. A post-launch HRMS enterprise UX redesign slice is complete as of 2026-05-21. Stage 7 (financial reporting UI) remains next. DMS staging foundation, DMS normalizers, Sales Pipeline RPCs, Full-Stack Refactor, AR Foundation (immutable `payment_events` ledger), AP Foundation (`supplier_payment_events` with lifecycle state machine), HRMS role-based access system (`hrms_roles`, `employee_hrms_role_assignments`, `useHrmsAccess` hook, `deriveFullHrmsAccess` admin bypass), six HRMS feature migrations (half-day leave, company branding, leave type rules, staff role consolidation, `creator_updater` defaults), HRMS enterprise UX redesign (dashboard, IA, shell polish, employee profile, attendance/payroll/appraisal/announcement/calendar/directory upgrades), approval flow conditions JSONB + category flow FK pin, Request Queue saved views + bulk actions, Purchase Invoice detail page (`PurchaseInvoiceDetail.tsx`), and `fookloi.net` legacy data seeding (26,254 rows across 14 tables, `sales_advisors` table created) are all committed and locally validated.
-
-HRMS redesign status against the May 2026 redesign brief:
-
-- Completed: discovery and implementation map, role-aware information architecture, global HRMS shell polish, role-aware dashboard, shared design-system foundation, employee profile page, personal profile center, attendance redesign, payroll summary redesign, appraisals redesign, announcements redesign, leave control center, leave calendar enhancements, leave quota workspace shell, HRMS shell/topbar polish, employee directory enhancements, and QA/typecheck/lint validation for the redesign slice.
-- Partially complete or follow-up work: deeper leave quota/admin settings workflows and richer HRMS-wide search/notification experiences.
+Current phase: Phase 5 / Stages 0–6 complete as of 2026-05-14. Stage 7 (financial reporting UI) is next. DMS staging foundation, DMS normalizers, Sales Pipeline RPCs, Full-Stack Refactor, AR Foundation (immutable `payment_events` ledger), AP Foundation (`supplier_payment_events` with lifecycle state machine), HRMS role-based access system (`hrms_roles`, `employee_hrms_role_assignments`, `useHrmsAccess` hook, `deriveFullHrmsAccess` admin bypass), and six HRMS feature migrations (half-day leave, company branding, leave type rules, staff role consolidation, `creator_updater` defaults) are all committed and locally validated.
 
 Stage 0 goal:
 
@@ -197,11 +189,9 @@ Use this checklist to decide the next work item without needing to ask for a bro
 
 ### Parked Enterprise Follow-Ups
 
-- [x] Internal Request: category/template-specific approval flow routing. **Implemented 2026-05-18 — `approval_flows.conditions` JSONB + `match_priority` (migration `20260518000000`); `request_categories.approval_flow_id` FK pin (migration `20260518030000`); condition-based flow scorer in approval routing service.**
-- [x] Internal Request: approval history timeline. **Implemented — `TicketApprovalHistory` component ships decision timeline in ticket detail.**
-- [x] Internal Request: saved views and bulk actions. **Implemented 2026-05-18 — 6 saved-view presets; bulk assign/status/CSV export; `assignedTo` filter in `ticketService`; checkbox selection in `RequestQueueList`.**
-- [ ] Internal Request: escalation/delegation policies.
-- [ ] Internal Request: server-side SLA summaries and owner workload views.
+- [ ] Internal Request: category/template-specific approval flow routing.
+- [ ] Internal Request: escalation/delegation policies and approval history timeline.
+- [ ] Internal Request: saved views, server-side SLA summaries, owner workload views, and bulk actions.
 - [ ] Internal Request: requester follow-up attachments and satisfaction rating.
 - [ ] Internal Request: analytics dashboards and notification expansion.
 - [ ] Production APNs: provision secrets and record iOS device smoke evidence.
@@ -216,16 +206,6 @@ Use this checklist to decide the next work item without needing to ask for a bro
 - [x] Add SECURITY DEFINER posting RPCs: `post_ar_payment_to_gl` (derives from AR `payment_events`), `post_ap_payment_to_gl` (derives from AP `supplier_payment_events`). Both idempotent.
 - [x] Add `get_trial_balance(company_id, period_id)` RPC.
 - [x] Add focused tests and RLS coverage for journal entries and account tables. 14/14 `glService.test.ts` tests pass.
-
-### Stage 7 - Financial Reporting UI
-
-- [ ] `src/pages/accounts/ChartOfAccounts.tsx` — list and manage accounts grouped by type (`asset`, `liability`, `equity`, `revenue`, `expense`); reads `accounts` table via `glService`; company-scoped; admin/accounts role write, viewer read.
-- [ ] `src/pages/accounts/AccountingPeriods.tsx` — period management (open/close/lock); reads `accounting_periods`; lifecycle actions via `glService`; guard against closing periods with unposted journal entries.
-- [ ] `src/pages/accounts/TrialBalance.tsx` — reads `get_trial_balance(company_id, period_id)` RPC; displays debit/credit totals by account grouped by type; verify debits equal credits.
-- [ ] `src/pages/accounts/JournalEntries.tsx` — paginated ledger of `journal_entries` with expandable debit/credit line detail; filter by period, account, and date range.
-- [ ] Add `/accounts/*` routes to `src/main.tsx` under `ADMIN_ONLY` or `accounts`/`director` role gate.
-- [ ] Regenerate Supabase TypeScript types if any schema changes are made.
-- [ ] Run typecheck, lint, and focused GL tests (`glService.test.ts`) after all four pages are wired.
 
 Current foundation slice status:
 
@@ -249,7 +229,6 @@ Current foundation slice status:
 18. ~~Next: begin Stage 6 — General Ledger. Define chart of accounts, journal entry structure, posting rules that derive from AR `payment_events` and AP `supplier_payment_events`, and accounting period close contract.~~ Done 2026-05-14 — Stage 6 GL Foundation complete. Migration `20260514200000` applied; `accounts`, `accounting_periods`, `journal_entries`, `journal_entry_lines` live; `post_ar_payment_to_gl`, `post_ap_payment_to_gl`, `get_trial_balance` RPCs shipped; `glService.ts` + 14 tests added. 788/788 tests pass.
 19. ~~Next: apply HRMS feature migrations (half-day leave, HRMS role system, company branding, leave type rules, staff role consolidation, analyst default cleanup) and implement HRMS role-based access control.~~ Done 2026-05-14 — 6 migrations applied; `hrms_roles` + `employee_hrms_role_assignments` tables live; `useHrmsAccess` + `deriveFullHrmsAccess()` shipped; `super_admin`/`company_admin` bypass in place (`e61a4ec`).
 20. ~~Next: begin Stage 6 — General Ledger.~~ Done — see item 18.
-21. Next: begin Stage 7 — Financial Reporting UI. Build `ChartOfAccounts`, `AccountingPeriods`, `TrialBalance`, and `JournalEntries` pages backed by the Stage 6 GL service and `get_trial_balance` RPC. See Stage 7 checklist above.
 
 ### Stage 3 - Sales Pipeline Foundation
 
@@ -437,8 +416,7 @@ Phase 5 should proceed in controlled stages.
 | Stage 4 | Accounts Receivable foundation | Payments become immutable events with allocation, receipt reference, reversal behavior, reconciliation status, AR aging, and clear separation from DMS collection snapshots. |
 | Stage 5 | Accounts Payable and purchasing integration | Purchase invoice lifecycle, supplier payments, AP aging, and approval controls are auditable and company-scoped. |
 | Stage 6 | General Ledger and financial reporting | Balanced immutable journal entries, chart of accounts, posting rules, accounting periods, and financial reports reconcile to AR/AP. |
-| Stage 7 | Financial Reporting UI | Chart of accounts, accounting periods, trial balance, and journal entry ledger pages are accessible to authorized users and reconcile to the AR/AP ledger. |
-| Stage 8 | Cross-module launch hardening | End-to-end order-to-cash tests, RLS tests, load tests, bundle checks, migration/rollback plans, observability, and business sign-off are complete. |
+| Stage 7 | Cross-module launch hardening | End-to-end order-to-cash tests, RLS tests, load tests, bundle checks, migration/rollback plans, observability, and business sign-off are complete. |
 
 Finance guardrails:
 
