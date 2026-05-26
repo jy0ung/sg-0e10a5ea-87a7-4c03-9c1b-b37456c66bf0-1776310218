@@ -1487,6 +1487,35 @@ export interface CreateGrnInput {
   lines: CreateGrnLineInput[];
 }
 
+// ===== 3-way match (Phase 3e.3) =====
+
+export type ThreeWayMatchStatus =
+  | 'unmatched'
+  | 'pending_receipt'
+  | 'amount_variance'
+  | 'matched';
+
+export interface ThreeWayMatchRow {
+  purchaseInvoiceId: string;
+  invoiceNo: string;
+  supplier: string;
+  chassisNo: string | null;
+  piAmount: number;
+  invoiceDate: string | null;
+  poNo: string | null;
+  poLineNo: number | null;
+  orderedQuantity: number | null;
+  expectedAmount: number | null;
+  receivedQuantity: number;
+  amountVariance: number | null;
+  matchStatus: ThreeWayMatchStatus;
+}
+
+export interface ThreeWayMatchStatusCount {
+  matchStatus: ThreeWayMatchStatus;
+  total: number;
+}
+
 export type AgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
 
 export interface AgingByBranchRow {

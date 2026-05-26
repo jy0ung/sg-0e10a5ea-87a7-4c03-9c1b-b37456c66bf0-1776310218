@@ -71,6 +71,7 @@ const mainRoutes: RouteCheck[] = [
   { module: 'Inventory', name: 'Chassis Movement', path: '/inventory/chassis' },
   { module: 'Purchasing', name: 'Purchase Orders', path: '/purchasing/orders' },
   { module: 'Purchasing', name: 'Goods Receipt Notes', path: '/purchasing/grn' },
+  { module: 'Purchasing', name: '3-way Match', path: '/purchasing/three-way-match' },
   { module: 'Purchasing', name: 'Purchase Invoices', path: '/purchasing/invoices' },
   { module: 'Accounts', name: 'Profit & Loss', path: '/accounts/profit-loss' },
   { module: 'Accounts', name: 'Balance Sheet', path: '/accounts/balance-sheet' },

@@ -104,6 +104,7 @@ const PurchaseOrderDetail = lazy(() => import("./pages/purchasing/PurchaseOrderD
 const GoodsReceiptNotes = lazy(() => import("./pages/purchasing/GoodsReceiptNotes"));
 const GoodsReceiptNoteNew = lazy(() => import("./pages/purchasing/GoodsReceiptNoteNew"));
 const GoodsReceiptNoteDetail = lazy(() => import("./pages/purchasing/GoodsReceiptNoteDetail"));
+const ThreeWayMatch = lazy(() => import("./pages/purchasing/ThreeWayMatch"));
 const ChartOfAccounts = lazy(() => import("./pages/accounts/ChartOfAccounts"));
 const AccountingPeriods = lazy(() => import("./pages/accounts/AccountingPeriods"));
 const TrialBalance = lazy(() => import("./pages/accounts/TrialBalance"));
@@ -248,6 +249,7 @@ const router = createBrowserRouter([
       { path: "purchasing/grn", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="Goods Receipt Notes"><S><GoodsReceiptNotes /></S></R></RequireRole>) },
       { path: "purchasing/grn/new", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="New GRN"><S><GoodsReceiptNoteNew /></S></R></RequireRole>) },
       { path: "purchasing/grn/:id", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="GRN Detail"><S><GoodsReceiptNoteDetail /></S></R></RequireRole>) },
+      { path: "purchasing/three-way-match", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="3-way Match"><S><ThreeWayMatch /></S></R></RequireRole>) },
       { path: "accounts/chart", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Chart of Accounts"><S><ChartOfAccounts /></S></R></RequireRole> },
       { path: "accounts/periods", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Accounting Periods"><S><AccountingPeriods /></S></R></RequireRole> },
       { path: "accounts/trial-balance", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Trial Balance"><S><TrialBalance /></S></R></RequireRole> },
