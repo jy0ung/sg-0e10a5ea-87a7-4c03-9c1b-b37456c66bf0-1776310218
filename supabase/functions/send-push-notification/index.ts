@@ -37,6 +37,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { withRequestLogging, type EdgeLogger } from '../_shared/logger.ts';
 
 interface RequestBody {
   user_ids: string[];
@@ -134,11 +135,12 @@ async function sendApnsNotification(
   title: string,
   msgBody: string,
   path: string | undefined,
+  log: EdgeLogger,
 ): Promise<{ token: string; ok: boolean; error?: string }[]> {
   const bundleId = Deno.env.get('APNS_BUNDLE_ID');
   const jwt = await getApnsJwt();
   if (!bundleId || !jwt) {
-    console.warn('[push] APNs secrets not set — skipping iOS notifications');
+    log.warn('apns.skipped', { reason: 'secrets_missing' });
     return tokens.map(() => ({ token: 'apns', ok: false, error: 'APNs is not configured' }));
   }
 
@@ -168,11 +170,11 @@ async function sendApnsNotification(
       });
 
       if (!res.ok) {
-        console.error(`[push] APNs responded with HTTP ${res.status}`);
+        log.error('apns.http_error', { status: res.status });
       }
       return { token: 'apns', ok: res.ok };
     } catch (apnsErr) {
-      console.error('[push] APNs fetch failed:', (apnsErr as Error).message);
+      log.error('apns.fetch_failed', { error: (apnsErr as Error).message });
       return { token: 'apns', ok: false, error: 'APNs request failed' };
     }
   }));
@@ -192,7 +194,7 @@ if (!Deno.env.get('FCM_SERVER_KEY')) {
   );
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withRequestLogging('send-push-notification', async ({ req, log }) => {
   const corsHeaders = buildCorsHeaders(req);
   const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
 
@@ -317,7 +319,7 @@ Deno.serve(async (req: Request) => {
     .in('user_id', user_ids);
 
   if (error) {
-    console.error('[push] fetch tokens error:', error);
+    log.error('push.fetch_tokens_failed', { error: error.message });
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: jsonHeaders,
@@ -331,7 +333,7 @@ Deno.serve(async (req: Request) => {
   if (fcmTokens.length > 0) {
     const fcmKey = Deno.env.get('FCM_SERVER_KEY');
     if (!fcmKey) {
-      console.warn('[push] FCM_SERVER_KEY not set — skipping Android notifications');
+      log.warn('fcm.skipped', { reason: 'FCM_SERVER_KEY not set' });
     } else {
       const fcmPayload = {
         registration_ids: fcmTokens,
@@ -349,11 +351,11 @@ Deno.serve(async (req: Request) => {
         });
         if (!fcmRes.ok) {
           // Log status only — never log the key or response body (may echo key errors)
-          console.error(`[push] FCM responded with HTTP ${fcmRes.status}`);
+          log.error('fcm.http_error', { status: fcmRes.status });
         }
         results.push({ token: 'fcm_batch', ok: fcmRes.ok });
       } catch (fcmErr) {
-        console.error('[push] FCM fetch failed:', (fcmErr as Error).message);
+        log.error('fcm.fetch_failed', { error: (fcmErr as Error).message });
         results.push({ token: 'fcm_batch', ok: false, error: 'FCM request failed' });
       }
     }
@@ -361,11 +363,11 @@ Deno.serve(async (req: Request) => {
 
   const iosTokens = tokens.filter((t) => t.platform === 'ios').map((t) => t.token);
   if (iosTokens.length > 0) {
-    results.push(...await sendApnsNotification(iosTokens, title, msgBody, path));
+    results.push(...await sendApnsNotification(iosTokens, title, msgBody, path, log));
   }
 
   return new Response(JSON.stringify({ sent: results.length, results }), {
     status: 200,
     headers: jsonHeaders,
   });
-});
+}));

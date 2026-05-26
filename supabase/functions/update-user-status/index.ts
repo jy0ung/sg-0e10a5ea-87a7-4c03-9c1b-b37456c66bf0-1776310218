@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { withRequestLogging } from '../_shared/logger.ts';
 
 interface UpdateUserStatusPayload {
   user_id: string;
@@ -32,7 +33,7 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withRequestLogging('update-user-status', async ({ req }) => {
   const corsHeaders = buildCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -216,4 +217,4 @@ Deno.serve(async (req: Request) => {
       corsHeaders,
     );
   }
-});
+}));

@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { resolveInviteSiteUrl } from '../_shared/publicSiteUrl.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { withRequestLogging } from '../_shared/logger.ts';
 
 interface InvitePayload {
   email: string;
@@ -24,7 +25,7 @@ function isMissingEmployeeLinkColumnError(message: string | null | undefined): b
 const RATE_MAX_CALLS = 10;
 const RATE_WINDOW_SECONDS = 60 * 60;
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withRequestLogging('invite-user', async ({ req }) => {
   const corsHeaders = buildCorsHeaders(req);
 
   // Handle CORS preflight
@@ -224,4 +225,4 @@ Deno.serve(async (req: Request) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
-});
+}));

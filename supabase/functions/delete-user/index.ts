@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { withRequestLogging } from '../_shared/logger.ts';
 
 interface DeleteUserPayload {
   user_id: string;
@@ -40,7 +41,7 @@ function buildArchivedEmail(userId: string): string {
   return `deleted+${userId}@${ARCHIVED_EMAIL_DOMAIN}`;
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withRequestLogging('delete-user', async ({ req }) => {
   const corsHeaders = buildCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -297,4 +298,4 @@ Deno.serve(async (req: Request) => {
       corsHeaders,
     );
   }
-});
+}));

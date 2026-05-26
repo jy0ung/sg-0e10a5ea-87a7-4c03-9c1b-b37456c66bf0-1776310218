@@ -18,6 +18,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { withRequestLogging } from '../_shared/logger.ts';
 
 const MAX_CARRY_DEFAULT = 5;
 
@@ -33,7 +34,7 @@ interface RolloverPayload {
   max_carry_days?: number;
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withRequestLogging('rollover-leave-balances', async ({ req }) => {
   const corsHeaders = buildCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -210,4 +211,4 @@ Deno.serve(async (req: Request) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
-});
+}));

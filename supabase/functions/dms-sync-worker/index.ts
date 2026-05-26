@@ -10,6 +10,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { buildCorsHeaders } from '../_shared/cors.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { withRequestLogging } from '../_shared/logger.ts';
 
 // Durable rate limit for non-service-role callers: 60 staging POSTs per
 // minute. Tuned for batched operator-driven uploads (up to 1000 records
@@ -221,7 +222,7 @@ async function mapRecord(target: DmsTarget, companyId: string, syncRunId: string
   }
 }
 
-Deno.serve(async (req: Request) => {
+Deno.serve(withRequestLogging('dms-sync-worker', async ({ req }) => {
   const corsHeaders = buildCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -360,4 +361,4 @@ Deno.serve(async (req: Request) => {
       .eq('id', syncRunId);
     return jsonResponse(req, 500, { error: message, sync_run_id: syncRunId });
   }
-});
+}));
