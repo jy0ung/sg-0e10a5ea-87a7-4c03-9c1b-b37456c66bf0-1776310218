@@ -246,83 +246,152 @@ export function StandardTable<T extends object>({
           <p className="text-muted-foreground text-sm">{emptyMessage}</p>
         </div>
       ) : (
-        <div className="glass-panel overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-secondary/30">
-                  {selectable && (
-                    <th className="w-10 px-3 py-3">
-                      <input
-                        type="checkbox"
-                        checked={allPageSelected}
-                        onChange={toggleAll}
-                        aria-label="Select all rows on this page"
-                        className="h-3.5 w-3.5 accent-primary"
-                      />
-                    </th>
-                  )}
-                  {columns.map(col => (
-                    <th
-                      key={col.key}
-                      className={cn(
-                        'px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider',
-                        col.sortable !== false && 'cursor-pointer select-none hover:text-foreground transition-colors',
-                        col.className,
-                      )}
-                      onClick={() => col.sortable !== false && handleSort(col.key)}
-                    >
-                      <span className="inline-flex items-center">
-                        {col.label}
-                        <SortIcon col={col} />
-                      </span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {pageData.map((item, idx) => {
-                  const key = String(getValue(item, rowKey) ?? idx);
-                  return (
-                    <tr
-                      key={key}
-                      className={cn(
-                        'data-table-row border-b border-border last:border-0',
-                        onRowClick && 'cursor-pointer',
-                        selected.has(key) && 'bg-primary/5',
-                      )}
-                      onClick={() => onRowClick?.(item)}
-                    >
-                      {selectable && (
-                        <td className="w-10 px-3 py-3" onClick={e => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={selected.has(key)}
-                            onChange={() => toggleRow(key)}
-                            aria-label="Select row"
-                            className="h-3.5 w-3.5 accent-primary"
-                          />
-                        </td>
-                      )}
-                      {columns.map(col => (
-                        <td key={col.key} className={cn('px-4 py-3 text-foreground', col.className)}>
-                          {col.render
-                            ? col.render(item, idx)
-                            : String(getValue(item, col.key) ?? '—')}
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {/* Desktop / tablet: classic <table>. Hidden below md so phones get cards. */}
+          <div className="glass-panel overflow-hidden hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-secondary/30">
+                    {selectable && (
+                      <th className="w-10 px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={allPageSelected}
+                          onChange={toggleAll}
+                          aria-label="Select all rows on this page"
+                          className="h-3.5 w-3.5 accent-primary"
+                        />
+                      </th>
+                    )}
+                    {columns.map(col => (
+                      <th
+                        key={col.key}
+                        className={cn(
+                          'px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider',
+                          col.sortable !== false && 'cursor-pointer select-none hover:text-foreground transition-colors',
+                          col.className,
+                        )}
+                        onClick={() => col.sortable !== false && handleSort(col.key)}
+                      >
+                        <span className="inline-flex items-center">
+                          {col.label}
+                          <SortIcon col={col} />
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageData.map((item, idx) => {
+                    const key = String(getValue(item, rowKey) ?? idx);
+                    return (
+                      <tr
+                        key={key}
+                        className={cn(
+                          'data-table-row border-b border-border last:border-0',
+                          onRowClick && 'cursor-pointer',
+                          selected.has(key) && 'bg-primary/5',
+                        )}
+                        onClick={() => onRowClick?.(item)}
+                      >
+                        {selectable && (
+                          <td className="w-10 px-3 py-3" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selected.has(key)}
+                              onChange={() => toggleRow(key)}
+                              aria-label="Select row"
+                              className="h-3.5 w-3.5 accent-primary"
+                            />
+                          </td>
+                        )}
+                        {columns.map(col => (
+                          <td key={col.key} className={cn('px-4 py-3 text-foreground', col.className)}>
+                            {col.render
+                              ? col.render(item, idx)
+                              : String(getValue(item, col.key) ?? '—')}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* Pagination footer */}
+          {/*
+            Mobile (<md): stacked card list per row, using the same columns
+            metadata. Phase 5d — replaces horizontal-scroll on phones.
+          */}
+          <ul className="md:hidden space-y-2" data-testid="standard-table-mobile-list">
+            {pageData.map((item, idx) => {
+              const key = String(getValue(item, rowKey) ?? idx);
+              const interactive = Boolean(onRowClick);
+              const cardClass = cn(
+                'glass-panel p-3 flex flex-col gap-1.5',
+                interactive && 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40',
+                selected.has(key) && 'ring-1 ring-primary/40 bg-primary/5',
+              );
+              const interactiveProps = interactive
+                ? {
+                    role: 'button' as const,
+                    tabIndex: 0,
+                    onClick: () => onRowClick?.(item),
+                    onKeyDown: (e: React.KeyboardEvent<HTMLLIElement>) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onRowClick?.(item);
+                      }
+                    },
+                  }
+                : {};
+              return (
+                <li
+                  key={key}
+                  className={cardClass}
+                  data-testid={`standard-table-mobile-row-${key}`}
+                  {...interactiveProps}
+                >
+                  {selectable && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(key)}
+                        onChange={() => toggleRow(key)}
+                        onClick={e => e.stopPropagation()}
+                        aria-label="Select row"
+                        className="h-3.5 w-3.5 accent-primary"
+                      />
+                      <span aria-hidden>Select</span>
+                    </div>
+                  )}
+                  {columns.map(col => {
+                    const cell = col.render
+                      ? col.render(item, idx)
+                      : String(getValue(item, col.key) ?? '—');
+                    return (
+                      <div key={col.key} className="flex items-baseline justify-between gap-3">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground flex-shrink-0">
+                          {col.label}
+                        </span>
+                        <span className={cn('text-sm text-foreground text-right break-words', col.className)}>
+                          {cell}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Shared pagination footer — single instance under either layout. */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-secondary/10">
+            <div className="glass-panel flex items-center justify-between px-4 py-3 mt-2">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Rows per page</span>
+                <span className="text-xs text-muted-foreground hidden sm:inline">Rows per page</span>
                 <Select
                   value={String(pageSize)}
                   onValueChange={v => { setPageSize(Number(v)); handlePageChange(1); }}
@@ -348,7 +417,7 @@ export function StandardTable<T extends object>({
               </div>
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );

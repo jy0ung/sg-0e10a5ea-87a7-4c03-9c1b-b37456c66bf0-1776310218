@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { StandardTable } from './StandardTable';
 
@@ -32,8 +32,14 @@ describe('StandardTable', () => {
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search branches' }), { target: { value: 'alpha' } });
 
-    expect(screen.getByText('Alpha Branch')).toBeInTheDocument();
-    expect(screen.queryByText('Beta Branch')).not.toBeInTheDocument();
+    // Phase 5d: both the desktop <table> and the mobile <ul> exist in JSDOM
+    // (Tailwind media queries don't evaluate without a layout engine), so the
+    // visible row appears twice. The intent of the test is "matched row is
+    // shown, non-matched row is hidden" — assert against the desktop table
+    // to keep the assertion deterministic.
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Alpha Branch')).toBeInTheDocument();
+    expect(within(table).queryByText('Beta Branch')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search branches' }), { target: { value: 'missing' } });
     expect(screen.getByText('No branches found')).toBeInTheDocument();
@@ -49,7 +55,7 @@ describe('StandardTable', () => {
       />,
     );
 
-    fireEvent.click(screen.getByText('Name'));
+    fireEvent.click(within(screen.getByRole('table')).getByText('Name'));
     expect(screen.getAllByRole('cell').map((cell) => cell.textContent)).toEqual([
       'Alpha Branch',
       'active',
@@ -58,8 +64,9 @@ describe('StandardTable', () => {
     ]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
-    expect(screen.getByText('Gamma Branch')).toBeInTheDocument();
-    expect(screen.queryByText('Alpha Branch')).not.toBeInTheDocument();
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Gamma Branch')).toBeInTheDocument();
+    expect(within(table).queryByText('Alpha Branch')).not.toBeInTheDocument();
   });
 
   it('exposes accessible selection controls', () => {
@@ -75,9 +82,46 @@ describe('StandardTable', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select row' }));
+    // Phase 5d: both desktop + mobile views render checkboxes; click the
+    // first instance (desktop) which represents the same row.
+    fireEvent.click(screen.getAllByRole('checkbox', { name: 'Select row' })[0]);
 
     expect(onSelectionChange).toHaveBeenCalledWith(new Set(['1']));
     expect(screen.getByRole('checkbox', { name: 'Select all rows on this page' })).toBeInTheDocument();
+  });
+
+  it('renders a stacked card list (mobile layout) with label–value pairs per row', () => {
+    render(
+      <StandardTable
+        data={rows.slice(0, 2)}
+        columns={columns}
+        hideSearch
+      />,
+    );
+
+    const mobileList = screen.getByTestId('standard-table-mobile-list');
+    expect(mobileList.tagName).toBe('UL');
+
+    const cards = within(mobileList).getAllByRole('listitem');
+    expect(cards).toHaveLength(2);
+    expect(within(cards[0]).getByText('Name')).toBeInTheDocument();
+    expect(within(cards[0]).getByText('Beta Branch')).toBeInTheDocument();
+    expect(within(cards[0]).getByText('Status')).toBeInTheDocument();
+    expect(within(cards[0]).getByText('inactive')).toBeInTheDocument();
+  });
+
+  it('mobile card layout forwards clicks to onRowClick', () => {
+    const onRowClick = vi.fn();
+    render(
+      <StandardTable
+        data={rows.slice(0, 1)}
+        columns={columns}
+        hideSearch
+        onRowClick={onRowClick}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('standard-table-mobile-row-1'));
+    expect(onRowClick).toHaveBeenCalledWith(rows[0]);
   });
 });
