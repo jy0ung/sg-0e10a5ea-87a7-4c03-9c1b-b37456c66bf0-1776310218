@@ -9,7 +9,7 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getPurchaseOrder, transitionPoStatus } from '@/services/purchaseOrderService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, Send, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardCheck, Loader2, Send, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PurchaseOrderStatus } from '@/types';
 
@@ -115,6 +115,16 @@ export default function PurchaseOrderDetail() {
             <Button variant="outline" size="sm" onClick={() => navigate('/purchasing/orders')}>
               <ArrowLeft className="h-3.5 w-3.5 mr-1" />Back
             </Button>
+            {(po.lifecycleStatus === 'approved' || po.lifecycleStatus === 'fulfilled') && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate(`/purchasing/grn/new?poId=${po.id}`)}
+                data-testid="po-receive-button"
+              >
+                <ClipboardCheck className="h-3.5 w-3.5 mr-1" />Receive (GRN)
+              </Button>
+            )}
             {nextStatuses.map(next => (
               <Button
                 key={next}

@@ -1432,6 +1432,61 @@ export interface CreatePurchaseOrderInput {
   lines: CreatePurchaseOrderLineInput[];
 }
 
+// ===== Goods Receipt Notes (Phase 3e.2) =====
+
+export interface GoodsReceiptNote {
+  id: string;
+  companyId: string;
+  grnNo: string;
+  purchaseOrderId: string;
+  receivedDate: string;
+  supplierDnNo: string | null;
+  notes: string | null;
+  receivedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GrnLine {
+  id: string;
+  companyId: string;
+  goodsReceiptNoteId: string;
+  purchaseOrderLineId: string;
+  receivedQuantity: number;
+  lineNotes: string | null;
+  createdAt: string;
+}
+
+export interface GoodsReceiptNoteWithLines extends GoodsReceiptNote {
+  lines: GrnLine[];
+}
+
+export interface PoLineReceiptSummary {
+  purchaseOrderLineId: string;
+  lineNo: number;
+  chassisNo: string | null;
+  model: string;
+  variant: string | null;
+  orderedQuantity: number;
+  receivedQuantity: number;
+  remainingQuantity: number;
+}
+
+export interface CreateGrnLineInput {
+  purchaseOrderLineId: string;
+  receivedQuantity: number;
+  lineNotes?: string;
+}
+
+export interface CreateGrnInput {
+  grnNo: string;
+  purchaseOrderId: string;
+  receivedDate: string;
+  supplierDnNo?: string;
+  notes?: string;
+  lines: CreateGrnLineInput[];
+}
+
 export type AgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
 
 export interface AgingByBranchRow {

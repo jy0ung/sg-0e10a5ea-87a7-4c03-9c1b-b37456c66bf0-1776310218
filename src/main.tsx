@@ -101,6 +101,9 @@ const PurchaseInvoiceDetail = lazy(() => import("./pages/purchasing/PurchaseInvo
 const PurchaseOrders = lazy(() => import("./pages/purchasing/PurchaseOrders"));
 const PurchaseOrderNew = lazy(() => import("./pages/purchasing/PurchaseOrderNew"));
 const PurchaseOrderDetail = lazy(() => import("./pages/purchasing/PurchaseOrderDetail"));
+const GoodsReceiptNotes = lazy(() => import("./pages/purchasing/GoodsReceiptNotes"));
+const GoodsReceiptNoteNew = lazy(() => import("./pages/purchasing/GoodsReceiptNoteNew"));
+const GoodsReceiptNoteDetail = lazy(() => import("./pages/purchasing/GoodsReceiptNoteDetail"));
 const ChartOfAccounts = lazy(() => import("./pages/accounts/ChartOfAccounts"));
 const AccountingPeriods = lazy(() => import("./pages/accounts/AccountingPeriods"));
 const TrialBalance = lazy(() => import("./pages/accounts/TrialBalance"));
@@ -242,6 +245,9 @@ const router = createBrowserRouter([
       { path: "purchasing/orders", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="Purchase Orders"><S><PurchaseOrders /></S></R></RequireRole>) },
       { path: "purchasing/orders/new", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="New Purchase Order"><S><PurchaseOrderNew /></S></R></RequireRole>) },
       { path: "purchasing/orders/:id", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="Purchase Order Detail"><S><PurchaseOrderDetail /></S></R></RequireRole>) },
+      { path: "purchasing/grn", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="Goods Receipt Notes"><S><GoodsReceiptNotes /></S></R></RequireRole>) },
+      { path: "purchasing/grn/new", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="New GRN"><S><GoodsReceiptNoteNew /></S></R></RequireRole>) },
+      { path: "purchasing/grn/:id", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="GRN Detail"><S><GoodsReceiptNoteDetail /></S></R></RequireRole>) },
       { path: "accounts/chart", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Chart of Accounts"><S><ChartOfAccounts /></S></R></RequireRole> },
       { path: "accounts/periods", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Accounting Periods"><S><AccountingPeriods /></S></R></RequireRole> },
       { path: "accounts/trial-balance", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Trial Balance"><S><TrialBalance /></S></R></RequireRole> },

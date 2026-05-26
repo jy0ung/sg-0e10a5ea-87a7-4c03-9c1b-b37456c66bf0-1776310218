@@ -111,6 +111,7 @@ const navItems: MainNavItem[] = [
   { label: 'Vehicle Transfer', path: '/inventory/transfers', icon: ArrowLeftRight, section: 'Inventory', group: 'Movement', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
 
   { label: 'Purchase Orders', path: '/purchasing/orders', icon: ShoppingCart, section: 'Purchasing', group: 'Operations', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { label: 'Goods Receipt Notes', path: '/purchasing/grn', icon: Package, section: 'Purchasing', group: 'Operations', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'Purchase Invoices', path: '/purchasing/invoices', icon: Truck, section: 'Purchasing', group: 'Operations', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
 
   { label: 'Chart of Accounts', path: '/accounts/chart', icon: BookOpen, section: 'Accounts', group: 'Ledger', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'] },
