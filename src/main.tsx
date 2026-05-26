@@ -11,6 +11,7 @@ import { AuthProvider, ProtectedRoute, useAuth } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { ModuleAccessProvider } from "@/contexts/ModuleAccessContext";
 import { BrandingProvider } from "@/contexts/BrandingContext";
+import { useApplyBranding } from "@/hooks/useApplyBranding";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RequireRole } from "@/components/shared/RequireRole";
 import { RequireActiveModule } from "@/components/shared/RequireActiveModule";
@@ -348,6 +349,11 @@ const router = createBrowserRouter([
   },
 ]);
 
+function BrandedShellEffect() {
+  useApplyBranding();
+  return null;
+}
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -357,6 +363,7 @@ const App = () => {
           <ErrorBoundary>
             <AuthProvider>
               <BrandingProvider>
+                <BrandedShellEffect />
                 <RouterProvider router={router} />
               </BrandingProvider>
             </AuthProvider>
