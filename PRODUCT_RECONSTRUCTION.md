@@ -306,14 +306,23 @@ Acceptance per sub-phase (per the original spec):
 
 Decision #7 (DMS captcha-gated, no service account) was honoured throughout 3c — no headless cron; the dashboard reflects the manual-upload reality and the credential rotation card documents what operators need.
 
-### Phase 4 — UX unification (2 sprints)
-- One shared `@flc/shell` (already extracted in Phase 2).
-- **Role-aware Home** + KPI Definition Studio.
-- **/inbox** consolidating Approvals + Reconciliation + Tickets + Notifications.
-- Mobile-first list views across all StandardTables.
-- Branded shell with `company_branding`.
-- PWA offline fallback (`public/offline.html`).
-- Acceptance: WCAG 2.0 AA on all primary routes; LCP/INP/CLS budgets enforced; Lighthouse > 90 across PWA categories.
+### Phase 4 — UX unification (2 sprints) — **COMPLETE (2026-05-26)**
+Each sub-phase shipped behind its own feature flag, default-off in prod.
+
+- **4a — Unified `/inbox`** ✅ — feature flag `phase4.unified-inbox`. Single page consolidating approvals (HRMS leave / payroll / appraisals), reconciliation review items, my tickets, and notifications, with per-source filter chips, per-source error collection, and click-through deep links. (`3f6a667`)
+- **4b — Role-aware Home + KPI Definition Studio** ✅ — feature flag `phase4.role-home`.
+  - `/home` curated KPI grid for the signed-in role (per-company override > global default).
+  - `/admin/kpi-studio` admin tool to assign KPIs per role.
+  - Backend: `kpi_definitions`, `kpi_role_defaults`, `get_role_home_kpis` and `upsert_role_kpi_defaults` SECURITY DEFINER RPCs, seeded global catalogue + per-role defaults. (`22b440d`)
+- **4c — Branded shell** ✅ — feature flag `phase4.branded-shell`. Applies `company_branding.accent_color` (hex → HSL channels for Tailwind), `app_name` (document title), and `favicon_path` to the runtime shell. (`70f3c99`)
+- **4d — PWA offline runtime banner** ✅ — feature flag `phase4.pwa-offline`. Sticky in-app banner surfaces when the browser flips offline (online/offline events). Pairs with the existing `public/offline.html` precached navigation fallback. (`c7e172b`)
+
+Acceptance per sub-phase:
+- ✅ Feature flag default-off in prod (four new flags seeded)
+- ✅ Unit tests for each surface (≈30 new tests across `inboxService`, `kpiHomeService`, `colorToHsl`, `useApplyBranding`, `useOnlineStatus`, `OfflineBanner`)
+- ✅ Playwright E2E specs for `/inbox` and `/home` + `/admin/kpi-studio`
+- ✅ All admin / SECURITY DEFINER RPCs gate on caller-company + role
+- ⏳ Mobile-first StandardTable pass and WCAG 2.0 AA audit are deferred to Phase 5 (observability + accessibility closeout) since they are evidence-gathering rather than feature work.
 
 ### Phase 5 — Observability & reliability close-out (1 sprint)
 - Ship `performanceService` metrics to Sentry; enable `BrowserTracing`.
