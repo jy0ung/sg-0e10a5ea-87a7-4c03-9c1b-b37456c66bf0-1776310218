@@ -324,12 +324,22 @@ Acceptance per sub-phase:
 - ✅ All admin / SECURITY DEFINER RPCs gate on caller-company + role
 - ⏳ Mobile-first StandardTable pass and WCAG 2.0 AA audit are deferred to Phase 5 (observability + accessibility closeout) since they are evidence-gathering rather than feature work.
 
-### Phase 5 — Observability & reliability close-out (1 sprint)
-- Ship `performanceService` metrics to Sentry; enable `BrowserTracing`.
-- Edge function structured logs with `request_id` + alert rules.
-- PITR + restore drill evidence; rollback drill evidence; OSV/CodeQL evidence — close the launch checklist.
-- DR runbook tabletop.
-- Acceptance: launch checklist 100% green.
+### Phase 5 — Observability & reliability close-out (1 sprint) — **CODE COMPLETE (2026-05-26)**
+Code-side scope shipped in five slices on `main`. Each is additive and either flag-gated or non-breaking. Operator-side evidence capture (Sentry DSN provisioning, PITR enable, OSV/CodeQL, DR tabletop) is tracked in [`docs/PHASE5_EVIDENCE.md`](docs/PHASE5_EVIDENCE.md) and remains open until artefacts are attached.
+
+- **5a — Phase 4 defect close-out + a11y coverage extension** ✅ — Three latent Phase 4b defects closed: NULL-company branch in `upsert_role_kpi_defaults`, `kpi_definitions.landing_route` column wired through RPC → service → Home (replaces the hardcoded code-keyed map and unknown-code `/` fallback), and `e2e/accessibility.spec.ts` extended to `/inbox`, `/home`, `/admin/kpi-studio` with the Phase 4 flags mocked enabled. No new flag. (`062c3fb`)
+- **5b — Observability closeout** ✅ — Most of the originally-planned scope was already shipped; this slice closed the narrow remaining gap. Added `webVitalsService.ts` (subscribes all five Core Web Vitals: CLS / FCP / INP / LCP / TTFB — FCP and TTFB were missing), plus tests asserting `browserTracingIntegration()` is registered in `Sentry.init` and `performanceService` slow-query metrics route through `Sentry.setMeasurement`. AUDIT P3-1/P3-2/P3-3 flipped to ✅ DONE. No new flag — `VITE_SENTRY_DSN` is the natural off-switch. (`fb0ff0f`)
+- **5c — Edge-function structured logs + `request_id` correlation** ✅ — New `supabase/functions/_shared/logger.ts` exports `newRequestId`, `createLogger`, and a `withRequestLogging` `Deno.serve` wrapper that emits `request.start` / `request.end` JSON lines, reflects `x-request-id` on every response, and turns thrown errors into a logged 500 carrying the request id. All six edge functions adopted the wrapper; `send-push-notification`'s eight free-floating `console.*` calls were replaced with structured events. No new flag — format change is non-breaking. (`2fe47e2`)
+- **5d — Mobile-first StandardTable + evidence runbook** ✅ — `StandardTable` dual-renders: `<table>` on `md+`, stacked `<li>` cards below `md`. Mobile cards opt into `role="button"` + `tabIndex={0}` + Enter/Space keyboard activation when `onRowClick` is provided. Pagination footer collapses to a single shared instance under either layout. `docs/PHASE5_EVIDENCE.md` documents the operator capture procedure for Sentry RUM, edge log alerts, WCAG axe, Lighthouse (with per-route acceptance thresholds), PITR + DR drills, and OSV / CodeQL. No new flag. (`5f85d59`)
+
+Acceptance per sub-phase:
+- ✅ Code-side scope shipped (4 feature commits + this closure note).
+- ✅ Unit / RTL tests added (≈25 new tests across `hrefForKpi`, `kpiHomeService`, `webVitalsService`, `errorTrackingService`, `performanceService`, edge-`logger`, `StandardTable` mobile layout).
+- ✅ Phase 4b defects closed (1 migration: `20260527000000_phase5a_kpi_home_defects.sql`).
+- ✅ Accessibility coverage extended to all three Phase 4 surfaces.
+- ⏳ Operator-side evidence (Sentry DSN, PITR enable, DR tabletop, OSV/CodeQL attach, on-call rota) tracked in `docs/PHASE5_EVIDENCE.md` and gates the launch checklist.
+
+Launch-checklist closes when every ⏳ item in `docs/PHASE5_EVIDENCE.md` §7 has an attached artefact.
 
 ### Phase 6 — New product surfaces (open-ended)
 - Service/workshop module.
