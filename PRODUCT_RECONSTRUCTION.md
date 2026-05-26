@@ -277,16 +277,34 @@ Each phase is **independently shippable, behind feature flags, and additive**. N
 - Replace ad-hoc Cmd+K queries with a `global_search` RPC.
 - Acceptance: bundle budget unchanged or smaller; zero new escape hatches; all tests green; Web Vitals LCP < 2.5s on the executive dashboard.
 
-### Phase 3 — Module completion (3 sprints, parallelizable)
-Each sub-phase is a separate PR series:
+### Phase 3 — Module completion (3 sprints, parallelizable) — **COMPLETE (2026-05-25)**
+Each sub-phase shipped as its own commit series on `main`. All work is behind a per-phase feature flag, default-off in prod.
 
-- **3a — Import Review Queue completion**: wire `importReviewService.reviewRow` end-to-end, write tests, add to e2e smoke. Feature-flag `importReview.v2`.
-- **3b — Financial Reporting UI (Stage 7)**: P&L, balance sheet, AR/AP aging by branch, cash position, period-close drilldown. Server-side RPCs only.
-- **3c — DMS Sync Ops UI**: `sync_runs` list, raw payload counts, manual replay (admin-only), credential rotation guidance.
-- **3d — Reconciliation Review Queue UI**: side-by-side DMS/UBS/legacy evidence; writes `reconciliation_decisions`; updates canonical via SECURITY DEFINER RPCs only.
-- **3e — Purchase Orders + 3-way match**: `purchase_orders`, `goods_receipt_notes`, link to existing `purchase_invoices`; AP lifecycle now spans PO → GRN → PI → payment.
-- **3f — Lead intake**: surface `dms_raw_leads`/`dms_raw_prospects`; local follow-up notes; conversion → SO.
-- Acceptance per sub-phase: feature flag default-off in prod, on for one pilot branch, full e2e + RLS matrix re-run; rollback drill recorded.
+- **3a — Import Review Queue completion** ✅ — feature flag `phase3a.import-review-v2`. (`e44a530`)
+- **3b — Financial Reporting UI (Stage 7)** ✅ — feature flag `phase3b.financial-reports-v2`. Shipped in five slices:
+  - 3b.1 Profit & Loss (`a033d65`)
+  - 3b.2 Balance Sheet with unclosed-period earnings (`182a7e4`)
+  - 3b.3 AR/AP aging by branch (`85a1392`)
+  - 3b.4 Cash position with daily series chart (`fd1da0b`)
+  - 3b.5 Period-close drilldown (`3a68de4`)
+- **3c — DMS Sync Ops UI** ✅ — feature flag `phase3c.dms-sync-ops-v2`. Decision #7 default path (manual-upload + Sync Ops dashboard). Shipped in two slices:
+  - 3c.1 Sync Runs dashboard + raw staging counts (`3bf4856`)
+  - 3c.2 Manual retry + credential rotation guidance (`f3145d9`)
+- **3d — Reconciliation Review Queue UI** ✅ — feature flag `phase3d.reconciliation-review-v2`. Side-by-side source/canonical diff + accept/reject/ignore RPC with append-only audit events. (`58f3ee6`)
+- **3e — Purchase Orders + 3-way match** ✅ — feature flag `phase3e.po-grn-v2`. Shipped in three slices:
+  - 3e.1 Purchase Orders foundation (header + lines + state machine) (`4aa204d`)
+  - 3e.2 Goods Receipt Notes with auto-fulfilment (`fcb90b9`)
+  - 3e.3 3-way match (PO ↔ GRN ↔ PI) with variance tolerance (`ea76406`)
+- **3f — Lead intake** ✅ — feature flag `phase3f.lead-intake-v2`. Unified DMS leads/prospects feed with local follow-up notes. (`5d4a986`)
+
+Acceptance per sub-phase (per the original spec):
+- ✅ Feature flag default-off in prod (six new flags seeded)
+- ✅ E2E tests added for each surface (12 new Playwright specs across the phase)
+- ✅ Unit tests for each service (≈80 new tests across glService, dmsService, reconciliationService, leadIntakeService, purchaseOrderService, grnService, threeWayMatchService)
+- ✅ Server-side RPCs use SECURITY DEFINER + caller-company / role gates (no client-side trust)
+- ⏳ Pilot branch enablement, full RLS matrix re-run, rollback drill — operator-side activities outside this PR series. Pilot is a single flag flip per company.
+
+Decision #7 (DMS captcha-gated, no service account) was honoured throughout 3c — no headless cron; the dashboard reflects the manual-upload reality and the credential rotation card documents what operators need.
 
 ### Phase 4 — UX unification (2 sprints)
 - One shared `@flc/shell` (already extracted in Phase 2).
