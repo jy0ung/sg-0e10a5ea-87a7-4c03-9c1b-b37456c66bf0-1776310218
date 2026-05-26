@@ -69,6 +69,7 @@ const mainRoutes: RouteCheck[] = [
   { module: 'Inventory', name: 'Chassis Filter', path: '/inventory/chassis-filter' },
   { module: 'Inventory', name: 'Vehicle Transfer', path: '/inventory/transfers' },
   { module: 'Inventory', name: 'Chassis Movement', path: '/inventory/chassis' },
+  { module: 'Purchasing', name: 'Purchase Orders', path: '/purchasing/orders' },
   { module: 'Purchasing', name: 'Purchase Invoices', path: '/purchasing/invoices' },
   { module: 'Accounts', name: 'Profit & Loss', path: '/accounts/profit-loss' },
   { module: 'Accounts', name: 'Balance Sheet', path: '/accounts/balance-sheet' },

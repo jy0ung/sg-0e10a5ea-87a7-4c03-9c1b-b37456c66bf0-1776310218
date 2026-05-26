@@ -98,6 +98,9 @@ const VehicleTransfer = lazy(() => import("./pages/inventory/VehicleTransfer"));
 const ChassisMovement = lazy(() => import("./pages/inventory/ChassisMovement"));
 const PurchaseInvoices = lazy(() => import("./pages/purchasing/PurchaseInvoices"));
 const PurchaseInvoiceDetail = lazy(() => import("./pages/purchasing/PurchaseInvoiceDetail"));
+const PurchaseOrders = lazy(() => import("./pages/purchasing/PurchaseOrders"));
+const PurchaseOrderNew = lazy(() => import("./pages/purchasing/PurchaseOrderNew"));
+const PurchaseOrderDetail = lazy(() => import("./pages/purchasing/PurchaseOrderDetail"));
 const ChartOfAccounts = lazy(() => import("./pages/accounts/ChartOfAccounts"));
 const AccountingPeriods = lazy(() => import("./pages/accounts/AccountingPeriods"));
 const TrialBalance = lazy(() => import("./pages/accounts/TrialBalance"));
@@ -236,6 +239,9 @@ const router = createBrowserRouter([
       { path: "inventory/chassis", element: withModuleAccess('inventory', <R scope="Chassis Movement"><S><ChassisMovement /></S></R>) },
       { path: "purchasing/invoices", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="Purchase Invoices"><S><PurchaseInvoices /></S></R></RequireRole>) },
       { path: "purchasing/invoices/:id", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="Purchase Invoice Detail"><S><PurchaseInvoiceDetail /></S></R></RequireRole>) },
+      { path: "purchasing/orders", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="Purchase Orders"><S><PurchaseOrders /></S></R></RequireRole>) },
+      { path: "purchasing/orders/new", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="New Purchase Order"><S><PurchaseOrderNew /></S></R></RequireRole>) },
+      { path: "purchasing/orders/:id", element: withModuleAccess('purchasing', <RequireRole roles={MANAGER_AND_UP} section="Purchasing"><R scope="Purchase Order Detail"><S><PurchaseOrderDetail /></S></R></RequireRole>) },
       { path: "accounts/chart", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Chart of Accounts"><S><ChartOfAccounts /></S></R></RequireRole> },
       { path: "accounts/periods", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Accounting Periods"><S><AccountingPeriods /></S></R></RequireRole> },
       { path: "accounts/trial-balance", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Trial Balance"><S><TrialBalance /></S></R></RequireRole> },

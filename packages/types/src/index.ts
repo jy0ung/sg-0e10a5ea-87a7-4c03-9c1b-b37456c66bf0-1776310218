@@ -1373,6 +1373,65 @@ export interface LeadDetail {
   followups: LeadFollowup[];
 }
 
+// ===== Purchase Orders (Phase 3e.1) =====
+
+export type PurchaseOrderStatus =
+  | 'draft' | 'submitted' | 'approved' | 'fulfilled' | 'closed' | 'cancelled';
+
+export interface PurchaseOrder {
+  id: string;
+  companyId: string;
+  poNo: string;
+  supplier: string;
+  orderDate: string;
+  expectedDeliveryDate: string | null;
+  lifecycleStatus: PurchaseOrderStatus;
+  totalAmount: number;
+  notes: string | null;
+  createdBy: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseOrderLine {
+  id: string;
+  companyId: string;
+  purchaseOrderId: string;
+  lineNo: number;
+  chassisNo: string | null;
+  model: string;
+  variant: string | null;
+  quantity: number;
+  unitPrice: number;
+  lineAmount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseOrderWithLines extends PurchaseOrder {
+  lines: PurchaseOrderLine[];
+}
+
+export interface CreatePurchaseOrderLineInput {
+  lineNo: number;
+  chassisNo?: string;
+  model: string;
+  variant?: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface CreatePurchaseOrderInput {
+  poNo: string;
+  supplier: string;
+  orderDate: string;
+  expectedDeliveryDate?: string;
+  notes?: string;
+  lines: CreatePurchaseOrderLineInput[];
+}
+
 export type AgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
 
 export interface AgingByBranchRow {
