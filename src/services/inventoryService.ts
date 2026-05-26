@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from './auditService';
 import { loggingService } from './loggingService';
+import { emitWebhookEvent } from './webhookOutboxService';
 
 // -----------------------------------------------------------------------------
 // Vehicle Transfers
@@ -66,12 +67,13 @@ export async function listVehicleTransfers(companyId: string): Promise<VehicleTr
 export async function createVehicleTransfer(
   input: CreateVehicleTransferInput,
 ): Promise<{ error: Error | null }> {
+  const chassisNo = input.chassisNo.toUpperCase();
   const { error } = await supabase.from('vehicle_transfers').insert({
     company_id: input.companyId,
     running_no: input.runningNo,
     from_branch: input.fromBranch,
     to_branch: input.toBranch,
-    chassis_no: input.chassisNo.toUpperCase(),
+    chassis_no: chassisNo,
     model: input.model,
     colour: input.colour ?? null,
     status: 'pending',
@@ -82,6 +84,19 @@ export async function createVehicleTransfer(
     return { error: new Error(error.message) };
   }
   if (input.actorId) void logUserAction(input.actorId, 'create', 'vehicle_transfer', undefined, { component: 'InventoryService' });
+
+  // Phase 6a producer adoption: fan out a domain event. Fire-and-forget so a
+  // webhook RPC failure can never block the inventory mutation. The RPC is a
+  // safe no-op when no endpoints are registered.
+  void emitWebhookEvent(input.companyId, 'vehicle.transfer.requested', {
+    running_no:  input.runningNo,
+    from_branch: input.fromBranch,
+    to_branch:   input.toBranch,
+    chassis_no:  chassisNo,
+    model:       input.model,
+    colour:      input.colour ?? null,
+  });
+
   return { error: null };
 }
 
@@ -139,6 +154,17 @@ export async function updateVehicleTransferStatus(
   }
 
   if (options.actorId) void logUserAction(options.actorId, 'update', 'vehicle_transfer', id, { component: 'InventoryService' });
+
+  // Phase 6a producer adoption: emit a state-transition event so downstream
+  // consumers (DMS mirrors, branch ops dashboards) can react. Arrived is the
+  // most interesting transition because it reflects a real physical change.
+  void emitWebhookEvent(options.companyId, `vehicle.transfer.${status}`, {
+    transfer_id: id,
+    chassis_no:  options.chassisNo ?? null,
+    to_branch:   options.toBranch  ?? null,
+    status,
+    arrived_at:  arrivedAt,
+  });
 
   return { error: null };
 }
