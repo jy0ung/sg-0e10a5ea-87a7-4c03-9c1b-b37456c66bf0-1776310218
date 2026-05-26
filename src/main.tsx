@@ -23,11 +23,11 @@ import AppLayout from "./components/layout/AppLayout";
 import SalesLayout from "./components/layout/SalesLayout";
 import { SalesProvider } from "./contexts/SalesContext";
 import { errorTrackingService } from "@/services/errorTrackingService";
+import { subscribeWebVitals } from "@/services/webVitalsService";
 import { env } from "@/config/env";
 import { createAppQueryClient } from "@/lib/queryClient";
 import { isPortalOnlyUser } from '@/lib/portalAccess';
 import { getDedicatedHrmsWorkspacePath, HRMS_PATHS } from '@/lib/hrmsWorkspace';
-import { onCLS, onINP, onLCP } from 'web-vitals';
 import {
   ADMIN_ONLY,
   ADMIN_AND_DIRECTOR,
@@ -45,12 +45,10 @@ errorTrackingService.init({
   tracesSampleRate: env.VITE_SENTRY_TRACES_SAMPLE_RATE,
 });
 
-// Ship Core Web Vitals to Sentry RUM
-const reportWebVital = ({ name, value }: { name: string; value: number }) =>
-  errorTrackingService.logMetric(name, value);
-onCLS(reportWebVital);
-onINP(reportWebVital);
-onLCP(reportWebVital);
+// Ship all five Core Web Vitals to Sentry RUM (CLS, FCP, INP, LCP, TTFB).
+// Implementation lives in webVitalsService so the subscription set is
+// unit-testable and adding a metric does not require editing the entry point.
+subscribeWebVitals();
 
 // Route-level code splitting — all pages are loaded on demand
 const LandingPage = lazy(() => import("./pages/LandingPage"));

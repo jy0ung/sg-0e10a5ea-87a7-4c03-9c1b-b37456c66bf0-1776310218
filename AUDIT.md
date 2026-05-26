@@ -33,7 +33,7 @@ However there are **three immediate blockers** (P0), five meaningful security ga
 | P0 — Blockers | 3 | Broken test infrastructure, broken linter, import-parser syntax error |
 | P1 — Security | 5 | No CSP, localStorage RBAC, vulnerable xlsx, no edge-function rate-limiting |
 | P2 — Architecture | 4 | 2,113-line service monolith, dual Excel libs, manual fetch pattern in 16 pages, orphaned i18n |
-| P3 — Observability | 3 | Performance metrics never shipped, no Web Vitals, no RUM |
+| P3 — Observability | 0 | ✅ Closed in Phase 5b: web vitals, performanceService metrics, and BrowserTracing all shipping to Sentry. |
 | P4 — Feature Debt | 3 | Import-review queue incomplete, i18n 0% coverage, approval inbox partially wired |
 
 ---
@@ -477,41 +477,35 @@ const { data = [], isLoading, error, refetch } = useQuery({
 
 ### P3 — Observability
 
-#### P3-1 · Ship performanceService metrics to Sentry
+#### P3-1 · Ship performanceService metrics to Sentry — ✅ DONE (Phase 5b)
 
-- **File**: `src/services/performanceService.ts`
-- **Action**: On each slow query (>500 ms already tracked), emit a Sentry custom metric:
-  ```ts
-  import * as Sentry from '@sentry/react';
-  // inside recordQuery():
-  if (durationMs > SLOW_THRESHOLD_MS) {
-    Sentry.metrics.distribution('query.duration', durationMs, {
-      tags: { queryKey: key },
-      unit: 'millisecond',
-    });
-  }
-  ```
-- **Scope**: 2 hours
+- **Status**: Every `endQueryTimer` and `logComponentRender` call in
+  `src/services/performanceService.ts` now forwards to
+  `errorTrackingService.logMetric`, which calls `Sentry.setMeasurement`
+  whenever a DSN is configured. Slow queries (>1000 ms) emit a warning
+  through `loggingService.warn` in addition to the measurement.
+- **Test**: `src/services/performanceService.test.ts` asserts the pipeline
+  (slow-query warn + measurement forward).
 
-#### P3-2 · Add Web Vitals measurement
+#### P3-2 · Add Web Vitals measurement — ✅ DONE (Phase 5b)
 
-- **File**: `src/main.tsx`
-- **Action**:
-  ```ts
-  import { onCLS, onINP, onLCP, onFCP, onTTFB } from 'web-vitals';
-  const reportVital = ({ name, value, id }: Metric) => {
-    Sentry.metrics.distribution(`web_vitals.${name.toLowerCase()}`, value, { tags: { id } });
-  };
-  onCLS(reportVital); onINP(reportVital); onLCP(reportVital);
-  onFCP(reportVital); onTTFB(reportVital);
-  ```
-- **Scope**: 1 hour
+- **Status**: `src/services/webVitalsService.ts` subscribes to all five
+  standardised metrics (CLS, FCP, INP, LCP, TTFB) and routes each report
+  to `errorTrackingService.logMetric`. The entry point (`src/main.tsx`)
+  calls `subscribeWebVitals()` once at bootstrap.
+- **Note**: `onFID` was removed in `web-vitals` v4+ when INP replaced FID
+  as a Core Web Vital; the AUDIT example snippet predated that change.
+- **Test**: `src/services/webVitalsService.test.ts` asserts all five
+  subscriptions are wired and that the reporter forwards `(name, value)`.
 
-#### P3-3 · Enable Sentry BrowserTracing for RUM
+#### P3-3 · Enable Sentry BrowserTracing for RUM — ✅ DONE (Phase 5b)
 
-- **File**: `src/main.tsx` (Sentry `init()` call)
-- **Action**: Add `Sentry.browserTracingIntegration()` and set `tracesSampleRate: 0.1` (10% in prod)
-- **Scope**: 30 minutes
+- **Status**: `src/services/errorTrackingService.ts` includes
+  `Sentry.browserTracingIntegration()` in the `integrations` array passed
+  to `Sentry.init`, with `tracesSampleRate` driven by
+  `VITE_SENTRY_TRACES_SAMPLE_RATE` (default 0.1).
+- **Test**: `src/services/errorTrackingService.test.ts` asserts the
+  integration is registered and that the sample rate flows through.
 
 ---
 

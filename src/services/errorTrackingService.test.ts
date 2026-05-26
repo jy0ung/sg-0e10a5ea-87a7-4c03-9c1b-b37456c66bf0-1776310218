@@ -107,6 +107,39 @@ describe('errorTrackingService', () => {
     });
   });
 
+  it('registers browserTracingIntegration in the Sentry init payload', () => {
+    const service = new ErrorTrackingService();
+    const integration = { __id: 'tracing' } as unknown as Record<string, unknown>;
+    sentryMock.browserTracingIntegration.mockReturnValueOnce(integration);
+
+    service.init({ dsn: 'https://public@example.ingest.sentry.io/1' });
+
+    expect(sentryMock.browserTracingIntegration).toHaveBeenCalledTimes(1);
+    const initArgs = sentryMock.init.mock.calls[0][0];
+    expect(initArgs.integrations).toContain(integration);
+  });
+
+  it('routes logMetric through Sentry.setMeasurement when a DSN is configured', () => {
+    const service = new ErrorTrackingService();
+    service.init({ dsn: 'https://public@example.ingest.sentry.io/1' });
+
+    service.logMetric('LCP', 1234.5);
+    service.logMetric('query.list_customers', 642);
+
+    expect(sentryMock.setMeasurement).toHaveBeenCalledTimes(2);
+    expect(sentryMock.setMeasurement).toHaveBeenNthCalledWith(1, 'LCP', 1234.5, 'millisecond');
+    expect(sentryMock.setMeasurement).toHaveBeenNthCalledWith(2, 'query.list_customers', 642, 'millisecond');
+  });
+
+  it('does not call Sentry.setMeasurement when running without a DSN', () => {
+    const service = new ErrorTrackingService();
+    service.init();
+
+    service.logMetric('LCP', 1234.5);
+
+    expect(sentryMock.setMeasurement).not.toHaveBeenCalled();
+  });
+
   it('redacts warning messages and context before Sentry capture', () => {
     const service = new ErrorTrackingService();
     service.init({ dsn: 'https://public@example.ingest.sentry.io/1' });
