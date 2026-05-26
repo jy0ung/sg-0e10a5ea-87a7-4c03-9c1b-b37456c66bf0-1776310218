@@ -68,6 +68,8 @@ const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const ModuleDirectory = lazy(() => import("./pages/ModuleDirectory"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Inbox = lazy(() => import("./pages/Inbox"));
+const Home = lazy(() => import("./pages/Home"));
+const KpiStudio = lazy(() => import("./pages/admin/KpiStudio"));
 const AutoAgingDashboard = lazy(() => import("./pages/auto-aging/AutoAgingDashboard"));
 const VehicleExplorer = lazy(() => import("./pages/auto-aging/VehicleExplorer"));
 const ImportCenter = lazy(() => import("./pages/auto-aging/ImportCenter"));
@@ -209,6 +211,7 @@ const router = createBrowserRouter([
       { path: "modules", element: <S><ModuleDirectory /></S> },
       { path: "notifications", element: <S><Notifications /></S> },
       { path: "inbox", element: <R scope="Inbox"><S><Inbox /></S></R> },
+      { path: "home", element: <R scope="Home"><S><Home /></S></R> },
       { path: "auto-aging", element: withModuleAccess('auto-aging', <R scope="Auto-Aging"><S><AutoAgingDashboard /></S></R>) },
       { path: "auto-aging/vehicles", element: withModuleAccess('auto-aging', <R scope="Vehicle Explorer"><S><VehicleExplorer /></S></R>) },
       { path: "auto-aging/vehicles/:chassisNo", element: withModuleAccess('auto-aging', <R scope="Vehicle Detail"><S><VehicleDetail /></S></R>) },
@@ -262,6 +265,7 @@ const router = createBrowserRouter([
       { path: "accounts/period-close", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Period Close"><S><PeriodCloseDrilldown /></S></R></RequireRole> },
       { path: "accounts/journal", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Journal Entries"><S><JournalEntries /></S></R></RequireRole> },
       { path: "admin/activity", element: <RequireRole roles={EXECUTIVE} section="Admin"><R scope="Activity Dashboard"><S><ActivityDashboard /></S></R></RequireRole> },
+      { path: "admin/kpi-studio", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="KPI Studio"><S><KpiStudio /></S></R></RequireRole> },
       { path: "admin/dms-sync", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="DMS Sync Ops"><S><DmsSyncOps /></S></R></RequireRole> },
       { path: "admin/reconciliation", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Reconciliation Queue"><S><ReconciliationQueue /></S></R></RequireRole> },
       { path: "admin/reconciliation/:matchId", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Reconciliation Match"><S><ReconciliationDetail /></S></R></RequireRole> },

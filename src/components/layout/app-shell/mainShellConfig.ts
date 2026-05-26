@@ -30,6 +30,7 @@ import {
   Settings,
   Shield,
   ShoppingCart,
+  Sparkles,
   Target,
   Timer,
   TrendingDown,
@@ -82,6 +83,7 @@ const sectionDefs: MainSectionDef[] = [
 const navItems: MainNavItem[] = [
   { label: 'My Dashboard', path: '/', icon: LayoutDashboard, section: 'Platform', end: true },
   { label: 'Module Directory', path: '/modules', icon: Grid3X3, section: 'Platform' },
+  { label: 'Home', path: '/home', icon: LayoutDashboard, section: 'Platform' },
   { label: 'Inbox', path: '/inbox', icon: InboxIcon, section: 'Platform' },
   { label: 'Notifications', path: '/notifications', icon: Bell, section: 'Platform' },
   { label: 'Internal Requests', path: '/portal/tickets/new', icon: HeadphonesIcon, section: 'Platform' },
@@ -131,6 +133,7 @@ const navItems: MainNavItem[] = [
   { label: 'Open HRMS Workspace', path: `${HRMS_PATHS.root}/`, href: getDedicatedHrmsWorkspacePath(HRMS_PATHS.root), icon: Briefcase, section: 'HRMS', group: 'Workspace', external: true },
 
   { label: 'Activity Overview', path: '/admin/activity', icon: BarChart3, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
+  { label: 'KPI Studio', path: '/admin/kpi-studio', icon: Sparkles, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
   { label: 'DMS Sync Ops', path: '/admin/dms-sync', icon: Database, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
   { label: 'Reconciliation Queue', path: '/admin/reconciliation', icon: ArrowLeftRight, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
   { label: 'Audit Log', path: '/admin/audit', icon: FileText, section: 'Admin', group: 'Governance', roles: ['super_admin', 'company_admin', 'director'] },
@@ -158,7 +161,9 @@ const PATH_TO_SECTION: Record<string, string> = {
 const MAIN_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/$/, title: 'Executive Dashboard', kicker: 'Company-wide KPI cockpit' },
   { pattern: /^\/modules/, title: 'Module Directory', kicker: 'Active workspaces' },
+  { pattern: /^\/home/, title: 'Home', kicker: 'Role-aware workspace' },
   { pattern: /^\/inbox/, title: 'Inbox', kicker: 'Approvals · Reconciliation · Requests · Alerts' },
+  { pattern: /^\/admin\/kpi-studio/, title: 'KPI Studio', kicker: 'Curate KPIs per role' },
   { pattern: /^\/notifications/, title: 'Notifications', kicker: 'Operational alerts' },
   { pattern: /^\/auto-aging\/vehicles/, title: 'Vehicle Explorer', kicker: 'Aging drilldown' },
   { pattern: /^\/auto-aging\/reports/, title: 'Auto Aging Reports', kicker: 'Report builder' },

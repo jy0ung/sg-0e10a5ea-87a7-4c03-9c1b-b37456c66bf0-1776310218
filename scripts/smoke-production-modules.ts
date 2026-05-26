@@ -40,6 +40,8 @@ const mainRoutes: RouteCheck[] = [
   { module: 'Platform', name: 'Module Directory', path: '/modules' },
   { module: 'Platform', name: 'Notifications', path: '/notifications' },
   { module: 'Platform', name: 'Inbox', path: '/inbox' },
+  { module: 'Platform', name: 'Home', path: '/home' },
+  { module: 'Admin', name: 'KPI Studio', path: '/admin/kpi-studio' },
   { module: 'Internal Requests', name: 'New Ticket', path: '/portal/tickets/new' },
   { module: 'Internal Requests', name: 'My Tickets', path: '/portal/tickets' },
   { module: 'Internal Requests', name: 'Request Queue', path: '/portal/queue' },
