@@ -67,6 +67,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const ModuleDirectory = lazy(() => import("./pages/ModuleDirectory"));
 const Notifications = lazy(() => import("./pages/Notifications"));
+const Inbox = lazy(() => import("./pages/Inbox"));
 const AutoAgingDashboard = lazy(() => import("./pages/auto-aging/AutoAgingDashboard"));
 const VehicleExplorer = lazy(() => import("./pages/auto-aging/VehicleExplorer"));
 const ImportCenter = lazy(() => import("./pages/auto-aging/ImportCenter"));
@@ -207,6 +208,7 @@ const router = createBrowserRouter([
       { path: "profile", element: <Navigate to="/admin/settings" replace /> },
       { path: "modules", element: <S><ModuleDirectory /></S> },
       { path: "notifications", element: <S><Notifications /></S> },
+      { path: "inbox", element: <R scope="Inbox"><S><Inbox /></S></R> },
       { path: "auto-aging", element: withModuleAccess('auto-aging', <R scope="Auto-Aging"><S><AutoAgingDashboard /></S></R>) },
       { path: "auto-aging/vehicles", element: withModuleAccess('auto-aging', <R scope="Vehicle Explorer"><S><VehicleExplorer /></S></R>) },
       { path: "auto-aging/vehicles/:chassisNo", element: withModuleAccess('auto-aging', <R scope="Vehicle Detail"><S><VehicleDetail /></S></R>) },

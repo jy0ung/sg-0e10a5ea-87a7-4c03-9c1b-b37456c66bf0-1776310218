@@ -39,6 +39,7 @@ const mainRoutes: RouteCheck[] = [
   { module: 'Platform', name: 'Dashboard', path: '/' },
   { module: 'Platform', name: 'Module Directory', path: '/modules' },
   { module: 'Platform', name: 'Notifications', path: '/notifications' },
+  { module: 'Platform', name: 'Inbox', path: '/inbox' },
   { module: 'Internal Requests', name: 'New Ticket', path: '/portal/tickets/new' },
   { module: 'Internal Requests', name: 'My Tickets', path: '/portal/tickets' },
   { module: 'Internal Requests', name: 'Request Queue', path: '/portal/queue' },

@@ -18,6 +18,7 @@ import {
   Grid3X3,
   HeadphonesIcon,
   History,
+  Inbox as InboxIcon,
   KanbanSquare,
   Landmark,
   LayoutDashboard,
@@ -81,6 +82,7 @@ const sectionDefs: MainSectionDef[] = [
 const navItems: MainNavItem[] = [
   { label: 'My Dashboard', path: '/', icon: LayoutDashboard, section: 'Platform', end: true },
   { label: 'Module Directory', path: '/modules', icon: Grid3X3, section: 'Platform' },
+  { label: 'Inbox', path: '/inbox', icon: InboxIcon, section: 'Platform' },
   { label: 'Notifications', path: '/notifications', icon: Bell, section: 'Platform' },
   { label: 'Internal Requests', path: '/portal/tickets/new', icon: HeadphonesIcon, section: 'Platform' },
 
@@ -156,6 +158,7 @@ const PATH_TO_SECTION: Record<string, string> = {
 const MAIN_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/$/, title: 'Executive Dashboard', kicker: 'Company-wide KPI cockpit' },
   { pattern: /^\/modules/, title: 'Module Directory', kicker: 'Active workspaces' },
+  { pattern: /^\/inbox/, title: 'Inbox', kicker: 'Approvals · Reconciliation · Requests · Alerts' },
   { pattern: /^\/notifications/, title: 'Notifications', kicker: 'Operational alerts' },
   { pattern: /^\/auto-aging\/vehicles/, title: 'Vehicle Explorer', kicker: 'Aging drilldown' },
   { pattern: /^\/auto-aging\/reports/, title: 'Auto Aging Reports', kicker: 'Report builder' },
