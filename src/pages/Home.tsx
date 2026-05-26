@@ -7,24 +7,8 @@ import { EmptyState, PageErrorState } from '@/components/shared/PageState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getRoleHomeKpis, type RoleHomeKpi } from '@/services/kpiHomeService';
+import { hrefForKpi } from './home/hrefForKpi';
 import { AlertTriangle, ArrowRight, BarChart3, Sparkles } from 'lucide-react';
-
-/**
- * Best-effort deep link per KPI code. Falls back to the executive dashboard
- * when no specific drill-down route is known. Adding a new KPI definition
- * only needs a new entry here if a more specific destination exists.
- */
-const KPI_HREF_BY_CODE: Record<string, string> = {
-  'vehicles.total_stock':     '/auto-aging/vehicles',
-  'vehicles.aged_over_180':   '/auto-aging/vehicles?ageBucket=181%2B',
-  'sales.open_orders':        '/sales/orders',
-  'sales.weekly_revenue':     '/sales',
-  'customers.new_this_month': '/sales/customers',
-};
-
-function hrefForKpi(code: string): string {
-  return KPI_HREF_BY_CODE[code] ?? '/';
-}
 
 export default function Home() {
   const navigate = useNavigate();
@@ -87,7 +71,7 @@ export default function Home() {
             <button
               type="button"
               key={kpi.code}
-              onClick={() => navigate(hrefForKpi(kpi.code))}
+              onClick={() => navigate(hrefForKpi(kpi.code, kpi.landingRoute))}
               data-testid={`home-kpi-${kpi.code}`}
               className="glass-panel text-left p-4 flex flex-col gap-2 transition-colors hover:bg-secondary/30"
             >

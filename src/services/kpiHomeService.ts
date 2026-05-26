@@ -9,42 +9,61 @@ export interface KpiDefinition {
   label: string;
   description: string | null;
   formula: Record<string, unknown>;
+  /**
+   * Optional deep-link target for the Role-aware Home card. Persisted in
+   * kpi_definitions.landing_route (added by Phase 5a migration). When
+   * absent, the Home page falls back to its hardcoded route map and
+   * finally to /dashboard.
+   */
+  landingRoute: string | null;
   version: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
+/**
+ * Slim KPI projection returned by get_role_home_kpis.
+ *
+ * Cards on the Role-aware Home are navigational only — the `formula` field
+ * is carried through for future use (Phase 6 reporting) but is not
+ * evaluated client-side in Phase 5. Each card's value lives on its
+ * destination page, which is reached via `landingRoute` (preferred) or
+ * the legacy hardcoded map in Home.tsx.
+ */
 export interface RoleHomeKpi {
   code: string;
   label: string;
   description: string | null;
   formula: Record<string, unknown>;
+  landingRoute: string | null;
   position: number;
 }
 
 function mapDefinition(row: Record<string, unknown>): KpiDefinition {
   return {
-    id:          String(row.id ?? ''),
-    companyId:   row.company_id == null ? null : String(row.company_id),
-    code:        String(row.code ?? ''),
-    label:       String(row.label ?? ''),
-    description: row.description == null ? null : String(row.description),
-    formula:     (row.formula as Record<string, unknown>) ?? {},
-    version:     Number(row.version ?? 1),
-    isActive:    Boolean(row.is_active ?? true),
-    createdAt:   String(row.created_at ?? ''),
-    updatedAt:   String(row.updated_at ?? ''),
+    id:           String(row.id ?? ''),
+    companyId:    row.company_id == null ? null : String(row.company_id),
+    code:         String(row.code ?? ''),
+    label:        String(row.label ?? ''),
+    description:  row.description == null ? null : String(row.description),
+    formula:      (row.formula as Record<string, unknown>) ?? {},
+    landingRoute: row.landing_route == null ? null : String(row.landing_route),
+    version:      Number(row.version ?? 1),
+    isActive:     Boolean(row.is_active ?? true),
+    createdAt:    String(row.created_at ?? ''),
+    updatedAt:    String(row.updated_at ?? ''),
   };
 }
 
 function mapHomeKpi(row: Record<string, unknown>): RoleHomeKpi {
   return {
-    code:        String(row.code ?? ''),
-    label:       String(row.label ?? ''),
-    description: row.description == null ? null : String(row.description),
-    formula:     (row.formula as Record<string, unknown>) ?? {},
-    position:    Number(row.position ?? 0),
+    code:         String(row.code ?? ''),
+    label:        String(row.label ?? ''),
+    description:  row.description == null ? null : String(row.description),
+    formula:      (row.formula as Record<string, unknown>) ?? {},
+    landingRoute: row.landing_route == null ? null : String(row.landing_route),
+    position:     Number(row.position ?? 0),
   };
 }
 
