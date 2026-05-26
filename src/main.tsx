@@ -70,6 +70,7 @@ const Notifications = lazy(() => import("./pages/Notifications"));
 const Inbox = lazy(() => import("./pages/Inbox"));
 const Home = lazy(() => import("./pages/Home"));
 const KpiStudio = lazy(() => import("./pages/admin/KpiStudio"));
+const WebhookOutbox = lazy(() => import("./pages/admin/WebhookOutbox"));
 const AutoAgingDashboard = lazy(() => import("./pages/auto-aging/AutoAgingDashboard"));
 const VehicleExplorer = lazy(() => import("./pages/auto-aging/VehicleExplorer"));
 const ImportCenter = lazy(() => import("./pages/auto-aging/ImportCenter"));
@@ -266,6 +267,7 @@ const router = createBrowserRouter([
       { path: "accounts/journal", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Journal Entries"><S><JournalEntries /></S></R></RequireRole> },
       { path: "admin/activity", element: <RequireRole roles={EXECUTIVE} section="Admin"><R scope="Activity Dashboard"><S><ActivityDashboard /></S></R></RequireRole> },
       { path: "admin/kpi-studio", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="KPI Studio"><S><KpiStudio /></S></R></RequireRole> },
+      { path: "admin/webhooks",   element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Webhook Outbox"><S><WebhookOutbox /></S></R></RequireRole> },
       { path: "admin/dms-sync", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="DMS Sync Ops"><S><DmsSyncOps /></S></R></RequireRole> },
       { path: "admin/reconciliation", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Reconciliation Queue"><S><ReconciliationQueue /></S></R></RequireRole> },
       { path: "admin/reconciliation/:matchId", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Reconciliation Match"><S><ReconciliationDetail /></S></R></RequireRole> },

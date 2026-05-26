@@ -351,10 +351,20 @@ Acceptance per sub-phase:
 Launch-checklist closes when every ⏳ item in `docs/PHASE5_EVIDENCE.md` §7 has an attached artefact.
 
 ### Phase 6 — New product surfaces (open-ended)
-- Service/workshop module.
-- Sales mobile app (Capacitor, reuses `@flc/shell`).
-- Customer-facing portal.
-- Webhook outbox for downstream consumers.
+Foundation-first: ship the surfaces that other Phase 6 surfaces depend on (events, auth-public scaffolding) before greenfield UX work. Each sub-phase ships behind its own feature flag, default-off in prod.
+
+- **6a — Webhook Outbox** ✅ — feature flag `phase6.webhook-outbox`. Durable fan-out of domain events to external HTTPS consumers with HMAC-SHA256 signing, exponential backoff, and an admin surface at `/admin/webhooks`. Reusable by every later Phase 6 surface. Shipped in two slices:
+  - 6a backend (migration, `emit_webhook_event` / `upsert_webhook_endpoint` / `requeue_webhook_delivery` RPCs, `webhook-deliverer` edge function, service, tests) — `83b45c4`.
+  - 6a admin UI (`/admin/webhooks` — endpoint CRUD + recent deliveries with per-row requeue) — pending commit.
+- **6b — Service / workshop module** ⏳ — bookings + technicians + jobs + parts. Domain modelling input needed.
+- **6c — Sales mobile app (Capacitor)** ⏳ — wraps the existing PWA into native iOS / Android. Deployment infrastructure (App Store / Play Store accounts, signing) is operator-side.
+- **6d — Customer-facing portal** ⏳ — public-auth surface for vehicle / order self-service. Largest security surface; needs threat model before code.
+
+Acceptance per sub-phase:
+- ✅ Feature flag default-off in prod.
+- ✅ SECURITY DEFINER RPCs gate on caller-company / role.
+- ✅ Unit + page tests for the surface.
+- ⏳ Operator runbook (cron schedule for `webhook-deliverer`, key rotation steps for endpoint secrets) — to be drafted under `docs/` when 6a goes pilot.
 
 ---
 
