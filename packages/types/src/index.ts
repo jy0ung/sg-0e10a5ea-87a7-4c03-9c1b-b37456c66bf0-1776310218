@@ -1317,6 +1317,62 @@ export interface ReconciliationStatusCount {
   total: number;
 }
 
+// ===== Lead Intake (Phase 3f) =====
+
+export type LeadSourceKind = 'lead' | 'prospect';
+
+export type LeadFollowupOutcome =
+  | 'contacted'
+  | 'no_answer'
+  | 'callback_scheduled'
+  | 'not_interested'
+  | 'qualified'
+  | 'converted'
+  | 'lost';
+
+export interface LeadFeedRow {
+  sourceKind: LeadSourceKind;
+  sourceRawId: string;
+  dmsExternalId: string | null;
+  dmsCustomerId: string | null;
+  branchCode: string | null;
+  salespersonCode: string | null;
+  status: string | null;
+  sourceCreatedAt: string | null;
+  fetchedAt: string;
+  followupCount: number;
+  lastFollowupAt: string | null;
+  lastFollowupOutcome: LeadFollowupOutcome | null;
+  nextActionDate: string | null;
+}
+
+export interface LeadFollowup {
+  id: string;
+  companyId: string;
+  sourceKind: LeadSourceKind;
+  sourceRawId: string;
+  notes: string;
+  outcome: LeadFollowupOutcome | null;
+  nextActionDate: string | null;
+  authorId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeadDetail {
+  sourceKind: LeadSourceKind;
+  sourceRawId: string;
+  dmsExternalId: string | null;
+  dmsCustomerId: string | null;
+  branchCode: string | null;
+  salespersonCode: string | null;
+  status: string | null;
+  sourceCreatedAt: string | null;
+  fetchedAt: string;
+  rawPayload: Record<string, unknown>;
+  followups: LeadFollowup[];
+}
+
 export type AgingBucket = 'no_due_date' | 'current' | '1_30_days' | '31_60_days' | '61_90_days' | 'over_90_days';
 
 export interface AgingByBranchRow {

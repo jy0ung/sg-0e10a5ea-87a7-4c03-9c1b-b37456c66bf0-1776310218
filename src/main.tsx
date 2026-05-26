@@ -108,6 +108,8 @@ const CashPosition = lazy(() => import("./pages/accounts/CashPosition"));
 const PeriodCloseDrilldown = lazy(() => import("./pages/accounts/PeriodCloseDrilldown"));
 const JournalEntries = lazy(() => import("./pages/accounts/JournalEntries"));
 const MarginAnalysis = lazy(() => import("./pages/sales/MarginAnalysis"));
+const LeadIntake = lazy(() => import("./pages/sales/LeadIntake"));
+const LeadIntakeDetail = lazy(() => import("./pages/sales/LeadIntakeDetail"));
 const OutstandingCollection = lazy(() => import("./pages/sales/OutstandingCollection"));
 const BranchManagement = lazy(() => import("./pages/admin/BranchManagement"));
 const MasterData = lazy(() => import("./pages/admin/MasterData"));
@@ -216,6 +218,8 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <R scope="Sales Dashboard"><S><SalesDashboard /></S></R> },
           { path: "pipeline", element: <RequireRole roles={MANAGER_AND_UP} section="Sales"><R scope="Deal Pipeline"><S><DealPipeline /></S></R></RequireRole> },
+          { path: "lead-intake", element: <RequireRole roles={MANAGER_AND_UP} section="Sales"><R scope="Lead Intake"><S><LeadIntake /></S></R></RequireRole> },
+          { path: "lead-intake/:kind/:rawId", element: <RequireRole roles={MANAGER_AND_UP} section="Sales"><R scope="Lead Detail"><S><LeadIntakeDetail /></S></R></RequireRole> },
           { path: "orders", element: <R scope="Sales Orders"><S><SalesOrders /></S></R> },
           { path: "customers", element: <R scope="Customers"><S><Customers /></S></R> },
           { path: "invoices", element: <RequireRole roles={MANAGER_AND_UP} section="Sales"><R scope="Invoices"><S><Invoices /></S></R></RequireRole> },

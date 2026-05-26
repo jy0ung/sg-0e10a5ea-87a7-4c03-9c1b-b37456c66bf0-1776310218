@@ -97,6 +97,7 @@ const navItems: MainNavItem[] = [
 
   { label: 'Sales Overview', path: '/sales', icon: TrendingUp, section: 'Sales', group: 'Overview', end: true },
   { label: 'Deal Pipeline', path: '/sales/pipeline', icon: KanbanSquare, section: 'Sales', group: 'Overview', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { label: 'Lead Intake', path: '/sales/lead-intake', icon: Target, section: 'Sales', group: 'Overview', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'Performance', path: '/sales/performance', icon: Target, section: 'Sales', group: 'Analytics', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { label: 'Margin Analysis', path: '/sales/margin', icon: TrendingDown, section: 'Sales', group: 'Analytics', roles: ['super_admin', 'company_admin', 'director', 'general_manager'] },
   { label: 'Sales Orders', path: '/sales/orders', icon: ShoppingCart, section: 'Sales', group: 'Transactions' },

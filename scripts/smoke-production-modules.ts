@@ -55,6 +55,7 @@ const mainRoutes: RouteCheck[] = [
   { module: 'Auto Aging', name: 'Aging Reports', path: '/auto-aging/reports' },
   { module: 'Sales', name: 'Overview', path: '/sales' },
   { module: 'Sales', name: 'Deal Pipeline', path: '/sales/pipeline' },
+  { module: 'Sales', name: 'Lead Intake', path: '/sales/lead-intake' },
   { module: 'Sales', name: 'Performance', path: '/sales/performance' },
   { module: 'Sales', name: 'Margin Analysis', path: '/sales/margin' },
   { module: 'Sales', name: 'Sales Orders', path: '/sales/orders' },
