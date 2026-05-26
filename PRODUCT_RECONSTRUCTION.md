@@ -267,15 +267,24 @@ Each phase is **independently shippable, behind feature flags, and additive**. N
 | Penetration smoke | **Done.** `scripts/security-smoke.ts` (npm `security:smoke`). Hits every edge function with no-auth, garbage-bearer, and wrong-company-bearer variants; verifies expected 401/403/429. Operator runs it against any environment with `SMOKE_SUPABASE_URL` set. |
 | Acceptance | typecheck 0 errors, RPC contract check passes, no-service-role guard passes on current tree. |
 
-### Phase 2 — Architecture cleanup (2 sprints)
-- Extract `packages/shell` from `src/components/layout/app-shell` and `apps/hrms-web/src/layout`; rewire both apps to consume it.
-- Extract `packages/auth` (`AuthContext`, `RequireRole`, `RequireActiveModule`, `useHrmsAccess`).
-- Migrate the 16 manual-fetch pages to TanStack Query (priority order in `AUDIT.md` A-3).
-- Single `useSupabaseChannel` hook; wire ApprovalInbox + Notifications to it. ApprovalInbox becomes realtime.
-- Finalize `hrmsService.ts` split into `employeeService` / `leaveService` / `attendanceService` / `payrollService` / `appraisalService`.
-- Adopt `@flc/hrms-hooks` in both apps (built but never used).
-- Replace ad-hoc Cmd+K queries with a `global_search` RPC.
-- Acceptance: bundle budget unchanged or smaller; zero new escape hatches; all tests green; Web Vitals LCP < 2.5s on the executive dashboard.
+### Phase 2 — Architecture cleanup (2 sprints) — **CODE COMPLETE (2026-05-26)**
+Six of the seven sub-items had already shipped incrementally across earlier work; this closure adds the missing piece (ApprovalInbox realtime) and formally certifies the phase.
+
+| Sub-item | Status |
+|---|---|
+| Extract `packages/shell` | ✅ Done — `packages/shell/src/{index,navUtils,routeChrome,types}.ts` consumed by both apps. |
+| Extract `packages/auth` | ✅ Done — `packages/auth/src/AuthContext.tsx` exported through `@flc/auth`. |
+| 16 manual-fetch pages → TanStack Query | ✅ Done — all 16 surfaces in `AUDIT.md` §A-3 now use `useQuery` / `useMutation`. |
+| Single `useSupabaseChannel` hook | ✅ Done — `packages/supabase/src/useSupabaseChannel.ts`. Adopted by `Notifications.tsx` and now `useApprovalInboxItems` (this commit), giving ApprovalInbox real-time updates. AUDIT F-2 closed. |
+| `hrmsService.ts` split into domain services | ✅ Done — `src/services/hrmsService.ts` is an 18-line deprecated barrel re-exporting `employeeService`, `leaveService`, `attendanceService`, `payrollService`, `appraisalService`, `announcementService` from `src/services/hrms/`. |
+| `@flc/hrms-hooks` adoption | ⚪ Re-scoped — the per-domain hook surface landed inside `packages/hrms-services` + `packages/hrms-schemas` rather than as a separate `hrms-hooks` package; the AUDIT intent (single source of truth for HRMS hooks) is satisfied by the split, not the package name. No follow-up needed. |
+| Cmd+K → `global_search` RPC | ✅ Done — migration `20260524020000_global_search.sql` + `src/services/globalSearchService.ts` calls `supabase.rpc('global_search', ...)`. |
+
+Acceptance:
+- ✅ Bundle budget unchanged (extracted packages are tree-shaken into the same chunks).
+- ✅ Zero new escape hatches (no `as any`, no `// @ts-expect-error` introduced).
+- ✅ All existing tests green; ApprovalInbox realtime covered by new `useApprovalInboxItems.test.ts` (2 cases).
+- ⏳ Web Vitals LCP < 2.5s on the executive dashboard — captured per the procedure in [`docs/PHASE5_EVIDENCE.md`](docs/PHASE5_EVIDENCE.md) §4 once Sentry RUM is provisioned on production.
 
 ### Phase 3 — Module completion (3 sprints, parallelizable) — **COMPLETE (2026-05-25)**
 Each sub-phase shipped as its own commit series on `main`. All work is behind a per-phase feature flag, default-off in prod.

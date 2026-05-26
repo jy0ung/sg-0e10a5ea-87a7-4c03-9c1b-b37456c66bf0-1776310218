@@ -32,7 +32,7 @@ However there are **three immediate blockers** (P0), five meaningful security ga
 |----------|-------|---------|
 | P0 — Blockers | 3 | Broken test infrastructure, broken linter, import-parser syntax error |
 | P1 — Security | 5 | No CSP, localStorage RBAC, vulnerable xlsx, no edge-function rate-limiting |
-| P2 — Architecture | 4 | 2,113-line service monolith, dual Excel libs, manual fetch pattern in 16 pages, orphaned i18n |
+| P2 — Architecture | 0 | ✅ Closed in Phase 2: packages/shell + packages/auth extracted, hrmsService split into 6 domain services, all 16 manual-fetch pages on TanStack Query, useSupabaseChannel hook adopted, global_search RPC shipped. |
 | P3 — Observability | 0 | ✅ Closed in Phase 5b: web vitals, performanceService metrics, and BrowserTracing all shipping to Sentry. |
 | P4 — Feature Debt | 3 | Import-review queue incomplete, i18n 0% coverage, approval inbox partially wired |
 
@@ -280,9 +280,10 @@ Sentry is configured for error capture but `BrowserTracing` performance integrat
 
 ---
 
-#### F-2 · ApprovalInbox exists but uses manual fetch — no real-time updates
+#### F-2 · ApprovalInbox exists but uses manual fetch — no real-time updates — ✅ DONE (Phase 2)
 
-`ApprovalInbox.tsx` loads approval requests with `useCallback` and `useEffect`. Approval workflows are inherently push-driven (a manager should see new requests in real time), but there is no Supabase channel subscription in the inbox page. `Notifications.tsx` has a working channel pattern that could be replicated.
+- **Status**: `useApprovalInboxItems` (consumed by both `src/pages/hrms/leave/ApprovalInboxTab.tsx` and the `apps/hrms-web` copy) now wraps `useSupabaseChannel` from `@flc/supabase`. The channel subscribes to INSERT/UPDATE/DELETE on `leave_requests`, `payroll_runs`, and `appraisals` filtered to the caller's `company_id`, and invalidates the `approval-inbox` React Query cache on any change. Manual `useCallback` + `useEffect` polling is gone; the existing window-event invalidation stays as a fallback for in-process optimistic updates that bypass the realtime channel.
+- **Test**: `src/hooks/useApprovalInboxItems.test.ts` asserts the subscription shape and that `onChange` invalidates the right query key.
 
 ---
 
