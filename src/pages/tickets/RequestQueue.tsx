@@ -44,6 +44,7 @@ import {
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
+import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
 import {
   Drawer,
   DrawerContent,
@@ -262,6 +263,22 @@ export default function RequestQueue() {
     },
     enabled: !!user?.company_id,
     staleTime: 30_000,
+  });
+
+  // ─── Realtime ──────────────────────────────────────────────────────────────
+  // Invalidate both queue queries on any ticket / activity / attachment change
+  // in this tenant so queue managers see new submissions, status flips, and
+  // assignment changes without polling the Refresh button. The button stays
+  // as an explicit override for the rare case where the websocket dropped.
+  const invalidateQueueQueries = useCallback(() => {
+    if (!user?.company_id) return;
+    void queryClient.invalidateQueries({ queryKey: ['ticketQueue', user.company_id] });
+    void queryClient.invalidateQueries({ queryKey: ['ticketQueueStatusCounts', user.company_id] });
+  }, [queryClient, user?.company_id]);
+  useTicketsRealtime({
+    companyId: user?.company_id,
+    scope: 'queue',
+    onChange: invalidateQueueQueries,
   });
 
   // ─── Derived state ─────────────────────────────────────────────────────────

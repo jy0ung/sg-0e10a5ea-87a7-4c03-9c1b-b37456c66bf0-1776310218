@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { toast } from 'sonner';
@@ -29,6 +29,7 @@ import {
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
+import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
 import {
   listCompanyTicketsPage,
   listTicketActivity,
@@ -172,6 +173,20 @@ export default function RequestHistory() {
   }, [tickets]);
 
   const loadTickets = () => void queryClient.invalidateQueries({ queryKey: historyKey });
+
+  // Realtime: a ticket moving from active → resolved/closed/cancelled, or any
+  // late activity on an archived ticket (e.g. a manager updating a resolution
+  // note), should appear here without a manual refresh. Scoped channel name
+  // keeps it independent of the Queue's subscription.
+  const invalidateHistory = useCallback(() => {
+    if (!user?.company_id) return;
+    void queryClient.invalidateQueries({ queryKey: ['request-history', user.company_id] });
+  }, [queryClient, user?.company_id]);
+  useTicketsRealtime({
+    companyId: user?.company_id,
+    scope: 'history',
+    onChange: invalidateHistory,
+  });
 
   const selectedTicket = useMemo(
     () => tickets.find((t) => t.id === selectedTicketId) ?? null,

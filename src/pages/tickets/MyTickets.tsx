@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { Link } from 'react-router-dom';
@@ -48,6 +48,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
+import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 
 import {
@@ -126,7 +127,25 @@ export default function MyTickets() {
     });
   }, [tickets]);
 
-  const refreshTickets = () => void queryClient.invalidateQueries({ queryKey: myTicketsKey });
+  const refreshTickets = useCallback(
+    () => { void queryClient.invalidateQueries({ queryKey: myTicketsKey }); },
+    // myTicketsKey is a readonly tuple — spread its primitive members so the
+    // memoization tracks values, not the array identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [queryClient, ...myTicketsKey],
+  );
+
+  // Realtime: queue managers may assign, comment on, or resolve the user's
+  // ticket while they have this page open. We subscribe to the full tenant
+  // (other people's tickets too) and let invalidateQueries refetch only
+  // listMyTickets — the cost is a few extra refetches per company-wide
+  // change in exchange for not maintaining a compound filter expression
+  // that supabase realtime doesn't natively support.
+  useTicketsRealtime({
+    companyId: user?.company_id,
+    scope: 'my-tickets',
+    onChange: refreshTickets,
+  });
 
   const handleAddComment = async (ticketId: string) => {
     if (!user) return;
