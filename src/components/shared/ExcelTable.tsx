@@ -131,7 +131,6 @@ const EditableGridCell = React.memo(function EditableGridCell({
               type="date"
               aria-label={`Edit ${column.label}`}
               value={editValue as string}
-              aria-label={`Edit ${column.label}`}
               onChange={(event) => onEditValueChange(event.target.value)}
               onBlur={() => void onSave(rowId, column.key, column)}
               className={cn('h-8 px-2 rounded border border-input bg-background text-foreground', validationError && 'border-destructive')}
