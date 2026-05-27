@@ -185,69 +185,8 @@ interface TicketActivityInsert extends TicketActivityDbInsert {
   metadata: Json;
 }
 
-const LEGACY_TICKET_SELECT =
-  'id, subject, category, subcategory, priority, status, description, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
-
-const OPERATIONAL_TICKET_SELECT =
-  'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
-
-const MODERN_TICKET_SELECT =
-  'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, custom_fields, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
-
 const TICKET_SELECT =
   'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, custom_fields, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, first_response_due_at, resolution_due_at, first_responded_at, resolved_at, resolution_note';
-
-const operationalTicketFields = [
-  'requested_due_date',
-  'business_impact',
-  'desired_outcome',
-  'custom_fields',
-  'first_response_due_at',
-  'resolution_due_at',
-  'first_responded_at',
-];
-
-function isMissingOperationalTicketFieldError(error: unknown) {
-  const message = error instanceof Error
-    ? error.message
-    : typeof error === 'object' && error !== null && 'message' in error
-      ? String((error as { message?: unknown }).message ?? '')
-      : String(error ?? '');
-
-  return operationalTicketFields.some((field) => message.includes(field));
-}
-
-function getFallbackTicketSelect(error: unknown) {
-  const message = error instanceof Error
-    ? error.message
-    : typeof error === 'object' && error !== null && 'message' in error
-      ? String((error as { message?: unknown }).message ?? '')
-      : String(error ?? '');
-
-  if (message.includes('custom_fields')) return OPERATIONAL_TICKET_SELECT;
-  if (
-    message.includes('first_response_due_at')
-    || message.includes('resolution_due_at')
-    || message.includes('first_responded_at')
-  ) {
-    return MODERN_TICKET_SELECT;
-  }
-  return LEGACY_TICKET_SELECT;
-}
-
-function appendOperationalContextToDescription(
-  description: string,
-  input: Pick<CreateTicketInput, 'requested_due_date' | 'business_impact' | 'desired_outcome'>,
-) {
-  const details = [
-    input.requested_due_date?.trim() ? `Needed by: ${input.requested_due_date.trim()}` : '',
-    input.desired_outcome?.trim() ? `Desired outcome: ${input.desired_outcome.trim()}` : '',
-    input.business_impact?.trim() ? `Business impact: ${input.business_impact.trim()}` : '',
-  ].filter(Boolean);
-
-  if (details.length === 0) return description;
-  return `${description.trim()}\n\nOperational context:\n${details.join('\n')}`;
-}
 
 function mapTicket(row: TicketRow): TicketRecord {
   return {
@@ -330,30 +269,13 @@ function isFirstResponseTicketStatus(status: TicketStatus) {
 }
 
 async function fetchTicketForUpdate(ticketId: string, companyId: string) {
-  let { data, error } = await ticketsTable()
+  const { data, error } = await ticketsTable()
     .select(TICKET_SELECT)
     .eq('company_id', companyId)
     .eq('id', ticketId)
     .single();
-
-  const useLegacyTicketSelect = Boolean(error && isMissingOperationalTicketFieldError(error));
-  const fallbackSelect = error ? getFallbackTicketSelect(error) : TICKET_SELECT;
-  if (useLegacyTicketSelect) {
-    // @ts-expect-error - Supabase inferred union too complex; result cast via data as TicketRow in return
-    const legacyResult = await ticketsTable()
-      .select(fallbackSelect)
-      .eq('company_id', companyId)
-      .eq('id', ticketId)
-      .single();
-    data = legacyResult.data;
-    error = legacyResult.error;
-  }
-
   if (error) throw error;
-  return {
-    ticket: mapTicket(data as TicketRow),
-    select: useLegacyTicketSelect ? fallbackSelect : TICKET_SELECT,
-  };
+  return mapTicket(data as TicketRow);
 }
 
 function buildTicketActivityEntries(before: TicketRecord, after: TicketRecord, actorId: string): TicketActivityInsert[] {
@@ -560,22 +482,13 @@ function buildTicketSearchOrFilter(search: string, profileIds: string[]): string
 
 export async function listMyTickets(userId: string, companyId: string): Promise<TicketServiceResult<RequestTicketRecord[]>> {
   try {
-    let { data, error } = await ticketsTable()
+    const { data, error } = await ticketsTable()
       .select(TICKET_SELECT)
       .eq('submitted_by', userId)
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
 
-    if (error && isMissingOperationalTicketFieldError(error)) {
-      // @ts-expect-error - Supabase inferred union too complex; result cast via TicketRow below
-      const legacyResult = await ticketsTable()
-        .select(getFallbackTicketSelect(error))
-        .eq('submitted_by', userId)
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false });
-      data = legacyResult.data;
-      error = legacyResult.error;
-    }
+    if (error) throw error;
 
     const rows = await applyApprovalMetadata(((data ?? []) as TicketRow[]).map(mapTicket));
     const profilesById = await fetchProfilesById(
@@ -593,19 +506,10 @@ export async function listMyTickets(userId: string, companyId: string): Promise<
 
 export async function listCompanyTickets(companyId: string): Promise<TicketServiceResult<CompanyTicketRecord[]>> {
   try {
-    let { data, error } = await ticketsTable()
+    const { data, error } = await ticketsTable()
       .select(TICKET_SELECT)
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
-
-    if (error && isMissingOperationalTicketFieldError(error)) {
-      const legacyResult = await ticketsTable()
-        .select(getFallbackTicketSelect(error))
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false });
-      data = legacyResult.data;
-      error = legacyResult.error;
-    }
 
     if (error) throw error;
 
@@ -674,45 +578,9 @@ export async function listCompanyTicketsPage(
       query = query.or(buildTicketSearchOrFilter(search, profileIds));
     }
 
-    let { data, error, count } = await query
+    const { data, error, count } = await query
       .order('created_at', { ascending: false })
       .range(normalized.from, normalized.to);
-
-    if (error && isMissingOperationalTicketFieldError(error)) {
-      let legacyQuery = ticketsTable()
-        .select(getFallbackTicketSelect(error), { count: 'exact' })
-        .eq('company_id', companyId);
-
-      if (normalized.status && normalized.status !== 'all') {
-        if (normalized.status === 'active') {
-          legacyQuery = legacyQuery.in('status', ACTIVE_STATUSES);
-        } else if (normalized.status === 'archived') {
-          legacyQuery = legacyQuery.in('status', ARCHIVED_STATUSES);
-        } else {
-          legacyQuery = legacyQuery.eq('status', normalized.status);
-        }
-      }
-      if (normalized.priority && normalized.priority !== 'all') {
-        legacyQuery = legacyQuery.eq('priority', normalized.priority);
-      }
-      if (normalized.assignedTo && normalized.assignedTo !== 'all') {
-        if (normalized.assignedTo === 'unassigned') {
-          legacyQuery = legacyQuery.is('assigned_to', null);
-        } else {
-          legacyQuery = legacyQuery.eq('assigned_to', normalized.assignedTo);
-        }
-      }
-      if (search) {
-        legacyQuery = legacyQuery.or(buildTicketSearchOrFilter(search, profileIds));
-      }
-
-      const legacyResult = await legacyQuery
-        .order('created_at', { ascending: false })
-        .range(normalized.from, normalized.to);
-      data = legacyResult.data;
-      error = legacyResult.error;
-      count = legacyResult.count;
-    }
 
     if (error) throw error;
 
@@ -876,29 +744,10 @@ export async function createTicket(
       resolution_note: null,
     };
 
-    let { data, error } = await ticketsTable()
+    const { data, error } = await ticketsTable()
       .insert(insertPayload)
       .select('id')
       .single();
-
-    if (error && isMissingOperationalTicketFieldError(error)) {
-      const {
-        requested_due_date: _requestedDueDate,
-        business_impact: _businessImpact,
-        desired_outcome: _desiredOutcome,
-        custom_fields: _customFields,
-        ...legacyPayload
-      } = insertPayload;
-      const legacyResult = await ticketsTable()
-        .insert({
-          ...legacyPayload,
-          description: appendOperationalContextToDescription(input.description, input),
-        })
-        .select('id')
-        .single();
-      data = legacyResult.data;
-      error = legacyResult.error;
-    }
 
     if (error) throw error;
 
@@ -965,7 +814,7 @@ export async function updateTicket(
   }
 
   try {
-    const { ticket: current, select: updateSelect } = await fetchTicketForUpdate(ticketId, context.companyId);
+    const current = await fetchTicketForUpdate(ticketId, context.companyId);
 
     if (input.status && (input.status === 'resolved' || input.status === 'closed')) {
       const approvalGate = await getInternalRequestApprovalGate(ticketId);
@@ -1008,7 +857,7 @@ export async function updateTicket(
       .update(patch)
       .eq('company_id', context.companyId)
       .eq('id', ticketId)
-      .select(updateSelect)
+      .select(TICKET_SELECT)
       .single();
 
     if (error) throw error;
@@ -1050,7 +899,7 @@ export async function cancelMyTicket(
   const reason = input.reason?.trim() ? input.reason.trim() : null;
 
   try {
-    const { ticket: current } = await fetchTicketForUpdate(ticketId, context.companyId);
+    const current = await fetchTicketForUpdate(ticketId, context.companyId);
     if (current.submitted_by !== context.userId) {
       return { data: null, error: new Error('Only the requester can cancel this request') };
     }
@@ -1104,26 +953,7 @@ export async function addTicketComment(
   }
 
   try {
-    let { data: ticketData, error: ticketError } = await ticketsTable()
-      .select(TICKET_SELECT)
-      .eq('company_id', context.companyId)
-      .eq('id', ticketId)
-      .single();
-
-    const useLegacyTicketSelect = Boolean(ticketError && isMissingOperationalTicketFieldError(ticketError));
-    const fallbackSelect = ticketError ? getFallbackTicketSelect(ticketError) : TICKET_SELECT;
-    if (useLegacyTicketSelect) {
-      const legacyResult = await ticketsTable()
-        .select(fallbackSelect)
-        .eq('company_id', context.companyId)
-        .eq('id', ticketId)
-        .single();
-      ticketData = legacyResult.data;
-      ticketError = legacyResult.error;
-    }
-
-    if (ticketError) throw ticketError;
-    const ticket = mapTicket(ticketData as TicketRow);
+    const ticket = await fetchTicketForUpdate(ticketId, context.companyId);
 
     const { data, error } = await ticketActivityTable()
       .insert({
