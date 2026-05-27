@@ -359,3 +359,29 @@ export async function reviewInternalRequestApproval(
 
   return { error: null };
 }
+
+/**
+ * Mark the approval instance for a ticket as cancelled. Idempotent: a no-op
+ * when no instance exists or the instance is already in a terminal state.
+ */
+export async function cancelInternalRequestApprovalInstance(
+  ticketId: string,
+  companyId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await approvalInstancesTable()
+    .update({
+      status: 'cancelled',
+      current_step_id: null,
+      current_step_order: null,
+      current_step_name: null,
+      current_approver_role: null,
+      current_approver_user_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('company_id', companyId)
+    .eq('entity_type', 'internal_request')
+    .eq('entity_id', ticketId)
+    .eq('status', 'pending');
+
+  return { error: error?.message ?? null };
+}

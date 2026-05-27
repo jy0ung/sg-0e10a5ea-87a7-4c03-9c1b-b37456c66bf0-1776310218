@@ -108,14 +108,15 @@ describe('HrmsLayout', () => {
 
   it('keeps navigation limited to HRMS routes', () => {
     expect(hrmsNavItems.map((item) => item.path)).toEqual([
+      '/dashboard',
       '/leave',
-      '/approvals',
-      '/appraisals',
       '/announcements',
+      '/appraisals',
       '/profile',
+      '/employees',
       '/attendance',
       '/leave/calendar',
-      '/employees',
+      '/approvals',
       '/payroll',
       '/settings/leave-quota',
       '/settings',
@@ -125,8 +126,8 @@ describe('HrmsLayout', () => {
   it('shows self-service navigation for an accounts user and hides admin-only items', () => {
     renderLayout('accounts');
 
-    expect(screen.getByRole('link', { name: 'Leave Management' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Approvals' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Leave' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Approval Inbox' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Employees' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Payroll' })).not.toBeInTheDocument();

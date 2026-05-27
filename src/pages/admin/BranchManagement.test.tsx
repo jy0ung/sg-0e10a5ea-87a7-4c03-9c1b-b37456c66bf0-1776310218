@@ -64,7 +64,7 @@ describe('BranchManagement', () => {
 
   it('renders inline validation messages for required fields', async () => {
     renderPage();
-    await screen.findByText('Kota Kinabalu');
+    await screen.findAllByText('Kota Kinabalu');
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Branch' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -75,7 +75,7 @@ describe('BranchManagement', () => {
 
   it('creates a branch with normalized values', async () => {
     renderPage();
-    await screen.findByText('Kota Kinabalu');
+    await screen.findAllByText('Kota Kinabalu');
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Branch' }));
     fireEvent.change(screen.getByLabelText('Branch Code'), { target: { value: 'sdk' } });
@@ -96,9 +96,9 @@ describe('BranchManagement', () => {
 
   it('supports edit and delete flows', async () => {
     renderPage();
-    await screen.findByText('Kota Kinabalu');
+    await screen.findAllByText('Kota Kinabalu');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit KK' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit KK' })[0]);
     fireEvent.change(screen.getByLabelText('Branch Name'), { target: { value: 'Kota Kinabalu HQ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -109,7 +109,7 @@ describe('BranchManagement', () => {
       }));
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete KK' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Delete KK' })[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => {

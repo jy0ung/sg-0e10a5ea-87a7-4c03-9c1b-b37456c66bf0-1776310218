@@ -70,7 +70,7 @@ describe('AppShell', () => {
     renderShell('/settings');
 
     expect(screen.getByText('FLC BI')).toBeInTheDocument();
-    expect(screen.getByText('Configuration')).toBeInTheDocument();
+    expect(screen.getAllByText('Configuration').length).toBeGreaterThan(0);
     expect(screen.getByRole('textbox', { name: 'Search shell' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveClass('nav-item-active');

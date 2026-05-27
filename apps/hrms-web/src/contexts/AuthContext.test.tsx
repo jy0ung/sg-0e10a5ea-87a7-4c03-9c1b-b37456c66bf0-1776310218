@@ -12,7 +12,7 @@ const mockLogError = vi.fn();
 const mockTrackSetUser = vi.fn();
 const mockTrackClearUser = vi.fn();
 
-vi.mock('@/integrations/supabase/client', () => ({
+vi.mock('@flc/supabase/client', () => ({
   supabase: {
     auth: {
       getSession: () => mockGetSession(),
