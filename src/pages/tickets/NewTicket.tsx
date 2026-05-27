@@ -24,7 +24,6 @@ import { useAttachmentSettings } from '@/hooks/useAttachmentSettings';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { createTicket } from '@/services/ticketService';
 import { uploadTicketAttachment } from '@/services/ticketAttachmentService';
-import { resolveBranchCode } from '@/services/branchService';
 import { getInternalRequestApprovalPlan } from '@/services/requestApprovalService';
 import type { RequestTemplateRecord } from '@/services/requestTemplateService';
 import type { AppRole } from '@/types';
@@ -34,15 +33,11 @@ import {
   DEFAULT_ROLE_CONTEXT,
   ROLE_CONTEXT,
   ticketSchema,
-  ApprovalRouteCard,
   AttachmentsSection,
-  CustomFieldsSection,
-  OperationalContextSection,
-  RequestDetailsSection,
-  RequestRoutingSection,
+  RequestDescriptionCard,
+  RequestHeaderCard,
   RequestSummaryCard,
   StickySubmitPanel,
-  TemplateSelectorCard,
   type ApprovalPlanState,
   type TicketFormData,
 } from './new-ticket/NewTicketSections';
@@ -52,8 +47,7 @@ export default function NewTicket() {
   const { user } = useAuth();
   const { categories, loading: categoriesLoading, error: categoriesError } =
     useRequestCategories(user?.company_id);
-  const { subcategories, loading: subcategoriesLoading } =
-    useRequestSubcategories(user?.company_id);
+  const { subcategories } = useRequestSubcategories(user?.company_id);
   const { templates, loading: templatesLoading } = useRequestTemplates(user?.company_id);
   const { settings: attachmentSettings } = useAttachmentSettings(user?.company_id);
 
@@ -70,14 +64,6 @@ export default function NewTicket() {
   const skipDraftSaveRef = useRef(false);
 
   const roleContext = ROLE_CONTEXT[user?.role as AppRole] ?? DEFAULT_ROLE_CONTEXT;
-
-  const { data: resolvedBranchCode = null } = useQuery({
-    queryKey: ['branch-code', user?.branch_id],
-    queryFn: () => resolveBranchCode(user!.branch_id!),
-    enabled: !!user?.branch_id,
-    staleTime: STALE.reference,
-  });
-  const branchCode = resolvedBranchCode;
 
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
@@ -168,10 +154,9 @@ export default function NewTicket() {
     placeholderData: 'loading' as ApprovalPlanState,
   });
 
-  const selectedSubcategoryKey = form.watch('subcategory');
-  const selectedPriority = form.watch('priority');
   const descriptionValue = form.watch('description') ?? '';
   const subjectValue = form.watch('subject') ?? '';
+  const selectedSubcategoryKey = form.watch('subcategory');
 
   const availableSubcategories = useMemo(
     () => subcategories.filter((subcategory) => subcategory.category_key === selectedCategoryKey),
@@ -379,12 +364,8 @@ export default function NewTicket() {
     await submitTicket(data);
   };
 
-  const selectedCategory = categories.find((category) => category.key === selectedCategoryKey) ?? null;
-  const selectedSubcategory =
-    availableSubcategories.find((subcategory) => subcategory.key === selectedSubcategoryKey) ?? null;
   const categorySelectionDisabled = categoriesLoading || categories.length === 0;
   const requiresSubcategory = availableSubcategories.length > 0;
-  const activeTemplate = templates.find((template) => template.id === activeTemplateId) ?? null;
   const missingRequiredCustomFields = customFields.filter(
     (field) => field.is_required && !customFieldValues[field.key]?.trim(),
   );
@@ -423,6 +404,13 @@ export default function NewTicket() {
       subcategory: firstSubcategoryKey,
     });
     setCustomFieldValues({});
+  };
+
+  const handleCategoryChange = (categoryKey: string) => {
+    setActiveTemplateId(null);
+    form.setValue('category', categoryKey as TicketFormData['category'], {
+      shouldValidate: true,
+    });
   };
 
   const draftSavedLabel = draftSavedAt
@@ -490,51 +478,31 @@ export default function NewTicket() {
         onSubmit={form.handleSubmit(handleValidatedSubmit)}
         className="min-h-0 flex-1 overflow-auto"
       >
-        <div className="grid gap-5 pb-6 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-5 pb-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_340px]">
 
           {/* ── Left: main form ──────────────────────────────── */}
-          <div className="space-y-4">
-            <TemplateSelectorCard
-              templates={templates}
-              categories={categories}
-              activeTemplateId={activeTemplateId}
-              onSelect={applyTemplate}
-              onClear={clearTemplate}
-              loading={templatesLoading}
-            />
-
-            <RequestRoutingSection
+          <div className="space-y-5">
+            <RequestHeaderCard
               form={form}
               categories={categories}
               categoriesLoading={categoriesLoading}
-              selectedCategoryKey={selectedCategoryKey}
-              selectedCategory={selectedCategory}
-              availableSubcategories={availableSubcategories}
-              subcategoriesLoading={subcategoriesLoading}
-              selectedSubcategoryKey={selectedSubcategoryKey}
-              selectedSubcategory={selectedSubcategory}
-              selectedPriority={selectedPriority}
               categorySelectionDisabled={categorySelectionDisabled}
-              requiresSubcategory={requiresSubcategory}
+              selectedCategoryKey={selectedCategoryKey}
+              templates={templates}
+              activeTemplateId={activeTemplateId}
+              onCategoryChange={handleCategoryChange}
+              onTemplateSelect={applyTemplate}
+              onTemplateClear={clearTemplate}
+              templatesLoading={templatesLoading}
+              subjectValue={subjectValue}
+              subjectStatus={fieldValidationStatus.subject}
             />
 
-            <RequestDetailsSection
+            <RequestDescriptionCard
               form={form}
               roleContext={roleContext}
               descriptionValue={descriptionValue}
-              subjectValue={subjectValue}
-              subjectStatus={fieldValidationStatus.subject}
               descriptionStatus={fieldValidationStatus.description}
-            />
-
-            <OperationalContextSection form={form} />
-
-            <CustomFieldsSection
-              customFields={customFields}
-              selectedCategory={selectedCategory}
-              customFieldValues={customFieldValues}
-              companyId={user?.company_id}
-              setCustomFieldValues={setCustomFieldValues}
             />
           </div>
 
@@ -544,14 +512,8 @@ export default function NewTicket() {
 
               {/* 1. Request Summary */}
               <RequestSummaryCard
-                activeTemplate={activeTemplate}
-                categoryLabel={selectedCategory?.label ?? ''}
-                subcategoryLabel={selectedSubcategory?.label ?? null}
-                priority={selectedPriority}
-                attachedFiles={attachedFiles}
-                maxFiles={attachmentSettings.max_files_per_ticket}
-                branchCode={branchCode}
-                draftSavedAt={draftSavedAt}
+                title={subjectValue}
+                requestorName={user?.name || user?.email || 'Current user'}
               />
 
               {/* 2. Attachments */}
@@ -562,16 +524,14 @@ export default function NewTicket() {
                 dragOver={dragOver}
                 fileInputRef={fileInputRef}
                 compact
+                uploading={submitting}
                 setDragOver={setDragOver}
                 onDrop={handleDrop}
                 onFileInputChange={handleFileInputChange}
                 onRemoveFile={removeFile}
               />
 
-              {/* 3. Approval Route */}
-              <ApprovalRouteCard plan={approvalPlan} />
-
-              {/* 4. Submit */}
+              {/* 3. Submit */}
               <StickySubmitPanel
                 canSubmit={canSubmit}
                 submitting={submitting}

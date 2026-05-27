@@ -536,7 +536,17 @@ export function TemplateDropdown({
   }
 
   if (activeTemplates.length === 0) {
-    return null;
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        disabled
+        className="h-10 w-full justify-start font-normal"
+      >
+        <FileText className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+        No templates available
+      </Button>
+    );
   }
 
   return (
@@ -550,7 +560,8 @@ export function TemplateDropdown({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="h-9 w-full justify-between font-normal shadow-sm"
+          aria-label="Template"
+          className="h-10 w-full justify-between font-normal"
         >
           <div className="flex min-w-0 items-center gap-2">
             <FileText className={cn('h-3.5 w-3.5 shrink-0', selectedTemplate ? 'text-primary' : 'text-muted-foreground')} />
@@ -597,7 +608,7 @@ export function TemplateDropdown({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm">{template.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {getCategoryLabel(template.category_key)} · {template.priority}
+                      {getCategoryLabel(template.category_key)}
                     </p>
                   </div>
                 </CommandItem>
@@ -607,6 +618,195 @@ export function TemplateDropdown({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+interface RequestHeaderCardProps {
+  form: UseFormReturn<TicketFormData>;
+  categories: RequestCategoryRecord[];
+  categoriesLoading: boolean;
+  categorySelectionDisabled: boolean;
+  selectedCategoryKey: string;
+  templates: RequestTemplateRecord[];
+  activeTemplateId: string | null;
+  onCategoryChange: (categoryKey: string) => void;
+  onTemplateSelect: (template: RequestTemplateRecord) => void;
+  onTemplateClear: () => void;
+  templatesLoading: boolean;
+  subjectValue: string;
+  subjectStatus: 'valid' | 'invalid' | 'untouched';
+}
+
+export function RequestHeaderCard({
+  form,
+  categories,
+  categoriesLoading,
+  categorySelectionDisabled,
+  selectedCategoryKey,
+  templates,
+  activeTemplateId,
+  onCategoryChange,
+  onTemplateSelect,
+  onTemplateClear,
+  templatesLoading,
+  subjectValue,
+  subjectStatus,
+}: RequestHeaderCardProps) {
+  return (
+    <Card className="border-border/80 shadow-sm">
+      <CardHeader className="border-b bg-muted/20 px-5 py-4">
+        <p className="text-sm font-semibold text-foreground">Request Header</p>
+      </CardHeader>
+      <CardContent className="space-y-5 p-5">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="subject">
+              Request Title <span className="text-destructive">*</span>
+            </Label>
+            {subjectStatus === 'valid' && (
+              <CheckCircle2 className="h-4 w-4 text-success" />
+            )}
+            {subjectStatus === 'invalid' && (
+              <XCircle className="h-4 w-4 text-destructive" />
+            )}
+          </div>
+          <Input
+            id="subject"
+            placeholder="e.g. Urgent invoice correction for customer delivery"
+            {...form.register('subject')}
+            className={cn(
+              'h-10 transition-colors',
+              subjectStatus === 'valid' && 'border-success/50 focus-visible:ring-success/50',
+              subjectStatus === 'invalid' && 'border-destructive',
+            )}
+          />
+          {form.formState.errors.subject ? (
+            <p className="flex items-center gap-1 text-xs text-destructive">
+              <AlertCircle className="h-3 w-3" />
+              {form.formState.errors.subject.message}
+            </p>
+          ) : subjectValue.length > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {subjectValue.length} character{subjectValue.length !== 1 ? 's' : ''}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="category">
+              Category <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={selectedCategoryKey}
+              onValueChange={onCategoryChange}
+              disabled={categorySelectionDisabled}
+            >
+              <SelectTrigger
+                id="category"
+                className={cn(
+                  'h-10',
+                  form.formState.errors.category ? 'border-destructive' : '',
+                  !form.formState.errors.category && form.formState.touchedFields.category && 'border-success/50',
+                )}
+              >
+                <SelectValue
+                  placeholder={
+                    categoriesLoading ? 'Loading categories...' : 'Select a category'
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map(({ key, label }) => (
+                  <SelectItem key={key} value={key}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.formState.errors.category && (
+              <p className="flex items-center gap-1 text-xs text-destructive">
+                <AlertCircle className="h-3 w-3" />
+                {form.formState.errors.category.message}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Template</Label>
+            <TemplateDropdown
+              templates={templates}
+              categories={categories}
+              activeTemplateId={activeTemplateId}
+              onSelect={onTemplateSelect}
+              onClear={onTemplateClear}
+              loading={templatesLoading}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface RequestDescriptionCardProps {
+  form: UseFormReturn<TicketFormData>;
+  roleContext: RoleContext;
+  descriptionValue: string;
+  descriptionStatus: 'valid' | 'invalid' | 'untouched';
+}
+
+export function RequestDescriptionCard({
+  form,
+  roleContext,
+  descriptionValue,
+  descriptionStatus,
+}: RequestDescriptionCardProps) {
+  return (
+    <Card className="border-border/80 shadow-sm">
+      <CardHeader className="border-b bg-muted/20 px-5 py-4">
+        <p className="text-sm font-semibold text-foreground">Contents / Description</p>
+      </CardHeader>
+      <CardContent className="p-5">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="description">
+              Contents / Description <span className="text-destructive">*</span>
+            </Label>
+            <span
+              className={cn(
+                'flex items-center gap-1 text-xs tabular-nums transition-colors',
+                descriptionStatus === 'valid'
+                  ? 'text-success'
+                  : descriptionStatus === 'invalid'
+                    ? 'text-destructive'
+                    : 'text-muted-foreground',
+              )}
+            >
+              {descriptionStatus === 'valid' && <CheckCircle2 className="h-3 w-3" />}
+              {descriptionValue.length} / 20 min
+            </span>
+          </div>
+          <Textarea
+            id="description"
+            placeholder={roleContext.descriptionPlaceholder}
+            rows={14}
+            {...form.register('description')}
+            className={cn(
+              'min-h-[320px] resize-y transition-colors',
+              descriptionStatus === 'valid' && 'border-success/50 focus-visible:ring-success/50',
+              descriptionStatus === 'invalid' && 'border-destructive',
+            )}
+          />
+          {form.formState.errors.description && (
+            <p className="flex items-center gap-1 text-xs text-destructive">
+              <AlertCircle className="h-3 w-3" />
+              {form.formState.errors.description.message}
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -797,30 +997,14 @@ export function RequestSummaryPanel({
 // ─── Standalone sidebar components ───────────────────────────────────────────
 
 interface RequestSummaryCardProps {
-  activeTemplate: RequestTemplateRecord | null;
-  categoryLabel: string;
-  subcategoryLabel: string | null;
-  priority: TicketFormData['priority'];
-  attachedFiles: File[];
-  maxFiles: number;
-  branchCode?: string | null;
-  draftSavedAt?: Date | null;
+  title: string;
+  requestorName: string;
 }
 
 export function RequestSummaryCard({
-  activeTemplate,
-  categoryLabel,
-  subcategoryLabel,
-  priority,
-  attachedFiles,
-  maxFiles,
-  branchCode,
-  draftSavedAt,
+  title,
+  requestorName,
 }: RequestSummaryCardProps) {
-  const draftLabel = draftSavedAt
-    ? `Saved ${draftSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-    : null;
-
   return (
     <div className="rounded-lg border bg-card p-4 shadow-sm">
       <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -828,52 +1012,18 @@ export function RequestSummaryCard({
       </p>
       <div className="space-y-2.5 text-sm">
         <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-muted-foreground">Template</span>
-          <span className="text-right font-medium text-foreground">
-            {activeTemplate ? activeTemplate.name : 'Custom'}
+          <span className="shrink-0 text-muted-foreground">Title</span>
+          <span className="min-w-0 text-right font-medium text-foreground">
+            {title.trim() || 'Untitled request'}
           </span>
         </div>
         <Separator />
         <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-muted-foreground">Category</span>
-          <span className="text-right font-medium text-foreground">{categoryLabel || '—'}</span>
-        </div>
-        {subcategoryLabel && (
-          <div className="flex items-start justify-between gap-3">
-            <span className="shrink-0 text-muted-foreground">Subcategory</span>
-            <span className="text-right font-medium text-foreground">{subcategoryLabel}</span>
-          </div>
-        )}
-        <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-muted-foreground">Priority</span>
-          <span
-            className={cn(
-              'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
-              PRIORITY_BADGE[priority],
-            )}
-          >
-            {priority.charAt(0).toUpperCase() + priority.slice(1)}
+          <span className="shrink-0 text-muted-foreground">Requestor</span>
+          <span className="min-w-0 text-right font-medium text-foreground">
+            {requestorName}
           </span>
         </div>
-        {branchCode && (
-          <div className="flex items-start justify-between gap-3">
-            <span className="shrink-0 text-muted-foreground">Branch</span>
-            <span className="text-right font-medium text-foreground">{branchCode}</span>
-          </div>
-        )}
-        <Separator />
-        <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-muted-foreground">Attachments</span>
-          <span className="font-medium tabular-nums text-foreground">
-            {attachedFiles.length} / {maxFiles}
-          </span>
-        </div>
-        {draftLabel && (
-          <div className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2.5 py-1.5">
-            <Save className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Draft {draftLabel}</span>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -1382,6 +1532,7 @@ interface AttachmentsSectionProps {
   fileInputRef: React.RefObject<HTMLInputElement>;
   /** Compact mode for sidebar placement: smaller drop zone, tighter padding. */
   compact?: boolean;
+  uploading?: boolean;
   setDragOver: (dragOver: boolean) => void;
   onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
   onFileInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -1395,6 +1546,7 @@ export function AttachmentsSection({
   dragOver,
   fileInputRef,
   compact = false,
+  uploading = false,
   setDragOver,
   onDrop,
   onFileInputChange,
@@ -1414,8 +1566,7 @@ export function AttachmentsSection({
               </span>
             </p>
             <p className="text-xs text-muted-foreground">
-              PDF, Word, Excel, images, CSV, TXT · up to{' '}
-              {attachmentSettings.max_file_size_mb} MB each
+              PDF, Word, Excel, images, CSV, TXT
             </p>
           </div>
           <span
@@ -1446,35 +1597,26 @@ export function AttachmentsSection({
             if (event.key === 'Enter' || event.key === ' ') fileInputRef.current?.click();
           }}
           className={cn(
-            'flex cursor-pointer items-center justify-center gap-2.5 rounded-lg border border-dashed transition-colors',
-            compact ? 'px-3 py-3' : 'flex-col px-4 py-5',
+            'flex cursor-pointer items-center justify-center rounded-lg border border-dashed text-center transition-colors',
+            compact ? 'min-h-[120px] flex-col gap-2 px-3 py-4' : 'min-h-[150px] flex-col gap-2.5 px-4 py-5',
             dragOver
-              ? 'border-primary bg-primary/5'
-              : 'border-border bg-muted/30 hover:bg-muted/60',
+              ? 'border-primary bg-primary/5 ring-2 ring-primary/15'
+              : 'border-border bg-background hover:bg-muted/40',
             isLimitReached && 'pointer-events-none opacity-50',
           )}
         >
-          {compact ? (
-            <>
-              <UploadCloud className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                {isLimitReached ? 'File limit reached' : 'Click or drag to attach files'}
-              </span>
-            </>
-          ) : (
-            <>
-              <Paperclip className="h-5 w-5 text-muted-foreground" />
-              <div className="text-center">
-                <p className="text-sm font-medium text-foreground">
-                  Click to browse or drag &amp; drop
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Max {attachmentSettings.max_files_per_ticket} files,{' '}
-                  {attachmentSettings.max_file_size_mb} MB each
-                </p>
-              </div>
-            </>
-          )}
+          <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted/40">
+            <UploadCloud className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              {isLimitReached ? 'File limit reached' : 'Drop files here or browse'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Up to {attachmentSettings.max_files_per_ticket} files,{' '}
+              {attachmentSettings.max_file_size_mb} MB each
+            </p>
+          </div>
         </div>
 
         <input
@@ -1487,6 +1629,12 @@ export function AttachmentsSection({
           onChange={onFileInputChange}
         />
 
+        {attachedFiles.length === 0 && fileErrors.length === 0 && (
+          <div className="rounded-md border border-dashed bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            No files attached.
+          </div>
+        )}
+
         {attachedFiles.length > 0 && (
           <ul className="space-y-1">
             {attachedFiles.map((file, index) => (
@@ -1494,23 +1642,30 @@ export function AttachmentsSection({
                 key={`${file.name}-${file.size}`}
                 className={cn(
                   'group flex items-center gap-2 rounded-lg border bg-card transition-colors hover:bg-muted/40',
-                  compact ? 'px-2.5 py-1.5' : 'px-3 py-2',
+                  compact ? 'px-2.5 py-2' : 'px-3 py-2.5',
                 )}
               >
-                <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
-                <span className="flex-1 truncate text-xs text-foreground">
-                  {file.name}
-                </span>
-                <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
-                  {formatBytes(file.size)}
-                </span>
+                <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-foreground">
+                    {file.name}
+                  </p>
+                  <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span className="tabular-nums">{formatBytes(file.size)}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className={cn(uploading ? 'text-primary' : 'text-success')}>
+                      {uploading ? 'Uploading' : 'Ready'}
+                    </span>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => onRemoveFile(index)}
-                  className="ml-0.5 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                  disabled={uploading}
+                  className="ml-0.5 shrink-0 rounded p-1 text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-40"
                   aria-label={`Remove ${file.name}`}
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </li>
             ))}
