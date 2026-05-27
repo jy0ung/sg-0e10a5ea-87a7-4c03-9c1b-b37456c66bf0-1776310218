@@ -14,6 +14,7 @@ import { SalesOrder, SalesOrderStatus } from '@/types';
 import { loggingService } from './loggingService';
 import { performanceService } from './performanceService';
 import { logUserAction } from './auditService';
+import { emitWebhookEvent } from './webhookOutboxService';
 
 type SalesOrderEditableFields = Omit<SalesOrder, 'id' | 'companyId' | 'createdAt' | 'updatedAt'>;
 
@@ -114,7 +115,30 @@ export async function createSalesOrder(companyId: string, fields: SalesOrderEdit
     .single();
   if (error) { loggingService.error('createSalesOrder failed', { error }); return { data: null, error: new Error(error.message) }; }
   if (actorId) void logUserAction(actorId, 'create', 'sales_order', String(data.id), { component: 'SalesOrderService' });
-  return { data: mapOrder(data as Record<string, unknown>), error: null };
+
+  // Phase 6a producer adoption: emit sales_order.created so downstream
+  // consumers (DMS mirror, ERP sync, commission engine) can react.
+  // Fire-and-forget — a webhook RPC failure must never roll back the
+  // order. Payload carries IDs + non-PII business context only; the
+  // receiver can call back through the API for full customer details.
+  const order = mapOrder(data as Record<string, unknown>);
+  void emitWebhookEvent(companyId, 'sales_order.created', {
+    order_id:       order.id,
+    order_no:       order.orderNo,
+    customer_id:    order.customerId,
+    branch_code:    order.branchCode,
+    salesman_name:  order.salesmanName,
+    model:          order.model,
+    variant:        order.variant,
+    chassis_no:     order.chassisNo,
+    vehicle_id:     order.vehicleId,
+    selling_price:  order.totalPrice,
+    booking_date:   order.bookingDate,
+    expected_delivery_date: order.deliveryDate,
+    stage_id:       order.dealStageId,
+  });
+
+  return { data: order, error: null };
 }
 
 export async function updateSalesOrder(companyId: string, id: string, fields: Partial<SalesOrderEditableFields>, actorId?: string): Promise<{ data: SalesOrder | null; error: Error | null }> {
@@ -164,6 +188,15 @@ export async function moveSalesOrderStage(companyId: string, id: string, dealSta
     .eq('id', id);
   if (error) return { error: new Error(error.message) };
   if (actorId) void logUserAction(actorId, 'update', 'sales_order', id, { component: 'SalesOrderService' });
+
+  // Phase 6a producer adoption: pipeline stage transitions are the
+  // canonical hook for downstream automation (commission engine,
+  // delivery scheduling). Fire-and-forget.
+  void emitWebhookEvent(companyId, 'sales_order.stage_changed', {
+    order_id:      id,
+    new_stage_id:  dealStageId,
+  });
+
   return { error: null };
 }
 

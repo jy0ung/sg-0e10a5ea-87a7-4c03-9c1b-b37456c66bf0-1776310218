@@ -224,10 +224,12 @@ receiver is updated.
 
 ## 7. Producer adoption (current)
 
-| Producer flow                  | Event                          | Path                                                                          |
-|--------------------------------|--------------------------------|-------------------------------------------------------------------------------|
-| `createVehicleTransfer`        | `vehicle.transfer.requested`   | [src/services/inventoryService.ts](../src/services/inventoryService.ts)       |
-| `updateVehicleTransferStatus`  | `vehicle.transfer.<status>`    | [src/services/inventoryService.ts](../src/services/inventoryService.ts)       |
+| Producer flow                  | Event                          | Path                                                                                  |
+|--------------------------------|--------------------------------|---------------------------------------------------------------------------------------|
+| `createVehicleTransfer`        | `vehicle.transfer.requested`   | [src/services/inventoryService.ts](../src/services/inventoryService.ts)               |
+| `updateVehicleTransferStatus`  | `vehicle.transfer.<status>`    | [src/services/inventoryService.ts](../src/services/inventoryService.ts)               |
+| `createSalesOrder`             | `sales_order.created`          | [src/services/salesOrderCrudService.ts](../src/services/salesOrderCrudService.ts)     |
+| `moveSalesOrderStage`          | `sales_order.stage_changed`    | [src/services/salesOrderCrudService.ts](../src/services/salesOrderCrudService.ts)     |
 
 To adopt the outbox from another producer service:
 

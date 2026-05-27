@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { supabase } from '@/integrations/supabase/client';
+
+const emitWebhookEventMock = vi.hoisted(() => vi.fn().mockResolvedValue({ fanned: 0, error: null }));
+vi.mock('./webhookOutboxService', () => ({ emitWebhookEvent: emitWebhookEventMock }));
+
 import {
+  createSalesOrder,
   createVehicleFromSalesOrder,
   deleteSalesOrder,
   getLinkedSalesOrderForVehicle,
@@ -96,6 +101,63 @@ describe('salesOrderService', () => {
     expect(builder.eq).toHaveBeenNthCalledWith(1, 'company_id', 'company-1');
     expect(builder.eq).toHaveBeenNthCalledWith(2, 'id', 'order-1');
     expect(logUserAction).toHaveBeenCalledWith('actor-1', 'update', 'sales_order', 'order-1', { component: 'SalesOrderService' });
+  });
+
+  it('emits sales_order.created via the webhook outbox after a successful insert (Phase 6a)', async () => {
+    const builder = createMutationBuilder({ data: orderRow });
+    vi.mocked(supabase.from).mockReturnValue(builder as never);
+
+    await createSalesOrder('company-1', {
+      orderNo: 'SO-001', customerId: 'cust-1', branchCode: 'KK',
+      salesmanName: 'A', model: 'Model X', variant: 'V1',
+      colour: 'Red', bookingDate: '2026-04-25', deliveryDate: null,
+      bookingAmount: 0, totalPrice: 80000, dealStageId: 'stage-1',
+      chassisNo: null, vehicleId: null, notes: null, vsoNo: null,
+      depositAmount: 0, bankLoanAmount: 0, outstandingAmount: 0,
+      financeCompany: null, insuranceCompany: null, plateNo: null,
+    } as never, 'actor-1');
+
+    expect(emitWebhookEventMock).toHaveBeenCalledWith(
+      'company-1',
+      'sales_order.created',
+      expect.objectContaining({
+        order_id:  'order-1',
+        order_no:  'SO-001',
+        customer_id: 'cust-1',
+        branch_code: 'KK',
+        model:       'Model X',
+      }),
+    );
+  });
+
+  it('does not emit sales_order.created when the insert fails (Phase 6a)', async () => {
+    const builder = createMutationBuilder({ error: new Error('unique violation') });
+    vi.mocked(supabase.from).mockReturnValue(builder as never);
+
+    const result = await createSalesOrder('company-1', {
+      orderNo: 'SO-DUP', customerId: 'cust-1', branchCode: 'KK',
+      salesmanName: 'A', model: 'Model X', variant: 'V1',
+      colour: null, bookingDate: '2026-04-25', deliveryDate: null,
+      bookingAmount: 0, totalPrice: 0, dealStageId: 'stage-1',
+      chassisNo: null, vehicleId: null, notes: null, vsoNo: null,
+      depositAmount: 0, bankLoanAmount: 0, outstandingAmount: 0,
+      financeCompany: null, insuranceCompany: null, plateNo: null,
+    } as never);
+
+    expect(result.error?.message).toBe('unique violation');
+    expect(emitWebhookEventMock).not.toHaveBeenCalled();
+  });
+
+  it('emits sales_order.stage_changed when a stage move succeeds (Phase 6a)', async () => {
+    const builder = createMutationBuilder();
+    vi.mocked(supabase.from).mockReturnValue(builder as never);
+
+    await moveSalesOrderStage('company-1', 'order-1', 'stage-2');
+
+    expect(emitWebhookEventMock).toHaveBeenCalledWith('company-1', 'sales_order.stage_changed', {
+      order_id:     'order-1',
+      new_stage_id: 'stage-2',
+    });
   });
 
   it('soft-deletes sales orders within company scope', async () => {
