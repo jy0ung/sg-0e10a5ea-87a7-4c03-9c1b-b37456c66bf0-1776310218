@@ -225,6 +225,12 @@ async function login(page: Page, baseUrl: URL, credentials: { email: string; pas
 async function smokeRoute(page: Page, baseUrl: URL, routeCheck: RouteCheck): Promise<RouteResult> {
   console.info(`CHECK ${routeCheck.module}: ${routeCheck.name} ${routeCheck.path}`);
   const issues: Issue[] = [];
+  const consoleErrors: string[] = [];
+  const onConsole = (msg: Parameters<Page['on']>[1]) => {
+    if ('type' in msg && typeof msg.type === 'function' && msg.type() === 'error') {
+      consoleErrors.push(msg.text().slice(0, 500));
+    }
+  };
   const onPageError = (error: Error) => addUniqueIssue(issues, { type: 'pageerror', detail: error.message });
   const onResponse = (response: Awaited<ReturnType<Page['waitForResponse']>>) => {
     const status = response.status();
@@ -239,6 +245,7 @@ async function smokeRoute(page: Page, baseUrl: URL, routeCheck: RouteCheck): Pro
     }
   };
 
+  page.on('console', onConsole);
   page.on('pageerror', onPageError);
   page.on('response', onResponse);
 
@@ -261,9 +268,23 @@ async function smokeRoute(page: Page, baseUrl: URL, routeCheck: RouteCheck): Pro
       addUniqueIssue(issues, { type: 'ui', detail: 'empty page body' });
     }
     for (const issue of findUiIssues(bodyText)) addUniqueIssue(issues, issue);
+    if (issues.length > 0) {
+      const renderedError = await page
+        .locator('.font-mono, [data-testid="route-error-detail"], [data-testid="app-error-detail"]')
+        .first()
+        .textContent({ timeout: 1_000 })
+        .catch(() => null);
+      if (renderedError?.trim()) {
+        addUniqueIssue(issues, { type: 'ui-detail', detail: renderedError.trim().slice(0, 500) });
+      }
+      for (const consoleError of consoleErrors.slice(0, 3)) {
+        addUniqueIssue(issues, { type: 'console', detail: consoleError });
+      }
+    }
   } catch (error) {
     addUniqueIssue(issues, { type: 'exception', detail: error instanceof Error ? error.message : String(error) });
   } finally {
+    page.off('console', onConsole);
     page.off('pageerror', onPageError);
     page.off('response', onResponse);
   }
