@@ -53,6 +53,19 @@ describe('ticketService', () => {
     return { select };
   }
 
+  // request_subcategories.select('approval_flow_id').eq().eq().eq().maybeSingle()
+  // — used by getInternalRequestApprovalPlan to honor a subcategory-pinned flow.
+  // Default mock returns no pin so the resolver falls through to the category pin.
+  // The chain has three .eq() calls: company_id, category_key, subcategory_key.
+  function mockNoSubcategoryFlowPin() {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const subcategoryKeyEq = vi.fn(() => ({ maybeSingle }));
+    const categoryKeyEq = vi.fn(() => ({ eq: subcategoryKeyEq }));
+    const companyEq = vi.fn(() => ({ eq: categoryKeyEq }));
+    const select = vi.fn(() => ({ eq: companyEq }));
+    return { select };
+  }
+
   // request_categories.select('approval_flow_id').eq().eq().maybeSingle()
   // — used by getInternalRequestApprovalPlan to honor a category-pinned flow.
   // Default mock returns no pin so the resolver falls through to the flow scorer.
@@ -87,6 +100,11 @@ describe('ticketService', () => {
 
   it('derives ticket owner and company from authenticated context', async () => {
     const profilesLookup = mockProfilesDepartmentLookup();
+    // subcategory pin lookup runs before the category pin because it is the
+    // more specific resolution. This test passes a non-null subcategory so
+    // the DB call fires (a null subcategory would short-circuit in the
+    // service and skip the round-trip).
+    const subcategoryPinLookup = mockNoSubcategoryFlowPin();
     const categoryPinLookup = mockNoCategoryFlowPin();
     const approvalFlowSelect = mockNoActiveInternalRequestApprovalFlow();
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-1' }, error: null });
@@ -94,6 +112,7 @@ describe('ticketService', () => {
     const insert = vi.fn(() => ({ select }));
     vi.mocked(supabase.from)
       .mockImplementationOnce(() => ({ select: profilesLookup.select }) as never)
+      .mockImplementationOnce(() => ({ select: subcategoryPinLookup.select }) as never)
       .mockImplementationOnce(() => ({ select: categoryPinLookup.select }) as never)
       .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
       .mockImplementationOnce(() => ({ insert }) as never);

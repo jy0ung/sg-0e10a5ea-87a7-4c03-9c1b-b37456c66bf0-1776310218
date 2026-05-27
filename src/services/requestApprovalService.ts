@@ -90,11 +90,15 @@ function mapApproval(row: ApprovalInstanceRow): InternalRequestApprovalMetadata 
 
 /**
  * Optional category/priority context used when resolving which approval flow
- * a request should follow. When `categoryKey` matches a category that has
- * `request_categories.approval_flow_id` set, that pinned flow takes priority
- * over the department- or default-resolved flow. `subcategoryKey` and
- * `priority` are accepted for forward-compatibility with future per-rule
- * routing; they are currently informational.
+ * a request should follow.
+ *
+ * Resolution order (most specific wins, first non-null result returned):
+ *   1. `subcategoryKey` → `request_subcategories.approval_flow_id`
+ *   2. `categoryKey`    → `request_categories.approval_flow_id`
+ *   3. department-scoped scorer / company default
+ *
+ * `priority` is accepted for forward-compatibility with future condition-rule
+ * routing; it is currently informational.
  */
 export interface InternalRequestApprovalPlanOptions {
   categoryKey?: string | null;
@@ -121,6 +125,28 @@ async function getCategoryPinnedFlowId(
   return pinned ? String(pinned) : null;
 }
 
+/**
+ * Look up the approval flow id pinned directly on a request_subcategories row,
+ * if any. Takes priority over the category-level pin so a single subcategory
+ * can override its parent's default.
+ */
+async function getSubcategoryPinnedFlowId(
+  companyId: string,
+  categoryKey: string | null | undefined,
+  subcategoryKey: string | null | undefined,
+): Promise<string | null> {
+  if (!categoryKey || !subcategoryKey) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase.from('request_subcategories' as never) as any)
+    .select('approval_flow_id')
+    .eq('company_id', companyId)
+    .eq('category_key', categoryKey)
+    .eq('subcategory_key', subcategoryKey)
+    .maybeSingle();
+  const pinned = (data as Record<string, unknown> | null)?.approval_flow_id;
+  return pinned ? String(pinned) : null;
+}
+
 export async function getInternalRequestApprovalPlan(
   companyId: string,
   requesterId: string,
@@ -135,10 +161,21 @@ export async function getInternalRequestApprovalPlan(
     ? String((requesterProfile as Record<string, unknown>).department_id)
     : null;
 
-  // Category-pinned flows take priority over the department/default scorer
-  // (see migration 20260518030000_request_categories_approval_flow_fk.sql).
-  const pinnedFlowId = await getCategoryPinnedFlowId(companyId, options.categoryKey);
-  const flowId = pinnedFlowId
+  // Resolution order (most specific wins):
+  //   1. subcategory pin — migration 20260527020000_request_subcategories_approval_flow_fk
+  //   2. category pin    — migration 20260518030000_request_categories_approval_flow_fk
+  //   3. department-scoped / company-default scorer in approvalFlowService
+  // Lookups are sequenced rather than parallel because the more specific pin
+  // short-circuits the rest; if subcategoryKey is unset, the call is a no-op
+  // round-trip back to the caller.
+  const subcategoryPinnedFlowId = await getSubcategoryPinnedFlowId(
+    companyId,
+    options.categoryKey,
+    options.subcategoryKey,
+  );
+  const categoryPinnedFlowId = subcategoryPinnedFlowId
+    ?? await getCategoryPinnedFlowId(companyId, options.categoryKey);
+  const flowId = categoryPinnedFlowId
     ?? await resolveApprovalFlowId(companyId, 'internal_request', departmentId);
   if (!flowId) return { data: null, error: null };
 

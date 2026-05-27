@@ -11,6 +11,7 @@ export interface RequestSubcategoryRecord {
   description: string;
   is_active: boolean;
   sort_order: number;
+  approval_flow_id: string | null;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
@@ -25,6 +26,7 @@ interface RequestSubcategoryRow {
   description: string | null;
   is_active: boolean;
   sort_order: number;
+  approval_flow_id: string | null;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
@@ -45,6 +47,12 @@ export interface UpdateRequestSubcategoryInput {
   label?: string;
   description?: string;
   is_active?: boolean;
+  /**
+   * Optional pinned approval flow for this subcategory. Pass `null` to clear
+   * the pin and fall back to the category-level pin or the condition scorer.
+   * Pass `undefined` (or omit) to leave the current pin unchanged.
+   */
+  approval_flow_id?: string | null;
 }
 
 export interface ListRequestSubcategoriesOptions {
@@ -62,6 +70,7 @@ function mapRequestSubcategory(row: RequestSubcategoryRow): RequestSubcategoryRe
     description: row.description ?? '',
     is_active: row.is_active,
     sort_order: row.sort_order,
+    approval_flow_id: row.approval_flow_id ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     updated_by: row.updated_by,
@@ -83,7 +92,7 @@ async function fetchRequestSubcategories(
   options: ListRequestSubcategoriesOptions = {},
 ) {
   let query = requestSubcategoriesTable()
-    .select('id, company_id, category_key, subcategory_key, label, description, is_active, sort_order, created_at, updated_at, updated_by')
+    .select('id, company_id, category_key, subcategory_key, label, description, is_active, sort_order, approval_flow_id, created_at, updated_at, updated_by')
     .eq('company_id', companyId)
     .order('category_key', { ascending: true })
     .order('sort_order', { ascending: true })
@@ -146,7 +155,7 @@ export async function createRequestSubcategory(
       sort_order: nextSortOrder,
       updated_by: context.actorId,
     })
-    .select('id, company_id, category_key, subcategory_key, label, description, is_active, sort_order, created_at, updated_at, updated_by')
+    .select('id, company_id, category_key, subcategory_key, label, description, is_active, sort_order, approval_flow_id, created_at, updated_at, updated_by')
     .single();
 
   if (error) return { data: null, error: error.message };
@@ -206,11 +215,17 @@ export async function updateRequestSubcategory(
     patch.is_active = input.is_active;
   }
 
+  if (input.approval_flow_id !== undefined) {
+    // Trim empty strings to null so the column either holds a real UUID or
+    // nothing — the resolver checks for truthiness.
+    patch.approval_flow_id = input.approval_flow_id?.trim() ? input.approval_flow_id : null;
+  }
+
   const { data, error } = await requestSubcategoriesTable()
     .update(patch)
     .eq('id', subcategoryId)
     .eq('company_id', context.companyId)
-    .select('id, company_id, category_key, subcategory_key, label, description, is_active, sort_order, created_at, updated_at, updated_by')
+    .select('id, company_id, category_key, subcategory_key, label, description, is_active, sort_order, approval_flow_id, created_at, updated_at, updated_by')
     .single();
 
   if (error) return { data: null, error: error.message };

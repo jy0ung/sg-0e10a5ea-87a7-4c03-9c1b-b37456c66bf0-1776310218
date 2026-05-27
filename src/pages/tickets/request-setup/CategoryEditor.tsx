@@ -133,6 +133,7 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
       label: sub.label,
       description: sub.description,
       is_active: sub.is_active,
+      approval_flow_id: sub.approval_flow_id,
     }])));
   }, [subcategories]);
 
@@ -195,6 +196,7 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
           label: sub.label,
           description: sub.description,
           is_active: sub.is_active,
+          approval_flow_id: sub.approval_flow_id,
         }),
         ...patch,
       },
@@ -326,7 +328,12 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
     setBusySubcategoryId(sub.id);
     const result = await updateRequestSubcategory(
       sub.id,
-      { label: draft.label, description: draft.description, is_active: draft.is_active },
+      {
+        label: draft.label,
+        description: draft.description,
+        is_active: draft.is_active,
+        approval_flow_id: draft.approval_flow_id,
+      },
       { actorId, companyId },
     );
     if (result.error) {
@@ -547,57 +554,87 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
                       const subDraft = subcategoryDrafts[sub.id];
                       const isSubBusy = busySubcategoryId === sub.id;
                       const isSubDirty = hasSubcategoryChanges(sub, subDraft);
+                      const subFlowValue = subDraft?.approval_flow_id ?? sub.approval_flow_id ?? '__none__';
                       return (
                         <div
                           key={sub.id}
-                          className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2.5"
+                          className="space-y-2 rounded-lg border bg-background px-3 py-2.5"
                         >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
-                            <Input
-                              className="h-7 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                              value={subDraft?.label ?? sub.label}
-                              onChange={(event) => updateSubcategoryDraft(sub, { label: event.target.value })}
-                              disabled={isSubBusy}
-                            />
-                            {!sub.is_active && (
-                              <Badge variant="outline" className="shrink-0 text-xs">Archived</Badge>
-                            )}
-                          </div>
-                          <div className="flex shrink-0 items-center gap-0.5">
-                            <Button
-                              variant="ghost" size="icon" className="h-7 w-7"
-                              onClick={() => void handleMoveSubcategory(sub.id, 'up')}
-                              disabled={isSubBusy || subIdx === 0}
-                              aria-label="Move up"
-                            >
-                              <ArrowUp className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost" size="icon" className="h-7 w-7"
-                              onClick={() => void handleMoveSubcategory(sub.id, 'down')}
-                              disabled={isSubBusy || subIdx === editCatSubcategories.length - 1}
-                              aria-label="Move down"
-                            >
-                              <ArrowDown className="h-3 w-3" />
-                            </Button>
-                            {isSubDirty && (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
+                              <Input
+                                className="h-7 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                                value={subDraft?.label ?? sub.label}
+                                onChange={(event) => updateSubcategoryDraft(sub, { label: event.target.value })}
+                                disabled={isSubBusy}
+                              />
+                              {!sub.is_active && (
+                                <Badge variant="outline" className="shrink-0 text-xs">Archived</Badge>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-0.5">
                               <Button
                                 variant="ghost" size="icon" className="h-7 w-7"
-                                onClick={() => void handleSaveSubcategory(sub)}
-                                disabled={isSubBusy}
-                                aria-label="Save subcategory"
+                                onClick={() => void handleMoveSubcategory(sub.id, 'up')}
+                                disabled={isSubBusy || subIdx === 0}
+                                aria-label="Move up"
                               >
-                                <Save className="h-3 w-3" />
+                                <ArrowUp className="h-3 w-3" />
                               </Button>
-                            )}
-                            <Switch
-                              className="scale-75 origin-right"
-                              checked={subDraft?.is_active ?? sub.is_active}
-                              onCheckedChange={(checked) => updateSubcategoryDraft(sub, { is_active: checked })}
+                              <Button
+                                variant="ghost" size="icon" className="h-7 w-7"
+                                onClick={() => void handleMoveSubcategory(sub.id, 'down')}
+                                disabled={isSubBusy || subIdx === editCatSubcategories.length - 1}
+                                aria-label="Move down"
+                              >
+                                <ArrowDown className="h-3 w-3" />
+                              </Button>
+                              {isSubDirty && (
+                                <Button
+                                  variant="ghost" size="icon" className="h-7 w-7"
+                                  onClick={() => void handleSaveSubcategory(sub)}
+                                  disabled={isSubBusy}
+                                  aria-label="Save subcategory"
+                                >
+                                  <Save className="h-3 w-3" />
+                                </Button>
+                              )}
+                              <Switch
+                                className="scale-75 origin-right"
+                                checked={subDraft?.is_active ?? sub.is_active}
+                                onCheckedChange={(checked) => updateSubcategoryDraft(sub, { is_active: checked })}
+                                disabled={isSubBusy}
+                              />
+                              {isSubBusy && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 pl-3.5">
+                            <span className="shrink-0 text-[11px] text-muted-foreground">Approval flow</span>
+                            <Select
+                              value={subFlowValue}
+                              onValueChange={(value) =>
+                                updateSubcategoryDraft(sub, { approval_flow_id: value === '__none__' ? null : value })
+                              }
                               disabled={isSubBusy}
-                            />
-                            {isSubBusy && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                            >
+                              <SelectTrigger className="h-7 flex-1 text-xs">
+                                <SelectValue placeholder="Inherit from category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">Inherit from category</SelectItem>
+                                {internalRequestFlows.map((flow) => (
+                                  <SelectItem key={flow.id} value={flow.id}>
+                                    {flow.name}
+                                  </SelectItem>
+                                ))}
+                                {internalRequestFlows.length === 0 && (
+                                  <SelectItem value="__no_flows__" disabled>
+                                    No active internal-request flows configured
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
                       );

@@ -36,6 +36,7 @@ export interface SubcategoryDraft {
   label: string;
   description: string;
   is_active: boolean;
+  approval_flow_id: string | null;
 }
 
 export interface CreateSubcategoryDraft {
@@ -67,6 +68,7 @@ export function hasSubcategoryChanges(
     draft.label !== subcategory.label
     || draft.description !== subcategory.description
     || draft.is_active !== subcategory.is_active
+    || draft.approval_flow_id !== subcategory.approval_flow_id
   );
 }
 
