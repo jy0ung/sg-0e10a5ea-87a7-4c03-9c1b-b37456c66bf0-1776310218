@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
-import { PORTAL_SETUP_ROLES } from '@/config/routeRoles';
+import { canManagePortalSetup } from '@/lib/portalAccess';
 import {
   listPortalAnnouncements,
   createPortalAnnouncement,
@@ -41,8 +41,6 @@ import {
 } from '@/services/portalAnnouncementService';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-
-const PORTAL_SETUP_ROLES_SET = new Set<string>(PORTAL_SETUP_ROLES);
 
 const TYPE_LABELS: Record<PortalAnnouncementType, string> = {
   general:        'General',
@@ -102,7 +100,7 @@ const EMPTY_FORM: FormState = {
 export default function PortalAnnouncements() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const canManage = PORTAL_SETUP_ROLES_SET.has(user?.role ?? '');
+  const canManage = canManagePortalSetup(user);
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const queryKey = ['portal-announcements', user?.companyId] as const;

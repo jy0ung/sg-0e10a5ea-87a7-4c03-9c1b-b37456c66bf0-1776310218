@@ -1,8 +1,7 @@
 import { ArrowLeft, Archive, ClipboardList, FolderOpen, Home, ListTodo, Megaphone, Settings2, TicketCheck } from 'lucide-react';
-import { PORTAL_QUEUE_ROLES, PORTAL_SETUP_ROLES } from '@/config/routeRoles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
-import { canAccessMainApp } from '@/lib/portalAccess';
+import { canAccessMainApp, canManagePortalQueue, canManagePortalSetup } from '@/lib/portalAccess';
 import type { AppShellNavItem, AppShellRouteChromeMatch } from '@flc/shell';
 
 const baseNavItems: AppShellNavItem[] = [
@@ -20,9 +19,6 @@ const queueNavItems: AppShellNavItem[] = [
 
 const setupNavItem: AppShellNavItem = { label: 'Request Setup', path: '/portal/setup', icon: Settings2, group: 'Administration' };
 
-const portalQueueRoles = new Set<string>(PORTAL_QUEUE_ROLES);
-const portalSetupRoles = new Set<string>(PORTAL_SETUP_ROLES);
-
 const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/portal\/?$/, title: 'Overview', kicker: 'Internal requests workspace' },
   { pattern: /^\/portal\/tickets\/new/, title: 'New Request', kicker: 'Submit and track internal support demand' },
@@ -37,11 +33,10 @@ const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
 export function useInternalRequestsShellConfig() {
   const { user, logout } = useAuth();
   const { branding } = useBranding();
-  const userRole = user?.role ?? '';
   const navItems = [
     ...baseNavItems,
-    ...(portalQueueRoles.has(userRole) ? queueNavItems : []),
-    ...(portalSetupRoles.has(userRole) ? [setupNavItem] : []),
+    ...(canManagePortalQueue(user) ? queueNavItems : []),
+    ...(canManagePortalSetup(user) ? [setupNavItem] : []),
   ];
 
   return {

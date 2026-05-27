@@ -3,10 +3,7 @@ import { Archive, ClipboardList, FolderOpen, Megaphone, PlusCircle, Settings2 } 
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
-import { PORTAL_QUEUE_ROLES, PORTAL_SETUP_ROLES } from '@/config/routeRoles';
-
-const QUEUE_ROLES = new Set<string>(PORTAL_QUEUE_ROLES);
-const SETUP_ROLES = new Set<string>(PORTAL_SETUP_ROLES);
+import { canManagePortalQueue, canManagePortalSetup } from '@/lib/portalAccess';
 
 interface QuickLinkCardProps {
   to: string;
@@ -35,9 +32,8 @@ function QuickLinkCard({ to, icon: Icon, title, description }: QuickLinkCardProp
 
 export default function PortalLanding() {
   const { user } = useAuth();
-  const role = user?.role ?? '';
-  const canManageQueue = QUEUE_ROLES.has(role);
-  const canManageSetup = SETUP_ROLES.has(role);
+  const canManageQueue = canManagePortalQueue(user);
+  const canManageSetup = canManagePortalSetup(user);
 
   const firstName = user?.name?.split(' ')[0] ?? 'there';
 

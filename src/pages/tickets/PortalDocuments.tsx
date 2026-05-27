@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
-import { PORTAL_SETUP_ROLES } from '@/config/routeRoles';
+import { canManagePortalSetup } from '@/lib/portalAccess';
 import {
   listPortalDocuments,
   uploadPortalDocument,
@@ -41,8 +41,6 @@ import {
 } from '@/services/portalDocumentService';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-
-const PORTAL_SETUP_ROLES_SET = new Set<string>(PORTAL_SETUP_ROLES);
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
@@ -130,7 +128,7 @@ const EMPTY_UPLOAD_FORM: UploadForm = {
 export default function PortalDocuments() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const canManage = PORTAL_SETUP_ROLES_SET.has(user?.role ?? '');
+  const canManage = canManagePortalSetup(user);
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const queryKey = ['portal-documents', user?.companyId] as const;

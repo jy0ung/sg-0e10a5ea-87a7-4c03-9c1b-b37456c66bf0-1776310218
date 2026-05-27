@@ -26,7 +26,7 @@ import { errorTrackingService } from "@/services/errorTrackingService";
 import { subscribeWebVitals } from "@/services/webVitalsService";
 import { env } from "@/config/env";
 import { createAppQueryClient } from "@/lib/queryClient";
-import { isPortalOnlyUser } from '@/lib/portalAccess';
+import { hasPortalSpecificRole, isPortalOnlyUser } from '@/lib/portalAccess';
 import { getDedicatedHrmsWorkspacePath, HRMS_PATHS } from '@/lib/hrmsWorkspace';
 import {
   ADMIN_ONLY,
@@ -153,9 +153,10 @@ function ProtectedAppShell({ redirectTo = "/login" }: { redirectTo?: string | ((
   const location = useLocation();
 
   if (isPortalOnlyUser(user)) {
-    // Portal-specific roles (internal requests) → keep going to /portal
-    const hasPortalRole = ['portal_admin', 'portal_manager', 'portal_staff'].includes(user?.role ?? '');
-    if (hasPortalRole) {
+    // Portal-specific roles (internal requests) → keep going to /portal.
+    // Other portal-only users (HRMS portal_access_only flag) fall through to
+    // the HRMS workspace redirect below.
+    if (hasPortalSpecificRole(user)) {
       return <Navigate to="/portal" state={{ from: location }} replace />;
     }
     // HRMS-only users (portal_access_only flag) → redirect to HRMS workspace

@@ -1,10 +1,11 @@
-import { PORTAL_QUEUE_ROLES } from '@/config/routeRoles';
+import { canManagePortalQueue } from '@/lib/portalAccess';
 import type { ProfileRow } from '@/services/profileService';
 
-const REQUEST_OWNER_ROLES = new Set<string>(PORTAL_QUEUE_ROLES);
-
+// Anyone with PORTAL_QUEUE_ROLES (the queue managers) is a valid request
+// assignee — they're the people who triage and resolve incoming requests.
+// canManagePortalQueue is the single source of truth for that role set.
 export function getRequestAssignees(profiles: ProfileRow[]) {
   return profiles
-    .filter((profile) => profile.status === 'active' && REQUEST_OWNER_ROLES.has(profile.role))
+    .filter((profile) => profile.status === 'active' && canManagePortalQueue(profile))
     .sort((left, right) => left.name.localeCompare(right.name));
 }
