@@ -148,7 +148,9 @@ export default function MyTickets() {
     }
 
     setCommentDrafts((current) => ({ ...current, [ticketId]: '' }));
-    await refreshTicketActivity(ticketId);
+    // The activity timeline is fetched as part of the myTicketsKey query —
+    // invalidate so the new comment shows up without manual state plumbing.
+    await queryClient.invalidateQueries({ queryKey: myTicketsKey });
   };
 
   const handleCancelTicket = async (ticketId: string) => {

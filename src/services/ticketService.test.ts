@@ -53,6 +53,17 @@ describe('ticketService', () => {
     return { select };
   }
 
+  // request_categories.select('approval_flow_id').eq().eq().maybeSingle()
+  // — used by getInternalRequestApprovalPlan to honor a category-pinned flow.
+  // Default mock returns no pin so the resolver falls through to the flow scorer.
+  function mockNoCategoryFlowPin() {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const categoryKeyEq = vi.fn(() => ({ maybeSingle }));
+    const companyEq = vi.fn(() => ({ eq: categoryKeyEq }));
+    const select = vi.fn(() => ({ eq: companyEq }));
+    return { select };
+  }
+
   function mockNoInternalRequestApprovalMetadata() {
     const inFn = vi.fn().mockResolvedValue({ data: [], error: null });
     const entityEq = vi.fn(() => ({ in: inFn }));
@@ -76,12 +87,14 @@ describe('ticketService', () => {
 
   it('derives ticket owner and company from authenticated context', async () => {
     const profilesLookup = mockProfilesDepartmentLookup();
+    const categoryPinLookup = mockNoCategoryFlowPin();
     const approvalFlowSelect = mockNoActiveInternalRequestApprovalFlow();
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-1' }, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
     vi.mocked(supabase.from)
       .mockImplementationOnce(() => ({ select: profilesLookup.select }) as never)
+      .mockImplementationOnce(() => ({ select: categoryPinLookup.select }) as never)
       .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
       .mockImplementationOnce(() => ({ insert }) as never);
 
@@ -225,12 +238,14 @@ describe('ticketService', () => {
     vi.mocked(evaluateRoutingRules).mockResolvedValueOnce('agent-7');
 
     const profilesLookup = mockProfilesDepartmentLookup();
+    const categoryPinLookup = mockNoCategoryFlowPin();
     const approvalFlowSelect = mockNoActiveInternalRequestApprovalFlow();
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-2' }, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
     vi.mocked(supabase.from)
       .mockImplementationOnce(() => ({ select: profilesLookup.select }) as never)
+      .mockImplementationOnce(() => ({ select: categoryPinLookup.select }) as never)
       .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
       .mockImplementationOnce(() => ({ insert }) as never);
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { useNavigate } from 'react-router-dom';
@@ -152,11 +152,17 @@ export default function NewTicket() {
     categoryKey: selectedCategoryKey || undefined,
   });
 
-  const { data: approvalPlan = 'loading' } = useQuery({
+  const { data: approvalPlan = 'loading' } = useQuery<ApprovalPlanState>({
     queryKey: ['approval-plan', user?.company_id, user?.id, selectedCategoryKey],
-    queryFn: () =>
-      getInternalRequestApprovalPlan(user!.company_id, user!.id, { categoryKey: selectedCategoryKey || null })
-        .then(({ data, error }) => (error ? ('error' as const) : data)),
+    queryFn: async (): Promise<ApprovalPlanState> => {
+      const { data, error } = await getInternalRequestApprovalPlan(
+        user!.company_id,
+        user!.id,
+        { categoryKey: selectedCategoryKey || null },
+      );
+      if (error) return 'error';
+      return data;
+    },
     enabled: !!user?.company_id && !!user?.id,
     staleTime: STALE.reference,
     placeholderData: 'loading' as ApprovalPlanState,

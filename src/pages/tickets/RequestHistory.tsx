@@ -207,9 +207,9 @@ export default function RequestHistory() {
       toast.error('Failed to add comment', { description: result.error.message });
     } else {
       setCommentDrafts((prev) => ({ ...prev, [ticketId]: '' }));
-      // Reload activity for this ticket
-      const { data } = await listTicketActivity([ticketId], user.company_id);
-      if (data) setActivitiesByTicket((prev) => ({ ...prev, ...data }));
+      // Activity is owned by the historyKey query — invalidate to refetch the
+      // ticket's updated activity timeline alongside everything else.
+      await queryClient.invalidateQueries({ queryKey: historyKey });
     }
     setSavingTicketId(null);
   }

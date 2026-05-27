@@ -1,6 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { ApprovalDecision, ApprovalInstanceStatus } from '@/types';
-import { rowToApprovalDecision, rowToApprovalStep, resolveStepRouting, userHasAssignedHrmsRole } from './hrms/shared';
+import {
+  rowToApprovalDecision,
+  rowToApprovalStep,
+  resolveStepRouting,
+  userHasAssignedHrmsRole,
+  type ApprovalStepRecord,
+} from './hrms/shared';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
 import { resolveApprovalFlowId } from './approvalFlowService';
@@ -82,9 +88,43 @@ function mapApproval(row: ApprovalInstanceRow): InternalRequestApprovalMetadata 
   };
 }
 
+/**
+ * Optional category/priority context used when resolving which approval flow
+ * a request should follow. When `categoryKey` matches a category that has
+ * `request_categories.approval_flow_id` set, that pinned flow takes priority
+ * over the department- or default-resolved flow. `subcategoryKey` and
+ * `priority` are accepted for forward-compatibility with future per-rule
+ * routing; they are currently informational.
+ */
+export interface InternalRequestApprovalPlanOptions {
+  categoryKey?: string | null;
+  subcategoryKey?: string | null;
+  priority?: string | null;
+}
+
+/**
+ * Look up the approval flow id pinned directly on a request_categories row,
+ * if any. Returns null when the category is unknown or has no pinning.
+ */
+async function getCategoryPinnedFlowId(
+  companyId: string,
+  categoryKey: string | null | undefined,
+): Promise<string | null> {
+  if (!categoryKey) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase.from('request_categories' as never) as any)
+    .select('approval_flow_id')
+    .eq('company_id', companyId)
+    .eq('category_key', categoryKey)
+    .maybeSingle();
+  const pinned = (data as Record<string, unknown> | null)?.approval_flow_id;
+  return pinned ? String(pinned) : null;
+}
+
 export async function getInternalRequestApprovalPlan(
   companyId: string,
   requesterId: string,
+  options: InternalRequestApprovalPlanOptions = {},
 ): Promise<{ data: InternalRequestApprovalPlan | null; error: string | null }> {
   // Look up requester's department for department-scoped flow resolution
   const { data: requesterProfile } = await profilesTable()
@@ -95,7 +135,11 @@ export async function getInternalRequestApprovalPlan(
     ? String((requesterProfile as Record<string, unknown>).department_id)
     : null;
 
-  const flowId = await resolveApprovalFlowId(companyId, 'internal_request', departmentId);
+  // Category-pinned flows take priority over the department/default scorer
+  // (see migration 20260518030000_request_categories_approval_flow_fk.sql).
+  const pinnedFlowId = await getCategoryPinnedFlowId(companyId, options.categoryKey);
+  const flowId = pinnedFlowId
+    ?? await resolveApprovalFlowId(companyId, 'internal_request', departmentId);
   if (!flowId) return { data: null, error: null };
 
   const { data: steps, error: stepsError } = await approvalStepsTable()
@@ -106,7 +150,9 @@ export async function getInternalRequestApprovalPlan(
   if (stepsError) return { data: null, error: stepsError.message };
   if (!steps?.length) return { data: null, error: 'The configured approval flow has no steps. Please contact HR/Admin.' };
 
-  const firstStep = (steps ?? []).map((row: Record<string, unknown>) => rowToApprovalStep(row)).find(step => step.isActive);
+  const firstStep = (steps as Record<string, unknown>[])
+    .map((row) => rowToApprovalStep(row))
+    .find((step: ApprovalStepRecord) => step.isActive);
   if (!firstStep) return { data: null, error: 'The configured approval flow has no active steps. Please contact HR/Admin.' };
   const routing = await resolveStepRouting(firstStep, requesterId, companyId);
   if (routing.error) return { data: null, error: routing.error };
@@ -230,9 +276,11 @@ export async function reviewInternalRequestApproval(
     .order('step_order');
   if (stepsError) return { error: stepsError.message };
 
-  const steps = (stepRows ?? []).map((row: Record<string, unknown>) => rowToApprovalStep(row)).filter(step => step.isActive);
-  const currentStep = steps.find((step) => step.id === approval.current_step_id)
-    ?? steps.find((step) => step.stepOrder === Number(approval.current_step_order));
+  const steps: ApprovalStepRecord[] = (stepRows as Record<string, unknown>[] ?? [])
+    .map((row) => rowToApprovalStep(row))
+    .filter((step: ApprovalStepRecord) => step.isActive);
+  const currentStep = steps.find((step: ApprovalStepRecord) => step.id === approval.current_step_id)
+    ?? steps.find((step: ApprovalStepRecord) => step.stepOrder === Number(approval.current_step_order));
   if (!currentStep) return { error: 'The current approval step could not be resolved.' };
 
   const requesterId = String(approval.requester_id ?? ticket.submitted_by ?? '');
@@ -249,7 +297,7 @@ export async function reviewInternalRequestApproval(
   if (!isAssignedApprover) return { error: 'You are not the assigned approver for the current step.' };
 
   const nextStep = decision === 'approved'
-    ? steps.find((step) => step.stepOrder > currentStep.stepOrder)
+    ? steps.find((step: ApprovalStepRecord) => step.stepOrder > currentStep.stepOrder)
     : undefined;
   const nextRouting = nextStep
     ? await resolveStepRouting(nextStep, requesterId, context.companyId)
@@ -358,4 +406,44 @@ export async function reviewInternalRequestApproval(
   });
 
   return { error: null };
+}
+
+/**
+ * Mark the approval instance for a ticket as cancelled. Idempotent: a no-op
+ * when no instance exists or the instance is already in a terminal state.
+ * Called by ticketService.cancelMyTicket so an in-flight approval doesn't
+ * remain orphaned after the requester cancels their own ticket.
+ */
+export async function cancelInternalRequestApprovalInstance(
+  ticketId: string,
+  companyId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await approvalInstancesTable()
+    .update({
+      status: 'cancelled',
+      current_step_id: null,
+      current_step_order: null,
+      current_step_name: null,
+      current_approver_role: null,
+      current_approver_user_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('company_id', companyId)
+    .eq('entity_type', 'internal_request')
+    .eq('entity_id', ticketId)
+    .eq('status', 'pending');
+  return { error: error?.message ?? null };
+}
+
+/**
+ * Single-ticket convenience that returns the approval metadata together with
+ * the full decision history. Consumed by TicketApprovalHistory in the request
+ * detail panel.
+ */
+export async function getInternalRequestApprovalWithHistory(
+  ticketId: string,
+): Promise<{ data: InternalRequestApprovalMetadata | null; error: string | null }> {
+  const { data, error } = await listInternalRequestApprovalMetadata([ticketId], true);
+  if (error) return { data: null, error };
+  return { data: data.get(ticketId) ?? null, error: null };
 }
