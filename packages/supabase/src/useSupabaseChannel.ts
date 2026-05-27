@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from './client';
 
 // One hook to replace the inline supabase.channel(...).on(...).subscribe()
@@ -55,6 +55,10 @@ export function useSupabaseChannel<TRow = Record<string, unknown>>(
   options: UseSupabaseChannelOptions<TRow>,
 ): void {
   const { name, enabled = true, subscriptions, onChange } = options;
+  const instanceId = useRef<string>();
+  if (!instanceId.current) {
+    instanceId.current = Math.random().toString(36).slice(2);
+  }
 
   // The subscriptions array is rebuilt on every render. We re-subscribe
   // when its serialized shape changes so the effect dependency list stays
@@ -71,7 +75,7 @@ export function useSupabaseChannel<TRow = Record<string, unknown>>(
   useEffect(() => {
     if (!enabled) return;
 
-    let channel = supabase.channel(name);
+    let channel = supabase.channel(`${name}:${instanceId.current}`);
     for (const sub of subscriptions) {
       const handler = sub.onChange ?? onChange;
       if (!handler) continue;
