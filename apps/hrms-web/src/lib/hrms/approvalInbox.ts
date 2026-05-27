@@ -58,45 +58,45 @@ export function buildApprovalInboxItems(
   const leaveItems: ApprovalInboxItem[] = leaveRequests.map(request => ({
     entityType: 'leave_request',
     entity: request,
-    entityId: request.id,
-    title: `${request.employeeName ?? 'Employee'} · ${request.leaveTypeName ?? 'Leave request'}`,
-    subtitle: `${request.startDate} -> ${request.endDate} · ${request.days} day${request.days === 1 ? '' : 's'}`,
-    summary: request.reason,
-    updatedAt: request.updatedAt,
-    currentApprovalStepName: request.currentApprovalStepName,
-    currentApproverRole: request.currentApproverRole,
-    currentApproverUserId: request.currentApproverUserId,
+    entityId: safeText(request.id, 'unknown-leave-request'),
+    title: `${optionalText(request.employeeName) ?? 'Employee'} · ${optionalText(request.leaveTypeName) ?? 'Leave request'}`,
+    subtitle: `${safeText(request.startDate, 'Unknown start')} -> ${safeText(request.endDate, 'Unknown end')} · ${formatDayCount(request.days)}`,
+    summary: optionalText(request.reason),
+    updatedAt: safeText(request.updatedAt, request.startDate ?? new Date(0).toISOString()),
+    currentApprovalStepName: optionalText(request.currentApprovalStepName),
+    currentApproverRole: optionalText(request.currentApproverRole),
+    currentApproverUserId: optionalText(request.currentApproverUserId),
     approvalInstanceStatus: request.approvalInstanceStatus,
-    approvalHistory: request.approvalHistory,
+    approvalHistory: Array.isArray(request.approvalHistory) ? request.approvalHistory : undefined,
   }));
 
   const payrollItems: ApprovalInboxItem[] = payrollRuns.map(run => ({
     entityType: 'payroll_run',
     entity: run,
-    entityId: run.id,
+    entityId: safeText(run.id, 'unknown-payroll-run'),
     title: `Payroll Finalisation · ${formatPayrollPeriod(run.periodMonth, run.periodYear)}`,
-    subtitle: `${run.totalHeadcount} employees · RM ${formatMoney(run.totalGross)} gross · RM ${formatMoney(run.totalNet)} net`,
-    summary: run.notes,
-    updatedAt: run.updatedAt,
-    currentApprovalStepName: run.currentApprovalStepName,
-    currentApproverRole: run.currentApproverRole,
-    currentApproverUserId: run.currentApproverUserId,
+    subtitle: `${formatCount(run.totalHeadcount)} employees · RM ${formatMoney(run.totalGross)} gross · RM ${formatMoney(run.totalNet)} net`,
+    summary: optionalText(run.notes),
+    updatedAt: safeText(run.updatedAt, new Date(0).toISOString()),
+    currentApprovalStepName: optionalText(run.currentApprovalStepName),
+    currentApproverRole: optionalText(run.currentApproverRole),
+    currentApproverUserId: optionalText(run.currentApproverUserId),
     approvalInstanceStatus: run.approvalInstanceStatus,
-    approvalHistory: run.approvalHistory,
+    approvalHistory: Array.isArray(run.approvalHistory) ? run.approvalHistory : undefined,
   }));
 
   const appraisalItems: ApprovalInboxItem[] = appraisals.map(appraisal => ({
     entityType: 'appraisal',
     entity: appraisal,
-    entityId: appraisal.id,
-    title: `Appraisal Activation · ${appraisal.title}`,
-    subtitle: `${appraisal.cycle.replace(/_/g, ' ')} · ${appraisal.periodStart} -> ${appraisal.periodEnd}`,
-    updatedAt: appraisal.updatedAt,
-    currentApprovalStepName: appraisal.currentApprovalStepName,
-    currentApproverRole: appraisal.currentApproverRole,
-    currentApproverUserId: appraisal.currentApproverUserId,
+    entityId: safeText(appraisal.id, 'unknown-appraisal'),
+    title: `Appraisal Activation · ${safeText(appraisal.title, 'Untitled appraisal')}`,
+    subtitle: `${safeText(appraisal.cycle, 'annual').replace(/_/g, ' ')} · ${safeText(appraisal.periodStart, 'Unknown start')} -> ${safeText(appraisal.periodEnd, 'Unknown end')}`,
+    updatedAt: safeText(appraisal.updatedAt, appraisal.periodStart ?? new Date(0).toISOString()),
+    currentApprovalStepName: optionalText(appraisal.currentApprovalStepName),
+    currentApproverRole: optionalText(appraisal.currentApproverRole),
+    currentApproverUserId: optionalText(appraisal.currentApproverUserId),
     approvalInstanceStatus: appraisal.approvalInstanceStatus,
-    approvalHistory: appraisal.approvalHistory,
+    approvalHistory: Array.isArray(appraisal.approvalHistory) ? appraisal.approvalHistory : undefined,
   }));
 
   return [...leaveItems, ...payrollItems, ...appraisalItems]
@@ -149,13 +149,47 @@ export function notifyApprovalInboxChanged() {
 }
 
 function formatMoney(value: number) {
-  return value.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const numericValue = finiteNumber(value);
+  return (Number.isFinite(numericValue) ? numericValue : 0)
+    .toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatPayrollPeriod(periodMonth: number, periodYear: number) {
-  try {
-    return format(new Date(periodYear, periodMonth - 1, 1), 'MMM yyyy');
-  } catch {
-    return `${periodMonth}/${periodYear}`;
+  const month = finiteNumber(periodMonth);
+  const year = finiteNumber(periodYear);
+  if (!Number.isFinite(month) || !Number.isFinite(year) || month < 1 || month > 12) {
+    return 'Unknown period';
   }
+  try {
+    return format(new Date(year, month - 1, 1), 'MMM yyyy');
+  } catch {
+    return `${month}/${year}`;
+  }
+}
+
+function safeText(value: unknown, fallback: string): string {
+  return optionalText(value) ?? fallback;
+}
+
+function optionalText(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === 'string') return value.trim() ? value : undefined;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return undefined;
+}
+
+function formatCount(value: number): string {
+  const numericValue = finiteNumber(value);
+  return Number.isFinite(numericValue) ? String(numericValue) : '0';
+}
+
+function formatDayCount(value: number): string {
+  const numericValue = finiteNumber(value);
+  const days = Number.isFinite(numericValue) ? numericValue : 0;
+  return `${days} day${days === 1 ? '' : 's'}`;
+}
+
+function finiteNumber(value: unknown): number {
+  if (value == null || value === '') return Number.NaN;
+  return Number(value);
 }
