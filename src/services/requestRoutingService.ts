@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logUserAction } from './auditService';
 
 export interface RequestRoutingRule {
   id: string;
@@ -119,7 +120,19 @@ export async function createRoutingRule(
     .select('*')
     .single();
   if (error) return { data: null, error: (error as { message: string }).message };
-  return { data: mapRule(data as RoutingRuleRow), error: null };
+
+  const rule = mapRule(data as RoutingRuleRow);
+  void logUserAction(context.actorId, 'create', 'request_routing_rule', rule.id, {
+    component: 'RequestRoutingService',
+    name: rule.name,
+    match_category: rule.match_category,
+    match_subcategory: rule.match_subcategory,
+    match_submitter_role: rule.match_submitter_role,
+    match_priority: rule.match_priority,
+    assign_to_user_id: rule.assign_to_user_id,
+  });
+
+  return { data: rule, error: null };
 }
 
 export async function updateRoutingRule(
@@ -143,7 +156,17 @@ export async function updateRoutingRule(
     .select('*')
     .single();
   if (error) return { data: null, error: (error as { message: string }).message };
-  return { data: mapRule(data as RoutingRuleRow), error: null };
+
+  const rule = mapRule(data as RoutingRuleRow);
+  // patch keys mirror UpdateRoutingRuleInput; log only the fields the caller
+  // actually sent so the audit trail records intent rather than the full row.
+  void logUserAction(context.actorId, 'update', 'request_routing_rule', ruleId, {
+    component: 'RequestRoutingService',
+    changedFields: Object.keys(patch),
+    ...patch,
+  });
+
+  return { data: rule, error: null };
 }
 
 export async function deleteRoutingRule(
@@ -155,6 +178,11 @@ export async function deleteRoutingRule(
     .eq('id', ruleId)
     .eq('company_id', context.companyId);
   if (error) return { error: (error as { message: string }).message };
+
+  void logUserAction(context.actorId, 'delete', 'request_routing_rule', ruleId, {
+    component: 'RequestRoutingService',
+  });
+
   return { error: null };
 }
 
@@ -187,6 +215,12 @@ export async function moveRoutingRule(
     .eq('id', target.id)
     .eq('company_id', context.companyId);
   if (e2) return { error: (e2 as { message: string }).message };
+
+  void logUserAction(context.actorId, 'update', 'request_routing_rule', ruleId, {
+    component: 'RequestRoutingService',
+    move: direction,
+    swappedWith: target.id,
+  });
 
   return { error: null };
 }
