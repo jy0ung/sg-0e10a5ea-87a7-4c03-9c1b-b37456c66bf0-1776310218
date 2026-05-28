@@ -36,6 +36,8 @@ However there are **three immediate blockers** (P0), five meaningful security ga
 | P3 — Observability | 0 | ✅ Closed in Phase 5b: web vitals, performanceService metrics, and BrowserTracing all shipping to Sentry. |
 | P4 — Feature Debt | 3 | Import-review queue incomplete, i18n 0% coverage, approval inbox partially wired |
 
+> **2026-05-28 re-audit note.** All P0 blockers, all five P1 security gaps, every P4 feature-debt item in the original table, and `DX-1` / `DX-2` are now closed in `main`. The narrative below preserves the original gap statements; the **Re-audit — 2026-05-28** section near the end is the live source of truth, and the **Re-audit Metrics & Success Criteria** table replaces the original one for current state.
+
 ---
 
 ## What's Working Well
@@ -743,3 +745,159 @@ These pre-existing issues exist in non-HRMS service files. Root `tsc --noEmit` p
 | Route coverage | ✅ Pass | All routed pages exist |
 | Env var documentation | ✅ Pass | All vars documented |
 | Context provider mounting | ✅ Pass | All active providers mounted |
+
+---
+
+## Re-audit — 2026-05-28
+
+A fresh sweep two weeks after the 2026-05-13 production-readiness pass. Everything in the original 2025 gap inventory and the 2026-05-13 bug list is verified against `main`. The picture: every P0/P1/P3/P4 item from the original audit is closed; the live debt is concentrated in **TypeScript escape hatches in services**, **service-level unit-test coverage**, and **unwritten Phase 6/7 surfaces**.
+
+### Toolchain signal
+
+| Gate | Result | Notes |
+|------|--------|------|
+| `npm run typecheck` | ✅ 0 errors | `tsc --noEmit` + `check:rpc-contracts` both clean. |
+| `npm run lint` | ✅ 0 errors | 9 warnings — all in non-shipped script files (`check-no-service-role`, `security-smoke`) plus one `react-hooks/exhaustive-deps` on `SalesAdvisors.tsx`, one `@typescript-eslint/no-explicit-any` on the rate-limit helper, two unused-var warnings on dev fixtures. None block CI. |
+| `npm test` | ✅ 967 pass, 28 skipped (124 files) | Drop from 986 → 967 reflects the unified-landing close-out: `dashboardPreferencesService.test.ts` + `customKpiFormula.test.ts` deleted alongside the components they covered. Skipped suites are `RLS_E2E=1`-gated specs that require a live Supabase stack. |
+| `tsc --noEmit` strict (app config) | ✅ 0 errors | Previous "technical debt" list (`salesOrderCrudService`, `inventoryService`, etc.) all type-clean now — but see *S2-1* below. |
+
+### Migration / backend state
+
+- **131 migrations applied** (latest two: `20260528000000_ticket_input_bounds.sql`, `20260528010000_ticket_attachment_size_enforcement.sql`). Both belong to the active **Internal Requests hardening** workstream (see Phase 7 in `PRODUCT_RECONSTRUCTION.md`).
+- **7 edge functions** all carry `verify_jwt=true` and import `_shared/rateLimit.ts`: `invite-user`, `delete-user`, `update-user-status`, `send-push-notification`, `rollover-leave-balances`, `dms-sync-worker`, `webhook-deliverer`. The shared helper is backed by the durable `bump_rate_limit` RPC.
+- **`_shared/logger.ts`** wraps every function in `withRequestLogging`, reflecting `x-request-id` and emitting structured `request.start` / `request.end` lines.
+- **RLS** still covers all public tables; the spec at `src/test/rls-matrix.spec.ts` is the gate.
+
+### Closed since the 2025 audit (do not re-litigate)
+
+| Original ID | Status | Evidence |
+|------|------|---------|
+| **S-1** No CSP | ✅ Closed | `index.html:8` meta + `docker/nginx.conf:15,19,92,100` headers. |
+| **S-2** localStorage RBAC | ✅ Closed | Migration `20260421110000_phase2_role_sections.sql`; `usePermissions` reads from `role_section_permissions` via React Query; no `localStorage.*flc_role*` references remain. |
+| **S-3** `xlsx` v0.18 | ✅ Closed | `xlsx` not in any `package.json`; `import-parser.ts` uses `exceljs` exclusively. |
+| **S-4** No edge rate-limit | ✅ Closed | All 7 functions wired (per above). |
+| **S-5** FCM rotation | ✅ Closed | `docs/EDGE_KEY_ROTATION.md` 90-day cadence + emergency steps. |
+| **T-1** 8 broken vitest files | ✅ Closed | 124/126 files pass; the 3 skipped are intentional RLS specs. |
+| **T-2** DataContext insert mock | ✅ Closed | Test removed when `DataContext` was decommissioned at root (per Module Integration Audit). |
+| **T-4** ESLint broken | ✅ Closed | `npm run lint` returns 0; gate runs in `.husky/pre-commit`. |
+| **A-1** `hrmsService.ts` 2,113 lines | ✅ Closed | Now an 18-line deprecated barrel; domain files live in `src/services/hrms/`. |
+| **A-2** Dual Excel libs | ✅ Closed | (Same as S-3.) |
+| **A-3** 16 manual-fetch pages | ✅ Closed | Every page in the original list now uses TanStack Query; 55 distinct `useFeatureFlag` callsites and 64 pages consuming `useQuery`/`useMutation`. |
+| **A-4** i18n 0% adoption | ✅ Closed (by removal) | `i18next` uninstalled across all `package.json`; `src/i18n/` and `apps/hrms-web/src/i18n/` deleted; no `useTranslation` import remains. |
+| **O-1/O-2/O-3** Observability | ✅ Closed (Phase 5b) | `webVitalsService.ts`, `performanceService.ts` → `Sentry.setMeasurement`, `browserTracingIntegration()` in `errorTrackingService.ts`. |
+| **F-1** Import Review Queue | ✅ Closed (Phase 3a) | `phase3a.import-review-v2` flag, `e44a530`. |
+| **F-2** ApprovalInbox realtime | ✅ Closed (Phase 2) | `useApprovalInboxItems` via `useSupabaseChannel`. |
+| **F-3** PWA offline fallback | ✅ Closed | `public/offline.html` precached and registered as `navigateFallback` (per `vite.config.ts:94,113`). Supabase paths denylisted. |
+| **DX-1** import-parser stash | ✅ Closed | File compiles; tests cover it. |
+| **DX-2** Pre-commit hooks | ✅ Closed | `.husky/pre-commit` runs `lint-staged` (eslint --max-warnings 0), `tsc --noEmit`, `check-rpc-contracts.ts`, `check-no-service-role.ts`. |
+| 2026-05-13 BUG-1/2/3/4 | ✅ Closed | Per the 2026-05-13 sweep above; all four fixed in that session. |
+
+### Live findings (open as of 2026-05-28)
+
+#### S2-1 · 116 `as unknown` casts remain in services — type-debt, not security  *(was the AUDIT footnote "Multiple TS escape hatches")*
+
+The 2026-05-13 audit said `@ts-expect-error` was reduced to zero. That is still true (`grep` finds none in `src/services/` or `apps/hrms-web/src/services/`), but **116** `as unknown`/`as unknown as` casts now stand in for the previous suppressions. Distribution:
+
+| File | Casts |
+|------|-------|
+| `src/services/vehicleService.ts` | 18 |
+| `src/services/apService.ts` | 8 |
+| `src/services/salesPipelineService.ts` | 5 |
+| `src/services/invoiceService.ts` | 5 |
+| `src/services/businessReportService.ts` | 5 |
+| `src/services/autoAgingDataService.ts` | 5 |
+| `src/services/auditService.ts` | 5 |
+| `apps/hrms-web/src/services/{vehicle,businessReport,autoAgingData}Service.ts` | 5 each |
+| Remainder spread across 30+ files | 1–4 each |
+
+These are functionally cosmetic (the code works), but they bypass the generated `Database` types, so a schema rename anywhere in those tables fails silently at runtime instead of at `tsc`. The fix is structural: extend `scripts/check-rpc-contracts.ts` into the **generated typed-RPC SDK** already named in `PRODUCT_RECONSTRUCTION.md §4.4`, then delete the casts file-by-file.
+
+**Impact**: Low (no functional bug today). **Effort**: ~3 days for the SDK script + 1 day per top-5 service to delete casts.
+
+#### T2-1 · Service test coverage still ~50%; no enforced floor  *(was T-3 + T-5)*
+
+| Tree | Service files | Tested | % |
+|------|--------------|-------|---|
+| `src/services/` | 70 | 37 | 53% |
+| `apps/hrms-web/src/services/` | 57 | 20 | 35% |
+| `src/services/hrms/` (wrappers) | 7 | 0 | 0% |
+
+`vitest.config.ts` still only enforces coverage thresholds for `src/lib/**`, `src/contexts/**`, `src/utils/**`. The previously-flagged riskiest services — `approvalEngineService`, `approvalFlowService`, `requestApprovalService`, `salesTargetService`, `inventoryService`, `mappingService`, `masterDataService` — remain untested.
+
+**Impact**: Medium (regression risk on business-critical mutation paths). **Effort**: ~1 sprint to land an initial set + add a `"src/services/**": {lines: 50}` threshold and ratchet up.
+
+#### DX2-1 · `ecosystem.config.cjs` (PM2) still undocumented  *(was DX-3)*
+
+The 2025 finding is unchanged. The file is at repo root and `README.md` does not mention what runs under PM2 vs static-nginx. Either delete it (the production deploy is static via `docker/nginx.conf`) or add a single paragraph in `README.md` describing the worker it runs.
+
+**Impact**: Low (confusion only). **Effort**: 30 minutes.
+
+#### F2-1 · Internal Requests / Portal is the live workstream and is not in the plan yet  *(new)*
+
+The last seven commits on `main` are all `feat/refactor(internal-requests)` — server-side input bounds, attachment size enforcement, signed-URL caching, persisted comment/note drafts, routing-rule assignee validation, subcategory-pinned approval flows, live queue/history/my-requests, and panel-level error boundaries. Two new migrations (`20260528000000`, `20260528010000`) belong to this stream. `docs/INTERNAL_REQUEST_GAP_ASSESSMENT.md`, `INTERNAL_REQUEST_QA_REPORT.md`, and `INTERNAL_REQUEST_REFACTOR.md` define the scope.
+
+This is not yet recorded as a phase in `PRODUCT_RECONSTRUCTION.md` — it sits between Phase 6a (Webhook Outbox) and the remaining Phase 6 surfaces. The plan update below adds **Phase 7 — Internal Requests hardening** to capture it; the work is largely shipped but the close-out checklist (E2E suite, RLS re-run, runbook) is still owed.
+
+**Impact**: Medium — without a phase entry, the close-out gates from §7 of `PRODUCT_RECONSTRUCTION.md` are not being applied to this workstream. **Effort**: ~half a sprint for the gate evidence (E2E + RLS re-run + runbook), see plan below.
+
+#### F2-2 · Phase 6 partial — 6a shipped, 6b/6c/6d open  *(restatement)*
+
+Per `PRODUCT_RECONSTRUCTION.md §Phase 6`: webhook outbox is in production; **Service / Workshop module**, **Sales mobile app**, and **Customer-facing portal** are unbuilt. These are net-new product surfaces, not debt — they sit in the roadmap, not this gap list — but they bound the launch-checklist scope.
+
+### Re-audit Metrics & Success Criteria
+
+| Metric | 2025 baseline | 2026-05-13 | **2026-05-28 (live)** | Target |
+|--------|--------------|------------|----------------------|--------|
+| `tsc --noEmit` errors | 0 | 0 | **0** | 0 |
+| `check:rpc-contracts` | n/a | pass | **pass** | pass |
+| Test files failing | 8 / 49 | 0 / 49 | **0 / 126** (3 RLS-gated skips) | 0 fails |
+| Lint exit | 1 (broken) | 0 | **0** (9 warnings) | 0, ≤ 5 warnings |
+| Services with tests (main) | 17 / 33 | 20 / 45 | **37 / 70** | ≥ 50 / 70 |
+| Services with tests (hrms-web) | n/a | 20 / 45 | **20 / 57** | ≥ 35 / 57 |
+| HRMS-wrapper services tested | 0 / 7 | 0 / 7 | **0 / 7** | 7 / 7 |
+| `as unknown` casts in services | many | unchanged | **116** | ≤ 30 (post-SDK) |
+| `@ts-expect-error` in services | several | 0 | **0** | 0 |
+| Pages on TanStack Query | 8 / 24 | 24 / 24 | **64 / 103** (broader denominator; ExecutiveDashboard + ModuleDirectory deleted in 4e close-out) | maintained |
+| CSP / security headers | none | shipped | **shipped** | maintained |
+| `xlsx` in any `package.json` | yes | no | **no** | no |
+| `localStorage` RBAC | yes | no | **no** | no |
+| Web Vitals + RUM + slow-query metrics | none | shipped | **shipped** | maintained |
+| Edge-function rate limit | none | partial | **all 7 functions** | maintained |
+| Edge structured logs + `request_id` | no | partial | **all 7 functions** | maintained |
+| PWA offline fallback | no | yes | **yes** | maintained |
+| Pre-commit hooks | none | lint+tsc | **lint+tsc+RPC+no-service-role** | maintained |
+| `i18n` adoption | 0% installed | removed | **removed** | n/a |
+
+### Refreshed Implementation Plan
+
+Original P0/P1/P3/P4 sections are historical — they are all closed. The live plan, **in priority order**:
+
+#### R1 — Phase 7 close-out: Internal Requests hardening evidence  *(scope: ~3 days)*
+- Add Playwright E2E covering ticket create → route → approve → close happy path + portal-only-user denied paths.
+- Re-run `npm run test:rls` against the new portal tables touched by `20260527020000_request_subcategories_approval_flow_fk.sql` and the two `20260528*` migrations.
+- Author `docs/INTERNAL_REQUEST_RUNBOOK.md` (operator-facing: attachment storage rotation, signed-URL TTL, SLA breach manual escalation).
+- Add a Phase 7 row to `PRODUCT_RECONSTRUCTION.md §5` with the same acceptance gates as Phases 3–5.
+
+#### R2 — Generated typed-RPC SDK + delete `as unknown` casts  *(scope: ~5 days, parallel-isable)*
+- Extend `scripts/check-rpc-contracts.ts` into `scripts/gen-sdk.ts` emitting `packages/supabase/src/rpcs.ts` typed wrappers per RPC.
+- Sweep `vehicleService.ts`, `apService.ts`, `salesPipelineService.ts`, `invoiceService.ts`, `businessReportService.ts`, `autoAgingDataService.ts`, `auditService.ts` first — they account for 51 of the 116 casts.
+- Enable an ESLint rule banning new `as unknown` introductions in `src/services/**` (custom `no-restricted-syntax` selector).
+
+#### R3 — Service-level test coverage + enforced floor  *(scope: ~1 sprint)*
+- Write unit tests for the high-risk untested services in priority order: `approvalEngineService`, `approvalFlowService`, `requestApprovalService`, `salesTargetService`, `inventoryService`, `mappingService`, `masterDataService`, all 7 wrappers in `src/services/hrms/`.
+- Add to `vitest.config.ts`: `coverage.thresholds["src/services/**"] = { lines: 50, branches: 40 }`; ratchet to 60/50 after one PR cycle clean.
+
+#### R4 — DX cleanup  *(scope: ~half a day)*
+- Remove `ecosystem.config.cjs` if PM2 is unused in production, or add a 5-line `README.md` paragraph describing what it runs.
+- Fix the 9 ESLint warnings flagged above (5-minute job each).
+
+#### R5 — Phase 6b / 6c / 6d  *(open-ended, roadmap)*
+- 6b **Service / Workshop module** — needs product input (bookings, technicians, parts, warranty). Tracked in `PRODUCT_RECONSTRUCTION.md §3.1`.
+- 6c **Sales mobile app (Capacitor)** — wraps the existing PWA into native iOS / Android. Operator-side App Store / Play Store setup is a prerequisite.
+- 6d **Customer-facing portal** — public-auth surface. Requires threat model before code (largest new security surface).
+
+No further P0/P1 items in scope. The Phase 5 launch-checklist evidence (`docs/PHASE5_EVIDENCE.md` §7 — Sentry DSN provisioning, PITR enable, DR tabletop, OSV/CodeQL attach, on-call rota) remains the gating workstream and is **operator-side**, not code-side.
+
+---
+
+*Re-audit performed by Claude Opus 4.7 against `main` at `7227596`.*

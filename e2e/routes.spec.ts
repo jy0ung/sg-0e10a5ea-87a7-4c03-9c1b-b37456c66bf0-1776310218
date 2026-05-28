@@ -32,14 +32,20 @@ async function assertPageLoaded(page: import("@playwright/test").Page, path: str
 // ── Platform routes ───────────────────────────────────────────────────────────
 
 test.describe("Platform", () => {
-  test("Executive Dashboard (/)", async ({ page }) => {
-    await assertPageLoaded(page, "/");
-    await expect(page.locator("text=/executive|dashboard|kpi/i").first()).toBeVisible({ timeout: 8000 });
+  test("Home (/) redirects to /home", async ({ page }) => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/home$/, { timeout: 8000 });
+    await expect(page.locator("text=/welcome|home|kpi/i").first()).toBeVisible({ timeout: 8000 });
   });
 
-  test("Module Directory (/modules)", async ({ page }) => {
-    await assertPageLoaded(page, "/modules");
-    await expect(page.locator("text=/module|directory/i").first()).toBeVisible({ timeout: 8000 });
+  test("Home (/home)", async ({ page }) => {
+    await assertPageLoaded(page, "/home");
+    await expect(page.locator("text=/welcome|home|kpi/i").first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test("Legacy /modules redirects to /home", async ({ page }) => {
+    await page.goto("/modules", { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/home$/, { timeout: 8000 });
   });
 
   test("Notifications (/notifications)", async ({ page }) => {

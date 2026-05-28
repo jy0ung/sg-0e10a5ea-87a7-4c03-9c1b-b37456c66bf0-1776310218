@@ -15,15 +15,15 @@ test.describe("responsive shell", () => {
     test.skip(testInfo.project.name !== "mobile-chromium", "mobile-only drawer behavior");
     await setupAuthMocks(page);
 
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.goto("/home", { waitUntil: "domcontentloaded" });
     const menuButton = page.getByLabel("Open navigation menu");
     await expect(menuButton).toBeVisible({ timeout: 8000 });
 
     await menuButton.click();
-    await expect(page.getByRole("link", { name: /module directory/i })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("link", { name: /^inbox$/i })).toBeVisible({ timeout: 8000 });
 
-    await page.getByRole("link", { name: /module directory/i }).click();
-    await expect(page).toHaveURL(/\/modules$/);
+    await page.getByRole("link", { name: /^inbox$/i }).click();
+    await expect(page).toHaveURL(/\/inbox$/);
     await expect(menuButton).toBeVisible({ timeout: 8000 });
   });
 
@@ -31,9 +31,9 @@ test.describe("responsive shell", () => {
     test.skip(testInfo.project.name !== "tablet-chromium", "tablet-only navigation behavior");
     await setupAuthMocks(page);
 
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.goto("/home", { waitUntil: "domcontentloaded" });
     await expect(page.getByLabel("Open navigation menu")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: /module directory/i })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByRole("link", { name: /^home$/i })).toBeVisible({ timeout: 8000 });
   });
 
   test("critical authenticated routes avoid document-level horizontal overflow", async ({ page }) => {

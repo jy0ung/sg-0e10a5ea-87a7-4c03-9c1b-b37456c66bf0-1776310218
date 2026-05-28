@@ -315,8 +315,8 @@ Acceptance per sub-phase (per the original spec):
 
 Decision #7 (DMS captcha-gated, no service account) was honoured throughout 3c — no headless cron; the dashboard reflects the manual-upload reality and the credential rotation card documents what operators need.
 
-### Phase 4 — UX unification (2 sprints) — **COMPLETE (2026-05-26)**
-Each sub-phase shipped behind its own feature flag, default-off in prod.
+### Phase 4 — UX unification (2 sprints) — **COMPLETE (2026-05-28, re-closed)**
+Each sub-phase shipped behind its own feature flag, default-off in prod, then the landing was unified in the 2026-05-28 close-out.
 
 - **4a — Unified `/inbox`** ✅ — feature flag `phase4.unified-inbox`. Single page consolidating approvals (HRMS leave / payroll / appraisals), reconciliation review items, my tickets, and notifications, with per-source filter chips, per-source error collection, and click-through deep links. (`3f6a667`)
 - **4b — Role-aware Home + KPI Definition Studio** ✅ — feature flag `phase4.role-home`.
@@ -325,12 +325,14 @@ Each sub-phase shipped behind its own feature flag, default-off in prod.
   - Backend: `kpi_definitions`, `kpi_role_defaults`, `get_role_home_kpis` and `upsert_role_kpi_defaults` SECURITY DEFINER RPCs, seeded global catalogue + per-role defaults. (`22b440d`)
 - **4c — Branded shell** ✅ — feature flag `phase4.branded-shell`. Applies `company_branding.accent_color` (hex → HSL channels for Tailwind), `app_name` (document title), and `favicon_path` to the runtime shell. (`70f3c99`)
 - **4d — PWA offline runtime banner** ✅ — feature flag `phase4.pwa-offline`. Sticky in-app banner surfaces when the browser flips offline (online/offline events). Pairs with the existing `public/offline.html` precached navigation fallback. (`c7e172b`)
+- **4e — Unified landing (close-out, 2026-05-28)** ✅ — the legacy "My Dashboard" (`ExecutiveDashboard.tsx`) and "Module Directory" (`ModuleDirectory.tsx`) pages are deleted; `/` redirects to `/home`, `/modules` redirects to `/home`, and the `phase4.role-home` gate on the Home page is removed so it always renders. The redesigned Home merges the KPI grid (existing role-aware) with the module catalogue and quick-access shortcuts (Inbox / Notifications / Internal Requests). Module access toggles are honoured — deactivated modules disappear from Home and the direct route shows the `RequireActiveModule` "coming soon" surface with a "Back to Home" link. Companion deletions: `KpiDashboard`, `components/dashboard/*`, `personalDashboard`, `dashboardPreferencesService`, `customKpiFormula`, `CustomKpiBuilder`, `CustomKpiCard`. E2E specs in `navigation.spec.ts`, `routes.spec.ts`, `responsive.spec.ts`, `accessibility.spec.ts`, `hrms-production.spec.ts`, and `dashboard-module-flows.spec.ts` updated to the new topology.
 
 Acceptance per sub-phase:
 - ✅ Feature flag default-off in prod (four new flags seeded)
 - ✅ Unit tests for each surface (≈30 new tests across `inboxService`, `kpiHomeService`, `colorToHsl`, `useApplyBranding`, `useOnlineStatus`, `OfflineBanner`)
 - ✅ Playwright E2E specs for `/inbox` and `/home` + `/admin/kpi-studio`
 - ✅ All admin / SECURITY DEFINER RPCs gate on caller-company + role
+- ✅ Unified landing (`/home`) verified: typecheck 0 errors, RPC contract pass, vitest 967 / 967 pass (124 files), production build clean.
 - ⏳ Mobile-first StandardTable pass and WCAG 2.0 AA audit are deferred to Phase 5 (observability + accessibility closeout) since they are evidence-gathering rather than feature work.
 
 ### Phase 5 — Observability & reliability close-out (1 sprint) — **CODE COMPLETE (2026-05-26)**
@@ -365,6 +367,32 @@ Acceptance per sub-phase:
 - ✅ SECURITY DEFINER RPCs gate on caller-company / role.
 - ✅ Unit + page tests for the surface.
 - ⏳ Operator runbook (cron schedule for `webhook-deliverer`, key rotation steps for endpoint secrets) — to be drafted under `docs/` when 6a goes pilot.
+
+### Phase 7 — Internal Requests hardening (1 sprint) — **CODE LARGELY SHIPPED, EVIDENCE PENDING (2026-05-28)**
+
+This phase formalises the active workstream on `main`. Scope and intent are in `docs/INTERNAL_REQUEST_GAP_ASSESSMENT.md`, `docs/INTERNAL_REQUEST_QA_REPORT.md`, and `docs/INTERNAL_REQUEST_REFACTOR.md`. Eight commits across the last week have landed the code-side work; the close-out evidence is what's outstanding.
+
+Already shipped:
+- **7a — Subcategory-pinned approval flow routing** ✅ — migration `20260527020000_request_subcategories_approval_flow_fk.sql`, commit `71335c3`.
+- **7b — Live updates for Queue, History, My Requests** ✅ — `useTicketsRealtime` + `useSupabaseChannel`, commit `494ce89`.
+- **7c — Server-side hardening** ✅ — input bounds + attachment caps + routing audit, migrations `20260528000000_ticket_input_bounds.sql`, `20260528010000_ticket_attachment_size_enforcement.sql`, commit `109ed05`.
+- **7d — Routing-rule assignee validation** ✅ — create + update + evaluate paths, commit `e20e0ad`.
+- **7e — Service-layer cleanup** ✅ — dropped stale table-accessor any-casts, commit `d8ad196`.
+- **7f — Signed-URL cache + persisted comment/note drafts** ✅ — commit `fd2262d`.
+- **7g — Polish** ✅ — datetime TZ fix, SLA hint copy, panel error boundary, commit `7227596`.
+- **7h — RequestSetup god-component split + portal predicate centralisation** ✅ — commits `23dcd89`, `ef4b0ca`.
+
+Still owed for phase close-out (covered by AUDIT.md §R1):
+- ⏳ Playwright E2E covering ticket create → route → approve → close + portal-only-user denied paths.
+- ⏳ Re-run `npm run test:rls` against the three new portal-related migrations.
+- ⏳ `docs/INTERNAL_REQUEST_RUNBOOK.md` (attachment storage rotation, signed-URL TTL, SLA breach manual escalation).
+- ⏳ Move the two existing orphan portal test specs (per Module Integration Audit) into routed E2E coverage.
+
+Acceptance:
+- ✅ Feature flag — N/A; this is a hardening of an existing surface, not a new flag-gated feature.
+- ✅ SECURITY DEFINER RPCs gate on caller-company / role (validated in the routing audit).
+- ✅ Unit tests across services (`requestRoutingService`, `requestApprovalService`, etc.).
+- ⏳ E2E + RLS re-run + operator runbook (per §7 gates).
 
 ---
 
@@ -444,3 +472,18 @@ A phase is not done until ALL of:
 ---
 
 *Execution begins at Phase 0. One PR per phase, behind feature flags.*
+
+---
+
+## 10. Live snapshot — 2026-05-28
+
+Toolchain: `tsc --noEmit` 0, RPC contract check pass, `npm run lint` 0 errors / 9 cosmetic warnings, `npm test` 986 pass + 28 skipped (RLS-gated). 131 migrations applied. Seven edge functions all carry rate-limit + structured `request_id` logging. CSP / xlsx-removed / no-localStorage-RBAC / Web Vitals + RUM / pre-commit hooks all in place.
+
+Live debt (full detail in `AUDIT.md` "Re-audit — 2026-05-28"):
+1. **R1** — Phase 7 (Internal Requests) close-out evidence (E2E, RLS re-run, runbook). ~3 days.
+2. **R2** — Generated typed-RPC SDK to retire the 116 remaining `as unknown` casts in service files. ~5 days.
+3. **R3** — Service-level unit-test coverage from ~50% → ≥ 65%, with an enforced `vitest` threshold on `src/services/**`. ~1 sprint.
+4. **R4** — DX cleanup (PM2 config decision + 9 lint warnings). ~½ day.
+5. **R5** — Phase 6b/6c/6d remain greenfield product surfaces, not debt.
+
+Operator-side launch-checklist evidence (`docs/PHASE5_EVIDENCE.md §7`) is unchanged and remains the gating workstream for cutover.

@@ -14,7 +14,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 const navLinks: Array<{ label: string | RegExp; expectedPath: RegExp; startPath?: string }> = [
-  { label: /module.?directory/i, expectedPath: /\/modules$/ },
+  { label: /^home$/i, expectedPath: /\/home$/ },
+  { label: /^inbox$/i, expectedPath: /\/inbox$/ },
   { label: /notification/i, expectedPath: /\/notifications$/ },
   { label: /auto.?aging.?overview/i, expectedPath: /\/auto-aging$/, startPath: '/auto-aging' },
   { label: /vehicle.?explorer/i, expectedPath: /\/auto-aging\/vehicles$/, startPath: '/auto-aging' },

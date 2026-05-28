@@ -161,8 +161,7 @@ test.describe("accessibility smoke", () => {
     await setupAuthMocks(page);
 
     for (const path of [
-      "/",
-      "/modules",
+      "/home",
       "/notifications",
       "/auto-aging/vehicles",
       "/sales/customers",

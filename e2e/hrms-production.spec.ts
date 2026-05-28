@@ -24,8 +24,8 @@ test.describe('HRMS production deployment handoff', () => {
     });
   });
 
-  test('module directory launches the dedicated HRMS production origin', async ({ page }) => {
-    await page.goto('/modules', { waitUntil: 'domcontentloaded' });
+  test('home page launches the dedicated HRMS production origin', async ({ page }) => {
+    await page.goto('/home', { waitUntil: 'domcontentloaded' });
 
     await expect(page.getByRole('button', { name: /hrms/i })).toBeVisible({ timeout: 8000 });
     await Promise.all([

@@ -15,7 +15,6 @@ import {
   FileText,
   Gauge,
   GitBranch,
-  Grid3X3,
   HeadphonesIcon,
   History,
   Inbox as InboxIcon,
@@ -81,9 +80,7 @@ const sectionDefs: MainSectionDef[] = [
 ];
 
 const navItems: MainNavItem[] = [
-  { label: 'My Dashboard', path: '/', icon: LayoutDashboard, section: 'Platform', end: true },
-  { label: 'Module Directory', path: '/modules', icon: Grid3X3, section: 'Platform' },
-  { label: 'Home', path: '/home', icon: LayoutDashboard, section: 'Platform' },
+  { label: 'Home', path: '/home', icon: LayoutDashboard, section: 'Platform', end: true },
   { label: 'Inbox', path: '/inbox', icon: InboxIcon, section: 'Platform' },
   { label: 'Notifications', path: '/notifications', icon: Bell, section: 'Platform' },
   { label: 'Internal Requests', path: '/portal/tickets/new', icon: HeadphonesIcon, section: 'Platform' },
@@ -159,9 +156,7 @@ const PATH_TO_SECTION: Record<string, string> = {
 };
 
 const MAIN_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
-  { pattern: /^\/$/, title: 'Executive Dashboard', kicker: 'Company-wide KPI cockpit' },
-  { pattern: /^\/modules/, title: 'Module Directory', kicker: 'Active workspaces' },
-  { pattern: /^\/home/, title: 'Home', kicker: 'Role-aware workspace' },
+  { pattern: /^\/(home)?$/, title: 'Home', kicker: 'Role-aware workspace' },
   { pattern: /^\/inbox/, title: 'Inbox', kicker: 'Approvals · Reconciliation · Requests · Alerts' },
   { pattern: /^\/admin\/kpi-studio/, title: 'KPI Studio', kicker: 'Curate KPIs per role' },
   { pattern: /^\/notifications/, title: 'Notifications', kicker: 'Operational alerts' },
@@ -308,7 +303,7 @@ export function useMainAppShellConfig() {
     commandItems,
     onCommandSearch,
     topbarActions: [{ label: 'Open notifications', icon: Bell, to: '/notifications', badge: unreadCount || undefined }],
-    focusedBackLink: isFocused && focusedSection ? { label: 'All modules', to: '/modules', icon: ArrowLeft } : null,
+    focusedBackLink: isFocused && focusedSection ? { label: 'Home', to: '/home', icon: ArrowLeft } : null,
     widthMode: 'full' as const,
   };
 }

@@ -53,7 +53,7 @@ export function RequireActiveModule({ moduleId, children }: RequireActiveModuleP
 
         <div className="flex flex-wrap gap-3">
           <Button asChild>
-            <Link to="/modules">Open Module Directory</Link>
+            <Link to="/home">Back to Home</Link>
           </Button>
           {canManageModules && (
             <Button asChild variant="outline">

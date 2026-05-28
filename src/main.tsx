@@ -64,8 +64,6 @@ const SignUpPage = lazy(() => import("./pages/SignUpPage"));
 const AuthVerifyPage = lazy(() => import("./pages/AuthVerifyPage"));
 const AccountPending = lazy(() => import("./pages/AccountPending"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
-const ModuleDirectory = lazy(() => import("./pages/ModuleDirectory"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Inbox = lazy(() => import("./pages/Inbox"));
 const Home = lazy(() => import("./pages/Home"));
@@ -208,9 +206,10 @@ const router = createBrowserRouter([
       </div>
     ),
     children: [
-      { index: true, element: <R scope="Executive Dashboard"><S><ExecutiveDashboard /></S></R> },
+      { index: true, element: <Navigate to="/home" replace /> },
       { path: "profile", element: <Navigate to="/admin/settings" replace /> },
-      { path: "modules", element: <S><ModuleDirectory /></S> },
+      // Legacy /modules URL — collapsed into /home (Phase 4 unification, 2026-05-28)
+      { path: "modules", element: <Navigate to="/home" replace /> },
       { path: "notifications", element: <S><Notifications /></S> },
       { path: "inbox", element: <R scope="Inbox"><S><Inbox /></S></R> },
       { path: "home", element: <R scope="Home"><S><Home /></S></R> },
