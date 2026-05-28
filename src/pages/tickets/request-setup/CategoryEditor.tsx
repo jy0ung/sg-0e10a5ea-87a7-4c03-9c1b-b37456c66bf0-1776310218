@@ -453,7 +453,9 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
                     onChange={(event) => updateCategoryDraft(editCategory, { response_sla_hours: parseSlaHours(event.target.value) })}
                     disabled={busyCategoryId === editCategory.id}
                   />
-                  <p className="text-xs text-muted-foreground">Leave blank when this category has no response target.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Hours from submission until an assignee must respond. Allowed range 1–720 (up to 30 days). Leave blank when this category has no response target.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor={`edit-cat-resolution-sla-${editCategory.id}`}>Resolution SLA (hours)</Label>
@@ -466,7 +468,9 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
                     onChange={(event) => updateCategoryDraft(editCategory, { resolution_sla_hours: parseSlaHours(event.target.value) })}
                     disabled={busyCategoryId === editCategory.id}
                   />
-                  <p className="text-xs text-muted-foreground">New requests copy this target when they are submitted.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Hours from submission until the request must be resolved. Allowed range 1–2160 (up to 90 days). New requests copy this target when they are submitted.
+                  </p>
                 </div>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">

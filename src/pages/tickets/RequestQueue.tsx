@@ -23,6 +23,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { PanelErrorBoundary } from '@/components/shared/PanelErrorBoundary';
 import { RequestDetailPanel } from '@/components/tickets/RequestDetailPanel';
 import {
   RequestQueueFilters,
@@ -939,7 +940,9 @@ export default function RequestQueue() {
           />
 
           <section className="hidden min-h-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:block">
-            {renderDetailPanel(selectedTicket)}
+            <PanelErrorBoundary scope="request-queue:detail" resetKey={selectedTicket.id}>
+              {renderDetailPanel(selectedTicket)}
+            </PanelErrorBoundary>
           </section>
         </div>
       ) : null}
@@ -981,7 +984,9 @@ export default function RequestQueue() {
         <DrawerContent className="max-h-[92vh]">
           {selectedTicket && (
             <div className="overflow-y-auto px-4 pb-6 pt-3">
-              {renderDetailPanel(selectedTicket, 'drawer')}
+              <PanelErrorBoundary scope="request-queue:detail-drawer" resetKey={selectedTicket.id}>
+                {renderDetailPanel(selectedTicket, 'drawer')}
+              </PanelErrorBoundary>
             </div>
           )}
         </DrawerContent>

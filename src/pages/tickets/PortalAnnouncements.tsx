@@ -79,6 +79,19 @@ function isExpired(record: PortalAnnouncementRecord): boolean {
   return !!record.expires_at && new Date(record.expires_at) <= new Date();
 }
 
+// `datetime-local` inputs render TZ-less wall time. The form stores UTC ISO
+// strings (`new Date(...).toISOString()`), so slicing the first 16 chars off
+// the ISO would surface UTC as if it were local — a user in UTC+8 saving
+// "11:00" then reopening would see "03:00". Round-trip through Date so the
+// input always shows the same wall-clock moment the user picked.
+function toLocalDateTimeInput(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 // ── Empty form defaults ───────────────────────────────────────────────────────
 
 type FormState = CreatePortalAnnouncementInput;
@@ -463,7 +476,7 @@ export default function PortalAnnouncements() {
                 <Input
                   id="ann-publish"
                   type="datetime-local"
-                  value={form.publish_at ? form.publish_at.slice(0, 16) : ''}
+                  value={toLocalDateTimeInput(form.publish_at)}
                   onChange={e => setFormField('publish_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
                 />
               </div>
@@ -472,7 +485,7 @@ export default function PortalAnnouncements() {
                 <Input
                   id="ann-expires"
                   type="datetime-local"
-                  value={form.expires_at ? form.expires_at.slice(0, 16) : ''}
+                  value={toLocalDateTimeInput(form.expires_at)}
                   onChange={e => setFormField('expires_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
                 />
               </div>
