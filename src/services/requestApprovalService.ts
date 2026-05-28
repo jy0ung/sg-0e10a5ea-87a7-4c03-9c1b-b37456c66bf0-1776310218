@@ -45,36 +45,6 @@ interface ApprovalInstanceRow {
 
 type RequestApprovalDecision = 'approved' | 'rejected';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function profilesTable(): any {
-  return supabase.from('profiles' as never);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function approvalStepsTable(): any {
-  return supabase.from('approval_steps' as never);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function approvalInstancesTable(): any {
-  return supabase.from('approval_instances' as never);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function approvalDecisionsTable(): any {
-  return supabase.from('approval_decisions' as never);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ticketsTable(): any {
-  return supabase.from('tickets' as never);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ticketActivityTable(): any {
-  return supabase.from('ticket_activity' as never);
-}
-
 function mapApproval(row: ApprovalInstanceRow): InternalRequestApprovalMetadata {
   return {
     id: row.id,
@@ -115,14 +85,15 @@ async function getCategoryPinnedFlowId(
   categoryKey: string | null | undefined,
 ): Promise<string | null> {
   if (!categoryKey) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabase.from('request_categories' as never) as any)
+  // approval_flow_id was added in migration 20260518030000 — the generated
+  // database types are older and miss the column, so narrow the row shape
+  // at the call site rather than the table accessor.
+  const { data } = await supabase.from('request_categories')
     .select('approval_flow_id')
     .eq('company_id', companyId)
     .eq('category_key', categoryKey)
-    .maybeSingle();
-  const pinned = (data as Record<string, unknown> | null)?.approval_flow_id;
-  return pinned ? String(pinned) : null;
+    .maybeSingle<{ approval_flow_id: string | null }>();
+  return data?.approval_flow_id ?? null;
 }
 
 /**
@@ -136,15 +107,15 @@ async function getSubcategoryPinnedFlowId(
   subcategoryKey: string | null | undefined,
 ): Promise<string | null> {
   if (!categoryKey || !subcategoryKey) return null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabase.from('request_subcategories' as never) as any)
+  // approval_flow_id was added in migration 20260527020000 — see the
+  // category-pin helper above for the same generated-types caveat.
+  const { data } = await supabase.from('request_subcategories')
     .select('approval_flow_id')
     .eq('company_id', companyId)
     .eq('category_key', categoryKey)
     .eq('subcategory_key', subcategoryKey)
-    .maybeSingle();
-  const pinned = (data as Record<string, unknown> | null)?.approval_flow_id;
-  return pinned ? String(pinned) : null;
+    .maybeSingle<{ approval_flow_id: string | null }>();
+  return data?.approval_flow_id ?? null;
 }
 
 export async function getInternalRequestApprovalPlan(
@@ -153,13 +124,11 @@ export async function getInternalRequestApprovalPlan(
   options: InternalRequestApprovalPlanOptions = {},
 ): Promise<{ data: InternalRequestApprovalPlan | null; error: string | null }> {
   // Look up requester's department for department-scoped flow resolution
-  const { data: requesterProfile } = await profilesTable()
+  const { data: requesterProfile } = await supabase.from('profiles')
     .select('department_id')
     .eq('id', requesterId)
     .maybeSingle();
-  const departmentId = (requesterProfile as Record<string, unknown>)?.department_id
-    ? String((requesterProfile as Record<string, unknown>).department_id)
-    : null;
+  const departmentId = requesterProfile?.department_id ?? null;
 
   // Resolution order (most specific wins):
   //   1. subcategory pin — migration 20260527020000_request_subcategories_approval_flow_fk
@@ -179,7 +148,7 @@ export async function getInternalRequestApprovalPlan(
     ?? await resolveApprovalFlowId(companyId, 'internal_request', departmentId);
   if (!flowId) return { data: null, error: null };
 
-  const { data: steps, error: stepsError } = await approvalStepsTable()
+  const { data: steps, error: stepsError } = await supabase.from('approval_steps')
     .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
     .eq('flow_id', flowId)
     .order('step_order');
@@ -213,7 +182,7 @@ export async function createInternalRequestApprovalInstance(
   requesterId: string,
   plan: InternalRequestApprovalPlan,
 ): Promise<{ error: string | null }> {
-  const { error } = await approvalInstancesTable().insert({
+  const { error } = await supabase.from('approval_instances').insert({
     company_id: companyId,
     flow_id: plan.flowId,
     entity_type: 'internal_request',
@@ -237,7 +206,7 @@ export async function listInternalRequestApprovalMetadata(
   const empty = new Map<string, InternalRequestApprovalMetadata>();
   if (ticketIds.length === 0) return { data: empty, error: null };
 
-  const { data, error } = await approvalInstancesTable()
+  const { data, error } = await supabase.from('approval_instances')
     .select('id, entity_id, status, current_step_id, current_step_order, current_step_name, current_approver_role, current_approver_user_id')
     .eq('entity_type', 'internal_request')
     .in('entity_id', ticketIds);
@@ -254,7 +223,7 @@ export async function listInternalRequestApprovalMetadata(
 
   if (!includeHistory || instanceIds.length === 0) return { data: approvalsByTicket, error: null };
 
-  const { data: decisions, error: decisionsError } = await approvalDecisionsTable()
+  const { data: decisions, error: decisionsError } = await supabase.from('approval_decisions')
     .select('id, instance_id, step_id, step_order, approver_id, decision, note, decided_at, created_at, approver:profiles!approval_decisions_approver_id_fkey(name), step:approval_steps!approval_decisions_step_id_fkey(name)')
     .in('instance_id', instanceIds)
     .order('decided_at');
@@ -287,7 +256,7 @@ export async function reviewInternalRequestApproval(
   note: string | undefined,
   context: { userId: string; companyId: string },
 ): Promise<{ error: string | null }> {
-  const { data: ticket, error: ticketError } = await ticketsTable()
+  const { data: ticket, error: ticketError } = await supabase.from('tickets')
     .select('id, company_id, submitted_by, subject, status')
     .eq('company_id', context.companyId)
     .eq('id', ticketId)
@@ -295,7 +264,7 @@ export async function reviewInternalRequestApproval(
   if (ticketError) return { error: ticketError.message };
   if (!ticket) return { error: 'Request not found.' };
 
-  const { data: approvalRow, error: approvalError } = await approvalInstancesTable()
+  const { data: approvalRow, error: approvalError } = await supabase.from('approval_instances')
     .select('id, flow_id, requester_id, status, current_step_id, current_step_order, current_step_name, current_approver_role, current_approver_user_id')
     .eq('company_id', context.companyId)
     .eq('entity_type', 'internal_request')
@@ -307,7 +276,7 @@ export async function reviewInternalRequestApproval(
   const approval = approvalRow as Record<string, unknown>;
   if (approval.status !== 'pending') return { error: `This request approval is already ${approval.status}.` };
 
-  const { data: stepRows, error: stepsError } = await approvalStepsTable()
+  const { data: stepRows, error: stepsError } = await supabase.from('approval_steps')
     .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
     .eq('flow_id', String(approval.flow_id))
     .order('step_order');
@@ -343,20 +312,26 @@ export async function reviewInternalRequestApproval(
 
   const decidedAt = new Date().toISOString();
   const normalizedNote = note?.trim() ? note.trim() : null;
-  const { error: decisionError } = await approvalDecisionsTable().insert({
-    instance_id: String(approval.id),
-    step_id: currentStep.id,
-    step_order: currentStep.stepOrder,
-    approver_id: context.userId,
-    decision,
-    note: normalizedNote,
-    decided_at: decidedAt,
-  });
+  // The generated types still mark approval_request_id as required on this
+  // insert, but a later migration made it nullable for entity-driven decisions.
+  // Until types are regenerated, narrow the insert payload here.
+  const { error: decisionError } = await supabase
+    .from('approval_decisions')
+    .insert({
+      instance_id: String(approval.id),
+      step_id: currentStep.id,
+      step_order: currentStep.stepOrder,
+      approver_id: context.userId,
+      decision,
+      note: normalizedNote,
+      decided_at: decidedAt,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
   if (decisionError) return { error: decisionError.message };
 
   if (decision === 'rejected') {
     const [{ error: workflowError }, { error: requestError }, { error: activityError }] = await Promise.all([
-      approvalInstancesTable()
+      supabase.from('approval_instances')
         .update({
           status: 'rejected',
           current_step_id: null,
@@ -367,7 +342,7 @@ export async function reviewInternalRequestApproval(
           updated_at: decidedAt,
         })
         .eq('id', String(approval.id)),
-      ticketsTable()
+      supabase.from('tickets')
         .update({
           status: 'cancelled',
           resolved_at: decidedAt,
@@ -375,7 +350,7 @@ export async function reviewInternalRequestApproval(
         })
         .eq('company_id', context.companyId)
         .eq('id', ticketId),
-      ticketActivityTable().insert({
+      supabase.from('ticket_activity').insert({
         ticket_id: ticketId,
         company_id: context.companyId,
         actor_id: context.userId,
@@ -388,7 +363,7 @@ export async function reviewInternalRequestApproval(
     if (requestError) return { error: requestError.message };
     if (activityError) return { error: activityError.message };
   } else if (nextStep) {
-    const { error: workflowError } = await approvalInstancesTable()
+    const { error: workflowError } = await supabase.from('approval_instances')
       .update({
         current_step_id: nextStep.id,
         current_step_order: nextStep.stepOrder,
@@ -401,7 +376,7 @@ export async function reviewInternalRequestApproval(
     if (workflowError) return { error: workflowError.message };
   } else {
     const [{ error: workflowError }, { error: activityError }] = await Promise.all([
-      approvalInstancesTable()
+      supabase.from('approval_instances')
         .update({
           status: 'approved',
           current_step_id: null,
@@ -412,7 +387,7 @@ export async function reviewInternalRequestApproval(
           updated_at: decidedAt,
         })
         .eq('id', String(approval.id)),
-      ticketActivityTable().insert({
+      supabase.from('ticket_activity').insert({
         ticket_id: ticketId,
         company_id: context.companyId,
         actor_id: context.userId,
@@ -455,7 +430,7 @@ export async function cancelInternalRequestApprovalInstance(
   ticketId: string,
   companyId: string,
 ): Promise<{ error: string | null }> {
-  const { error } = await approvalInstancesTable()
+  const { error } = await supabase.from('approval_instances')
     .update({
       status: 'cancelled',
       current_step_id: null,

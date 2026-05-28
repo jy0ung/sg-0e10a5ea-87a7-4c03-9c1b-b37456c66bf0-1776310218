@@ -81,17 +81,11 @@ function normalizeDescription(description?: string) {
   return description?.trim() ?? '';
 }
 
-// Keep the generated-type escape hatch isolated to this service.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function requestSubcategoriesTable(): any {
-  return supabase.from('request_subcategories' as never);
-}
-
 async function fetchRequestSubcategories(
   companyId: string,
   options: ListRequestSubcategoriesOptions = {},
 ) {
-  let query = requestSubcategoriesTable()
+  let query = supabase.from('request_subcategories')
     .select('id, company_id, category_key, subcategory_key, label, description, is_active, sort_order, approval_flow_id, created_at, updated_at, updated_by')
     .eq('company_id', companyId)
     .order('category_key', { ascending: true })
@@ -109,8 +103,12 @@ async function fetchRequestSubcategories(
   const { data, error } = await query;
   if (error) return { data: [] as RequestSubcategoryRecord[], error: error.message };
 
+  // approval_flow_id was added by migration 20260527020000 — the generated
+  // database types are older and treat any SELECT including it as a
+  // SelectQueryError. Double-cast via unknown is the narrowest workaround
+  // until the types are regenerated.
   return {
-    data: ((data ?? []) as RequestSubcategoryRow[]).map(mapRequestSubcategory),
+    data: ((data ?? []) as unknown as RequestSubcategoryRow[]).map(mapRequestSubcategory),
     error: null,
   };
 }
@@ -144,7 +142,7 @@ export async function createRequestSubcategory(
   }
 
   const nextSortOrder = (existingSubcategories.at(-1)?.sort_order ?? 0) + 10;
-  const { data, error } = await requestSubcategoriesTable()
+  const { data, error } = await supabase.from('request_subcategories')
     .insert({
       company_id: context.companyId,
       category_key: categoryKey,
@@ -160,13 +158,16 @@ export async function createRequestSubcategory(
 
   if (error) return { data: null, error: error.message };
 
-  void logUserAction(context.actorId, 'create', 'request_subcategory', data.id, {
+  // Same generated-types caveat as fetchRequestSubcategories — narrow via unknown.
+  const row = data as unknown as RequestSubcategoryRow;
+
+  void logUserAction(context.actorId, 'create', 'request_subcategory', row.id, {
     component: 'RequestSubcategoryService',
     category_key: categoryKey,
     subcategory_key: normalizedKey,
   });
 
-  return { data: mapRequestSubcategory(data as RequestSubcategoryRow), error: null };
+  return { data: mapRequestSubcategory(row), error: null };
 }
 
 export async function updateRequestSubcategory(
@@ -221,8 +222,11 @@ export async function updateRequestSubcategory(
     patch.approval_flow_id = input.approval_flow_id?.trim() ? input.approval_flow_id : null;
   }
 
-  const { data, error } = await requestSubcategoriesTable()
-    .update(patch)
+  // patch may include approval_flow_id, which the stale generated types do
+  // not yet know about — see comment in fetchRequestSubcategories. Narrow the
+  // patch via unknown so the .update overload accepts it.
+  const { data, error } = await supabase.from('request_subcategories')
+    .update(patch as unknown as Record<string, never>)
     .eq('id', subcategoryId)
     .eq('company_id', context.companyId)
     .select('id, company_id, category_key, subcategory_key, label, description, is_active, sort_order, approval_flow_id, created_at, updated_at, updated_by')
@@ -235,7 +239,7 @@ export async function updateRequestSubcategory(
     fieldCount: Object.keys(patch).length,
   });
 
-  return { data: mapRequestSubcategory(data as RequestSubcategoryRow), error: null };
+  return { data: mapRequestSubcategory(data as unknown as RequestSubcategoryRow), error: null };
 }
 
 export async function moveRequestSubcategory(
@@ -263,13 +267,13 @@ export async function moveRequestSubcategory(
   const target = siblings[targetIndex];
   const timestamp = new Date().toISOString();
 
-  const { error: currentError } = await requestSubcategoriesTable()
+  const { error: currentError } = await supabase.from('request_subcategories')
     .update({ sort_order: target.sort_order, updated_by: context.actorId, updated_at: timestamp })
     .eq('id', current.id)
     .eq('company_id', context.companyId);
   if (currentError) return { error: currentError.message };
 
-  const { error: targetError } = await requestSubcategoriesTable()
+  const { error: targetError } = await supabase.from('request_subcategories')
     .update({ sort_order: current.sort_order, updated_by: context.actorId, updated_at: timestamp })
     .eq('id', target.id)
     .eq('company_id', context.companyId);

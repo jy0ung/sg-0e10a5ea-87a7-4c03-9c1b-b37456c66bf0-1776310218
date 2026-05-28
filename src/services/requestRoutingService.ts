@@ -1,6 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { canManagePortalQueue } from '@/lib/portalAccess';
 import { logUserAction } from './auditService';
+
+type RoutingRuleUpdate = Database['public']['Tables']['request_routing_rules']['Update'];
 
 export interface RequestRoutingRule {
   id: string;
@@ -56,12 +59,6 @@ export interface UpdateRoutingRuleInput {
 export interface RoutingRuleContext {
   actorId: string;
   companyId: string;
-}
-
-// The request_routing_rules table is not yet in the generated Database types.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function routingRulesTable(): any {
-  return supabase.from('request_routing_rules' as never);
 }
 
 function mapRule(row: RoutingRuleRow): RequestRoutingRule {
@@ -124,7 +121,7 @@ async function fetchValidAssigneeIds(companyId: string): Promise<Set<string>> {
 export async function listRoutingRules(
   companyId: string,
 ): Promise<{ data: RequestRoutingRule[]; error: string | null }> {
-  const { data, error } = await routingRulesTable()
+  const { data, error } = await supabase.from('request_routing_rules')
     .select('*')
     .eq('company_id', companyId)
     .order('sort_order', { ascending: true });
@@ -145,7 +142,7 @@ export async function createRoutingRule(
     };
   }
 
-  const { data: tail } = await routingRulesTable()
+  const { data: tail } = await supabase.from('request_routing_rules')
     .select('sort_order')
     .eq('company_id', context.companyId)
     .order('sort_order', { ascending: false })
@@ -153,7 +150,7 @@ export async function createRoutingRule(
     .maybeSingle();
   const nextOrder = ((tail as { sort_order: number } | null)?.sort_order ?? -1) + 1;
 
-  const { data, error } = await routingRulesTable()
+  const { data, error } = await supabase.from('request_routing_rules')
     .insert({
       company_id: context.companyId,
       name: input.name.trim(),
@@ -201,7 +198,7 @@ export async function updateRoutingRule(
     };
   }
 
-  const patch: Record<string, unknown> = {};
+  const patch: RoutingRuleUpdate = {};
   if (input.name !== undefined) patch.name = input.name.trim();
   if (input.is_active !== undefined) patch.is_active = input.is_active;
   if (input.match_category !== undefined) patch.match_category = input.match_category;
@@ -210,7 +207,7 @@ export async function updateRoutingRule(
   if (input.match_priority !== undefined) patch.match_priority = input.match_priority;
   if (input.assign_to_user_id !== undefined) patch.assign_to_user_id = input.assign_to_user_id;
 
-  const { data, error } = await routingRulesTable()
+  const { data, error } = await supabase.from('request_routing_rules')
     .update(patch)
     .eq('id', ruleId)
     .eq('company_id', context.companyId)
@@ -234,7 +231,7 @@ export async function deleteRoutingRule(
   ruleId: string,
   context: RoutingRuleContext,
 ): Promise<{ error: string | null }> {
-  const { error } = await routingRulesTable()
+  const { error } = await supabase.from('request_routing_rules')
     .delete()
     .eq('id', ruleId)
     .eq('company_id', context.companyId);
@@ -265,13 +262,13 @@ export async function moveRoutingRule(
   const target = rules[targetIndex];
   const timestamp = new Date().toISOString();
 
-  const { error: e1 } = await routingRulesTable()
+  const { error: e1 } = await supabase.from('request_routing_rules')
     .update({ sort_order: target.sort_order, updated_at: timestamp })
     .eq('id', current.id)
     .eq('company_id', context.companyId);
   if (e1) return { error: (e1 as { message: string }).message };
 
-  const { error: e2 } = await routingRulesTable()
+  const { error: e2 } = await supabase.from('request_routing_rules')
     .update({ sort_order: current.sort_order, updated_at: timestamp })
     .eq('id', target.id)
     .eq('company_id', context.companyId);

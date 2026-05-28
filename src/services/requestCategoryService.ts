@@ -131,7 +131,7 @@ async function fetchRequestCategories(companyId: string, includeInactive = false
   }
   if (error) return { data: [] as RequestCategoryRecord[], error: error.message };
   return {
-    data: ((data ?? []) as RequestCategoryRow[]).map(mapRequestCategory),
+    data: ((data ?? []) as unknown as RequestCategoryRow[]).map(mapRequestCategory),
     error: null,
   };
 }
@@ -179,12 +179,13 @@ export async function createRequestCategory(
 
   if (error) return { data: null, error: error.message };
 
-  void logUserAction(context.actorId, 'create', 'request_category', data.id, {
+  const row = data as unknown as RequestCategoryRow;
+  void logUserAction(context.actorId, 'create', 'request_category', row.id, {
     component: 'RequestCategoryService',
     category_key: normalizedKey,
   });
 
-  return { data: mapRequestCategory(data as RequestCategoryRow), error: null };
+  return { data: mapRequestCategory(row), error: null };
 }
 
 export async function updateRequestCategory(
@@ -242,7 +243,7 @@ export async function updateRequestCategory(
     fieldCount: Object.keys(patch).length,
   });
 
-  return { data: mapRequestCategory(data as RequestCategoryRow), error: null };
+  return { data: mapRequestCategory(data as unknown as RequestCategoryRow), error: null };
 }
 
 export interface DeleteRequestCategoryResult {
