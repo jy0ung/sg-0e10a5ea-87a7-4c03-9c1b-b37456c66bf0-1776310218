@@ -30,6 +30,7 @@ import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
+import { usePersistedDraftMap } from '@/hooks/usePersistedDraftMap';
 import {
   listCompanyTicketsPage,
   listTicketActivity,
@@ -152,25 +153,20 @@ export default function RequestHistory() {
   const activitiesByTicket = useMemo(() => historyData?.activitiesByTicket ?? {}, [historyData]);
   const attachmentsByTicket = useMemo(() => historyData?.attachmentsByTicket ?? {}, [historyData]);
 
-  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
-  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    setNoteDrafts((prev) => {
-      const next = { ...prev };
-      for (const t of tickets) {
-        if (!(t.id in next)) next[t.id] = t.resolution_note ?? '';
-      }
-      return next;
-    });
-    setCommentDrafts((prev) => {
-      const next = { ...prev };
-      for (const t of tickets) {
-        if (!(t.id in next)) next[t.id] = '';
-      }
-      return next;
-    });
-  }, [tickets]);
+  // Drafts overlay the server state — present in the map only when the user
+  // has actually typed something. The textarea read pattern below falls back
+  // to the ticket's resolution_note when no draft exists, so we no longer
+  // need a seed effect that pre-populated every ticket id.
+  const [noteDrafts, setNoteDrafts, clearNoteDraft] = usePersistedDraftMap(
+    'history:note',
+    user?.company_id,
+    user?.id,
+  );
+  const [commentDrafts, setCommentDrafts, clearCommentDraft] = usePersistedDraftMap(
+    'history:comment',
+    user?.company_id,
+    user?.id,
+  );
 
   const loadTickets = () => void queryClient.invalidateQueries({ queryKey: historyKey });
 
@@ -221,7 +217,7 @@ export default function RequestHistory() {
     if (result.error) {
       toast.error('Failed to add comment', { description: result.error.message });
     } else {
-      setCommentDrafts((prev) => ({ ...prev, [ticketId]: '' }));
+      clearCommentDraft(ticketId);
       // Activity is owned by the historyKey query — invalidate to refetch the
       // ticket's updated activity timeline alongside everything else.
       await queryClient.invalidateQueries({ queryKey: historyKey });
@@ -241,7 +237,11 @@ export default function RequestHistory() {
       statusOptions={statusOptions}
       priorityOptions={priorityOptions}
       saving={savingTicketId === ticket.id}
-      noteDraft={noteDrafts[ticket.id] ?? ''}
+      // Drafts overlay the server state: an entry in noteDrafts means the
+      // user has typed something; otherwise we show the ticket's current
+      // resolution_note. After a successful save the draft is cleared and
+      // the textarea naturally falls back to the new server value.
+      noteDraft={noteDrafts[ticket.id] ?? ticket.resolution_note ?? ''}
       commentDraft={commentDrafts[ticket.id] ?? ''}
       canReviewApproval={false}
       variant={variant}
@@ -251,9 +251,11 @@ export default function RequestHistory() {
         void handleUpdateTicket(ticketId, { assigned_to: value === 'unassigned' ? null : value })
       }
       onResolutionNoteChange={(ticketId, value) => setNoteDrafts((prev) => ({ ...prev, [ticketId]: value }))}
-      onResolutionNoteSave={(ticketId) =>
-        void handleUpdateTicket(ticketId, { resolution_note: noteDrafts[ticketId] ?? '' })
-      }
+      onResolutionNoteSave={async (ticketId) => {
+        const nextNote = noteDrafts[ticketId] ?? ticket.resolution_note ?? '';
+        await handleUpdateTicket(ticketId, { resolution_note: nextNote });
+        clearNoteDraft(ticketId);
+      }}
       onCommentChange={(ticketId, value) => setCommentDrafts((prev) => ({ ...prev, [ticketId]: value }))}
       onAddComment={(ticketId) => void handleAddComment(ticketId)}
       onReviewApproval={() => undefined}

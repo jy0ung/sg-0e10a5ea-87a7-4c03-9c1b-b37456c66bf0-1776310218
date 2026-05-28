@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { Link } from 'react-router-dom';
@@ -49,6 +49,7 @@ import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
+import { usePersistedDraftMap } from '@/hooks/usePersistedDraftMap';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 
 import {
@@ -77,7 +78,11 @@ export default function MyTickets() {
   useRequestSubcategories(user?.company_id, { includeInactive: true });
   const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
   const [error, setError] = useState<string | null>(null);
-  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [commentDrafts, setCommentDrafts, clearCommentDraft] = usePersistedDraftMap(
+    'my-tickets:comment',
+    user?.company_id,
+    user?.id,
+  );
   const [savingCommentId, setSavingCommentId] = useState<string | null>(null);
   const [cancellingTicketId, setCancellingTicketId] = useState<string | null>(null);
   const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
@@ -116,16 +121,9 @@ export default function MyTickets() {
   const activitiesByTicket = useMemo(() => ticketsData?.activitiesByTicket ?? {}, [ticketsData]);
   const attachmentsByTicket = useMemo(() => ticketsData?.attachmentsByTicket ?? {}, [ticketsData]);
 
-  // Initialise comment drafts when new tickets arrive; preserve in-progress drafts.
-  useEffect(() => {
-    setCommentDrafts((prev) => {
-      const next = { ...prev };
-      for (const t of tickets) {
-        if (!(t.id in next)) next[t.id] = '';
-      }
-      return next;
-    });
-  }, [tickets]);
+  // Seed effect removed: usePersistedDraftMap returns the same shape and
+  // every consumer already falls back to '' via `commentDrafts[id] ?? ''`,
+  // so we no longer need to pre-populate empty entries for every ticket.
 
   const refreshTickets = useCallback(
     () => { void queryClient.invalidateQueries({ queryKey: myTicketsKey }); },
@@ -166,7 +164,7 @@ export default function MyTickets() {
       return;
     }
 
-    setCommentDrafts((current) => ({ ...current, [ticketId]: '' }));
+    clearCommentDraft(ticketId);
     // The activity timeline is fetched as part of the myTicketsKey query —
     // invalidate so the new comment shows up without manual state plumbing.
     await queryClient.invalidateQueries({ queryKey: myTicketsKey });

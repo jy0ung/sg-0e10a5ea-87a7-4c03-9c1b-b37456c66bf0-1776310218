@@ -45,6 +45,7 @@ import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
+import { usePersistedDraftMap } from '@/hooks/usePersistedDraftMap';
 import {
   Drawer,
   DrawerContent,
@@ -150,8 +151,20 @@ export default function RequestQueue() {
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
   const [reviewTarget, setReviewTarget] = useState<ApprovalReviewTarget>(null);
   const [reviewNote, setReviewNote] = useState('');
-  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
-  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  // Drafts overlay the server state — see usePersistedDraftMap. Cycle 3.5's
+  // realtime invalidations made it routine for the ticket page to refetch
+  // while a queue manager was mid-comment; without persistence those drafts
+  // were silently destroyed every time a colleague mutated any ticket.
+  const [noteDrafts, setNoteDrafts, clearNoteDraft] = usePersistedDraftMap(
+    'queue:note',
+    user?.company_id,
+    user?.id,
+  );
+  const [commentDrafts, setCommentDrafts, clearCommentDraft] = usePersistedDraftMap(
+    'queue:comment',
+    user?.company_id,
+    user?.id,
+  );
   const [queueError, setQueueError] = useState<string | null>(null);
 
   const customFieldLabelMap = useMemo(
@@ -303,20 +316,12 @@ export default function RequestQueue() {
   }, [priorityFilter, searchTerm, statusFilter, slaFilter, assignedToFilter]);
 
   // ─── Side effects keyed on incoming ticket data ────────────────────────────
+  // Fetch the matching activity and attachment slices alongside the paged
+  // tickets. Drafts are NOT re-seeded here — they're owned by the persisted
+  // draft hook, which preserves in-progress text across realtime refetches.
   useEffect(() => {
     if (!ticketPage || !user) return;
     const nextTickets = ticketPage.rows;
-
-    setNoteDrafts((prev) => {
-      const next: Record<string, string> = {};
-      for (const ticket of nextTickets) {
-        next[ticket.id] = prev[ticket.id] !== undefined
-          ? prev[ticket.id]
-          : (ticket.resolution_note ?? '');
-      }
-      return next;
-    });
-    setCommentDrafts(Object.fromEntries(nextTickets.map((ticket) => [ticket.id, ''])));
 
     const ticketIds = nextTickets.map((ticket) => ticket.id);
     if (ticketIds.length === 0) {
@@ -331,8 +336,6 @@ export default function RequestQueue() {
       setActivitiesByTicket(activityData ?? {});
       setAttachmentsByTicket(attachmentData ?? {});
     });
-  // Deliberately omit noteDrafts / commentDrafts from deps — we only want to
-  // sync when server data arrives, not on every local edit.
   }, [ticketPage, user]);
 
   useEffect(() => {
@@ -510,13 +513,18 @@ export default function RequestQueue() {
 
   const handleResolutionNoteSave = async (ticketId: string) => {
     if (!user) return;
+    // Resolve the saveable note: prefer the user's in-progress draft;
+    // if no draft, fall back to whatever resolution_note is already on
+    // the ticket (this matches what the textarea is currently showing).
+    const ticket = tickets.find((t) => t.id === ticketId);
+    const nextNote = noteDrafts[ticketId] ?? ticket?.resolution_note ?? '';
 
     setSavingTicketId(ticketId);
     setQueueError(null);
 
     const { data, error: updateError } = await updateTicket(
       ticketId,
-      { resolution_note: noteDrafts[ticketId] ?? '' },
+      { resolution_note: nextNote },
       { userId: user.id, companyId: user.company_id },
     );
 
@@ -531,7 +539,9 @@ export default function RequestQueue() {
       resolved_at: data.resolved_at,
       updated_at: data.updated_at,
     });
-    setNoteDrafts((current) => ({ ...current, [ticketId]: data.resolution_note ?? '' }));
+    // Drop the draft; the textarea now reads from the optimistically-updated
+    // server state via `noteDrafts[id] ?? ticket.resolution_note`.
+    clearNoteDraft(ticketId);
     setSavingTicketId(null);
     void refreshTicketActivity(ticketId);
   };
@@ -556,7 +566,7 @@ export default function RequestQueue() {
       return;
     }
 
-    setCommentDrafts((current) => ({ ...current, [ticketId]: '' }));
+    clearCommentDraft(ticketId);
     setSavingTicketId(null);
     void refreshTicketActivity(ticketId);
   };
@@ -619,7 +629,8 @@ export default function RequestQueue() {
       statusOptions={statusOptions}
       priorityOptions={priorityOptions}
       saving={savingTicketId === ticket.id}
-      noteDraft={noteDrafts[ticket.id] ?? ''}
+      // Drafts overlay the server state — see usePersistedDraftMap.
+      noteDraft={noteDrafts[ticket.id] ?? ticket.resolution_note ?? ''}
       commentDraft={commentDrafts[ticket.id] ?? ''}
       canReviewApproval={isApprovalAssignedToUser(ticket, user)}
       variant={variant}

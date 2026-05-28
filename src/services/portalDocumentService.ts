@@ -218,16 +218,51 @@ export async function deletePortalDocument(
 
 // ── Get signed download URL ───────────────────────────────────────────────────
 
+/**
+ * In-memory cache for signed download URLs. Previously every download click
+ * round-tripped to storage.createSignedUrl, which is the more expensive of
+ * the two storage operations — multiple clicks on the same file (re-download,
+ * preview, share) blew through the bandwidth budget on portal-heavy tenants.
+ *
+ * Keyed by `${filePath}:${expiresInSeconds}` so distinct callers requesting
+ * different TTLs don't trample each other. Cleared 60s before the server-side
+ * expiry so we never return an about-to-expire URL.
+ */
+interface CachedSignedUrl {
+  url: string;
+  expiresAt: number;
+}
+const signedUrlCache = new Map<string, CachedSignedUrl>();
+const SIGNED_URL_SAFETY_MARGIN_MS = 60 * 1000;
+
+/** Test helper: drop everything so a fresh fetch happens next call. */
+export function clearPortalDocumentSignedUrlCache(): void {
+  signedUrlCache.clear();
+}
+
 export async function getPortalDocumentSignedUrl(
   filePath: string,
   expiresInSeconds = 3600,
 ): Promise<DocumentServiceResult<string>> {
+  const cacheKey = `${filePath}:${expiresInSeconds}`;
+  const cached = signedUrlCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { data: cached.url, error: null };
+  }
+  // Stale entry — drop it before the refetch so a transient failure doesn't
+  // leave a broken URL in the map.
+  if (cached) signedUrlCache.delete(cacheKey);
+
   try {
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKET)
       .createSignedUrl(filePath, expiresInSeconds);
 
     if (error) throw error;
+    signedUrlCache.set(cacheKey, {
+      url: data.signedUrl,
+      expiresAt: Date.now() + expiresInSeconds * 1000 - SIGNED_URL_SAFETY_MARGIN_MS,
+    });
     return { data: data.signedUrl, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to generate download link';
