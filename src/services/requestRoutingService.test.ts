@@ -51,6 +51,30 @@ function buildSelectChain(rows: object[] | null, error: object | null = null) {
   return { select, eq, order };
 }
 
+/** Builds a chain mock: supabase.from('profiles').select().eq().eq() — used by
+ *  fetchValidAssigneeIds. The second .eq() resolves directly. */
+function buildProfilesListChain(rows: object[] | null, error: object | null = null) {
+  const eq2 = vi.fn().mockResolvedValue({ data: rows, error });
+  const eq1 = vi.fn(() => ({ eq: eq2 }));
+  const select = vi.fn(() => ({ eq: eq1 }));
+  return { select };
+}
+
+/** Builds a chain mock: supabase.from('profiles').select().eq().eq().maybeSingle()
+ *  used by isValidAssignee. */
+function buildProfilesSingleChain(row: object | null, error: object | null = null) {
+  const maybeSingle = vi.fn().mockResolvedValue({ data: row, error });
+  const eq2 = vi.fn(() => ({ maybeSingle }));
+  const eq1 = vi.fn(() => ({ eq: eq2 }));
+  const select = vi.fn(() => ({ eq: eq1 }));
+  return { select };
+}
+
+/** Returns a profile row shape the canManagePortalQueue helper accepts. */
+function validProfileRow(id: string) {
+  return { id, role: 'company_admin', status: 'active', portal_access_only: false };
+}
+
 // ── listRoutingRules ─────────────────────────────────────────────────────────
 
 describe('listRoutingRules', () => {
@@ -85,9 +109,27 @@ describe('listRoutingRules', () => {
 describe('evaluateRoutingRules', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  function setupRules(rules: ReturnType<typeof makeRule>[]) {
-    const chain = buildSelectChain(rules);
-    vi.mocked(supabase.from).mockReturnValue({ select: chain.select } as never);
+  /**
+   * Sets up the two supabase.from() calls evaluateRoutingRules now performs:
+   *  1) `request_routing_rules` — the rules list (existing)
+   *  2) `profiles`              — the bulk validity check
+   *
+   * By default every rule's assignee is treated as valid so existing tests
+   * keep their behaviour. Tests covering the stale-assignee skip pass an
+   * explicit `validAssigneeIds` shortlist.
+   */
+  function setupRules(
+    rules: ReturnType<typeof makeRule>[],
+    options: { validAssigneeIds?: string[] } = {},
+  ) {
+    const rulesChain = buildSelectChain(rules);
+    const profileIds = options.validAssigneeIds ?? rules.map((r) => r.assign_to_user_id);
+    const profilesChain = buildProfilesListChain(profileIds.map(validProfileRow));
+    vi.mocked(supabase.from).mockImplementation(((table: string) => {
+      if (table === 'request_routing_rules') return { select: rulesChain.select } as never;
+      if (table === 'profiles') return { select: profilesChain.select } as never;
+      throw new Error(`evaluateRoutingRules test received unexpected table: ${table}`);
+    }) as never);
   }
 
   it('returns null when there are no rules', async () => {
@@ -197,6 +239,34 @@ describe('evaluateRoutingRules', () => {
     expect(result).toBe('agent-first');
   });
 
+  it('skips a matching rule whose assignee is no longer a valid queue owner', async () => {
+    // Two rules both match the ticket. The first rule's pinned user no longer
+    // has queue access (e.g. resigned or role demoted), so evaluation should
+    // fall through to the second rule rather than auto-assigning a ghost owner.
+    setupRules(
+      [
+        makeRule({ id: 'rule-1', sort_order: 0, assign_to_user_id: 'agent-stale' }),
+        makeRule({ id: 'rule-2', sort_order: 1, assign_to_user_id: 'agent-live'  }),
+      ],
+      { validAssigneeIds: ['agent-live'] },
+    );
+    const result = await evaluateRoutingRules('company-1', {
+      category: 'ops', subcategory: null, priority: 'medium', submitterRole: null,
+    });
+    expect(result).toBe('agent-live');
+  });
+
+  it('returns null when every matching rule has a stale assignee', async () => {
+    setupRules(
+      [makeRule({ assign_to_user_id: 'agent-stale' })],
+      { validAssigneeIds: [] },
+    );
+    const result = await evaluateRoutingRules('company-1', {
+      category: 'ops', subcategory: null, priority: 'medium', submitterRole: null,
+    });
+    expect(result).toBeNull();
+  });
+
   it('returns null and does not throw when listRoutingRules fails', async () => {
     // Simulate supabase throwing
     vi.mocked(supabase.from).mockImplementation(() => {
@@ -217,6 +287,9 @@ describe('createRoutingRule', () => {
   it('appends the rule after the highest existing sort_order', async () => {
     const newRow = makeRule({ sort_order: 2 });
 
+    // isValidAssignee — profiles.select().eq().eq().maybeSingle()
+    const assigneeChain = buildProfilesSingleChain(validProfileRow('user-5'));
+
     const maybeSingle = vi.fn().mockResolvedValue({ data: { sort_order: 1 }, error: null });
     const limit = vi.fn(() => ({ maybeSingle }));
     const order = vi.fn(() => ({ limit }));
@@ -228,6 +301,7 @@ describe('createRoutingRule', () => {
     const insert = vi.fn(() => ({ select: insertSelect }));
 
     vi.mocked(supabase.from)
+      .mockReturnValueOnce({ select: assigneeChain.select } as never)
       .mockReturnValueOnce({ select: tailSelect } as never)
       .mockReturnValueOnce({ insert } as never);
 
@@ -245,6 +319,20 @@ describe('createRoutingRule', () => {
       assign_to_user_id: 'user-5',
     }));
   });
+
+  it('rejects creation when the assignee is no longer active or has no queue access', async () => {
+    // isValidAssignee returns null (profile not found OR inactive OR no queue role)
+    const assigneeChain = buildProfilesSingleChain(null);
+    vi.mocked(supabase.from).mockReturnValueOnce({ select: assigneeChain.select } as never);
+
+    const { data, error } = await createRoutingRule(
+      { name: 'Bad Rule', assign_to_user_id: 'ghost-user' },
+      { actorId: 'actor-1', companyId: 'company-1' },
+    );
+
+    expect(data).toBeNull();
+    expect(error).toMatch(/no longer active|queue access/i);
+  });
 });
 
 // ── updateRoutingRule ────────────────────────────────────────────────────────
@@ -253,6 +341,8 @@ describe('updateRoutingRule', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('scopes the update to the company and returns the updated rule', async () => {
+    // input.assign_to_user_id is undefined here, so isValidAssignee never runs
+    // — the test still only sees the single UPDATE round-trip.
     const updatedRow = makeRule({ is_active: false });
     const single = vi.fn().mockResolvedValue({ data: updatedRow, error: null });
     const updateSelect = vi.fn(() => ({ single }));
@@ -271,6 +361,22 @@ describe('updateRoutingRule', () => {
     expect(data?.is_active).toBe(false);
     expect(eq1).toHaveBeenCalledWith('id', 'rule-1');
     expect(eq2).toHaveBeenCalledWith('company_id', 'company-1');
+  });
+
+  it('rejects an assignee swap when the new user is no longer valid', async () => {
+    // Caller is touching assign_to_user_id, so isValidAssignee fires and
+    // returns null — no UPDATE round-trip should happen.
+    const assigneeChain = buildProfilesSingleChain(null);
+    vi.mocked(supabase.from).mockReturnValueOnce({ select: assigneeChain.select } as never);
+
+    const { data, error } = await updateRoutingRule(
+      'rule-1',
+      { assign_to_user_id: 'ghost-user' },
+      { actorId: 'actor-1', companyId: 'company-1' },
+    );
+
+    expect(data).toBeNull();
+    expect(error).toMatch(/no longer active|queue access/i);
   });
 });
 

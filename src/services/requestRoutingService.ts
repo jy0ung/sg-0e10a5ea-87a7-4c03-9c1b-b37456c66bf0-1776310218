@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { canManagePortalQueue } from '@/lib/portalAccess';
 import { logUserAction } from './auditService';
 
 export interface RequestRoutingRule {
@@ -81,6 +82,45 @@ function mapRule(row: RoutingRuleRow): RequestRoutingRule {
   };
 }
 
+/**
+ * Confirms `userId` is an active profile in `companyId` whose role can
+ * actually own tickets (i.e. holds a PORTAL_QUEUE_ROLES grant). Used to
+ * guard rule mutations against accidentally pinning a stale or unprivileged
+ * user as the assignee. A `null`/empty input returns `false`; a DB failure
+ * also returns `false` so the caller fails closed.
+ */
+async function isValidAssignee(companyId: string, userId: string): Promise<boolean> {
+  if (!userId) return false;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, role, status, portal_access_only')
+    .eq('company_id', companyId)
+    .eq('id', userId)
+    .maybeSingle();
+  if (error || !data) return false;
+  const profile = data as { role: string; status: string; portal_access_only: boolean };
+  if (profile.status !== 'active') return false;
+  return canManagePortalQueue(profile);
+}
+
+/**
+ * Bulk variant used by evaluateRoutingRules at ticket-creation time so we
+ * pay a single round-trip even when many rules might match. Returns the set
+ * of user ids in the company that are currently safe to auto-assign to.
+ */
+async function fetchValidAssigneeIds(companyId: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, role, status, portal_access_only')
+    .eq('company_id', companyId)
+    .eq('status', 'active');
+  if (error || !data) return new Set();
+  const ids = (data as Array<{ id: string; role: string; status: string; portal_access_only: boolean }>)
+    .filter((profile) => canManagePortalQueue(profile))
+    .map((profile) => profile.id);
+  return new Set(ids);
+}
+
 export async function listRoutingRules(
   companyId: string,
 ): Promise<{ data: RequestRoutingRule[]; error: string | null }> {
@@ -96,6 +136,15 @@ export async function createRoutingRule(
   input: CreateRoutingRuleInput,
   context: RoutingRuleContext,
 ): Promise<{ data: RequestRoutingRule | null; error: string | null }> {
+  // Refuse to create a rule pinned to a user who can't actually own a ticket —
+  // would otherwise produce silent routing failures at evaluation time.
+  if (!(await isValidAssignee(context.companyId, input.assign_to_user_id))) {
+    return {
+      data: null,
+      error: 'The selected assignee is no longer active or does not have queue access.',
+    };
+  }
+
   const { data: tail } = await routingRulesTable()
     .select('sort_order')
     .eq('company_id', context.companyId)
@@ -140,6 +189,18 @@ export async function updateRoutingRule(
   input: UpdateRoutingRuleInput,
   context: RoutingRuleContext,
 ): Promise<{ data: RequestRoutingRule | null; error: string | null }> {
+  // Same guard as createRoutingRule, applied only when the caller is touching
+  // the assignee field — leaves status/match-condition-only updates untouched.
+  if (
+    input.assign_to_user_id !== undefined
+    && !(await isValidAssignee(context.companyId, input.assign_to_user_id))
+  ) {
+    return {
+      data: null,
+      error: 'The selected assignee is no longer active or does not have queue access.',
+    };
+  }
+
   const patch: Record<string, unknown> = {};
   if (input.name !== undefined) patch.name = input.name.trim();
   if (input.is_active !== undefined) patch.is_active = input.is_active;
@@ -242,12 +303,20 @@ export async function evaluateRoutingRules(
   try {
     const { data: rules, error } = await listRoutingRules(companyId);
     if (error) return null;
+
+    // Bulk-load the set of users who can currently own a ticket so a rule
+    // pinned to a deactivated or repurposed user falls through to the next
+    // matching rule instead of silently assigning a ghost owner. One round
+    // trip per ticket creation regardless of rule count.
+    const validAssigneeIds = await fetchValidAssigneeIds(companyId);
+
     for (const rule of rules) {
       if (!rule.is_active) continue;
       if (rule.match_category && rule.match_category !== ticket.category) continue;
       if (rule.match_subcategory && rule.match_subcategory !== (ticket.subcategory ?? null)) continue;
       if (rule.match_priority && rule.match_priority !== ticket.priority) continue;
       if (rule.match_submitter_role && rule.match_submitter_role !== ticket.submitterRole) continue;
+      if (!validAssigneeIds.has(rule.assign_to_user_id)) continue;
       return rule.assign_to_user_id;
     }
   } catch {
