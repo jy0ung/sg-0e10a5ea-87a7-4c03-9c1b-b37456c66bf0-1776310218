@@ -134,7 +134,7 @@ RETURNS TABLE (
   label       text,
   description text,
   formula     jsonb,
-  position    int
+  "position"  int
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
 DECLARE
@@ -167,7 +167,7 @@ BEGIN
            d.label,
            d.description,
            d.formula,
-           array_position(v_codes, d.code) AS position
+           array_position(v_codes, d.code) AS "position"
       FROM kpi_definitions d
      WHERE d.code = ANY(v_codes)
        AND d.is_active

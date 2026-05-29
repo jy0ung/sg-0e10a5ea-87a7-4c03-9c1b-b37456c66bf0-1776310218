@@ -39,7 +39,13 @@ function getMigrationFiles(): string[] {
 }
 
 function getLatestFunctionDefinition(functionName: string): { filePath: string; source: string } {
-  const matcher = new RegExp(`create\\s+or\\s+replace\\s+function\\s+${escapeRegex(functionName)}\\s*\\(`, 'i');
+  const bareFunctionName = functionName.includes('.')
+    ? functionName.split('.').at(-1) ?? functionName
+    : functionName;
+  const matcher = new RegExp(
+    `create\\s+or\\s+replace\\s+function\\s+(?:public\\s*\\.\\s*)?${escapeRegex(bareFunctionName)}\\s*\\(`,
+    'i',
+  );
 
   let latestMatch: { filePath: string; source: string } | null = null;
   for (const filePath of getMigrationFiles()) {
