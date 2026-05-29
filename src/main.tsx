@@ -13,6 +13,7 @@ import { ModuleAccessProvider } from "@/contexts/ModuleAccessContext";
 import { BrandingProvider } from "@/contexts/BrandingContext";
 import { useApplyBranding } from "@/hooks/useApplyBranding";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
+import { PlatformHealthBanner } from "@/components/shared/PlatformHealthBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RequireRole } from "@/components/shared/RequireRole";
 import { RequireActiveModule } from "@/components/shared/RequireActiveModule";
@@ -365,6 +366,7 @@ const App = () => {
             <AuthProvider>
               <BrandingProvider>
                 <BrandedShellEffect />
+                <PlatformHealthBanner />
                 <OfflineBanner />
                 <RouterProvider router={router} />
               </BrandingProvider>

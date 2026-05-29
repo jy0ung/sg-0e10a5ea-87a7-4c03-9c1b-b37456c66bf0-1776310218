@@ -1,6 +1,7 @@
 import React from 'react';
-import { AlertCircle, Inbox } from 'lucide-react';
+import { AlertCircle, Inbox, ServerCrash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { isPlatformMismatchError } from '@/lib/platformErrors';
 
 interface EmptyStateProps {
   title: string;
@@ -41,18 +42,28 @@ export function PageErrorState({
   error,
   onRetry,
 }: PageErrorStateProps) {
-  const heading = title ?? 'Unable to load data';
-  const detail = description ?? 'Retry the request. If the problem persists, sign out and sign back in.';
   const message = getErrorMessage(error);
+  const isMismatch = isPlatformMismatchError(error);
+
+  const heading = title ?? (isMismatch ? 'Platform configuration mismatch' : 'Unable to load data');
+  const detail = description ?? (isMismatch
+    ? 'This screen depends on a database object that is not yet deployed. Operators have been notified. Other screens may also be affected — try Inbox or Notifications in the meantime.'
+    : 'Retry the request. If the problem persists, sign out and sign back in.');
+  const Icon = isMismatch ? ServerCrash : AlertCircle;
 
   return (
     <div className="glass-panel p-10 text-center" role="alert">
-      <AlertCircle className="mx-auto mb-3 h-10 w-10 text-destructive" aria-hidden />
+      <Icon className="mx-auto mb-3 h-10 w-10 text-destructive" aria-hidden />
       <h3 className="text-base font-semibold text-foreground">{heading}</h3>
       <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-        {message ? `${detail} (${message})` : detail}
+        {message && !isMismatch ? `${detail} (${message})` : detail}
       </p>
-      {onRetry && (
+      {message && isMismatch && (
+        <p className="mx-auto mt-2 max-w-xl text-xs text-muted-foreground/70 font-mono">
+          {message}
+        </p>
+      )}
+      {onRetry && !isMismatch && (
         <Button type="button" variant="outline" className="mt-5" onClick={onRetry}>
           Retry
         </Button>

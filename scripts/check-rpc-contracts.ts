@@ -108,6 +108,99 @@ const targets: FunctionTarget[] = [
       },
     ],
   },
+  // ─── Phase 4b / 5a — Role-aware Home ──────────────────────────────────────
+  {
+    functionName: 'get_role_home_kpis',
+    checks: [
+      {
+        kind: 'required',
+        pattern: /\(\s*p_company_id\s+text\s*,\s*p_role\s+text\s*\)/i,
+        message: 'get_role_home_kpis must keep (p_company_id text, p_role text) — the Home page calls it by named args',
+      },
+      {
+        kind: 'required',
+        pattern: /landing_route\s+text/i,
+        message: 'get_role_home_kpis must return landing_route — the Role-aware Home reads it for KPI deep-links',
+      },
+      {
+        kind: 'required',
+        pattern: /security\s+definer/i,
+        message: 'get_role_home_kpis must be SECURITY DEFINER so its auth check can read profiles',
+      },
+      {
+        kind: 'required',
+        pattern: /RAISE\s+EXCEPTION\s+'Unauthorized'/i,
+        message: 'get_role_home_kpis must keep its caller-company auth guard before returning data',
+      },
+    ],
+  },
+  {
+    functionName: 'upsert_role_kpi_defaults',
+    checks: [
+      {
+        kind: 'required',
+        pattern: /\(\s*p_company_id\s+text\s*,\s*p_role\s+text\s*,\s*p_kpi_codes\s+text\[\]\s*\)/i,
+        message: 'upsert_role_kpi_defaults signature must stay (text, text, text[]) — KPI Studio depends on it',
+      },
+      {
+        kind: 'required',
+        pattern: /RAISE\s+EXCEPTION\s+'Unauthorized'/i,
+        message: 'upsert_role_kpi_defaults must remain admin-gated',
+      },
+    ],
+  },
+  // ─── Phase 3b — Financial reports ─────────────────────────────────────────
+  {
+    functionName: 'get_profit_loss',
+    checks: [
+      {
+        kind: 'required',
+        pattern: /p_company_id\s+text/i,
+        message: 'get_profit_loss must accept p_company_id text — accounts UI calls it by named args',
+      },
+    ],
+  },
+  {
+    functionName: 'get_balance_sheet',
+    checks: [
+      {
+        kind: 'required',
+        pattern: /p_company_id\s+text/i,
+        message: 'get_balance_sheet must accept p_company_id text',
+      },
+    ],
+  },
+  {
+    functionName: 'get_ar_aging_by_branch',
+    checks: [
+      {
+        kind: 'required',
+        pattern: /p_company_id\s+text/i,
+        message: 'get_ar_aging_by_branch must accept p_company_id text',
+      },
+    ],
+  },
+  {
+    functionName: 'get_ap_aging_by_branch',
+    checks: [
+      {
+        kind: 'required',
+        pattern: /p_company_id\s+text/i,
+        message: 'get_ap_aging_by_branch must accept p_company_id text',
+      },
+    ],
+  },
+  // ─── Phase 6a — Webhook outbox ────────────────────────────────────────────
+  {
+    functionName: 'emit_webhook_event',
+    checks: [
+      {
+        kind: 'required',
+        pattern: /security\s+definer/i,
+        message: 'emit_webhook_event must be SECURITY DEFINER — it writes to webhook_outbox on behalf of business RPCs',
+      },
+    ],
+  },
 ];
 
 for (const target of targets) {

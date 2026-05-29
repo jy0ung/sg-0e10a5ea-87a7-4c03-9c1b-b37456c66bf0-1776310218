@@ -29,6 +29,36 @@ Manual redeploys are available from the Production Deploy workflow:
 - set `image_tag` to deploy an existing published image tag
 - use `build_target=main-with-hrms` for the current production architecture
 
+## Apply Database Migrations (required when migrations land on `main`)
+
+**The container deploy in `main-deploy.yml` does NOT apply Supabase migrations.**
+If the PR being deployed adds files under `supabase/migrations/`, an operator
+**must** apply them to the production host-local Supabase stack before the
+new web app talks to users:
+
+```bash
+# On the production host (after `git pull` lands the new migrations):
+cd /srv/flc-bi
+supabase db push --local --dry-run   # list pending migrations — sanity check
+supabase db push --local --yes       # apply them
+
+# Force a PostgREST schema-cache reload (idempotent; auto on hosted Supabase,
+# explicit on the self-hosted stack we run in production):
+psql "$(supabase status -o env | awk -F= '/^DB_URL=/{print $2}' | tr -d \"'\\\"\")" \
+     -c "NOTIFY pgrst, 'reload schema';"
+```
+
+If you skip this step, the new web container will surface "Platform
+configuration mismatch" via the global banner (and `PageErrorState`'s
+schema-cache-miss branch) on every page that depends on a new RPC or table.
+Past incidents of this shape: `get_role_home_kpis` on 2026-05-28 — see
+`AUDIT.md` Re-audit section for the full root-cause writeup.
+
+The Phase 7+ migration `20260528100000_schema_qualify_and_reload.sql`
+verifies the ledger state and refuses to apply unless the prior Phase 3+
+migrations have been applied first — this is a deliberate safety net, not
+a workaround.
+
 ## Production Image Layout
 
 The current `main-with-hrms` image serves:

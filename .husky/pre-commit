@@ -2,4 +2,5 @@
 npx lint-staged
 npx tsc --noEmit
 npx tsx scripts/check-rpc-contracts.ts
+npx tsx scripts/check-rpc-frontend-vs-migrations.ts
 npx tsx scripts/check-no-service-role.ts

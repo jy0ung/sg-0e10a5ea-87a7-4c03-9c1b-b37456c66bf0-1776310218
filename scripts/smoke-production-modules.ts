@@ -164,6 +164,12 @@ function findUiIssues(bodyText: string): Issue[] {
     'Access denied',
     'HRMS is unavailable',
     'Page Not Found',
+    // PageErrorState — surfaces when an RPC / table is missing from the
+    // schema cache. Catches the get_role_home_kpis-class regression that
+    // would otherwise pass smoke as a "rendered" page.
+    'Unable to load data',
+    'Platform configuration mismatch',
+    'schema cache',
   ];
 
   return markers

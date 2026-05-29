@@ -171,5 +171,38 @@ Both must show zero `critical` and zero unreviewed `high` findings.
 | DR tabletop minutes               |       | ⏳        |
 | OSV-Scanner attach                |       | ⏳        |
 | CodeQL enable + attach            |       | ⏳        |
+| Migration ledger up to date on prod | ✅ canary-banner code-side | ⏳ apply pending migrations, attach `select max(version) from supabase_migrations.schema_migrations` output |
 
 The launch checklist closes when every operator item is ticked.
+
+### 7a. Migration ledger drift (2026-05-28 outage class)
+
+The "Could not find the function public.get_role_home_kpis(...)" outage on
+2026-05-28 surfaced a structural gap: `main-deploy.yml` ships the web
+container but never runs `supabase db push`. Code-side mitigations now in
+place:
+
+- **`scripts/check-rpc-frontend-vs-migrations.ts`** — pre-commit gate that
+  diffs every `supabase.rpc(name)` against migrations. Catches future
+  drift at commit time.
+- **`scripts/check-rpc-contracts.ts`** — extended to assert signature +
+  authorisation gate on `get_role_home_kpis`, `upsert_role_kpi_defaults`,
+  `get_profit_loss`, `get_balance_sheet`, `get_ar_aging_by_branch`,
+  `get_ap_aging_by_branch`, `emit_webhook_event`.
+- **`scripts/smoke-production-modules.ts`** — `"Unable to load data"`,
+  `"Platform configuration mismatch"`, `"schema cache"` added to the
+  error-marker list so future schema-cache misses fail the deploy smoke
+  instead of passing as "rendered" pages.
+- **`PlatformHealthBanner`** + **`usePlatformHealth`** — global UI banner
+  that lights up when the canary RPC (`get_role_home_kpis`) returns a
+  schema-cache-miss. Pairs with `PageErrorState`'s mismatch branch so
+  per-page error cards read coherently.
+- **Repair migration** `20260528100000_schema_qualify_and_reload.sql` —
+  drops stray non-public copies of Phase-3+ RPCs, asserts presence, and
+  notifies `pgrst` to reload the schema cache. Refuses to apply if the
+  ledger is out of sync, with a clear actionable error.
+
+Operator evidence to attach: output of `select version from
+supabase_migrations.schema_migrations where version >= '20260524000000'
+order by version;` against production immediately after a `supabase db
+push --local --yes` run.
