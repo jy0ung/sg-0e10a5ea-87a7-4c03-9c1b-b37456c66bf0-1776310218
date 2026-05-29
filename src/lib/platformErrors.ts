@@ -11,6 +11,8 @@
  * Caught error shapes:
  *   • "Could not find the function public.x(...) in the schema cache"
  *   • "Could not find the table ..."
+ *   • PostgREST code PGRST202 / PGRST204
+ *   • PostgreSQL codes 42P01 / 42883 / 42703
  *   • "relation \"public.x\" does not exist"
  *   • Anything else mentioning "schema cache"
  *
@@ -21,10 +23,34 @@
  *   • Network errors, timeouts — those retry naturally.
  */
 const PLATFORM_MISMATCH_RE =
-  /Could not find the (function|relation|table)|schema cache|relation .* does not exist/i;
+  /PGRST20[24]|Could not find the (function|relation|table|column)|schema cache|relation .* does not exist|function .* does not exist|column .* does not exist/i;
+
+const PLATFORM_MISMATCH_CODES = new Set([
+  'PGRST202', // function not found in schema cache
+  'PGRST204', // column not found in schema cache
+  '42P01',    // undefined_table
+  '42883',    // undefined_function
+  '42703',    // undefined_column
+]);
+
+function errorParts(error: unknown): string[] {
+  if (!error) return [];
+  if (typeof error === 'string') return [error];
+  if (error instanceof Error) return [error.message];
+  if (typeof error !== 'object') return [String(error)];
+
+  const record = error as Record<string, unknown>;
+  return ['code', 'message', 'details', 'hint']
+    .map((key) => record[key])
+    .filter((value): value is string | number => (
+      typeof value === 'string' || typeof value === 'number'
+    ))
+    .map(String);
+}
 
 export function isPlatformMismatchError(error: unknown): boolean {
-  if (!error) return false;
-  const msg = error instanceof Error ? error.message : String(error);
-  return PLATFORM_MISMATCH_RE.test(msg);
+  const parts = errorParts(error);
+  return parts.some((part) => (
+    PLATFORM_MISMATCH_CODES.has(part.toUpperCase()) || PLATFORM_MISMATCH_RE.test(part)
+  ));
 }

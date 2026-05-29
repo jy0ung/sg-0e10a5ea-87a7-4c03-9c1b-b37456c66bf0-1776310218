@@ -8,8 +8,24 @@ describe('isPlatformMismatchError', () => {
   });
 
   it('matches "schema cache" mentions', () => {
-    expect(isPlatformMismatchError(new Error('PGRST202: cached schema reload required'))).toBe(false);
+    expect(isPlatformMismatchError(new Error('PGRST202: cached schema reload required'))).toBe(true);
     expect(isPlatformMismatchError(new Error('reload the schema cache'))).toBe(true);
+  });
+
+  it('matches Supabase/PostgREST plain object errors', () => {
+    expect(isPlatformMismatchError({
+      code: 'PGRST202',
+      message: 'Could not find the function public.get_role_home_kpis(p_company_id, p_role) in the schema cache',
+      details: 'Searched for the function public.get_role_home_kpis with parameters p_company_id, p_role',
+      hint: 'Perhaps you meant to call public.get_role_home_kpis',
+    })).toBe(true);
+  });
+
+  it('matches PostgreSQL undefined table code 42P01', () => {
+    expect(isPlatformMismatchError({
+      code: '42P01',
+      message: 'relation "public.kpi_definitions" does not exist',
+    })).toBe(true);
   });
 
   it('matches "relation x does not exist"', () => {
@@ -24,6 +40,10 @@ describe('isPlatformMismatchError', () => {
   it('does NOT match RLS denials (those are auth issues, not deploy issues)', () => {
     const err = new Error('permission denied for relation invoices');
     expect(isPlatformMismatchError(err)).toBe(false);
+    expect(isPlatformMismatchError({
+      code: '42501',
+      message: 'permission denied for relation invoices',
+    })).toBe(false);
   });
 
   it('does NOT match unauthorized raises from SECURITY DEFINER functions', () => {

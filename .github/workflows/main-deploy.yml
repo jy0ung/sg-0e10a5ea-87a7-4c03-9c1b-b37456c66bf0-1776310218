@@ -273,6 +273,16 @@ jobs:
           PROD_VERIFY_FETCH_ATTEMPTS: '3'
         run: npm run verify:production
 
+      - name: Probe RPC canaries
+        if: steps.login.outputs.enabled == 'true'
+        shell: bash
+        env:
+          SMOKE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SMOKE_SUPABASE_ANON: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SMOKE_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
+          SMOKE_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
+        run: npm run health:rpc-canaries
+
       - name: Smoke production modules
         if: steps.login.outputs.enabled == 'true'
         shell: bash

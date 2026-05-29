@@ -337,15 +337,15 @@ export async function getAutoAgingReport(
     return { data: cached, error: null };
   }
 
-  const { data, error } = await supabase.rpc('auto_aging_report' as never, {
+  const { data, error } = await supabase.rpc('auto_aging_report', {
     p_report_type: params.reportType,
-    p_branch: params.branch ?? null,
-    p_model: params.model ?? null,
-    p_bg_date_from: params.bgDateFrom ?? null,
-    p_bg_date_to: params.bgDateTo ?? null,
+    p_branch: params.branch ?? undefined,
+    p_model: params.model ?? undefined,
+    p_bg_date_from: params.bgDateFrom ?? undefined,
+    p_bg_date_to: params.bgDateTo ?? undefined,
     p_limit: params.limit ?? 500,
     p_offset: params.offset ?? 0,
-  } as never);
+  });
 
   performanceService.endQueryTimer(queryId, 'auto_aging_report');
 
@@ -377,15 +377,15 @@ export async function getAutoAgingSourceLedger(
     return { data: cached, error: null };
   }
 
-  const { data, error } = await supabase.rpc('auto_aging_source_ledger' as never, {
-    p_branch: params.branch ?? null,
-    p_model: params.model ?? null,
-    p_search: params.search ?? null,
-    p_bg_date_from: params.bgDateFrom ?? null,
-    p_bg_date_to: params.bgDateTo ?? null,
+  const { data, error } = await supabase.rpc('auto_aging_source_ledger', {
+    p_branch: params.branch ?? undefined,
+    p_model: params.model ?? undefined,
+    p_search: params.search ?? undefined,
+    p_bg_date_from: params.bgDateFrom ?? undefined,
+    p_bg_date_to: params.bgDateTo ?? undefined,
     p_limit: params.limit ?? 100,
     p_offset: params.offset ?? 0,
-  } as never);
+  });
 
   performanceService.endQueryTimer(queryId, 'auto_aging_source_ledger');
 
@@ -663,10 +663,10 @@ export async function getAutoAgingDashboardSummary(
   }
 
   const { data, error } = await supabase.rpc('auto_aging_dashboard_summary', {
-    p_branch: params.branch ?? null,
-    p_model: params.model ?? null,
-    p_from: params.bgDateFrom ?? null,
-    p_to: params.bgDateTo ?? null,
+    p_branch: params.branch ?? undefined,
+    p_model: params.model ?? undefined,
+    p_from: params.bgDateFrom ?? undefined,
+    p_to: params.bgDateTo ?? undefined,
   });
 
   performanceService.endQueryTimer(queryId, 'auto_aging_dashboard_summary');

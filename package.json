@@ -31,6 +31,7 @@
     "security:edge-functions": "tsx scripts/check-edge-functions.ts",
     "verify:production": "tsx scripts/verify-production-deploy.ts",
     "smoke:production": "tsx scripts/smoke-production-modules.ts",
+    "health:rpc-canaries": "tsx scripts/health-rpc-canaries.ts",
     "prepare": "husky"
   },
   "dependencies": {

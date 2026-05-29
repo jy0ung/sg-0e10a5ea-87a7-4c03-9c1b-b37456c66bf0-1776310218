@@ -129,11 +129,11 @@ export async function linkExistingVehicle(
     return { data: null, error: new Error('Vehicle id or chassis number is required') };
   }
 
-  const { data, error } = await supabase.rpc('link_vehicle_to_sales_order' as never, {
+  const { data, error } = await supabase.rpc('link_vehicle_to_sales_order', {
     p_sales_order_id: params.orderId,
-    p_chassis_no: params.chassisNo?.trim() || null,
-    p_vehicle_id: params.vehicleId ?? null,
-  } as never);
+    p_chassis_no: params.chassisNo?.trim() || undefined,
+    p_vehicle_id: params.vehicleId ?? undefined,
+  });
 
   if (error) {
     loggingService.error('linkExistingVehicle failed', { error, params }, 'SalesPipelineService');
@@ -168,9 +168,9 @@ export async function unlinkExistingVehicle(
   if (!companyId) return { data: null, error: missingCompanyError() };
   if (!orderId) return { data: null, error: new Error('Sales order id is required') };
 
-  const { data, error } = await supabase.rpc('unlink_vehicle_from_sales_order' as never, {
+  const { data, error } = await supabase.rpc('unlink_vehicle_from_sales_order', {
     p_sales_order_id: orderId,
-  } as never);
+  });
 
   if (error) {
     loggingService.error('unlinkExistingVehicle failed', { error, orderId }, 'SalesPipelineService');
