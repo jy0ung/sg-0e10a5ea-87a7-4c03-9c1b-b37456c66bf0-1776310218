@@ -24,7 +24,7 @@
 -- on both hosted and self-hosted Supabase.
 -- ─────────────────────────────────────────────────────────────────────────────
 
-SET LOCAL search_path = public, pg_catalog;
+SET search_path = public, pg_catalog;
 
 -- ─── 1. Drop stray non-public copies of at-risk RPCs ─────────────────────────
 -- These names are all the Phase 3+/4+/5+/6+ frontend-callable RPCs. If any
@@ -127,3 +127,5 @@ END$$;
 -- become visible at /rest/v1/rpc/* immediately after migration apply.
 -- Sending it twice (once here, once via the trigger) is harmless.
 NOTIFY pgrst, 'reload schema';
+
+RESET search_path;

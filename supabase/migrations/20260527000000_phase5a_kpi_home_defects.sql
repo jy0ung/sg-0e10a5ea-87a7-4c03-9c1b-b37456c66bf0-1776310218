@@ -13,8 +13,9 @@
 --    and exposes it through get_role_home_kpis so new KPIs no longer require
 --    a frontend code change to be reachable.
 --
--- Both changes are additive. No drops. Backwards-compatible with any caller
--- that ignores landing_route.
+-- The table change is additive. The RPC must be dropped/recreated because
+-- PostgreSQL cannot change a function's RETURNS TABLE OUT-parameter row type
+-- with CREATE OR REPLACE.
 
 ALTER TABLE public.kpi_definitions
   ADD COLUMN IF NOT EXISTS landing_route text;
@@ -55,7 +56,9 @@ UPDATE public.kpi_definitions
 -- Republish get_role_home_kpis to include landing_route in the return shape.
 -- Same authorisation gate, same per-company-override-then-global resolution
 -- order. Returning landing_route is purely additive.
-CREATE OR REPLACE FUNCTION get_role_home_kpis(
+DROP FUNCTION IF EXISTS public.get_role_home_kpis(text, text);
+
+CREATE OR REPLACE FUNCTION public.get_role_home_kpis(
   p_company_id text,
   p_role       text
 )
@@ -65,7 +68,7 @@ RETURNS TABLE (
   description   text,
   formula       jsonb,
   landing_route text,
-  position      int
+  "position"    int
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
 DECLARE
@@ -98,7 +101,7 @@ BEGIN
            d.description,
            d.formula,
            d.landing_route,
-           array_position(v_codes, d.code) AS position
+           array_position(v_codes, d.code) AS "position"
       FROM kpi_definitions d
      WHERE d.code = ANY(v_codes)
        AND d.is_active
