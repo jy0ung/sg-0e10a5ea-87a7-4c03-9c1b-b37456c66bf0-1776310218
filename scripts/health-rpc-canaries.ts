@@ -1,5 +1,6 @@
 #!/usr/bin/env -S npx tsx
 import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 import { isPlatformMismatchError } from '../src/lib/platformErrors';
 
 type Canary = {
@@ -187,6 +188,9 @@ async function main(): Promise<void> {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
+    },
+    realtime: {
+      transport: WebSocket,
     },
   });
 
