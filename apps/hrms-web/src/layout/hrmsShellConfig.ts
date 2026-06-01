@@ -8,17 +8,17 @@ import type { AppShellNavSection, AppShellRouteChromeMatch } from '@/components/
 import { hrmsNavItems } from './navItems';
 
 const HRMS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
-  { pattern: /^\/dashboard/, title: 'My Dashboard', kicker: 'Your HRMS command centre' },
+  { pattern: /^\/dashboard/, title: 'My HR Dashboard', kicker: 'Your HRMS command centre' },
   { pattern: /^\/leave\/calendar/, title: 'Leave Calendar', kicker: 'Team leave visibility' },
-  { pattern: /^\/leave$/, title: 'Leave', kicker: 'Requests, balances, and approvals' },
-  { pattern: /^\/attendance/, title: 'Attendance', kicker: 'Daily workforce records' },
+  { pattern: /^\/leave$/, title: 'My Leave', kicker: 'Requests, balances, and approvals' },
+  { pattern: /^\/attendance/, title: 'Team Attendance', kicker: 'Daily workforce records' },
   { pattern: /^\/approvals/, title: 'Approval Inbox', kicker: 'Assigned HRMS decisions' },
-  { pattern: /^\/appraisals/, title: 'Appraisals', kicker: 'Review cycles and outcomes' },
+  { pattern: /^\/appraisals/, title: 'My Appraisals', kicker: 'Review cycles and outcomes' },
   { pattern: /^\/announcements/, title: 'Announcements', kicker: 'Company communications' },
   { pattern: /^\/employees\/[^/]+/, title: 'Employee Profile', kicker: 'Workforce record' },
-  { pattern: /^\/employees/, title: 'Employees', kicker: 'Workforce directory' },
+  { pattern: /^\/employees/, title: 'Employee Directory', kicker: 'Workforce directory' },
   { pattern: /^\/payroll/, title: 'Payroll', kicker: 'Runs, approvals, and payout status' },
-  { pattern: /^\/settings/, title: 'Settings', kicker: 'Admin console and workflow governance' },
+  { pattern: /^\/settings/, title: 'HRMS Settings', kicker: 'Admin console and workflow governance' },
   { pattern: /^\/profile/, title: 'My Profile', kicker: 'HRMS identity and access' },
 ];
 
