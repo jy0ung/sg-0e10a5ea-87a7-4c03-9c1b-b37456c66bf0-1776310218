@@ -29,6 +29,7 @@ import { listAnnouncements, listAttendanceRecords } from '@/services/hrmsService
 import { cn } from '@/lib/utils';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { SectionCard } from '@/components/shared/SectionCard';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import { toneClass, type Tone } from '@/lib/statusTones';
 import type { Announcement, LeaveBalance, LeaveRequest } from '@/types';
 
@@ -112,12 +113,7 @@ function QuickActionRow({ label, description, icon: Icon, tone, href }: QuickAct
   );
 }
 
-const LEAVE_STATUS_TONE: Record<string, Tone> = {
-  pending: 'amber',
-  approved: 'emerald',
-  rejected: 'red',
-  cancelled: 'slate',
-};
+const LEAVE_ROW_ICON_TONE = 'bg-primary/10 text-primary';
 
 interface LeaveRequestRowProps {
   request: LeaveRequest;
@@ -128,7 +124,7 @@ function LeaveRequestRow({ request, leaveTypeName }: LeaveRequestRowProps) {
   return (
     <div className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', LEAVE_ROW_ICON_TONE)}>
           <Calendar className="h-3.5 w-3.5" aria-hidden />
         </div>
         <div className="min-w-0">
@@ -136,9 +132,7 @@ function LeaveRequestRow({ request, leaveTypeName }: LeaveRequestRowProps) {
           <p className="text-xs text-muted-foreground">{fmtLeaveRange(request.startDate, request.endDate)}</p>
         </div>
       </div>
-      <Badge className={cn('shrink-0 text-xs capitalize', toneClass(LEAVE_STATUS_TONE[request.status] ?? 'slate'))}>
-        {request.status === 'pending' ? 'Pending' : request.status}
-      </Badge>
+      <StatusBadge status={request.status} domain="leave" className="shrink-0" />
     </div>
   );
 }
