@@ -1,12 +1,19 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { MetricCard } from '@/components/shared/MetricCard';
+import { SectionCard } from '@/components/shared/SectionCard';
+import { ActionRequiredPanel } from '@/components/shared/ActionRequiredPanel';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { EmptyState, PageErrorState } from '@/components/shared/PageState';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
+import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getRoleHomeKpis, type RoleHomeKpi } from '@/services/kpiHomeService';
+import { getNotifications } from '@/services/notificationService';
+import { loadInbox } from '@/services/inboxService';
 import { hrefForKpi } from './home/hrefForKpi';
 import { isHrmsWorkspacePath, openDedicatedHrmsWorkspace } from '@/lib/hrmsWorkspace';
 import {
@@ -16,12 +23,15 @@ import {
   Brain,
   Briefcase,
   ChevronRight,
+  ClipboardList,
   Clock,
   DollarSign,
   HeadphonesIcon,
   Inbox as InboxIcon,
+  LayoutGrid,
   Package,
   Settings,
+  ShieldCheck,
   Sparkles,
   Timer,
   TrendingUp,
@@ -85,13 +95,23 @@ function formatRoleLabel(role: string): string {
   return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export default function Home() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
   const { modules, loading: modulesLoading } = useModuleAccess();
+  const hrmsAccess = useHrmsAccess();
+  const canUseInbox = useFeatureFlag('phase4.unified-inbox', false);
 
   const companyId = user?.companyId ?? '';
   const role = user?.role ?? 'creator_updater';
+  const includeReconciliation = hasRole(['super_admin', 'company_admin', 'director']);
 
   const kpiQuery = useQuery({
     queryKey: ['role-home-kpis', companyId, role],
@@ -104,12 +124,44 @@ export default function Home() {
     staleTime: 60_000,
   });
 
+  const notificationsQuery = useQuery({
+    queryKey: ['notifications', user?.id ?? ''],
+    queryFn: async () => {
+      const r = await getNotifications(user!.id);
+      if (r.error) throw r.error;
+      return r.data;
+    },
+    enabled: !!user?.id,
+    staleTime: 30_000,
+  });
+
+  const inboxQuery = useQuery({
+    queryKey: ['unified-inbox', companyId, user?.id, includeReconciliation],
+    queryFn: () => loadInbox(companyId, {
+      approver: user ? {
+        id: user.id,
+        hrmsRoleIds: hrmsAccess.roleIds,
+        hrmsRoleCodes: hrmsAccess.roleCodes,
+        canApproveRequests: hrmsAccess.canApproveRequests,
+      } : null,
+      userId: user!.id,
+      includeReconciliation,
+      perSourceLimit: 25,
+    }),
+    enabled: !!companyId && !!user?.id && canUseInbox,
+    staleTime: 30_000,
+  });
+
   const moduleById = useMemo(
     () => Object.fromEntries(modules.map(m => [m.id, m])),
     [modules],
   );
   const roadmapModules = useMemo(
     () => modules.filter(m => m.status !== 'active'),
+    [modules],
+  );
+  const activeModuleCount = useMemo(
+    () => modules.filter(m => m.status === 'active').length,
     [modules],
   );
 
@@ -124,79 +176,177 @@ export default function Home() {
 
   const firstName = user?.name?.split(' ')[0];
   const kpis: RoleHomeKpi[] = kpiQuery.data ?? [];
+  const counts = inboxQuery.data?.counts;
+  const inboxItems = inboxQuery.data?.items ?? [];
+  const unreadCount = (notificationsQuery.data ?? []).filter(n => !n.read).length;
+  const dash = (n: number | undefined) => (n === undefined ? '—' : String(n));
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <PageHeader
-        title={`Welcome${firstName ? `, ${firstName}` : ''}`}
-        description={`Your ${formatRoleLabel(role)} workspace — KPIs, modules, and shortcuts in one place.`}
-        breadcrumbs={[{ label: 'FLC BI', path: '/home' }, { label: 'Home' }]}
-      />
-
-      {/* Quick access */}
-      <section className="space-y-3" aria-label="Quick access">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick Access</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <QuickLink
-            label="Inbox"
-            description="Approvals, reconciliation, requests, alerts"
-            Icon={InboxIcon}
-            onClick={() => navigate('/inbox')}
-          />
-          <QuickLink
-            label="Notifications"
-            description="Operational alerts and recent updates"
-            Icon={Bell}
-            onClick={() => navigate('/notifications')}
-          />
-          <QuickLink
-            label="Internal Requests"
-            description="Submit and track service tickets"
-            Icon={HeadphonesIcon}
-            onClick={() => navigate('/portal/tickets/new')}
-          />
+    <div className="space-y-5 animate-fade-in">
+      {/* Executive hero */}
+      <header className="hero-gradient surface-card flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wider text-primary">{formatRoleLabel(role)} workspace</p>
+          <h1 className="mt-1 truncate text-2xl font-bold tracking-tight text-foreground">
+            {greeting()}{firstName ? `, ${firstName}` : ''}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Here&apos;s what needs your attention across the business today.
+          </p>
         </div>
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/portal/tickets/new')}>
+            <HeadphonesIcon className="mr-1.5 h-4 w-4" aria-hidden />
+            New request
+          </Button>
+          <Button size="sm" onClick={() => navigate(canUseInbox ? '/inbox' : '/notifications')}>
+            <InboxIcon className="mr-1.5 h-4 w-4" aria-hidden />
+            Open inbox
+          </Button>
+        </div>
+      </header>
+
+      {/* Metric strip — real signals only */}
+      <section aria-label="Key metrics" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          label="Pending Approvals"
+          value={canUseInbox ? dash(counts?.approval) : '—'}
+          hint={canUseInbox ? 'Awaiting your decision' : 'Inbox not enabled'}
+          icon={ShieldCheck}
+          tone="amber"
+          onClick={canUseInbox ? () => navigate('/inbox') : undefined}
+          data-testid="home-metric-approvals"
+        />
+        <MetricCard
+          label="Open Requests"
+          value={canUseInbox ? dash(counts?.ticket) : '—'}
+          hint="Internal service tickets"
+          icon={ClipboardList}
+          tone="blue"
+          onClick={() => navigate(canUseInbox ? '/inbox' : '/portal/tickets')}
+          data-testid="home-metric-requests"
+        />
+        <MetricCard
+          label="Notifications"
+          value={notificationsQuery.isLoading ? '…' : dash(unreadCount)}
+          hint="Unread alerts"
+          icon={Bell}
+          tone="violet"
+          onClick={() => navigate('/notifications')}
+          data-testid="home-metric-notifications"
+        />
+        <MetricCard
+          label="Active Modules"
+          value={modulesLoading ? '…' : dash(activeModuleCount)}
+          hint="Enabled for your company"
+          icon={LayoutGrid}
+          tone="emerald"
+          data-testid="home-metric-modules"
+        />
       </section>
 
-      {/* KPIs */}
-      <section className="space-y-3" aria-label="KPIs">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">KPIs for your role</h2>
-        {kpiQuery.isLoading ? (
-          <TableSkeleton />
-        ) : kpiQuery.isError ? (
-          <PageErrorState error={kpiQuery.error} />
-        ) : kpis.length === 0 ? (
-          <EmptyState
-            title="No KPIs configured for your role"
-            description="Ask an administrator to assign KPIs through the KPI Studio."
-            icon={<Sparkles className="h-5 w-5" aria-hidden />}
-          />
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="home-kpi-grid">
-            {kpis.map(kpi => (
-              <button
-                type="button"
-                key={kpi.code}
-                onClick={() => navigate(hrefForKpi(kpi.code, kpi.landingRoute))}
-                data-testid={`home-kpi-${kpi.code}`}
-                className="glass-panel text-left p-4 flex flex-col gap-2 transition-colors hover:bg-secondary/30"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <BarChart3 className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" aria-hidden />
-                  <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" aria-hidden />
-                </div>
-                <p className="text-sm font-semibold text-foreground">{kpi.label}</p>
-                {kpi.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-3">{kpi.description}</p>
-                )}
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground mt-auto pt-1">{kpi.code}</p>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* Main grid */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Left column (2/3) */}
+        <div className="space-y-4 lg:col-span-2">
+          <SectionCard
+            title="Action required"
+            description="Items waiting for you"
+            icon={InboxIcon}
+            action={canUseInbox ? { label: 'Open inbox', to: '/inbox' } : undefined}
+            bodyClassName="py-1"
+          >
+            {!canUseInbox ? (
+              <EmptyState
+                title="Unified inbox not enabled"
+                description="Approvals, reconciliation, and requests appear here once the inbox is enabled for your company."
+                icon={<InboxIcon className="h-5 w-5" aria-hidden />}
+              />
+            ) : inboxQuery.isLoading ? (
+              <div className="py-2"><TableSkeleton /></div>
+            ) : inboxQuery.isError ? (
+              <PageErrorState error={inboxQuery.error} />
+            ) : (
+              <ActionRequiredPanel items={inboxItems} limit={6} />
+            )}
+          </SectionCard>
 
-      {/* Module sections */}
+          <SectionCard
+            title="KPIs for your role"
+            description="Curated through the KPI Studio"
+            icon={Sparkles}
+          >
+            {kpiQuery.isLoading ? (
+              <TableSkeleton />
+            ) : kpiQuery.isError ? (
+              <PageErrorState error={kpiQuery.error} />
+            ) : kpis.length === 0 ? (
+              <EmptyState
+                title="No KPIs configured for your role"
+                description="Ask an administrator to assign KPIs through the KPI Studio."
+                icon={<Sparkles className="h-5 w-5" aria-hidden />}
+              />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2" data-testid="home-kpi-grid">
+                {kpis.map(kpi => (
+                  <button
+                    type="button"
+                    key={kpi.code}
+                    onClick={() => navigate(hrefForKpi(kpi.code, kpi.landingRoute))}
+                    data-testid={`home-kpi-${kpi.code}`}
+                    className="surface-card surface-card-hover flex flex-col gap-2 p-3.5 text-left"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <BarChart3 className="h-4 w-4" aria-hidden />
+                      </span>
+                      <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden />
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">{kpi.label}</p>
+                    {kpi.description && (
+                      <p className="line-clamp-2 text-xs text-muted-foreground">{kpi.description}</p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+        </div>
+
+        {/* Right column (1/3) */}
+        <div className="space-y-4">
+          <SectionCard title="Jump to" description="Frequent destinations" icon={ArrowRight} bodyClassName="space-y-1.5">
+            <JumpLink label="Inbox" Icon={InboxIcon} onClick={() => navigate(canUseInbox ? '/inbox' : '/notifications')} />
+            <JumpLink label="Notifications" Icon={Bell} onClick={() => navigate('/notifications')} />
+            <JumpLink label="Internal Requests" Icon={HeadphonesIcon} onClick={() => navigate('/portal/tickets/new')} />
+            <JumpLink label="Reports & BI" Icon={BarChart3} onClick={() => navigate('/reports')} />
+          </SectionCard>
+
+          {!modulesLoading && roadmapModules.length > 0 && (
+            <SectionCard title="Roadmap" description="Planned capabilities" icon={Clock} bodyClassName="space-y-2">
+              {roadmapModules.map(mod => {
+                const Icon = moduleIconMap[mod.icon] ?? Settings;
+                return (
+                  <div key={mod.id} className="flex items-start gap-3 rounded-lg border border-dashed p-2.5 opacity-80">
+                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                      <Icon className="h-4 w-4" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">{mod.name}</p>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <Clock className="h-3 w-3" aria-hidden />
+                        {mod.status === 'coming_soon' ? 'Coming soon' : 'Planned'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </SectionCard>
+          )}
+        </div>
+      </div>
+
+      {/* Workspaces / module launcher */}
       {MODULE_SECTIONS.map(section => {
         const items = section.moduleIds
           .map(id => moduleById[id])
@@ -208,9 +358,9 @@ export default function Home() {
           <section key={section.id} className="space-y-3" aria-label={section.title}>
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{section.title}</h2>
-              <p className="text-xs text-muted-foreground mt-1">{section.subtitle}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{section.subtitle}</p>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {items.map(mod => {
                 const Icon = moduleIconMap[mod.icon] ?? Settings;
                 return (
@@ -229,59 +379,22 @@ export default function Home() {
           </section>
         );
       })}
-
-      {/* Roadmap */}
-      {!modulesLoading && roadmapModules.length > 0 && (
-        <section className="space-y-3" aria-label="Roadmap">
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Roadmap</h2>
-            <p className="text-xs text-muted-foreground mt-1">Capabilities planned for future releases.</p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {roadmapModules.map(mod => {
-              const Icon = moduleIconMap[mod.icon] ?? Settings;
-              return (
-                <RoadmapCard
-                  key={mod.id}
-                  name={mod.name}
-                  description={mod.description}
-                  status={mod.status}
-                  Icon={Icon}
-                />
-              );
-            })}
-          </div>
-        </section>
-      )}
     </div>
   );
 }
 
-function QuickLink({
-  label,
-  description,
-  Icon,
-  onClick,
-}: {
-  label: string;
-  description: string;
-  Icon: React.ElementType;
-  onClick: () => void;
-}) {
+function JumpLink({ label, Icon, onClick }: { label: string; Icon: React.ElementType; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="glass-panel p-4 flex items-center gap-4 text-left cursor-pointer hover:border-primary/30 hover:shadow-md hover:-translate-y-px transition-all duration-150"
+      className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/50"
     >
-      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-        <Icon className="h-4 w-4 text-primary" aria-hidden />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-foreground leading-snug">{label}</p>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
-      </div>
-      <ChevronRight className="h-4 w-4 text-muted-foreground/40 flex-shrink-0" aria-hidden />
+      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Icon className="h-4 w-4" aria-hidden />
+      </span>
+      <span className="flex-1 text-sm font-medium text-foreground">{label}</span>
+      <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground/40" aria-hidden />
     </button>
   );
 }
@@ -305,48 +418,18 @@ function ModuleCard({
     <button
       type="button"
       onClick={onClick}
-      className="glass-panel p-5 flex flex-col gap-3 text-left cursor-pointer hover:border-primary/30 hover:shadow-md hover:-translate-y-px transition-all duration-150"
+      className="surface-card surface-card-hover group flex flex-col gap-3 p-5 text-left"
     >
       <div className="flex items-start justify-between">
-        <div className={`w-10 h-10 rounded-lg ${accent} flex items-center justify-center flex-shrink-0`}>
+        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${accent}`}>
           <Icon className={`h-5 w-5 ${iconColor}`} aria-hidden />
         </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" aria-hidden />
+        <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-colors group-hover:text-muted-foreground" aria-hidden />
       </div>
       <div className="space-y-1">
-        <h3 className="font-semibold text-sm text-foreground">{name}</h3>
-        <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+        <h3 className="text-sm font-semibold text-foreground">{name}</h3>
+        <p className="text-xs leading-relaxed text-muted-foreground">{description}</p>
       </div>
     </button>
-  );
-}
-
-function RoadmapCard({
-  name,
-  description,
-  status,
-  Icon,
-}: {
-  name: string;
-  description: string;
-  status: 'active' | 'coming_soon' | 'planned';
-  Icon: React.ElementType;
-}) {
-  return (
-    <div className="glass-panel p-5 flex flex-col gap-3 opacity-60 cursor-default">
-      <div className="flex items-start justify-between">
-        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-          <Icon className="h-5 w-5 text-muted-foreground" aria-hidden />
-        </div>
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-          <Clock className="h-3 w-3" aria-hidden />
-          {status === 'coming_soon' ? 'Coming soon' : 'Planned'}
-        </span>
-      </div>
-      <div className="space-y-1">
-        <h3 className="font-semibold text-sm text-foreground">{name}</h3>
-        <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
-      </div>
-    </div>
   );
 }
