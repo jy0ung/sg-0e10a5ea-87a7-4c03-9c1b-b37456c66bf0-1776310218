@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loggingService } from './loggingService';
 
-vi.mock('@/integrations/supabase/client', () => ({
+vi.mock('@flc/supabase', () => ({
   supabase: {
     from: vi.fn(() => ({
       insert: vi.fn().mockResolvedValue({ error: null }),

@@ -36,6 +36,7 @@ export default defineConfig(({ mode }) => {
         '@flc/shell': path.resolve(rootDir, 'packages/shell/src/index.ts'),
         '@flc/hrms-schemas': path.resolve(rootDir, 'packages/hrms-schemas/src/index.ts'),
         '@flc/hrms-services': path.resolve(rootDir, 'packages/hrms-services/src/index.ts'),
+        '@flc/platform-services': path.resolve(rootDir, 'packages/platform-services/src/index.ts'),
         '@flc/ui': path.resolve(rootDir, 'packages/ui/src'),
       },
       dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],

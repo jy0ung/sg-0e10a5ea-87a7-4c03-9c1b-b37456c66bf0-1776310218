@@ -26,6 +26,7 @@
       "@flc/shell": ["../../packages/shell/src/index.ts"],
       "@flc/hrms-schemas": ["../../packages/hrms-schemas/src/index.ts"],
       "@flc/hrms-services": ["../../packages/hrms-services/src/index.ts"],
+      "@flc/platform-services": ["../../packages/platform-services/src/index.ts"],
       "@flc/ui/*": ["../../packages/ui/src/*"]
     },
     "resolveJsonModule": true,

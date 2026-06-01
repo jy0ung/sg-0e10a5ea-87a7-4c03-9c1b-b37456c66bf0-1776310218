@@ -39,6 +39,7 @@
     "@flc/auth": "*",
     "@flc/hrms-schemas": "*",
     "@flc/hrms-services": "*",
+    "@flc/platform-services": "*",
     "@flc/shell": "*",
     "@flc/supabase": "*",
     "@flc/types": "*",
