@@ -9,7 +9,8 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getDmsSyncRunsSummary, getDmsRawStagingCounts, listSyncRuns, markSyncRunForRetry } from '@/services/dmsService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, CheckCircle2, Clock, Loader2, XCircle, Database, KeyRound, RotateCw, ShieldAlert } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { CheckCircle2, Clock, Loader2, XCircle, Database, KeyRound, RotateCw, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import type { SyncRunStatus, SyncSourceSystem } from '@/types';
 
@@ -111,11 +112,7 @@ export default function DmsSyncOps() {
           description="Inspect sync runs and DMS staging counts"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin' }, { label: 'DMS Sync Ops' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">DMS Sync Operations is not enabled for your company. Contact your administrator for access.</p>
-        </div>
+        <FeatureUnavailableState featureName="DMS Sync Operations" flagName="phase3c.dms-sync-ops-v2" />
       </div>
     );
   }

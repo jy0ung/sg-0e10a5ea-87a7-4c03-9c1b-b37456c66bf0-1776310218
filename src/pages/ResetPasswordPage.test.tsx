@@ -11,7 +11,7 @@ const mockVerifyOtp = vi.fn();
 const mockUpdateUser = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 
-vi.mock('@/integrations/supabase/client', () => ({
+vi.mock('@flc/supabase/client', () => ({
   supabase: {
     auth: {
       getSession: () => mockGetSession(),

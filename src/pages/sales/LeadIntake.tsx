@@ -10,7 +10,8 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getLeadsFeed } from '@/services/leadIntakeService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, ArrowRight, Calendar, MessageSquare, Target } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { ArrowRight, Calendar, MessageSquare, Target } from 'lucide-react';
 import type { LeadFollowupOutcome, LeadSourceKind } from '@/types';
 
 const OUTCOME_BADGE: Record<LeadFollowupOutcome, string> = {
@@ -72,11 +73,7 @@ export default function LeadIntake() {
           description="DMS leads & prospects with local follow-up tracking"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales' }, { label: 'Lead Intake' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Lead Intake is not enabled for your company. Contact your administrator for access.</p>
-        </div>
+        <FeatureUnavailableState featureName="Lead Intake" flagName="phase3f.lead-intake-v2" />
       </div>
     );
   }

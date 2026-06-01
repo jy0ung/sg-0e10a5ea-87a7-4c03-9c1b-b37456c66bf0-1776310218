@@ -8,7 +8,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { loadInbox, type InboxItem, type InboxSource, type InboxTone } from '@/services/inboxService';
-import { AlertTriangle, ArrowRight, Bell, ClipboardList, GitMerge, Inbox as InboxIcon, ShieldCheck } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { ArrowRight, Bell, ClipboardList, GitMerge, Inbox as InboxIcon, ShieldCheck } from 'lucide-react';
 
 const SOURCE_META: Record<InboxSource, { label: string; icon: typeof InboxIcon }> = {
   approval:       { label: 'Approvals',      icon: ShieldCheck },
@@ -67,11 +68,7 @@ export default function Inbox() {
           description="Unified workspace for approvals, reconciliation, requests, and notifications"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inbox' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto" data-testid="inbox-feature-off">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">The unified inbox is gated by the <code>phase4.unified-inbox</code> feature flag.</p>
-        </div>
+        <FeatureUnavailableState featureName="Inbox" flagName="phase4.unified-inbox" data-testid="inbox-feature-off" />
       </div>
     );
   }

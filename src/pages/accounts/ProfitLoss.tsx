@@ -8,7 +8,8 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { listAccountingPeriods, getProfitLoss } from '@/services/glService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import type { ProfitLossRow } from '@/types';
 
 function fmt(n: number) {
@@ -80,11 +81,7 @@ export default function ProfitLoss() {
           description="Revenue and expense activity by period"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Accounts' }, { label: 'Profit & Loss' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Financial reporting is not enabled for your company. Contact your administrator for access.</p>
-        </div>
+        <FeatureUnavailableState featureName="Profit & Loss" flagName="phase3b.financial-reports-v2" />
       </div>
     );
   }

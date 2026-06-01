@@ -1,5 +1,6 @@
 #!/usr/bin/env -S npx tsx
 import { chromium, type Page } from 'playwright';
+import { getProductionSmokeRoutes } from '@flc/shell';
 
 const DEFAULT_MAIN_URL = 'https://ubs.protonfookloi.com';
 const DEFAULT_HRMS_URL = 'https://hrms.protonfookloi.com';
@@ -35,81 +36,8 @@ const loginEmail = readEnv('PROD_LOGIN_EMAIL');
 const loginPassword = readEnv('PROD_LOGIN_PASSWORD');
 const routeTimeoutMs = parsePositiveInteger(readEnv('PROD_SMOKE_ROUTE_TIMEOUT_MS'), 45_000);
 
-const mainRoutes: RouteCheck[] = [
-  { module: 'Platform', name: 'Dashboard', path: '/' },
-  { module: 'Platform', name: 'Module Directory', path: '/modules' },
-  { module: 'Platform', name: 'Notifications', path: '/notifications' },
-  { module: 'Platform', name: 'Inbox', path: '/inbox' },
-  { module: 'Platform', name: 'Home', path: '/home' },
-  { module: 'Admin', name: 'KPI Studio', path: '/admin/kpi-studio' },
-  { module: 'Internal Requests', name: 'New Ticket', path: '/portal/tickets/new' },
-  { module: 'Internal Requests', name: 'My Tickets', path: '/portal/tickets' },
-  { module: 'Internal Requests', name: 'Request Queue', path: '/portal/queue' },
-  { module: 'Internal Requests', name: 'Request Setup', path: '/portal/setup' },
-  { module: 'Auto Aging', name: 'Overview', path: '/auto-aging' },
-  { module: 'Auto Aging', name: 'Vehicle Explorer', path: '/auto-aging/vehicles' },
-  { module: 'Auto Aging', name: 'Import Center', path: '/auto-aging/import' },
-  { module: 'Auto Aging', name: 'Review Queue', path: '/auto-aging/review' },
-  { module: 'Auto Aging', name: 'Import History', path: '/auto-aging/history' },
-  { module: 'Auto Aging', name: 'Data Quality', path: '/auto-aging/quality' },
-  { module: 'Auto Aging', name: 'SLA Policies', path: '/auto-aging/sla' },
-  { module: 'Auto Aging', name: 'Mappings', path: '/auto-aging/mappings' },
-  { module: 'Auto Aging', name: 'Commissions', path: '/auto-aging/commissions' },
-  { module: 'Auto Aging', name: 'Aging Reports', path: '/auto-aging/reports' },
-  { module: 'Sales', name: 'Overview', path: '/sales' },
-  { module: 'Sales', name: 'Deal Pipeline', path: '/sales/pipeline' },
-  { module: 'Sales', name: 'Lead Intake', path: '/sales/lead-intake' },
-  { module: 'Sales', name: 'Performance', path: '/sales/performance' },
-  { module: 'Sales', name: 'Margin Analysis', path: '/sales/margin' },
-  { module: 'Sales', name: 'Sales Orders', path: '/sales/orders' },
-  { module: 'Sales', name: 'Invoices', path: '/sales/invoices' },
-  { module: 'Sales', name: 'Customers', path: '/sales/customers' },
-  { module: 'Sales', name: 'Dealer Invoices', path: '/sales/dealer-invoices' },
-  { module: 'Sales', name: 'Verify OR', path: '/sales/verify-or' },
-  { module: 'Sales', name: 'Outstanding Collection', path: '/sales/outstanding' },
-  { module: 'Sales', name: 'Sales Advisors', path: '/sales/advisors' },
-  { module: 'Inventory', name: 'Stock Balance', path: '/inventory/stock' },
-  { module: 'Inventory', name: 'Chassis Filter', path: '/inventory/chassis-filter' },
-  { module: 'Inventory', name: 'Vehicle Transfer', path: '/inventory/transfers' },
-  { module: 'Inventory', name: 'Chassis Movement', path: '/inventory/chassis' },
-  { module: 'Purchasing', name: 'Purchase Orders', path: '/purchasing/orders' },
-  { module: 'Purchasing', name: 'Goods Receipt Notes', path: '/purchasing/grn' },
-  { module: 'Purchasing', name: '3-way Match', path: '/purchasing/three-way-match' },
-  { module: 'Purchasing', name: 'Purchase Invoices', path: '/purchasing/invoices' },
-  { module: 'Accounts', name: 'Profit & Loss', path: '/accounts/profit-loss' },
-  { module: 'Accounts', name: 'Balance Sheet', path: '/accounts/balance-sheet' },
-  { module: 'Accounts', name: 'Aging by Branch', path: '/accounts/aging-by-branch' },
-  { module: 'Accounts', name: 'Cash Position', path: '/accounts/cash-position' },
-  { module: 'Accounts', name: 'Period Close', path: '/accounts/period-close' },
-  { module: 'Reports', name: 'Business Reports', path: '/reports' },
-  { module: 'Admin', name: 'Settings', path: '/admin/settings' },
-  { module: 'Admin', name: 'Activity Overview', path: '/admin/activity' },
-  { module: 'Admin', name: 'DMS Sync Ops', path: '/admin/dms-sync' },
-  { module: 'Admin', name: 'Reconciliation Queue', path: '/admin/reconciliation' },
-  { module: 'Admin', name: 'Audit Log', path: '/admin/audit' },
-  { module: 'Admin', name: 'Users & Roles', path: '/admin/users' },
-  { module: 'Admin', name: 'User Groups', path: '/admin/user-groups' },
-  { module: 'Admin', name: 'Role Permissions', path: '/admin/role-permissions' },
-  { module: 'Admin', name: 'Branch Management', path: '/admin/branches' },
-  { module: 'Admin', name: 'Master Data', path: '/admin/master-data' },
-  { module: 'Admin', name: 'Suppliers', path: '/admin/suppliers' },
-  { module: 'Admin', name: 'Dealers', path: '/admin/dealers' },
-];
-
-const hrmsRoutes: RouteCheck[] = [
-  { module: 'HRMS', name: 'Root Redirect', path: '/' },
-  { module: 'HRMS', name: 'Leave', path: '/leave' },
-  { module: 'HRMS', name: 'Approvals', path: '/approvals' },
-  { module: 'HRMS', name: 'Appraisals', path: '/appraisals' },
-  { module: 'HRMS', name: 'Announcements', path: '/announcements' },
-  { module: 'HRMS', name: 'Profile', path: '/profile' },
-  { module: 'HRMS', name: 'Attendance', path: '/attendance' },
-  { module: 'HRMS', name: 'Leave Calendar', path: '/leave/calendar' },
-  { module: 'HRMS', name: 'Employees', path: '/employees' },
-  { module: 'HRMS', name: 'Payroll', path: '/payroll' },
-  { module: 'HRMS', name: 'Settings', path: '/settings' },
-  { module: 'HRMS', name: 'Approval Flows', path: '/approval-flows' },
-];
+const mainRoutes: RouteCheck[] = getProductionSmokeRoutes('main');
+const hrmsRoutes: RouteCheck[] = getProductionSmokeRoutes('hrms');
 
 function readEnv(name: string): string | undefined {
   const value = process.env[name]?.trim();

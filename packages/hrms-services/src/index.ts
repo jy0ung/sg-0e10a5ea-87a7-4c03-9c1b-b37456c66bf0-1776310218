@@ -18,6 +18,7 @@ export * from './leave/leaveService';
 export * from './payroll/payrollService';
 export * from './appraisal/appraisalService';
 export * from './settings/settingsService';
+export * from './settings/rolloverService';
 
 // Backward-compat alias used by apps/hrms-mobile
 export { listLeaveTypes as getLeaveTypes } from './leave/leaveService';
@@ -85,4 +86,3 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
     .eq('read', false);
   if (error) throw new Error(error.message);
 }
-

@@ -1,5 +1,13 @@
 # FLC BI — Architecture
 
+> **Active enterprise architecture source of truth:** see
+> [ENTERPRISE_REARCHITECTURE.md](ENTERPRISE_REARCHITECTURE.md).
+>
+> This file remains a useful implementation overview, but sections that mention
+> historical route counts, extracted package status, or old phase debt should be
+> treated as descriptive context rather than the transformation plan. Durable
+> decisions now live in [docs/adr](adr/README.md).
+
 ## Monorepo layout
 
 ```
@@ -136,4 +144,3 @@ src/features/{module}/
 ```
 
 Existing code under `src/pages/` and `src/services/` remains in place. Migrate incrementally when touching a file for another reason.
-

@@ -54,6 +54,7 @@ import {
   replaceHrmsRoleEmployeeAssignments,
   updateHrmsRole,
 } from '@/services/hrmsRoleService';
+import { runLeaveBalanceRollover } from '@flc/hrms-services';
 
 const ApprovalFlowsWorkspace = lazy(() => import('./ApprovalFlows'));
 const LeaveQuotaPanel = lazy(() => import('./LeaveQuotaPanel'));
@@ -1095,13 +1096,12 @@ function RolloverPanel({ companyId, canWrite }: RolloverPanelProps) {
     if (!canWrite) return;
     setRunning(true);
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const { VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY } = import.meta.env as Record<string, string>;
-      const client = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY);
-      const { error } = await client.functions.invoke('rollover-leave-balances', {
-        body: { company_id: companyId, from_year: form.fromYear, to_year: form.toYear, max_carry_days: form.maxCarryDays },
+      await runLeaveBalanceRollover({
+        companyId,
+        fromYear: form.fromYear,
+        toYear: form.toYear,
+        maxCarryDays: form.maxCarryDays,
       });
-      if (error) throw error;
       toast({ title: 'Leave rollover completed', description: `Balances rolled from ${form.fromYear} → ${form.toYear}.` });
     } catch (err) {
       toast({ title: 'Rollover failed', description: String((err as Error).message), variant: 'destructive' });

@@ -3,13 +3,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getRoleHomeKpis, listKpiDefinitions, upsertRoleKpiDefaults } from '@/services/kpiHomeService';
 import { toast } from 'sonner';
-import { AlertTriangle, Loader2, Save } from 'lucide-react';
+import { Loader2, Save } from 'lucide-react';
 import type { AppRole } from '@/types';
 
 const APP_ROLES: AppRole[] = [
@@ -94,11 +95,7 @@ export default function KpiStudio() {
           description="Curate which KPIs each role sees on Home"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin' }, { label: 'KPI Studio' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto" data-testid="studio-feature-off">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">The KPI Studio is gated by the <code>phase4.role-home</code> feature flag.</p>
-        </div>
+        <FeatureUnavailableState featureName="KPI Studio" flagName="phase4.role-home" data-testid="studio-feature-off" />
       </div>
     );
   }

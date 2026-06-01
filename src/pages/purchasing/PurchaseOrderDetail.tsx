@@ -9,7 +9,8 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getPurchaseOrder, transitionPoStatus } from '@/services/purchaseOrderService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardCheck, Loader2, Send, XCircle } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { ArrowLeft, CheckCircle2, ClipboardCheck, Loader2, Send, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PurchaseOrderStatus } from '@/types';
 
@@ -82,10 +83,7 @@ export default function PurchaseOrderDetail() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Purchase Order" description="" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'Purchase Order' }]} />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-        </div>
+        <FeatureUnavailableState featureName="Purchase Order" flagName="phase3e.po-grn-v2" />
       </div>
     );
   }

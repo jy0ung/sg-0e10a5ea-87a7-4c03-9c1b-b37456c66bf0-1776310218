@@ -8,6 +8,7 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { listAccountingPeriods, getBalanceSheet } from '@/services/glService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { BalanceSheetRow } from '@/types';
 
@@ -98,11 +99,7 @@ export default function BalanceSheet() {
           description="Statement of financial position as of period end"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Accounts' }, { label: 'Balance Sheet' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Financial reporting is not enabled for your company. Contact your administrator for access.</p>
-        </div>
+        <FeatureUnavailableState featureName="Balance Sheet" flagName="phase3b.financial-reports-v2" />
       </div>
     );
   }

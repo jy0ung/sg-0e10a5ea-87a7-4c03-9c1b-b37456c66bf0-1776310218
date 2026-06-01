@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, KeyRound, Loader2, Plus, RefreshCcw } from 'lucide-react';
+import { KeyRound, Loader2, Plus, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { EmptyState, PageErrorState } from '@/components/shared/PageState';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -194,13 +195,7 @@ export default function WebhookOutbox() {
           description="Durable event fan-out to external HTTPS consumers"
           breadcrumbs={[{ label: 'Admin', path: '/admin' }, { label: 'Webhooks' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto" data-testid="webhook-outbox-feature-off">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">
-            The webhook outbox is gated by the <code>phase6.webhook-outbox</code> feature flag.
-          </p>
-        </div>
+        <FeatureUnavailableState featureName="Webhook Outbox" flagName="phase6.webhook-outbox" data-testid="webhook-outbox-feature-off" />
       </div>
     );
   }
