@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
@@ -15,9 +15,9 @@ import {
   Users,
   AlertCircle,
   CalendarCheck,
-  Zap,
+  PlusCircle,
+  Settings2,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +27,9 @@ import { useLeaveData } from '@/hooks/useLeaveData';
 import { useApprovalInboxItems } from '@/hooks/useApprovalInboxItems';
 import { listAnnouncements, listAttendanceRecords } from '@/services/hrmsService';
 import { cn } from '@/lib/utils';
+import { MetricCard } from '@/components/shared/MetricCard';
+import { SectionCard } from '@/components/shared/SectionCard';
+import { toneClass, type Tone } from '@/lib/statusTones';
 import type { Announcement, LeaveBalance, LeaveRequest } from '@/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -73,96 +76,48 @@ function timeAgo(isoDate: string): string {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-interface MetricCardProps {
-  label: string;
-  value: React.ReactNode;
-  sub?: string;
-  icon: React.ElementType;
-  iconColor: string;
-  trend?: 'up' | 'down' | 'neutral';
-  href?: string;
-  loading?: boolean;
-}
-
-function MetricCard({ label, value, sub, icon: Icon, iconColor, href, loading }: MetricCardProps) {
-  const inner = (
-    <Card className={cn(
-      'relative overflow-hidden shadow-sm transition-all',
-      href && 'cursor-pointer hover:shadow-md hover:-translate-y-0.5',
-    )}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-            {loading ? (
-              <Skeleton className="mt-1 h-8 w-16" />
-            ) : (
-              <p className="mt-1 text-2xl font-bold leading-none tabular-nums text-foreground">{value}</p>
-            )}
-            {sub && !loading && (
-              <p className="mt-1 truncate text-xs text-muted-foreground">{sub}</p>
-            )}
-          </div>
-          <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', iconColor)}>
-            <Icon className="h-5 w-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  if (href) return <Link to={href}>{inner}</Link>;
-  return inner;
-}
-
-interface SectionHeaderProps {
-  title: string;
-  action?: { label: string; href: string };
-}
-
-function SectionHeader({ title, action }: SectionHeaderProps) {
-  return (
-    <div className="flex items-center justify-between">
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
-      {action && (
-        <Link
-          to={action.href}
-          className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-        >
-          {action.label}
-          <ArrowRight className="h-3 w-3" />
-        </Link>
-      )}
-    </div>
-  );
-}
-
-interface QuickActionCardProps {
+interface QuickActionRowProps {
   label: string;
   description: string;
   icon: React.ElementType;
-  iconColor: string;
+  tone: Tone;
   href: string;
 }
 
-function QuickActionCard({ label, description, icon: Icon, iconColor, href }: QuickActionCardProps) {
+const ACTION_CHIP: Record<Tone, string> = {
+  amber:   'bg-amber-500/12 text-amber-600 dark:text-amber-400',
+  red:     'bg-red-500/12 text-red-600 dark:text-red-400',
+  blue:    'bg-blue-500/12 text-blue-600 dark:text-blue-400',
+  emerald: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400',
+  violet:  'bg-violet-500/12 text-violet-600 dark:text-violet-400',
+  slate:   'bg-slate-500/12 text-slate-600 dark:text-slate-300',
+  muted:   'bg-primary/10 text-primary',
+};
+
+function QuickActionRow({ label, description, icon: Icon, tone, href }: QuickActionRowProps) {
   return (
-    <Link to={href}>
-      <Card className="cursor-pointer shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
-        <CardContent className="flex items-center gap-3 p-4">
-          <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', iconColor)}>
-            <Icon className="h-4.5 w-4.5 h-[18px] w-[18px]" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold leading-tight text-foreground">{label}</p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">{description}</p>
-          </div>
-          <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground/50" />
-        </CardContent>
-      </Card>
+    <Link
+      to={href}
+      className="group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-all hover:border-primary/30 hover:bg-muted/40"
+    >
+      <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', ACTION_CHIP[tone])}>
+        <Icon className="h-[18px] w-[18px]" aria-hidden />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold leading-tight text-foreground">{label}</span>
+        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{description}</span>
+      </span>
+      <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5" aria-hidden />
     </Link>
   );
 }
+
+const LEAVE_STATUS_TONE: Record<string, Tone> = {
+  pending: 'amber',
+  approved: 'emerald',
+  rejected: 'red',
+  cancelled: 'slate',
+};
 
 interface LeaveRequestRowProps {
   request: LeaveRequest;
@@ -170,25 +125,18 @@ interface LeaveRequestRowProps {
 }
 
 function LeaveRequestRow({ request, leaveTypeName }: LeaveRequestRowProps) {
-  const statusStyles: Record<string, string> = {
-    pending:   'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    approved:  'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-    rejected:  'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    cancelled: 'bg-secondary text-secondary-foreground',
-  };
-
   return (
     <div className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50">
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex min-w-0 items-center gap-3">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Calendar className="h-3.5 w-3.5" />
+          <Calendar className="h-3.5 w-3.5" aria-hidden />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-foreground">{leaveTypeName}</p>
           <p className="text-xs text-muted-foreground">{fmtLeaveRange(request.startDate, request.endDate)}</p>
         </div>
       </div>
-      <Badge className={cn('shrink-0 text-xs capitalize', statusStyles[request.status] ?? 'bg-secondary text-secondary-foreground')}>
+      <Badge className={cn('shrink-0 text-xs capitalize', toneClass(LEAVE_STATUS_TONE[request.status] ?? 'slate'))}>
         {request.status === 'pending' ? 'Pending' : request.status}
       </Badge>
     </div>
@@ -233,6 +181,7 @@ function BalanceRow({ balance, typeName }: BalanceRowProps) {
 
 export default function HrmsDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const hrmsAccess = useHrmsAccess();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -310,98 +259,108 @@ export default function HrmsDashboard() {
     return aOrder - bOrder;
   });
 
-  const priorityBadge: Record<string, string> = {
-    urgent: 'bg-red-100 text-red-700 border-red-200',
-    high:   'bg-orange-100 text-orange-700 border-orange-200',
-    normal: 'bg-blue-50 text-blue-600 border-blue-100',
-    low:    'bg-gray-100 text-gray-500 border-gray-200',
+  const announcementTone: Record<string, Tone> = {
+    urgent: 'red',
+    high:   'amber',
+    normal: 'blue',
+    low:    'slate',
   };
 
   return (
     <div className="w-full space-y-6">
 
-      {/* ── Welcome Header ──────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/8 via-background to-background px-6 py-5 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md">
-              <span className="text-base font-bold">{getInitials(user?.name)}</span>
-            </div>
-            <div>
-              <p className="text-lg font-semibold leading-tight text-foreground">
-                {getGreeting()}, {firstName}
-              </p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {format(new Date(), 'EEEE, d MMMM yyyy')}
-              </p>
-            </div>
+      {/* ── Hero ────────────────────────────────────────────────────────────── */}
+      <header className="surface-card hero-gradient flex flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md">
+            <span className="text-base font-bold">{getInitials(user?.name)}</span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {hrmsAccess.primaryRoleLabel && (
-              <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary text-xs px-2.5 py-1">
-                {hrmsAccess.primaryRoleLabel}
-              </Badge>
-            )}
-            {hrmsAccess.canApproveRequests && approvalItems.length > 0 && (
-              <Link to="/approvals">
-                <Badge className="gap-1 bg-amber-500 text-white hover:bg-amber-600 text-xs px-2.5 py-1 shadow-sm">
-                  <Inbox className="h-3 w-3" />
-                  {approvalItems.length} pending
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-lg font-semibold leading-tight tracking-tight text-foreground">
+                {getGreeting()}, {firstName}
+              </h1>
+              {hrmsAccess.primaryRoleLabel && (
+                <Badge variant="outline" className="border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] text-primary">
+                  {hrmsAccess.primaryRoleLabel}
                 </Badge>
-              </Link>
-            )}
+              )}
+            </div>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {format(new Date(), 'EEEE, d MMMM yyyy')}
+            </p>
           </div>
         </div>
-      </div>
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+          <Button asChild size="sm" className="gap-1.5">
+            <Link to="/leave">
+              <PlusCircle className="h-4 w-4" aria-hidden />
+              Apply for leave
+            </Link>
+          </Button>
+          {hrmsAccess.canApproveRequests && (
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link to="/approvals">
+                <Inbox className="h-4 w-4" aria-hidden />
+                Approvals
+                {approvalItems.length > 0 && (
+                  <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">
+                    {approvalItems.length}
+                  </span>
+                )}
+              </Link>
+            </Button>
+          )}
+        </div>
+      </header>
 
       {/* ── Metric Strip ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-5">
         <MetricCard
           label="Leave Available"
           value={primaryBalance != null ? `${primaryBalance.remainingDays}d` : '—'}
-          sub={primaryBalance != null ? 'days remaining' : 'No balance data'}
+          hint={primaryBalance != null ? 'days remaining' : 'No balance data'}
           icon={Calendar}
-          iconColor="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
-          href="/leave"
+          tone="emerald"
+          onClick={() => navigate('/leave')}
           loading={leaveData.isLoading}
+          data-testid="hrms-metric-leave-available"
         />
         <MetricCard
           label="My Pending"
           value={leaveData.myActivePending.length}
-          sub={leaveData.myActivePending.length === 1 ? 'leave request' : 'leave requests'}
+          hint={leaveData.myActivePending.length === 1 ? 'leave request' : 'leave requests'}
           icon={Clock}
-          iconColor={leaveData.myActivePending.length > 0
-            ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
-            : 'bg-muted text-muted-foreground'}
-          href="/leave"
+          tone={leaveData.myActivePending.length > 0 ? 'amber' : 'muted'}
+          onClick={() => navigate('/leave')}
           loading={leaveData.isLoading}
+          data-testid="hrms-metric-pending"
         />
         <MetricCard
           label="Attendance Today"
           value={<span className={attendanceColor}>{attendanceLabel}</span>}
-          sub={todayAttendance?.clockIn ? `In: ${todayAttendance.clockIn}` : undefined}
+          hint={todayAttendance?.clockIn ? `In: ${todayAttendance.clockIn}` : undefined}
           icon={CheckCircle2}
-          iconColor="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+          tone="blue"
         />
         <MetricCard
           label="Upcoming Leave"
           value={leaveData.myUpcoming.length > 0 ? fmtLeaveRange(leaveData.myUpcoming[0].startDate, leaveData.myUpcoming[0].endDate) : '—'}
-          sub={leaveData.myUpcoming.length > 0 ? leaveTypeMap.get(leaveData.myUpcoming[0].leaveTypeId) : 'None scheduled'}
+          hint={leaveData.myUpcoming.length > 0 ? leaveTypeMap.get(leaveData.myUpcoming[0].leaveTypeId) : 'None scheduled'}
           icon={CalendarCheck}
-          iconColor="bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400"
-          href="/leave"
+          tone="violet"
+          onClick={() => navigate('/leave')}
           loading={leaveData.isLoading}
         />
         {isManager && (
           <MetricCard
             label="Needs My Action"
             value={approvalItems.length}
-            sub={approvalItems.length === 1 ? 'approval pending' : 'approvals pending'}
+            hint={approvalItems.length === 1 ? 'approval pending' : 'approvals pending'}
             icon={Inbox}
-            iconColor={approvalItems.length > 0
-              ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
-              : 'bg-muted text-muted-foreground'}
-            href="/approvals"
+            tone={approvalItems.length > 0 ? 'amber' : 'muted'}
+            onClick={() => navigate('/approvals')}
+            data-testid="hrms-metric-approvals"
           />
         )}
       </div>
@@ -412,145 +371,132 @@ export default function HrmsDashboard() {
         {/* ── Left / Main column (2/3) ─────────────────────────────────────── */}
         <div className="space-y-6 xl:col-span-2">
 
-          {/* Approval Queue — managers only */}
+          {/* Action Required — managers only */}
           {isManager && approvalItems.length > 0 && (
-            <div className="space-y-3">
-              <SectionHeader title="Action Required" action={{ label: 'View all', href: '/approvals' }} />
-              <Card className="shadow-sm border-amber-200/60 dark:border-amber-800/30">
-                <CardContent className="divide-y p-0">
-                  {approvalItems.slice(0, 4).map((item) => (
-                    <Link key={item.entityId} to="/approvals" className="block transition-colors hover:bg-muted/50">
-                      <div className="flex items-center gap-3 px-4 py-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                          <Inbox className="h-3.5 w-3.5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
-                          <p className="text-xs text-muted-foreground">{item.subtitle}</p>
-                        </div>
-                        <Badge className="shrink-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs border-amber-200">
-                          Review
-                        </Badge>
+            <SectionCard
+              title="Action required"
+              description={`${approvalItems.length} ${approvalItems.length === 1 ? 'item needs' : 'items need'} your review`}
+              icon={Inbox}
+              action={{ label: 'View all', to: '/approvals' }}
+              bodyClassName="p-0"
+            >
+              <div className="divide-y">
+                {approvalItems.slice(0, 5).map((item) => (
+                  <Link key={item.entityId} to="/approvals" className="block transition-colors hover:bg-muted/50">
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/12 text-amber-600 dark:text-amber-400">
+                        <Inbox className="h-3.5 w-3.5" aria-hidden />
                       </div>
-                    </Link>
-                  ))}
-                  {approvalItems.length > 4 && (
-                    <div className="px-4 py-2.5 text-center">
-                      <Link to="/approvals" className="text-xs font-medium text-primary hover:underline">
-                        +{approvalItems.length - 4} more pending
-                      </Link>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">{item.title}</p>
+                        <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
+                      </div>
+                      <Badge className={cn('shrink-0 text-xs', toneClass('amber'))}>Review</Badge>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* My Leave Requests */}
-          <div className="space-y-3">
-            <SectionHeader
-              title={activeAndUpcomingRequests.length > 0 ? 'My Active Leave' : 'My Recent Leave'}
-              action={{ label: 'View all', href: '/leave' }}
-            />
-            <Card className="shadow-sm">
-              <CardContent className="p-0">
-                {leaveData.isLoading ? (
-                  <div className="divide-y">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="flex items-center gap-3 px-4 py-3">
-                        <Skeleton className="h-8 w-8 rounded-lg" />
-                        <div className="flex-1 space-y-1">
-                          <Skeleton className="h-3.5 w-32" />
-                          <Skeleton className="h-3 w-20" />
-                        </div>
-                        <Skeleton className="h-5 w-16 rounded-full" />
-                      </div>
-                    ))}
-                  </div>
-                ) : activeAndUpcomingRequests.length > 0 ? (
-                  <div className="divide-y">
-                    {activeAndUpcomingRequests.map((req) => (
-                      <LeaveRequestRow
-                        key={req.id}
-                        request={req}
-                        leaveTypeName={leaveTypeMap.get(req.leaveTypeId) ?? 'Leave'}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
-                    <Calendar className="h-8 w-8 opacity-25" />
-                    <p className="text-sm">No active or upcoming leave</p>
-                    <Link to="/leave">
-                      <Button variant="outline" size="sm" className="mt-1 gap-1.5">
-                        Apply for Leave
-                      </Button>
+                  </Link>
+                ))}
+                {approvalItems.length > 5 && (
+                  <div className="px-4 py-2.5 text-center">
+                    <Link to="/approvals" className="text-xs font-semibold text-primary hover:underline">
+                      +{approvalItems.length - 5} more pending
                     </Link>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {/* My Leave Requests */}
+          <SectionCard
+            title={activeAndUpcomingRequests.length > 0 ? 'My active leave' : 'My recent leave'}
+            description="Requests in progress and upcoming time off"
+            icon={Calendar}
+            action={{ label: 'View all', to: '/leave' }}
+            bodyClassName="p-0"
+          >
+            {leaveData.isLoading ? (
+              <div className="divide-y">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3">
+                    <Skeleton className="h-8 w-8 rounded-lg" />
+                    <div className="flex-1 space-y-1">
+                      <Skeleton className="h-3.5 w-32" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                ))}
+              </div>
+            ) : activeAndUpcomingRequests.length > 0 ? (
+              <div className="divide-y">
+                {activeAndUpcomingRequests.map((req) => (
+                  <LeaveRequestRow
+                    key={req.id}
+                    request={req}
+                    leaveTypeName={leaveTypeMap.get(req.leaveTypeId) ?? 'Leave'}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
+                <Calendar className="h-8 w-8 opacity-25" aria-hidden />
+                <p className="text-sm">No active or upcoming leave</p>
+                <Button asChild variant="outline" size="sm" className="mt-1 gap-1.5">
+                  <Link to="/leave">Apply for leave</Link>
+                </Button>
+              </div>
+            )}
+          </SectionCard>
 
           {/* Announcements */}
-          <div className="space-y-3">
-            <SectionHeader title="Recent Announcements" action={{ label: 'View all', href: '/announcements' }} />
+          <SectionCard
+            title="Recent announcements"
+            description="Company communications and notices"
+            icon={Megaphone}
+            action={{ label: 'View all', to: '/announcements' }}
+            bodyClassName="p-0"
+          >
             {announcementsLoading ? (
-              <div className="space-y-3">
+              <div className="divide-y">
                 {[1, 2].map((i) => (
-                  <Card key={i} className="shadow-sm">
-                    <CardContent className="p-4">
-                      <Skeleton className="h-4 w-48 mb-2" />
-                      <Skeleton className="h-3 w-full mb-1" />
-                      <Skeleton className="h-3 w-3/4" />
-                    </CardContent>
-                  </Card>
+                  <div key={i} className="px-4 py-3">
+                    <Skeleton className="mb-2 h-4 w-48" />
+                    <Skeleton className="mb-1 h-3 w-full" />
+                    <Skeleton className="h-3 w-3/4" />
+                  </div>
                 ))}
               </div>
             ) : sortedAnnouncements.length > 0 ? (
-              <div className="space-y-3">
+              <div className="divide-y">
                 {sortedAnnouncements.map((ann) => (
-                  <Link key={ann.id} to="/announcements">
-                    <Card className={cn(
-                      'shadow-sm cursor-pointer transition-all hover:shadow-md',
-                      ann.pinned && 'border-primary/40',
-                    )}>
-                      <CardContent className="p-4">
-                        <div className="mb-2 flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Megaphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                            <p className="truncate text-sm font-semibold text-foreground">{ann.title}</p>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                'text-[10px] capitalize px-1.5 py-0.5',
-                                priorityBadge[ann.priority] ?? '',
-                              )}
-                            >
-                              {ann.priority}
-                            </Badge>
-                          </div>
-                        </div>
-                        <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{ann.body}</p>
-                        <p className="mt-2 text-[10px] text-muted-foreground/60">
-                          {ann.authorName ?? 'HR'} · {timeAgo(ann.createdAt)}
-                        </p>
-                      </CardContent>
-                    </Card>
+                  <Link
+                    key={ann.id}
+                    to="/announcements"
+                    className={cn('block px-4 py-3 transition-colors hover:bg-muted/50', ann.pinned && 'bg-primary/[0.03]')}
+                  >
+                    <div className="mb-1 flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Megaphone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                        <p className="truncate text-sm font-semibold text-foreground">{ann.title}</p>
+                      </div>
+                      <Badge className={cn('shrink-0 text-[10px] capitalize', toneClass(announcementTone[ann.priority] ?? 'slate'))}>
+                        {ann.priority}
+                      </Badge>
+                    </div>
+                    <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{ann.body}</p>
+                    <p className="mt-1.5 text-[10px] text-muted-foreground/60">
+                      {ann.authorName ?? 'HR'} · {timeAgo(ann.createdAt)}
+                    </p>
                   </Link>
                 ))}
               </div>
             ) : (
-              <Card className="shadow-sm">
-                <CardContent className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
-                  <Megaphone className="h-8 w-8 opacity-25" />
-                  <p className="text-sm">No announcements yet</p>
-                </CardContent>
-              </Card>
+              <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
+                <Megaphone className="h-8 w-8 opacity-25" aria-hidden />
+                <p className="text-sm">No announcements yet</p>
+              </div>
             )}
-          </div>
+          </SectionCard>
 
         </div>
 
@@ -558,166 +504,160 @@ export default function HrmsDashboard() {
         <div className="space-y-6">
 
           {/* Leave Balances */}
-          <div className="space-y-3">
-            <SectionHeader title="Leave Balances" action={{ label: 'Manage', href: '/leave' }} />
-            <Card className="shadow-sm">
-              <CardContent className="p-4">
-                {leaveData.isLoading ? (
-                  <div className="space-y-3">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="space-y-1.5">
-                        <div className="flex justify-between">
-                          <Skeleton className="h-3 w-24" />
-                          <Skeleton className="h-3 w-16" />
-                        </div>
-                        <Skeleton className="h-1.5 w-full rounded-full" />
-                      </div>
-                    ))}
+          <SectionCard
+            title="Leave balances"
+            description="Entitlement remaining by type"
+            icon={CalendarCheck}
+            action={{ label: 'Manage', to: '/leave' }}
+          >
+            {leaveData.isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex justify-between">
+                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                    <Skeleton className="h-1.5 w-full rounded-full" />
                   </div>
-                ) : balancesToShow.length > 0 ? (
-                  <div className="space-y-3.5">
-                    {balancesToShow.map((balance) => (
-                      <BalanceRow
-                        key={balance.id}
-                        balance={balance}
-                        typeName={leaveData.leaveTypes.find((t) => t.id === balance.leaveTypeId)?.name ?? 'Leave'}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-1 py-6 text-muted-foreground">
-                    <AlertCircle className="h-6 w-6 opacity-30" />
-                    <p className="text-sm">Balances not initialised</p>
-                    <p className="text-xs text-center">Contact HR to set up your leave balances.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                ))}
+              </div>
+            ) : balancesToShow.length > 0 ? (
+              <div className="space-y-3.5">
+                {balancesToShow.map((balance) => (
+                  <BalanceRow
+                    key={balance.id}
+                    balance={balance}
+                    typeName={leaveData.leaveTypes.find((t) => t.id === balance.leaveTypeId)?.name ?? 'Leave'}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-1 py-6 text-center text-muted-foreground">
+                <AlertCircle className="h-6 w-6 opacity-30" aria-hidden />
+                <p className="text-sm">Balances not initialised</p>
+                <p className="text-xs">Contact HR to set up your leave balances.</p>
+              </div>
+            )}
+          </SectionCard>
 
           {/* Quick Actions */}
-          <div className="space-y-3">
-            <SectionHeader title="Quick Actions" />
-            <div className="space-y-2">
-              <QuickActionCard
-                label="Apply for Leave"
-                description="Submit a new leave request"
-                icon={Calendar}
-                iconColor="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
-                href="/leave"
+          <SectionCard title="Quick actions" icon={TrendingUp} bodyClassName="space-y-2 p-3">
+            <QuickActionRow
+              label="Apply for leave"
+              description="Submit a new leave request"
+              icon={Calendar}
+              tone="emerald"
+              href="/leave"
+            />
+            {hrmsAccess.canApproveRequests && (
+              <QuickActionRow
+                label="Approval inbox"
+                description={approvalItems.length > 0 ? `${approvalItems.length} items need your review` : 'Review pending items'}
+                icon={Inbox}
+                tone="amber"
+                href="/approvals"
               />
-              {hrmsAccess.canApproveRequests && (
-                <QuickActionCard
-                  label="Approval Inbox"
-                  description={approvalItems.length > 0 ? `${approvalItems.length} items need your review` : 'Review pending items'}
-                  icon={Inbox}
-                  iconColor="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-                  href="/approvals"
-                />
-              )}
-              {hrmsAccess.canAccessAppraisals && (
-                <QuickActionCard
-                  label="My Appraisals"
-                  description="View performance reviews"
-                  icon={Star}
-                  iconColor="bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
-                  href="/appraisals"
-                />
-              )}
-              {hrmsAccess.canAccessEmployees && (
-                <QuickActionCard
-                  label="Employee Directory"
-                  description="Browse workforce records"
-                  icon={Users}
-                  iconColor="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                  href="/employees"
-                />
-              )}
-              {isHrAdmin && (
-                <QuickActionCard
-                  label="HRMS Settings"
-                  description="Manage roles, flows, and config"
-                  icon={Zap}
-                  iconColor="bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400"
-                  href="/settings"
-                />
-              )}
-            </div>
-          </div>
+            )}
+            {hrmsAccess.canAccessAppraisals && (
+              <QuickActionRow
+                label="My appraisals"
+                description="View performance reviews"
+                icon={Star}
+                tone="violet"
+                href="/appraisals"
+              />
+            )}
+            {hrmsAccess.canAccessEmployees && (
+              <QuickActionRow
+                label="Employee directory"
+                description="Browse workforce records"
+                icon={Users}
+                tone="blue"
+                href="/employees"
+              />
+            )}
+            {isHrAdmin && (
+              <QuickActionRow
+                label="HRMS settings"
+                description="Manage roles, flows, and config"
+                icon={Settings2}
+                tone="slate"
+                href="/settings"
+              />
+            )}
+          </SectionCard>
 
           {/* Workforce context — managers/HR */}
           {isManager && (
-            <div className="space-y-3">
-              <SectionHeader title="Team at a Glance" action={{ label: 'Leave Calendar', href: '/leave/calendar' }} />
-              <Card className="shadow-sm">
-                <CardContent className="p-4">
-                  {leaveData.isLoading ? (
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-24" />
+            <SectionCard
+              title="Team at a glance"
+              description="Who's out and what's pending"
+              icon={Users}
+              action={{ label: 'Calendar', to: '/leave/calendar' }}
+            >
+              {leaveData.isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      <span className="text-sm font-medium">Team on leave today</span>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Team on leave today</span>
+                    <span className="font-bold tabular-nums text-foreground">{leaveData.teamOnLeaveToday.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      <span className="text-sm font-medium">Pending approvals</span>
+                    </div>
+                    <span className={cn('font-bold tabular-nums', approvalItems.length > 0 ? 'text-amber-600' : 'text-foreground')}>
+                      {approvalItems.length}
+                    </span>
+                  </div>
+                  {leaveData.teamOnLeaveToday.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Away today</p>
+                      {leaveData.teamOnLeaveToday.slice(0, 3).map((req) => (
+                        <div key={req.id} className="flex items-center gap-2">
+                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                            {getInitials(req.employeeName)}
+                          </div>
+                          <span className="truncate text-xs text-foreground">{req.employeeName}</span>
                         </div>
-                        <span className="font-bold tabular-nums text-foreground">{leaveData.teamOnLeaveToday.length}</span>
-                      </div>
-                      <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Pending approvals</span>
-                        </div>
-                        <span className={cn('font-bold tabular-nums', approvalItems.length > 0 ? 'text-amber-600' : 'text-foreground')}>
-                          {approvalItems.length}
-                        </span>
-                      </div>
-                      {leaveData.teamOnLeaveToday.length > 0 && (
-                        <div className="space-y-1.5">
-                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Away Today</p>
-                          {leaveData.teamOnLeaveToday.slice(0, 3).map((req) => (
-                            <div key={req.id} className="flex items-center gap-2">
-                              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                                {getInitials(req.employeeName)}
-                              </div>
-                              <span className="truncate text-xs text-foreground">{req.employeeName}</span>
-                            </div>
-                          ))}
-                          {leaveData.teamOnLeaveToday.length > 3 && (
-                            <p className="text-xs text-muted-foreground">+{leaveData.teamOnLeaveToday.length - 3} more</p>
-                          )}
-                        </div>
+                      ))}
+                      {leaveData.teamOnLeaveToday.length > 3 && (
+                        <p className="text-xs text-muted-foreground">+{leaveData.teamOnLeaveToday.length - 3} more</p>
                       )}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              )}
+            </SectionCard>
           )}
 
           {/* Performance / Appraisals teaser */}
           {hrmsAccess.canAccessAppraisals && (
-            <div className="space-y-3">
-              <SectionHeader title="Performance" action={{ label: 'View', href: '/appraisals' }} />
-              <Card className="shadow-sm">
-                <CardContent className="flex items-center gap-3 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400">
-                    <TrendingUp className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground">Appraisals</p>
-                    <p className="text-xs text-muted-foreground">View performance reviews and cycles</p>
-                  </div>
+            <SectionCard title="Performance" icon={Star} action={{ label: 'Open', to: '/appraisals' }}>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-600 dark:text-violet-400">
+                  <TrendingUp className="h-5 w-5" aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">Appraisals</p>
+                  <p className="text-xs text-muted-foreground">View performance reviews and cycles</p>
+                </div>
+                <Button asChild variant="outline" size="sm" className="shrink-0 gap-1 text-xs">
                   <Link to="/appraisals">
-                    <Button variant="outline" size="sm" className="shrink-0 gap-1 text-xs">
-                      Open <ArrowRight className="h-3 w-3" />
-                    </Button>
+                    Open <ArrowRight className="h-3 w-3" aria-hidden />
                   </Link>
-                </CardContent>
-              </Card>
-            </div>
+                </Button>
+              </div>
+            </SectionCard>
           )}
 
         </div>
