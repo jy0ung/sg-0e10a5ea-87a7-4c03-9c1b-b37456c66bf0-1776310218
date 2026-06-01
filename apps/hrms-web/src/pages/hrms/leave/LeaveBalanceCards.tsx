@@ -20,7 +20,7 @@ function CompactBalanceRow({ lt, balance }: { lt: LeaveType; balance: LeaveBalan
         <p className="truncate text-xs font-medium">{lt.name}</p>
       </div>
       {isUnpaid ? (
-        <p className="flex-1 text-xs text-muted-foreground">No limit · Approval required</p>
+        <p className="flex-1 text-xs text-muted-foreground">No entitlement limit / Subject to approval</p>
       ) : !balance ? (
         <p className="flex-1 text-xs italic text-muted-foreground">Not initialized</p>
       ) : (

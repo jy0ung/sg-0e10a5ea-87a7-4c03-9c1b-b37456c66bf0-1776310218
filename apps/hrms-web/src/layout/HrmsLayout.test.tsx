@@ -116,6 +116,7 @@ describe('HrmsLayout', () => {
       '/profile',
       '/employees',
       '/attendance',
+      '/leave/team',
       '/leave/calendar',
       '/approvals',
       '/payroll',
@@ -130,6 +131,7 @@ describe('HrmsLayout', () => {
     expect(screen.getByRole('link', { name: 'My Leave' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Approval Inbox' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'My Profile' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Team Leave' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Employee Directory' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Payroll' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'HRMS Settings' })).not.toBeInTheDocument();
@@ -140,6 +142,7 @@ describe('HrmsLayout', () => {
     renderLayout('company_admin', '/settings');
 
     expect(screen.getByRole('link', { name: 'Employee Directory' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Team Leave' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Payroll' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'HRMS Settings' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Approval Flows' })).not.toBeInTheDocument();

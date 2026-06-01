@@ -1,17 +1,13 @@
-import React, { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { CalendarRange, ClipboardCheck, Plus, ShieldCheck } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useHrmsAccess } from '@/hooks/useHrmsAccess';
+import { CalendarRange, Plus } from 'lucide-react';
 import { matchesHrmsApproverRole, type HrmsApproverIdentity } from '@/lib/hrms/access';
 import { useLeaveData } from '@/hooks/useLeaveData';
 import type { LeaveDayPart, LeaveRequest, LeaveStatus } from '@/types';
 import { type LeaveHoliday } from '@/services/hrmsService';
 import { calculateLeaveDays as _calcLeaveDays } from './leave/utils';
 import { SnapshotStrip } from './leave/SnapshotStrip';
-import { LeaveTabSystem, type LeaveTabId } from './leave/LeaveTabSystem';
+import { MyLeaveTab } from './leave/MyLeaveTab';
 import { ContextPanel } from './leave/ContextPanel';
 import { ApplyLeaveDialog } from './leave/ApplyLeaveDialog';
 
@@ -57,72 +53,11 @@ export function calculateLeaveDays(
   return _calcLeaveDays(startDate, endDate, dayPart, holidays);
 }
 
-// ─── Orchestrator ─────────────────────────────────────────────────────────────
+// ─── My Leave (personal only) ─────────────────────────────────────────────────
 
 export default function LeaveManagement() {
-  const { user } = useAuth();
-  const hrmsAccess = useHrmsAccess();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const canApproveRequests = hrmsAccess.canApproveRequests;
-  const canViewTeam = canApproveRequests || hrmsAccess.canAccessEmployees;
-  const selfServiceEmployeeId = user?.employeeId ?? user?.id;
-
-  const approverIdentity: LeaveApproverIdentity = useMemo(() => ({
-    id: user?.id,
-    hrmsRoleIds:   hrmsAccess.roleIds,
-    hrmsRoleCodes: hrmsAccess.roleCodes,
-  }), [user?.id, hrmsAccess.roleIds, hrmsAccess.roleCodes]);
-
   const leaveData = useLeaveData();
-
   const [showApply, setShowApply] = useState(false);
-
-  // Tab state persisted in URL
-  const requestedTab = searchParams.get('tab') as LeaveTabId | null;
-  const validTabs: LeaveTabId[] = ['my-leave', 'team-leave', 'approval-inbox', 'calendar'];
-  const activeTab: LeaveTabId =
-    requestedTab && validTabs.includes(requestedTab) &&
-    (requestedTab !== 'team-leave' || canViewTeam) &&
-    (requestedTab !== 'approval-inbox' || canApproveRequests) &&
-    (requestedTab !== 'calendar' || canViewTeam)
-      ? requestedTab
-      : 'my-leave';
-
-  const activeTabMeta: Record<LeaveTabId, { label: string; description: string; icon: React.ElementType }> = {
-    'my-leave': {
-      label: 'My Leave',
-      description: 'Track pending requests, approved time away, and history.',
-      icon: CalendarRange,
-    },
-    'team-leave': {
-      label: 'Team Leave',
-      description: 'Monitor team coverage and upcoming absences.',
-      icon: ClipboardCheck,
-    },
-    'approval-inbox': {
-      label: 'Approval Inbox',
-      description: 'Review only requests that currently need your decision.',
-      icon: ShieldCheck,
-    },
-    calendar: {
-      label: 'Leave Calendar',
-      description: 'Plan around approved leave and team availability.',
-      icon: CalendarRange,
-    },
-  };
-
-  const activeMeta = activeTabMeta[activeTab];
-  const ActiveIcon = activeMeta.icon;
-
-  function setActiveTab(tab: LeaveTabId) {
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      if (tab === 'my-leave') next.delete('tab');
-      else next.set('tab', tab);
-      return next;
-    });
-  }
 
   return (
     <div className="w-full space-y-5">
@@ -130,18 +65,13 @@ export default function LeaveManagement() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-3.5">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <ActiveIcon className="h-5 w-5" aria-hidden />
+              <CalendarRange className="h-5 w-5" aria-hidden />
             </div>
             <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight">{activeMeta.label}</h1>
-                {canApproveRequests && leaveData.pendingForMeCount > 0 && (
-                  <Badge className="rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-400">
-                    {leaveData.pendingForMeCount} need action
-                  </Badge>
-                )}
-              </div>
-              <p className="max-w-2xl text-sm text-muted-foreground">{activeMeta.description}</p>
+              <h1 className="text-2xl font-bold tracking-tight">My Leave</h1>
+              <p className="max-w-2xl text-sm text-muted-foreground">
+                Track your balances, requests, upcoming time away, and leave history.
+              </p>
             </div>
           </div>
 
@@ -156,49 +86,30 @@ export default function LeaveManagement() {
         leaveBalances={leaveData.leaveBalances}
         myActivePending={leaveData.myActivePending}
         myUpcoming={leaveData.myUpcoming}
-        pendingForMeCount={leaveData.pendingForMeCount}
-        teamOnLeaveToday={leaveData.teamOnLeaveToday}
-        isManager={canApproveRequests || canViewTeam}
+        pendingForMeCount={0}
+        teamOnLeaveToday={[]}
+        isManager={false}
         isLoading={leaveData.isLoading}
       />
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        {/* Main tab area */}
+        {/* Personal leave content */}
         <div className="min-w-0 flex-1">
-          <LeaveTabSystem
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
+          <MyLeaveTab
             leaveTypes={leaveData.leaveTypes}
             leaveBalances={leaveData.leaveBalances}
             myActivePending={leaveData.myActivePending}
             myUpcoming={leaveData.myUpcoming}
             myHistory={leaveData.myHistory}
             approvalPreview={leaveData.approvalPreview}
-            allRequests={leaveData.requests}
-            selfServiceEmployeeId={selfServiceEmployeeId}
-            approverIdentity={approverIdentity}
-            canApproveRequests={canApproveRequests}
-            canViewTeam={canViewTeam}
-            pendingForMeCount={leaveData.pendingForMeCount}
             isLoading={leaveData.isLoading}
             onApplyLeave={() => setShowApply(true)}
             onRefresh={leaveData.invalidate}
           />
         </div>
 
-        {/* Context panel (desktop) */}
+        {/* Context panel (desktop only; mobile balances live inside MyLeaveTab) */}
         <div className="hidden w-80 shrink-0 lg:block xl:w-[22rem]">
-          <ContextPanel
-            leaveTypes={leaveData.leaveTypes}
-            leaveBalances={leaveData.leaveBalances}
-            approvalPreview={leaveData.approvalPreview}
-            isLoading={leaveData.isLoading}
-            onApplyLeave={() => setShowApply(true)}
-          />
-        </div>
-
-        {/* Context panel (mobile) */}
-        <div className="lg:hidden">
           <ContextPanel
             leaveTypes={leaveData.leaveTypes}
             leaveBalances={leaveData.leaveBalances}

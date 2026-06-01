@@ -36,6 +36,7 @@ export const hrmsNavItems: HrmsNavItem[] = [
   // ── Team ─────────────────────────────────────────────────────────────────
   { label: 'Employee Directory', path: '/employees',    icon: Users,           group: 'Team', access: 'employees' },
   { label: 'Team Attendance', path: '/attendance',      icon: Clock,           group: 'Team', access: 'attendance' },
+  { label: 'Team Leave',      path: '/leave/team',      icon: CalendarDays,    group: 'Team', access: 'teamLeave' },
   { label: 'Leave Calendar',  path: '/leave/calendar',  icon: CalendarDays,    group: 'Team', access: 'leaveCalendar' },
 
   // ── Approvals ────────────────────────────────────────────────────────────

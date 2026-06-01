@@ -37,6 +37,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const HrmsDashboard = lazy(() => import('./pages/hrms/HrmsDashboard'));
 const ApprovalInbox = lazy(() => import('./pages/hrms/ApprovalInbox'));
 const LeaveManagement = lazy(() => import('./pages/hrms/LeaveManagement'));
+const TeamLeave = lazy(() => import('./pages/hrms/TeamLeave'));
 const LeaveCalendar = lazy(() => import('./pages/hrms/LeaveCalendar'));
 const AttendanceLog = lazy(() => import('./pages/hrms/AttendanceLog'));
 const PayrollSummary = lazy(() => import('./pages/hrms/PayrollSummary'));
@@ -99,6 +100,7 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <RequireHrmsRouteAccess access="dashboard"><R scope="Dashboard"><S><HrmsDashboard /></S></R></RequireHrmsRouteAccess> },
       { path: 'profile', element: <RequireHrmsRouteAccess access="profile"><R scope="Profile"><ProfilePage /></R></RequireHrmsRouteAccess> },
       { path: 'leave', element: <RequireHrmsRouteAccess access="leave"><R scope="Leave"><S><LeaveManagement /></S></R></RequireHrmsRouteAccess> },
+      { path: 'leave/team', element: <RequireHrmsRouteAccess access="teamLeave"><R scope="Team Leave"><S><TeamLeave /></S></R></RequireHrmsRouteAccess> },
       { path: 'leave/calendar', element: <RequireHrmsRouteAccess access="leaveCalendar"><R scope="Leave Calendar"><S><LeaveCalendar /></S></R></RequireHrmsRouteAccess> },
       { path: 'attendance', element: <RequireHrmsRouteAccess access="attendancePage"><R scope="Attendance"><S><AttendanceLog /></S></R></RequireHrmsRouteAccess> },
       { path: 'approvals', element: <RequireHrmsRouteAccess access="approvals"><R scope="Approvals"><S><ApprovalInbox /></S></R></RequireHrmsRouteAccess> },

@@ -5,6 +5,7 @@ export type HrmsRouteAccessKey =
   | 'profile'
   | 'leave'
   | 'leaveCalendar'
+  | 'teamLeave'
   | 'attendance'
   | 'myAttendance'
   | 'attendancePage'
@@ -165,6 +166,9 @@ export function deriveHrmsAccess(roles: HrmsRole[]): DerivedHrmsAccess {
         return hasSelfServiceAccess;
       case 'leaveCalendar':
         return hasSupervisoryRole;
+      case 'teamLeave':
+        // Manager+/approver team leave view; staff (self-service only) are excluded.
+        return canApproveRequests || canAccessEmployees;
       case 'attendance':
         return canAccessAttendance;
       case 'myAttendance':
