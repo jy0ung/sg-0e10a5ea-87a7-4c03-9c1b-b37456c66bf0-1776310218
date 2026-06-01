@@ -8,7 +8,6 @@ import { type LeaveHoliday } from '@/services/hrmsService';
 import { calculateLeaveDays as _calcLeaveDays } from './leave/utils';
 import { SnapshotStrip } from './leave/SnapshotStrip';
 import { MyLeaveTab } from './leave/MyLeaveTab';
-import { ContextPanel } from './leave/ContextPanel';
 import { ApplyLeaveDialog } from './leave/ApplyLeaveDialog';
 
 // ─── Preserved exports (used by other modules) ───────────────────────────────
@@ -92,33 +91,17 @@ export default function LeaveManagement() {
         isLoading={leaveData.isLoading}
       />
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        {/* Personal leave content */}
-        <div className="min-w-0 flex-1">
-          <MyLeaveTab
-            leaveTypes={leaveData.leaveTypes}
-            leaveBalances={leaveData.leaveBalances}
-            myActivePending={leaveData.myActivePending}
-            myUpcoming={leaveData.myUpcoming}
-            myHistory={leaveData.myHistory}
-            approvalPreview={leaveData.approvalPreview}
-            isLoading={leaveData.isLoading}
-            onApplyLeave={() => setShowApply(true)}
-            onRefresh={leaveData.invalidate}
-          />
-        </div>
-
-        {/* Context panel (desktop only; mobile balances live inside MyLeaveTab) */}
-        <div className="hidden w-80 shrink-0 lg:block xl:w-[22rem]">
-          <ContextPanel
-            leaveTypes={leaveData.leaveTypes}
-            leaveBalances={leaveData.leaveBalances}
-            approvalPreview={leaveData.approvalPreview}
-            isLoading={leaveData.isLoading}
-            onApplyLeave={() => setShowApply(true)}
-          />
-        </div>
-      </div>
+      <MyLeaveTab
+        leaveTypes={leaveData.leaveTypes}
+        leaveBalances={leaveData.leaveBalances}
+        myActivePending={leaveData.myActivePending}
+        myUpcoming={leaveData.myUpcoming}
+        myHistory={leaveData.myHistory}
+        approvalPreview={leaveData.approvalPreview}
+        isLoading={leaveData.isLoading}
+        onApplyLeave={() => setShowApply(true)}
+        onRefresh={leaveData.invalidate}
+      />
 
       <ApplyLeaveDialog
         open={showApply}
