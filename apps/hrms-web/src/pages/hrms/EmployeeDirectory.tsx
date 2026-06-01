@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -65,12 +66,6 @@ const ROLE_BADGE: Record<AppRole, string> = {
   portal_admin:    'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   portal_manager:  'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
   portal_staff:    'bg-secondary text-secondary-foreground',
-};
-
-const STATUS_BADGE: Record<EmployeeStatus, string> = {
-  active:   'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
-  inactive: 'bg-secondary text-secondary-foreground',
-  resigned: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 };
 
 const NONE_SELECT_VALUE = '__none__';
@@ -228,7 +223,7 @@ export default function EmployeeDirectory() {
       key: 'status',
       label: 'Status',
       className: 'whitespace-nowrap',
-      render: emp => <Badge className={`text-xs capitalize ${STATUS_BADGE[emp.status]}`}>{emp.status}</Badge>,
+      render: emp => <StatusBadge status={emp.status} domain="employee" />,
     },
     ...(canManage ? [{
       key: 'actions',
