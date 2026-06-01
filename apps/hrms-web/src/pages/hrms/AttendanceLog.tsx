@@ -5,7 +5,6 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { listAttendanceRecords, listEmployeeDirectory, upsertAttendance } from '@/services/hrmsService';
 import type { AttendanceRecord, UpsertAttendanceInput, AttendanceStatus } from '@/types';
-import { CalendarDays, Download, FilterX, Plus, Users } from 'lucide-react';
+import { Download, FilterX, Plus } from 'lucide-react';
 import { upsertAttendanceSchema } from '@/lib/validations';
 
 type AttendanceRow = AttendanceRecord & Record<string, unknown>;
@@ -149,9 +148,13 @@ export default function AttendanceLog() {
       <section className="rounded-xl border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">Attendance Control Center</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              {canAccessTeamAttendance ? 'Attendance overview' : 'My attendance overview'}
+            </h2>
             <p className="text-xs text-muted-foreground">
-              Review operational attendance, exception patterns, and the current period scope.
+              {canAccessTeamAttendance
+                ? 'Presence rate and exception breakdown for the current period scope.'
+                : 'Your presence rate and attendance breakdown for the selected period.'}
             </p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={resetFilters}>
@@ -159,36 +162,27 @@ export default function AttendanceLog() {
             Reset filters
           </Button>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="shadow-sm"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30"><CalendarDays className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /></div><div><p className="text-sm text-muted-foreground">Presence rate</p><p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{presenceRate}%</p><p className="text-xs text-muted-foreground">Of all active attendance records</p></div></CardContent></Card>
-          <Card className="shadow-sm"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/30"><span className="text-lg font-bold text-red-600 dark:text-red-400">✕</span></div><div><p className="text-sm text-muted-foreground">Absent</p><p className="text-2xl font-bold tabular-nums text-red-600 dark:text-red-400">{counts.absent}</p><p className="text-xs text-muted-foreground">Requires follow-up</p></div></CardContent></Card>
-          <Card className="shadow-sm"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30"><Users className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div><div><p className="text-sm text-muted-foreground">Tracked records</p><p className="text-2xl font-bold tabular-nums">{records.length}</p><p className="text-xs text-muted-foreground">Current date range</p></div></CardContent></Card>
-          <Card className="shadow-sm"><CardContent className="flex items-start gap-3 p-4"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30"><span className="text-lg font-bold text-violet-600 dark:text-violet-400">★</span></div><div><p className="text-sm text-muted-foreground">Half-day / leave</p><p className="text-2xl font-bold tabular-nums text-violet-600 dark:text-violet-400">{counts.half_day + counts.on_leave}</p><p className="text-xs text-muted-foreground">Exceptions and approved leave</p></div></CardContent></Card>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          <div className="rounded-lg border bg-emerald-50/60 p-3.5 dark:bg-emerald-900/10">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Presence rate</p>
+            <p className="mt-1 text-2xl font-bold leading-none tabular-nums text-emerald-600 dark:text-emerald-400">{presenceRate}%</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{records.length} records</p>
+          </div>
+          {([
+            { status: 'present',        label: 'Present',        text: 'text-emerald-700 dark:text-emerald-400' },
+            { status: 'absent',         label: 'Absent',         text: 'text-red-700 dark:text-red-400' },
+            { status: 'half_day',       label: 'Half Day',       text: 'text-amber-700 dark:text-amber-400' },
+            { status: 'on_leave',       label: 'On Leave',       text: 'text-blue-700 dark:text-blue-400' },
+            { status: 'public_holiday', label: 'Public Holiday', text: 'text-violet-700 dark:text-violet-400' },
+          ] as const).map(({ status, label, text }) => (
+            <div key={status} className="rounded-lg border bg-card p-3.5 shadow-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+              <p className={`mt-1 text-2xl font-bold leading-none tabular-nums ${counts[status] > 0 ? text : 'text-muted-foreground'}`}>{counts[status]}</p>
+            </div>
+          ))}
         </div>
       </section>
-
-      {/* Summary strip — colour-coded by exception severity */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        {([
-          { status: 'present',        label: 'Present',        icon: '✓',  bg: 'bg-emerald-100 dark:bg-emerald-900/20', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-200/60 dark:border-emerald-800/40' },
-          { status: 'absent',         label: 'Absent',         icon: '✕',  bg: 'bg-red-100 dark:bg-red-900/20',         text: 'text-red-700 dark:text-red-400',         border: 'border-red-200/60 dark:border-red-800/40' },
-          { status: 'half_day',       label: 'Half Day',       icon: '½',  bg: 'bg-amber-100 dark:bg-amber-900/20',     text: 'text-amber-700 dark:text-amber-400',     border: 'border-amber-200/60 dark:border-amber-800/40' },
-          { status: 'on_leave',       label: 'On Leave',       icon: '↗',  bg: 'bg-blue-100 dark:bg-blue-900/20',       text: 'text-blue-700 dark:text-blue-400',       border: 'border-blue-200/60 dark:border-blue-800/40' },
-          { status: 'public_holiday', label: 'Public Holiday', icon: '★',  bg: 'bg-violet-100 dark:bg-violet-900/20',   text: 'text-violet-700 dark:text-violet-400',   border: 'border-violet-200/60 dark:border-violet-800/40' },
-        ] as const).map(({ status, label, icon, bg, text, border }) => (
-          <Card key={status} className={`shadow-sm border ${border}`}>
-            <CardContent className="flex items-center gap-3 p-3.5">
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-bold ${bg} ${text}`}>
-                {icon}
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-                <p className={`text-2xl font-bold leading-none tabular-nums ${text}`}>{counts[status]}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
 
       {/* Exception banner — shown if >0 absent in range */}
       {counts.absent > 0 && (

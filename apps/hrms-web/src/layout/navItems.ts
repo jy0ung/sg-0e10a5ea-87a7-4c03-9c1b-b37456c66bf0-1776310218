@@ -28,6 +28,7 @@ export const hrmsNavItems: HrmsNavItem[] = [
   // ── Self-Service ──────────────────────────────────────────────────────────
   { label: 'My HR Dashboard', path: '/dashboard',       icon: LayoutDashboard, group: 'Self-Service', access: 'dashboard' },
   { label: 'My Leave',        path: '/leave',           icon: Calendar,        group: 'Self-Service', access: 'leave' },
+  { label: 'My Attendance',   path: '/attendance',      icon: Clock,           group: 'Self-Service', access: 'myAttendance' },
   { label: 'My Appraisals',   path: '/appraisals',      icon: Star,            group: 'Self-Service', access: 'appraisals' },
   { label: 'Announcements',   path: '/announcements',   icon: Megaphone,       group: 'Self-Service', access: 'announcements' },
   { label: 'My Profile',      path: '/profile',         icon: UserRound,       group: 'Self-Service', access: 'profile' },

@@ -11,7 +11,7 @@ const HRMS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/dashboard/, title: 'My HR Dashboard', kicker: 'Your HRMS command centre' },
   { pattern: /^\/leave\/calendar/, title: 'Leave Calendar', kicker: 'Team leave visibility' },
   { pattern: /^\/leave$/, title: 'My Leave', kicker: 'Requests, balances, and approvals' },
-  { pattern: /^\/attendance/, title: 'Team Attendance', kicker: 'Daily workforce records' },
+  { pattern: /^\/attendance/, title: 'Attendance', kicker: 'Daily attendance records' },
   { pattern: /^\/approvals/, title: 'Approval Inbox', kicker: 'Assigned HRMS decisions' },
   { pattern: /^\/appraisals/, title: 'My Appraisals', kicker: 'Review cycles and outcomes' },
   { pattern: /^\/announcements/, title: 'Announcements', kicker: 'Company communications' },
