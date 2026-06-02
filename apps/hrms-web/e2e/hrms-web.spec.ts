@@ -69,11 +69,11 @@ test.describe('HRMS web dedicated app', () => {
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-    await expect(page).toHaveURL(/\/leave$/);
+    await expect(page).toHaveURL(/\/dashboard$/);
     await assertDedicatedHrmsShell(page);
-    await expect(page.getByRole('link', { name: 'Leave', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Approvals' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'My Leave' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Approval Inbox' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'HRMS Settings' })).toBeVisible();
   });
 
   test('loads priority HRMS pages in the dedicated app', async ({ page }) => {
@@ -93,6 +93,22 @@ test.describe('HRMS web dedicated app', () => {
       await assertDedicatedHrmsShell(page);
       await expect(page.locator('main').getByText(route.text).first()).toBeVisible();
     }
+  });
+
+  test('renders My Leave as a compact personal leave history page', async ({ page }) => {
+    await setupDedicatedHrmsMocks(page);
+
+    await page.goto('/leave', { waitUntil: 'domcontentloaded' });
+
+    await assertDedicatedHrmsShell(page);
+    await expect(page.getByRole('heading', { name: 'My Leave' })).toBeVisible();
+    await expect(page.getByText('Review your leave applications, dates, statuses, and approval progress.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pending Requests' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Upcoming Leave' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Leave History' })).toBeVisible();
+    await expect(page.getByText('My Leave Overview')).toHaveCount(0);
+    await expect(page.getByText('Leave Balances')).toHaveCount(0);
+    await expect(page.getByText(/Balances - \d{4}/)).toHaveCount(0);
   });
 
   test('maps legacy nested HRMS paths to dedicated-app paths', async ({ page }) => {

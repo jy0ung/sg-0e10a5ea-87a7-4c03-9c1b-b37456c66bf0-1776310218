@@ -45,30 +45,30 @@ export function RequestCard({
     <button type="button" className="w-full text-left" onClick={() => onSelect(req)}>
       <div
         className={[
-          'flex items-center gap-3 rounded-lg border border-l-4 bg-card px-3 py-2.5 shadow-sm transition-all hover:shadow-md',
+          'grid gap-2 rounded-md border border-l-4 bg-card px-2.5 py-2 transition-colors hover:bg-accent/25 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center',
           accentColor,
         ].join(' ')}
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
-          {(req.leaveTypeName ?? 'L').charAt(0).toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium leading-tight">{req.leaveTypeName ?? 'Leave'}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {fmtDateRange(req.startDate, req.endDate)}
-            <span className="mx-1.5 opacity-40">·</span>
-            <span className="tabular-nums">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <p className="truncate text-sm font-medium leading-tight">{req.leaveTypeName ?? 'Leave'}</p>
+            <span className="text-xs tabular-nums text-muted-foreground">
               {formatDays(req.days)} day{req.days !== 1 ? 's' : ''}
             </span>
+          </div>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {fmtDateRange(req.startDate, req.endDate)}
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-0.5">
-          <Badge variant="outline" className={`text-xs font-medium ${className}`}>
+        <div className="flex min-w-0 items-center justify-between gap-2 sm:justify-end">
+          {stage ? (
+            <span className={`min-w-0 truncate text-xs ${stageClassName}`}>{stage}</span>
+          ) : (
+            <span className="text-xs text-muted-foreground">No approval updates</span>
+          )}
+          <Badge variant="outline" className={`shrink-0 text-[11px] font-medium ${className}`}>
             {label}
           </Badge>
-          {stage && (
-            <span className={`hidden text-right text-xs sm:block ${stageClassName}`}>{stage}</span>
-          )}
         </div>
       </div>
     </button>
@@ -88,12 +88,12 @@ export function SectionHeading({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </h3>
       {count != null && count > 0 && (
         <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${colorClass ?? 'bg-muted text-muted-foreground'}`}
+          className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium tabular-nums ${colorClass ?? 'bg-muted text-muted-foreground'}`}
         >
           {count}
         </span>
@@ -114,7 +114,7 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+    <div className="flex items-center gap-2 py-1.5 text-xs text-muted-foreground">
       {icon ?? <span className="text-base opacity-40">—</span>}
       <span>{title}</span>
       {action && <span className="ml-1">{action}</span>}
@@ -126,9 +126,9 @@ export function EmptyState({
 
 export function LoadingSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-14 animate-pulse rounded-lg border bg-muted/30" />
+        <div key={i} className="h-11 animate-pulse rounded-md border bg-muted/30" />
       ))}
     </div>
   );

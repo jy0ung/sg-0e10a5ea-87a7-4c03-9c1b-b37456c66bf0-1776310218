@@ -6,7 +6,6 @@ import { useLeaveData } from '@/hooks/useLeaveData';
 import type { LeaveDayPart, LeaveRequest, LeaveStatus } from '@/types';
 import { type LeaveHoliday } from '@/services/hrmsService';
 import { calculateLeaveDays as _calcLeaveDays } from './leave/utils';
-import { SnapshotStrip } from './leave/SnapshotStrip';
 import { MyLeaveTab } from './leave/MyLeaveTab';
 import { ApplyLeaveDialog } from './leave/ApplyLeaveDialog';
 
@@ -59,48 +58,34 @@ export default function LeaveManagement() {
   const [showApply, setShowApply] = useState(false);
 
   return (
-    <div className="w-full space-y-5">
-      <section className="surface-card hero-gradient px-5 py-5 sm:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-start gap-3.5">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <CalendarRange className="h-5 w-5" aria-hidden />
+    <div className="w-full space-y-3">
+      <section className="surface-card px-4 py-3.5 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <CalendarRange className="h-4 w-4" aria-hidden />
             </div>
-            <div className="min-w-0 space-y-1">
-              <h1 className="text-2xl font-bold tracking-tight">My Leave</h1>
-              <p className="max-w-2xl text-sm text-muted-foreground">
-                Track your balances, requests, upcoming time away, and leave history.
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight">My Leave</h1>
+              <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
+                Review your leave applications, dates, statuses, and approval progress.
               </p>
             </div>
           </div>
 
-          <Button size="sm" className="gap-2 self-start shadow-sm lg:self-auto" onClick={() => setShowApply(true)}>
+          <Button size="sm" className="h-8 gap-1.5 self-start shadow-sm sm:self-auto" onClick={() => setShowApply(true)}>
             <Plus className="h-4 w-4" />
-            Apply for Leave
+            New request
           </Button>
         </div>
       </section>
 
-      <SnapshotStrip
-        leaveBalances={leaveData.leaveBalances}
-        myActivePending={leaveData.myActivePending}
-        myUpcoming={leaveData.myUpcoming}
-        pendingForMeCount={0}
-        teamOnLeaveToday={[]}
-        isManager={false}
-        isLoading={leaveData.isLoading}
-      />
-
       <MyLeaveTab
-        leaveTypes={leaveData.leaveTypes}
-        leaveBalances={leaveData.leaveBalances}
         myActivePending={leaveData.myActivePending}
         myUpcoming={leaveData.myUpcoming}
         myHistory={leaveData.myHistory}
-        approvalPreview={leaveData.approvalPreview}
         isLoading={leaveData.isLoading}
         onApplyLeave={() => setShowApply(true)}
-        onRefresh={leaveData.invalidate}
       />
 
       <ApplyLeaveDialog
