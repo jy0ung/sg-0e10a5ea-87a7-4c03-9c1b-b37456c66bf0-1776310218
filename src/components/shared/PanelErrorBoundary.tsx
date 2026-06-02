@@ -1,7 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { errorTrackingService } from '@/services/errorTrackingService';
+import { errorTrackingService } from '@flc/platform-services';
 
 interface Props {
   children: ReactNode;

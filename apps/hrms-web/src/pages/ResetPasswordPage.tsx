@@ -14,7 +14,7 @@ import { Loader2, CheckCircle } from 'lucide-react';
 import { resetPasswordSchema, type ResetPasswordFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BRANDING_DEFAULTS } from '@/services/brandingService';
+import { BRANDING_DEFAULTS } from '@flc/platform-services';
 
 const brandName = BRANDING_DEFAULTS.appName;
 const brandLogo = BRANDING_DEFAULTS.logoUrl ?? '';

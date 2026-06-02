@@ -23,7 +23,7 @@ import { PageSpinner } from "@/components/shared/PageSpinner";
 import AppLayout from "./components/layout/AppLayout";
 import SalesLayout from "./components/layout/SalesLayout";
 import { SalesProvider } from "./contexts/SalesContext";
-import { errorTrackingService } from "@/services/errorTrackingService";
+import { errorTrackingService } from "@flc/platform-services";
 import { subscribeWebVitals } from "@/services/webVitalsService";
 import { env } from "@/config/env";
 import { createAppQueryClient } from "@/lib/queryClient";

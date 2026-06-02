@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { getAllAuditLogs } from '@/services/auditService';
 import { formatDate, formatTime } from '@/lib/utils';
-import { loggingService } from '@/services/loggingService';
+import { loggingService } from '@flc/platform-services';
 import { useAuth } from '@/contexts/AuthContext';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { PageHeader } from '@/components/shared/PageHeader';

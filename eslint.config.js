@@ -63,7 +63,7 @@ export default tseslint.config(
     ],
     rules: {
       "no-restricted-syntax": [
-        "warn",
+        "error",
         {
           selector: "CallExpression[callee.object.name='supabase'][callee.property.name='from']",
           message: "Do not call supabase.from() from pages/components. Use a service in src/services/*.",

@@ -30,14 +30,14 @@ import { ROLE_LABELS } from '@/config/rolePermissions';
 import { useRoutingRules } from '@/hooks/useRoutingRules';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
-import { listProfiles } from '@/services/profileService';
+import { listProfiles } from '@flc/auth';
 import {
   createRoutingRule,
   deleteRoutingRule,
   moveRoutingRule,
   updateRoutingRule,
   type RequestRoutingRule,
-} from '@/services/requestRoutingService';
+} from '@flc/internal-requests';
 
 import {
   ANY_SELECT_VALUE,

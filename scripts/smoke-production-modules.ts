@@ -235,13 +235,13 @@ async function smokeRoute(page: Page, baseUrl: URL, routeCheck: RouteCheck): Pro
 }
 
 async function checkHrmsModuleRedirect(page: Page): Promise<RouteResult> {
-  console.info('CHECK HRMS Launch: Module Directory Card /modules');
-  const routeCheck = { module: 'HRMS Launch', name: 'Module Directory Card', path: '/modules' };
+  console.info('CHECK HRMS Launch: Home shortcut /home');
+  const routeCheck = { module: 'HRMS Launch', name: 'Home shortcut', path: '/home' };
   const issues: Issue[] = [];
   let finalUrl = '';
 
   try {
-    await page.goto(new URL('/modules', mainUrl.origin).toString(), {
+    await page.goto(new URL('/home', mainUrl.origin).toString(), {
       waitUntil: 'domcontentloaded',
       timeout: routeTimeoutMs,
     });
@@ -264,7 +264,7 @@ async function checkHrmsModuleRedirect(page: Page): Promise<RouteResult> {
   }
 
   const result = { ...routeCheck, finalUrl, ok: issues.length === 0, issues };
-  console.info(`${result.ok ? 'PASS' : 'FAIL'} HRMS Launch: Module Directory Card`);
+  console.info(`${result.ok ? 'PASS' : 'FAIL'} HRMS Launch: Home shortcut`);
   return result;
 }
 

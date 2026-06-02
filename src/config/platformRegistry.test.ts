@@ -58,6 +58,8 @@ describe('platformRegistry', () => {
     const mainRoutes = getProductionSmokeRoutes('main');
     const hrmsRoutes = getProductionSmokeRoutes('hrms');
 
+    expect(mainRoutes.find((route) => route.path === '/modules')?.name).toBe('Home legacy redirect');
+
     expect(mainRoutes.map((route) => route.path)).toEqual(expect.arrayContaining([
       '/',
       '/modules',

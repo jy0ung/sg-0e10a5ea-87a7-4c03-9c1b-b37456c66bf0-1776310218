@@ -50,7 +50,7 @@ import { useRoleSectionMatrix } from '@/hooks/usePermissions';
 import { getDedicatedHrmsWorkspacePath, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
 import { getModuleIdForPath, getModuleIdForSection } from '@/lib/moduleAccess';
 import { STALE } from '@/lib/queryClient';
-import { getNotifications } from '@/services/notificationService';
+import { getNotifications } from '@flc/platform-services';
 import { globalSearch, type GlobalSearchHit } from '@/services/globalSearchService';
 import {
   MAIN_NAV_ROUTES,

@@ -117,7 +117,7 @@ export const PLATFORM_SECTIONS: readonly PlatformSectionDefinition[] = [
 
 export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
   { id: 'platform-root', label: 'Dashboard', path: '/', shell: 'main', section: 'Platform', icon: 'layout-dashboard', smoke: { app: 'main' } },
-  { id: 'platform-modules-legacy', label: 'Module Directory', path: '/modules', shell: 'main', section: 'Platform', icon: 'layout-dashboard', smoke: { app: 'main' } },
+  { id: 'platform-modules-legacy', label: 'Home legacy redirect', path: '/modules', shell: 'main', section: 'Platform', icon: 'layout-dashboard', smoke: { app: 'main', name: 'Home legacy redirect' } },
   { id: 'platform-home', label: 'Home', path: '/home', shell: 'main', section: 'Platform', icon: 'layout-dashboard', end: true, navShell: 'main', smoke: { app: 'main' } },
   { id: 'platform-inbox', label: 'Inbox', path: '/inbox', shell: 'main', section: 'Platform', icon: 'inbox', navShell: 'main', smoke: { app: 'main' } },
   { id: 'platform-notifications', label: 'Notifications', path: '/notifications', shell: 'main', section: 'Platform', icon: 'bell', navShell: 'main', smoke: { app: 'main' } },

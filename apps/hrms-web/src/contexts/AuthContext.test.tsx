@@ -35,16 +35,13 @@ vi.mock('react-router-dom', () => ({
   Navigate: ({ to }: { to: string }) => React.createElement('div', { 'data-testid': 'navigate', 'data-to': to }),
 }));
 
-vi.mock('@/services/loggingService', () => ({
+vi.mock('@flc/platform-services', () => ({
   loggingService: {
     error: (...args: unknown[]) => mockLogError(...args),
     warn: vi.fn(),
     setUserId: vi.fn(),
     clearUserId: vi.fn(),
   },
-}));
-
-vi.mock('@/services/errorTrackingService', () => ({
   errorTrackingService: {
     setUser: (...args: unknown[]) => mockTrackSetUser(...args),
     clearUser: (...args: unknown[]) => mockTrackClearUser(...args),

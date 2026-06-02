@@ -7,7 +7,7 @@ import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useAuth } from '@/contexts/AuthContext';
-import { loggingService } from '@/services/loggingService';
+import { loggingService } from '@flc/platform-services';
 import { resolveBranchCode } from '@/services/branchService';
 import { useToast } from '@/hooks/use-toast';
 import {

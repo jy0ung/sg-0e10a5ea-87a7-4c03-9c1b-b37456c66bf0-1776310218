@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserPermissions, type UserPermissions, type PermissionLevel } from '@/services/permissionService';
+import { getUserPermissions, type UserPermissions, type PermissionLevel } from '@flc/auth';
 
 /**
  * React hook that fetches and caches the current user's column-level

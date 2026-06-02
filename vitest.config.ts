@@ -56,6 +56,7 @@ export default defineConfig({
       "@flc/supabase": path.resolve(__dirname, "./packages/supabase/src/index.ts"),
       "@flc/shell": path.resolve(__dirname, "./packages/shell/src/index.ts"),
       "@flc/hrms-schemas": path.resolve(__dirname, "./packages/hrms-schemas/src/index.ts"),
+      "@flc/internal-requests": path.resolve(__dirname, "./packages/internal-requests/src/index.ts"),
       "@flc/platform-services": path.resolve(__dirname, "./packages/platform-services/src/index.ts"),
       "@flc/ui": path.resolve(__dirname, "./packages/ui/src"),
     },

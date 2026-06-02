@@ -1,0 +1,249 @@
+/**
+ * Profile service — typed wrappers over `profiles` reads/writes used by
+ * the Users & Roles admin page and the per-user Settings page.
+ *
+ * Centralizing these mutations here lets every call go through the same
+ * DAL boundary (Phase 2 #14) and gives us a single place to attach audit
+ * logging, zod validation, and RPC hardening later.
+ */
+import { supabase } from '@flc/supabase';
+import type { AppRole, AccessScope } from '@flc/types';
+import { logUserAction } from '@flc/platform-services';
+
+export interface ProfileRow {
+  id: string;
+  email: string;
+  name: string;
+  role: AppRole;
+  company_id: string | null;
+  branch_id: string | null;
+  employee_id?: string | null;
+  access_scope: AccessScope;
+  status: 'active' | 'inactive' | 'resigned' | 'pending';
+  created_at: string;
+  portal_access_only: boolean;
+}
+
+export interface ListProfilesResult {
+  data: ProfileRow[];
+  error: string | null;
+}
+
+export interface CompanyOption {
+  id: string;
+  name: string;
+}
+
+type FunctionErrorWithContext = {
+  message?: string;
+  context?: Response;
+};
+
+async function getFunctionErrorMessage(error: unknown): Promise<string> {
+  const functionError = error as FunctionErrorWithContext;
+  const response = functionError?.context;
+
+  if (response && typeof response.json === 'function') {
+    try {
+      const payload = await response.clone().json() as { error?: unknown; message?: unknown };
+      if (payload.error) return String(payload.error);
+      if (payload.message) return String(payload.message);
+    } catch {
+      // Fall through to the Supabase client error message.
+    }
+  }
+
+  return functionError?.message ?? 'Edge function request failed';
+}
+
+/** List all profiles (optionally scoped to a company for non-super-admins). */
+export async function listProfiles(companyId?: string): Promise<ListProfilesResult> {
+  let q = supabase
+    .from('profiles')
+    .select('id, email, name, role, company_id, branch_id, employee_id, access_scope, status, created_at, portal_access_only')
+    .order('created_at', { ascending: true });
+  if (companyId) q = q.eq('company_id', companyId);
+  const { data, error } = await q;
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []) as unknown as ProfileRow[], error: null };
+}
+
+export async function listCompanyOptions(): Promise<{ data: CompanyOption[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('companies')
+    .select('id, name')
+    .order('name', { ascending: true });
+  if (error) return { data: [], error: error.message };
+  return { data: (data ?? []) as CompanyOption[], error: null };
+}
+
+export interface UpdateProfileInput {
+  id: string;
+  name?: string;
+  role?: AppRole;
+  access_scope?: AccessScope;
+  branch_id?: string | null;
+  employee_id?: string | null;
+  company_id?: string;
+  status?: 'active' | 'inactive' | 'resigned' | 'pending';
+  portal_access_only?: boolean;
+}
+
+export interface UpdateProfileContext {
+  actorId?: string;
+  companyId?: string | null;
+  allowCompanyAssignment?: boolean;
+  allowGlobalScope?: boolean;
+}
+
+/** Admin-side user update (Users & Roles). */
+export async function updateProfile(
+  input: UpdateProfileInput,
+  context: UpdateProfileContext = {},
+): Promise<{ error: string | null }> {
+  if (!context.actorId) return { error: 'Actor context is required for profile updates' };
+  if (!context.companyId && !context.allowGlobalScope) return { error: 'Company context is required for profile updates' };
+  if (input.company_id !== undefined && !context.allowCompanyAssignment) {
+    return { error: 'Company assignment requires explicit activation context' };
+  }
+  if (input.company_id && context.companyId && input.company_id !== context.companyId && !context.allowGlobalScope) {
+    return { error: 'Cannot assign a user outside the current company scope' };
+  }
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.name !== undefined)         patch.name         = input.name;
+  if (input.role !== undefined)         patch.role         = input.role;
+  if (input.access_scope !== undefined) patch.access_scope = input.access_scope;
+  if (input.branch_id !== undefined)    patch.branch_id    = input.branch_id;
+  if (input.employee_id !== undefined)  patch.employee_id  = input.employee_id;
+  if (input.company_id !== undefined)   patch.company_id   = input.company_id;
+  if (input.status !== undefined)       patch.status       = input.status;
+  if (input.portal_access_only !== undefined) patch.portal_access_only = input.portal_access_only;
+
+  let query = supabase.from('profiles').update(patch as never).eq('id', input.id);
+  if (context.companyId) {
+    query = input.company_id !== undefined && context.allowCompanyAssignment
+      ? query.or(`company_id.eq.${context.companyId},company_id.is.null`)
+      : query.eq('company_id', context.companyId);
+  }
+
+  const { error } = await query;
+  if (!error) {
+    void logUserAction(context.actorId, 'update', 'profile', input.id, {
+      component: 'ProfileService',
+      itemCount: Object.keys(patch).length,
+    });
+  }
+  return { error: error?.message ?? null };
+}
+
+/** Send an invitation via the `invite-user` edge function. */
+export async function inviteUser(payload: {
+  email: string;
+  name: string;
+  role: AppRole;
+  companyId: string;
+  employeeId?: string | null;
+  portalAccessOnly?: boolean;
+}): Promise<{ error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('invite-user', {
+    body: {
+      email: payload.email,
+      name: payload.name,
+      role: payload.role,
+      company_id: payload.companyId,
+      employee_id: payload.employeeId ?? null,
+      portal_access_only: payload.portalAccessOnly ?? false,
+    },
+  });
+  if (error) return { error: await getFunctionErrorMessage(error) };
+  if (data && typeof data === 'object' && 'error' in data && data.error) {
+    return { error: String(data.error) };
+  }
+  return { error: null };
+}
+
+/** Delete an invited user that has never signed in so they can be re-invited. */
+export async function deleteInvitedUser(userId: string): Promise<{ error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('delete-user', {
+    body: { user_id: userId },
+  });
+  if (error) return { error: await getFunctionErrorMessage(error) };
+  if (data && typeof data === 'object' && 'error' in data && data.error) {
+    return { error: String(data.error) };
+  }
+  return { error: null };
+}
+
+async function updateUserAccountStatus(
+  userId: string,
+  status: 'active' | 'inactive',
+  reason?: string,
+): Promise<{ error: string | null }> {
+  const { data, error } = await supabase.functions.invoke('delete-user', {
+    body: {
+      action: 'update_status',
+      user_id: userId,
+      status,
+      reason: reason?.trim() || null,
+    },
+  });
+  if (error) return { error: await getFunctionErrorMessage(error) };
+  if (data && typeof data === 'object' && 'error' in data && data.error) {
+    return { error: String(data.error) };
+  }
+  return { error: null };
+}
+
+/** Deactivate an existing user account and block future sign-in/session refresh. */
+export async function deactivateUser(userId: string, reason?: string): Promise<{ error: string | null }> {
+  return updateUserAccountStatus(userId, 'inactive', reason);
+}
+
+/** Restore an inactive user account and remove the Supabase Auth ban marker. */
+export async function reactivateUser(userId: string, reason?: string): Promise<{ error: string | null }> {
+  return updateUserAccountStatus(userId, 'active', reason);
+}
+
+/** Re-authenticate then update password (Settings → Change Password). */
+export async function changePassword(
+  email: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ error: string | null; code?: 'wrong_current' | 'update_failed' }> {
+  const { error: authError } = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+  });
+  if (authError) return { error: 'Current password is incorrect', code: 'wrong_current' };
+  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+  if (updateError) return { error: updateError.message, code: 'update_failed' };
+  return { error: null };
+}
+
+/** Update the authenticated user's own profile name (used during invite sign-up). */
+export async function updateOwnProfileName(userId: string, name: string): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ name, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select('id')
+    .single();
+  return { error: error?.message ?? null };
+}
+
+/**
+ * Grant or revoke main-app access for a user.
+ * portalAccessOnly = true  → HRMS access only (default for new employees)
+ * portalAccessOnly = false → full main app + HRMS access
+ */
+export async function setPortalAccess(
+  userId: string,
+  portalAccessOnly: boolean,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ portal_access_only: portalAccessOnly, updated_at: new Date().toISOString() })
+    .eq('id', userId);
+  return { error: error?.message ?? null };
+}

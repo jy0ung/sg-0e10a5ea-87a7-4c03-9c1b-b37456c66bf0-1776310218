@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   listRequestFormFields,
   type RequestFormFieldRecord,
-} from '@/services/requestFormFieldService';
+} from '@flc/internal-requests';
 
 export function useRequestFormFields(
   companyId?: string,

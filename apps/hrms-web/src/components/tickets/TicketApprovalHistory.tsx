@@ -2,7 +2,7 @@ import { CheckCircle2, Clock3, Loader2, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
-import { getInternalRequestApprovalWithHistory } from '@/services/requestApprovalService';
+import { getInternalRequestApprovalWithHistory } from '@flc/internal-requests';
 import type { ApprovalDecision } from '@/types';
 
 interface Props {

@@ -35,7 +35,7 @@ import {
   updateRequestTemplate,
   type RequestTemplateRecord,
   type TemplatePriority,
-} from '@/services/requestTemplateService';
+} from '@flc/internal-requests';
 
 import {
   NONE_SELECT_VALUE,

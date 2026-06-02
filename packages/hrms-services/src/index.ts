@@ -34,7 +34,7 @@ export type {
   ApprovalAuditAdapter,
   ApprovalAuditEvent,
 } from './approval/approvalTypes';
-export { rowToApprovalStep, rowToApprovalInstance } from './approval/approvalTypes';
+export { rowToApprovalStep, rowToApprovalInstance, rowToApprovalDecision } from './approval/approvalTypes';
 export { resolveStepRouting, userHasAssignedHrmsRole } from './approval/approvalRouting';
 
 // ─── Profile ──────────────────────────────────────────────────────────────────

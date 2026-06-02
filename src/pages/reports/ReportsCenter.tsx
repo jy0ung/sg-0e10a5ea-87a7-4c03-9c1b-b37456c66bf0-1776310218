@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { Download, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
-import { REPORT_PAGE_SIZE, REPORT_EXPORT_CAP, type ReportConfig, type ReportRow, REPORTS } from '@/services/businessReportService';
+import { REPORT_PAGE_SIZE, REPORT_EXPORT_CAP, type ReportConfig, type ReportRow, REPORTS } from '@flc/platform-services';
 
 function ReportTab({ config, companyId }: { config: ReportConfig; companyId: string }) {
   const today = new Date().toISOString().slice(0, 10);

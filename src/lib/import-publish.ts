@@ -1,6 +1,6 @@
 import { normalizeSupportedDateValue, parseSupportedDateString } from '@/lib/dateParsing';
 import { normalizeImportNumericText } from '@/lib/importNumeric';
-import { loggingService } from '@/services/loggingService';
+import { loggingService } from '@flc/platform-services';
 import type { DataQualityIssue, VehicleCanonical, VehicleRaw } from '@/types';
 import { deriveVehicleStage } from '@/utils/vehicleStage';
 

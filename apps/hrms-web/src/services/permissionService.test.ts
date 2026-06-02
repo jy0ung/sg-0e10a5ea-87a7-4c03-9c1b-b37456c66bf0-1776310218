@@ -1,19 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@flc/supabase';
 import { setUserColumnPermissions } from './permissionService';
-import { logPermissionChange } from './auditService';
+import { logPermissionChange } from '@flc/platform-services';
 
-vi.mock('@/integrations/supabase/client', () => ({
+vi.mock('@flc/supabase', () => ({
   supabase: {
     from: vi.fn(),
   },
 }));
 
-vi.mock('./auditService', () => ({
+vi.mock('@flc/platform-services', () => ({
   logPermissionChange: vi.fn().mockResolvedValue({ error: null }),
-}));
-
-vi.mock('./loggingService', () => ({
   loggingService: {
     error: vi.fn(),
   },

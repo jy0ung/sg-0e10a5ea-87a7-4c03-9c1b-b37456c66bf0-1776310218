@@ -1,7 +1,2 @@
-// Domain service barrel — backward-compatible re-exports
-export * from './employeeService';
-export * from './leaveService';
-export * from './attendanceService';
-export * from './payrollService';
-export * from './appraisalService';
-export * from './announcementService';
+// Compatibility re-export: canonical HRMS wrapper lives in the main app service tree.
+export * from '../../../../../src/services/hrms';

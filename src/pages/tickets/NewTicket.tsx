@@ -23,9 +23,9 @@ import { useRequestTemplates } from '@/hooks/useRequestTemplates';
 import { useAttachmentSettings } from '@/hooks/useAttachmentSettings';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { createTicket } from '@/services/ticketService';
-import { uploadTicketAttachment } from '@/services/ticketAttachmentService';
-import { getInternalRequestApprovalPlan } from '@/services/requestApprovalService';
-import type { RequestTemplateRecord } from '@/services/requestTemplateService';
+import { uploadTicketAttachment } from '@flc/platform-services';
+import { getInternalRequestApprovalPlan } from '@flc/internal-requests';
+import type { RequestTemplateRecord } from '@flc/internal-requests';
 import type { AppRole } from '@/types';
 import {
   ACCEPTED_TYPES,

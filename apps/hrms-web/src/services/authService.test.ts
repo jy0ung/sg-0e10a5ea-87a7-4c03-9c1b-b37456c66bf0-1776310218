@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { authService } from './authService';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@flc/supabase/client';
 
-vi.mock('@/integrations/supabase/client', () => ({
+vi.mock('@flc/supabase/client', () => ({
   supabase: {
     auth: {
       getUser: vi.fn(),

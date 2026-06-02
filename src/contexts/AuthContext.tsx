@@ -4,8 +4,7 @@
  */
 import React from 'react';
 import { AuthProvider as BaseAuthProvider } from '@flc/auth';
-import { loggingService } from '@/services/loggingService';
-import { errorTrackingService } from '@/services/errorTrackingService';
+import { errorTrackingService, loggingService } from '@flc/platform-services';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export { useAuth, ProtectedRoute } from '@flc/auth';

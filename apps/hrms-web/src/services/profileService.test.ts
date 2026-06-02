@@ -17,7 +17,7 @@ function drainResolve(): QueuedResult {
   return queuedResults.shift() ?? { data: null, error: null };
 }
 
-vi.mock('@/integrations/supabase/client', () => {
+vi.mock('@flc/supabase', () => {
   function makeProxy(table: string): any {
     const proxy: Record<string, unknown> = {};
 
@@ -50,7 +50,7 @@ vi.mock('@/integrations/supabase/client', () => {
   };
 });
 
-vi.mock('./auditService', () => ({
+vi.mock('@flc/platform-services', () => ({
   logUserAction: vi.fn().mockResolvedValue({ error: null }),
 }));
 

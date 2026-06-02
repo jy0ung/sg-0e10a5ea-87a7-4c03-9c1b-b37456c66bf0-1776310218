@@ -71,9 +71,9 @@ import {
   type TicketStatusCounts,
   updateTicket,
 } from '@/services/ticketService';
-import { reviewInternalRequestApproval } from '@/services/requestApprovalService';
-import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
-import { listProfiles } from '@/services/profileService';
+import { reviewInternalRequestApproval } from '@flc/internal-requests';
+import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@flc/platform-services';
+import { listProfiles } from '@flc/auth';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
 import { getRequestAssignees } from '@/lib/requestAssignees';

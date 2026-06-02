@@ -26,7 +26,8 @@ vi.mock('@flc/supabase/client', () => ({
   },
 }));
 
-vi.mock('@/services/profileService', () => ({
+vi.mock('@flc/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@flc/auth')>()),
   updateOwnProfileName: vi.fn().mockResolvedValue({ error: null }),
 }));
 

@@ -6,7 +6,7 @@ import {
   DEFAULT_ROLE_SECTIONS,
   type SectionName,
 } from '@/config/rolePermissions';
-import { fetchRoleSections, type RoleSectionsMatrix } from '@/services/roleSectionService';
+import { fetchRoleSections, type RoleSectionsMatrix } from '@flc/auth';
 import type { AppRole } from '@/types';
 
 /**
@@ -16,7 +16,7 @@ import type { AppRole } from '@/types';
  * Collapses three previously-independent gates:
  *   1. Role-based route access  (RequireRole + inline role arrays)
  *   2. Section visibility        (role_sections DB table)
- *   3. Column-level view/edit    (useColumnPermissions → permissionService)
+ *   3. Column-level view/edit    (useColumnPermissions → /auth permission APIs)
  */
 
 export interface UnifiedPermissions {

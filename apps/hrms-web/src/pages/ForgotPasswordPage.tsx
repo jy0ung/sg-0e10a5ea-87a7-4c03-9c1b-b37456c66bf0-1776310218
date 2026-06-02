@@ -8,7 +8,7 @@ import { forgotPasswordSchema, type ForgotPasswordFormData } from '@/lib/validat
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { authService } from '@/services/authService';
-import { BRANDING_DEFAULTS } from '@/services/brandingService';
+import { BRANDING_DEFAULTS } from '@flc/platform-services';
 
 const brandName = BRANDING_DEFAULTS.appName;
 const brandLogo = BRANDING_DEFAULTS.logoUrl ?? '';

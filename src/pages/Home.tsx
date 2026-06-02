@@ -12,7 +12,7 @@ import { useModuleAccess } from '@/contexts/ModuleAccessContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getRoleHomeKpis, type RoleHomeKpi } from '@/services/kpiHomeService';
-import { getNotifications } from '@/services/notificationService';
+import { getNotifications } from '@flc/platform-services';
 import { loadInbox } from '@/services/inboxService';
 import { hrefForKpi } from './home/hrefForKpi';
 import { isHrmsWorkspacePath, openDedicatedHrmsWorkspace } from '@/lib/hrmsWorkspace';

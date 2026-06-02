@@ -16,7 +16,7 @@ import { RequireHrmsRouteAccess } from '@/components/shared/RequireHrmsRouteAcce
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { env } from '@/config/env';
 import { createAppQueryClient } from '@/lib/queryClient';
-import { errorTrackingService } from '@/services/errorTrackingService';
+import { errorTrackingService } from '@flc/platform-services';
 import HrmsLayout from './layout/HrmsLayout';
 import ProfilePage from './pages/ProfilePage';
 import { getHrmsRouterBaseName, hrmsCompatibilityRedirects } from './routes';

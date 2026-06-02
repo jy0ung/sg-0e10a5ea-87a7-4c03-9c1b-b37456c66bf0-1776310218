@@ -14,7 +14,7 @@ import {
   setPortalAccess,
   updateProfile,
   type ProfileRow,
-} from '@/services/profileService';
+} from '@flc/auth';
 import {
   Ban,
   Check,

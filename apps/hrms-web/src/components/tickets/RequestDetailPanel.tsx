@@ -28,8 +28,8 @@ import { TicketApprovalSummary } from '@/components/tickets/TicketApprovalSummar
 import { TicketSlaSummary } from '@/components/tickets/TicketSlaSummary';
 import type { RequestCategoryRecord } from '@/services/requestCategoryService';
 import type { RequestSubcategoryRecord } from '@/services/requestSubcategoryService';
-import type { ProfileRow } from '@/services/profileService';
-import type { TicketAttachmentRecord } from '@/services/ticketAttachmentService';
+import type { ProfileRow } from '@flc/auth';
+import type { TicketAttachmentRecord } from '@flc/platform-services';
 import type {
   CompanyTicketRecord,
   TicketActivityRecord,

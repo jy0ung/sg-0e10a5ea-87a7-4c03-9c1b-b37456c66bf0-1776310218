@@ -14,7 +14,7 @@ import {
 } from '@/lib/requestFormatters';
 import type { RequestCategoryRecord } from '@/services/requestCategoryService';
 import type { RequestSubcategoryRecord } from '@/services/requestSubcategoryService';
-import type { TicketAttachmentRecord } from '@/services/ticketAttachmentService';
+import type { TicketAttachmentRecord } from '@flc/platform-services';
 import type { CompanyTicketRecord } from '@/services/ticketService';
 
 interface RequestQueueListProps {

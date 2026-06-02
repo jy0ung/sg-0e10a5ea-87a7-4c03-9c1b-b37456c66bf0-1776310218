@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { updateOwnProfileName } from '@/services/profileService';
 import {
   getAuthCallbackParams,
   getCurrentAuthUser,
   initializeInviteSignup,
   signOutAuthSession,
+  updateOwnProfileName,
   updateInvitedUserPasswordAndMetadata,
 } from '@flc/auth';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import { Loader2, CheckCircle } from 'lucide-react';
 import { inviteSignupSchema, type InviteSignupFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BRANDING_DEFAULTS } from '@/services/brandingService';
+import { BRANDING_DEFAULTS } from '@flc/platform-services';
 
 const brandName = BRANDING_DEFAULTS.appName;
 const brandLogo = BRANDING_DEFAULTS.logoUrl ?? '';

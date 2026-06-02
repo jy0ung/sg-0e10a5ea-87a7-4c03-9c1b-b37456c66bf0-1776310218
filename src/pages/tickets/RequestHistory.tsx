@@ -42,8 +42,8 @@ import {
   updateTicket,
   addTicketComment,
 } from '@/services/ticketService';
-import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
-import { listProfiles } from '@/services/profileService';
+import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@flc/platform-services';
+import { listProfiles } from '@flc/auth';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { formatTicketLabel, priorityColorMap, statusColorMap } from '@/lib/requestFormatters';
 import { getRequestAssignees } from '@/lib/requestAssignees';

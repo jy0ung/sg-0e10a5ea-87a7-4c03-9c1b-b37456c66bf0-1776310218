@@ -111,7 +111,7 @@ Current implementation status:
 
 - `@flc/hrms-services` owns the canonical `approval_instances` engine for HRMS leave, payroll, appraisal, and resubmission flows.
 - `resubmitApprovalInstance` is covered by a package-level regression test that verifies the rejected-instance reset path queries `approval_steps`, resolves first-step routing, and updates the existing instance back to `pending`.
-- Internal Requests already write to `approval_instances`, but their request-specific orchestration still lives in app services until the shared workflow adapter package is introduced.
+- Internal Requests write to `approval_instances` through package-owned orchestration in `@flc/internal-requests`; app-local request approval services are compatibility shims guarded by `check:internal-request-service-boundary`.
 - Legacy `approvalEngineService` files that write `approval_requests` remain compatibility debt and must not receive new entity integrations.
 - `npm run check:workflow-boundary` fails if `approval_requests` access appears outside the documented legacy compatibility files.
 
@@ -129,10 +129,21 @@ Service APIs must return typed result objects and hide Supabase query shapes fro
 Current enforcement:
 
 - ESLint warns on direct Supabase data/auth/storage calls and local `createClient()` calls from `src/pages`, `src/components`, `apps/hrms-web/src/pages`, and `apps/hrms-web/src/components`.
+- Main and HRMS web shell navigation consume @flc/shell platformRegistry; HRMS web no longer keeps a separate hard-coded main navigation list.
+- The legacy /modules URL is retained only as a Home redirect and smoke compatibility route; it must not reappear as visible Module Directory navigation.
 - Feature-flagged unavailable states use `FeatureUnavailableState` and route metadata from `platformRegistry`, rather than page-local "Feature not available" copy.
 - HRMS leave-balance rollover edge invocation is owned by `@flc/hrms-services` via `runLeaveBalanceRollover`.
 - Signup and password-reset callback/session handling is owned by `@flc/auth` via `authFlows`.
+- Email/password auth service operations are owned by `@flc/auth`; app-local `authService` files are compatibility re-exports guarded by `check:auth-service-boundary`.
+- Default section permissions and role labels are owned by `@flc/auth` and app-local `rolePermissions` files are compatibility re-exports.
+- Server-backed role-section access is owned by `@flc/auth` via `fetchRoleSections` and `saveRoleSections`; app-local `roleSectionService` files are compatibility re-exports guarded by `check:auth-service-boundary`.
+- Column permission reads, mutations, default-role permissions, and column-level edit/view helpers are owned by `@flc/auth`; app-local `permissionService` files are compatibility re-exports guarded by `check:auth-service-boundary`.
+- Profile listing, profile mutation, invitation, account status, portal-access, and own-profile update flows are owned by `@flc/auth`; app-local `profileService` files are compatibility re-exports guarded by `check:auth-service-boundary`.
+- HRMS web domain service wrappers re-export the canonical main-app wrappers while shared core behavior continues to live in `@flc/hrms-services`.
 - Canonical HRMS workflow resubmission is owned by `@flc/hrms-services` and covered by `packages/hrms-services/src/approval/approvalEngine.test.ts`.
+- `check:platform-service-boundary` prevents app code from importing package-owned logging, notification, reporting, ticket-attachment, branding, error-tracking, performance, and module-setting services through local shims, and verifies app audit shims contain no direct Supabase implementation. Core audit logging lives in `@flc/platform-services`; app-local audit shims retain only the React `useActionLogger` integration.
+- Internal request template, form-field, routing-rule, auto-assignment evaluation, and `approval_instances` request-approval orchestration services are owned by `@flc/internal-requests`; app-local service files are compatibility re-exports guarded by `check:internal-request-service-boundary`.
+- `check:hrms-service-boundary` prevents the dedicated HRMS web host from regaining duplicated HRMS domain service wrapper implementations.
 
 Known compatibility exceptions:
 
