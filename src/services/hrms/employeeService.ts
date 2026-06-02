@@ -1,6 +1,6 @@
 import * as pkg from '@flc/hrms-services';
 import { logUserAction, type UserActionType, type UserActionMetadata } from '@/services/auditService';
-import { inviteUser, deleteInvitedUser } from '@/services/profileService';
+import { inviteUser, deleteInvitedUser } from '@flc/auth';
 import { Employee, EmployeeStatus, AppRole } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 

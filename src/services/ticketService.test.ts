@@ -3,13 +3,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { addTicketComment, cancelMyTicket, createTicket, listMyTickets, listTicketActivity, updateTicket } from './ticketService';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
-import { evaluateRoutingRules } from './requestRoutingService';
+import { evaluateRoutingRules } from '@flc/internal-requests';
+
+const mockSupabaseClient = vi.hoisted(() => ({
+  from: vi.fn(),
+  rpc: vi.fn(),
+}));
 
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    from: vi.fn(),
-    rpc: vi.fn(),
-  },
+  supabase: mockSupabaseClient,
+}));
+
+vi.mock('@flc/supabase', () => ({
+  supabase: mockSupabaseClient,
 }));
 
 vi.mock('./auditService', () => ({
@@ -26,7 +32,8 @@ vi.mock('./loggingService', () => ({
   },
 }));
 
-vi.mock('./requestRoutingService', () => ({
+vi.mock('@flc/internal-requests', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@flc/internal-requests')>()),
   evaluateRoutingRules: vi.fn().mockResolvedValue(null),
 }));
 

@@ -1,64 +1,25 @@
-import React from 'react';
 import { cn } from '@/lib/utils';
+import { toneClass } from '@/lib/statusTones';
+import { statusMeta, type StatusDomain } from '@/lib/hrmsStatus';
 
 interface StatusBadgeProps {
   status: string;
+  /** Disambiguate statuses shared by multiple domains (e.g. `pending`). */
+  domain?: StatusDomain;
+  /** Override the resolved label. */
+  label?: string;
   className?: string;
 }
 
-const statusStyles: Record<string, string> = {
-  published: 'bg-success/15 text-success',
-  published_with_review: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  active: 'bg-success/15 text-success',
-  inactive: 'bg-muted text-muted-foreground',
-  resigned: 'bg-muted text-muted-foreground',
-  pending: 'bg-warning/15 text-warning',
-  portal_only: 'bg-primary/15 text-primary',
-  validated: 'bg-info/15 text-info',
-  validating: 'bg-info/15 text-info',
-  review_pending: 'bg-warning/15 text-warning',
-  review_in_progress: 'bg-primary/15 text-primary',
-  review_complete: 'bg-success/15 text-success',
-  uploaded: 'bg-muted text-muted-foreground',
-  failed: 'bg-destructive/15 text-destructive',
-  error: 'bg-destructive/15 text-destructive',
-  warning: 'bg-warning/15 text-warning',
-  normalization_in_progress: 'bg-info/15 text-info',
-  normalization_complete: 'bg-info/15 text-info',
-  publish_in_progress: 'bg-primary/15 text-primary',
-  coming_soon: 'bg-primary/15 text-primary',
-  planned: 'bg-muted text-muted-foreground',
-  missing: 'bg-warning/15 text-warning',
-  negative: 'bg-destructive/15 text-destructive',
-  duplicate: 'bg-muted text-muted-foreground',
-  invalid: 'bg-destructive/15 text-destructive',
-  format_error: 'bg-warning/15 text-warning',
-  // ── HRMS attendance ──────────────────────────────────────────────────────
-  present:        'bg-success/15 text-success',
-  absent:         'bg-destructive/15 text-destructive',
-  half_day:       'bg-warning/15 text-warning',
-  on_leave:       'bg-info/15 text-info',
-  public_holiday: 'bg-primary/15 text-primary',
-  // ── HRMS payroll run ─────────────────────────────────────────────────────
-  draft:      'bg-muted text-muted-foreground',
-  finalised:  'bg-info/15 text-info',
-  paid:       'bg-success/15 text-success',
-  // ── HRMS appraisal cycle ─────────────────────────────────────────────────
-  open:        'bg-info/15 text-info',
-  in_progress: 'bg-warning/15 text-warning',
-  // completed already mapped above
-  archived: 'bg-muted text-muted-foreground',
-  // ── HRMS appraisal item ──────────────────────────────────────────────────
-  self_reviewed: 'bg-info/15 text-info',
-  reviewed:      'bg-warning/15 text-warning',
-  acknowledged:  'bg-success/15 text-success',
-};
-
-export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const style = statusStyles[status] || 'bg-muted text-muted-foreground';
+/**
+ * Consistent HRMS status chip. Resolves label + tone from the central
+ * {@link statusMeta} registry so every surface renders the same colours.
+ */
+export function StatusBadge({ status, domain, label, className }: StatusBadgeProps) {
+  const meta = statusMeta(status, domain);
   return (
-    <span className={cn('status-badge', style, className)}>
-      {status.replace(/_/g, ' ')}
+    <span className={cn('status-badge', toneClass(meta.tone), className)}>
+      {label ?? meta.label}
     </span>
   );
 }

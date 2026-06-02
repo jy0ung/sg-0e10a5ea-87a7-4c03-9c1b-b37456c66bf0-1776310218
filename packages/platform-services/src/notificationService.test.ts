@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@flc/supabase';
 import { markAsRead } from './notificationService';
 
-vi.mock('@/integrations/supabase/client', () => ({
+vi.mock('@flc/supabase', () => ({
   supabase: {
     from: vi.fn(),
   },

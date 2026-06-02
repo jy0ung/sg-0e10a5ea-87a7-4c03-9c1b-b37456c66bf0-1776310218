@@ -5,5 +5,6 @@
 // from the shadcn primitives that both apps duplicate today.
 
 export * from './types';
+export * from './platformRegistry';
 export { isAppShellNavItemActive } from './navUtils';
 export { resolveRouteChrome } from './routeChrome';

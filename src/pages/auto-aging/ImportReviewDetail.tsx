@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
 import { useData } from '@/contexts/DataContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useAuth } from '@/contexts/AuthContext';
@@ -56,11 +57,7 @@ export default function ImportReviewDetail() {
           description="Inspect queued import rows and their validation issues"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Review Queue' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">The Import Review Queue is not enabled for your company. Contact your administrator for access.</p>
-        </div>
+        <FeatureUnavailableState routeId="auto-aging-review-detail" />
       </div>
     );
   }

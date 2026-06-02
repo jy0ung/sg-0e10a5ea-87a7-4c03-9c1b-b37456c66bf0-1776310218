@@ -1,6 +1,5 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Clock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,11 +15,11 @@ import { useAuth } from '@/contexts/AuthContext';
  */
 export default function AccountPending() {
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, logout } = useAuth();
   const email = session?.user?.email ?? '';
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await logout();
     navigate('/login', { replace: true });
   };
 

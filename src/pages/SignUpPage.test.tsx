@@ -11,9 +11,8 @@ const mockGetSession = vi.fn();
 const mockGetUser = vi.fn();
 const mockUpdateUser = vi.fn();
 const mockSignOut = vi.fn();
-const mockOnAuthStateChange = vi.fn();
 
-vi.mock('@/integrations/supabase/client', () => ({
+vi.mock('@flc/supabase/client', () => ({
   supabase: {
     auth: {
       exchangeCodeForSession: (code: string) => mockExchangeCodeForSession(code),
@@ -23,12 +22,12 @@ vi.mock('@/integrations/supabase/client', () => ({
       getUser: () => mockGetUser(),
       updateUser: (params: unknown) => mockUpdateUser(params),
       signOut: () => mockSignOut(),
-      onAuthStateChange: (callback: unknown) => mockOnAuthStateChange(callback),
     },
   },
 }));
 
-vi.mock('@/services/profileService', () => ({
+vi.mock('@flc/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@flc/auth')>()),
   updateOwnProfileName: vi.fn().mockResolvedValue({ error: null }),
 }));
 
@@ -58,9 +57,6 @@ describe('SignUpPage', () => {
     });
     mockUpdateUser.mockResolvedValue({ error: null });
     mockSignOut.mockResolvedValue({ error: null });
-    mockOnAuthStateChange.mockReturnValue({
-      data: { subscription: { unsubscribe: vi.fn() } },
-    });
   });
 
   it('exchanges a bare PKCE invite code returned by GoTrue verify', async () => {

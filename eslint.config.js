@@ -55,10 +55,15 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/pages/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}"],
+    files: [
+      "src/pages/**/*.{ts,tsx}",
+      "src/components/**/*.{ts,tsx}",
+      "apps/hrms-web/src/pages/**/*.{ts,tsx}",
+      "apps/hrms-web/src/components/**/*.{ts,tsx}",
+    ],
     rules: {
       "no-restricted-syntax": [
-        "warn",
+        "error",
         {
           selector: "CallExpression[callee.object.name='supabase'][callee.property.name='from']",
           message: "Do not call supabase.from() from pages/components. Use a service in src/services/*.",
@@ -66,6 +71,18 @@ export default tseslint.config(
         {
           selector: "CallExpression[callee.object.name='supabase'][callee.property.name='rpc']",
           message: "Do not call supabase.rpc() from pages/components. Route RPCs through src/services/*.",
+        },
+        {
+          selector: "CallExpression[callee.object.object.name='supabase'][callee.object.property.name='auth']",
+          message: "Do not call supabase.auth.* from pages/components. Route auth operations through @flc/auth.",
+        },
+        {
+          selector: "CallExpression[callee.object.object.name='supabase'][callee.object.property.name='storage']",
+          message: "Do not call supabase.storage.* from pages/components. Route storage operations through a service package.",
+        },
+        {
+          selector: "CallExpression[callee.name='createClient']",
+          message: "Do not create Supabase clients in pages/components. Use the shared client through a service package.",
         },
       ],
     },

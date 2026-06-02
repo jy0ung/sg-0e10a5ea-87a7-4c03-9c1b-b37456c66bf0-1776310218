@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { BRANDING_DEFAULTS } from '@/services/brandingService';
+import { BRANDING_DEFAULTS } from '@flc/platform-services';
 
 const brandName = BRANDING_DEFAULTS.appName;
 const brandLogo = BRANDING_DEFAULTS.logoUrl ?? '';

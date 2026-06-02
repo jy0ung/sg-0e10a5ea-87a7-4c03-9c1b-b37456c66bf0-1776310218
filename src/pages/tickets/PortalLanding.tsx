@@ -1,9 +1,24 @@
-import { Link } from 'react-router-dom';
-import { Archive, ClipboardList, FolderOpen, Megaphone, PlusCircle, Settings2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import {
+  Archive,
+  CheckCircle2,
+  ClipboardList,
+  FolderOpen,
+  Inbox,
+  Megaphone,
+  MessageSquare,
+  PlusCircle,
+  Settings2,
+} from 'lucide-react';
 
+import { STALE } from '@/lib/queryClient';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent } from '@/components/ui/card';
 import { canManagePortalQueue, canManagePortalSetup } from '@/lib/portalAccess';
+import { isOpenStatus } from '@/lib/requestFormatters';
+import { listMyTickets, getCompanyTicketStatusCounts } from '@/services/ticketService';
+import { MetricCard } from '@/components/shared/MetricCard';
+import { SectionCard } from '@/components/shared/SectionCard';
 
 interface QuickLinkCardProps {
   to: string;
@@ -14,44 +29,149 @@ interface QuickLinkCardProps {
 
 function QuickLinkCard({ to, icon: Icon, title, description }: QuickLinkCardProps) {
   return (
-    <Link to={to} className="group block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg">
-      <Card className="h-full transition-shadow hover:shadow-md group-focus-visible:shadow-md">
-        <CardContent className="flex items-start gap-4 p-5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Icon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-medium text-foreground">{title}</p>
-            <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
-          </div>
-        </CardContent>
-      </Card>
+    <Link
+      to={to}
+      className="surface-card surface-card-hover group flex items-start gap-3 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary/15">
+        <Icon className="h-5 w-5" aria-hidden />
+      </span>
+      <span className="min-w-0">
+        <span className="block font-medium text-foreground">{title}</span>
+        <span className="mt-0.5 block text-sm text-muted-foreground">{description}</span>
+      </span>
     </Link>
   );
 }
 
 export default function PortalLanding() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const canManageQueue = canManagePortalQueue(user);
   const canManageSetup = canManagePortalSetup(user);
 
   const firstName = user?.name?.split(' ')[0] ?? 'there';
 
+  const { data: myTickets } = useQuery({
+    queryKey: ['portal-landing:my-tickets', user?.id, user?.company_id],
+    queryFn: async () => {
+      const { data, error } = await listMyTickets(user!.id, user!.company_id);
+      if (error) throw new Error(error.message || 'Unable to load requests.');
+      return data ?? [];
+    },
+    enabled: !!user,
+    staleTime: STALE.transactional,
+  });
+
+  const { data: queueCounts } = useQuery({
+    queryKey: ['portal-landing:queue-counts', user?.company_id],
+    queryFn: async () => {
+      const { data, error } = await getCompanyTicketStatusCounts(user!.company_id);
+      if (error) throw new Error(error.message || 'Unable to load queue counts.');
+      return data;
+    },
+    enabled: !!user && canManageQueue,
+    staleTime: STALE.transactional,
+  });
+
+  const myOpen = myTickets?.filter((t) => isOpenStatus(t.status)).length ?? 0;
+  const myAwaiting = myTickets?.filter((t) => t.status === 'awaiting_requester').length ?? 0;
+  const myResolved = myTickets?.filter((t) => t.status === 'resolved' || t.status === 'closed').length ?? 0;
+
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          Welcome back, {firstName}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Use the shortcuts below to get started, or navigate using the sidebar.
-        </p>
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+      {/* Hero */}
+      <header className="surface-card hero-gradient flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            Welcome back, {firstName}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Submit a request, track your tickets, or browse shared resources.
+          </p>
+        </div>
+        <div className="flex flex-shrink-0 flex-wrap gap-2">
+          <Link
+            to="/portal/tickets/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <PlusCircle className="h-4 w-4" aria-hidden />
+            New request
+          </Link>
+          <Link
+            to="/portal/tickets"
+            className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ClipboardList className="h-4 w-4" aria-hidden />
+            My requests
+          </Link>
+        </div>
+      </header>
+
+      {/* Personal metric strip */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MetricCard
+          label="My open requests"
+          value={myOpen}
+          icon={Inbox}
+          tone="blue"
+          hint="In progress or awaiting action"
+          onClick={() => navigate('/portal/tickets')}
+          data-testid="portal-metric-open"
+        />
+        <MetricCard
+          label="Awaiting your reply"
+          value={myAwaiting}
+          icon={MessageSquare}
+          tone="amber"
+          hint="Needs information from you"
+          onClick={() => navigate('/portal/tickets')}
+          data-testid="portal-metric-awaiting"
+        />
+        <MetricCard
+          label="Resolved"
+          value={myResolved}
+          icon={CheckCircle2}
+          tone="emerald"
+          hint="Resolved or closed"
+          onClick={() => navigate('/portal/tickets')}
+          data-testid="portal-metric-resolved"
+        />
       </div>
 
-      <div>
-        <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Requests
-        </p>
+      {/* Queue snapshot for staff */}
+      {canManageQueue && (
+        <SectionCard
+          title="Queue at a glance"
+          description="Company-wide request load"
+          icon={ClipboardList}
+          action={{ label: 'Open queue', to: '/portal/queue' }}
+        >
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-2xl font-bold leading-none tracking-tight text-foreground">
+                {queueCounts?.open ?? '—'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Needs triage</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold leading-none tracking-tight text-foreground">
+                {queueCounts?.in_progress ?? '—'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">In progress</p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold leading-none tracking-tight text-foreground">
+                {queueCounts?.awaiting_requester ?? '—'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Awaiting requester</p>
+            </div>
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Requests */}
+      <SectionCard title="Requests" icon={ClipboardList}>
         <div className="grid gap-3 sm:grid-cols-2">
           <QuickLinkCard
             to="/portal/tickets/new"
@@ -82,12 +202,10 @@ export default function PortalLanding() {
             </>
           )}
         </div>
-      </div>
+      </SectionCard>
 
-      <div>
-        <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Resources
-        </p>
+      {/* Resources */}
+      <SectionCard title="Resources" icon={FolderOpen}>
         <div className="grid gap-3 sm:grid-cols-2">
           <QuickLinkCard
             to="/portal/announcements"
@@ -102,13 +220,11 @@ export default function PortalLanding() {
             description="Download forms, templates, SOPs, and reference documents"
           />
         </div>
-      </div>
+      </SectionCard>
 
+      {/* Administration */}
       {canManageSetup && (
-        <div>
-          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Administration
-          </p>
+        <SectionCard title="Administration" icon={Settings2}>
           <div className="grid gap-3 sm:grid-cols-2">
             <QuickLinkCard
               to="/portal/setup"
@@ -117,7 +233,7 @@ export default function PortalLanding() {
               description="Configure categories, routing rules, and form fields"
             />
           </div>
-        </div>
+        </SectionCard>
       )}
     </div>
   );

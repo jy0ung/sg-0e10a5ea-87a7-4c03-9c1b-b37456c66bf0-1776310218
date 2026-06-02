@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { getAllAuditLogs, AuditLogWithProfile } from '@/services/auditService';
 import { History, Search, Filter, Download, ChevronRight, ChevronDown, X } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
-import { loggingService } from '@/services/loggingService';
+import { loggingService } from '@flc/platform-services';
 
 interface AuditLogViewerProps {
   entityId?: string;

@@ -1,8 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import type { DataQualityIssue, ImportBatch, KpiSummary, SlaPolicy, VehicleCanonical } from '@/types';
-import { loggingService } from '@/services/loggingService';
-import { performanceService } from '@/services/performanceService';
+import { loggingService, performanceService } from '@flc/platform-services';
 import { getAutoAgingDashboardSummary } from '@/services/vehicleService';
 
 export type AutoAgingDataLoadMode = 'full' | 'summary-only';

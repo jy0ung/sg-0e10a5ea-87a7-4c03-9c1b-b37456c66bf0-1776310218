@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TicketCheck, ClipboardList, ArrowRight } from 'lucide-react';
-import { BRANDING_DEFAULTS } from '@/services/brandingService';
+import { BRANDING_DEFAULTS } from '@flc/platform-services';
 import { getDedicatedHrmsWorkspacePath, HRMS_PATHS } from '@/lib/hrmsWorkspace';
 
 const brandName = BRANDING_DEFAULTS.appName;

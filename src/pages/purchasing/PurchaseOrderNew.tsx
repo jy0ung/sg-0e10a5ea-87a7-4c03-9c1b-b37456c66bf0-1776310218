@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { createPurchaseOrder } from '@/services/purchaseOrderService';
-import { AlertTriangle, ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CreatePurchaseOrderLineInput } from '@/types';
 
@@ -106,11 +107,7 @@ export default function PurchaseOrderNew() {
           description="Create a new PO from a supplier"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'New PO' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Purchase Orders is not enabled for your company.</p>
-        </div>
+        <FeatureUnavailableState routeId="purchasing-order-new" />
       </div>
     );
   }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { BRANDING_DEFAULTS, type ResolvedBranding } from '@/services/brandingService';
+import { BRANDING_DEFAULTS, type ResolvedBranding } from '@flc/platform-services';
 import { useApplyBranding } from './useApplyBranding';
 
 const mockBranding = vi.fn();

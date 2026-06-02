@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +55,7 @@ import {
   replaceHrmsRoleEmployeeAssignments,
   updateHrmsRole,
 } from '@/services/hrmsRoleService';
+import { runLeaveBalanceRollover } from '@flc/hrms-services';
 
 const ApprovalFlowsWorkspace = lazy(() => import('./ApprovalFlows'));
 const LeaveQuotaPanel = lazy(() => import('./LeaveQuotaPanel'));
@@ -313,11 +315,7 @@ function DepartmentsPanel({ companyId, actorId, canWrite }: DepartmentPanelProps
                   <td className="px-3 py-2 text-muted-foreground">{dept.headEmployeeName ?? '—'}</td>
                   <td className="px-3 py-2 text-muted-foreground">{dept.costCentre ?? '—'}</td>
                   <td className="px-3 py-2">
-                    <Badge className={dept.isActive
-                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
-                      : 'bg-secondary text-secondary-foreground'}>
-                      {dept.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
+                    <StatusBadge status={dept.isActive ? 'active' : 'inactive'} domain="employee" />
                   </td>
                   {canWrite && (
                     <td className="px-3 py-2">
@@ -528,11 +526,7 @@ function JobTitlesPanel({ companyId, actorId, canWrite }: JobTitlesPanelProps) {
                   <td className="px-3 py-2 text-muted-foreground">{jt.departmentName ?? '—'}</td>
                   <td className="px-3 py-2 text-muted-foreground capitalize">{jt.level ?? '—'}</td>
                   <td className="px-3 py-2">
-                    <Badge className={jt.isActive
-                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
-                      : 'bg-secondary text-secondary-foreground'}>
-                      {jt.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
+                    <StatusBadge status={jt.isActive ? 'active' : 'inactive'} domain="employee" />
                   </td>
                   {canWrite && (
                     <td className="px-3 py-2">
@@ -771,7 +765,7 @@ function LeaveTypesPanel({ companyId, actorId, canWrite }: LeaveTypesPanelProps)
                   <td className="px-3 py-2">
                     {canWrite
                       ? <Switch checked={lt.active} onCheckedChange={v => handleQuickToggle(lt, v)} />
-                      : <Badge className={lt.active ? 'bg-emerald-100 text-emerald-800' : 'bg-secondary text-secondary-foreground'}>{lt.active ? 'Active' : 'Inactive'}</Badge>}
+                      : <StatusBadge status={lt.active ? 'active' : 'inactive'} domain="employee" />}
                   </td>
                   {canWrite && (
                     <td className="px-3 py-2">
@@ -1095,13 +1089,12 @@ function RolloverPanel({ companyId, canWrite }: RolloverPanelProps) {
     if (!canWrite) return;
     setRunning(true);
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const { VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY } = import.meta.env as Record<string, string>;
-      const client = createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY);
-      const { error } = await client.functions.invoke('rollover-leave-balances', {
-        body: { company_id: companyId, from_year: form.fromYear, to_year: form.toYear, max_carry_days: form.maxCarryDays },
+      await runLeaveBalanceRollover({
+        companyId,
+        fromYear: form.fromYear,
+        toYear: form.toYear,
+        maxCarryDays: form.maxCarryDays,
       });
-      if (error) throw error;
       toast({ title: 'Leave rollover completed', description: `Balances rolled from ${form.fromYear} → ${form.toYear}.` });
     } catch (err) {
       toast({ title: 'Rollover failed', description: String((err as Error).message), variant: 'destructive' });

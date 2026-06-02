@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageSpinner } from '@/components/shared/PageSpinner';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -283,12 +284,7 @@ export default function PayrollSummary() {
                     </CardTitle>
                     <p className="truncate text-sm text-muted-foreground">{run.totalHeadcount} employees · RM {fmt(run.totalGross)} gross · RM {fmt(run.totalNet)} net</p>
                   </div>
-                <Badge variant="outline" className={`capitalize text-xs ${
-                  run.status === 'paid'      ? 'bg-green-50 text-green-700 border-green-200' :
-                  run.status === 'finalised' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                  run.status === 'draft'     ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                  'bg-red-50 text-red-700 border-red-200'
-                }`}>{run.status}</Badge>
+                <StatusBadge status={run.status} domain="payroll" />
                 </div>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center gap-2 p-4">

@@ -7,13 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { loggingService } from '@/services/loggingService';
+import { loggingService } from '@flc/platform-services';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   getUserPermissions, 
   setUserColumnPermissions,
   getUserColumnPermissions 
-} from '@/services/permissionService';
+} from '@flc/auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { User, Save, Eye, EyeOff, Edit, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';

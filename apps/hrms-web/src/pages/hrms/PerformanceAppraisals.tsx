@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageSpinner } from '@/components/shared/PageSpinner';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,13 +37,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { getApprovalInboxReviewPath, notifyApprovalInboxChanged } from '@/lib/hrms/approvalInbox';
-
-const ITEM_STATUS_COLORS: Record<AppraisalItem['status'], string> = {
-  pending:       'bg-gray-100 text-gray-600',
-  self_reviewed: 'bg-blue-100 text-blue-700',
-  reviewed:      'bg-yellow-100 text-yellow-700',
-  acknowledged:  'bg-green-100 text-green-700',
-};
 
 type AppraisalItemRow = AppraisalItem & Record<string, unknown>;
 
@@ -326,9 +319,7 @@ export default function PerformanceAppraisals() {
     { key: 'reviewerName', label: 'Reviewer', render: (item) => item.reviewerName ?? '—' },
     { key: 'rating', label: 'Rating', sortable: false, render: (item) => <StarRating rating={item.rating} /> },
     { key: 'status', label: 'Status', render: (item) => (
-      <Badge variant="secondary" className={`capitalize text-xs ${ITEM_STATUS_COLORS[item.status]}`}>
-        {item.status.replace('_', ' ')}
-      </Badge>
+      <StatusBadge status={item.status} domain="appraisalItem" />
     )},
     { key: 'goals', label: 'Notes', sortable: false, render: (item) => (
       <div className="space-y-1 whitespace-normal text-xs text-muted-foreground max-w-xs">
@@ -414,12 +405,7 @@ export default function PerformanceAppraisals() {
                       {a.cycle.replace('_', ' ')} · {a.periodStart} → {a.periodEnd}
                     </p>
                   </div>
-                  <Badge variant="outline" className={`capitalize text-xs ${
-                    a.status === 'completed'   ? 'bg-green-50 text-green-700 border-green-200' :
-                    a.status === 'open'        ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
-                    a.status === 'in_progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                    'bg-muted text-muted-foreground'
-                  }`}>{a.status.replace('_', ' ')}</Badge>
+                  <StatusBadge status={a.status} domain="appraisalCycle" />
                 </div>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center gap-2 p-4">

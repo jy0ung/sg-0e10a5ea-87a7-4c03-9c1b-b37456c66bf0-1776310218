@@ -76,6 +76,12 @@ vi.mock('@/services/auditService', () => ({
   logUserAction: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@flc/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@flc/auth')>()),
+  deleteInvitedUser: vi.fn().mockResolvedValue({ error: null }),
+  inviteUser: vi.fn().mockResolvedValue({ error: null }),
+}));
+
 vi.mock('@flc/hrms-services', () => ({
   createLeaveRequest: vi.fn().mockResolvedValue('leave-1'),
   listLeaveTypes: vi.fn().mockResolvedValue([]),

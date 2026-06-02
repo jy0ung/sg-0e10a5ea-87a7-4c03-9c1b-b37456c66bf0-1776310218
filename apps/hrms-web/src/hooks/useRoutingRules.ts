@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listRoutingRules, type RequestRoutingRule } from '@/services/requestRoutingService';
+import { listRoutingRules, type RequestRoutingRule } from '@flc/internal-requests';
 
 export function useRoutingRules(companyId?: string) {
   const [rules, setRules] = useState<RequestRoutingRule[]>([]);

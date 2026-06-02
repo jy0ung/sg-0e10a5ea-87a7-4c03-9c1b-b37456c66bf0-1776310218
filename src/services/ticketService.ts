@@ -4,15 +4,15 @@ import { type RequestCategoryValue } from '@/lib/requestCategories';
 import { logUserAction } from './auditService';
 import { loggingService } from './loggingService';
 import { createNotifications, type CreateNotificationInput } from './notificationService';
-import { evaluateRoutingRules } from './requestRoutingService';
 import {
+  evaluateRoutingRules,
   cancelInternalRequestApprovalInstance,
   createInternalRequestApprovalInstance,
   getInternalRequestApprovalGate,
   getInternalRequestApprovalPlan,
   listInternalRequestApprovalMetadata,
   type InternalRequestApprovalMetadata,
-} from './requestApprovalService';
+} from '@flc/internal-requests';
 
 /**
  * Ticket service — the only module allowed to talk to the `tickets` table.

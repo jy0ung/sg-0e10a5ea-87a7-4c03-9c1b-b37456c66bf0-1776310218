@@ -1,4 +1,8 @@
 import type { AppRole } from '@/types';
+import {
+  PORTAL_QUEUE_ROLES as SHARED_PORTAL_QUEUE_ROLES,
+  PORTAL_SETUP_ROLES as SHARED_PORTAL_SETUP_ROLES,
+} from '@flc/auth';
 
 /**
  * Phase 2 #15: centralized route-level role lists.
@@ -87,17 +91,8 @@ export const HRMS_APPRAISALS: readonly AppRole[] = [
 ] as const;
 
 // Portal management roles.
-export const PORTAL_QUEUE_ROLES: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'portal_admin',
-  'portal_manager',
-] as const;
+export const PORTAL_QUEUE_ROLES: readonly AppRole[] = SHARED_PORTAL_QUEUE_ROLES;
 
 // portal_admin can also manage setup (categories, routing, templates).
 // portal_manager stays off this write-capable setup route until a read-only setup view exists.
-export const PORTAL_SETUP_ROLES: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'portal_admin',
-] as const;
+export const PORTAL_SETUP_ROLES: readonly AppRole[] = SHARED_PORTAL_SETUP_ROLES;

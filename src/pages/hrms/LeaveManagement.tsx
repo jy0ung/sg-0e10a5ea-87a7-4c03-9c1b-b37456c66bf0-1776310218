@@ -64,7 +64,6 @@ export default function LeaveManagement() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewAction, setReviewAction] = useState<'approved' | 'rejected'>('approved');
   const [reviewRequestId, setReviewRequestId] = useState<string | null>(null);
-  const [reviewApprovalRequestId, setReviewApprovalRequestId] = useState<string | null>(null);
 
   // ─── Handlers ──────────────────────────────────────────────────────
 
@@ -73,10 +72,9 @@ export default function LeaveManagement() {
     setDrawerOpen(true);
   }, []);
 
-  const startReview = useCallback((action: 'approved' | 'rejected', requestId: string, approvalRequestId?: string | null) => {
+  const startReview = useCallback((action: 'approved' | 'rejected', requestId: string) => {
     setReviewAction(action);
     setReviewRequestId(requestId);
-    setReviewApprovalRequestId(approvalRequestId ?? null);
     setDrawerOpen(false);
     setReviewOpen(true);
   }, []);
@@ -103,11 +101,11 @@ export default function LeaveManagement() {
 
   // Handle approval inbox actions
   const handleInboxApprove = useCallback((pa: PendingApproval) => {
-    startReview('approved', pa.entityId, pa.id);
+    startReview('approved', pa.entityId);
   }, [startReview]);
 
   const handleInboxReject = useCallback((pa: PendingApproval) => {
-    startReview('rejected', pa.entityId, pa.id);
+    startReview('rejected', pa.entityId);
   }, [startReview]);
 
   const handleInboxViewDetails = useCallback((pa: PendingApproval) => {
@@ -281,8 +279,8 @@ export default function LeaveManagement() {
         onOpenChange={setDrawerOpen}
         request={selectedRequest}
         canReview={canReviewSelected}
-        onApprove={() => startReview('approved', selectedRequest?.id ?? '', selectedRequest?.approvalInstanceId)}
-        onReject={() => startReview('rejected', selectedRequest?.id ?? '', selectedRequest?.approvalInstanceId)}
+        onApprove={() => startReview('approved', selectedRequest?.id ?? '')}
+        onReject={() => startReview('rejected', selectedRequest?.id ?? '')}
         onCancel={handleCancelRequest}
         currentUserId={user?.employeeId ?? user?.id}
       />
@@ -291,7 +289,6 @@ export default function LeaveManagement() {
         open={reviewOpen}
         onOpenChange={setReviewOpen}
         requestId={reviewRequestId}
-        approvalRequestId={reviewApprovalRequestId}
         action={reviewAction}
         userId={user?.id ?? ''}
       />

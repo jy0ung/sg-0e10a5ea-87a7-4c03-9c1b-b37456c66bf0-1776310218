@@ -9,7 +9,7 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getCashPosition } from '@/services/glService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { CashPositionRow } from '@/types';
 
@@ -70,11 +70,7 @@ export default function CashPosition() {
           description="Daily Cash and Bank balance trajectory"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Accounts' }, { label: 'Cash Position' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Financial reporting is not enabled for your company. Contact your administrator for access.</p>
-        </div>
+        <FeatureUnavailableState routeId="accounts-cash-position" />
       </div>
     );
   }

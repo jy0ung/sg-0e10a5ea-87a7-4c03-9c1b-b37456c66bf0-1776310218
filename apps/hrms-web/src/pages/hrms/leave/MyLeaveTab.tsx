@@ -89,7 +89,7 @@ export function MyLeaveTab({
         </div>
       </section>
 
-      <section className="space-y-2 rounded-xl border bg-card p-4 shadow-sm lg:hidden">
+      <section className="space-y-2 rounded-xl border bg-card p-4 shadow-sm">
         <SectionHeading title={`Balances - ${leaveYear}`} />
         <LeaveBalanceCards
           leaveTypes={leaveTypes}

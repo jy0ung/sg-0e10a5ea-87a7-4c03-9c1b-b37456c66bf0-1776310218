@@ -22,7 +22,7 @@ import { validateVehicleImportBatch } from '@/services/validationService';
 import { createImportBatch, insertImportReviewRows, validateAndInsertVehicles } from '@/services/importService';
 import { resolveNamesToIds } from '@/services/hrmsService';
 import type { DataQualityIssue, ImportBatch, ImportBatchInsert, ImportStatus, VehicleRaw, ValidationError } from '@/types';
-import { loggingService } from '@/services/loggingService';
+import { loggingService } from '@flc/platform-services';
 
 type Step = 'upload' | 'validating' | 'review' | 'publishing' | 'done';
 

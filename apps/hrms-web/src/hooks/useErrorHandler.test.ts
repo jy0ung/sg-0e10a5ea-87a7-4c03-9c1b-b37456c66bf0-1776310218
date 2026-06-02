@@ -7,7 +7,7 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: mockToast }),
 }));
 
-vi.mock('@/services/errorTrackingService', () => ({
+vi.mock('@flc/platform-services', () => ({
   errorTrackingService: {
     captureException: vi.fn(),
   },
@@ -76,7 +76,7 @@ describe('useErrorHandler', () => {
     });
 
     it('reports to error tracking service', async () => {
-      const { errorTrackingService } = await import('@/services/errorTrackingService');
+      const { errorTrackingService } = await import('@flc/platform-services');
       const { result } = renderHook(() => useErrorHandler());
 
       act(() => {

@@ -11,7 +11,8 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { listPurchaseOrders } from '@/services/purchaseOrderService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, ArrowRight, Plus } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { ArrowRight, Plus } from 'lucide-react';
 import type { PurchaseOrderStatus } from '@/types';
 
 const STATUS_BADGE: Record<PurchaseOrderStatus, string> = {
@@ -57,11 +58,7 @@ export default function PurchaseOrders() {
           description="Track CBU procurement from supplier order through fulfilment"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'Purchase Orders' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Purchase Orders is not enabled for your company.</p>
-        </div>
+        <FeatureUnavailableState routeId="purchasing-orders" />
       </div>
     );
   }

@@ -1,6 +1,6 @@
 import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
-import { loggingService } from '@/services/loggingService';
+import { loggingService } from '@flc/platform-services';
 
 const NotFound = () => {
   const location = useLocation();

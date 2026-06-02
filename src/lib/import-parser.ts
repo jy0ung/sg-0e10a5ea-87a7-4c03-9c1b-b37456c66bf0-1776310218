@@ -1,7 +1,7 @@
 import { VehicleRaw, DataQualityIssue } from '@/types';
 import { parseVehicleGrid, REQUIRED_DB_COLUMNS } from '@/lib/import-grid-parser';
 import { normalizeVehicleRawCell } from '@/lib/import-normalization';
-import { loggingService } from '@/services/loggingService';
+import { loggingService } from '@flc/platform-services';
 import { loadExcelJS } from '@/lib/exceljs-loader';
 
 export { publishCanonical } from '@/lib/import-publish';

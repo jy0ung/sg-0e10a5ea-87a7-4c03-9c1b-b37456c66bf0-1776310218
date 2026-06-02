@@ -9,7 +9,8 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { listGoodsReceiptNotes } from '@/services/grnService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, ArrowRight, ClipboardCheck } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { ArrowRight, ClipboardCheck } from 'lucide-react';
 
 function fmtDate(iso: string): string {
   const d = new Date(iso);
@@ -40,11 +41,7 @@ export default function GoodsReceiptNotes() {
           description="Physical receipts against purchase orders"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'GRN' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Purchasing module is not enabled for your company.</p>
-        </div>
+        <FeatureUnavailableState routeId="purchasing-grn" />
       </div>
     );
   }

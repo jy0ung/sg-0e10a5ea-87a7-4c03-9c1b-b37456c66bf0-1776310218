@@ -4,7 +4,7 @@ import {
   getAttachmentSettings,
   upsertAttachmentSettings,
   type AttachmentSettings,
-} from '@/services/ticketAttachmentService';
+} from '@flc/platform-services';
 
 export function useAttachmentSettings(companyId?: string) {
   const [settings, setSettings] = useState<AttachmentSettings>(DEFAULT_ATTACHMENT_SETTINGS);

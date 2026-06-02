@@ -16,7 +16,7 @@ import { RequireHrmsRouteAccess } from '@/components/shared/RequireHrmsRouteAcce
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { env } from '@/config/env';
 import { createAppQueryClient } from '@/lib/queryClient';
-import { errorTrackingService } from '@/services/errorTrackingService';
+import { errorTrackingService } from '@flc/platform-services';
 import HrmsLayout from './layout/HrmsLayout';
 import ProfilePage from './pages/ProfilePage';
 import { getHrmsRouterBaseName, hrmsCompatibilityRedirects } from './routes';
@@ -37,6 +37,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const HrmsDashboard = lazy(() => import('./pages/hrms/HrmsDashboard'));
 const ApprovalInbox = lazy(() => import('./pages/hrms/ApprovalInbox'));
 const LeaveManagement = lazy(() => import('./pages/hrms/LeaveManagement'));
+const TeamLeave = lazy(() => import('./pages/hrms/TeamLeave'));
 const LeaveCalendar = lazy(() => import('./pages/hrms/LeaveCalendar'));
 const AttendanceLog = lazy(() => import('./pages/hrms/AttendanceLog'));
 const PayrollSummary = lazy(() => import('./pages/hrms/PayrollSummary'));
@@ -99,8 +100,9 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <RequireHrmsRouteAccess access="dashboard"><R scope="Dashboard"><S><HrmsDashboard /></S></R></RequireHrmsRouteAccess> },
       { path: 'profile', element: <RequireHrmsRouteAccess access="profile"><R scope="Profile"><ProfilePage /></R></RequireHrmsRouteAccess> },
       { path: 'leave', element: <RequireHrmsRouteAccess access="leave"><R scope="Leave"><S><LeaveManagement /></S></R></RequireHrmsRouteAccess> },
+      { path: 'leave/team', element: <RequireHrmsRouteAccess access="teamLeave"><R scope="Team Leave"><S><TeamLeave /></S></R></RequireHrmsRouteAccess> },
       { path: 'leave/calendar', element: <RequireHrmsRouteAccess access="leaveCalendar"><R scope="Leave Calendar"><S><LeaveCalendar /></S></R></RequireHrmsRouteAccess> },
-      { path: 'attendance', element: <RequireHrmsRouteAccess access="attendance"><R scope="Attendance"><S><AttendanceLog /></S></R></RequireHrmsRouteAccess> },
+      { path: 'attendance', element: <RequireHrmsRouteAccess access="attendancePage"><R scope="Attendance"><S><AttendanceLog /></S></R></RequireHrmsRouteAccess> },
       { path: 'approvals', element: <RequireHrmsRouteAccess access="approvals"><R scope="Approvals"><S><ApprovalInbox /></S></R></RequireHrmsRouteAccess> },
       { path: 'appraisals', element: <RequireHrmsRouteAccess access="appraisals"><R scope="Appraisals"><S><PerformanceAppraisals /></S></R></RequireHrmsRouteAccess> },
       { path: 'announcements', element: <RequireHrmsRouteAccess access="announcements"><R scope="Announcements"><S><HrmsAnnouncements /></S></R></RequireHrmsRouteAccess> },

@@ -1,14 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   resolvePlatformModules,
   type ModuleSettingRecord,
   type ResolvedPlatformModule,
 } from '@/lib/moduleAccess';
-import { fetchModuleSettings, upsertModuleSetting, type ModuleSettingRow } from '@/services/moduleSettingsService';
+import { fetchModuleSettings, upsertModuleSetting, type ModuleSettingInsert, type ModuleSettingRow } from '@flc/platform-services';
 
 interface ModuleAccessContextValue {
   modules: ResolvedPlatformModule[];
@@ -72,11 +71,12 @@ export function ModuleAccessProvider({ children }: { children: React.ReactNode }
     if (!module) throw new Error('Unknown module');
     if (!module.isToggleable) throw new Error(`${module.name} cannot be deactivated.`);
 
-    const payload: Database['public']['Tables']['module_settings']['Insert'] = {
+    const updatedAt = new Date().toISOString();
+    const payload: ModuleSettingInsert = {
       company_id: companyId,
       module_id: moduleId,
       is_active: isActive,
-      updated_at: new Date().toISOString(),
+      updated_at: updatedAt,
       updated_by: user?.id ?? null,
     };
 
@@ -91,8 +91,8 @@ export function ModuleAccessProvider({ children }: { children: React.ReactNode }
         company_id: companyId,
         module_id: moduleId,
         is_active: isActive,
-        updated_at: payload.updated_at ?? undefined as unknown as string,
-        updated_by: payload.updated_by ?? undefined as unknown as string,
+        updated_at: updatedAt,
+        updated_by: payload.updated_by ?? null,
       };
 
       return [

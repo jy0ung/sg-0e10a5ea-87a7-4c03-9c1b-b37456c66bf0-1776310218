@@ -1,5 +1,17 @@
 // ===== User & Auth =====
-export type AppRole = 'super_admin' | 'company_admin' | 'director' | 'general_manager' | 'manager' | 'sales' | 'accounts' | 'analyst' | 'creator_updater';
+export type AppRole =
+  | 'super_admin'
+  | 'company_admin'
+  | 'director'
+  | 'general_manager'
+  | 'manager'
+  | 'sales'
+  | 'accounts'
+  | 'analyst'
+  | 'creator_updater'
+  | 'portal_admin'
+  | 'portal_manager'
+  | 'portal_staff';
 export type AccessScope = 'self' | 'branch' | 'company' | 'global';
 
 export const DEFAULT_APP_ROLE: AppRole = 'creator_updater';
@@ -14,6 +26,9 @@ export const ROLE_DEFAULT_SCOPE: Record<AppRole, AccessScope> = {
   accounts: 'company',
   analyst: 'company',
   creator_updater: 'branch',
+  portal_admin: 'company',
+  portal_manager: 'company',
+  portal_staff: 'self',
 };
 
 export interface User {
@@ -805,6 +820,55 @@ export interface PlatformModule {
   status: 'active' | 'coming_soon' | 'planned';
   path?: string;
 }
+
+export type PlatformModuleId =
+  | 'platform'
+  | 'auto-aging'
+  | 'sales'
+  | 'inventory'
+  | 'purchasing'
+  | 'accounts'
+  | 'reports'
+  | 'hrms'
+  | 'admin'
+  | 'support';
+
+export type PermissionCapability =
+  | 'route:view'
+  | 'module:view'
+  | 'module:manage'
+  | 'record:view'
+  | 'record:create'
+  | 'record:update'
+  | 'record:delete'
+  | 'workflow:submit'
+  | 'workflow:approve'
+  | 'workflow:reject'
+  | 'audit:view'
+  | 'audit:export';
+
+export type WorkflowEntityType = FlowEntityType;
+
+export interface ApprovalEntityAdapter {
+  entityType: WorkflowEntityType;
+  resolveRequesterId(entityId: string): Promise<string | null>;
+  updateEntityStatus(
+    entityId: string,
+    decision: ApprovalDecisionStatus,
+    reviewerId: string,
+    note: string | undefined,
+    decidedAt: string,
+  ): Promise<void>;
+  resolveAuditMetadata?(entityId: string): Promise<Record<string, unknown>>;
+}
+
+export type PlatformErrorCode =
+  | 'platform.schema_mismatch'
+  | 'platform.permission_denied'
+  | 'platform.network'
+  | 'platform.validation'
+  | 'platform.not_found'
+  | 'platform.unknown';
 
 // ===== KPI Dashboard Filters =====
 export interface KpiDashboardFilters {

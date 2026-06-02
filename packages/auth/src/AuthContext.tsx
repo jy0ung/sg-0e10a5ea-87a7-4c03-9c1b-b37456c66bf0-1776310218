@@ -3,6 +3,7 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from '@flc/supabase/client';
 import { AppRole, AccessScope, DEFAULT_APP_ROLE } from '@flc/types';
 import { useLocation, Navigate } from 'react-router-dom';
+import { hasAppRole } from './accessControl';
 
 export interface AuthLogger {
   warn(message: string, context?: Record<string, unknown>, component?: string): void;
@@ -73,7 +74,7 @@ export interface AuthContextType {
   profileError: string | null;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
-  hasRole: (roles: AppRole[]) => boolean;
+  hasRole: (roles: readonly AppRole[]) => boolean;
   refreshProfile: () => Promise<void>;
 }
 
@@ -270,11 +271,7 @@ export function AuthProvider({
     }
   }, [session?.user, fetchProfile]);
 
-  const hasRole = useCallback((roles: AppRole[]): boolean => {
-    if (!profile) return false;
-    if (profile.role === 'super_admin') return true;
-    return roles.includes(profile.role);
-  }, [profile]);
+  const hasRole = useCallback((roles: readonly AppRole[]): boolean => hasAppRole(profile, roles), [profile]);
 
   const contextValue = useMemo<AuthContextType>(() => ({
     user: profile,

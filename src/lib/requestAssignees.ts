@@ -1,5 +1,5 @@
 import { canManagePortalQueue } from '@/lib/portalAccess';
-import type { ProfileRow } from '@/services/profileService';
+import type { ProfileRow } from '@flc/auth';
 
 // Anyone with PORTAL_QUEUE_ROLES (the queue managers) is a valid request
 // assignee — they're the people who triage and resolve incoming requests.

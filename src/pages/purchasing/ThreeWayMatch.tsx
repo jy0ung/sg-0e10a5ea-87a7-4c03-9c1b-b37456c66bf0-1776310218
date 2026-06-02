@@ -10,6 +10,7 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getThreeWayMatchQueue, getThreeWayMatchStatusCounts } from '@/services/threeWayMatchService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
 import { AlertTriangle, ArrowRight, CheckCircle2, Clock, GitCompare, Unplug } from 'lucide-react';
 import type { ThreeWayMatchStatus } from '@/types';
 
@@ -90,11 +91,7 @@ export default function ThreeWayMatch() {
           description="PO ↔ GRN ↔ PI reconciliation"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: '3-way Match' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Purchasing module is not enabled for your company.</p>
-        </div>
+        <FeatureUnavailableState routeId="purchasing-three-way-match" />
       </div>
     );
   }

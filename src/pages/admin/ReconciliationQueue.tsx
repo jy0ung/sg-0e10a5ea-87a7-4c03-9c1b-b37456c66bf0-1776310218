@@ -10,6 +10,7 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getReconciliationQueue, getReconciliationStatusCounts } from '@/services/reconciliationService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
 import { AlertTriangle, ArrowRight, CheckCircle2, GitMerge, Link as LinkIcon, XCircle } from 'lucide-react';
 import type { ReconciliationMatchStatus, ReconciliationObjectType } from '@/types';
 
@@ -95,11 +96,7 @@ export default function ReconciliationQueue() {
           description="Review source-to-canonical match decisions"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin' }, { label: 'Reconciliation Queue' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Reconciliation Review is not enabled for your company. Contact your administrator for access.</p>
-        </div>
+        <FeatureUnavailableState routeId="admin-reconciliation" />
       </div>
     );
   }

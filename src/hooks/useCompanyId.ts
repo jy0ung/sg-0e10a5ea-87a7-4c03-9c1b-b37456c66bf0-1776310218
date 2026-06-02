@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { loggingService } from '@/services/loggingService';
+import { loggingService } from '@flc/platform-services';
 
 /**
  * Returns the authenticated user's company_id.

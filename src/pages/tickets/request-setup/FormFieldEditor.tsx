@@ -24,7 +24,7 @@ import {
   type RequestFieldDataSource,
   type RequestFormFieldRecord,
   type RequestFormFieldType,
-} from '@/services/requestFormFieldService';
+} from '@flc/internal-requests';
 
 import {
   DATA_SOURCE_OPTIONS,

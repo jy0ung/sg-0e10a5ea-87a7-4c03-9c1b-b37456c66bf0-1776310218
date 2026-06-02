@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { errorTrackingService } from "@/services/errorTrackingService";
+import { errorTrackingService } from "@flc/platform-services";
 
 export function useErrorHandler() {
   const { toast } = useToast();

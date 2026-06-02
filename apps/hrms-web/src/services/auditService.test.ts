@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { logVehicleEdit, getAuditLog } from './auditService';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@flc/supabase';
 
-vi.mock('@/integrations/supabase/client', () => ({
+vi.mock('@flc/supabase', () => ({
   supabase: {
     from: vi.fn(() => ({
       insert: vi.fn().mockReturnThis(),

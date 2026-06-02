@@ -280,8 +280,10 @@ export async function resubmitApprovalInstance(
     throw new Error(`Only rejected ${entityType.replace('_', ' ')} approvals can be resubmitted.`);
   }
 
-  const { data: stepRows, error: stepsError } = await untypedSupabase    // TODO: Replace untypedSupabase after APPROVAL_STEP_SELECT is updated to use select('*')
-    // and rowToApprovalStep() is updated to accept ApprovalStepRow.    .from('approval_steps')
+  const { data: stepRows, error: stepsError } = await untypedSupabase
+    // TODO: Replace untypedSupabase after APPROVAL_STEP_SELECT is updated to use select('*')
+    // and rowToApprovalStep() is updated to accept ApprovalStepRow.
+    .from('approval_steps')
     .select(APPROVAL_STEP_SELECT)
     .eq('flow_id', instance.flowId)
     .order('step_order');

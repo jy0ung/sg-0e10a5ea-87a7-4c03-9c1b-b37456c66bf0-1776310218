@@ -11,7 +11,7 @@ import {
 import type { AppRole } from '@/types';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchRoleSections, saveRoleSections } from '@/services/roleSectionService';
+import { fetchRoleSections, saveRoleSections } from '@flc/auth';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';

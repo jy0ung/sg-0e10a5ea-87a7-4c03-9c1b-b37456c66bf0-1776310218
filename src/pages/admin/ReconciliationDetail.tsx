@@ -10,7 +10,8 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getReconciliationMatchDetail, decideReconciliationMatch } from '@/services/reconciliationService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Loader2, EyeOff, XCircle } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { ArrowLeft, CheckCircle2, Loader2, EyeOff, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ReconciliationDecision } from '@/types';
 
@@ -87,11 +88,7 @@ export default function ReconciliationDetail() {
           description="Side-by-side source vs canonical evidence"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin' }, { label: 'Reconciliation' }, { label: 'Match' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Reconciliation Review is not enabled for your company.</p>
-        </div>
+        <FeatureUnavailableState routeId="admin-reconciliation-detail" />
       </div>
     );
   }

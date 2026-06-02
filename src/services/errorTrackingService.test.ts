@@ -12,7 +12,7 @@ const sentryMock = vi.hoisted(() => ({
 
 vi.mock('@sentry/react', () => sentryMock);
 
-vi.mock('@/integrations/supabase/client', () => ({
+vi.mock('@flc/supabase', () => ({
   supabase: {
     from: vi.fn(() => ({
       insert: vi.fn().mockResolvedValue({ error: null }),
@@ -20,8 +20,8 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
-import { ErrorTrackingService } from './errorTrackingService';
-import { loggingService } from './loggingService';
+import { ErrorTrackingService } from '../../packages/platform-services/src/errorTrackingService';
+import { loggingService } from '../../packages/platform-services/src/loggingService';
 
 describe('errorTrackingService', () => {
   beforeEach(() => {

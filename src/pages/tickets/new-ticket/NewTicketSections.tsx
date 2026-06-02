@@ -43,17 +43,17 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import type { InternalRequestApprovalPlan } from '@/services/requestApprovalService';
 import {
+  type InternalRequestApprovalPlan,
   listRequestFieldOptions,
   type DatabaseFieldOption,
   type RequestFieldDataSource,
   type RequestFormFieldRecord,
-} from '@/services/requestFormFieldService';
+  type RequestTemplateRecord,
+} from '@flc/internal-requests';
 import type { RequestCategoryRecord } from '@/services/requestCategoryService';
 import type { RequestSubcategoryRecord } from '@/services/requestSubcategoryService';
-import type { RequestTemplateRecord } from '@/services/requestTemplateService';
-import type { AttachmentSettings } from '@/services/ticketAttachmentService';
+import type { AttachmentSettings } from '@flc/platform-services';
 import type { AppRole } from '@/types';
 
 export const ticketSchema = z.object({

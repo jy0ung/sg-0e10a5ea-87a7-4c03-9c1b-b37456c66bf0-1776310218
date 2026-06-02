@@ -110,11 +110,13 @@ describe('HrmsLayout', () => {
     expect(hrmsNavItems.map((item) => item.path)).toEqual([
       '/dashboard',
       '/leave',
-      '/announcements',
+      '/attendance',
       '/appraisals',
+      '/announcements',
       '/profile',
       '/employees',
       '/attendance',
+      '/leave/team',
       '/leave/calendar',
       '/approvals',
       '/payroll',
@@ -126,21 +128,23 @@ describe('HrmsLayout', () => {
   it('shows self-service navigation for an accounts user and hides admin-only items', () => {
     renderLayout('accounts');
 
-    expect(screen.getByRole('link', { name: 'Leave' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'My Leave' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Approval Inbox' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Employees' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'My Profile' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Team Leave' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Employee Directory' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Payroll' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'HRMS Settings' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Approval Flows' })).not.toBeInTheDocument();
   });
 
   it('shows workforce and administration navigation for a company admin', () => {
     renderLayout('company_admin', '/settings');
 
-    expect(screen.getByRole('link', { name: 'Employees' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Employee Directory' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Team Leave' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Payroll' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'HRMS Settings' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Approval Flows' })).not.toBeInTheDocument();
   });
 });

@@ -3,7 +3,7 @@ import {
   listRequestTemplates,
   type ListRequestTemplatesOptions,
   type RequestTemplateRecord,
-} from '@/services/requestTemplateService';
+} from '@flc/internal-requests';
 
 export function useRequestTemplates(
   companyId?: string,

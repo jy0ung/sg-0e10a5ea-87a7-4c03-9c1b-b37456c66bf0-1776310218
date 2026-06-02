@@ -5,7 +5,10 @@ export type HrmsRouteAccessKey =
   | 'profile'
   | 'leave'
   | 'leaveCalendar'
+  | 'teamLeave'
   | 'attendance'
+  | 'myAttendance'
+  | 'attendancePage'
   | 'approvals'
   | 'appraisals'
   | 'announcements'
@@ -163,8 +166,19 @@ export function deriveHrmsAccess(roles: HrmsRole[]): DerivedHrmsAccess {
         return hasSelfServiceAccess;
       case 'leaveCalendar':
         return hasSupervisoryRole;
+      case 'teamLeave':
+        // Manager+/approver team leave view; staff (self-service only) are excluded.
+        return canApproveRequests || canAccessEmployees;
       case 'attendance':
         return canAccessAttendance;
+      case 'myAttendance':
+        // Self-service "My Attendance" entry for non-supervisory staff only;
+        // supervisors use the team-scoped 'attendance' entry instead.
+        return hasSelfServiceAccess && !canAccessAttendance;
+      case 'attendancePage':
+        // Route-level guard for /attendance: admits anyone with HRMS access.
+        // The page self-scopes (own records vs team) and RLS is company-scoped.
+        return hasSelfServiceAccess;
       case 'approvals':
         return canApproveRequests;
       case 'appraisals':

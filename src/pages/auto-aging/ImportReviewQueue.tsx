@@ -5,7 +5,8 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { useData } from '@/contexts/DataContext';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
-import { Clock, Eye, AlertTriangle } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { Clock, Eye } from 'lucide-react';
 
 export default function ImportReviewQueue() {
   const navigate = useNavigate();
@@ -20,11 +21,7 @@ export default function ImportReviewQueue() {
           description="Review rows held back from Auto Aging imports"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Review Queue' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">The Import Review Queue is not enabled for your company. Contact your administrator for access.</p>
-        </div>
+        <FeatureUnavailableState routeId="auto-aging-review" />
       </div>
     );
   }

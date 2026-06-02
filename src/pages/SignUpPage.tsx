@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { updateOwnProfileName } from '@/services/profileService';
+import {
+  getAuthCallbackParams,
+  getCurrentAuthUser,
+  initializeInviteSignup,
+  signOutAuthSession,
+  updateOwnProfileName,
+  updateInvitedUserPasswordAndMetadata,
+} from '@flc/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +15,7 @@ import { Loader2, CheckCircle } from 'lucide-react';
 import { inviteSignupSchema, type InviteSignupFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BRANDING_DEFAULTS } from '@/services/brandingService';
+import { BRANDING_DEFAULTS } from '@flc/platform-services';
 
 const brandName = BRANDING_DEFAULTS.appName;
 const brandLogo = BRANDING_DEFAULTS.logoUrl ?? '';
@@ -33,120 +39,23 @@ export default function SignUpPage() {
   useEffect(() => {
     let isMounted = true;
 
-    const getCallbackParams = () => {
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      const searchParams = new URLSearchParams(window.location.search);
-
-      return {
-        type: hashParams.get('type') || searchParams.get('type'),
-        accessToken: hashParams.get('access_token') || searchParams.get('access_token'),
-        refreshToken: hashParams.get('refresh_token') || searchParams.get('refresh_token'),
-        tokenHash: hashParams.get('token_hash') || searchParams.get('token_hash'),
-        code: hashParams.get('code') || searchParams.get('code'),
-      };
-    };
-
     const initializeInvite = async () => {
-      const { type, accessToken, refreshToken, tokenHash, code } = getCallbackParams();
-      // Supabase PKCE invite links first verify at /auth/v1/verify and then
-      // redirect here with ?code=...; the returned URL may not include type.
-      // On /signup, a bare code/token_hash is therefore treated as an invite.
-      const callbackType = type || ((code || tokenHash) ? 'invite' : null);
-      const isInviteCallback =
-        (callbackType === 'invite' || callbackType === 'signup' || callbackType === 'magiclink') &&
-        !!(accessToken || tokenHash || code);
-
-      if (!isInviteCallback) {
-        // No tokens in URL — check if Supabase already auto-processed them
-        // and established a session (the client consumes hash tokens on load)
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          // Session exists — the user was invited and tokens were auto-consumed.
-          // They still need to set their password.
-          if (isMounted) {
-            setEmail(session.user.email || '');
-            const metaName = session.user.user_metadata?.name || '';
-            if (metaName) {
-              form.setValue('name', metaName, { shouldValidate: true });
-            }
-            setIsInvite(true);
-            setInitializing(false);
-          }
-          return;
-        }
-
-        if (isMounted) {
-          setError('Invalid or expired invitation link. Please ask your administrator to resend the invitation.');
-          setInitializing(false);
-        }
-        return;
-      }
-
-      // Exchange code for session (PKCE flow)
-      if (code) {
-        const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
-        if (codeError && isMounted) {
-          setError('Invalid or expired invitation link. Please ask your administrator to resend the invitation.');
-          setInitializing(false);
-          return;
-        }
-      }
-
-      if (tokenHash && callbackType) {
-        const { error: tokenError } = await supabase.auth.verifyOtp({
-          type: callbackType as 'invite' | 'signup' | 'magiclink',
-          token_hash: tokenHash,
-        });
-
-        if (tokenError && isMounted) {
-          setError('Invalid or expired invitation link. Please ask your administrator to resend the invitation.');
-          setInitializing(false);
-          return;
-        }
-      }
-
-      // Set session from tokens (implicit flow)
-      if (accessToken && refreshToken) {
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (sessionError && isMounted) {
-          setError('Invalid or expired invitation link. Please ask your administrator to resend the invitation.');
-          setInitializing(false);
-          return;
-        }
-      }
-
-      // Get the current user to pre-fill name
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && isMounted) {
-        setEmail(user.email || '');
-        const metaName = user.user_metadata?.name || '';
-        if (metaName) {
-          form.setValue('name', metaName, { shouldValidate: true });
-        }
+      const result = await initializeInviteSignup(getAuthCallbackParams(window.location));
+      if (!isMounted) return;
+      if (result.ok) {
+        setEmail(result.email ?? '');
+        if (result.name) form.setValue('name', result.name, { shouldValidate: true });
         setIsInvite(true);
-        setInitializing(false);
-      } else if (isMounted) {
-        setError('Could not verify your invitation. Please ask your administrator to resend it.');
-        setInitializing(false);
+      } else {
+        setError(result.error ?? 'Could not verify your invitation. Please ask your administrator to resend it.');
       }
+      setInitializing(false);
     };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN' && isMounted) {
-        // When the invite token is processed, we get a SIGNED_IN event
-        // The user still needs to set their password
-      }
-    });
 
     void initializeInvite();
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -156,19 +65,19 @@ export default function SignUpPage() {
     setLoading(true);
 
     // Update password and user metadata
-    const { error: updateError } = await supabase.auth.updateUser({
+    const { error: updateError } = await updateInvitedUserPasswordAndMetadata({
       password: data.password,
-      data: { name: data.name },
+      name: data.name,
     });
 
     if (updateError) {
-      setError(updateError.message);
+      setError(updateError);
       setLoading(false);
       return;
     }
 
     // Update the profile name
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentAuthUser();
     if (!user) {
       setError('Your password was saved, but we could not verify your session to finish account setup. Please sign in and contact an administrator if your profile name is still incorrect.');
       setLoading(false);
@@ -184,7 +93,7 @@ export default function SignUpPage() {
     }
 
     // Sign out so they log in fresh
-    await supabase.auth.signOut();
+    await signOutAuthSession();
     setLoading(false);
     setSuccess(true);
     setTimeout(() => window.location.replace(getDedicatedHrmsWorkspacePath(HRMS_PATHS.login)), 2500);

@@ -22,7 +22,7 @@ import {
   resolveBranding,
   BRANDING_DEFAULTS,
   type ResolvedBranding,
-} from '@/services/brandingService';
+} from '@flc/platform-services';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface BrandingContextValue {

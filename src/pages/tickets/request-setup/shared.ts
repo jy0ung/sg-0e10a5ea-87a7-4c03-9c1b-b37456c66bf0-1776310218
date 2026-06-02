@@ -11,15 +11,13 @@
 import type { RequestCategoryRecord } from '@/services/requestCategoryService';
 import type { RequestSubcategoryRecord } from '@/services/requestSubcategoryService';
 import type {
-  RequestTemplateRecord,
-  TemplatePriority,
-} from '@/services/requestTemplateService';
-import type {
   RequestFieldDataSource,
   RequestFormFieldRecord,
   RequestFormFieldType,
-} from '@/services/requestFormFieldService';
-import type { RequestRoutingRule } from '@/services/requestRoutingService';
+  RequestTemplateRecord,
+  TemplatePriority,
+  RequestRoutingRule,
+} from '@flc/internal-requests';
 
 // ───────────────────────── Category drafts ──────────────────────────
 

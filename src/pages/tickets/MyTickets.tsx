@@ -67,7 +67,7 @@ import {
   listTicketActivity,
   type TicketActivityRecord,
 } from '@/services/ticketService';
-import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
+import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@flc/platform-services';
 
 type MyStatusFilter = 'all' | 'active' | 'resolved' | 'cancelled';
 

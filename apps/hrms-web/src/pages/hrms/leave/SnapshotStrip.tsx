@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, CalendarClock, ShieldCheck, Users } from 'lucide-react';
+import { CalendarClock, ShieldCheck, Users } from 'lucide-react';
 import type { LeaveBalance, LeaveRequest } from '@/types';
 import { formatDays, fmtDateRange } from './utils';
 
@@ -120,12 +120,6 @@ export function SnapshotStrip({
           <span className="inline-flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5" />
             {teamValue} teammate{teamValue === 1 ? '' : 's'} away today
-          </span>
-        )}
-        {balancesMissing && (
-          <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Leave balances need HR initialization
           </span>
         )}
       </div>

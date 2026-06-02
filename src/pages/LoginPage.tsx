@@ -8,7 +8,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { loginSchema, type LoginFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { BRANDING_DEFAULTS } from '@/services/brandingService';
+import { BRANDING_DEFAULTS } from '@flc/platform-services';
 
 const { appName: brandName, logoUrl: _brandLogoUrl } = BRANDING_DEFAULTS;
 const brandLogo = _brandLogoUrl ?? '';

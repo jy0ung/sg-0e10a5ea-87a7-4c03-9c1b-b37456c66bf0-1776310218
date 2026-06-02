@@ -6,7 +6,7 @@ const errorTrackingMock = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('./errorTrackingService', () => errorTrackingMock);
+vi.mock('../../packages/platform-services/src/errorTrackingService', () => errorTrackingMock);
 
 const loggingMock = vi.hoisted(() => ({
   loggingService: {
@@ -15,9 +15,9 @@ const loggingMock = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('./loggingService', () => loggingMock);
+vi.mock('../../packages/platform-services/src/loggingService', () => loggingMock);
 
-import { performanceService } from './performanceService';
+import { performanceService } from '../../packages/platform-services/src/performanceService';
 
 beforeEach(() => {
   vi.clearAllMocks();

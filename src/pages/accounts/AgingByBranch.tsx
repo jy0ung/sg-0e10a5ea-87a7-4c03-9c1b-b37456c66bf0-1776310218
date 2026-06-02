@@ -9,7 +9,7 @@ import { getArAgingByBranch } from '@/services/invoiceService';
 import { getApAgingByBranch } from '@/services/apService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
 import type { AgingBucket, AgingByBranchRow } from '@/types';
 
 const BUCKETS: AgingBucket[] = ['no_due_date', 'current', '1_30_days', '31_60_days', '61_90_days', 'over_90_days'];
@@ -168,11 +168,7 @@ export default function AgingByBranch() {
           description="AR and AP outstanding balances grouped by branch"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Accounts' }, { label: 'Aging by Branch' }]}
         />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-          <p className="text-sm text-muted-foreground">Financial reporting is not enabled for your company. Contact your administrator for access.</p>
-        </div>
+        <FeatureUnavailableState routeId="accounts-aging-by-branch" />
       </div>
     );
   }

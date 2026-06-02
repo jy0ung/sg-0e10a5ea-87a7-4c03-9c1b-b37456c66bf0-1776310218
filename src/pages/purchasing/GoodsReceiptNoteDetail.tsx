@@ -9,7 +9,8 @@ import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getGoodsReceiptNote } from '@/services/grnService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, ArrowLeft, ExternalLink } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 
 export default function GoodsReceiptNoteDetail() {
   const navigate = useNavigate();
@@ -32,10 +33,7 @@ export default function GoodsReceiptNoteDetail() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="GRN" description="" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'GRN' }]} />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-        </div>
+        <FeatureUnavailableState routeId="purchasing-grn-detail" />
       </div>
     );
   }

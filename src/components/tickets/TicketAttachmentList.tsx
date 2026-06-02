@@ -3,7 +3,7 @@ import { Download, Loader2, Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { getAttachmentSignedUrl, type TicketAttachmentRecord } from '@/services/ticketAttachmentService';
+import { getAttachmentSignedUrl, type TicketAttachmentRecord } from '@flc/platform-services';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

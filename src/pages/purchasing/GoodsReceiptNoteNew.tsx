@@ -12,7 +12,8 @@ import { createGrn, getPoLineReceipts } from '@/services/grnService';
 import { getPurchaseOrder } from '@/services/purchaseOrderService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
-import { AlertTriangle, ArrowLeft, ClipboardCheck, Loader2 } from 'lucide-react';
+import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
+import { ArrowLeft, ClipboardCheck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function GoodsReceiptNoteNew() {
@@ -111,10 +112,7 @@ export default function GoodsReceiptNoteNew() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Receive Goods" description="" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'Receive' }]} />
-        <div className="glass-panel p-12 text-center max-w-md mx-auto">
-          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Feature not available</h3>
-        </div>
+        <FeatureUnavailableState routeId="purchasing-grn-new" />
       </div>
     );
   }
