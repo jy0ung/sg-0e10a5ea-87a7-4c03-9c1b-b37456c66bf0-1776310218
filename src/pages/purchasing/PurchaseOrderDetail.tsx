@@ -83,7 +83,7 @@ export default function PurchaseOrderDetail() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Purchase Order" description="" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'Purchase Order' }]} />
-        <FeatureUnavailableState featureName="Purchase Order" flagName="phase3e.po-grn-v2" />
+        <FeatureUnavailableState routeId="purchasing-order-detail" />
       </div>
     );
   }

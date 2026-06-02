@@ -57,7 +57,7 @@ export default function ImportReviewDetail() {
           description="Inspect queued import rows and their validation issues"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Review Queue' }]}
         />
-        <FeatureUnavailableState featureName="Review Batch" flagName="phase3a.import-review-v2" />
+        <FeatureUnavailableState routeId="auto-aging-review-detail" />
       </div>
     );
   }

@@ -58,7 +58,7 @@ export default function PurchaseOrders() {
           description="Track CBU procurement from supplier order through fulfilment"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'Purchase Orders' }]}
         />
-        <FeatureUnavailableState featureName="Purchase Orders" flagName="phase3e.po-grn-v2" />
+        <FeatureUnavailableState routeId="purchasing-orders" />
       </div>
     );
   }

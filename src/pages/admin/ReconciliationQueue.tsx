@@ -96,7 +96,7 @@ export default function ReconciliationQueue() {
           description="Review source-to-canonical match decisions"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin' }, { label: 'Reconciliation Queue' }]}
         />
-        <FeatureUnavailableState featureName="Reconciliation Queue" flagName="phase3d.reconciliation-review-v2" />
+        <FeatureUnavailableState routeId="admin-reconciliation" />
       </div>
     );
   }

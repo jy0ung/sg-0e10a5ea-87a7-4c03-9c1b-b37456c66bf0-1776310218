@@ -107,7 +107,7 @@ export default function PurchaseOrderNew() {
           description="Create a new PO from a supplier"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'New PO' }]}
         />
-        <FeatureUnavailableState featureName="New Purchase Order" flagName="phase3e.po-grn-v2" />
+        <FeatureUnavailableState routeId="purchasing-order-new" />
       </div>
     );
   }

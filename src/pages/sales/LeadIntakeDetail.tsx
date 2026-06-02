@@ -88,7 +88,7 @@ export default function LeadIntakeDetail() {
           description="DMS lead/prospect detail and follow-up timeline"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales' }, { label: 'Lead Intake' }, { label: 'Detail' }]}
         />
-        <FeatureUnavailableState featureName="Lead Detail" flagName="phase3f.lead-intake-v2" />
+        <FeatureUnavailableState routeId="sales-lead-detail" />
       </div>
     );
   }

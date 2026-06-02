@@ -88,6 +88,7 @@ export interface PlatformRouteDefinition {
   moduleGate?: PlatformModuleId;
   roles?: readonly AppRole[];
   navShell?: PlatformShell;
+  featureFlag?: string;
   smoke?: {
     app: PlatformShell;
     name?: string;
@@ -119,7 +120,7 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
   { id: 'platform-root', label: 'Dashboard', path: '/', shell: 'main', section: 'Platform', icon: 'layout-dashboard', smoke: { app: 'main' } },
   { id: 'platform-modules-legacy', label: 'Home legacy redirect', path: '/modules', shell: 'main', section: 'Platform', icon: 'layout-dashboard', smoke: { app: 'main', name: 'Home legacy redirect' } },
   { id: 'platform-home', label: 'Home', path: '/home', shell: 'main', section: 'Platform', icon: 'layout-dashboard', end: true, navShell: 'main', smoke: { app: 'main' } },
-  { id: 'platform-inbox', label: 'Inbox', path: '/inbox', shell: 'main', section: 'Platform', icon: 'inbox', navShell: 'main', smoke: { app: 'main' } },
+  { id: 'platform-inbox', label: 'Inbox', path: '/inbox', shell: 'main', section: 'Platform', icon: 'inbox', navShell: 'main', featureFlag: 'phase4.unified-inbox', smoke: { app: 'main' } },
   { id: 'platform-notifications', label: 'Notifications', path: '/notifications', shell: 'main', section: 'Platform', icon: 'bell', navShell: 'main', smoke: { app: 'main' } },
   { id: 'platform-internal-requests-shortcut', label: 'Internal Requests', path: '/portal/tickets/new', shell: 'portal', section: 'Platform', icon: 'headphones', moduleGate: 'support', navShell: 'main' },
 
@@ -131,7 +132,8 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
   { id: 'auto-aging-overview', label: 'Auto Aging Overview', path: '/auto-aging', shell: 'main', section: 'Auto Aging', icon: 'timer', group: 'Overview', end: true, moduleGate: 'auto-aging', navShell: 'main', smoke: { app: 'main', name: 'Overview' } },
   { id: 'auto-aging-vehicles', label: 'Vehicle Explorer', path: '/auto-aging/vehicles', shell: 'main', section: 'Auto Aging', icon: 'car', group: 'Overview', moduleGate: 'auto-aging', navShell: 'main', smoke: { app: 'main' } },
   { id: 'auto-aging-import', label: 'Import Center', path: '/auto-aging/import', shell: 'main', section: 'Auto Aging', icon: 'upload', group: 'Data Import', moduleGate: 'auto-aging', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'auto-aging-review', label: 'Review Queue', path: '/auto-aging/review', shell: 'main', section: 'Auto Aging', icon: 'search', group: 'Data Import', moduleGate: 'auto-aging', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'auto-aging-review', label: 'Review Queue', path: '/auto-aging/review', shell: 'main', section: 'Auto Aging', icon: 'search', group: 'Data Import', moduleGate: 'auto-aging', featureFlag: 'phase3a.import-review-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'auto-aging-review-detail', label: 'Review Batch', path: '/auto-aging/review/:batchId', shell: 'main', section: 'Auto Aging', icon: 'search', group: 'Data Import', moduleGate: 'auto-aging', featureFlag: 'phase3a.import-review-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { id: 'auto-aging-history', label: 'Import History', path: '/auto-aging/history', shell: 'main', section: 'Auto Aging', icon: 'history', group: 'Data Import', moduleGate: 'auto-aging', navShell: 'main', smoke: { app: 'main' } },
   { id: 'auto-aging-quality', label: 'Data Quality', path: '/auto-aging/quality', shell: 'main', section: 'Auto Aging', icon: 'alert-triangle', group: 'Configuration', moduleGate: 'auto-aging', navShell: 'main', smoke: { app: 'main' } },
   { id: 'auto-aging-sla', label: 'SLA Policies', path: '/auto-aging/sla', shell: 'main', section: 'Auto Aging', icon: 'gauge', group: 'Configuration', moduleGate: 'auto-aging', roles: ['super_admin', 'company_admin', 'director', 'general_manager'], navShell: 'main', smoke: { app: 'main' } },
@@ -141,7 +143,8 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
 
   { id: 'sales-overview', label: 'Sales Overview', path: '/sales', shell: 'main', section: 'Sales', icon: 'trending-up', group: 'Overview', end: true, moduleGate: 'sales', navShell: 'main', smoke: { app: 'main', name: 'Overview' } },
   { id: 'sales-pipeline', label: 'Deal Pipeline', path: '/sales/pipeline', shell: 'main', section: 'Sales', icon: 'kanban', group: 'Overview', moduleGate: 'sales', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'sales-lead-intake', label: 'Lead Intake', path: '/sales/lead-intake', shell: 'main', section: 'Sales', icon: 'target', group: 'Overview', moduleGate: 'sales', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'sales-lead-intake', label: 'Lead Intake', path: '/sales/lead-intake', shell: 'main', section: 'Sales', icon: 'target', group: 'Overview', moduleGate: 'sales', featureFlag: 'phase3f.lead-intake-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'sales-lead-detail', label: 'Lead Detail', path: '/sales/lead-intake/:kind/:rawId', shell: 'main', section: 'Sales', icon: 'target', group: 'Overview', moduleGate: 'sales', featureFlag: 'phase3f.lead-intake-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
   { id: 'sales-performance', label: 'Performance', path: '/sales/performance', shell: 'main', section: 'Sales', icon: 'target', group: 'Analytics', moduleGate: 'sales', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'sales-margin', label: 'Margin Analysis', path: '/sales/margin', shell: 'main', section: 'Sales', icon: 'trending-down', group: 'Analytics', moduleGate: 'sales', roles: ['super_admin', 'company_admin', 'director', 'general_manager'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'sales-orders', label: 'Sales Orders', path: '/sales/orders', shell: 'main', section: 'Sales', icon: 'shopping-cart', group: 'Transactions', moduleGate: 'sales', navShell: 'main', smoke: { app: 'main' } },
@@ -157,19 +160,23 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
   { id: 'inventory-transfers', label: 'Vehicle Transfer', path: '/inventory/transfers', shell: 'main', section: 'Inventory', icon: 'arrow-left-right', group: 'Movement', moduleGate: 'inventory', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'inventory-chassis', label: 'Chassis Movement', path: '/inventory/chassis', shell: 'main', section: 'Inventory', icon: 'kanban', group: 'Movement', moduleGate: 'inventory', smoke: { app: 'main' } },
 
-  { id: 'purchasing-orders', label: 'Purchase Orders', path: '/purchasing/orders', shell: 'main', section: 'Purchasing', icon: 'shopping-cart', group: 'Operations', moduleGate: 'purchasing', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'purchasing-grn', label: 'Goods Receipt Notes', path: '/purchasing/grn', shell: 'main', section: 'Purchasing', icon: 'package', group: 'Operations', moduleGate: 'purchasing', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'purchasing-three-way-match', label: '3-way Match', path: '/purchasing/three-way-match', shell: 'main', section: 'Purchasing', icon: 'arrow-left-right', group: 'Operations', moduleGate: 'purchasing', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'purchasing-orders', label: 'Purchase Orders', path: '/purchasing/orders', shell: 'main', section: 'Purchasing', icon: 'shopping-cart', group: 'Operations', moduleGate: 'purchasing', featureFlag: 'phase3e.po-grn-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'purchasing-order-new', label: 'New Purchase Order', path: '/purchasing/orders/new', shell: 'main', section: 'Purchasing', icon: 'shopping-cart', group: 'Operations', moduleGate: 'purchasing', featureFlag: 'phase3e.po-grn-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { id: 'purchasing-order-detail', label: 'Purchase Order', path: '/purchasing/orders/:id', shell: 'main', section: 'Purchasing', icon: 'shopping-cart', group: 'Operations', moduleGate: 'purchasing', featureFlag: 'phase3e.po-grn-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { id: 'purchasing-grn', label: 'Goods Receipt Notes', path: '/purchasing/grn', shell: 'main', section: 'Purchasing', icon: 'package', group: 'Operations', moduleGate: 'purchasing', featureFlag: 'phase3e.po-grn-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'purchasing-grn-new', label: 'Receive Goods', path: '/purchasing/grn/new', shell: 'main', section: 'Purchasing', icon: 'package', group: 'Operations', moduleGate: 'purchasing', featureFlag: 'phase3e.po-grn-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { id: 'purchasing-grn-detail', label: 'Goods Receipt Note', path: '/purchasing/grn/:id', shell: 'main', section: 'Purchasing', icon: 'package', group: 'Operations', moduleGate: 'purchasing', featureFlag: 'phase3e.po-grn-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'] },
+  { id: 'purchasing-three-way-match', label: '3-way Match', path: '/purchasing/three-way-match', shell: 'main', section: 'Purchasing', icon: 'arrow-left-right', group: 'Operations', moduleGate: 'purchasing', featureFlag: 'phase3e.po-grn-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'purchasing-invoices', label: 'Purchase Invoices', path: '/purchasing/invoices', shell: 'main', section: 'Purchasing', icon: 'truck', group: 'Operations', moduleGate: 'purchasing', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'], navShell: 'main', smoke: { app: 'main' } },
 
   { id: 'accounts-chart', label: 'Chart of Accounts', path: '/accounts/chart', shell: 'main', section: 'Accounts', icon: 'book-open', group: 'Ledger', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main' },
   { id: 'accounts-periods', label: 'Accounting Periods', path: '/accounts/periods', shell: 'main', section: 'Accounts', icon: 'calendar', group: 'Ledger', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main' },
   { id: 'accounts-trial-balance', label: 'Trial Balance', path: '/accounts/trial-balance', shell: 'main', section: 'Accounts', icon: 'scale', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main' },
-  { id: 'accounts-profit-loss', label: 'Profit & Loss', path: '/accounts/profit-loss', shell: 'main', section: 'Accounts', icon: 'trending-up', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'accounts-balance-sheet', label: 'Balance Sheet', path: '/accounts/balance-sheet', shell: 'main', section: 'Accounts', icon: 'landmark', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'accounts-aging-by-branch', label: 'Aging by Branch', path: '/accounts/aging-by-branch', shell: 'main', section: 'Accounts', icon: 'git-branch', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'accounts-cash-position', label: 'Cash Position', path: '/accounts/cash-position', shell: 'main', section: 'Accounts', icon: 'dollar-sign', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'accounts-period-close', label: 'Period Close', path: '/accounts/period-close', shell: 'main', section: 'Accounts', icon: 'check-square', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'accounts-profit-loss', label: 'Profit & Loss', path: '/accounts/profit-loss', shell: 'main', section: 'Accounts', icon: 'trending-up', group: 'Reports', featureFlag: 'phase3b.financial-reports-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'accounts-balance-sheet', label: 'Balance Sheet', path: '/accounts/balance-sheet', shell: 'main', section: 'Accounts', icon: 'landmark', group: 'Reports', featureFlag: 'phase3b.financial-reports-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'accounts-aging-by-branch', label: 'Aging by Branch', path: '/accounts/aging-by-branch', shell: 'main', section: 'Accounts', icon: 'git-branch', group: 'Reports', featureFlag: 'phase3b.financial-reports-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'accounts-cash-position', label: 'Cash Position', path: '/accounts/cash-position', shell: 'main', section: 'Accounts', icon: 'dollar-sign', group: 'Reports', featureFlag: 'phase3b.financial-reports-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'accounts-period-close', label: 'Period Close', path: '/accounts/period-close', shell: 'main', section: 'Accounts', icon: 'check-square', group: 'Reports', featureFlag: 'phase3b.financial-reports-v2', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'accounts-journal', label: 'Journal Entries', path: '/accounts/journal', shell: 'main', section: 'Accounts', icon: 'file-text', group: 'Reports', roles: ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'], navShell: 'main' },
 
   { id: 'reports-business', label: 'Business Reports', path: '/reports', shell: 'main', section: 'Reports', icon: 'bar-chart', group: 'Workspace', end: true, moduleGate: 'reports', navShell: 'main', smoke: { app: 'main' } },
@@ -177,10 +184,12 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
 
   { id: 'admin-settings', label: 'Settings', path: '/admin/settings', shell: 'main', section: 'Admin', icon: 'settings', group: 'Configuration', moduleGate: 'admin', navShell: 'main', smoke: { app: 'main' } },
   { id: 'admin-activity', label: 'Activity Overview', path: '/admin/activity', shell: 'main', section: 'Admin', icon: 'bar-chart', group: 'Governance', moduleGate: 'admin', roles: ['super_admin', 'company_admin', 'director', 'general_manager'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'admin-kpi-studio', label: 'KPI Studio', path: '/admin/kpi-studio', shell: 'main', section: 'Admin', icon: 'sparkles', group: 'Governance', moduleGate: 'admin', roles: ['super_admin', 'company_admin', 'director'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'admin-dms-sync', label: 'DMS Sync Ops', path: '/admin/dms-sync', shell: 'main', section: 'Admin', icon: 'database', group: 'Governance', moduleGate: 'admin', roles: ['super_admin', 'company_admin', 'director'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'admin-reconciliation', label: 'Reconciliation Queue', path: '/admin/reconciliation', shell: 'main', section: 'Admin', icon: 'arrow-left-right', group: 'Governance', moduleGate: 'admin', roles: ['super_admin', 'company_admin', 'director'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'admin-kpi-studio', label: 'KPI Studio', path: '/admin/kpi-studio', shell: 'main', section: 'Admin', icon: 'sparkles', group: 'Governance', moduleGate: 'admin', featureFlag: 'phase4.role-home', roles: ['super_admin', 'company_admin', 'director'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'admin-dms-sync', label: 'DMS Sync Ops', path: '/admin/dms-sync', shell: 'main', section: 'Admin', icon: 'database', group: 'Governance', moduleGate: 'admin', featureFlag: 'phase3c.dms-sync-ops-v2', roles: ['super_admin', 'company_admin', 'director'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'admin-reconciliation', label: 'Reconciliation Queue', path: '/admin/reconciliation', shell: 'main', section: 'Admin', icon: 'arrow-left-right', group: 'Governance', moduleGate: 'admin', featureFlag: 'phase3d.reconciliation-review-v2', roles: ['super_admin', 'company_admin', 'director'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'admin-reconciliation-detail', label: 'Reconciliation Match', path: '/admin/reconciliation/:matchId', shell: 'main', section: 'Admin', icon: 'arrow-left-right', group: 'Governance', moduleGate: 'admin', featureFlag: 'phase3d.reconciliation-review-v2', roles: ['super_admin', 'company_admin', 'director'] },
   { id: 'admin-audit', label: 'Audit Log', path: '/admin/audit', shell: 'main', section: 'Admin', icon: 'file-text', group: 'Governance', moduleGate: 'admin', roles: ['super_admin', 'company_admin', 'director'], navShell: 'main', smoke: { app: 'main' } },
+  { id: 'admin-webhooks', label: 'Webhook Outbox', path: '/admin/webhooks', shell: 'main', section: 'Admin', icon: 'git-branch', group: 'Governance', moduleGate: 'admin', featureFlag: 'phase6.webhook-outbox', roles: ['super_admin', 'company_admin'] },
   { id: 'admin-users', label: 'Users & Roles', path: '/admin/users', shell: 'main', section: 'Admin', icon: 'shield', group: 'Access', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'admin-user-groups', label: 'User Groups', path: '/admin/user-groups', shell: 'main', section: 'Admin', icon: 'shield', group: 'Access', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'admin-role-permissions', label: 'Role Permissions', path: '/admin/role-permissions', shell: 'main', section: 'Admin', icon: 'shield', group: 'Access', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
@@ -255,7 +264,17 @@ function pathMatchesPrefix(pathname: string, prefix: string): boolean {
 function routeMatchesPath(route: PlatformRouteDefinition, pathname: string): boolean {
   const routePath = route.path.replace(/\/$/, '');
   if (!routePath) return pathname === route.path;
-  return pathname === route.path || pathname.startsWith(`${routePath}/`);
+  if (pathname === route.path || pathname.startsWith(`${routePath}/`)) return true;
+
+  const routeSegments = routePath.replace(/^\/+/, '').split('/');
+  const pathSegments = pathname.replace(/^\/+/, '').replace(/\/+$/, '').split('/');
+  if (routeSegments.length !== pathSegments.length) return false;
+
+  return routeSegments.every((segment, index) => segment.startsWith(':') || segment === pathSegments[index]);
+}
+
+export function getPlatformRouteById(routeId: string): PlatformRouteDefinition | null {
+  return PLATFORM_ROUTES.find((route) => route.id === routeId) ?? null;
 }
 
 export function getPlatformRouteForPath(pathname: string, shells: readonly PlatformShell[] = ['main', 'portal', 'hrms']): PlatformRouteDefinition | null {
@@ -296,12 +315,15 @@ export function getProductionSmokeRoutes(app: PlatformShell): ProductionSmokeRou
 export function getPlatformUnavailableCopy(
   pathname: string,
   reason: PlatformUnavailableReason,
-  options: { featureName?: string; flagName?: string } = {},
+  options: { featureName?: string; flagName?: string; routeId?: string } = {},
 ): PlatformUnavailableCopy {
-  const route = getPlatformRouteForPath(pathname, ['main', 'portal', 'hrms']);
+  const route = options.routeId
+    ? getPlatformRouteById(options.routeId) ?? getPlatformRouteForPath(pathname, ['main', 'portal', 'hrms'])
+    : getPlatformRouteForPath(pathname, ['main', 'portal', 'hrms']);
   const featureName = options.featureName ?? route?.label ?? 'This workspace';
   const configuredDescription = route?.unavailable?.[reason];
-  const flagSuffix = options.flagName ? ` Control: ${options.flagName}.` : '';
+  const controlName = options.flagName ?? route?.featureFlag;
+  const flagSuffix = controlName ? ` Control: ${controlName}.` : '';
 
   if (configuredDescription) {
     return {

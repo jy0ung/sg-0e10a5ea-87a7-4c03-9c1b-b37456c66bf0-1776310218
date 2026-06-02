@@ -36,14 +36,17 @@ describe('platformRegistry', () => {
     expect(getModuleGateForPath('/auto-aging/vehicles/ABC123')).toBe('auto-aging');
     expect(getModuleGateForPath('/portal/queue')).toBe('support');
     expect(getModuleGateForPath('/admin/webhooks')).toBe('admin');
+    expect(getModuleGateForPath('/admin/reconciliation/match-1')).toBe('admin');
     expect(getModuleGateForPath('/accounts/profit-loss')).toBeNull();
     expect(getModuleGateForSection('Purchasing')).toBe('purchasing');
     expect(getModuleGateForSection('Accounts')).toBeNull();
   });
 
   it('resolves longest-match route metadata for nested paths', () => {
-    expect(getPlatformRouteForPath('/purchasing/orders/new')?.id).toBe('purchasing-orders');
-    expect(getPlatformRouteForPath('/sales/lead-intake/person/raw-1')?.id).toBe('sales-lead-intake');
+    expect(getPlatformRouteForPath('/purchasing/orders/new')?.id).toBe('purchasing-order-new');
+    expect(getPlatformRouteForPath('/purchasing/grn/grn-1')?.id).toBe('purchasing-grn-detail');
+    expect(getPlatformRouteForPath('/admin/reconciliation/match-1')?.id).toBe('admin-reconciliation-detail');
+    expect(getPlatformRouteForPath('/sales/lead-intake/person/raw-1')?.id).toBe('sales-lead-detail');
     expect(getPlatformRouteForPath('/unknown/path')).toBeNull();
   });
 
@@ -77,11 +80,16 @@ describe('platformRegistry', () => {
   });
 
   it('builds unavailable-state copy from the route registry', () => {
-    expect(getPlatformUnavailableCopy('/purchasing/orders', 'disabledModule', {
-      flagName: 'phase3e.po-grn-v2',
-    })).toEqual({
+    expect(getPlatformUnavailableCopy('/purchasing/orders', 'disabledModule')).toEqual({
       title: 'Purchase Orders unavailable',
       description: 'Purchase Orders is registered in the platform catalogue, but it is disabled for this company or gated behind an inactive feature flag. Control: phase3e.po-grn-v2.',
+    });
+
+    expect(getPlatformUnavailableCopy('/purchasing/orders/po-1', 'disabledModule', {
+      routeId: 'purchasing-order-detail',
+    })).toEqual({
+      title: 'Purchase Order unavailable',
+      description: 'Purchase Order is registered in the platform catalogue, but it is disabled for this company or gated behind an inactive feature flag. Control: phase3e.po-grn-v2.',
     });
 
     expect(getPlatformUnavailableCopy('/admin/kpi-studio', 'missingPermission')).toEqual({

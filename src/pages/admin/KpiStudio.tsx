@@ -95,7 +95,7 @@ export default function KpiStudio() {
           description="Curate which KPIs each role sees on Home"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin' }, { label: 'KPI Studio' }]}
         />
-        <FeatureUnavailableState featureName="KPI Studio" flagName="phase4.role-home" data-testid="studio-feature-off" />
+        <FeatureUnavailableState routeId="admin-kpi-studio" data-testid="studio-feature-off" />
       </div>
     );
   }

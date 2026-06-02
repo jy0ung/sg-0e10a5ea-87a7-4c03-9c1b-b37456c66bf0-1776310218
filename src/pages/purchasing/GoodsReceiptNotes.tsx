@@ -41,7 +41,7 @@ export default function GoodsReceiptNotes() {
           description="Physical receipts against purchase orders"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'GRN' }]}
         />
-        <FeatureUnavailableState featureName="Goods Receipt Notes" flagName="phase3e.po-grn-v2" />
+        <FeatureUnavailableState routeId="purchasing-grn" />
       </div>
     );
   }

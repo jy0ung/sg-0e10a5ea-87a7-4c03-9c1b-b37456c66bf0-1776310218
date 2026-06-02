@@ -65,6 +65,7 @@ The registry owns:
 - Page chrome metadata for the main shell.
 - Production smoke route lists for main and HRMS hosts.
 - Future unavailable-state copy for disabled module, missing permission, and planned feature cases.
+- Feature-flag/control labels for registered but gated workflows.
 
 Router elements are still declared in `src/main.tsx`; moving route construction to registry-driven definitions is intentionally deferred to avoid a risky big-bang router rewrite.
 
@@ -132,6 +133,7 @@ Current enforcement:
 - Main and HRMS web shell navigation consume @flc/shell platformRegistry; HRMS web no longer keeps a separate hard-coded main navigation list.
 - The legacy /modules URL is retained only as a Home redirect and smoke compatibility route; it must not reappear as visible Module Directory navigation.
 - Feature-flagged unavailable states use `FeatureUnavailableState` and route metadata from `platformRegistry`, rather than page-local "Feature not available" copy.
+- `FeatureUnavailableState` calls in page code must pass a registry `routeId`; `check:unavailable-state-registry` blocks page-local `featureName` and `flagName` drift.
 - HRMS leave-balance rollover edge invocation is owned by `@flc/hrms-services` via `runLeaveBalanceRollover`.
 - Signup and password-reset callback/session handling is owned by `@flc/auth` via `authFlows`.
 - Email/password auth service operations are owned by `@flc/auth`; app-local `authService` files are compatibility re-exports guarded by `check:auth-service-boundary`.

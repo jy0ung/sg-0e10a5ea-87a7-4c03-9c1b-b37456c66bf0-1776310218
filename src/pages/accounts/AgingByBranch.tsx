@@ -168,7 +168,7 @@ export default function AgingByBranch() {
           description="AR and AP outstanding balances grouped by branch"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Accounts' }, { label: 'Aging by Branch' }]}
         />
-        <FeatureUnavailableState featureName="Aging by Branch" flagName="phase3b.financial-reports-v2" />
+        <FeatureUnavailableState routeId="accounts-aging-by-branch" />
       </div>
     );
   }

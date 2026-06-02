@@ -195,7 +195,7 @@ export default function WebhookOutbox() {
           description="Durable event fan-out to external HTTPS consumers"
           breadcrumbs={[{ label: 'Admin', path: '/admin' }, { label: 'Webhooks' }]}
         />
-        <FeatureUnavailableState featureName="Webhook Outbox" flagName="phase6.webhook-outbox" data-testid="webhook-outbox-feature-off" />
+        <FeatureUnavailableState routeId="admin-webhooks" data-testid="webhook-outbox-feature-off" />
       </div>
     );
   }

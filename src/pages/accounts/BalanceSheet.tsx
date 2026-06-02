@@ -99,7 +99,7 @@ export default function BalanceSheet() {
           description="Statement of financial position as of period end"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Accounts' }, { label: 'Balance Sheet' }]}
         />
-        <FeatureUnavailableState featureName="Balance Sheet" flagName="phase3b.financial-reports-v2" />
+        <FeatureUnavailableState routeId="accounts-balance-sheet" />
       </div>
     );
   }

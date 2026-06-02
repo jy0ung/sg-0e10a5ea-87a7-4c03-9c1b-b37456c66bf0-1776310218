@@ -73,7 +73,7 @@ export default function LeadIntake() {
           description="DMS leads & prospects with local follow-up tracking"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales' }, { label: 'Lead Intake' }]}
         />
-        <FeatureUnavailableState featureName="Lead Intake" flagName="phase3f.lead-intake-v2" />
+        <FeatureUnavailableState routeId="sales-lead-intake" />
       </div>
     );
   }

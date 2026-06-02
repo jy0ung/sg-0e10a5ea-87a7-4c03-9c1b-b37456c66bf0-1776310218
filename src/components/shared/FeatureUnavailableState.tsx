@@ -7,6 +7,7 @@ import {
 } from '@flc/shell';
 
 interface FeatureUnavailableStateProps {
+  routeId?: string;
   featureName?: string;
   flagName?: string;
   reason?: PlatformUnavailableReason;
@@ -21,6 +22,7 @@ const ICONS: Record<PlatformUnavailableReason, typeof AlertTriangle> = {
 };
 
 export function FeatureUnavailableState({
+  routeId,
   featureName,
   flagName,
   reason = 'disabledModule',
@@ -28,7 +30,7 @@ export function FeatureUnavailableState({
   'data-testid': testId,
 }: FeatureUnavailableStateProps) {
   const location = useLocation();
-  const copy = getPlatformUnavailableCopy(location.pathname, reason, { featureName, flagName });
+  const copy = getPlatformUnavailableCopy(location.pathname, reason, { routeId, featureName, flagName });
   const Icon = ICONS[reason];
 
   return (

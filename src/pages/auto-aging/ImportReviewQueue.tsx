@@ -21,7 +21,7 @@ export default function ImportReviewQueue() {
           description="Review rows held back from Auto Aging imports"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Review Queue' }]}
         />
-        <FeatureUnavailableState featureName="Import Review Queue" flagName="phase3a.import-review-v2" />
+        <FeatureUnavailableState routeId="auto-aging-review" />
       </div>
     );
   }

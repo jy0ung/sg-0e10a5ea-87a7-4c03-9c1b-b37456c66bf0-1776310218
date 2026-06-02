@@ -112,7 +112,7 @@ export default function DmsSyncOps() {
           description="Inspect sync runs and DMS staging counts"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin' }, { label: 'DMS Sync Ops' }]}
         />
-        <FeatureUnavailableState featureName="DMS Sync Operations" flagName="phase3c.dms-sync-ops-v2" />
+        <FeatureUnavailableState routeId="admin-dms-sync" />
       </div>
     );
   }

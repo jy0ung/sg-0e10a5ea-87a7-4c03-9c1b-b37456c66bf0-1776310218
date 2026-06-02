@@ -70,7 +70,7 @@ export default function CashPosition() {
           description="Daily Cash and Bank balance trajectory"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Accounts' }, { label: 'Cash Position' }]}
         />
-        <FeatureUnavailableState featureName="Cash Position" flagName="phase3b.financial-reports-v2" />
+        <FeatureUnavailableState routeId="accounts-cash-position" />
       </div>
     );
   }

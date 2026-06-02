@@ -68,7 +68,7 @@ export default function Inbox() {
           description="Unified workspace for approvals, reconciliation, requests, and notifications"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inbox' }]}
         />
-        <FeatureUnavailableState featureName="Inbox" flagName="phase4.unified-inbox" data-testid="inbox-feature-off" />
+        <FeatureUnavailableState routeId="platform-inbox" data-testid="inbox-feature-off" />
       </div>
     );
   }

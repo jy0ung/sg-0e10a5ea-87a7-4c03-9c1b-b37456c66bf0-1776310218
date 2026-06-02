@@ -88,7 +88,7 @@ export default function ReconciliationDetail() {
           description="Side-by-side source vs canonical evidence"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin' }, { label: 'Reconciliation' }, { label: 'Match' }]}
         />
-        <FeatureUnavailableState featureName="Reconciliation Match" flagName="phase3d.reconciliation-review-v2" />
+        <FeatureUnavailableState routeId="admin-reconciliation-detail" />
       </div>
     );
   }

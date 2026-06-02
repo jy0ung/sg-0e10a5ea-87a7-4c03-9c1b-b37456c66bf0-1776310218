@@ -78,7 +78,7 @@ export default function PeriodCloseDrilldown() {
           description="Drill into journal totals, unposted payments, and open invoices before closing a period"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Accounts' }, { label: 'Period Close' }]}
         />
-        <FeatureUnavailableState featureName="Period Close" flagName="phase3b.financial-reports-v2" />
+        <FeatureUnavailableState routeId="accounts-period-close" />
       </div>
     );
   }

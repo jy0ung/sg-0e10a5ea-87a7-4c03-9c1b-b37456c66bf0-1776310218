@@ -33,7 +33,7 @@ export default function GoodsReceiptNoteDetail() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="GRN" description="" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'GRN' }]} />
-        <FeatureUnavailableState featureName="Goods Receipt Note" flagName="phase3e.po-grn-v2" />
+        <FeatureUnavailableState routeId="purchasing-grn-detail" />
       </div>
     );
   }

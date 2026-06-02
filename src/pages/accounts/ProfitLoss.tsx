@@ -81,7 +81,7 @@ export default function ProfitLoss() {
           description="Revenue and expense activity by period"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Accounts' }, { label: 'Profit & Loss' }]}
         />
-        <FeatureUnavailableState featureName="Profit & Loss" flagName="phase3b.financial-reports-v2" />
+        <FeatureUnavailableState routeId="accounts-profit-loss" />
       </div>
     );
   }

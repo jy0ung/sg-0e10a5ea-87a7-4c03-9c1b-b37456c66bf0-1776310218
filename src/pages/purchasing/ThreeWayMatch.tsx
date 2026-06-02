@@ -91,7 +91,7 @@ export default function ThreeWayMatch() {
           description="PO ↔ GRN ↔ PI reconciliation"
           breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: '3-way Match' }]}
         />
-        <FeatureUnavailableState featureName="3-way Match" flagName="phase3e.po-grn-v2" />
+        <FeatureUnavailableState routeId="purchasing-three-way-match" />
       </div>
     );
   }

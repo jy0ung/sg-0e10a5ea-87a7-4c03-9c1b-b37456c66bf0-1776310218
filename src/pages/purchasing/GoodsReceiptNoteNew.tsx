@@ -112,7 +112,7 @@ export default function GoodsReceiptNoteNew() {
     return (
       <div className="space-y-6 animate-fade-in">
         <PageHeader title="Receive Goods" description="" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing' }, { label: 'Receive' }]} />
-        <FeatureUnavailableState featureName="Receive Goods" flagName="phase3e.po-grn-v2" />
+        <FeatureUnavailableState routeId="purchasing-grn-new" />
       </div>
     );
   }
