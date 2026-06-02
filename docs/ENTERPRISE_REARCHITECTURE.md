@@ -129,7 +129,7 @@ Service APIs must return typed result objects and hide Supabase query shapes fro
 
 Current enforcement:
 
-- ESLint warns on direct Supabase data/auth/storage calls and local `createClient()` calls from `src/pages`, `src/components`, `apps/hrms-web/src/pages`, and `apps/hrms-web/src/components`.
+- ESLint and `check:page-data-boundary` block direct Supabase client imports, data/auth/storage calls, and local `createClient()` calls from `src/pages`, `src/components`, `apps/hrms-web/src/pages`, and `apps/hrms-web/src/components`; presentation surfaces may only use the shared realtime hook.
 - Main and HRMS web shell navigation consume @flc/shell platformRegistry; HRMS web no longer keeps a separate hard-coded main navigation list.
 - The legacy /modules URL is retained only as a Home redirect and smoke compatibility route; it must not reappear as visible Module Directory navigation.
 - Feature-flagged unavailable states use `FeatureUnavailableState` and route metadata from `platformRegistry`, rather than page-local "Feature not available" copy.
