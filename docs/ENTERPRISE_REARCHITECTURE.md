@@ -146,6 +146,7 @@ Current enforcement:
 - `check:platform-service-boundary` prevents app code from importing package-owned logging, notification, reporting, ticket-attachment, branding, error-tracking, performance, and module-setting services through local shims, and verifies app audit shims contain no direct Supabase implementation. Core audit logging lives in `@flc/platform-services`; app-local audit shims retain only the React `useActionLogger` integration.
 - Internal request template, form-field, routing-rule, auto-assignment evaluation, and `approval_instances` request-approval orchestration services are owned by `@flc/internal-requests`; app-local service files are compatibility re-exports guarded by `check:internal-request-service-boundary`.
 - `check:hrms-service-boundary` prevents the dedicated HRMS web host from regaining duplicated HRMS domain service wrapper implementations.
+- `check:production-smoke-registry` prevents deploy-smoke drift by asserting registry smoke routes are concrete, host-correct, baseline-covered, and consumed by the deploy script through a GitHub-Actions-safe direct registry import.
 
 Known compatibility exceptions:
 
@@ -181,6 +182,7 @@ Additional required coverage:
 - Access-model tests for role, module, section, portal, and HRMS interactions.
 - Workflow tests for submit, approve, reject, resubmit, self-approval, direct manager, HRMS role, and specific-user routing.
 - Production deploy checks: `verify:production`, `health:rpc-canaries`, `smoke:production`.
+- Production smoke metadata check: `check:production-smoke-registry`.
 
 ## Migration Plan
 
