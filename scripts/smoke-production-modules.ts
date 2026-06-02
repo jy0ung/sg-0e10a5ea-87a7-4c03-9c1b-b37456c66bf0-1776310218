@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npx tsx
 import { chromium, type Page } from 'playwright';
-import { getProductionSmokeRoutes } from '@flc/shell';
+import { getProductionSmokeRoutes } from '../packages/shell/src/platformRegistry';
 
 const DEFAULT_MAIN_URL = 'https://ubs.protonfookloi.com';
 const DEFAULT_HRMS_URL = 'https://hrms.protonfookloi.com';
