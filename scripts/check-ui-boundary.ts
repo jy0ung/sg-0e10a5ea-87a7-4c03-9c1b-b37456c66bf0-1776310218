@@ -21,12 +21,62 @@ for (const expected of ['export type Tone', 'export const TONE_CLASSES', 'export
   if (!packageSource.includes(expected)) findings.push({ file: packageFile, detail: `missing shared export ${expected}` });
 }
 
-for (const [file, expected] of [
-  ['packages/ui/src/PageHeader.tsx', 'export function PageHeader'],
-  ['packages/ui/src/PageSpinner.tsx', 'export function PageSpinner'],
-] as const) {
-  const source = read(file);
-  if (!source.includes(expected)) findings.push({ file, detail: `missing shared export ${expected}` });
+const sharedPrimitives = [
+  {
+    name: 'PageHeader',
+    packageFile: 'packages/ui/src/PageHeader.tsx',
+    expectedExport: 'export function PageHeader',
+    forbiddenPattern: /ChevronRight|breadcrumbs\.map|react-router-dom/,
+  },
+  {
+    name: 'PageSpinner',
+    packageFile: 'packages/ui/src/PageSpinner.tsx',
+    expectedExport: 'export function PageSpinner',
+    forbiddenPattern: /Loader2|ariaLabel|role="status"/,
+  },
+  {
+    name: 'KpiSkeleton',
+    packageFile: 'packages/ui/src/KpiSkeleton.tsx',
+    expectedExport: 'export function KpiSkeleton',
+    forbiddenPattern: /Array\.from|grid-cols-|glass-panel/,
+  },
+  {
+    name: 'TableSkeleton',
+    packageFile: 'packages/ui/src/TableSkeleton.tsx',
+    expectedExport: 'export function TableSkeleton',
+    forbiddenPattern: /<table|colWidths|Array\(cols\)/,
+  },
+  {
+    name: 'ScrollableRegion',
+    packageFile: 'packages/ui/src/ScrollableRegion.tsx',
+    expectedExport: 'export function ScrollableRegion',
+    forbiddenPattern: /role="region"|tabIndex|HTMLAttributes/,
+  },
+  {
+    name: 'LocationPreservingNavigate',
+    packageFile: 'packages/ui/src/LocationPreservingNavigate.tsx',
+    expectedExport: 'export function LocationPreservingNavigate',
+    forbiddenPattern: /withCurrentLocation|useLocation|<Navigate/,
+  },
+  {
+    name: 'UnauthorizedAccess',
+    packageFile: 'packages/ui/src/UnauthorizedAccess.tsx',
+    expectedExport: 'export function UnauthorizedAccess',
+    forbiddenPattern: /ShieldOff|Access Restricted|permission to view/,
+  },
+  {
+    name: 'StepperProgress',
+    packageFile: 'packages/ui/src/StepperProgress.tsx',
+    expectedExport: 'export function StepperProgress',
+    forbiddenPattern: /stepIndex|<ol|Check|currentIdx/,
+  },
+] as const;
+
+for (const primitive of sharedPrimitives) {
+  const source = read(primitive.packageFile);
+  if (!source.includes(primitive.expectedExport)) {
+    findings.push({ file: primitive.packageFile, detail: `missing shared export ${primitive.expectedExport}` });
+  }
 }
 
 for (const file of ['src/lib/statusTones.ts', 'apps/hrms-web/src/lib/statusTones.ts']) {
@@ -39,18 +89,19 @@ for (const file of ['src/lib/statusTones.ts', 'apps/hrms-web/src/lib/statusTones
   }
 }
 
-for (const [file, packagePath, forbiddenPattern] of [
-  ['src/components/shared/PageHeader.tsx', '@flc/ui/PageHeader', /ChevronRight|breadcrumbs\.map|react-router-dom/],
-  ['apps/hrms-web/src/components/shared/PageHeader.tsx', '@flc/ui/PageHeader', /ChevronRight|breadcrumbs\.map|react-router-dom/],
-  ['src/components/shared/PageSpinner.tsx', '@flc/ui/PageSpinner', /Loader2|ariaLabel|role="status"/],
-  ['apps/hrms-web/src/components/shared/PageSpinner.tsx', '@flc/ui/PageSpinner', /Loader2|ariaLabel|role="status"/],
-] as const) {
-  const source = read(file);
-  if (!source.includes(`from '${packagePath}'`)) {
-    findings.push({ file, detail: `must re-export from ${packagePath}` });
-  }
-  if (forbiddenPattern.test(source)) {
-    findings.push({ file, detail: 'must remain a compatibility shim, not an app-local implementation' });
+for (const primitive of sharedPrimitives) {
+  const packagePath = `@flc/ui/${primitive.name}`;
+  for (const file of [
+    `src/components/shared/${primitive.name}.tsx`,
+    `apps/hrms-web/src/components/shared/${primitive.name}.tsx`,
+  ]) {
+    const source = read(file);
+    if (!source.includes(`from '${packagePath}'`)) {
+      findings.push({ file, detail: `must re-export from ${packagePath}` });
+    }
+    if (primitive.forbiddenPattern.test(source)) {
+      findings.push({ file, detail: 'must remain a compatibility shim, not an app-local implementation' });
+    }
   }
 }
 
@@ -62,4 +113,4 @@ if (findings.length > 0) {
   process.exit(1);
 }
 
-console.info('UI boundary check passed: shared status tones, PageHeader, and PageSpinner are package-owned in @flc/ui.');
+console.info('UI boundary check passed: shared status tones and page primitives are package-owned in @flc/ui.');
