@@ -4,24 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { useApprovalInboxItems } from '@/hooks/useApprovalInboxItems';
-import type { AppShellNavSection, AppShellRouteChromeMatch } from '@/components/layout/app-shell';
+import type { AppShellNavSection } from '@/components/layout/app-shell';
+import { HRMS_ROUTE_CHROME } from '@flc/shell';
 import { hrmsNavItems } from './navItems';
-
-const HRMS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
-  { pattern: /^\/dashboard/, title: 'My HR Dashboard', kicker: 'Your HRMS command centre' },
-  { pattern: /^\/leave\/calendar/, title: 'Leave Calendar', kicker: 'Team leave visibility' },
-  { pattern: /^\/leave\/team/, title: 'Team Leave', kicker: 'Team coverage and approvals' },
-  { pattern: /^\/leave$/, title: 'My Leave', kicker: 'Applications and status history' },
-  { pattern: /^\/attendance/, title: 'Attendance', kicker: 'Daily attendance records' },
-  { pattern: /^\/approvals/, title: 'Approval Inbox', kicker: 'Assigned HRMS decisions' },
-  { pattern: /^\/appraisals/, title: 'My Appraisals', kicker: 'Review cycles and outcomes' },
-  { pattern: /^\/announcements/, title: 'Announcements', kicker: 'Company communications' },
-  { pattern: /^\/employees\/[^/]+/, title: 'Employee Profile', kicker: 'Workforce record' },
-  { pattern: /^\/employees/, title: 'Employee Directory', kicker: 'Workforce directory' },
-  { pattern: /^\/payroll/, title: 'Payroll', kicker: 'Runs, approvals, and payout status' },
-  { pattern: /^\/settings/, title: 'HRMS Settings', kicker: 'Admin console and workflow governance' },
-  { pattern: /^\/profile/, title: 'My Profile', kicker: 'HRMS identity and access' },
-];
 
 function groupHrmsItems(items: typeof hrmsNavItems): AppShellNavSection[] {
   const groups = new Map<string, typeof hrmsNavItems>();

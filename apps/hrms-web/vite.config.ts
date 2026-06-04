@@ -35,6 +35,7 @@ export default defineConfig(({ mode }) => {
         '@flc/supabase': path.resolve(rootDir, 'packages/supabase/src/index.ts'),
         '@flc/shell': path.resolve(rootDir, 'packages/shell/src/index.ts'),
         '@flc/hrms-schemas': path.resolve(rootDir, 'packages/hrms-schemas/src/index.ts'),
+        '@flc/hrms-services/access': path.resolve(rootDir, 'packages/hrms-services/src/access/access.ts'),
         '@flc/hrms-services': path.resolve(rootDir, 'packages/hrms-services/src/index.ts'),
         '@flc/internal-requests': path.resolve(rootDir, 'packages/internal-requests/src/index.ts'),
         '@flc/platform-services': path.resolve(rootDir, 'packages/platform-services/src/index.ts'),

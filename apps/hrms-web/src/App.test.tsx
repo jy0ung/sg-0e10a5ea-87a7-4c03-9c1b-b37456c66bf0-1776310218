@@ -1,3 +1,4 @@
+import { HRMS_PROTECTED_ROUTE_PATHS } from '@flc/shell';
 import { describe, expect, it } from 'vitest';
 import {
   getHrmsRouterBaseName,
@@ -12,22 +13,8 @@ describe('HRMS web route metadata', () => {
     expect(getHrmsRouterBaseName('/hrms')).toBe('/hrms');
   });
 
-  it('keeps the dedicated protected route surface explicit', () => {
-    expect(hrmsProtectedRoutePaths).toEqual([
-      'profile',
-      'leave',
-      'leave/calendar',
-      'attendance',
-      'approvals',
-      'appraisals',
-      'announcements',
-      'employees',
-      'payroll',
-      'settings',
-      'settings/leave-quota',
-      'settings/:module',
-      'unauthorized',
-    ]);
+  it('keeps the dedicated protected route surface registry-owned', () => {
+    expect(hrmsProtectedRoutePaths).toEqual(HRMS_PROTECTED_ROUTE_PATHS);
   });
 
   it('redirects legacy nested HRMS paths to dedicated-app paths', () => {

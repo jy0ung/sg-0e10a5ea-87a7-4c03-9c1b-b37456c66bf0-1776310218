@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { HRMS_NAV_ROUTES } from '@flc/shell';
 import type { AppRole, User } from '@/types';
 import HrmsLayout from './HrmsLayout';
 import { hrmsNavItems } from './navItems';
@@ -106,23 +107,9 @@ describe('HrmsLayout', () => {
     mockUseHrmsAccess.mockReset();
   });
 
-  it('keeps navigation limited to HRMS routes', () => {
-    expect(hrmsNavItems.map((item) => item.path)).toEqual([
-      '/dashboard',
-      '/leave',
-      '/attendance',
-      '/appraisals',
-      '/announcements',
-      '/profile',
-      '/employees',
-      '/attendance',
-      '/leave/team',
-      '/leave/calendar',
-      '/approvals',
-      '/payroll',
-      '/settings/leave-quota',
-      '/settings',
-    ]);
+  it('keeps navigation limited to HRMS registry routes', () => {
+    expect(hrmsNavItems.map((item) => item.path)).toEqual(HRMS_NAV_ROUTES.map((item) => item.path));
+    expect(hrmsNavItems.map((item) => item.label)).toEqual(HRMS_NAV_ROUTES.map((item) => item.label));
   });
 
   it('shows self-service navigation for an accounts user and hides admin-only items', () => {

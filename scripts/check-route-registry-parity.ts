@@ -21,7 +21,11 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PLATFORM_ROUTES, type PlatformRouteDefinition } from '../packages/shell/src/platformRegistry';
+import {
+  HRMS_GUARDED_ROUTE_DEFINITIONS,
+  PLATFORM_ROUTES,
+  type PlatformRouteDefinition,
+} from '../packages/shell/src/platformRegistry';
 
 const root = process.cwd();
 
@@ -54,6 +58,9 @@ function declaredPaths(file: string): Set<string> {
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(src)) !== null) {
     set.add(normalize(match[1]));
+  }
+  if (src.includes('HRMS_GUARDED_ROUTE_DEFINITIONS')) {
+    for (const route of HRMS_GUARDED_ROUTE_DEFINITIONS) set.add(normalize(route.path));
   }
   sourceCache.set(file, set);
   return set;

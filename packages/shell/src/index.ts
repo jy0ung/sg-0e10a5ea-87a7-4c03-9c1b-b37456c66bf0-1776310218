@@ -6,5 +6,7 @@
 
 export * from './types';
 export * from './platformRegistry';
+export * from './moduleAccess';
+export * from './hrmsWorkspace';
 export { isAppShellNavItemActive } from './navUtils';
 export { resolveRouteChrome } from './routeChrome';

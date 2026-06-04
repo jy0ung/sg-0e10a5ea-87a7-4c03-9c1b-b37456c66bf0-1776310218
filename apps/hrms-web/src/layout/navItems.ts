@@ -13,6 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import type { ElementType } from 'react';
+import { HRMS_NAV_ROUTES, type PlatformIconKey } from '@flc/shell';
 import type { HrmsRouteAccessKey } from '@/lib/hrms/access';
 
 export interface HrmsNavItem {
@@ -24,26 +25,29 @@ export interface HrmsNavItem {
   badgeCount?: number;
 }
 
-export const hrmsNavItems: HrmsNavItem[] = [
-  // ── Self-Service ──────────────────────────────────────────────────────────
-  { label: 'My HR Dashboard', path: '/dashboard',       icon: LayoutDashboard, group: 'Self-Service', access: 'dashboard' },
-  { label: 'My Leave',        path: '/leave',           icon: Calendar,        group: 'Self-Service', access: 'leave' },
-  { label: 'My Attendance',   path: '/attendance',      icon: Clock,           group: 'Self-Service', access: 'myAttendance' },
-  { label: 'My Appraisals',   path: '/appraisals',      icon: Star,            group: 'Self-Service', access: 'appraisals' },
-  { label: 'Announcements',   path: '/announcements',   icon: Megaphone,       group: 'Self-Service', access: 'announcements' },
-  { label: 'My Profile',      path: '/profile',         icon: UserRound,       group: 'Self-Service', access: 'profile' },
+const ICONS: Partial<Record<PlatformIconKey, ElementType>> = {
+  'layout-dashboard': LayoutDashboard,
+  calendar: Calendar,
+  timer: Clock,
+  sparkles: Star,
+  bell: Megaphone,
+  'user-check': UserRound,
+  users: Users,
+  inbox: Inbox,
+  'dollar-sign': CreditCard,
+  gauge: Gauge,
+  settings: Settings2,
+};
 
-  // ── Team ─────────────────────────────────────────────────────────────────
-  { label: 'Employee Directory', path: '/employees',    icon: Users,           group: 'Team', access: 'employees' },
-  { label: 'Team Attendance', path: '/attendance',      icon: Clock,           group: 'Team', access: 'attendance' },
-  { label: 'Team Leave',      path: '/leave/team',      icon: CalendarDays,    group: 'Team', access: 'teamLeave' },
-  { label: 'Leave Calendar',  path: '/leave/calendar',  icon: CalendarDays,    group: 'Team', access: 'leaveCalendar' },
+function resolveIcon(route: { icon: PlatformIconKey; path: string; label: string }) {
+  if (route.path.startsWith('/leave/') || route.label === 'Team Leave') return CalendarDays;
+  return ICONS[route.icon] ?? Calendar;
+}
 
-  // ── Approvals ────────────────────────────────────────────────────────────
-  { label: 'Approval Inbox',  path: '/approvals',       icon: Inbox,           group: 'Approvals', access: 'approvals' },
-
-  // ── Administration ───────────────────────────────────────────────────────
-  { label: 'Payroll',         path: '/payroll',         icon: CreditCard,      group: 'Administration', access: 'payroll' },
-  { label: 'Leave Quota',     path: '/settings/leave-quota', icon: Gauge,      group: 'Administration', access: 'leaveQuota' },
-  { label: 'HRMS Settings',   path: '/settings',        icon: Settings2,       group: 'Administration', access: 'settings' },
-];
+export const hrmsNavItems: HrmsNavItem[] = HRMS_NAV_ROUTES.map((route) => ({
+  label: route.label,
+  path: route.path,
+  icon: resolveIcon(route),
+  group: route.group,
+  access: route.accessKey as HrmsRouteAccessKey,
+}));

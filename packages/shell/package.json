@@ -9,6 +9,8 @@
     ".": "./src/index.ts",
     "./types": "./src/types.ts",
     "./platformRegistry": "./src/platformRegistry.ts",
+    "./moduleAccess": "./src/moduleAccess.ts",
+    "./hrmsWorkspace": "./src/hrmsWorkspace.ts",
     "./navUtils": "./src/navUtils.ts",
     "./routeChrome": "./src/routeChrome.ts"
   },

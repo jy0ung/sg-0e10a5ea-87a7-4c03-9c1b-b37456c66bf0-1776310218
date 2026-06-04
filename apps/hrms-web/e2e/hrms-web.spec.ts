@@ -73,7 +73,7 @@ test.describe('HRMS web dedicated app', () => {
     await assertDedicatedHrmsShell(page);
     await expect(page.getByRole('link', { name: 'My Leave' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Approval Inbox' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'HRMS Settings' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'HRMS Settings', exact: true })).toBeVisible();
   });
 
   test('loads priority HRMS pages in the dedicated app', async ({ page }) => {

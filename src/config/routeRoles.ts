@@ -1,98 +1,15 @@
-import type { AppRole } from '@/types';
-import {
-  PORTAL_QUEUE_ROLES as SHARED_PORTAL_QUEUE_ROLES,
-  PORTAL_SETUP_ROLES as SHARED_PORTAL_SETUP_ROLES,
+// Compatibility re-export: route-level role groups are owned by @flc/auth.
+export {
+  ACCOUNTS_AND_UP,
+  ADMIN_AND_DIRECTOR,
+  ADMIN_ONLY,
+  EXECUTIVE,
+  HRMS_ADMIN,
+  HRMS_APPRAISALS,
+  HRMS_APPROVAL_INBOX,
+  HRMS_LEAVE,
+  HRMS_PAYROLL,
+  MANAGER_AND_UP,
+  PORTAL_QUEUE_ROLES,
+  PORTAL_SETUP_ROLES,
 } from '@flc/auth';
-
-/**
- * Phase 2 #15: centralized route-level role lists.
- *
- * These replace the inline `roles={[...]}` arrays sprinkled across `main.tsx`
- * so that a single edit here changes route gating app-wide. The DB-backed
- * `role_sections` matrix remains authoritative for section visibility; these
- * arrays control which roles may even hit the route at all.
- */
-export const ADMIN_ONLY: readonly AppRole[] = ['super_admin', 'company_admin'] as const;
-
-export const ADMIN_AND_DIRECTOR: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'director',
-] as const;
-
-export const EXECUTIVE: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'director',
-  'general_manager',
-] as const;
-
-export const MANAGER_AND_UP: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'director',
-  'general_manager',
-  'manager',
-] as const;
-
-// Financial reporting: matches the GL RLS policy (accounting_periods_admin_write)
-export const ACCOUNTS_AND_UP: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'director',
-  'general_manager',
-  'accounts',
-] as const;
-
-export const HRMS_ADMIN: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'general_manager',
-  'manager',
-] as const;
-
-export const HRMS_PAYROLL: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'general_manager',
-] as const;
-
-export const HRMS_APPROVAL_INBOX: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'director',
-  'general_manager',
-  'manager',
-  'accounts',
-] as const;
-
-export const HRMS_LEAVE: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'director',
-  'general_manager',
-  'manager',
-  'accounts',
-  'sales',
-  'analyst',
-  'creator_updater',
-] as const;
-
-export const HRMS_APPRAISALS: readonly AppRole[] = [
-  'super_admin',
-  'company_admin',
-  'director',
-  'general_manager',
-  'manager',
-  'sales',
-  'accounts',
-  'analyst',
-  'creator_updater',
-] as const;
-
-// Portal management roles.
-export const PORTAL_QUEUE_ROLES: readonly AppRole[] = SHARED_PORTAL_QUEUE_ROLES;
-
-// portal_admin can also manage setup (categories, routing, templates).
-// portal_manager stays off this write-capable setup route until a read-only setup view exists.
-export const PORTAL_SETUP_ROLES: readonly AppRole[] = SHARED_PORTAL_SETUP_ROLES;

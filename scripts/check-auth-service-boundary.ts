@@ -41,6 +41,18 @@ const shimFiles = new Map<string, readonly string[]>([
     "} from '@flc/auth';",
     "} from '@flc/auth';",
   ]],
+  ['src/config/routeRoles.ts', [
+    "} from '@flc/auth';",
+  ]],
+  ['apps/hrms-web/src/config/routeRoles.ts', [
+    "} from '@flc/auth';",
+  ]],
+  ['src/config/hrmsConfig.ts', [
+    "} from '@flc/auth';",
+  ]],
+  ['apps/hrms-web/src/config/hrmsConfig.ts', [
+    "} from '@flc/auth';",
+  ]],
 ]);
 
 const forbiddenShimPatterns: readonly RegExp[] = [
@@ -157,4 +169,4 @@ if (findings.length > 0) {
   process.exit(1);
 }
 
-console.info(`Auth/access service boundary check passed: ${shimFiles.size} app service shims re-export @flc/auth.`);
+console.info(`Auth/access service boundary check passed: ${shimFiles.size} app service/config shims re-export @flc/auth.`);

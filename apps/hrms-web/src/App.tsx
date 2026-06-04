@@ -17,6 +17,7 @@ import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { env } from '@/config/env';
 import { createAppQueryClient } from '@/lib/queryClient';
 import { errorTrackingService } from '@flc/platform-services';
+import { HRMS_GUARDED_ROUTE_DEFINITIONS, type HrmsGuardedRouteDefinition } from '@flc/shell';
 import HrmsLayout from './layout/HrmsLayout';
 import ProfilePage from './pages/ProfilePage';
 import { getHrmsRouterBaseName, hrmsCompatibilityRedirects } from './routes';
@@ -91,27 +92,44 @@ function ProtectedHrmsShell() {
 
 const routerBaseName = getHrmsRouterBaseName(import.meta.env.BASE_URL);
 
+type HrmsGuardedRouteId = (typeof HRMS_GUARDED_ROUTE_DEFINITIONS)[number]['routeId'];
+
+const guardedRouteComponents = {
+  'hrms-dashboard': <S><HrmsDashboard /></S>,
+  'hrms-profile': <ProfilePage />,
+  'hrms-leave': <S><LeaveManagement /></S>,
+  'hrms-team-leave': <S><TeamLeave /></S>,
+  'hrms-leave-calendar': <S><LeaveCalendar /></S>,
+  'hrms-attendance': <S><AttendanceLog /></S>,
+  'hrms-approvals': <S><ApprovalInbox /></S>,
+  'hrms-appraisals': <S><PerformanceAppraisals /></S>,
+  'hrms-announcements': <S><HrmsAnnouncements /></S>,
+  'hrms-employees': <S><EmployeeDirectory /></S>,
+  'hrms-employee-detail': <S><EmployeeProfile /></S>,
+  'hrms-payroll': <S><PayrollSummary /></S>,
+  'hrms-settings': <S><HrmsAdmin /></S>,
+  'hrms-leave-quota': <S><HrmsAdmin /></S>,
+  'hrms-settings-module': <S><HrmsAdmin /></S>,
+} satisfies Record<HrmsGuardedRouteId, React.ReactNode>;
+
+function renderGuardedHrmsRoute(route: HrmsGuardedRouteDefinition) {
+  return {
+    path: route.path,
+    element: (
+      <RequireHrmsRouteAccess access={route.accessKey}>
+        <R scope={route.scope}>{guardedRouteComponents[route.routeId as HrmsGuardedRouteId]}</R>
+      </RequireHrmsRouteAccess>
+    ),
+  };
+}
+
 const router = createBrowserRouter([
   {
     path: '/',
     element: <ProtectedHrmsShell />,
     children: [
       { index: true, element: <Navigate to="dashboard" replace /> },
-      { path: 'dashboard', element: <RequireHrmsRouteAccess access="dashboard"><R scope="Dashboard"><S><HrmsDashboard /></S></R></RequireHrmsRouteAccess> },
-      { path: 'profile', element: <RequireHrmsRouteAccess access="profile"><R scope="Profile"><ProfilePage /></R></RequireHrmsRouteAccess> },
-      { path: 'leave', element: <RequireHrmsRouteAccess access="leave"><R scope="Leave"><S><LeaveManagement /></S></R></RequireHrmsRouteAccess> },
-      { path: 'leave/team', element: <RequireHrmsRouteAccess access="teamLeave"><R scope="Team Leave"><S><TeamLeave /></S></R></RequireHrmsRouteAccess> },
-      { path: 'leave/calendar', element: <RequireHrmsRouteAccess access="leaveCalendar"><R scope="Leave Calendar"><S><LeaveCalendar /></S></R></RequireHrmsRouteAccess> },
-      { path: 'attendance', element: <RequireHrmsRouteAccess access="attendancePage"><R scope="Attendance"><S><AttendanceLog /></S></R></RequireHrmsRouteAccess> },
-      { path: 'approvals', element: <RequireHrmsRouteAccess access="approvals"><R scope="Approvals"><S><ApprovalInbox /></S></R></RequireHrmsRouteAccess> },
-      { path: 'appraisals', element: <RequireHrmsRouteAccess access="appraisals"><R scope="Appraisals"><S><PerformanceAppraisals /></S></R></RequireHrmsRouteAccess> },
-      { path: 'announcements', element: <RequireHrmsRouteAccess access="announcements"><R scope="Announcements"><S><HrmsAnnouncements /></S></R></RequireHrmsRouteAccess> },
-      { path: 'employees', element: <RequireHrmsRouteAccess access="employees"><R scope="Employees"><S><EmployeeDirectory /></S></R></RequireHrmsRouteAccess> },
-      { path: 'employees/:id', element: <RequireHrmsRouteAccess access="employees"><R scope="Employee Profile"><S><EmployeeProfile /></S></R></RequireHrmsRouteAccess> },
-      { path: 'payroll', element: <RequireHrmsRouteAccess access="payroll"><R scope="Payroll"><S><PayrollSummary /></S></R></RequireHrmsRouteAccess> },
-      { path: 'settings', element: <RequireHrmsRouteAccess access="settings"><R scope="Settings"><S><HrmsAdmin /></S></R></RequireHrmsRouteAccess> },
-      { path: 'settings/leave-quota', element: <RequireHrmsRouteAccess access="leaveQuota"><R scope="Leave Quota Settings"><S><HrmsAdmin /></S></R></RequireHrmsRouteAccess> },
-      { path: 'settings/:module', element: <RequireHrmsRouteAccess access="settings"><R scope="Settings Module"><S><HrmsAdmin /></S></R></RequireHrmsRouteAccess> },
+      ...HRMS_GUARDED_ROUTE_DEFINITIONS.map(renderGuardedHrmsRoute),
       { path: 'unauthorized', element: <UnauthorizedAccess /> },
       ...hrmsCompatibilityRedirects.map((route) => ({
         path: route.path,

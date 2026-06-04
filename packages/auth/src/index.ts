@@ -29,7 +29,30 @@ export {
   ROLE_LABELS,
 } from './rolePermissions';
 export type { SectionName } from './rolePermissions';
+export {
+  HRMS_ACCESS_ROLES,
+  HRMS_ADMIN_ROLES,
+  HRMS_APPRAISAL_PARTICIPANT_ROLES,
+  HRMS_APPROVAL_INBOX_ROLES,
+  HRMS_LEAVE_APPROVER_ROLES,
+  HRMS_MANAGER_ROLES,
+  HRMS_PAYROLL_ROLES,
+  HRMS_SELF_SERVICE_ROLES,
+  PII_VIEW_ROLES,
+} from './hrmsConfig';
 export type { AccessSubject } from './accessControl';
+export {
+  ACCOUNTS_AND_UP,
+  ADMIN_AND_DIRECTOR,
+  ADMIN_ONLY,
+  EXECUTIVE,
+  HRMS_ADMIN,
+  HRMS_APPRAISALS,
+  HRMS_APPROVAL_INBOX,
+  HRMS_LEAVE,
+  HRMS_PAYROLL,
+  MANAGER_AND_UP,
+} from './routeRoles';
 export { fetchRoleSections, saveRoleSections } from './roleSectionService';
 export type { RoleSectionRow, RoleSectionsMatrix } from './roleSectionService';
 export {

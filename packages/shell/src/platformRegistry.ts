@@ -97,6 +97,38 @@ export interface PlatformRouteDefinition {
   unavailable?: Partial<Record<PlatformUnavailableReason, string>>;
 }
 
+export type HrmsRouteAccessKey =
+  | 'dashboard'
+  | 'profile'
+  | 'leave'
+  | 'leaveCalendar'
+  | 'teamLeave'
+  | 'attendance'
+  | 'myAttendance'
+  | 'attendancePage'
+  | 'approvals'
+  | 'appraisals'
+  | 'announcements'
+  | 'employees'
+  | 'payroll'
+  | 'settings'
+  | 'leaveQuota';
+
+export interface HrmsNavRouteDefinition {
+  label: string;
+  path: string;
+  icon: PlatformIconKey;
+  group: 'Self-Service' | 'Team' | 'Approvals' | 'Administration';
+  accessKey: Exclude<HrmsRouteAccessKey, 'attendancePage'>;
+}
+
+export interface HrmsGuardedRouteDefinition {
+  routeId: string;
+  path: string;
+  accessKey: HrmsRouteAccessKey;
+  scope: string;
+}
+
 export interface ProductionSmokeRoute {
   module: string;
   name: string;
@@ -199,20 +231,93 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
   { id: 'admin-dealers', label: 'Dealers', path: '/admin/dealers', shell: 'main', section: 'Admin', icon: 'users', group: 'Master Data', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
 
   { id: 'hrms-root', label: 'Root Redirect', path: '/', shell: 'hrms', section: 'HRMS', icon: 'briefcase', smoke: { app: 'hrms' } },
-  { id: 'hrms-leave', label: 'Leave', path: '/leave', shell: 'hrms', section: 'HRMS', icon: 'calendar', smoke: { app: 'hrms' } },
-  { id: 'hrms-approvals', label: 'Approvals', path: '/approvals', shell: 'hrms', section: 'HRMS', icon: 'check-square', smoke: { app: 'hrms' } },
-  { id: 'hrms-appraisals', label: 'Appraisals', path: '/appraisals', shell: 'hrms', section: 'HRMS', icon: 'sparkles', smoke: { app: 'hrms' } },
+  { id: 'hrms-dashboard', label: 'My HR Dashboard', path: '/dashboard', shell: 'hrms', section: 'HRMS', icon: 'layout-dashboard', smoke: { app: 'hrms' } },
+  { id: 'hrms-leave', label: 'My Leave', path: '/leave', shell: 'hrms', section: 'HRMS', icon: 'calendar', smoke: { app: 'hrms' } },
+  { id: 'hrms-approvals', label: 'Approval Inbox', path: '/approvals', shell: 'hrms', section: 'HRMS', icon: 'inbox', smoke: { app: 'hrms' } },
+  { id: 'hrms-appraisals', label: 'My Appraisals', path: '/appraisals', shell: 'hrms', section: 'HRMS', icon: 'sparkles', smoke: { app: 'hrms' } },
   { id: 'hrms-announcements', label: 'Announcements', path: '/announcements', shell: 'hrms', section: 'HRMS', icon: 'bell', smoke: { app: 'hrms' } },
-  { id: 'hrms-profile', label: 'Profile', path: '/profile', shell: 'hrms', section: 'HRMS', icon: 'users', smoke: { app: 'hrms' } },
+  { id: 'hrms-profile', label: 'My Profile', path: '/profile', shell: 'hrms', section: 'HRMS', icon: 'user-check', smoke: { app: 'hrms' } },
   { id: 'hrms-attendance', label: 'Attendance', path: '/attendance', shell: 'hrms', section: 'HRMS', icon: 'timer', smoke: { app: 'hrms' } },
+  { id: 'hrms-team-leave', label: 'Team Leave', path: '/leave/team', shell: 'hrms', section: 'HRMS', icon: 'calendar', smoke: { app: 'hrms' } },
   { id: 'hrms-leave-calendar', label: 'Leave Calendar', path: '/leave/calendar', shell: 'hrms', section: 'HRMS', icon: 'calendar', smoke: { app: 'hrms' } },
-  { id: 'hrms-employees', label: 'Employees', path: '/employees', shell: 'hrms', section: 'HRMS', icon: 'users', smoke: { app: 'hrms' } },
+  { id: 'hrms-employees', label: 'Employee Directory', path: '/employees', shell: 'hrms', section: 'HRMS', icon: 'users', smoke: { app: 'hrms' } },
+  { id: 'hrms-employee-detail', label: 'Employee Profile', path: '/employees/:id', shell: 'hrms', section: 'HRMS', icon: 'users' },
   { id: 'hrms-payroll', label: 'Payroll', path: '/payroll', shell: 'hrms', section: 'HRMS', icon: 'dollar-sign', smoke: { app: 'hrms' } },
-  { id: 'hrms-settings', label: 'Settings', path: '/settings', shell: 'hrms', section: 'HRMS', icon: 'settings', smoke: { app: 'hrms' } },
+  { id: 'hrms-leave-quota', label: 'Leave Quota', path: '/settings/leave-quota', shell: 'hrms', section: 'HRMS', icon: 'gauge', smoke: { app: 'hrms' } },
+  { id: 'hrms-settings', label: 'HRMS Settings', path: '/settings', shell: 'hrms', section: 'HRMS', icon: 'settings', smoke: { app: 'hrms' } },
+  { id: 'hrms-settings-module', label: 'HRMS Settings Module', path: '/settings/:module', shell: 'hrms', section: 'HRMS', icon: 'settings' },
+  { id: 'hrms-unauthorized', label: 'Unauthorized', path: '/unauthorized', shell: 'hrms', section: 'HRMS', icon: 'shield' },
   { id: 'hrms-approval-flows-legacy', label: 'Approval Flows', path: '/approval-flows', shell: 'hrms', section: 'HRMS', icon: 'settings', smoke: { app: 'hrms' } },
 ] as const;
 
 export const MAIN_NAV_ROUTES = PLATFORM_ROUTES.filter((route) => route.navShell === 'main');
+
+const HRMS_PROTECTED_ROUTE_IDS = [
+  'hrms-dashboard',
+  'hrms-profile',
+  'hrms-leave',
+  'hrms-team-leave',
+  'hrms-leave-calendar',
+  'hrms-attendance',
+  'hrms-approvals',
+  'hrms-appraisals',
+  'hrms-announcements',
+  'hrms-employees',
+  'hrms-employee-detail',
+  'hrms-payroll',
+  'hrms-settings',
+  'hrms-leave-quota',
+  'hrms-settings-module',
+  'hrms-unauthorized',
+] as const;
+
+const HRMS_GUARDED_ROUTE_INPUTS = [
+  { routeId: 'hrms-dashboard', accessKey: 'dashboard', scope: 'Dashboard' },
+  { routeId: 'hrms-profile', accessKey: 'profile', scope: 'Profile' },
+  { routeId: 'hrms-leave', accessKey: 'leave', scope: 'Leave' },
+  { routeId: 'hrms-team-leave', accessKey: 'teamLeave', scope: 'Team Leave' },
+  { routeId: 'hrms-leave-calendar', accessKey: 'leaveCalendar', scope: 'Leave Calendar' },
+  { routeId: 'hrms-attendance', accessKey: 'attendancePage', scope: 'Attendance' },
+  { routeId: 'hrms-approvals', accessKey: 'approvals', scope: 'Approvals' },
+  { routeId: 'hrms-appraisals', accessKey: 'appraisals', scope: 'Appraisals' },
+  { routeId: 'hrms-announcements', accessKey: 'announcements', scope: 'Announcements' },
+  { routeId: 'hrms-employees', accessKey: 'employees', scope: 'Employees' },
+  { routeId: 'hrms-employee-detail', accessKey: 'employees', scope: 'Employee Profile' },
+  { routeId: 'hrms-payroll', accessKey: 'payroll', scope: 'Payroll' },
+  { routeId: 'hrms-settings', accessKey: 'settings', scope: 'Settings' },
+  { routeId: 'hrms-leave-quota', accessKey: 'leaveQuota', scope: 'Leave Quota Settings' },
+  { routeId: 'hrms-settings-module', accessKey: 'settings', scope: 'Settings Module' },
+] as const satisfies readonly { routeId: string; accessKey: HrmsRouteAccessKey; scope: string }[];
+
+function getRegisteredRelativeRoutePath(routeId: string): string {
+  const route = PLATFORM_ROUTES.find((candidate) => candidate.id === routeId);
+  if (!route) throw new Error(`Missing registered platform route: ${routeId}`);
+  return route.path.replace(/^\//, '');
+}
+
+export const HRMS_PROTECTED_ROUTE_PATHS: readonly string[] = HRMS_PROTECTED_ROUTE_IDS.map(getRegisteredRelativeRoutePath);
+
+export const HRMS_GUARDED_ROUTE_DEFINITIONS: readonly HrmsGuardedRouteDefinition[] = HRMS_GUARDED_ROUTE_INPUTS.map((route) => ({
+  ...route,
+  path: getRegisteredRelativeRoutePath(route.routeId),
+}));
+
+export const HRMS_NAV_ROUTES: readonly HrmsNavRouteDefinition[] = [
+  { label: 'My HR Dashboard', path: '/dashboard', icon: 'layout-dashboard', group: 'Self-Service', accessKey: 'dashboard' },
+  { label: 'My Leave', path: '/leave', icon: 'calendar', group: 'Self-Service', accessKey: 'leave' },
+  { label: 'My Attendance', path: '/attendance', icon: 'timer', group: 'Self-Service', accessKey: 'myAttendance' },
+  { label: 'My Appraisals', path: '/appraisals', icon: 'sparkles', group: 'Self-Service', accessKey: 'appraisals' },
+  { label: 'Announcements', path: '/announcements', icon: 'bell', group: 'Self-Service', accessKey: 'announcements' },
+  { label: 'My Profile', path: '/profile', icon: 'user-check', group: 'Self-Service', accessKey: 'profile' },
+  { label: 'Employee Directory', path: '/employees', icon: 'users', group: 'Team', accessKey: 'employees' },
+  { label: 'Team Attendance', path: '/attendance', icon: 'timer', group: 'Team', accessKey: 'attendance' },
+  { label: 'Team Leave', path: '/leave/team', icon: 'calendar', group: 'Team', accessKey: 'teamLeave' },
+  { label: 'Leave Calendar', path: '/leave/calendar', icon: 'calendar', group: 'Team', accessKey: 'leaveCalendar' },
+  { label: 'Approval Inbox', path: '/approvals', icon: 'inbox', group: 'Approvals', accessKey: 'approvals' },
+  { label: 'Payroll', path: '/payroll', icon: 'dollar-sign', group: 'Administration', accessKey: 'payroll' },
+  { label: 'Leave Quota', path: '/settings/leave-quota', icon: 'gauge', group: 'Administration', accessKey: 'leaveQuota' },
+  { label: 'HRMS Settings', path: '/settings', icon: 'settings', group: 'Administration', accessKey: 'settings' },
+] as const;
 
 export const MAIN_ROUTE_CHROME: readonly PlatformRouteChromeDefinition[] = [
   { pattern: /^\/(home)?$/, title: 'Home', kicker: 'Role-aware workspace' },
@@ -232,6 +337,22 @@ export const MAIN_ROUTE_CHROME: readonly PlatformRouteChromeDefinition[] = [
   { pattern: /^\/reports/, title: 'Business Reports', kicker: 'Cross-module reporting' },
   { pattern: /^\/admin/, title: 'Administration', kicker: 'Controls and governance' },
   { pattern: /^\/hrms/, title: 'HRMS', kicker: 'Workforce workspace' },
+] as const;
+
+export const HRMS_ROUTE_CHROME: readonly PlatformRouteChromeDefinition[] = [
+  { pattern: /^\/dashboard/, title: 'My HR Dashboard', kicker: 'Your HRMS command centre' },
+  { pattern: /^\/leave\/calendar/, title: 'Leave Calendar', kicker: 'Team leave visibility' },
+  { pattern: /^\/leave\/team/, title: 'Team Leave', kicker: 'Team coverage and approvals' },
+  { pattern: /^\/leave$/, title: 'My Leave', kicker: 'Applications and status history' },
+  { pattern: /^\/attendance/, title: 'Attendance', kicker: 'Daily attendance records' },
+  { pattern: /^\/approvals/, title: 'Approval Inbox', kicker: 'Assigned HRMS decisions' },
+  { pattern: /^\/appraisals/, title: 'My Appraisals', kicker: 'Review cycles and outcomes' },
+  { pattern: /^\/announcements/, title: 'Announcements', kicker: 'Company communications' },
+  { pattern: /^\/employees\/[^/]+/, title: 'Employee Profile', kicker: 'Workforce record' },
+  { pattern: /^\/employees/, title: 'Employee Directory', kicker: 'Workforce directory' },
+  { pattern: /^\/payroll/, title: 'Payroll', kicker: 'Runs, approvals, and payout status' },
+  { pattern: /^\/settings/, title: 'HRMS Settings', kicker: 'Admin console and workflow governance' },
+  { pattern: /^\/profile/, title: 'My Profile', kicker: 'HRMS identity and access' },
 ] as const;
 
 const SECTION_PATH_PREFIXES: readonly { section: PlatformSectionName; prefixes: readonly string[] }[] = [
@@ -289,6 +410,12 @@ export function getFocusedPlatformSection(pathname: string): PlatformSectionName
   if (route) return route.section === 'Internal Requests' ? 'Platform' : route.section;
 
   return SECTION_PATH_PREFIXES.find(({ prefixes }) => prefixes.some((prefix) => pathMatchesPrefix(pathname, prefix)))?.section ?? null;
+}
+
+export function isFocusedPlatformPath(pathname: string): boolean {
+  return MODULE_PATH_PREFIXES
+    .filter((entry) => entry.moduleGate !== 'support')
+    .some(({ prefixes }) => prefixes.some((prefix) => pathMatchesPrefix(pathname, prefix)));
 }
 
 export function getModuleGateForPath(pathname: string): PlatformModuleId | null {

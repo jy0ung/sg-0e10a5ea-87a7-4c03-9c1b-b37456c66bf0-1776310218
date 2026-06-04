@@ -1,22 +1,7 @@
+import { isFocusedPlatformPath } from '@flc/shell';
 import { useLocation } from 'react-router-dom';
-
-/**
- * Paths whose first segment belongs to a standalone module.
- * Any route under these prefixes renders in focused (module-only) mode.
- * Platform paths (/, /home, /modules, /notifications) are excluded; /modules is a legacy redirect to Home.
- */
-const MODULE_PREFIXES = [
-  '/auto-aging',
-  '/sales',
-  '/inventory',
-  '/purchasing',
-  '/reports',
-  '/hrms',
-  '/admin',
-];
 
 export function useFocusedMode(): { isFocused: boolean } {
   const { pathname } = useLocation();
-  const isFocused = MODULE_PREFIXES.some(p => pathname.startsWith(p));
-  return { isFocused };
+  return { isFocused: isFocusedPlatformPath(pathname) };
 }

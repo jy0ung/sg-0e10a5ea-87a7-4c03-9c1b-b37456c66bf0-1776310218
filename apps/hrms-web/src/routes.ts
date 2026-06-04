@@ -1,3 +1,5 @@
+import { HRMS_PROTECTED_ROUTE_PATHS } from '@flc/shell';
+
 export const hrmsCompatibilityRedirects = [
   { path: 'leave-calendar', to: '/leave/calendar' },
   { path: 'admin', to: '/settings' },
@@ -18,18 +20,4 @@ export function getHrmsRouterBaseName(baseUrl: string): string {
   return baseUrl === '/' ? '/' : baseUrl.replace(/\/$/, '');
 }
 
-export const hrmsProtectedRoutePaths = [
-  'profile',
-  'leave',
-  'leave/calendar',
-  'attendance',
-  'approvals',
-  'appraisals',
-  'announcements',
-  'employees',
-  'payroll',
-  'settings',
-  'settings/leave-quota',
-  'settings/:module',
-  'unauthorized',
-] as const;
+export const hrmsProtectedRoutePaths = HRMS_PROTECTED_ROUTE_PATHS;

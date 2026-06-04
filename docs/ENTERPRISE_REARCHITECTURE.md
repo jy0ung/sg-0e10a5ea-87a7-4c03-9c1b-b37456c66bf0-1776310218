@@ -62,7 +62,8 @@ The registry owns:
 - Section definitions and module gates.
 - Route metadata for main, portal, and HRMS surfaces.
 - Navigation metadata for the main shell.
-- Page chrome metadata for the main shell.
+- Page chrome metadata for the main and HRMS shells.
+- HRMS dedicated-shell navigation labels, groups, icons, guarded route paths, scopes, and access keys via `HRMS_NAV_ROUTES` and `HRMS_GUARDED_ROUTE_DEFINITIONS`.
 - Production smoke route lists for main and HRMS hosts.
 - Future unavailable-state copy for disabled module, missing permission, and planned feature cases.
 - Feature-flag/control labels for registered but gated workflows.
@@ -131,13 +132,19 @@ Current enforcement:
 
 - ESLint and `check:page-data-boundary` block direct Supabase client imports, data/auth/storage calls, and local `createClient()` calls from `src/pages`, `src/components`, `apps/hrms-web/src/pages`, and `apps/hrms-web/src/components`; presentation surfaces may only use the shared realtime hook.
 - Main and HRMS web shell navigation consume @flc/shell platformRegistry; HRMS web no longer keeps a separate hard-coded main navigation list.
+- Platform module catalogue, module toggle resolution, and module path/section gates are owned by `@flc/shell` through `moduleAccess`; app-local module files are compatibility re-exports guarded by `check:shell-module-boundary`.
+- Focused module-shell detection is registry-backed through `isFocusedPlatformPath`; app hooks only adapt `useLocation()` to the package-owned predicate.
+- HRMS workspace path constants, legacy alias normalization, and dedicated-host URL composition are owned by `@flc/shell`; app-local `hrmsWorkspace` files retain only environment/window wiring.
+- Dedicated HRMS sidebar metadata, guarded route entries, protected route paths, and route chrome are package-owned through `HRMS_NAV_ROUTES`, `HRMS_GUARDED_ROUTE_DEFINITIONS`, `HRMS_PROTECTED_ROUTE_PATHS`, and `HRMS_ROUTE_CHROME`; `apps/hrms-web/src/layout/navItems.ts` is a compatibility adapter that only maps registry icon keys to local icon components, and `check:hrms-registry-boundary` blocks app-local metadata drift.
 - The legacy /modules URL is retained only as a Home redirect and smoke compatibility route; it must not reappear as visible Module Directory navigation.
 - Feature-flagged unavailable states use `FeatureUnavailableState` and route metadata from `platformRegistry`, rather than page-local "Feature not available" copy.
+- Shared status tone classes are owned by `@flc/ui/statusTones`; app-local `statusTones` files are compatibility re-exports guarded by `check:ui-boundary` for incremental UI migration.
 - `FeatureUnavailableState` calls in page code must pass a registry `routeId`; `check:unavailable-state-registry` blocks page-local `featureName` and `flagName` drift.
 - HRMS leave-balance rollover edge invocation is owned by `@flc/hrms-services` via `runLeaveBalanceRollover`.
 - Signup and password-reset callback/session handling is owned by `@flc/auth` via `authFlows`.
 - Email/password auth service operations are owned by `@flc/auth`; app-local `authService` files are compatibility re-exports guarded by `check:auth-service-boundary`.
 - Default section permissions and role labels are owned by `@flc/auth` and app-local `rolePermissions` files are compatibility re-exports.
+- HRMS app-role sets for self-service, manager, payroll, approval inbox, appraisal, PII, and admin eligibility are owned by `@flc/auth`; app-local `hrmsConfig` files are compatibility re-exports guarded by `check:auth-service-boundary`.
 - Server-backed role-section access is owned by `@flc/auth` via `fetchRoleSections` and `saveRoleSections`; app-local `roleSectionService` files are compatibility re-exports guarded by `check:auth-service-boundary`.
 - Column permission reads, mutations, default-role permissions, and column-level edit/view helpers are owned by `@flc/auth`; app-local `permissionService` files are compatibility re-exports guarded by `check:auth-service-boundary`.
 - Profile listing, profile mutation, invitation, account status, portal-access, and own-profile update flows are owned by `@flc/auth`; app-local `profileService` files are compatibility re-exports guarded by `check:auth-service-boundary`.

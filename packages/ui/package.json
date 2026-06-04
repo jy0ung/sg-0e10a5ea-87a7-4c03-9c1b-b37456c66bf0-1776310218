@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./*": "./src/*.tsx",
+    "./statusTones": "./src/statusTones.ts",
     "./hooks/use-toast": "./src/hooks/use-toast.ts",
     "./hooks/use-mobile": "./src/hooks/use-mobile.tsx",
     "./lib/utils": "./src/lib/utils.ts"

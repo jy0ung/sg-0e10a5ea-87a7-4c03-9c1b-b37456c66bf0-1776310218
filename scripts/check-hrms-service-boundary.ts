@@ -9,6 +9,8 @@ import { join } from 'node:path';
 const root = process.cwd();
 
 const canonicalReExports = new Map<string, string>([
+  ['src/lib/hrms/access.ts', "export * from '@flc/hrms-services/access';"],
+  ['apps/hrms-web/src/lib/hrms/access.ts', "export * from '@flc/hrms-services/access';"],
   ['apps/hrms-web/src/services/hrms/announcementService.ts', "export * from '../../../../../src/services/hrms/announcementService';"],
   ['apps/hrms-web/src/services/hrms/appraisalService.ts', "export * from '../../../../../src/services/hrms/appraisalService';"],
   ['apps/hrms-web/src/services/hrms/attendanceService.ts', "export * from '../../../../../src/services/hrms/attendanceService';"],
@@ -65,4 +67,4 @@ if (findings.length > 0) {
   process.exit(1);
 }
 
-console.info(`HRMS service boundary check passed: ${canonicalReExports.size} HRMS web service wrappers are canonical re-exports.`);
+console.info(`HRMS service boundary check passed: ${canonicalReExports.size} HRMS service/access wrappers are canonical re-exports.`);
