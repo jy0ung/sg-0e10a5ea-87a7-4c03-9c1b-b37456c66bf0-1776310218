@@ -5,6 +5,7 @@ export * from './FilterBar';
 export * from './ConfirmDialog';
 export * from './SectionCard';
 export * from './ValidationSummaryModal';
+export * from './ExcelTable';
 export * from './AuditDiffTable';
 export * from './HrmsEmptyState';
 export * from './KpiCard';

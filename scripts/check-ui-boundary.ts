@@ -124,6 +124,12 @@ const sharedPrimitives = [
     expectedExport: 'export function ValidationSummaryModal',
     forbiddenPattern: /useMemo|severityFilter|toggleSort|getSeverityBadge/,
   },
+  {
+    name: 'ExcelTable',
+    packageFile: 'packages/ui/src/ExcelTable.tsx',
+    expectedExport: 'export function ExcelTable',
+    forbiddenPattern: /EditableGridCell|EditableGridRow|TableRowRecord|handleCellSave/,
+  },
 ] as const;
 
 for (const primitive of sharedPrimitives) {
