@@ -106,6 +106,18 @@ const sharedPrimitives = [
     expectedExport: 'export function StepperProgress',
     forbiddenPattern: /stepIndex|<ol|Check|currentIdx/,
   },
+  {
+    name: 'ConfirmDialog',
+    packageFile: 'packages/ui/src/ConfirmDialog.tsx',
+    expectedExport: 'export function ConfirmDialog',
+    forbiddenPattern: /AlertDialog|confirmVariant|Loader2/,
+  },
+  {
+    name: 'SectionCard',
+    packageFile: 'packages/ui/src/SectionCard.tsx',
+    expectedExport: 'export function SectionCard',
+    forbiddenPattern: /surface-card|ArrowRight|headerRight/,
+  },
 ] as const;
 
 for (const primitive of sharedPrimitives) {

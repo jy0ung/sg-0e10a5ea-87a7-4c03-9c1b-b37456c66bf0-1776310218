@@ -2,6 +2,8 @@ export * from './statusTones';
 export * from './PageHeader';
 export * from './PageSpinner';
 export * from './FilterBar';
+export * from './ConfirmDialog';
+export * from './SectionCard';
 export * from './AuditDiffTable';
 export * from './HrmsEmptyState';
 export * from './KpiCard';
