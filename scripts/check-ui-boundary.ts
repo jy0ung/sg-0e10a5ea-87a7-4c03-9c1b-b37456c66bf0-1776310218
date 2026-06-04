@@ -118,6 +118,12 @@ const sharedPrimitives = [
     expectedExport: 'export function SectionCard',
     forbiddenPattern: /surface-card|ArrowRight|headerRight/,
   },
+  {
+    name: 'ValidationSummaryModal',
+    packageFile: 'packages/ui/src/ValidationSummaryModal.tsx',
+    expectedExport: 'export function ValidationSummaryModal',
+    forbiddenPattern: /useMemo|severityFilter|toggleSort|getSeverityBadge/,
+  },
 ] as const;
 
 for (const primitive of sharedPrimitives) {
