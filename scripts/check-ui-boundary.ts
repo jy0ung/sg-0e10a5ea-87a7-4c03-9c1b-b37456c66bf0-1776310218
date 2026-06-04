@@ -47,6 +47,12 @@ const sharedPrimitives = [
     forbiddenPattern: /ChevronRight|breadcrumbs\.map|react-router-dom/,
   },
   {
+    name: 'FilterBar',
+    packageFile: 'packages/ui/src/FilterBar.tsx',
+    expectedExport: 'export function FilterBar',
+    forbiddenPattern: /useState|ChevronDown|ChevronUp|SlidersHorizontal|aria-expanded|rounded-lg border bg-card p-3/,
+  },
+  {
     name: 'PageSpinner',
     packageFile: 'packages/ui/src/PageSpinner.tsx',
     expectedExport: 'export function PageSpinner',
