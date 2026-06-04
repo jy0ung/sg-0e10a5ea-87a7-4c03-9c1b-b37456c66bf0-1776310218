@@ -130,6 +130,12 @@ const sharedPrimitives = [
     expectedExport: 'export function ExcelTable',
     forbiddenPattern: /EditableGridCell|EditableGridRow|TableRowRecord|handleCellSave/,
   },
+  {
+    name: 'MetricCard',
+    packageFile: 'packages/ui/src/MetricCard.tsx',
+    expectedExport: 'export function MetricCard',
+    forbiddenPattern: /TONE_CHIP|deltaColor|DeltaIcon/,
+  },
 ] as const;
 
 for (const primitive of sharedPrimitives) {
