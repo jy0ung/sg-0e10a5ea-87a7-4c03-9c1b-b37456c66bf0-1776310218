@@ -23,6 +23,24 @@ for (const expected of ['export type Tone', 'export const TONE_CLASSES', 'export
 
 const sharedPrimitives = [
   {
+    name: 'AuditDiffTable',
+    packageFile: 'packages/ui/src/AuditDiffTable.tsx',
+    expectedExport: 'export function AuditDiffTable',
+    forbiddenPattern: /formatValue|No field changes recorded|Object\.entries\(changes\)/,
+  },
+  {
+    name: 'HrmsEmptyState',
+    packageFile: 'packages/ui/src/HrmsEmptyState.tsx',
+    expectedExport: 'export function HrmsEmptyState',
+    forbiddenPattern: /border-dashed|action\.label|ElementType/,
+  },
+  {
+    name: 'KpiCard',
+    packageFile: 'packages/ui/src/KpiCard.tsx',
+    expectedExport: 'export function KpiCard',
+    forbiddenPattern: /median days|statusColors|validCount/,
+  },
+  {
     name: 'PageHeader',
     packageFile: 'packages/ui/src/PageHeader.tsx',
     expectedExport: 'export function PageHeader',
@@ -57,6 +75,12 @@ const sharedPrimitives = [
     packageFile: 'packages/ui/src/LocationPreservingNavigate.tsx',
     expectedExport: 'export function LocationPreservingNavigate',
     forbiddenPattern: /withCurrentLocation|useLocation|<Navigate/,
+  },
+  {
+    name: 'MobileCardList',
+    packageFile: 'packages/ui/src/MobileCardList.tsx',
+    expectedExport: 'export function MobileCardList',
+    forbiddenPattern: /renderCard|emptyMessage|sm:hidden space-y-3/,
   },
   {
     name: 'UnauthorizedAccess',
