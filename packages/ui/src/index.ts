@@ -8,6 +8,7 @@ export * from './KpiSkeleton';
 export * from './LocationPreservingNavigate';
 export * from './MobileCardList';
 export * from './ScrollableRegion';
+export * from './StandardTable';
 export * from './StepperProgress';
 export * from './TableSkeleton';
 export * from './UnauthorizedAccess';

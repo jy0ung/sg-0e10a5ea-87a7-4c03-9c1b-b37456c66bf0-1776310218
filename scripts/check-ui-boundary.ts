@@ -71,6 +71,12 @@ const sharedPrimitives = [
     forbiddenPattern: /role="region"|tabIndex|HTMLAttributes/,
   },
   {
+    name: 'StandardTable',
+    packageFile: 'packages/ui/src/StandardTable.tsx',
+    expectedExport: 'export function StandardTable',
+    forbiddenPattern: /DEFAULT_PAGE_SIZES|SortIcon|standard-table-mobile-list|getValue|<table|ChevronsUpDown/,
+  },
+  {
     name: 'LocationPreservingNavigate',
     packageFile: 'packages/ui/src/LocationPreservingNavigate.tsx',
     expectedExport: 'export function LocationPreservingNavigate',
