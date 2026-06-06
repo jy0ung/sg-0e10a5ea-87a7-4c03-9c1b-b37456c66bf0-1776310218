@@ -4,6 +4,13 @@ import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -41,7 +48,7 @@ interface Props {
 
 /**
  * Form Builder tab content. Owns the per-category custom-field list, the
- * inline create form, and the per-row edit drawer. The shell only sees the
+ * create dialog, and the per-row edit dialog. The shell only sees the
  * active-field count via onActiveCountChange.
  */
 export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Props) {
@@ -59,7 +66,7 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
   const [creating, setCreating] = useState(false);
 
   const [busyFieldId, setBusyFieldId] = useState<string | null>(null);
-  const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [fieldDrafts, setFieldDrafts] = useState<Record<string, FormFieldDraft>>({});
 
   // Reseed drafts whenever the server list changes so saving picks up server
@@ -174,7 +181,7 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
       toast.error('Unable to save form field', { description: result.error });
     } else {
       toast.success('Form field saved');
-      setExpandedFieldId(null);
+      setEditingFieldId(null);
       await reload();
     }
     setBusyFieldId(null);
@@ -187,11 +194,18 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
       toast.error('Unable to delete form field', { description: result.error });
     } else {
       toast.success('Form field deleted', { description: `"${field.label}" has been removed.` });
-      setExpandedFieldId(null);
+      setEditingFieldId(null);
       await reload();
     }
     setBusyFieldId(null);
   };
+
+  const editingField = fields.find((field) => field.id === editingFieldId) ?? null;
+  const editingDraft = editingField ? fieldDrafts[editingField.id] : null;
+  const editingBusy = editingField ? busyFieldId === editingField.id : false;
+  const editingDirty = editingField && editingDraft
+    ? hasFormFieldChanges(editingField, editingDraft)
+    : false;
 
   return (
     <div className="space-y-4">
@@ -210,10 +224,16 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
         )}
       </div>
 
-      {isAdding && (
-        <div className="space-y-4 rounded-lg border border-dashed border-border/70 bg-secondary/20 p-4">
+      <Dialog open={isAdding} onOpenChange={(open) => {
+        setIsAdding(open);
+        if (!open) resetCreateForm();
+      }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>New custom field</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-foreground">New custom field</p>
             <Button
               type="button"
               variant="ghost"
@@ -313,8 +333,9 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
             {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             Add field
           </Button>
-        </div>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {loading ? (
         <div className="flex items-center justify-center gap-3 rounded-xl border border-border py-12 text-muted-foreground">
@@ -352,10 +373,7 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                   <Badge variant="outline">{categoryFields.length}</Badge>
                 </div>
                 {categoryFields.map((field) => {
-                  const draft = fieldDrafts[field.id];
-                  const isExpanded = expandedFieldId === field.id;
                   const isBusy = busyFieldId === field.id;
-                  const isDirty = hasFormFieldChanges(field, draft);
 
                   return (
                     <div key={field.id} className="space-y-4 rounded-xl border border-border bg-background p-4">
@@ -378,8 +396,8 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <Button type="button" variant="outline" onClick={() => setExpandedFieldId(isExpanded ? null : field.id)} disabled={isBusy}>
-                            {isExpanded ? 'Collapse' : 'Edit'}
+                          <Button type="button" variant="outline" onClick={() => setEditingFieldId(field.id)} disabled={isBusy}>
+                            Edit
                           </Button>
                           <Button
                             type="button"
@@ -394,97 +412,6 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                           </Button>
                         </div>
                       </div>
-
-                      {isExpanded && draft && (
-                        <div className="space-y-4 rounded-xl border border-dashed border-border/70 bg-secondary/10 p-4">
-                          <div className="grid gap-4 md:grid-cols-3">
-                            <div className="space-y-2">
-                              <Label htmlFor={`field-label-${field.id}`}>Label</Label>
-                              <Input
-                                id={`field-label-${field.id}`}
-                                value={draft.label}
-                                onChange={(event) => updateDraft(field, { label: event.target.value })}
-                                disabled={isBusy}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor={`field-type-${field.id}`}>Type</Label>
-                              <Select
-                                value={draft.field_type}
-                                onValueChange={(value) => updateDraft(field, { field_type: value as RequestFormFieldType })}
-                                disabled={isBusy}
-                              >
-                                <SelectTrigger id={`field-type-${field.id}`}><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {FIELD_TYPE_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            {draft.field_type === 'database_select' && (
-                              <div className="space-y-2">
-                                <Label htmlFor={`field-source-${field.id}`}>Database source</Label>
-                                <Select
-                                  value={draft.data_source ?? 'branches'}
-                                  onValueChange={(value) => updateDraft(field, { data_source: value as RequestFieldDataSource })}
-                                  disabled={isBusy}
-                                >
-                                  <SelectTrigger id={`field-source-${field.id}`}><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    {DATA_SOURCE_OPTIONS.map((option) => (
-                                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="grid gap-4 md:grid-cols-2">
-                            <div className="space-y-2">
-                              <Label htmlFor={`field-placeholder-${field.id}`}>Placeholder</Label>
-                              <Input
-                                id={`field-placeholder-${field.id}`}
-                                value={draft.placeholder}
-                                onChange={(event) => updateDraft(field, { placeholder: event.target.value })}
-                                disabled={isBusy}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor={`field-help-${field.id}`}>Help text</Label>
-                              <Input
-                                id={`field-help-${field.id}`}
-                                value={draft.help_text}
-                                onChange={(event) => updateDraft(field, { help_text: event.target.value })}
-                                disabled={isBusy}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
-                              <div>
-                                <p className="text-sm font-medium text-foreground">Required</p>
-                                <p className="text-xs text-muted-foreground">Block submission when empty.</p>
-                              </div>
-                              <Switch checked={draft.is_required} onCheckedChange={(checked) => updateDraft(field, { is_required: checked })} disabled={isBusy} />
-                            </div>
-                            <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
-                              <div>
-                                <p className="text-sm font-medium text-foreground">Available</p>
-                                <p className="text-xs text-muted-foreground">Hide without deleting historical values.</p>
-                              </div>
-                              <Switch checked={draft.is_active} onCheckedChange={(checked) => updateDraft(field, { is_active: checked })} disabled={isBusy} />
-                            </div>
-                          </div>
-
-                          <Button type="button" onClick={() => void handleSave(field)} disabled={isBusy || !isDirty} className="gap-2">
-                            {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                            Save changes
-                          </Button>
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -493,6 +420,111 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
           })}
         </div>
       )}
+
+      <Dialog open={!!editingField} onOpenChange={(open) => { if (!open) setEditingFieldId(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit custom field</DialogTitle>
+          </DialogHeader>
+          {editingField && editingDraft && (
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor={`field-label-${editingField.id}`}>Label</Label>
+                  <Input
+                    id={`field-label-${editingField.id}`}
+                    value={editingDraft.label}
+                    onChange={(event) => updateDraft(editingField, { label: event.target.value })}
+                    disabled={editingBusy}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`field-type-${editingField.id}`}>Type</Label>
+                  <Select
+                    value={editingDraft.field_type}
+                    onValueChange={(value) => updateDraft(editingField, { field_type: value as RequestFormFieldType })}
+                    disabled={editingBusy}
+                  >
+                    <SelectTrigger id={`field-type-${editingField.id}`}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FIELD_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editingDraft.field_type === 'database_select' && (
+                  <div className="space-y-2">
+                    <Label htmlFor={`field-source-${editingField.id}`}>Database source</Label>
+                    <Select
+                      value={editingDraft.data_source ?? 'branches'}
+                      onValueChange={(value) => updateDraft(editingField, { data_source: value as RequestFieldDataSource })}
+                      disabled={editingBusy}
+                    >
+                      <SelectTrigger id={`field-source-${editingField.id}`}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {DATA_SOURCE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor={`field-placeholder-${editingField.id}`}>Placeholder</Label>
+                  <Input
+                    id={`field-placeholder-${editingField.id}`}
+                    value={editingDraft.placeholder}
+                    onChange={(event) => updateDraft(editingField, { placeholder: event.target.value })}
+                    disabled={editingBusy}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`field-help-${editingField.id}`}>Help text</Label>
+                  <Input
+                    id={`field-help-${editingField.id}`}
+                    value={editingDraft.help_text}
+                    onChange={(event) => updateDraft(editingField, { help_text: event.target.value })}
+                    disabled={editingBusy}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Required</p>
+                    <p className="text-xs text-muted-foreground">Block submission when empty.</p>
+                  </div>
+                  <Switch checked={editingDraft.is_required} onCheckedChange={(checked) => updateDraft(editingField, { is_required: checked })} disabled={editingBusy} />
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Available</p>
+                    <p className="text-xs text-muted-foreground">Hide without deleting historical values.</p>
+                  </div>
+                  <Switch checked={editingDraft.is_active} onCheckedChange={(checked) => updateDraft(editingField, { is_active: checked })} disabled={editingBusy} />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setEditingFieldId(null)} disabled={editingBusy}>Cancel</Button>
+            <Button
+              type="button"
+              onClick={() => { if (editingField) void handleSave(editingField); }}
+              disabled={!editingField || editingBusy || !editingDirty}
+              className="gap-2"
+            >
+              {editingBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

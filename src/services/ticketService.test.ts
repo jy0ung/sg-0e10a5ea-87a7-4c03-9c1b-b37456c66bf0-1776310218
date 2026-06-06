@@ -452,4 +452,133 @@ describe('ticketService', () => {
       status: 'cancelled',
     });
   });
+
+  it('auto-starts the first queue opener when a non-requestor opens an unassigned open ticket', async () => {
+    const currentSingle = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ticket-7',
+        company_id: 'company-1',
+        subject: 'Need branch support',
+        category: 'operations_support',
+        subcategory: null,
+        priority: 'medium',
+        status: 'open',
+        description: 'Need branch support.',
+        submitted_by: 'requestor-1',
+        assigned_to: null,
+        assigned_at: null,
+        first_response_due_at: '2026-04-30T13:00:00.000Z',
+        resolution_due_at: '2026-05-02T09:00:00.000Z',
+        first_responded_at: null,
+        resolved_at: null,
+        resolution_note: null,
+        custom_fields: {},
+        created_at: '2026-04-30T09:00:00.000Z',
+        updated_at: '2026-04-30T09:00:00.000Z',
+      },
+      error: null,
+    });
+    const currentIdEq = vi.fn(() => ({ single: currentSingle }));
+    const currentCompanyEq = vi.fn(() => ({ eq: currentIdEq }));
+    const currentSelect = vi.fn(() => ({ eq: currentCompanyEq }));
+
+    const updatedSingle = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ticket-7',
+        company_id: 'company-1',
+        subject: 'Need branch support',
+        category: 'operations_support',
+        subcategory: null,
+        priority: 'medium',
+        status: 'in_progress',
+        description: 'Need branch support.',
+        submitted_by: 'requestor-1',
+        assigned_to: 'agent-1',
+        assigned_at: '2026-04-30T10:00:00.000Z',
+        first_response_due_at: '2026-04-30T13:00:00.000Z',
+        resolution_due_at: '2026-05-02T09:00:00.000Z',
+        first_responded_at: '2026-04-30T10:00:00.000Z',
+        resolved_at: null,
+        resolution_note: null,
+        custom_fields: {},
+        created_at: '2026-04-30T09:00:00.000Z',
+        updated_at: '2026-04-30T10:00:00.000Z',
+      },
+      error: null,
+    });
+    const updatedSelect = vi.fn(() => ({ single: updatedSingle }));
+    const updatedIdEq = vi.fn(() => ({ select: updatedSelect }));
+    const updatedCompanyEq = vi.fn(() => ({ eq: updatedIdEq }));
+    const update = vi.fn(() => ({ eq: updatedCompanyEq }));
+
+    const approvalMetadataSelect = mockNoInternalRequestApprovalMetadata();
+    const activityInsert = vi.fn().mockResolvedValue({ error: null });
+
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: currentSelect }) as never)
+      .mockImplementationOnce(() => ({ update }) as never)
+      .mockImplementationOnce(() => ({ select: approvalMetadataSelect.select }) as never)
+      .mockImplementationOnce(() => ({ insert: activityInsert }) as never);
+
+    const result = await updateTicket(
+      'ticket-7',
+      { mark_opened: true },
+      { userId: 'agent-1', companyId: 'company-1' },
+    );
+
+    expect(result.error).toBeNull();
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'in_progress',
+      assigned_to: 'agent-1',
+      assigned_at: expect.any(String),
+      first_responded_at: expect.any(String),
+    }));
+    expect(activityInsert).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ ticket_id: 'ticket-7', event_type: 'status_changed' }),
+      expect.objectContaining({ ticket_id: 'ticket-7', event_type: 'owner_changed' }),
+    ]));
+  });
+
+  it('does not auto-start when requester opens their own ticket', async () => {
+    const currentSingle = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ticket-8',
+        company_id: 'company-1',
+        subject: 'Need branch support',
+        category: 'operations_support',
+        subcategory: null,
+        priority: 'medium',
+        status: 'open',
+        description: 'Need branch support.',
+        submitted_by: 'requestor-1',
+        assigned_to: null,
+        assigned_at: null,
+        first_response_due_at: '2026-04-30T13:00:00.000Z',
+        resolution_due_at: '2026-05-02T09:00:00.000Z',
+        first_responded_at: null,
+        resolved_at: null,
+        resolution_note: null,
+        custom_fields: {},
+        created_at: '2026-04-30T09:00:00.000Z',
+        updated_at: '2026-04-30T09:00:00.000Z',
+      },
+      error: null,
+    });
+    const currentIdEq = vi.fn(() => ({ single: currentSingle }));
+    const currentCompanyEq = vi.fn(() => ({ eq: currentIdEq }));
+    const currentSelect = vi.fn(() => ({ eq: currentCompanyEq }));
+
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: currentSelect }) as never);
+
+    const result = await updateTicket(
+      'ticket-8',
+      { mark_opened: true },
+      { userId: 'requestor-1', companyId: 'company-1' },
+    );
+
+    expect(result.error).toBeNull();
+    expect(result.data?.status).toBe('open');
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+  });
 });

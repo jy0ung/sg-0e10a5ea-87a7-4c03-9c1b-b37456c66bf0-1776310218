@@ -8,6 +8,9 @@ const baseNavItems: AppShellNavItem[] = [
   { label: 'Overview', path: '/portal', icon: Home, group: 'My Work', end: true },
   { label: 'New Request', path: '/portal/tickets/new', icon: TicketCheck, group: 'My Work', end: true },
   { label: 'My Requests', path: '/portal/tickets', icon: ClipboardList, group: 'My Work', end: true },
+];
+
+const resourceNavItems: AppShellNavItem[] = [
   { label: 'Announcements', path: '/portal/announcements', icon: Megaphone, group: 'Resources' },
   { label: 'Documents & Forms', path: '/portal/documents', icon: FolderOpen, group: 'Resources' },
 ];
@@ -36,6 +39,7 @@ export function useInternalRequestsShellConfig() {
   const navItems = [
     ...baseNavItems,
     ...(canManagePortalQueue(user) ? queueNavItems : []),
+    ...resourceNavItems,
     ...(canManagePortalSetup(user) ? [setupNavItem] : []),
   ];
 

@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from 'date-fns';
-import { CalendarDays, CheckCircle2, Loader2, MessageSquare, Send, UserRound, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, MessageSquare, Send, UserRound, XCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,17 +15,14 @@ import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
 import {
   customFieldEntries,
-  formatDueDate,
   formatTicketLabel,
   isOverdue,
   statusColorMap,
-  priorityColorMap,
 } from '@/lib/requestFormatters';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
 import { TicketAttachmentList } from '@/components/tickets/TicketAttachmentList';
 import { TicketApprovalHistory } from '@/components/tickets/TicketApprovalHistory';
 import { TicketApprovalSummary } from '@/components/tickets/TicketApprovalSummary';
-import { TicketSlaSummary } from '@/components/tickets/TicketSlaSummary';
 import type { RequestCategoryRecord } from '@/services/requestCategoryService';
 import type { RequestSubcategoryRecord } from '@/services/requestSubcategoryService';
 import type { ProfileRow } from '@flc/auth';
@@ -104,12 +101,8 @@ export function RequestDetailPanel({
               <Badge variant="outline" className={`border text-[10px] capitalize ${statusColorMap[ticket.status]}`}>
                 {formatTicketLabel(ticket.status)}
               </Badge>
-              <Badge variant="outline" className={`border text-[10px] capitalize ${priorityColorMap[ticket.priority]}`}>
-                {ticket.priority} priority
-              </Badge>
               {isOverdue(ticket) && <Badge variant="destructive" className="text-[10px]">Overdue</Badge>}
               <TicketApprovalSummary ticket={ticket} compact />
-              <TicketSlaSummary ticket={ticket} compact />
             </div>
             <h2 className={variant === 'drawer' ? 'text-base font-semibold leading-6 text-foreground' : 'text-base font-semibold text-foreground'}>{ticket.subject}</h2>
             <p className="text-[11px] text-muted-foreground">
@@ -228,20 +221,6 @@ export function RequestDetailPanel({
               </p>
             )}
           </div>
-          <div className="rounded-md border border-border bg-background px-3 py-2">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              <CalendarDays className="h-3 w-3" />
-              Timing
-            </p>
-            <p className="mt-1 text-sm font-medium text-foreground">
-              {ticket.requested_due_date ? formatDueDate(ticket.requested_due_date) : 'No target date'}
-            </p>
-            {ticket.resolved_at && (
-              <p className="text-[11px] text-muted-foreground">
-                Resolved {formatDistanceToNow(new Date(ticket.resolved_at), { addSuffix: true })}
-              </p>
-            )}
-          </div>
         </div>
 
         {/* Additional custom fields */}
@@ -258,8 +237,6 @@ export function RequestDetailPanel({
             </div>
           </div>
         )}
-
-        <TicketSlaSummary ticket={ticket} />
 
         {/* Description */}
         <div className="rounded-md border bg-background px-3 py-2">

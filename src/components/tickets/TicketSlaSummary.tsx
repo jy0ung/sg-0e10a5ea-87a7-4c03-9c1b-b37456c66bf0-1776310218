@@ -1,6 +1,7 @@
 import { Clock3 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
+  formatSlaCompactLabel,
   formatSlaCheck,
   formatSlaState,
   getTicketSlaSummary,
@@ -28,7 +29,7 @@ export function TicketSlaSummary({ ticket, compact = false }: TicketSlaSummaryPr
     return (
       <Badge variant={slaVariant[sla.overall]} className="inline-flex items-center gap-1">
         <Clock3 className="h-3 w-3" />
-        {formatSlaState(sla.overall)}
+        {formatSlaCompactLabel(sla)}
       </Badge>
     );
   }

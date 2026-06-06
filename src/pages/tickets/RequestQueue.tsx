@@ -512,6 +512,45 @@ export default function RequestQueue() {
     void refreshTicketActivity(ticketId);
   };
 
+  const handleTicketOpen = async (ticketId: string) => {
+    if (!user) return;
+
+    const existing = tickets.find((ticket) => ticket.id === ticketId);
+    if (!existing || existing.submitted_by === user.id) {
+      return;
+    }
+
+    const { data, error: updateError } = await updateTicket(
+      ticketId,
+      { mark_opened: true },
+      { userId: user.id, companyId: user.company_id },
+    );
+
+    if (updateError || !data) {
+      return;
+    }
+
+    const shouldRefreshActivity =
+      data.status !== existing.status
+      || data.assigned_to !== existing.assigned_to;
+
+    if (!shouldRefreshActivity) {
+      return;
+    }
+
+    applyOptimisticTicketUpdate(ticketId, {
+      status: data.status,
+      assigned_to: data.assigned_to,
+      assigned_at: data.assigned_at,
+      first_responded_at: data.first_responded_at,
+      updated_at: data.updated_at,
+      assigned_to_name: user.name,
+      assigned_to_email: user.email,
+    });
+
+    void refreshTicketActivity(ticketId);
+  };
+
   const handleResolutionNoteSave = async (ticketId: string) => {
     if (!user) return;
     // Resolve the saveable note: prefer the user's in-progress draft;
@@ -935,6 +974,7 @@ export default function RequestQueue() {
             }
             onSelectTicket={(ticketId) => {
               setSelectedTicketId(ticketId);
+              void handleTicketOpen(ticketId);
               if (!isLargeScreen) setDetailDrawerOpen(true);
             }}
           />

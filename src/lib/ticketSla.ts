@@ -131,3 +131,28 @@ export function formatSlaCheck(check: TicketSlaCheck) {
   }
   return `Due ${formatDistanceToNow(new Date(check.dueAt), { addSuffix: true })}`;
 }
+
+export function formatSlaCompactLabel(summary: TicketSlaSummary) {
+  if (summary.overall !== 'breached') {
+    return formatSlaState(summary.overall);
+  }
+
+  const breachedChecks = [summary.response, summary.resolution]
+    .filter((check) => check.state === 'breached' && !!check.dueAt)
+    .sort((a, b) => new Date(a.dueAt as string).getTime() - new Date(b.dueAt as string).getTime());
+
+  const primaryBreach = breachedChecks[0];
+  if (!primaryBreach?.dueAt) {
+    return 'SLA overdue';
+  }
+
+  const elapsedMs = differenceInMilliseconds(new Date(), new Date(primaryBreach.dueAt));
+  const elapsedHours = Math.max(1, Math.floor(elapsedMs / (60 * 60 * 1000)));
+
+  if (elapsedHours >= 24) {
+    const elapsedDays = Math.floor(elapsedHours / 24);
+    return `SLA ${elapsedDays}d overdue`;
+  }
+
+  return `SLA ${elapsedHours}h overdue`;
+}

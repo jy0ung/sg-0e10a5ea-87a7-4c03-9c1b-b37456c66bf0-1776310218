@@ -88,6 +88,7 @@ export interface UpdateTicketInput {
   priority?: TicketPriority;
   assigned_to?: string | null;
   resolution_note?: string | null;
+  mark_opened?: boolean;
 }
 
 export interface AddTicketCommentInput {
@@ -809,12 +810,29 @@ export async function updateTicket(
     patch.resolution_note = input.resolution_note?.trim() ? input.resolution_note.trim() : null;
   }
 
-  if (Object.keys(patch).length === 0) {
-    return { data: null, error: new Error('No request updates were provided') };
-  }
-
   try {
     const current = await fetchTicketForUpdate(ticketId, context.companyId);
+
+    if (
+      input.mark_opened
+      && current.submitted_by !== context.userId
+      && current.status === 'open'
+      && !current.assigned_to
+      && !current.first_responded_at
+    ) {
+      const now = new Date().toISOString();
+      patch.status = 'in_progress';
+      patch.assigned_to = context.userId;
+      patch.assigned_at = now;
+      patch.first_responded_at = now;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      if (input.mark_opened) {
+        return { data: current, error: null };
+      }
+      return { data: null, error: new Error('No request updates were provided') };
+    }
 
     if (input.status && (input.status === 'resolved' || input.status === 'closed')) {
       const approvalGate = await getInternalRequestApprovalGate(ticketId);
