@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   Megaphone, Pin, Plus, Pencil, Trash2, Archive, Loader2,
-  ChevronDown, ChevronUp, Search, X,
+  ChevronDown, ChevronUp, Search, X, Link as LinkIcon,
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -32,6 +31,9 @@ import {
   updatePortalAnnouncement,
   archivePortalAnnouncement,
   deletePortalAnnouncement,
+  parsePortalAnnouncementAttachment,
+  uploadPortalAnnouncementAttachment,
+  getPortalAnnouncementAttachmentUrl,
   type PortalAnnouncementRecord,
   type PortalAnnouncementType,
   type PortalAnnouncementPriority,
@@ -79,19 +81,6 @@ function isExpired(record: PortalAnnouncementRecord): boolean {
   return !!record.expires_at && new Date(record.expires_at) <= new Date();
 }
 
-// `datetime-local` inputs render TZ-less wall time. The form stores UTC ISO
-// strings (`new Date(...).toISOString()`), so slicing the first 16 chars off
-// the ISO would surface UTC as if it were local — a user in UTC+8 saving
-// "11:00" then reopening would see "03:00". Round-trip through Date so the
-// input always shows the same wall-clock moment the user picked.
-function toLocalDateTimeInput(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 // ── Empty form defaults ───────────────────────────────────────────────────────
 
 type FormState = CreatePortalAnnouncementInput;
@@ -99,13 +88,9 @@ type FormState = CreatePortalAnnouncementInput;
 const EMPTY_FORM: FormState = {
   title:             '',
   body:              '',
-  announcement_type: 'general',
-  priority:          'normal',
   audience_scope:    'all',
   status:            'draft',
   is_pinned:         false,
-  publish_at:        null,
-  expires_at:        null,
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -139,6 +124,7 @@ export default function PortalAnnouncements() {
   const [archivingId, setArchivingId]         = useState<string | null>(null);
   const [saving, setSaving]                   = useState(false);
   const [form, setForm]                       = useState<FormState>(EMPTY_FORM);
+  const [attachmentFile, setAttachmentFile]   = useState<File | null>(null);
 
   // ── Filtering ─────────────────────────────────────────────────────────────
   const visible = useMemo(() => {
@@ -155,7 +141,9 @@ export default function PortalAnnouncements() {
         if (filterPriority !== 'all' && a.priority !== filterPriority) return false;
         if (search.trim()) {
           const q = search.toLowerCase();
-          if (!a.title.toLowerCase().includes(q) && !a.body.toLowerCase().includes(q)) return false;
+          const attachment = parsePortalAnnouncementAttachment(a.body);
+          const searchableBody = attachment ? `attachment ${attachment.name}` : a.body;
+          if (!a.title.toLowerCase().includes(q) && !searchableBody.toLowerCase().includes(q)) return false;
         }
         return true;
       });
@@ -167,6 +155,7 @@ export default function PortalAnnouncements() {
   // ── Form helpers ──────────────────────────────────────────────────────────
   function openCreate() {
     setForm(EMPTY_FORM);
+    setAttachmentFile(null);
     setEditingId(null);
     setShowForm(true);
   }
@@ -175,14 +164,11 @@ export default function PortalAnnouncements() {
     setForm({
       title:             record.title,
       body:              record.body,
-      announcement_type: record.announcement_type,
-      priority:          record.priority,
       audience_scope:    record.audience_scope,
       status:            record.status,
       is_pinned:         record.is_pinned,
-      publish_at:        record.publish_at,
-      expires_at:        record.expires_at,
     });
+    setAttachmentFile(null);
     setEditingId(record.id);
     setShowForm(true);
   }
@@ -191,6 +177,7 @@ export default function PortalAnnouncements() {
     setShowForm(false);
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setAttachmentFile(null);
   }
 
   function setFormField<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -200,18 +187,40 @@ export default function PortalAnnouncements() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!user?.companyId || !user.id) return;
-    if (!form.title.trim() || !form.body.trim()) {
-      toast.error('Title and body are required');
+    if (!form.title.trim()) {
+      toast.error('Title is required');
+      return;
+    }
+    if (!editingId && !attachmentFile) {
+      toast.error('Memo attachment is required');
       return;
     }
     setSaving(true);
     try {
+      let nextBody = form.body;
+      if (attachmentFile) {
+        const upload = await uploadPortalAnnouncementAttachment(attachmentFile, user.companyId, user.id);
+        if (upload.error || !upload.data) {
+          throw new Error(upload.error ?? 'Failed to upload memo attachment');
+        }
+        nextBody = upload.data;
+      }
+
+      if (!nextBody.trim()) {
+        throw new Error('Memo attachment is required');
+      }
+
+      const payload: CreatePortalAnnouncementInput = {
+        ...form,
+        body: nextBody,
+      };
+
       if (editingId) {
-        const { error } = await updatePortalAnnouncement(editingId, user.companyId, user.id, form);
+        const { error } = await updatePortalAnnouncement(editingId, user.companyId, user.id, payload);
         if (error) throw new Error(error);
         toast.success('Announcement updated');
       } else {
-        const { error } = await createPortalAnnouncement(user.companyId, user.id, form);
+        const { error } = await createPortalAnnouncement(user.companyId, user.id, payload);
         if (error) throw new Error(error);
         toast.success('Announcement created');
       }
@@ -396,47 +405,22 @@ export default function PortalAnnouncements() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="ann-body">Body <span className="text-destructive">*</span></Label>
-              <Textarea
-                id="ann-body"
-                value={form.body}
-                onChange={e => setFormField('body', e.target.value)}
-                placeholder="Write the announcement content here…"
-                rows={5}
-                required
+              <Label htmlFor="ann-attachment">Memo Attachment <span className="text-destructive">*</span></Label>
+              <Input
+                id="ann-attachment"
+                type="file"
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                onChange={e => setAttachmentFile(e.target.files?.[0] ?? null)}
+                required={!editingId}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Type</Label>
-                <Select
-                  value={form.announcement_type}
-                  onValueChange={v => setFormField('announcement_type', v as PortalAnnouncementType)}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(TYPE_LABELS) as PortalAnnouncementType[]).map(t => (
-                      <SelectItem key={t} value={t}>{TYPE_LABELS[t]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Priority</Label>
-                <Select
-                  value={form.priority}
-                  onValueChange={v => setFormField('priority', v as PortalAnnouncementPriority)}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {attachmentFile && (
+                <p className="text-xs text-muted-foreground">Selected: {attachmentFile.name}</p>
+              )}
+              {!attachmentFile && editingId && parsePortalAnnouncementAttachment(form.body) && (
+                <p className="text-xs text-muted-foreground">
+                  Current memo: {parsePortalAnnouncementAttachment(form.body)?.name}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -467,27 +451,6 @@ export default function PortalAnnouncements() {
                     <SelectItem value="archived">Archived</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="ann-publish">Publish At</Label>
-                <Input
-                  id="ann-publish"
-                  type="datetime-local"
-                  value={toLocalDateTimeInput(form.publish_at)}
-                  onChange={e => setFormField('publish_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ann-expires">Expires At</Label>
-                <Input
-                  id="ann-expires"
-                  type="datetime-local"
-                  value={toLocalDateTimeInput(form.expires_at)}
-                  onChange={e => setFormField('expires_at', e.target.value ? new Date(e.target.value).toISOString() : null)}
-                />
               </div>
             </div>
 
@@ -571,6 +534,7 @@ function AnnouncementCard({
   onToggle, onEdit, onArchive, onDelete,
 }: AnnouncementCardProps) {
   const expired = isExpired(record);
+  const attachment = parsePortalAnnouncementAttachment(record.body);
 
   return (
     <Card className={[
@@ -643,7 +607,11 @@ function AnnouncementCard({
       {expanded && (
         <CardContent className="px-4 pb-3 pt-0">
           <div className="border-t pt-3 text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-            {record.body}
+            {attachment ? (
+              <AttachmentPreview record={record} />
+            ) : (
+              record.body
+            )}
           </div>
           {(record.audience_scope !== 'all') && (
             <p className="mt-2 text-xs text-muted-foreground">
@@ -653,5 +621,60 @@ function AnnouncementCard({
         </CardContent>
       )}
     </Card>
+  );
+}
+
+function AttachmentPreview({ record }: { record: PortalAnnouncementRecord }) {
+  const attachment = parsePortalAnnouncementAttachment(record.body);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    if (!attachment) {
+      setSignedUrl(null);
+      return;
+    }
+
+    void getPortalAnnouncementAttachmentUrl(record).then((res) => {
+      if (!mounted) return;
+      setSignedUrl(res.data ?? null);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [attachment, record]);
+
+  if (!attachment) {
+    return null;
+  }
+
+  if (!signedUrl) {
+    return (
+      <p className="text-sm text-muted-foreground">Loading memo attachment…</p>
+    );
+  }
+
+  const isPdf = attachment.mimeType === 'application/pdf' || attachment.name.toLowerCase().endsWith('.pdf');
+
+  return (
+    <div className="space-y-2">
+      <a
+        href={signedUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+      >
+        <LinkIcon className="h-4 w-4" />
+        Open memo: {attachment.name}
+      </a>
+      {isPdf && (
+        <iframe
+          src={signedUrl}
+          title={attachment.name}
+          className="h-80 w-full rounded-md border"
+        />
+      )}
+    </div>
   );
 }

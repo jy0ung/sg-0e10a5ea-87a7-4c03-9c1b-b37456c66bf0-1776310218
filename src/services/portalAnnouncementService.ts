@@ -35,16 +35,23 @@ export interface PortalAnnouncementRecord {
   archived_at: string | null;
 }
 
+export interface PortalAnnouncementAttachment {
+  name: string;
+  path: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface CreatePortalAnnouncementInput {
   title: string;
   body: string;
-  announcement_type: PortalAnnouncementType;
-  priority: PortalAnnouncementPriority;
+  announcement_type?: PortalAnnouncementType;
+  priority?: PortalAnnouncementPriority;
   audience_scope: PortalAnnouncementAudience;
   status: PortalAnnouncementStatus;
   is_pinned: boolean;
-  publish_at: string | null;
-  expires_at: string | null;
+  publish_at?: string | null;
+  expires_at?: string | null;
 }
 
 export interface UpdatePortalAnnouncementInput extends Partial<CreatePortalAnnouncementInput> {
@@ -60,6 +67,107 @@ export interface AnnouncementServiceResult<T> {
 
 function announcementsTable() {
   return supabase.from('portal_announcements');
+}
+
+const PORTAL_ANNOUNCEMENT_ATTACHMENT_BUCKET = 'portal-announcement-attachments';
+const PORTAL_ANNOUNCEMENT_ATTACHMENT_PREFIX = '__PORTAL_ATTACHMENT__';
+const MAX_ATTACHMENT_SIZE_BYTES = 15 * 1024 * 1024;
+
+const ALLOWED_ATTACHMENT_TYPES = [
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+] as const;
+
+function sanitizeAttachmentName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function encodePortalAttachment(payload: PortalAnnouncementAttachment) {
+  return `${PORTAL_ANNOUNCEMENT_ATTACHMENT_PREFIX}${JSON.stringify(payload)}`;
+}
+
+export function parsePortalAnnouncementAttachment(body: string): PortalAnnouncementAttachment | null {
+  if (!body.startsWith(PORTAL_ANNOUNCEMENT_ATTACHMENT_PREFIX)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(body.slice(PORTAL_ANNOUNCEMENT_ATTACHMENT_PREFIX.length)) as PortalAnnouncementAttachment;
+    if (!parsed?.path || !parsed?.name) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export async function uploadPortalAnnouncementAttachment(
+  file: File,
+  companyId: string,
+  userId: string,
+): Promise<AnnouncementServiceResult<string>> {
+  try {
+    if (!ALLOWED_ATTACHMENT_TYPES.includes(file.type as (typeof ALLOWED_ATTACHMENT_TYPES)[number])) {
+      return {
+        data: null,
+        error: 'Allowed file types: PDF, PNG, JPG, WEBP, DOC, DOCX.',
+      };
+    }
+
+    if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+      return {
+        data: null,
+        error: 'Attachment size must be 15MB or below.',
+      };
+    }
+
+    const filePath = `${companyId}/${userId}/${crypto.randomUUID()}-${sanitizeAttachmentName(file.name)}`;
+    const { error } = await supabase.storage
+      .from(PORTAL_ANNOUNCEMENT_ATTACHMENT_BUCKET)
+      .upload(filePath, file, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: false,
+      });
+
+    if (error) throw error;
+
+    const encoded = encodePortalAttachment({
+      name: file.name,
+      path: filePath,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size,
+    });
+    return { data: encoded, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to upload attachment';
+    return { data: null, error: message };
+  }
+}
+
+export async function getPortalAnnouncementAttachmentUrl(
+  record: PortalAnnouncementRecord,
+  expiresInSeconds = 60 * 60,
+): Promise<AnnouncementServiceResult<string>> {
+  const attachment = parsePortalAnnouncementAttachment(record.body);
+  if (!attachment) {
+    return { data: null, error: 'No attachment found' };
+  }
+
+  try {
+    const { data, error } = await supabase.storage
+      .from(PORTAL_ANNOUNCEMENT_ATTACHMENT_BUCKET)
+      .createSignedUrl(attachment.path, expiresInSeconds);
+    if (error) throw error;
+    return { data: data.signedUrl, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load attachment';
+    return { data: null, error: message };
+  }
 }
 
 // ── List ──────────────────────────────────────────────────────────────────────
@@ -96,6 +204,10 @@ export async function createPortalAnnouncement(
         created_by: createdBy,
         updated_by: createdBy,
         ...input,
+        announcement_type: input.announcement_type ?? 'general',
+        priority: input.priority ?? 'normal',
+        publish_at: input.publish_at ?? new Date().toISOString(),
+        expires_at: input.expires_at ?? null,
       })
       .select()
       .single();
