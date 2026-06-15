@@ -10,7 +10,6 @@ import { AttachmentSettingsEditor } from './request-setup/AttachmentSettingsEdit
 import { CategoryEditor } from './request-setup/CategoryEditor';
 import { FormFieldEditor } from './request-setup/FormFieldEditor';
 import { RoutingEditor } from './request-setup/RoutingEditor';
-import { TemplateEditor } from './request-setup/TemplateEditor';
 
 /**
  * Request Operations Setup — the admin console for the Internal Service
@@ -32,17 +31,12 @@ export default function RequestSetup() {
 
   const [activeCounts, setActiveCounts] = useState({
     categories: 0,
-    templates: 0,
     fields: 0,
     rules: 0,
   });
 
   const setCategoryCount = useCallback(
     (count: number) => setActiveCounts((prev) => ({ ...prev, categories: count })),
-    [],
-  );
-  const setTemplateCount = useCallback(
-    (count: number) => setActiveCounts((prev) => ({ ...prev, templates: count })),
     [],
   );
   const setFieldCount = useCallback(
@@ -67,17 +61,13 @@ export default function RequestSetup() {
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Internal Requests</p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">Request Operations Setup</h1>
             <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">
-              Shape the requester experience, routing logic, templates, and attachment controls from one workspace.
+              Shape the requester experience, routing logic, and attachment controls from one workspace.
             </p>
           </div>
-          <div className="grid w-full grid-cols-2 gap-2 text-center sm:w-auto sm:min-w-[460px] sm:grid-cols-4">
+          <div className="grid w-full grid-cols-2 gap-2 text-center sm:w-auto sm:min-w-[460px] sm:grid-cols-3">
             <div className="rounded-lg border bg-background px-3 py-2">
               <p className="text-lg font-semibold tabular-nums text-foreground">{activeCounts.categories}</p>
               <p className="text-[11px] text-muted-foreground">Categories</p>
-            </div>
-            <div className="rounded-lg border bg-background px-3 py-2">
-              <p className="text-lg font-semibold tabular-nums text-foreground">{activeCounts.templates}</p>
-              <p className="text-[11px] text-muted-foreground">Templates</p>
             </div>
             <div className="rounded-lg border bg-background px-3 py-2">
               <p className="text-lg font-semibold tabular-nums text-foreground">{activeCounts.fields}</p>
@@ -95,7 +85,7 @@ export default function RequestSetup() {
         <CardHeader className="border-b bg-muted/30">
           <CardTitle>Request Customization</CardTitle>
           <CardDescription>
-            Manage categories, subcategories, and templates from one canvas. Changes take effect immediately for new requests.
+            Manage categories and subcategories from one canvas. Changes take effect immediately for new requests.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4">
@@ -107,14 +97,6 @@ export default function RequestSetup() {
                   {activeCounts.categories > 0 && (
                     <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
                       {activeCounts.categories}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="templates">
-                  Templates
-                  {activeCounts.templates > 0 && (
-                    <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-xs">
-                      {activeCounts.templates}
                     </Badge>
                   )}
                 </TabsTrigger>
@@ -147,14 +129,6 @@ export default function RequestSetup() {
                 companyId={companyId}
                 actorId={actorId}
                 onActiveCountChange={setCategoryCount}
-              />
-            </TabsContent>
-
-            <TabsContent value="templates" className="space-y-4">
-              <TemplateEditor
-                companyId={companyId}
-                actorId={actorId}
-                onActiveCountChange={setTemplateCount}
               />
             </TabsContent>
 

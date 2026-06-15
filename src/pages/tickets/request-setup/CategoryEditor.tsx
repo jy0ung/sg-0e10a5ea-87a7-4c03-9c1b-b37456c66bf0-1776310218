@@ -533,10 +533,12 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs">Description</Label>
-                    <Input
+                    <Textarea
                       placeholder="Optional"
                       value={editCreateSubDraft.description}
                       onChange={(event) => updateCreateSubcategoryDraft(editCategory.key, { description: event.target.value })}
+                      rows={2}
+                      className="min-h-[40px] resize-y"
                       disabled={editIsCreatingSub}
                     />
                   </div>

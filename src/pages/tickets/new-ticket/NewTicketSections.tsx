@@ -1210,8 +1210,7 @@ export function RequestRoutingSection({
             </p>
           </div>
 
-          {(availableSubcategories.length > 0 ||
-            (subcategoriesLoading && selectedCategoryKey)) && (
+          {selectedCategoryKey && (
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="subcategory">
                 Subcategory
@@ -1236,7 +1235,11 @@ export function RequestRoutingSection({
                 >
                   <SelectValue
                     placeholder={
-                      subcategoriesLoading ? 'Loading...' : 'Select subcategory'
+                      subcategoriesLoading
+                        ? 'Loading...'
+                        : availableSubcategories.length === 0
+                          ? 'No subcategories for this category'
+                          : 'Select subcategory'
                     }
                   />
                 </SelectTrigger>
