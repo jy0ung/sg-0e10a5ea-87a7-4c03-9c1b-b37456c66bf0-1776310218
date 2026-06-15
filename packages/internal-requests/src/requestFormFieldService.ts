@@ -9,6 +9,7 @@ export interface RequestFormFieldRecord {
   id: string;
   company_id: string;
   category_key: string;
+  subcategory_key: string | null;
   key: string;
   label: string;
   field_type: RequestFormFieldType;
@@ -27,6 +28,7 @@ interface RequestFormFieldRow {
   id: string;
   company_id: string;
   category_key: string;
+  subcategory_key: string | null;
   field_key: string;
   label: string;
   field_type: RequestFormFieldType;
@@ -48,6 +50,7 @@ export interface RequestFormFieldContext {
 
 export interface CreateRequestFormFieldInput {
   category_key: string;
+  subcategory_key?: string | null;
   label: string;
   field_type: RequestFormFieldType;
   data_source?: RequestFieldDataSource | null;
@@ -81,6 +84,7 @@ function mapField(row: RequestFormFieldRow): RequestFormFieldRecord {
     id: row.id,
     company_id: row.company_id,
     category_key: row.category_key,
+    subcategory_key: row.subcategory_key ?? null,
     key: row.field_key,
     label: row.label,
     field_type: row.field_type,
@@ -103,7 +107,7 @@ function normalizeFieldSource(fieldType: RequestFormFieldType, dataSource?: Requ
 
 export async function listRequestFormFields(
   companyId: string,
-  options: { categoryKey?: string; includeInactive?: boolean } = {},
+  options: { categoryKey?: string; subcategoryKey?: string; includeInactive?: boolean } = {},
 ): Promise<{ data: RequestFormFieldRecord[]; error: string | null }> {
   let query = requestFormFieldsTable()
     .select('*')
@@ -113,6 +117,11 @@ export async function listRequestFormFields(
     .order('label', { ascending: true });
 
   if (options.categoryKey) query = query.eq('category_key', options.categoryKey);
+  // When a subcategory is selected, surface category-level fields (NULL
+  // subcategory_key) alongside fields scoped to that subcategory.
+  if (options.subcategoryKey) {
+    query = query.or(`subcategory_key.is.null,subcategory_key.eq.${options.subcategoryKey}`);
+  }
   if (!options.includeInactive) query = query.eq('is_active', true);
 
   const { data, error } = await query;
@@ -127,6 +136,8 @@ export async function createRequestFormField(
   const label = input.label.trim();
   if (!label) return { data: null, error: 'Field label is required.' };
 
+  const subcategoryKey = input.subcategory_key?.trim() || null;
+
   const { data: existingFields, error: existingError } = await listRequestFormFields(context.companyId, {
     categoryKey: input.category_key,
     includeInactive: true,
@@ -134,7 +145,7 @@ export async function createRequestFormField(
   if (existingError) return { data: null, error: existingError };
 
   const fieldKey = buildRequestCategoryKey(label);
-  if (existingFields.some((field) => field.key === fieldKey)) {
+  if (existingFields.some((field) => field.key === fieldKey && (field.subcategory_key ?? null) === subcategoryKey)) {
     return { data: null, error: 'A field with this label already exists for the selected category.' };
   }
 
@@ -143,6 +154,7 @@ export async function createRequestFormField(
     .insert({
       company_id: context.companyId,
       category_key: input.category_key,
+      subcategory_key: subcategoryKey,
       field_key: fieldKey,
       label,
       field_type: input.field_type,

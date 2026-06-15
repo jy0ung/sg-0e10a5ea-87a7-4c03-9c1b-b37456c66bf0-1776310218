@@ -32,6 +32,7 @@ import {
   ROLE_CONTEXT,
   ticketSchema,
   AttachmentsSection,
+  CustomFieldsSection,
   RequestDescriptionCard,
   RequestHeaderCard,
   RequestSummaryCard,
@@ -128,8 +129,10 @@ export default function NewTicket() {
   }, [categories, form]);
 
   const selectedCategoryKey = form.watch('category');
+  const selectedSubcategoryKeyForFields = form.watch('subcategory');
   const { fields: customFields } = useRequestFormFields(user?.company_id, {
     categoryKey: selectedCategoryKey || undefined,
+    subcategoryKey: selectedSubcategoryKeyForFields || undefined,
   });
 
   const { data: approvalPlan = 'loading' } = useQuery<ApprovalPlanState>({
@@ -160,6 +163,11 @@ export default function NewTicket() {
   const selectedSubcategory = useMemo(
     () => availableSubcategories.find((subcategory) => subcategory.key === selectedSubcategoryKey) ?? null,
     [availableSubcategories, selectedSubcategoryKey],
+  );
+
+  const selectedCategory = useMemo(
+    () => categories.find((category) => category.key === selectedCategoryKey) ?? null,
+    [categories, selectedCategoryKey],
   );
 
   useEffect(() => {
@@ -481,6 +489,14 @@ export default function NewTicket() {
               roleContext={roleContext}
               descriptionValue={descriptionValue}
               descriptionStatus={fieldValidationStatus.description}
+            />
+
+            <CustomFieldsSection
+              customFields={customFields}
+              selectedCategory={selectedCategory}
+              customFieldValues={customFieldValues}
+              companyId={user?.company_id}
+              setCustomFieldValues={setCustomFieldValues}
             />
           </div>
 

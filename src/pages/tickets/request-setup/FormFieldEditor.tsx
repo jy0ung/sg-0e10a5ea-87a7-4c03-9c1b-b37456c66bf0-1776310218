@@ -23,6 +23,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 
 import { useRequestCategories } from '@/hooks/useRequestCategories';
+import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import {
   createRequestFormField,
@@ -46,6 +47,10 @@ interface Props {
   onActiveCountChange?: (count: number) => void;
 }
 
+// Radix Select cannot use an empty string value, so represent the
+// "applies to every subcategory" choice with an explicit sentinel.
+const ALL_SUBCATEGORIES = '__all__';
+
 /**
  * Form Builder tab content. Owns the per-category custom-field list, the
  * create dialog, and the per-row edit dialog. The shell only sees the
@@ -53,10 +58,12 @@ interface Props {
  */
 export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Props) {
   const { categories } = useRequestCategories(companyId, true);
+  const { subcategories } = useRequestSubcategories(companyId, { includeInactive: true });
   const { fields, loading, error, reload } = useRequestFormFields(companyId, { includeInactive: true });
 
   const [isAdding, setIsAdding] = useState(false);
   const [createCategoryKey, setCreateCategoryKey] = useState('');
+  const [createSubcategoryKey, setCreateSubcategoryKey] = useState(ALL_SUBCATEGORIES);
   const [createLabel, setCreateLabel] = useState('');
   const [createType, setCreateType] = useState<RequestFormFieldType>('text');
   const [createSource, setCreateSource] = useState<RequestFieldDataSource>('branches');
@@ -99,6 +106,16 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
     [fields],
   );
 
+  const subcategoryLabels = useMemo(
+    () => new Map(subcategories.map((subcategory) => [`${subcategory.category_key}:${subcategory.key}`, subcategory.label])),
+    [subcategories],
+  );
+
+  const availableCreateSubcategories = useMemo(
+    () => subcategories.filter((subcategory) => subcategory.category_key === createCategoryKey && subcategory.is_active),
+    [createCategoryKey, subcategories],
+  );
+
   const activeFieldCount = useMemo(
     () => fields.filter((field) => field.is_active).length,
     [fields],
@@ -109,6 +126,7 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
 
   const resetCreateForm = () => {
     setCreateCategoryKey('');
+    setCreateSubcategoryKey(ALL_SUBCATEGORIES);
     setCreateLabel('');
     setCreateType('text');
     setCreateSource('branches');
@@ -140,6 +158,7 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
     const result = await createRequestFormField(
       {
         category_key: createCategoryKey,
+        subcategory_key: createSubcategoryKey === ALL_SUBCATEGORIES ? null : createSubcategoryKey,
         label: createLabel,
         field_type: createType,
         data_source: createType === 'database_select' ? createSource : null,
@@ -249,7 +268,14 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="field-create-category">Category <span className="text-destructive">*</span></Label>
-              <Select value={createCategoryKey} onValueChange={setCreateCategoryKey} disabled={creating}>
+              <Select
+                value={createCategoryKey}
+                onValueChange={(value) => {
+                  setCreateCategoryKey(value);
+                  setCreateSubcategoryKey(ALL_SUBCATEGORIES);
+                }}
+                disabled={creating}
+              >
                 <SelectTrigger id="field-create-category"><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
                   {categories.filter((category) => category.is_active).map((category) => (
@@ -294,6 +320,26 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
               </Select>
             </div>
           )}
+
+          <div className="max-w-xs space-y-2">
+            <Label htmlFor="field-create-subcategory">Subcategory</Label>
+            <Select
+              value={createSubcategoryKey}
+              onValueChange={setCreateSubcategoryKey}
+              disabled={creating || !createCategoryKey}
+            >
+              <SelectTrigger id="field-create-subcategory"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_SUBCATEGORIES}>All subcategories</SelectItem>
+                {availableCreateSubcategories.map((subcategory) => (
+                  <SelectItem key={subcategory.key} value={subcategory.key}>{subcategory.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Limit this field to one subcategory, or leave as “All subcategories” to show it for every subcategory of the category.
+            </p>
+          </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -386,6 +432,11 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                             </Badge>
                             <Badge variant="outline">
                               {FIELD_TYPE_OPTIONS.find((option) => option.value === field.field_type)?.label ?? field.field_type}
+                            </Badge>
+                            <Badge variant="outline">
+                              {field.subcategory_key
+                                ? (subcategoryLabels.get(`${field.category_key}:${field.subcategory_key}`) ?? field.subcategory_key)
+                                : 'All subcategories'}
                             </Badge>
                             {field.is_required && <Badge variant="outline">Required</Badge>}
                           </div>

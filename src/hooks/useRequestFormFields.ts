@@ -6,12 +6,13 @@ import {
 
 export function useRequestFormFields(
   companyId?: string,
-  options: { categoryKey?: string; includeInactive?: boolean } = {},
+  options: { categoryKey?: string; subcategoryKey?: string; includeInactive?: boolean } = {},
 ) {
   const [fields, setFields] = useState<RequestFormFieldRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const categoryKey = options.categoryKey;
+  const subcategoryKey = options.subcategoryKey;
   const includeInactive = options.includeInactive ?? false;
 
   const reload = useCallback(async () => {
@@ -22,11 +23,11 @@ export function useRequestFormFields(
       return;
     }
     setLoading(true);
-    const result = await listRequestFormFields(companyId, { categoryKey, includeInactive });
+    const result = await listRequestFormFields(companyId, { categoryKey, subcategoryKey, includeInactive });
     setFields(result.data);
     setError(result.error);
     setLoading(false);
-  }, [categoryKey, companyId, includeInactive]);
+  }, [categoryKey, companyId, includeInactive, subcategoryKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,7 +39,7 @@ export function useRequestFormFields(
         return;
       }
       setLoading(true);
-      const result = await listRequestFormFields(companyId, { categoryKey, includeInactive });
+      const result = await listRequestFormFields(companyId, { categoryKey, subcategoryKey, includeInactive });
       if (cancelled) return;
       setFields(result.data);
       setError(result.error);
@@ -49,7 +50,7 @@ export function useRequestFormFields(
     return () => {
       cancelled = true;
     };
-  }, [categoryKey, companyId, includeInactive]);
+  }, [categoryKey, companyId, includeInactive, subcategoryKey]);
 
   return { fields, loading, error, reload };
 }
