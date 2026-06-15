@@ -52,3 +52,5 @@ credentials.json
 .secrets
 secrets/
 coverage/
+scripts/setup-production-host.sh
+docs/ACCESS_LAYER_SHARING_PROPOSAL.md

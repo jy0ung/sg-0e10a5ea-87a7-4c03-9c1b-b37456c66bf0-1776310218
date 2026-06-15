@@ -657,7 +657,7 @@ export function RequestHeaderCard({
   return (
     <Card className="border-border/80 shadow-sm">
       <CardHeader className="border-b bg-muted/20 px-5 py-4">
-        <p className="text-sm font-semibold text-foreground">Request Header</p>
+        <p className="text-sm font-semibold text-foreground">Request Details</p>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
         <div className="space-y-1.5">
@@ -804,14 +804,13 @@ export function RequestDescriptionCard({
   return (
     <Card className="border-border/80 shadow-sm">
       <CardHeader className="border-b bg-muted/20 px-5 py-4">
-        <p className="text-sm font-semibold text-foreground">Contents / Description</p>
+        <p className="text-sm font-semibold text-foreground">
+          Contents / Description <span className="text-destructive">*</span>
+        </p>
       </CardHeader>
       <CardContent className="p-5">
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="description">
-              Contents / Description <span className="text-destructive">*</span>
-            </Label>
+          <div className="flex items-center justify-end gap-2">
             <span
               className={cn(
                 'flex items-center gap-1 text-xs tabular-nums transition-colors',
@@ -828,6 +827,7 @@ export function RequestDescriptionCard({
           </div>
           <Textarea
             id="description"
+            aria-label="Contents / Description"
             placeholder={roleContext.descriptionPlaceholder}
             rows={14}
             {...form.register('description')}

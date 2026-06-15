@@ -414,6 +414,13 @@ install_supabase_service() {
 set -euo pipefail
 cd "$ROOT_DIR"
 supabase start
+edge_container="\$(docker ps -a --format '{{.Names}}' | awk '/^supabase_edge_runtime_/ { print; exit }')"
+if [[ -n "\$edge_container" ]]; then
+  docker update --restart unless-stopped "\$edge_container" >/dev/null
+  if [[ "\$(docker inspect --format '{{.State.Running}}' "\$edge_container")" != "true" ]]; then
+    docker start "\$edge_container" >/dev/null
+  fi
+fi
 EOF
   sudo tee /usr/local/bin/flc-bi-supabase-down >/dev/null <<EOF
 #!/usr/bin/env bash
