@@ -19,13 +19,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
-import { useRequestTemplates } from '@/hooks/useRequestTemplates';
 import { useAttachmentSettings } from '@/hooks/useAttachmentSettings';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { createTicket } from '@/services/ticketService';
 import { uploadTicketAttachment } from '@flc/platform-services';
 import { getInternalRequestApprovalPlan } from '@flc/internal-requests';
-import type { RequestTemplateRecord } from '@flc/internal-requests';
 import type { AppRole } from '@/types';
 import {
   ACCEPTED_TYPES,
@@ -47,12 +45,10 @@ export default function NewTicket() {
   const { user } = useAuth();
   const { categories, loading: categoriesLoading, error: categoriesError } =
     useRequestCategories(user?.company_id);
-  const { subcategories } = useRequestSubcategories(user?.company_id);
-  const { templates, loading: templatesLoading } = useRequestTemplates(user?.company_id);
+  const { subcategories, loading: subcategoriesLoading } = useRequestSubcategories(user?.company_id);
   const { settings: attachmentSettings } = useAttachmentSettings(user?.company_id);
 
   const [submitting, setSubmitting] = useState(false);
-  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -88,13 +84,11 @@ export default function NewTicket() {
       const parsed = JSON.parse(rawDraft) as {
         values?: Partial<TicketFormData>;
         customFieldValues?: Record<string, string>;
-        activeTemplateId?: string | null;
       };
       if (parsed.values) {
         form.reset({ ...DEFAULT_FORM, ...parsed.values });
       }
       setCustomFieldValues(parsed.customFieldValues ?? {});
-      setActiveTemplateId(parsed.activeTemplateId ?? null);
     } catch {
       window.localStorage.removeItem(draftKey);
     }
@@ -108,7 +102,7 @@ export default function NewTicket() {
       try {
         window.localStorage.setItem(
           draftKey,
-          JSON.stringify({ values, customFieldValues, activeTemplateId, updatedAt: new Date().toISOString() }),
+          JSON.stringify({ values, customFieldValues, updatedAt: new Date().toISOString() }),
         );
         setDraftSavedAt(new Date());
       } catch {
@@ -119,7 +113,7 @@ export default function NewTicket() {
     persistDraft(form.getValues());
     const subscription = form.watch((values) => persistDraft(values));
     return () => subscription.unsubscribe();
-  }, [activeTemplateId, customFieldValues, draftKey, form]);
+  }, [customFieldValues, draftKey, form]);
 
   useEffect(() => {
     const nextCategory = categories[0]?.key ?? '';
@@ -161,6 +155,11 @@ export default function NewTicket() {
   const availableSubcategories = useMemo(
     () => subcategories.filter((subcategory) => subcategory.category_key === selectedCategoryKey),
     [selectedCategoryKey, subcategories],
+  );
+
+  const selectedSubcategory = useMemo(
+    () => availableSubcategories.find((subcategory) => subcategory.key === selectedSubcategoryKey) ?? null,
+    [availableSubcategories, selectedSubcategoryKey],
   );
 
   useEffect(() => {
@@ -338,7 +337,6 @@ export default function NewTicket() {
       subcategories.find((subcategory) => subcategory.category_key === firstCategoryKey)?.key ?? '';
 
     skipDraftSaveRef.current = true;
-    setActiveTemplateId(null);
     setAttachedFiles([]);
     setFileErrors([]);
     form.reset({
@@ -382,35 +380,14 @@ export default function NewTicket() {
     missingRequiredCustomFields.length === 0 &&
     !approvalRouteBlocked;
 
-  const applyTemplate = (template: RequestTemplateRecord) => {
-    setActiveTemplateId(template.id);
-    form.setValue('category', template.category_key, { shouldValidate: true });
-    form.setValue('subcategory', template.subcategory_key ?? '', { shouldValidate: true });
-    form.setValue('subject', template.subject, { shouldValidate: true });
-    form.setValue('priority', template.priority as TicketFormData['priority'], {
-      shouldValidate: true,
-    });
-    form.setValue('description', template.body, { shouldValidate: true });
-  };
-
-  const clearTemplate = () => {
-    setActiveTemplateId(null);
-    const firstCategoryKey = categories[0]?.key ?? '';
-    const firstSubcategoryKey =
-      subcategories.find((subcategory) => subcategory.category_key === firstCategoryKey)?.key ?? '';
-    form.reset({
-      ...DEFAULT_FORM,
-      category: firstCategoryKey,
-      subcategory: firstSubcategoryKey,
-    });
-    setCustomFieldValues({});
-  };
-
   const handleCategoryChange = (categoryKey: string) => {
-    setActiveTemplateId(null);
     form.setValue('category', categoryKey as TicketFormData['category'], {
       shouldValidate: true,
     });
+  };
+
+  const handleSubcategoryChange = (subcategoryKey: string) => {
+    form.setValue('subcategory', subcategoryKey, { shouldValidate: true });
   };
 
   const draftSavedLabel = draftSavedAt
@@ -488,12 +465,13 @@ export default function NewTicket() {
               categoriesLoading={categoriesLoading}
               categorySelectionDisabled={categorySelectionDisabled}
               selectedCategoryKey={selectedCategoryKey}
-              templates={templates}
-              activeTemplateId={activeTemplateId}
+              availableSubcategories={availableSubcategories}
+              subcategoriesLoading={subcategoriesLoading}
+              selectedSubcategoryKey={selectedSubcategoryKey ?? ''}
+              selectedSubcategory={selectedSubcategory}
+              requiresSubcategory={requiresSubcategory}
               onCategoryChange={handleCategoryChange}
-              onTemplateSelect={applyTemplate}
-              onTemplateClear={clearTemplate}
-              templatesLoading={templatesLoading}
+              onSubcategoryChange={handleSubcategoryChange}
               subjectValue={subjectValue}
               subjectStatus={fieldValidationStatus.subject}
             />

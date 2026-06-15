@@ -627,12 +627,13 @@ interface RequestHeaderCardProps {
   categoriesLoading: boolean;
   categorySelectionDisabled: boolean;
   selectedCategoryKey: string;
-  templates: RequestTemplateRecord[];
-  activeTemplateId: string | null;
+  availableSubcategories: RequestSubcategoryRecord[];
+  subcategoriesLoading: boolean;
+  selectedSubcategoryKey: string;
+  selectedSubcategory: RequestSubcategoryRecord | null;
+  requiresSubcategory: boolean;
   onCategoryChange: (categoryKey: string) => void;
-  onTemplateSelect: (template: RequestTemplateRecord) => void;
-  onTemplateClear: () => void;
-  templatesLoading: boolean;
+  onSubcategoryChange: (subcategoryKey: string) => void;
   subjectValue: string;
   subjectStatus: 'valid' | 'invalid' | 'untouched';
 }
@@ -643,12 +644,13 @@ export function RequestHeaderCard({
   categoriesLoading,
   categorySelectionDisabled,
   selectedCategoryKey,
-  templates,
-  activeTemplateId,
+  availableSubcategories,
+  subcategoriesLoading,
+  selectedSubcategoryKey,
+  selectedSubcategory,
+  requiresSubcategory,
   onCategoryChange,
-  onTemplateSelect,
-  onTemplateClear,
-  templatesLoading,
+  onSubcategoryChange,
   subjectValue,
   subjectStatus,
 }: RequestHeaderCardProps) {
@@ -733,15 +735,52 @@ export function RequestHeaderCard({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Template</Label>
-            <TemplateDropdown
-              templates={templates}
-              categories={categories}
-              activeTemplateId={activeTemplateId}
-              onSelect={onTemplateSelect}
-              onClear={onTemplateClear}
-              loading={templatesLoading}
-            />
+            <Label htmlFor="subcategory">
+              Subcategory
+              {requiresSubcategory && <span className="text-destructive"> *</span>}
+            </Label>
+            <Select
+              value={selectedSubcategoryKey}
+              onValueChange={onSubcategoryChange}
+              disabled={subcategoriesLoading || availableSubcategories.length === 0}
+            >
+              <SelectTrigger
+                id="subcategory"
+                className={cn(
+                  'h-10',
+                  form.formState.errors.subcategory ? 'border-destructive' : '',
+                  !form.formState.errors.subcategory && form.formState.touchedFields.subcategory && 'border-success/50',
+                )}
+              >
+                <SelectValue
+                  placeholder={
+                    subcategoriesLoading
+                      ? 'Loading subcategories...'
+                      : availableSubcategories.length === 0
+                        ? 'No subcategories for this category'
+                        : 'Select a subcategory'
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availableSubcategories.map(({ key, label }) => (
+                  <SelectItem key={key} value={key}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.formState.errors.subcategory ? (
+              <p className="flex items-center gap-1 text-xs text-destructive">
+                <AlertCircle className="h-3 w-3" />
+                {form.formState.errors.subcategory.message}
+              </p>
+            ) : selectedSubcategory?.description ? (
+              <p className="flex items-start gap-1 text-xs text-muted-foreground">
+                <Info className="mt-0.5 h-3 w-3 shrink-0" />
+                {selectedSubcategory.description}
+              </p>
+            ) : null}
           </div>
         </div>
       </CardContent>
