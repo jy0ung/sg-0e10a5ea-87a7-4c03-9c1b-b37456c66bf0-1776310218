@@ -123,12 +123,57 @@ jobs:
         env:
           PROD_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
           PROD_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
+          SMOKE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SMOKE_SUPABASE_ANON: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
 
-          if [[ -n "${PROD_LOGIN_EMAIL:-}" && -n "${PROD_LOGIN_PASSWORD:-}" ]]; then
+          if [[ -z "${PROD_LOGIN_EMAIL:-}" || -z "${PROD_LOGIN_PASSWORD:-}" ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ -z "${SMOKE_SUPABASE_URL:-}" || -z "${SMOKE_SUPABASE_ANON:-}" ]]; then
+            echo "::warning::Skipping credentialed production smoke checks because Supabase auth verification secrets are missing."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          request_body="$(
+            python3 - <<'PY'
+import json
+import os
+
+print(json.dumps({
+    "email": os.environ["PROD_LOGIN_EMAIL"],
+    "password": os.environ["PROD_LOGIN_PASSWORD"],
+}))
+PY
+          )"
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          status_code="$(
+            curl -sS -o "$response_file" -w '%{http_code}' \
+              -X POST "${SMOKE_SUPABASE_URL%/}/auth/v1/token?grant_type=password" \
+              -H "apikey: ${SMOKE_SUPABASE_ANON}" \
+              -H "Content-Type: application/json" \
+              -d "$request_body" || true
+          )"
+
+          if [[ "$status_code" == "200" ]] && python3 - "$response_file" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    payload = json.load(handle)
+
+token = payload.get("access_token")
+raise SystemExit(0 if isinstance(token, str) and token else 1)
+PY
+          then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
+            echo "::warning::Skipping credentialed production smoke checks because the configured smoke login is invalid."
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
