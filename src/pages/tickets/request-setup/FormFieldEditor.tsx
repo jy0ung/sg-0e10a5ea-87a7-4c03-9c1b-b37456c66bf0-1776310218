@@ -21,6 +21,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
@@ -35,9 +37,11 @@ import {
 } from '@flc/internal-requests';
 
 import {
+  CONFLICT_RELOAD_MESSAGE,
   DATA_SOURCE_OPTIONS,
   FIELD_TYPE_OPTIONS,
   hasFormFieldChanges,
+  isConflict,
   type FormFieldDraft,
 } from './shared';
 
@@ -75,6 +79,10 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
   const [busyFieldId, setBusyFieldId] = useState<string | null>(null);
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [fieldDrafts, setFieldDrafts] = useState<Record<string, FormFieldDraft>>({});
+  // Field awaiting delete confirmation, and the field whose last save hit an
+  // optimistic-lock conflict (drives the inline "reload" banner in the dialog).
+  const [deletingField, setDeletingField] = useState<RequestFormFieldRecord | null>(null);
+  const [conflictFieldId, setConflictFieldId] = useState<string | null>(null);
 
   // Reseed drafts whenever the server list changes so saving picks up server
   // canonical values for unedited fields.
@@ -193,13 +201,17 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
         help_text: draft.help_text,
         is_required: draft.is_required,
         is_active: draft.is_active,
+        expectedUpdatedAt: field.updated_at,
       },
       { actorId, companyId },
     );
-    if (result.error) {
+    if (isConflict(result)) {
+      setConflictFieldId(field.id);
+    } else if (result.error) {
       toast.error('Unable to save form field', { description: result.error });
     } else {
       toast.success('Form field saved');
+      setConflictFieldId(null);
       setEditingFieldId(null);
       await reload();
     }
@@ -208,14 +220,18 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
 
   const handleDelete = async (field: RequestFormFieldRecord) => {
     setBusyFieldId(field.id);
-    const result = await deleteRequestFormField(field.id, { actorId, companyId });
-    if (result.error) {
+    const result = await deleteRequestFormField(field.id, { actorId, companyId }, field.updated_at);
+    if (isConflict(result)) {
+      toast.error('Field changed', { description: CONFLICT_RELOAD_MESSAGE });
+      await reload();
+    } else if (result.error) {
       toast.error('Unable to delete form field', { description: result.error });
     } else {
       toast.success('Form field deleted', { description: `"${field.label}" has been removed.` });
       setEditingFieldId(null);
       await reload();
     }
+    setDeletingField(null);
     setBusyFieldId(null);
   };
 
@@ -455,7 +471,7 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                             variant="outline"
                             size="icon"
                             aria-label={`Delete ${field.label}`}
-                            onClick={() => void handleDelete(field)}
+                            onClick={() => setDeletingField(field)}
                             disabled={isBusy}
                             className="text-destructive hover:text-destructive"
                           >
@@ -472,13 +488,29 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
         </div>
       )}
 
-      <Dialog open={!!editingField} onOpenChange={(open) => { if (!open) setEditingFieldId(null); }}>
+      <Dialog open={!!editingField} onOpenChange={(open) => { if (!open) { setEditingFieldId(null); setConflictFieldId(null); } }}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Edit custom field</DialogTitle>
           </DialogHeader>
           {editingField && editingDraft && (
             <div className="space-y-4">
+              {conflictFieldId === editingField.id && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                    <span>{CONFLICT_RELOAD_MESSAGE}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setConflictFieldId(null); setEditingFieldId(null); void reload(); }}
+                    >
+                      Reload
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor={`field-label-${editingField.id}`}>Label</Label>
@@ -576,6 +608,21 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deletingField !== null}
+        onOpenChange={(open) => { if (!open) setDeletingField(null); }}
+        title="Delete custom field"
+        description={
+          deletingField
+            ? `"${deletingField.label}" will be permanently removed from the request form. This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete field"
+        confirmVariant="destructive"
+        loading={deletingField ? busyFieldId === deletingField.id : false}
+        onConfirm={() => { if (deletingField) void handleDelete(deletingField); }}
+      />
     </div>
   );
 }

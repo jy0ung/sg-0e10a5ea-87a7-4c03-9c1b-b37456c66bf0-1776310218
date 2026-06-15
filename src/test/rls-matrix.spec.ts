@@ -79,6 +79,14 @@ const TENANT_SCOPED_TABLES = [
   'employees',
   'leave_requests',
   'attendance_records',
+  // Internal Request module config tables — company-scoped SELECT, admin-only
+  // writes. The matrix asserts a user in company A can neither read nor insert
+  // into company B's rows for each of these.
+  'request_categories',
+  'request_subcategories',
+  'request_form_fields',
+  'request_templates',
+  'request_routing_rules',
 ] as const;
 
 type TenantScopedTable = typeof TENANT_SCOPED_TABLES[number];

@@ -1,5 +1,11 @@
 import { supabase } from '@flc/supabase';
 import { logUserAction } from '@flc/platform-services';
+import {
+  OPTIMISTIC_CONFLICT_MESSAGE,
+  buildAuditDiff,
+  type ConfigDeleteResult,
+  type ConfigMutationResult,
+} from './mutationSupport';
 
 export type TemplatePriority = 'low' | 'medium' | 'high';
 
@@ -61,6 +67,12 @@ export interface UpdateRequestTemplateInput {
   subject?: string;
   body?: string;
   is_active?: boolean;
+  /**
+   * Optimistic-lock token: the `updated_at` the caller last read. When
+   * provided, the update only applies if the row still has that timestamp;
+   * otherwise it returns `{ conflict: true }`. Omit for last-write-wins.
+   */
+  expectedUpdatedAt?: string;
 }
 
 export interface ListRequestTemplatesOptions {
@@ -171,7 +183,9 @@ export async function updateRequestTemplate(
   templateId: string,
   input: UpdateRequestTemplateInput,
   context: RequestTemplateContext,
-) {
+): Promise<ConfigMutationResult<RequestTemplateRecord>> {
+  const { expectedUpdatedAt } = input;
+
   const patch: Record<string, unknown> = { updated_by: context.actorId };
 
   if (input.name !== undefined) {
@@ -195,17 +209,32 @@ export async function updateRequestTemplate(
   }
   if (input.is_active !== undefined) patch.is_active = input.is_active;
 
-  const { data, error } = await requestTemplatesTable()
-    .update(patch)
+  // Snapshot prior state for the audit trail.
+  const { data: beforeRow } = await requestTemplatesTable()
+    .select(SELECT_COLS)
     .eq('id', templateId)
     .eq('company_id', context.companyId)
-    .select(SELECT_COLS)
-    .single();
+    .maybeSingle();
+  const before = beforeRow ? mapRequestTemplate(beforeRow as RequestTemplateRow) : null;
+
+  let query = requestTemplatesTable()
+    .update(patch)
+    .eq('id', templateId)
+    .eq('company_id', context.companyId);
+  if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt);
+
+  const { data, error } = await query.select(SELECT_COLS).maybeSingle();
 
   if (error) return { data: null, error: error.message as string };
+  if (!data) {
+    return expectedUpdatedAt
+      ? { data: null, error: OPTIMISTIC_CONFLICT_MESSAGE, conflict: true }
+      : { data: null, error: 'Template not found.' };
+  }
 
   void logUserAction(context.actorId, 'update', 'request_template', templateId, {
     component: 'RequestTemplateService',
+    ...buildAuditDiff(before as unknown as Record<string, unknown>, patch),
   });
 
   return { data: mapRequestTemplate(data as RequestTemplateRow), error: null };
@@ -252,16 +281,30 @@ export async function moveRequestTemplate(
 export async function deleteRequestTemplate(
   templateId: string,
   context: RequestTemplateContext,
-) {
-  const { error } = await requestTemplatesTable()
+  expectedUpdatedAt?: string,
+): Promise<ConfigDeleteResult> {
+  const { data: beforeRow } = await requestTemplatesTable()
+    .select(SELECT_COLS)
+    .eq('id', templateId)
+    .eq('company_id', context.companyId)
+    .maybeSingle();
+  const before = beforeRow ? mapRequestTemplate(beforeRow as RequestTemplateRow) : null;
+
+  let query = requestTemplatesTable()
     .delete()
     .eq('id', templateId)
     .eq('company_id', context.companyId);
+  if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt);
 
+  const { data: deletedRows, error } = await query.select('id');
   if (error) return { error: error.message as string };
+  if (expectedUpdatedAt && (!deletedRows || (deletedRows as unknown[]).length === 0)) {
+    return { error: OPTIMISTIC_CONFLICT_MESSAGE, conflict: true };
+  }
 
   void logUserAction(context.actorId, 'delete', 'request_template', templateId, {
     component: 'RequestTemplateService',
+    before: before ? { name: before.name, category_key: before.category_key } : undefined,
   });
 
   return { error: null };

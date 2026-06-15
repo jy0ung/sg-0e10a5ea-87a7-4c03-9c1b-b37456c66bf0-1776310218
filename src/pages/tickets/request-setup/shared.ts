@@ -176,6 +176,28 @@ export const DATA_SOURCE_OPTIONS: { value: RequestFieldDataSource; label: string
   { value: 'vehicles', label: 'Vehicles' },
 ];
 
+// ───────────────────────── Optimistic-lock conflict ─────────────────────────
+
+/**
+ * Shape returned by config mutations that support optimistic locking. When a
+ * concurrent edit moved the row's `updated_at` out from under the caller, the
+ * service returns `{ conflict: true }` (a 409-equivalent) instead of silently
+ * overwriting. Editors branch on this BEFORE the generic `error` so they can
+ * show an inline "reload" affordance rather than a throwaway error toast.
+ */
+export interface MaybeConflictResult {
+  error?: string | null;
+  conflict?: boolean;
+}
+
+/** True when a mutation failed because the record was changed concurrently. */
+export function isConflict(result: MaybeConflictResult | null | undefined): boolean {
+  return Boolean(result?.conflict);
+}
+
+export const CONFLICT_RELOAD_MESSAGE =
+  'This record was changed by someone else. Reload to see the latest version before saving.';
+
 // Sentinel values used by shadcn <Select> to represent "Any" / "None" — empty
 // strings would collide with the placeholder behaviour.
 export const ANY_SELECT_VALUE = '__any__';

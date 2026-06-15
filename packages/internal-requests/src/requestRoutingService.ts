@@ -1,6 +1,12 @@
 import { supabase, type Database } from '@flc/supabase';
 import { canManagePortalQueue } from '@flc/auth';
 import { logUserAction } from '@flc/platform-services';
+import {
+  OPTIMISTIC_CONFLICT_MESSAGE,
+  buildAuditDiff,
+  type ConfigDeleteResult,
+  type ConfigMutationResult,
+} from './mutationSupport';
 
 type RoutingRuleUpdate = Database['public']['Tables']['request_routing_rules']['Update'];
 
@@ -53,6 +59,12 @@ export interface UpdateRoutingRuleInput {
   match_submitter_role?: string | null;
   match_priority?: string | null;
   assign_to_user_id?: string;
+  /**
+   * Optimistic-lock token: the `updated_at` the caller last read. When
+   * provided, the update only applies if the row still has that timestamp;
+   * otherwise it returns `{ conflict: true }`. Omit for last-write-wins.
+   */
+  expectedUpdatedAt?: string;
 }
 
 export interface RoutingRuleContext {
@@ -184,7 +196,7 @@ export async function updateRoutingRule(
   ruleId: string,
   input: UpdateRoutingRuleInput,
   context: RoutingRuleContext,
-): Promise<{ data: RequestRoutingRule | null; error: string | null }> {
+): Promise<ConfigMutationResult<RequestRoutingRule>> {
   // Same guard as createRoutingRule, applied only when the caller is touching
   // the assignee field — leaves status/match-condition-only updates untouched.
   if (
@@ -197,6 +209,8 @@ export async function updateRoutingRule(
     };
   }
 
+  const { expectedUpdatedAt } = input;
+
   const patch: RoutingRuleUpdate = {};
   if (input.name !== undefined) patch.name = input.name.trim();
   if (input.is_active !== undefined) patch.is_active = input.is_active;
@@ -206,21 +220,34 @@ export async function updateRoutingRule(
   if (input.match_priority !== undefined) patch.match_priority = input.match_priority;
   if (input.assign_to_user_id !== undefined) patch.assign_to_user_id = input.assign_to_user_id;
 
-  const { data, error } = await supabase.from('request_routing_rules')
-    .update(patch)
+  // Snapshot prior state for the audit trail.
+  const { data: beforeRow } = await supabase.from('request_routing_rules')
+    .select('*')
     .eq('id', ruleId)
     .eq('company_id', context.companyId)
-    .select('*')
-    .single();
+    .maybeSingle();
+  const before = beforeRow ? mapRule(beforeRow as RoutingRuleRow) : null;
+
+  let query = supabase.from('request_routing_rules')
+    .update(patch)
+    .eq('id', ruleId)
+    .eq('company_id', context.companyId);
+  if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt);
+
+  const { data, error } = await query.select('*').maybeSingle();
   if (error) return { data: null, error: (error as { message: string }).message };
+  if (!data) {
+    return expectedUpdatedAt
+      ? { data: null, error: OPTIMISTIC_CONFLICT_MESSAGE, conflict: true }
+      : { data: null, error: 'Rule not found.' };
+  }
 
   const rule = mapRule(data as RoutingRuleRow);
-  // patch keys mirror UpdateRoutingRuleInput; log only the fields the caller
-  // actually sent so the audit trail records intent rather than the full row.
+  // Log the changed fields with their before/after so the audit trail records
+  // intent and prior state rather than the full row.
   void logUserAction(context.actorId, 'update', 'request_routing_rule', ruleId, {
     component: 'RequestRoutingService',
-    changedFields: Object.keys(patch),
-    ...patch,
+    ...buildAuditDiff(before as unknown as Record<string, unknown>, patch as Record<string, unknown>),
   });
 
   return { data: rule, error: null };
@@ -229,15 +256,30 @@ export async function updateRoutingRule(
 export async function deleteRoutingRule(
   ruleId: string,
   context: RoutingRuleContext,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('request_routing_rules')
+  expectedUpdatedAt?: string,
+): Promise<ConfigDeleteResult> {
+  const { data: beforeRow } = await supabase.from('request_routing_rules')
+    .select('*')
+    .eq('id', ruleId)
+    .eq('company_id', context.companyId)
+    .maybeSingle();
+  const before = beforeRow ? mapRule(beforeRow as RoutingRuleRow) : null;
+
+  let query = supabase.from('request_routing_rules')
     .delete()
     .eq('id', ruleId)
     .eq('company_id', context.companyId);
+  if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt);
+
+  const { data: deletedRows, error } = await query.select('id');
   if (error) return { error: (error as { message: string }).message };
+  if (expectedUpdatedAt && (!deletedRows || (deletedRows as unknown[]).length === 0)) {
+    return { error: OPTIMISTIC_CONFLICT_MESSAGE, conflict: true };
+  }
 
   void logUserAction(context.actorId, 'delete', 'request_routing_rule', ruleId, {
     component: 'RequestRoutingService',
+    before: before ? { name: before.name, assign_to_user_id: before.assign_to_user_id } : undefined,
   });
 
   return { error: null };

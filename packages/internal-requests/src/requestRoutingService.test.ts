@@ -344,16 +344,40 @@ describe('createRoutingRule', () => {
 describe('updateRoutingRule', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  /**
+   * updateRoutingRule now performs two round trips on request_routing_rules:
+   *  1) a before-snapshot SELECT (for the audit trail)
+   *  2) the UPDATE itself, which returns the row via .select().maybeSingle()
+   */
+  function setupUpdateChains(updatedRow: object | null, beforeRow = makeRule({})) {
+    // before-snapshot: .select().eq().eq().maybeSingle() (self-chaining eq)
+    const beforeMaybeSingle = vi.fn().mockResolvedValue({ data: beforeRow, error: null });
+    const beforeNode: { eq: ReturnType<typeof vi.fn>; maybeSingle: ReturnType<typeof vi.fn> } = {
+      eq: vi.fn(() => beforeNode),
+      maybeSingle: beforeMaybeSingle,
+    };
+    const beforeSelect = vi.fn(() => beforeNode);
+
+    // update: .update().eq().eq()[.eq()].select().maybeSingle() — eq self-chains
+    // so an optional updated_at predicate still resolves.
+    const updMaybeSingle = vi.fn().mockResolvedValue({ data: updatedRow, error: null });
+    const updateSelect = vi.fn(() => ({ maybeSingle: updMaybeSingle }));
+    const updNode: { eq: ReturnType<typeof vi.fn>; select: ReturnType<typeof vi.fn> } = {
+      eq: vi.fn(() => updNode),
+      select: updateSelect,
+    };
+    const update = vi.fn(() => updNode);
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce({ select: beforeSelect } as never)
+      .mockReturnValueOnce({ update } as never);
+
+    return { updEq: updNode.eq, update };
+  }
+
   it('scopes the update to the company and returns the updated rule', async () => {
-    // input.assign_to_user_id is undefined here, so isValidAssignee never runs
-    // — the test still only sees the single UPDATE round-trip.
-    const updatedRow = makeRule({ is_active: false });
-    const single = vi.fn().mockResolvedValue({ data: updatedRow, error: null });
-    const updateSelect = vi.fn(() => ({ single }));
-    const eq2 = vi.fn(() => ({ select: updateSelect }));
-    const eq1 = vi.fn(() => ({ eq: eq2 }));
-    const update = vi.fn(() => ({ eq: eq1 }));
-    vi.mocked(supabase.from).mockReturnValue({ update } as never);
+    // input.assign_to_user_id is undefined here, so isValidAssignee never runs.
+    const { updEq } = setupUpdateChains(makeRule({ is_active: false }));
 
     const { data, error } = await updateRoutingRule(
       'rule-1',
@@ -363,8 +387,24 @@ describe('updateRoutingRule', () => {
 
     expect(error).toBeNull();
     expect(data?.is_active).toBe(false);
-    expect(eq1).toHaveBeenCalledWith('id', 'rule-1');
-    expect(eq2).toHaveBeenCalledWith('company_id', 'company-1');
+    expect(updEq).toHaveBeenCalledWith('id', 'rule-1');
+    expect(updEq).toHaveBeenCalledWith('company_id', 'company-1');
+  });
+
+  it('returns a conflict when the optimistic-lock token no longer matches', async () => {
+    // The UPDATE matches zero rows because updated_at moved on — maybeSingle
+    // resolves to null, which under a supplied expectedUpdatedAt is a conflict.
+    setupUpdateChains(null);
+
+    const { data, error, conflict } = await updateRoutingRule(
+      'rule-1',
+      { is_active: false, expectedUpdatedAt: '2026-05-01T00:00:00.000Z' },
+      { actorId: 'actor-1', companyId: 'company-1' },
+    );
+
+    expect(data).toBeNull();
+    expect(conflict).toBe(true);
+    expect(error).toMatch(/changed by someone else/i);
   });
 
   it('rejects an assignee swap when the new user is no longer valid', async () => {
@@ -389,16 +429,54 @@ describe('updateRoutingRule', () => {
 describe('deleteRoutingRule', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  /**
+   * deleteRoutingRule now performs a before-snapshot SELECT, then a DELETE that
+   * ends in `.select('id')` so a zero-row outcome (under a version token) can be
+   * detected as a conflict.
+   */
+  function setupDeleteChains(deletedRows: object[] | null) {
+    const beforeMaybeSingle = vi.fn().mockResolvedValue({ data: makeRule({}), error: null });
+    const beforeNode: { eq: ReturnType<typeof vi.fn>; maybeSingle: ReturnType<typeof vi.fn> } = {
+      eq: vi.fn(() => beforeNode),
+      maybeSingle: beforeMaybeSingle,
+    };
+    const beforeSelect = vi.fn(() => beforeNode);
+
+    // delete: .delete().eq().eq()[.eq()].select('id') — eq self-chains.
+    const delSelect = vi.fn().mockResolvedValue({ data: deletedRows, error: null });
+    const delNode: { eq: ReturnType<typeof vi.fn>; select: ReturnType<typeof vi.fn> } = {
+      eq: vi.fn(() => delNode),
+      select: delSelect,
+    };
+    const del = vi.fn(() => delNode);
+
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce({ select: beforeSelect } as never)
+      .mockReturnValueOnce({ delete: del } as never);
+
+    return { delEq: delNode.eq, del };
+  }
+
   it('scopes the deletion to the company', async () => {
-    const eq2 = vi.fn().mockResolvedValue({ error: null });
-    const eq1 = vi.fn(() => ({ eq: eq2 }));
-    const del = vi.fn(() => ({ eq: eq1 }));
-    vi.mocked(supabase.from).mockReturnValue({ delete: del } as never);
+    const { delEq } = setupDeleteChains([{ id: 'rule-1' }]);
 
     const { error } = await deleteRoutingRule('rule-1', { actorId: 'actor-1', companyId: 'company-1' });
 
     expect(error).toBeNull();
-    expect(eq1).toHaveBeenCalledWith('id', 'rule-1');
-    expect(eq2).toHaveBeenCalledWith('company_id', 'company-1');
+    expect(delEq).toHaveBeenCalledWith('id', 'rule-1');
+    expect(delEq).toHaveBeenCalledWith('company_id', 'company-1');
+  });
+
+  it('returns a conflict when a versioned delete matches no rows', async () => {
+    setupDeleteChains([]);
+
+    const { error, conflict } = await deleteRoutingRule(
+      'rule-1',
+      { actorId: 'actor-1', companyId: 'company-1' },
+      '2026-05-01T00:00:00.000Z',
+    );
+
+    expect(conflict).toBe(true);
+    expect(error).toMatch(/changed by someone else/i);
   });
 });

@@ -62,8 +62,10 @@ import {
 import { listApprovalFlows } from '@/services/approvalFlowService';
 
 import {
+  CONFLICT_RELOAD_MESSAGE,
   hasCategoryChanges,
   hasSubcategoryChanges,
+  isConflict,
   parseSlaHours,
   type CategoryDraft,
   type CreateSubcategoryDraft,
@@ -254,10 +256,14 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
         resolution_sla_hours: draft.resolution_sla_hours,
         is_active: draft.is_active,
         approval_flow_id: draft.approval_flow_id,
+        expectedUpdatedAt: category.updated_at,
       },
       { actorId, companyId },
     );
-    if (result.error) {
+    if (isConflict(result)) {
+      toast.error('Category changed', { description: CONFLICT_RELOAD_MESSAGE });
+      await reload();
+    } else if (result.error) {
       toast.error('Unable to save category', { description: result.error });
     } else {
       toast.success('Category updated', {
@@ -279,11 +285,15 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
 
   const handleDeleteCategory = async () => {
     if (!deleteCategoryId) return;
+    const target = categories.find((category) => category.id === deleteCategoryId);
     setBusyCategoryId(deleteCategoryId);
-    const result = await deleteRequestCategory(deleteCategoryId, { actorId, companyId });
+    const result = await deleteRequestCategory(deleteCategoryId, { actorId, companyId }, target?.updated_at);
     setBusyCategoryId(null);
     setDeleteCategoryId(null);
-    if (result.error) {
+    if (isConflict(result)) {
+      toast.error('Category changed', { description: CONFLICT_RELOAD_MESSAGE });
+      await reload();
+    } else if (result.error) {
       if (result.inUse) {
         toast.warning('Cannot delete — category is in use', {
           description: result.error + ' Open the Edit dialog to deactivate it instead.',
@@ -333,10 +343,14 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
         description: draft.description,
         is_active: draft.is_active,
         approval_flow_id: draft.approval_flow_id,
+        expectedUpdatedAt: sub.updated_at,
       },
       { actorId, companyId },
     );
-    if (result.error) {
+    if (isConflict(result)) {
+      toast.error('Subcategory changed', { description: CONFLICT_RELOAD_MESSAGE });
+      await reloadSubcategories();
+    } else if (result.error) {
       toast.error('Unable to save subcategory', { description: result.error });
     } else {
       toast.success('Subcategory updated', {

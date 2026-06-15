@@ -23,7 +23,10 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov", "html"],
-      include: ["src/**/*.{ts,tsx}"],
+      include: [
+        "src/**/*.{ts,tsx}",
+        "packages/internal-requests/src/**/*.ts",
+      ],
       exclude: [
         "src/test/**",
         "src/**/*.test.{ts,tsx}",
@@ -31,6 +34,9 @@ export default defineConfig({
         "src/vite-env.d.ts",
         "src/main.tsx",
         "src/components/ui/**",
+        "packages/internal-requests/src/**/*.test.ts",
+        "packages/internal-requests/src/test/**",
+        "packages/internal-requests/src/index.ts",
       ],
       // Baseline thresholds — ratchet upward as coverage grows. Target per
       // plan is ≥70% on services/, contexts/, lib/. These floors protect
@@ -40,6 +46,16 @@ export default defineConfig({
         "src/contexts/**": { lines: 60, functions: 65, branches: 50, statements: 60 },
         "src/utils/**": { lines: 50, functions: 60, branches: 90, statements: 50 },
         "src/services/**": { lines: 60, functions: 65, branches: 50, statements: 60 },
+        // Internal Request module: the consolidated config services carry the
+        // production-hardening logic (CRUD, optimistic locking, audit) and are
+        // held to >80% line/function coverage. Listed per-file so the (separately
+        // owned, separately tested) approval service/resolver aren't gated here.
+        "packages/internal-requests/src/requestCategoryService.ts": { lines: 80, functions: 80, branches: 60, statements: 75 },
+        "packages/internal-requests/src/requestSubcategoryService.ts": { lines: 80, functions: 80, branches: 55, statements: 75 },
+        "packages/internal-requests/src/requestFormFieldService.ts": { lines: 80, functions: 80, branches: 55, statements: 70 },
+        "packages/internal-requests/src/requestTemplateService.ts": { lines: 80, functions: 80, branches: 55, statements: 75 },
+        "packages/internal-requests/src/requestRoutingService.ts": { lines: 80, functions: 80, branches: 60, statements: 70 },
+        "packages/internal-requests/src/mutationSupport.ts": { lines: 80, functions: 80, branches: 60, statements: 80 },
       },
     },
   },

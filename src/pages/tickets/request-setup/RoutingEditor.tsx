@@ -26,6 +26,8 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ROLE_LABELS } from '@/config/rolePermissions';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import { useRoutingRules } from '@/hooks/useRoutingRules';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
@@ -41,8 +43,10 @@ import {
 
 import {
   ANY_SELECT_VALUE,
+  CONFLICT_RELOAD_MESSAGE,
   PRIORITY_OPTIONS,
   hasRuleChanges,
+  isConflict,
   optionalSelectValue,
   selectValue,
   type RoutingRuleDraft,
@@ -90,6 +94,10 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
   const [busyRuleId, setBusyRuleId] = useState<string | null>(null);
   const [expandedRuleId, setExpandedRuleId] = useState<string | null>(null);
   const [ruleDrafts, setRuleDrafts] = useState<Record<string, RoutingRuleDraft>>({});
+  // Rule awaiting delete confirmation, and the rule whose last save hit an
+  // optimistic-lock conflict (drives the inline "reload" banner).
+  const [deletingRule, setDeletingRule] = useState<RequestRoutingRule | null>(null);
+  const [conflictRuleId, setConflictRuleId] = useState<string | null>(null);
 
   const activeProfiles = useMemo(
     () => profiles.filter((p) => p.status === 'active' && !p.portal_access_only),
@@ -173,29 +181,39 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
         match_submitter_role: draft.match_submitter_role || null,
         match_priority: draft.match_priority || null,
         assign_to_user_id: draft.assign_to_user_id,
+        // Optimistic-lock token: the version this draft was based on.
+        expectedUpdatedAt: rule.updated_at,
       },
       { actorId, companyId },
     );
-    if (result.error) {
+    if (isConflict(result)) {
+      // Surface an inline reload prompt instead of clobbering the other writer.
+      setConflictRuleId(rule.id);
+    } else if (result.error) {
       toast.error('Unable to save routing rule', { description: result.error });
     } else {
       toast.success('Rule updated');
+      setConflictRuleId(null);
       setExpandedRuleId(null);
       await reload();
     }
     setBusyRuleId(null);
   };
 
-  const handleDelete = async (ruleId: string, ruleName: string) => {
-    setBusyRuleId(ruleId);
-    const result = await deleteRoutingRule(ruleId, { actorId, companyId });
-    if (result.error) {
+  const handleDelete = async (rule: RequestRoutingRule) => {
+    setBusyRuleId(rule.id);
+    const result = await deleteRoutingRule(rule.id, { actorId, companyId }, rule.updated_at);
+    if (isConflict(result)) {
+      toast.error('Rule changed', { description: CONFLICT_RELOAD_MESSAGE });
+      await reload();
+    } else if (result.error) {
       toast.error('Unable to delete routing rule', { description: result.error });
     } else {
-      toast.success('Rule deleted', { description: `"${ruleName}" has been removed.` });
+      toast.success('Rule deleted', { description: `"${rule.name}" has been removed.` });
       setExpandedRuleId(null);
       await reload();
     }
+    setDeletingRule(null);
     setBusyRuleId(null);
   };
 
@@ -211,11 +229,17 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
     setBusyRuleId(rule.id);
     const result = await updateRoutingRule(
       rule.id,
-      { is_active: !rule.is_active },
+      { is_active: !rule.is_active, expectedUpdatedAt: rule.updated_at },
       { actorId, companyId },
     );
-    if (result.error) toast.error('Unable to update rule', { description: result.error });
-    else await reload();
+    if (isConflict(result)) {
+      toast.error('Rule changed', { description: CONFLICT_RELOAD_MESSAGE });
+      await reload();
+    } else if (result.error) {
+      toast.error('Unable to update rule', { description: result.error });
+    } else {
+      await reload();
+    }
     setBusyRuleId(null);
   };
 
@@ -505,7 +529,7 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
                       variant="outline"
                       size="icon"
                       aria-label={`Delete ${rule.name}`}
-                      onClick={() => void handleDelete(rule.id, rule.name)}
+                      onClick={() => setDeletingRule(rule)}
                       disabled={isRuleBusy}
                       className="text-destructive hover:text-destructive"
                     >
@@ -530,6 +554,26 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
 
                 {isExpanded && draft && (
                   <div className="space-y-4 rounded-xl border border-dashed border-border/70 bg-secondary/10 p-4">
+                    {conflictRuleId === rule.id && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                          <span>{CONFLICT_RELOAD_MESSAGE}</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setConflictRuleId(null);
+                              setExpandedRuleId(null);
+                              void reload();
+                            }}
+                          >
+                            Reload
+                          </Button>
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     <div className="space-y-2">
                       <Label htmlFor={`rule-name-${rule.id}`}>Rule name</Label>
                       <Input
@@ -662,6 +706,21 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deletingRule !== null}
+        onOpenChange={(open) => { if (!open) setDeletingRule(null); }}
+        title="Delete routing rule"
+        description={
+          deletingRule
+            ? `"${deletingRule.name}" will be permanently removed. Incoming requests will no longer match this rule. This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete rule"
+        confirmVariant="destructive"
+        loading={deletingRule ? busyRuleId === deletingRule.id : false}
+        onConfirm={() => { if (deletingRule) void handleDelete(deletingRule); }}
+      />
     </div>
   );
 }

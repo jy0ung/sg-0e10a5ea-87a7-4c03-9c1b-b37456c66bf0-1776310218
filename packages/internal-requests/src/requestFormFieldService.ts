@@ -1,6 +1,16 @@
 import { supabase } from '@flc/supabase';
 import { buildRequestCategoryKey } from './requestCategories';
 import { logUserAction } from '@flc/platform-services';
+import {
+  OPTIMISTIC_CONFLICT_MESSAGE,
+  buildAuditDiff,
+  type ConfigDeleteResult,
+  type ConfigMutationResult,
+} from './mutationSupport';
+
+/** Generated slug keys only ever contain [a-z0-9_]; reject anything else
+ *  before it reaches a raw PostgREST filter string (filter-injection guard). */
+const SLUG_KEY_PATTERN = /^[a-z0-9_]+$/;
 
 export type RequestFormFieldType = 'text' | 'textarea' | 'number' | 'date' | 'database_select';
 export type RequestFieldDataSource = 'branches' | 'employees' | 'vehicles';
@@ -67,6 +77,12 @@ export interface UpdateRequestFormFieldInput {
   help_text?: string;
   is_required?: boolean;
   is_active?: boolean;
+  /**
+   * Optimistic-lock token: the `updated_at` the caller last read. When
+   * provided, the update only applies if the row still has that timestamp;
+   * otherwise it returns `{ conflict: true }`. Omit for last-write-wins.
+   */
+  expectedUpdatedAt?: string;
 }
 
 export interface DatabaseFieldOption {
@@ -120,6 +136,12 @@ export async function listRequestFormFields(
   // When a subcategory is selected, surface category-level fields (NULL
   // subcategory_key) alongside fields scoped to that subcategory.
   if (options.subcategoryKey) {
+    // The value is interpolated into a raw PostgREST .or() filter, so reject
+    // anything that isn't a clean slug to prevent filter injection (a value
+    // containing ',' or ')' could otherwise alter the filter semantics).
+    if (!SLUG_KEY_PATTERN.test(options.subcategoryKey)) {
+      return { data: [], error: 'Invalid subcategory key.' };
+    }
     query = query.or(`subcategory_key.is.null,subcategory_key.eq.${options.subcategoryKey}`);
   }
   if (!options.includeInactive) query = query.eq('is_active', true);
@@ -182,7 +204,9 @@ export async function updateRequestFormField(
   fieldId: string,
   input: UpdateRequestFormFieldInput,
   context: RequestFormFieldContext,
-): Promise<{ data: RequestFormFieldRecord | null; error: string | null }> {
+): Promise<ConfigMutationResult<RequestFormFieldRecord>> {
+  const { expectedUpdatedAt } = input;
+
   const patch: Record<string, unknown> = {};
   if (input.label !== undefined) {
     const label = input.label.trim();
@@ -198,17 +222,31 @@ export async function updateRequestFormField(
   if (input.is_required !== undefined) patch.is_required = input.is_required;
   if (input.is_active !== undefined) patch.is_active = input.is_active;
 
-  const { data, error } = await requestFormFieldsTable()
-    .update(patch as never)
+  // Snapshot the prior state for the audit trail before mutating.
+  const { data: beforeRow } = await requestFormFieldsTable()
+    .select('*')
     .eq('id', fieldId)
     .eq('company_id', context.companyId)
-    .select('*')
-    .single();
+    .maybeSingle();
+  const before = beforeRow ? mapField(beforeRow as RequestFormFieldRow) : null;
+
+  let query = requestFormFieldsTable()
+    .update(patch as never)
+    .eq('id', fieldId)
+    .eq('company_id', context.companyId);
+  if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt);
+
+  const { data, error } = await query.select('*').maybeSingle();
 
   if (error) return { data: null, error: (error as { message: string }).message };
+  if (!data) {
+    return expectedUpdatedAt
+      ? { data: null, error: OPTIMISTIC_CONFLICT_MESSAGE, conflict: true }
+      : { data: null, error: 'Field not found.' };
+  }
   void logUserAction(context.actorId, 'update', 'request_form_field', fieldId, {
     component: 'RequestFormFieldService',
-    fieldCount: Object.keys(patch).length,
+    ...buildAuditDiff(before as unknown as Record<string, unknown>, patch),
   });
   return { data: mapField(data as RequestFormFieldRow), error: null };
 }
@@ -216,14 +254,29 @@ export async function updateRequestFormField(
 export async function deleteRequestFormField(
   fieldId: string,
   context: RequestFormFieldContext,
-): Promise<{ error: string | null }> {
-  const { error } = await requestFormFieldsTable()
+  expectedUpdatedAt?: string,
+): Promise<ConfigDeleteResult> {
+  const { data: beforeRow } = await requestFormFieldsTable()
+    .select('*')
+    .eq('id', fieldId)
+    .eq('company_id', context.companyId)
+    .maybeSingle();
+  const before = beforeRow ? mapField(beforeRow as RequestFormFieldRow) : null;
+
+  let query = requestFormFieldsTable()
     .delete()
     .eq('id', fieldId)
     .eq('company_id', context.companyId);
+  if (expectedUpdatedAt) query = query.eq('updated_at', expectedUpdatedAt);
+
+  const { data: deletedRows, error } = await query.select('id');
   if (error) return { error: (error as { message: string }).message };
+  if (expectedUpdatedAt && (!deletedRows || (deletedRows as unknown[]).length === 0)) {
+    return { error: OPTIMISTIC_CONFLICT_MESSAGE, conflict: true };
+  }
   void logUserAction(context.actorId, 'delete', 'request_form_field', fieldId, {
     component: 'RequestFormFieldService',
+    before: before ? { key: before.key, label: before.label, category_key: before.category_key } : undefined,
   });
   return { error: null };
 }
