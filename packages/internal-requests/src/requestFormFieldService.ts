@@ -121,6 +121,22 @@ function normalizeFieldSource(fieldType: RequestFormFieldType, dataSource?: Requ
   return fieldType === 'database_select' ? dataSource ?? 'branches' : null;
 }
 
+/**
+ * True when a PostgREST error is about a missing `subcategory_key` column —
+ * i.e. the target DB predates migration 20260528200000. Mirrors the
+ * `isMissingSlaColumnError` resilience pattern in requestCategoryService so
+ * the module degrades gracefully on a DB that is a migration or two behind
+ * (category-level fields keep working) instead of hard-failing.
+ */
+function isMissingSubcategoryColumnError(error: unknown): boolean {
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as { message?: unknown }).message ?? '')
+      : String(error ?? '');
+  return message.includes('subcategory_key');
+}
+
 export async function listRequestFormFields(
   companyId: string,
   options: { categoryKey?: string; subcategoryKey?: string; includeInactive?: boolean } = {},
@@ -146,7 +162,21 @@ export async function listRequestFormFields(
   }
   if (!options.includeInactive) query = query.eq('is_active', true);
 
-  const { data, error } = await query;
+  let { data, error } = await query;
+  if (error && options.subcategoryKey && isMissingSubcategoryColumnError(error)) {
+    // Target DB predates the subcategory_key column. Before that migration every
+    // field is category-level, so drop the subcategory predicate and return the
+    // category's fields (mapField defaults the missing column to null).
+    let legacy = requestFormFieldsTable()
+      .select('*')
+      .eq('company_id', companyId)
+      .order('category_key', { ascending: true })
+      .order('sort_order', { ascending: true })
+      .order('label', { ascending: true });
+    if (options.categoryKey) legacy = legacy.eq('category_key', options.categoryKey);
+    if (!options.includeInactive) legacy = legacy.eq('is_active', true);
+    ({ data, error } = await legacy);
+  }
   if (error) return { data: [], error: (error as { message: string }).message };
   return { data: ((data ?? []) as RequestFormFieldRow[]).map(mapField), error: null };
 }
@@ -172,24 +202,43 @@ export async function createRequestFormField(
   }
 
   const nextSortOrder = (existingFields.at(-1)?.sort_order ?? 0) + 10;
-  const { data, error } = await requestFormFieldsTable()
-    .insert({
-      company_id: context.companyId,
-      category_key: input.category_key,
-      subcategory_key: subcategoryKey,
-      field_key: fieldKey,
-      label,
-      field_type: input.field_type,
-      data_source: normalizeFieldSource(input.field_type, input.data_source),
-      placeholder: input.placeholder?.trim() ?? '',
-      help_text: input.help_text?.trim() ?? '',
-      is_required: input.is_required ?? false,
-      is_active: true,
-      sort_order: nextSortOrder,
-      created_by: context.actorId,
-    } as never)
+  const insertPayload: Record<string, unknown> = {
+    company_id: context.companyId,
+    category_key: input.category_key,
+    subcategory_key: subcategoryKey,
+    field_key: fieldKey,
+    label,
+    field_type: input.field_type,
+    data_source: normalizeFieldSource(input.field_type, input.data_source),
+    placeholder: input.placeholder?.trim() ?? '',
+    help_text: input.help_text?.trim() ?? '',
+    is_required: input.is_required ?? false,
+    is_active: true,
+    sort_order: nextSortOrder,
+    created_by: context.actorId,
+  };
+  let { data, error } = await requestFormFieldsTable()
+    .insert(insertPayload as never)
     .select('*')
     .single();
+
+  if (error && isMissingSubcategoryColumnError(error)) {
+    // Target DB predates the subcategory_key column (migration 20260528200000).
+    if (subcategoryKey) {
+      // Don't silently strip the requested scope — surface an actionable message.
+      return {
+        data: null,
+        error: 'Subcategory-scoped fields require a pending database update. Create the field at the category level for now, or apply the latest migrations.',
+      };
+    }
+    // Category-level field: retry without the not-yet-present column.
+    const legacyPayload = { ...insertPayload };
+    delete legacyPayload.subcategory_key;
+    ({ data, error } = await requestFormFieldsTable()
+      .insert(legacyPayload as never)
+      .select('*')
+      .single());
+  }
 
   if (error) return { data: null, error: (error as { message: string }).message };
   const field = mapField(data as RequestFormFieldRow);

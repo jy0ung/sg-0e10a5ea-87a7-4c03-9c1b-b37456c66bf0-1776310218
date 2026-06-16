@@ -73,6 +73,48 @@ describe('createRequestFormField', () => {
   });
 });
 
+describe('subcategory_key column drift (pre-migration DB)', () => {
+  const MISSING_COLUMN = {
+    message: "Could not find the 'subcategory_key' column of 'request_form_fields' in the schema cache",
+  };
+
+  it('retries a category-level create without the missing column', async () => {
+    from
+      .mockReturnValueOnce(queryResult({ data: [] }) as never) // existing-fields list
+      .mockReturnValueOnce(queryResult({ data: null, error: MISSING_COLUMN }) as never) // insert w/ subcategory_key fails
+      .mockReturnValueOnce(queryResult({ data: makeFieldRow({ id: 'field-new', field_key: 'serial', label: 'Serial' }) }) as never); // retry succeeds
+    const { data, error } = await createRequestFormField(
+      { category_key: 'support', label: 'Serial', field_type: 'text' },
+      TEST_CONTEXT,
+    );
+    expect(error).toBeNull();
+    expect(data?.key).toBe('serial');
+    expect(from).toHaveBeenCalledTimes(3);
+  });
+
+  it('refuses a subcategory-scoped create with an actionable message (no silent strip)', async () => {
+    from
+      .mockReturnValueOnce(queryResult({ data: [] }) as never)
+      .mockReturnValueOnce(queryResult({ data: null, error: MISSING_COLUMN }) as never);
+    const { data, error } = await createRequestFormField(
+      { category_key: 'support', subcategory_key: 'hardware', label: 'Serial', field_type: 'text' },
+      TEST_CONTEXT,
+    );
+    expect(data).toBeNull();
+    expect(error).toMatch(/pending database update|apply the latest migrations/i);
+    expect(from).toHaveBeenCalledTimes(2); // no retry
+  });
+
+  it('lists category fields when the subcategory filter hits a missing column', async () => {
+    from
+      .mockReturnValueOnce(queryResult({ data: null, error: MISSING_COLUMN }) as never) // .or() filter fails
+      .mockReturnValueOnce(queryResult({ data: [makeFieldRow()] }) as never); // legacy retry
+    const { data, error } = await listRequestFormFields('company-1', { categoryKey: 'support', subcategoryKey: 'hardware' });
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+  });
+});
+
 describe('updateRequestFormField', () => {
   it('updates and logs before/after', async () => {
     from
