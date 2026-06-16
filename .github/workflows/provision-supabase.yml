@@ -114,8 +114,9 @@ jobs:
     environment:
       # Match to a GitHub Environment configured with required reviewers
       # (Settings → Environments → production → Required reviewers).
+      # Note: environment.url cannot reference the `secrets` context (GitHub
+      # rejects the workflow at parse time), so the deploy URL is omitted here.
       name: ${{ needs.plan.outputs.env_name }}
-      url: ${{ secrets.SITE_URL }}
     steps:
       - uses: actions/checkout@v6
 
