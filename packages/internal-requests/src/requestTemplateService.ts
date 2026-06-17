@@ -278,6 +278,33 @@ export async function moveRequestTemplate(
   return { error: null };
 }
 
+/**
+ * Persist an arbitrary new order (e.g. from drag-and-drop) by writing
+ * `sort_order = index` for each id. App-layer like {@link moveRequestTemplate}.
+ */
+export async function reorderRequestTemplates(
+  orderedIds: string[],
+  context: RequestTemplateContext,
+): Promise<{ error: string | null }> {
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      requestTemplatesTable()
+        .update({ sort_order: index, updated_by: context.actorId })
+        .eq('id', id)
+        .eq('company_id', context.companyId),
+    ),
+  );
+  const failed = results.find((result: { error: unknown }) => result.error);
+  if (failed?.error) return { error: (failed.error as { message: string }).message };
+
+  void logUserAction(context.actorId, 'update', 'request_template', orderedIds[0] ?? '', {
+    component: 'RequestTemplateService',
+    reorder: orderedIds.length,
+  });
+
+  return { error: null };
+}
+
 export async function deleteRequestTemplate(
   templateId: string,
   context: RequestTemplateContext,

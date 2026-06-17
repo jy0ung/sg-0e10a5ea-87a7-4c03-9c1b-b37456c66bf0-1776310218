@@ -3,8 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import {
   AlertCircle,
-  ArrowDown,
-  ArrowUp,
   Loader2,
   Plus,
   Save,
@@ -24,13 +22,15 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
+import { SortableList } from '@/components/ui/SortableList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,13 +49,14 @@ import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import {
   createRequestCategory,
   deleteRequestCategory,
-  moveRequestCategory,
+  reorderRequestCategories,
   updateRequestCategory,
   type RequestCategoryRecord,
 } from '@/services/requestCategoryService';
 import {
   createRequestSubcategory,
-  moveRequestSubcategory,
+  deleteRequestSubcategory,
+  reorderRequestSubcategories,
   updateRequestSubcategory,
   type RequestSubcategoryRecord,
 } from '@/services/requestSubcategoryService';
@@ -116,8 +117,17 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
 
   const [creatingSubcategoryKey, setCreatingSubcategoryKey] = useState<string | null>(null);
   const [busySubcategoryId, setBusySubcategoryId] = useState<string | null>(null);
+  const [deletingSubcategory, setDeletingSubcategory] = useState<RequestSubcategoryRecord | null>(null);
   const [subcategoryDrafts, setSubcategoryDrafts] = useState<Record<string, SubcategoryDraft>>({});
   const [createSubcategoryDrafts, setCreateSubcategoryDrafts] = useState<Record<string, CreateSubcategoryDraft>>({});
+
+  // Local mirrors so drag-and-drop can reorder optimistically; re-synced from
+  // the hooks' server state on every load/reload.
+  const [orderedCategories, setOrderedCategories] = useState<RequestCategoryRecord[]>(categories);
+  const [orderedSubcategories, setOrderedSubcategories] = useState<RequestSubcategoryRecord[]>(subcategories);
+  const [reordering, setReordering] = useState(false);
+  useEffect(() => { setOrderedCategories(categories); }, [categories]);
+  useEffect(() => { setOrderedSubcategories(subcategories); }, [subcategories]);
 
   useEffect(() => {
     setDrafts(Object.fromEntries(categories.map((category) => [category.id, {
@@ -160,7 +170,9 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
     () => categories.find((c) => c.id === editCategoryId) ?? null,
     [categories, editCategoryId],
   );
-  const editCatSubcategories = editCategory ? (subcategoriesByCategory[editCategory.key] ?? []) : [];
+  const editCatSubcategories = editCategory
+    ? orderedSubcategories.filter((sub) => sub.category_key === editCategory.key)
+    : [];
   const editCreateSubDraft = editCategory
     ? (createSubcategoryDrafts[editCategory.key] ?? { label: '', description: '' })
     : { label: '', description: '' };
@@ -275,12 +287,15 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
     setBusyCategoryId(null);
   };
 
-  const handleMove = async (categoryId: string, direction: 'up' | 'down') => {
-    setBusyCategoryId(categoryId);
-    const result = await moveRequestCategory(categoryId, direction, { actorId, companyId });
+  const handleReorderCategories = async (orderedIds: string[]) => {
+    const byId = new Map(orderedCategories.map((category) => [category.id, category]));
+    const next = orderedIds.map((id) => byId.get(id)).filter((c): c is RequestCategoryRecord => Boolean(c));
+    setOrderedCategories(next);
+    setReordering(true);
+    const result = await reorderRequestCategories(orderedIds, { actorId, companyId });
     if (result.error) toast.error('Unable to reorder categories', { description: result.error });
-    else await reload();
-    setBusyCategoryId(null);
+    await reload();
+    setReordering(false);
   };
 
   const handleDeleteCategory = async () => {
@@ -361,26 +376,53 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
     setBusySubcategoryId(null);
   };
 
-  const handleMoveSubcategory = async (subId: string, direction: 'up' | 'down') => {
-    setBusySubcategoryId(subId);
-    const result = await moveRequestSubcategory(subId, direction, { actorId, companyId });
+  const handleReorderSubcategories = async (categoryKey: string, orderedIds: string[]) => {
+    // Optimistically reorder just this category's slice within the flat mirror.
+    setOrderedSubcategories((prev) => {
+      const byId = new Map(prev.filter((s) => s.category_key === categoryKey).map((s) => [s.id, s]));
+      const reordered = orderedIds.map((id) => byId.get(id)).filter((s): s is RequestSubcategoryRecord => Boolean(s));
+      let cursor = 0;
+      return prev.map((sub) => (sub.category_key === categoryKey ? reordered[cursor++] ?? sub : sub));
+    });
+    setReordering(true);
+    const result = await reorderRequestSubcategories(categoryKey, orderedIds, { actorId, companyId });
     if (result.error) toast.error('Unable to reorder subcategories', { description: result.error });
-    else await reloadSubcategories();
+    await reloadSubcategories();
+    setReordering(false);
+  };
+
+  const handleDeleteSubcategory = async (sub: RequestSubcategoryRecord) => {
+    setBusySubcategoryId(sub.id);
+    const result = await deleteRequestSubcategory(sub.id, { actorId, companyId }, sub.updated_at);
     setBusySubcategoryId(null);
+    setDeletingSubcategory(null);
+    if (isConflict(result)) {
+      toast.error('Subcategory changed', { description: CONFLICT_RELOAD_MESSAGE });
+      await reloadSubcategories();
+    } else if (result.error) {
+      if (result.inUse) {
+        toast.warning('Cannot delete — subcategory is in use', { description: result.error });
+      } else {
+        toast.error('Failed to delete subcategory', { description: result.error });
+      }
+    } else {
+      toast.success('Subcategory deleted');
+      await reloadSubcategories();
+    }
   };
 
   return (
     <div className="space-y-4">
-      {/* Create category dialog */}
-      <Dialog open={isAdding} onOpenChange={(open) => {
+      {/* Create category drawer */}
+      <Sheet open={isAdding} onOpenChange={(open) => {
         if (!open && !creating) { setIsAdding(false); setCreateLabel(''); setCreateDescription(''); }
       }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New category</DialogTitle>
-            <DialogDescription>Add a new request category for your team.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>New category</SheetTitle>
+            <SheetDescription>Add a new request category for your team.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="request-category-name">Name <span className="text-destructive">*</span></Label>
               <Input
@@ -405,7 +447,7 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
               />
             </div>
           </div>
-          <DialogFooter>
+          <SheetFooter className="mt-4 gap-2">
             <Button
               variant="outline"
               onClick={() => { setIsAdding(false); setCreateLabel(''); setCreateDescription(''); }}
@@ -421,21 +463,21 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Add category
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
-      {/* Edit category dialog */}
-      <Dialog open={editCategoryId !== null} onOpenChange={(open) => {
+      {/* Edit category drawer */}
+      <Sheet open={editCategoryId !== null} onOpenChange={(open) => {
         if (!open && !busyCategoryId) setEditCategoryId(null);
       }}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit category</DialogTitle>
-            <DialogDescription>Update this category's details, SLA targets, and subcategories.</DialogDescription>
-          </DialogHeader>
+        <SheetContent side="right" className="flex w-full flex-col overflow-y-auto sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Edit category</SheetTitle>
+            <SheetDescription>Update this category's details, SLA targets, and subcategories.</SheetDescription>
+          </SheetHeader>
           {editCategory && (
-            <div className="max-h-[68vh] space-y-4 overflow-y-auto py-2 pr-1">
+            <div className="mt-4 space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Name</Label>
@@ -569,20 +611,23 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
                 {editCatSubcategories.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No subcategories yet.</p>
                 ) : (
-                  <div className="space-y-1.5">
-                    {editCatSubcategories.map((sub, subIdx) => {
+                  <SortableList
+                    items={editCatSubcategories}
+                    getId={(sub) => sub.id}
+                    onReorder={(ids) => void handleReorderSubcategories(editCategory.key, ids)}
+                    disabled={reordering}
+                    className="space-y-1.5"
+                  >
+                    {(sub, { handle }) => {
                       const subDraft = subcategoryDrafts[sub.id];
                       const isSubBusy = busySubcategoryId === sub.id;
                       const isSubDirty = hasSubcategoryChanges(sub, subDraft);
                       const subFlowValue = subDraft?.approval_flow_id ?? sub.approval_flow_id ?? '__none__';
                       return (
-                        <div
-                          key={sub.id}
-                          className="space-y-2 rounded-lg border bg-background px-3 py-2.5"
-                        >
+                        <div className="space-y-2 rounded-lg border bg-background px-3 py-2.5">
                           <div className="flex items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              {handle}
                               <Input
                                 className="h-7 border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                                 value={subDraft?.label ?? sub.label}
@@ -594,22 +639,6 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
                               )}
                             </div>
                             <div className="flex shrink-0 items-center gap-0.5">
-                              <Button
-                                variant="ghost" size="icon" className="h-7 w-7"
-                                onClick={() => void handleMoveSubcategory(sub.id, 'up')}
-                                disabled={isSubBusy || subIdx === 0}
-                                aria-label="Move up"
-                              >
-                                <ArrowUp className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost" size="icon" className="h-7 w-7"
-                                onClick={() => void handleMoveSubcategory(sub.id, 'down')}
-                                disabled={isSubBusy || subIdx === editCatSubcategories.length - 1}
-                                aria-label="Move down"
-                              >
-                                <ArrowDown className="h-3 w-3" />
-                              </Button>
                               {isSubDirty && (
                                 <Button
                                   variant="ghost" size="icon" className="h-7 w-7"
@@ -626,11 +655,29 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
                                 onCheckedChange={(checked) => updateSubcategoryDraft(sub, { is_active: checked })}
                                 disabled={isSubBusy}
                               />
-                              {isSubBusy && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                              <Button
+                                variant="ghost" size="icon"
+                                className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => setDeletingSubcategory(sub)}
+                                disabled={isSubBusy}
+                                aria-label={`Delete ${sub.label}`}
+                              >
+                                {isSubBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                              </Button>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 pl-3.5">
-                            <span className="shrink-0 text-[11px] text-muted-foreground">Approval flow</span>
+                          <div className="pl-8">
+                            <Textarea
+                              placeholder="Description shown to requesters (optional)"
+                              value={subDraft?.description ?? sub.description}
+                              onChange={(event) => updateSubcategoryDraft(sub, { description: event.target.value })}
+                              rows={2}
+                              className="min-h-[40px] resize-y text-sm"
+                              disabled={isSubBusy}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 pl-8">
+                            <span className="shrink-0 text-xs text-muted-foreground">Approval flow</span>
                             <Select
                               value={subFlowValue}
                               onValueChange={(value) =>
@@ -658,13 +705,13 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
+                    }}
+                  </SortableList>
                 )}
               </div>
             </div>
           )}
-          <DialogFooter>
+          <SheetFooter className="mt-4 gap-2">
             <Button
               variant="outline"
               onClick={() => setEditCategoryId(null)}
@@ -680,9 +727,9 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
               {busyCategoryId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Save changes
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {setupLoading ? (
         <div className="flex items-center justify-center gap-3 rounded-lg border border-border py-12 text-muted-foreground">
@@ -690,24 +737,19 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
           <span>Loading request setup...</span>
         </div>
       ) : setupError ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-border py-12 text-center">
-          <AlertCircle className="h-8 w-8 text-destructive" />
-          <div className="space-y-1">
-            <p className="font-medium text-foreground">Unable to load request setup</p>
-            <p className="text-sm text-muted-foreground">{setupError}</p>
-          </div>
-          <Button variant="outline" onClick={() => void handleRetry()}>
-            Retry
-          </Button>
-        </div>
+        <HrmsEmptyState
+          icon={AlertCircle}
+          title="Unable to load request setup"
+          description={setupError}
+          action={{ label: 'Retry', onClick: () => void handleRetry() }}
+        />
       ) : categories.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-          <p className="text-sm text-muted-foreground">No categories yet. Add one to get started.</p>
-          <Button type="button" onClick={() => setIsAdding(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Category
-          </Button>
-        </div>
+        <HrmsEmptyState
+          icon={Plus}
+          title="No categories yet"
+          description="Add a request category to get started."
+          action={{ label: 'Add category', onClick: () => setIsAdding(true) }}
+        />
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
@@ -725,72 +767,64 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
               Add Category
             </Button>
           </div>
-          <div className="divide-y divide-border rounded-lg border">
-            {categories.map((category, index) => {
-              const catSubcategories = subcategoriesByCategory[category.key] ?? [];
-              const isBusy = busyCategoryId === category.id;
-              return (
-                <div key={category.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium text-foreground">{category.label}</span>
-                      {!category.is_active && (
-                        <Badge variant="outline" className="px-1.5 py-0 text-[10px]">Archived</Badge>
-                      )}
-                      {catSubcategories.length > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          {catSubcategories.length} {catSubcategories.length === 1 ? 'subcategory' : 'subcategories'}
-                        </span>
+          <div className="overflow-hidden rounded-lg border">
+            <SortableList
+              items={orderedCategories}
+              getId={(category) => category.id}
+              onReorder={(ids) => void handleReorderCategories(ids)}
+              disabled={reordering}
+              className="divide-y divide-border"
+            >
+              {(category, { handle }) => {
+                const catSubcategories = subcategoriesByCategory[category.key] ?? [];
+                const isBusy = busyCategoryId === category.id;
+                return (
+                  <div className="flex items-center gap-2 px-3 py-3">
+                    {handle}
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium text-foreground">{category.label}</span>
+                        {!category.is_active && (
+                          <Badge variant="outline" className="px-1.5 py-0 text-xs">Archived</Badge>
+                        )}
+                        {catSubcategories.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {catSubcategories.length} {catSubcategories.length === 1 ? 'subcategory' : 'subcategories'}
+                          </span>
+                        )}
+                      </div>
+                      {category.description && (
+                        <p className="truncate text-xs text-muted-foreground">{category.description}</p>
                       )}
                     </div>
-                    {category.description && (
-                      <p className="truncate text-xs text-muted-foreground">{category.description}</p>
-                    )}
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      {isBusy ? (
+                        <Loader2 className="ml-1 h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditCategoryId(category.id)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => setDeleteCategoryId(category.id)}
+                            aria-label={`Delete ${category.label}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-0.5">
-                    <Button
-                      variant="ghost" size="icon" className="h-7 w-7"
-                      onClick={() => void handleMove(category.id, 'up')}
-                      disabled={isBusy || index === 0}
-                      aria-label={`Move ${category.label} up`}
-                    >
-                      <ArrowUp className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost" size="icon" className="h-7 w-7"
-                      onClick={() => void handleMove(category.id, 'down')}
-                      disabled={isBusy || index === categories.length - 1}
-                      aria-label={`Move ${category.label} down`}
-                    >
-                      <ArrowDown className="h-3 w-3" />
-                    </Button>
-                    {isBusy ? (
-                      <Loader2 className="ml-1 h-4 w-4 animate-spin text-muted-foreground" />
-                    ) : (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditCategoryId(category.id)}
-                          className="ml-1"
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => setDeleteCategoryId(category.id)}
-                          aria-label={`Delete ${category.label}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              }}
+            </SortableList>
           </div>
         </div>
       )}
@@ -823,6 +857,33 @@ export function CategoryEditor({ companyId, actorId, onActiveCountChange }: Prop
           </AlertDialog>
         );
       })()}
+
+      {/* Subcategory delete confirmation */}
+      <AlertDialog
+        open={deletingSubcategory !== null}
+        onOpenChange={(open) => { if (!open) setDeletingSubcategory(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete subcategory</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingSubcategory
+                ? <>Permanently delete <strong>{deletingSubcategory.label}</strong>? This cannot be undone. If it is already used by requests or templates, you will be asked to deactivate it instead.</>
+                : 'Permanently delete this subcategory? This cannot be undone.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busySubcategoryId !== null}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (deletingSubcategory) void handleDeleteSubcategory(deletingSubcategory); }}
+              disabled={busySubcategoryId !== null}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {busySubcategoryId ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

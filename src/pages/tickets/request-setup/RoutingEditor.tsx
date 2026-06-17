@@ -3,13 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import {
   AlertCircle,
-  ArrowDown,
-  ArrowUp,
   Loader2,
   Plus,
+  Route,
   Save,
   Trash2,
-  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,9 +22,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { ROLE_LABELS } from '@/config/rolePermissions';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
+import { SortableList } from '@/components/ui/SortableList';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import { useRoutingRules } from '@/hooks/useRoutingRules';
@@ -36,7 +44,7 @@ import { listProfiles } from '@flc/auth';
 import {
   createRoutingRule,
   deleteRoutingRule,
-  moveRoutingRule,
+  reorderRoutingRules,
   updateRoutingRule,
   type RequestRoutingRule,
 } from '@flc/internal-requests';
@@ -98,6 +106,12 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
   // optimistic-lock conflict (drives the inline "reload" banner).
   const [deletingRule, setDeletingRule] = useState<RequestRoutingRule | null>(null);
   const [conflictRuleId, setConflictRuleId] = useState<string | null>(null);
+
+  // Local mirror so drag-and-drop can reorder optimistically; re-synced from
+  // the hook's server state on every load/reload.
+  const [orderedRules, setOrderedRules] = useState<RequestRoutingRule[]>(rules);
+  const [reordering, setReordering] = useState(false);
+  useEffect(() => { setOrderedRules(rules); }, [rules]);
 
   const activeProfiles = useMemo(
     () => profiles.filter((p) => p.status === 'active' && !p.portal_access_only),
@@ -217,12 +231,15 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
     setBusyRuleId(null);
   };
 
-  const handleMove = async (ruleId: string, direction: 'up' | 'down') => {
-    setBusyRuleId(ruleId);
-    const result = await moveRoutingRule(ruleId, direction, { actorId, companyId });
-    if (result.error) toast.error('Unable to reorder rule', { description: result.error });
-    else await reload();
-    setBusyRuleId(null);
+  const handleReorder = async (orderedIds: string[]) => {
+    const byId = new Map(orderedRules.map((rule) => [rule.id, rule]));
+    const next = orderedIds.map((id) => byId.get(id)).filter((rule): rule is RequestRoutingRule => Boolean(rule));
+    setOrderedRules(next);
+    setReordering(true);
+    const result = await reorderRoutingRules(orderedIds, { actorId, companyId });
+    if (result.error) toast.error('Unable to reorder rules', { description: result.error });
+    await reload();
+    setReordering(false);
   };
 
   const handleToggle = async (rule: RequestRoutingRule) => {
@@ -243,24 +260,37 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
     setBusyRuleId(null);
   };
 
+  const editingRule = rules.find((rule) => rule.id === expandedRuleId) ?? null;
+  const editingDraft = editingRule ? ruleDrafts[editingRule.id] : undefined;
+  const editingDirty = editingRule ? hasRuleChanges(editingRule, editingDraft) : false;
+
+  const openEdit = (rule: RequestRoutingRule) => {
+    setRuleDrafts((prev) => ({
+      ...prev,
+      [rule.id]: {
+        name: rule.name,
+        match_category: rule.match_category ?? '',
+        match_subcategory: rule.match_subcategory ?? '',
+        match_submitter_role: rule.match_submitter_role ?? '',
+        match_priority: rule.match_priority ?? '',
+        assign_to_user_id: rule.assign_to_user_id,
+      },
+    }));
+    setExpandedRuleId(rule.id);
+  };
+
   return (
     <div className="space-y-4">
-      {isAdding && (
-        <div className="space-y-4 rounded-lg border border-dashed border-border/70 bg-secondary/20 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-foreground">New routing rule</p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => { setIsAdding(false); resetCreateForm(); }}
-              disabled={creating}
-              aria-label="Cancel"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
+      <Sheet
+        open={isAdding}
+        onOpenChange={(open) => { setIsAdding(open); if (!open) resetCreateForm(); }}
+      >
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>New routing rule</SheetTitle>
+            <SheetDescription>Route matching requests to a specific assignee.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="rule-create-name">Rule name <span className="text-destructive">*</span></Label>
             <Input
@@ -384,17 +414,28 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
             </Select>
           </div>
 
-          <Button
-            type="button"
-            onClick={() => void handleCreate()}
-            disabled={creating || !createName.trim() || !createAssignTo}
-            className="gap-2"
-          >
-            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Add rule
-          </Button>
-        </div>
-      )}
+          <SheetFooter className="mt-4 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setIsAdding(false); resetCreateForm(); }}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleCreate()}
+              disabled={creating || !createName.trim() || !createAssignTo}
+              className="gap-2"
+            >
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Add rule
+            </Button>
+          </SheetFooter>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {loading ? (
         <div className="flex items-center justify-center gap-3 rounded-xl border border-border py-12 text-muted-foreground">
@@ -402,23 +443,19 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
           <span>Loading routing rules…</span>
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border py-12 text-center">
-          <AlertCircle className="h-8 w-8 text-destructive" />
-          <div className="space-y-1">
-            <p className="font-medium text-foreground">Unable to load routing rules</p>
-            <p className="text-sm text-muted-foreground">{error}</p>
-          </div>
-          <Button variant="outline" onClick={() => void reload()}>Retry</Button>
-        </div>
+        <HrmsEmptyState
+          icon={AlertCircle}
+          title="Unable to load routing rules"
+          description={error}
+          action={{ label: 'Retry', onClick: () => void reload() }}
+        />
       ) : rules.length === 0 ? (
-        !isAdding ? (
-          <div className="flex items-center justify-center py-16">
-            <Button type="button" onClick={() => setIsAdding(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Rule
-            </Button>
-          </div>
-        ) : null
+        <HrmsEmptyState
+          icon={Route}
+          title="No routing rules yet"
+          description="Add a rule to auto-assign matching requests to the right person."
+          action={{ label: 'Add rule', onClick: () => setIsAdding(true) }}
+        />
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -440,272 +477,254 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
             )}
           </div>
 
-          {rules.map((rule, rIdx) => {
-            const isRuleBusy = busyRuleId === rule.id;
-            const isExpanded = expandedRuleId === rule.id;
-            const draft = ruleDrafts[rule.id];
-            const isDirty = hasRuleChanges(rule, draft);
-            const assignee = profiles.find((p) => p.id === rule.assign_to_user_id);
+          <SortableList
+            items={orderedRules}
+            getId={(rule) => rule.id}
+            onReorder={(ids) => void handleReorder(ids)}
+            disabled={reordering}
+            className="space-y-4"
+          >
+            {(rule, { handle }) => {
+              const isRuleBusy = busyRuleId === rule.id;
+              const assignee = profiles.find((p) => p.id === rule.assign_to_user_id);
 
-            return (
-              <div key={rule.id} className="space-y-4 rounded-xl border border-border bg-background p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-base font-semibold text-foreground">{rule.name}</p>
-                      <Badge variant={rule.is_active ? 'secondary' : 'outline'}>
-                        {rule.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
+              return (
+                <div className="space-y-4 rounded-xl border border-border bg-background p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex min-w-0 items-start gap-2">
+                      <div className="pt-0.5">{handle}</div>
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-semibold text-foreground">{rule.name}</p>
+                          <Badge variant={rule.is_active ? 'secondary' : 'outline'}>
+                            {rule.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 text-xs">
+                          {rule.match_category ? (
+                            <Badge variant="outline">Category: {categories.find((c) => c.key === rule.match_category)?.label ?? rule.match_category}</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">Any category</Badge>
+                          )}
+                          {rule.match_subcategory && (
+                            <Badge variant="outline">Subcategory: {subcategories.find((s) => s.key === rule.match_subcategory)?.label ?? rule.match_subcategory}</Badge>
+                          )}
+                          {rule.match_submitter_role && (
+                            <Badge variant="outline">Role: {ROLE_LABELS[rule.match_submitter_role as keyof typeof ROLE_LABELS] ?? rule.match_submitter_role}</Badge>
+                          )}
+                          {rule.match_priority && (
+                            <Badge variant="outline" className="capitalize">Priority: {rule.match_priority}</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Assign to: <span className="font-medium text-foreground">{assignee ? (assignee.name || assignee.email) : rule.assign_to_user_id}</span>
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 text-xs">
-                      {rule.match_category ? (
-                        <Badge variant="outline">Category: {categories.find((c) => c.key === rule.match_category)?.label ?? rule.match_category}</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-muted-foreground">Any category</Badge>
-                      )}
-                      {rule.match_subcategory && (
-                        <Badge variant="outline">Subcategory: {subcategories.find((s) => s.key === rule.match_subcategory)?.label ?? rule.match_subcategory}</Badge>
-                      )}
-                      {rule.match_submitter_role && (
-                        <Badge variant="outline">Role: {ROLE_LABELS[rule.match_submitter_role as keyof typeof ROLE_LABELS] ?? rule.match_submitter_role}</Badge>
-                      )}
-                      {rule.match_priority && (
-                        <Badge variant="outline" className="capitalize">Priority: {rule.match_priority}</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Assign to: <span className="font-medium text-foreground">{assignee ? (assignee.name || assignee.email) : rule.assign_to_user_id}</span>
-                    </p>
-                  </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={`Move ${rule.name} up`}
-                      onClick={() => void handleMove(rule.id, 'up')}
-                      disabled={isRuleBusy || rIdx === 0}
-                    >
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={`Move ${rule.name} down`}
-                      onClick={() => void handleMove(rule.id, 'down')}
-                      disabled={isRuleBusy || rIdx === rules.length - 1}
-                    >
-                      <ArrowDown className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        if (isExpanded) {
-                          setExpandedRuleId(null);
-                        } else {
-                          setRuleDrafts((prev) => ({
-                            ...prev,
-                            [rule.id]: {
-                              name: rule.name,
-                              match_category: rule.match_category ?? '',
-                              match_subcategory: rule.match_subcategory ?? '',
-                              match_submitter_role: rule.match_submitter_role ?? '',
-                              match_priority: rule.match_priority ?? '',
-                              assign_to_user_id: rule.assign_to_user_id,
-                            },
-                          }));
-                          setExpandedRuleId(rule.id);
-                        }
-                      }}
-                      disabled={isRuleBusy}
-                    >
-                      {isExpanded ? 'Collapse' : 'Edit'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={`Delete ${rule.name}`}
-                      onClick={() => setDeletingRule(rule)}
-                      disabled={isRuleBusy}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      {isRuleBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Rule active</p>
-                    <p className="text-xs text-muted-foreground">
-                      Inactive rules are skipped during evaluation.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={rule.is_active}
-                    onCheckedChange={() => void handleToggle(rule)}
-                    disabled={isRuleBusy}
-                  />
-                </div>
-
-                {isExpanded && draft && (
-                  <div className="space-y-4 rounded-xl border border-dashed border-border/70 bg-secondary/10 p-4">
-                    {conflictRuleId === rule.id && (
-                      <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-                          <span>{CONFLICT_RELOAD_MESSAGE}</span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setConflictRuleId(null);
-                              setExpandedRuleId(null);
-                              void reload();
-                            }}
-                          >
-                            Reload
-                          </Button>
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                    <div className="space-y-2">
-                      <Label htmlFor={`rule-name-${rule.id}`}>Rule name</Label>
-                      <Input
-                        id={`rule-name-${rule.id}`}
-                        value={draft.name}
-                        onChange={(event) => updateDraft(rule, { name: event.target.value })}
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEdit(rule)}
                         disabled={isRuleBusy}
-                      />
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor={`rule-cat-${rule.id}`}>Category condition</Label>
-                        <Select
-                          value={selectValue(draft.match_category)}
-                          onValueChange={(value) => updateDraft(rule, {
-                            match_category: optionalSelectValue(value),
-                            match_subcategory: '',
-                          })}
-                          disabled={isRuleBusy}
-                        >
-                          <SelectTrigger id={`rule-cat-${rule.id}`}>
-                            <SelectValue placeholder="Any category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={ANY_SELECT_VALUE}>Any category</SelectItem>
-                            {categories.filter((c) => c.is_active).map((c) => (
-                              <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`rule-subcat-${rule.id}`}>Subcategory condition</Label>
-                        <Select
-                          value={selectValue(draft.match_subcategory)}
-                          onValueChange={(value) => updateDraft(rule, { match_subcategory: optionalSelectValue(value) })}
-                          disabled={isRuleBusy || !draft.match_category}
-                        >
-                          <SelectTrigger id={`rule-subcat-${rule.id}`}>
-                            <SelectValue placeholder="Any subcategory" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={ANY_SELECT_VALUE}>Any subcategory</SelectItem>
-                            {activeSubcategoriesForKey(draft.match_category).map((s) => (
-                              <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor={`rule-role-${rule.id}`}>Submitter role condition</Label>
-                        <Select
-                          value={selectValue(draft.match_submitter_role)}
-                          onValueChange={(value) => updateDraft(rule, { match_submitter_role: optionalSelectValue(value) })}
-                          disabled={isRuleBusy}
-                        >
-                          <SelectTrigger id={`rule-role-${rule.id}`}>
-                            <SelectValue placeholder="Any role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={ANY_SELECT_VALUE}>Any role</SelectItem>
-                            {(Object.entries(ROLE_LABELS) as [string, string][]).map(([key, label]) => (
-                              <SelectItem key={key} value={key}>{label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`rule-priority-${rule.id}`}>Priority condition</Label>
-                        <Select
-                          value={selectValue(draft.match_priority)}
-                          onValueChange={(value) => updateDraft(rule, { match_priority: optionalSelectValue(value) })}
-                          disabled={isRuleBusy}
-                        >
-                          <SelectTrigger id={`rule-priority-${rule.id}`}>
-                            <SelectValue placeholder="Any priority" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={ANY_SELECT_VALUE}>Any priority</SelectItem>
-                            {PRIORITY_OPTIONS.map((p) => (
-                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor={`rule-assign-${rule.id}`}>Assign to</Label>
-                      <Select
-                        value={draft.assign_to_user_id}
-                        onValueChange={(v) => updateDraft(rule, { assign_to_user_id: v })}
-                        disabled={isRuleBusy || profilesLoading}
                       >
-                        <SelectTrigger id={`rule-assign-${rule.id}`}>
-                          <SelectValue placeholder={profilesLoading ? 'Loading…' : 'Select assignee'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {activeProfiles.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name || p.email}
-                              {p.role && (
-                                <span className="ml-1.5 text-xs text-muted-foreground">
-                                  ({ROLE_LABELS[p.role] ?? p.role})
-                                </span>
-                              )}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete ${rule.name}`}
+                        onClick={() => setDeletingRule(rule)}
+                        disabled={isRuleBusy}
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        {isRuleBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      </Button>
                     </div>
-
-                    <Button
-                      type="button"
-                      onClick={() => void handleSave(rule)}
-                      disabled={isRuleBusy || !isDirty}
-                      className="gap-2"
-                    >
-                      {isRuleBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      Save changes
-                    </Button>
                   </div>
-                )}
-              </div>
-            );
-          })}
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Rule active</p>
+                      <p className="text-xs text-muted-foreground">
+                        Inactive rules are skipped during evaluation.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={rule.is_active}
+                      onCheckedChange={() => void handleToggle(rule)}
+                      disabled={isRuleBusy}
+                    />
+                  </div>
+                </div>
+              );
+            }}
+          </SortableList>
         </div>
       )}
+
+      {/* Edit routing rule drawer */}
+      <Sheet
+        open={!!editingRule}
+        onOpenChange={(open) => { if (!open) { setExpandedRuleId(null); setConflictRuleId(null); } }}
+      >
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>Edit routing rule</SheetTitle>
+            <SheetDescription>{editingRule?.name ?? ''}</SheetDescription>
+          </SheetHeader>
+          {editingRule && editingDraft && (
+            <div className="mt-4 space-y-4">
+              {conflictRuleId === editingRule.id && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                    <span>{CONFLICT_RELOAD_MESSAGE}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setConflictRuleId(null); setExpandedRuleId(null); void reload(); }}
+                    >
+                      Reload
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor={`rule-name-${editingRule.id}`}>Rule name</Label>
+                <Input
+                  id={`rule-name-${editingRule.id}`}
+                  value={editingDraft.name}
+                  onChange={(event) => updateDraft(editingRule, { name: event.target.value })}
+                  disabled={busyRuleId === editingRule.id}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor={`rule-cat-${editingRule.id}`}>Category condition</Label>
+                  <Select
+                    value={selectValue(editingDraft.match_category)}
+                    onValueChange={(value) => updateDraft(editingRule, {
+                      match_category: optionalSelectValue(value),
+                      match_subcategory: '',
+                    })}
+                    disabled={busyRuleId === editingRule.id}
+                  >
+                    <SelectTrigger id={`rule-cat-${editingRule.id}`}>
+                      <SelectValue placeholder="Any category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ANY_SELECT_VALUE}>Any category</SelectItem>
+                      {categories.filter((c) => c.is_active).map((c) => (
+                        <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`rule-subcat-${editingRule.id}`}>Subcategory condition</Label>
+                  <Select
+                    value={selectValue(editingDraft.match_subcategory)}
+                    onValueChange={(value) => updateDraft(editingRule, { match_subcategory: optionalSelectValue(value) })}
+                    disabled={busyRuleId === editingRule.id || !editingDraft.match_category}
+                  >
+                    <SelectTrigger id={`rule-subcat-${editingRule.id}`}>
+                      <SelectValue placeholder="Any subcategory" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ANY_SELECT_VALUE}>Any subcategory</SelectItem>
+                      {activeSubcategoriesForKey(editingDraft.match_category).map((s) => (
+                        <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor={`rule-role-${editingRule.id}`}>Submitter role condition</Label>
+                  <Select
+                    value={selectValue(editingDraft.match_submitter_role)}
+                    onValueChange={(value) => updateDraft(editingRule, { match_submitter_role: optionalSelectValue(value) })}
+                    disabled={busyRuleId === editingRule.id}
+                  >
+                    <SelectTrigger id={`rule-role-${editingRule.id}`}>
+                      <SelectValue placeholder="Any role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ANY_SELECT_VALUE}>Any role</SelectItem>
+                      {(Object.entries(ROLE_LABELS) as [string, string][]).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`rule-priority-${editingRule.id}`}>Priority condition</Label>
+                  <Select
+                    value={selectValue(editingDraft.match_priority)}
+                    onValueChange={(value) => updateDraft(editingRule, { match_priority: optionalSelectValue(value) })}
+                    disabled={busyRuleId === editingRule.id}
+                  >
+                    <SelectTrigger id={`rule-priority-${editingRule.id}`}>
+                      <SelectValue placeholder="Any priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ANY_SELECT_VALUE}>Any priority</SelectItem>
+                      {PRIORITY_OPTIONS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor={`rule-assign-${editingRule.id}`}>Assign to</Label>
+                <Select
+                  value={editingDraft.assign_to_user_id}
+                  onValueChange={(v) => updateDraft(editingRule, { assign_to_user_id: v })}
+                  disabled={busyRuleId === editingRule.id || profilesLoading}
+                >
+                  <SelectTrigger id={`rule-assign-${editingRule.id}`}>
+                    <SelectValue placeholder={profilesLoading ? 'Loading…' : 'Select assignee'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeProfiles.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name || p.email}
+                        {p.role && (
+                          <span className="ml-1.5 text-xs text-muted-foreground">
+                            ({ROLE_LABELS[p.role] ?? p.role})
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <SheetFooter className="mt-4 gap-2">
+            <Button type="button" variant="outline" onClick={() => setExpandedRuleId(null)} disabled={!!busyRuleId}>Cancel</Button>
+            <Button
+              type="button"
+              onClick={() => { if (editingRule) void handleSave(editingRule); }}
+              disabled={!editingRule || busyRuleId === editingRule?.id || !editingDirty}
+              className="gap-2"
+            >
+              {editingRule && busyRuleId === editingRule.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save changes
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       <ConfirmDialog
         open={deletingRule !== null}

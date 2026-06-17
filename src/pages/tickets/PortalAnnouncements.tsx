@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Badge } from '@/components/ui/badge';
+import { RequestBadge } from '@/components/tickets/RequestBadge';
+import { type Tone } from '@/lib/statusTones';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -53,17 +54,30 @@ const TYPE_LABELS: Record<PortalAnnouncementType, string> = {
   deadline:       'Deadline',
 };
 
-const PRIORITY_COLORS: Record<PortalAnnouncementPriority, string> = {
-  low:    'bg-gray-100 text-gray-600 border-gray-200',
-  normal: 'bg-blue-50 text-blue-700 border-blue-200',
-  high:   'bg-orange-100 text-orange-700 border-orange-200',
-  urgent: 'bg-red-100 text-red-700 border-red-200',
+const PRIORITY_TONES: Record<PortalAnnouncementPriority, Tone> = {
+  low:    'slate',
+  normal: 'blue',
+  high:   'amber',
+  urgent: 'red',
 };
 
-const STATUS_COLORS: Record<PortalAnnouncementStatus, string> = {
-  draft:     'bg-yellow-50 text-yellow-700 border-yellow-200',
-  published: 'bg-green-50 text-green-700 border-green-200',
-  archived:  'bg-gray-100 text-gray-500 border-gray-200',
+const PRIORITY_LABELS: Record<PortalAnnouncementPriority, string> = {
+  low:    'Low',
+  normal: 'Normal',
+  high:   'High',
+  urgent: 'Urgent',
+};
+
+const STATUS_TONES: Record<PortalAnnouncementStatus, Tone> = {
+  draft:     'amber',
+  published: 'emerald',
+  archived:  'slate',
+};
+
+const STATUS_LABELS: Record<PortalAnnouncementStatus, string> = {
+  draft:     'Draft',
+  published: 'Published',
+  archived:  'Archived',
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -551,21 +565,13 @@ function AnnouncementCard({
                 {record.title}
               </CardTitle>
               <div className="flex gap-1.5 flex-wrap shrink-0">
-                <Badge variant="outline" className={`text-xs ${PRIORITY_COLORS[record.priority]}`}>
-                  {record.priority.charAt(0).toUpperCase() + record.priority.slice(1)}
-                </Badge>
-                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                  {TYPE_LABELS[record.announcement_type]}
-                </Badge>
+                <RequestBadge tone={PRIORITY_TONES[record.priority]} label={PRIORITY_LABELS[record.priority]} />
+                <RequestBadge tone="violet" label={TYPE_LABELS[record.announcement_type]} />
                 {canManage && (
-                  <Badge variant="outline" className={`text-xs ${STATUS_COLORS[record.status]}`}>
-                    {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                  </Badge>
+                  <RequestBadge tone={STATUS_TONES[record.status]} label={STATUS_LABELS[record.status]} />
                 )}
                 {expired && (
-                  <Badge variant="outline" className="text-xs bg-gray-100 text-gray-500 border-gray-200">
-                    Expired
-                  </Badge>
+                  <RequestBadge tone="slate" label="Expired" />
                 )}
               </div>
             </div>

@@ -3,6 +3,7 @@ import { Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAttachmentSettings } from '@/hooks/useAttachmentSettings';
 
@@ -65,7 +66,7 @@ export function AttachmentSettingsEditor({ companyId, actorId }: Props) {
           <div className="space-y-2">
             <Label htmlFor="attach-max-size">Maximum file size per attachment (MB)</Label>
             <div className="flex items-center gap-3">
-              <input
+              <Input
                 id="attach-max-size"
                 type="number"
                 min={1}
@@ -76,7 +77,7 @@ export function AttachmentSettingsEditor({ companyId, actorId }: Props) {
                     Math.min(50, Math.max(1, Number.parseInt(event.target.value, 10) || 1)),
                   )
                 }
-                className="flex h-9 w-24 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="h-9 w-24"
               />
               <span className="text-sm text-muted-foreground">MB (1 – 50)</span>
             </div>
@@ -88,7 +89,7 @@ export function AttachmentSettingsEditor({ companyId, actorId }: Props) {
           <div className="space-y-2">
             <Label htmlFor="attach-max-files">Maximum files per request</Label>
             <div className="flex items-center gap-3">
-              <input
+              <Input
                 id="attach-max-files"
                 type="number"
                 min={1}
@@ -99,7 +100,7 @@ export function AttachmentSettingsEditor({ companyId, actorId }: Props) {
                     Math.min(10, Math.max(1, Number.parseInt(event.target.value, 10) || 1)),
                   )
                 }
-                className="flex h-9 w-24 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="h-9 w-24"
               />
               <span className="text-sm text-muted-foreground">files (1 – 10)</span>
             </div>

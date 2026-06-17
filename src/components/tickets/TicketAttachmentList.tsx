@@ -31,7 +31,7 @@ export function TicketAttachmentList({ attachments }: { attachments: TicketAttac
 
   return (
     <div className="rounded-lg border border-border px-3 py-2.5">
-      <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="eyebrow flex items-center gap-2">
         <Paperclip className="h-3.5 w-3.5" />
         Attachments ({attachments.length})
       </p>

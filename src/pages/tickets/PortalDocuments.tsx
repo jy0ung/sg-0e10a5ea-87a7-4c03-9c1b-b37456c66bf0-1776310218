@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Badge } from '@/components/ui/badge';
+import { RequestBadge } from '@/components/tickets/RequestBadge';
+import { type Tone } from '@/lib/statusTones';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -69,20 +70,26 @@ const CATEGORY_LABELS: Record<PortalDocumentCategory, string> = {
   general:   'General',
 };
 
-const CATEGORY_COLORS: Record<PortalDocumentCategory, string> = {
-  form:      'bg-blue-50 text-blue-700 border-blue-200',
-  template:  'bg-violet-50 text-violet-700 border-violet-200',
-  sop:       'bg-orange-50 text-orange-700 border-orange-200',
-  guideline: 'bg-teal-50 text-teal-700 border-teal-200',
-  checklist: 'bg-green-50 text-green-700 border-green-200',
-  policy:    'bg-red-50 text-red-700 border-red-200',
-  general:   'bg-gray-100 text-gray-600 border-gray-200',
+const CATEGORY_TONES: Record<PortalDocumentCategory, Tone> = {
+  form:      'blue',
+  template:  'violet',
+  sop:       'amber',
+  guideline: 'emerald',
+  checklist: 'emerald',
+  policy:    'red',
+  general:   'slate',
 };
 
-const STATUS_COLORS: Record<PortalDocumentStatus, string> = {
-  active:   'bg-green-50 text-green-700 border-green-200',
-  inactive: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  archived: 'bg-gray-100 text-gray-500 border-gray-200',
+const STATUS_TONES: Record<PortalDocumentStatus, Tone> = {
+  active:   'emerald',
+  inactive: 'amber',
+  archived: 'slate',
+};
+
+const STATUS_LABELS: Record<PortalDocumentStatus, string> = {
+  active:   'Active',
+  inactive: 'Inactive',
+  archived: 'Archived',
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -302,7 +309,7 @@ export default function PortalDocuments() {
   return (
     <div className="w-full space-y-4">
       <PageHeader
-        title="Documents &amp; Forms"
+        title="Documents & Forms"
         description="Downloadable forms, templates, SOPs, and supporting documents"
         breadcrumbs={[{ label: 'Internal Requests' }, { label: 'Documents & Forms' }]}
         actions={
@@ -642,18 +649,12 @@ function DocumentRow({
           <div className="flex items-center gap-2 flex-wrap">
             {pinned && <Pin className="h-3.5 w-3.5 text-amber-600 shrink-0" />}
             <p className="text-sm font-medium truncate">{record.title}</p>
-            <Badge variant="outline" className={`text-xs shrink-0 ${CATEGORY_COLORS[record.category]}`}>
-              {CATEGORY_LABELS[record.category]}
-            </Badge>
+            <RequestBadge tone={CATEGORY_TONES[record.category]} label={CATEGORY_LABELS[record.category]} className="shrink-0" />
             {canManage && (
-              <Badge variant="outline" className={`text-xs shrink-0 ${STATUS_COLORS[record.status]}`}>
-                {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-              </Badge>
+              <RequestBadge tone={STATUS_TONES[record.status]} label={STATUS_LABELS[record.status]} className="shrink-0" />
             )}
             {expired && (
-              <Badge variant="outline" className="text-xs shrink-0 bg-gray-100 text-gray-500 border-gray-200">
-                Expired
-              </Badge>
+              <RequestBadge tone="slate" label="Expired" className="shrink-0" />
             )}
           </div>
           <div className="flex items-center gap-3 mt-0.5 flex-wrap text-xs text-muted-foreground">

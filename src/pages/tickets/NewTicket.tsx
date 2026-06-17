@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { PageHeader } from '@/components/shared/PageHeader';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,12 +33,12 @@ import {
   ROLE_CONTEXT,
   ticketSchema,
   AttachmentsSection,
-  CustomFieldsSection,
   RequestDescriptionCard,
   RequestHeaderCard,
   RequestSummaryCard,
   StickySubmitPanel,
   type ApprovalPlanState,
+  type DescriptionSource,
   type TicketFormData,
 } from './new-ticket/NewTicketSections';
 
@@ -56,9 +57,13 @@ export default function NewTicket() {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [approvalConfirmData, setApprovalConfirmData] = useState<TicketFormData | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const [descriptionSource, setDescriptionSource] = useState<DescriptionSource>('subcategory');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftRestoredRef = useRef(false);
   const skipDraftSaveRef = useRef(false);
+  // Tracks the last description text we auto-filled from a category/subcategory,
+  // so we only overwrite the body while it still holds that suggested text.
+  const autoFilledDescriptionRef = useRef('');
 
   const roleContext = ROLE_CONTEXT[user?.role as AppRole] ?? DEFAULT_ROLE_CONTEXT;
 
@@ -185,6 +190,35 @@ export default function NewTicket() {
       form.setValue('subcategory', nextSubcategory, { shouldValidate: true });
     }
   }, [availableSubcategories, form]);
+
+  // ── Description auto-fill from category / subcategory description ──────────
+  // Default source is the subcategory's description, falling back to the
+  // category's. We only overwrite the body while it still holds the last
+  // suggested text — manual edits (or a restored draft) are preserved.
+  const selectedCategoryDescription = selectedCategory?.description ?? '';
+  const selectedSubcategoryDescription = selectedSubcategory?.description ?? '';
+
+  useEffect(() => {
+    if (descriptionSource === 'custom') return;
+    const suggested = descriptionSource === 'category'
+      ? selectedCategoryDescription
+      : (selectedSubcategoryDescription || selectedCategoryDescription);
+    const current = form.getValues('description') ?? '';
+    // Respect text the user typed or a restored draft.
+    if (current !== '' && current !== autoFilledDescriptionRef.current) return;
+    if (suggested !== current) {
+      form.setValue('description', suggested, { shouldValidate: true });
+    }
+    autoFilledDescriptionRef.current = suggested;
+  }, [descriptionSource, selectedCategoryDescription, selectedSubcategoryDescription, form]);
+
+  // Once the body diverges from the suggested text, switch to "Custom" so
+  // later category/subcategory changes stop overwriting it.
+  useEffect(() => {
+    if (descriptionSource !== 'custom' && descriptionValue !== autoFilledDescriptionRef.current) {
+      setDescriptionSource('custom');
+    }
+  }, [descriptionValue, descriptionSource]);
 
   const validateAndAddFiles = useCallback(
     (incoming: File[]) => {
@@ -353,6 +387,8 @@ export default function NewTicket() {
       subcategory: firstSubcategoryKey,
     });
     setCustomFieldValues({});
+    autoFilledDescriptionRef.current = '';
+    setDescriptionSource('subcategory');
     if (draftKey) window.localStorage.removeItem(draftKey);
     toast.success('Request submitted', {
       description: 'Your request has been recorded and will be reviewed shortly.',
@@ -434,13 +470,15 @@ export default function NewTicket() {
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
       {/* ── Page header ──────────────────────────────────────── */}
-      <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            {roleContext.pageTitle}
-          </h1>
-          <p className="text-sm text-muted-foreground">{roleContext.pageSubtitle}</p>
-        </div>
+      <div className="shrink-0 [&>div]:mb-0">
+        <PageHeader
+          title={roleContext.pageTitle}
+          description={roleContext.pageSubtitle}
+          breadcrumbs={[
+            { label: 'Internal Requests', path: '/portal' },
+            { label: 'New request' },
+          ]}
+        />
       </div>
 
       {/* ── Error state ──────────────────────────────────────── */}
@@ -482,6 +520,10 @@ export default function NewTicket() {
               onSubcategoryChange={handleSubcategoryChange}
               subjectValue={subjectValue}
               subjectStatus={fieldValidationStatus.subject}
+              customFields={customFields}
+              customFieldValues={customFieldValues}
+              setCustomFieldValues={setCustomFieldValues}
+              companyId={user?.company_id}
             />
 
             <RequestDescriptionCard
@@ -489,14 +531,8 @@ export default function NewTicket() {
               roleContext={roleContext}
               descriptionValue={descriptionValue}
               descriptionStatus={fieldValidationStatus.description}
-            />
-
-            <CustomFieldsSection
-              customFields={customFields}
-              selectedCategory={selectedCategory}
-              customFieldValues={customFieldValues}
-              companyId={user?.company_id}
-              setCustomFieldValues={setCustomFieldValues}
+              descriptionSource={descriptionSource}
+              onDescriptionSourceChange={setDescriptionSource}
             />
           </div>
 

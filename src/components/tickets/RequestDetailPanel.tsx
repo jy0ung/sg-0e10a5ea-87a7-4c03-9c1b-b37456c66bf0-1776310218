@@ -1,7 +1,6 @@
 import { formatDistanceToNow } from 'date-fns';
 import { CheckCircle2, Loader2, MessageSquare, Send, UserRound, XCircle } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -13,12 +12,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
-import {
-  customFieldEntries,
-  formatTicketLabel,
-  isOverdue,
-  statusColorMap,
-} from '@/lib/requestFormatters';
+import { customFieldEntries, isOverdue } from '@/lib/requestFormatters';
+import { RequestBadge, RequestStatusBadge } from '@/components/tickets/RequestBadge';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
 import { TicketAttachmentList } from '@/components/tickets/TicketAttachmentList';
 import { TicketApprovalHistory } from '@/components/tickets/TicketApprovalHistory';
@@ -98,14 +93,12 @@ export function RequestDetailPanel({
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0 space-y-1.5">
             <div className="flex flex-wrap gap-1.5">
-              <Badge variant="outline" className={`border text-[10px] capitalize ${statusColorMap[ticket.status]}`}>
-                {formatTicketLabel(ticket.status)}
-              </Badge>
-              {isOverdue(ticket) && <Badge variant="destructive" className="text-[10px]">Overdue</Badge>}
+              <RequestStatusBadge status={ticket.status} />
+              {isOverdue(ticket) && <RequestBadge tone="red" label="Overdue" />}
               <TicketApprovalSummary ticket={ticket} compact />
             </div>
             <h2 className={variant === 'drawer' ? 'text-base font-semibold leading-6 text-foreground' : 'text-base font-semibold text-foreground'}>{ticket.subject}</h2>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Submitted {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}
               {ticket.vso_number ? ` · VSO ${ticket.vso_number}` : ''}
             </p>
@@ -155,7 +148,7 @@ export function RequestDetailPanel({
         {/* Admin controls: status, priority, owner */}
         <div className={`grid gap-2 ${gridColumns}`}>
           <div className="space-y-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Status</p>
+            <p className="eyebrow">Status</p>
             <Select
               value={ticket.status}
               onValueChange={(value) => onStatusChange(ticket.id, value as TicketStatus)}
@@ -170,7 +163,7 @@ export function RequestDetailPanel({
             </Select>
           </div>
           <div className="space-y-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Priority</p>
+            <p className="eyebrow">Priority</p>
             <Select
               value={ticket.priority}
               onValueChange={(value) => onPriorityChange(ticket.id, value as TicketPriority)}
@@ -185,7 +178,7 @@ export function RequestDetailPanel({
             </Select>
           </div>
           <div className="space-y-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Owner</p>
+            <p className="eyebrow">Owner</p>
             <Select
               value={ticket.assigned_to ?? 'unassigned'}
               onValueChange={(value) => onAssignmentChange(ticket.id, value)}
@@ -205,18 +198,18 @@ export function RequestDetailPanel({
         {/* Metadata cards */}
         <div className={`grid gap-2 ${gridColumns}`}>
           <div className="rounded-md border border-border bg-background px-3 py-2">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <p className="flex items-center gap-1.5 eyebrow">
               <UserRound className="h-3 w-3" />
               Requester
             </p>
             <p className="mt-1 text-sm font-medium text-foreground">{ticket.submitted_by_name ?? 'Unknown requester'}</p>
-            {ticket.submitted_by_email && <p className="truncate text-[11px] text-muted-foreground">{ticket.submitted_by_email}</p>}
+            {ticket.submitted_by_email && <p className="truncate text-xs text-muted-foreground">{ticket.submitted_by_email}</p>}
           </div>
           <div className="rounded-md border border-border bg-background px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Category</p>
+            <p className="eyebrow">Category</p>
             <p className="mt-1 text-sm font-medium text-foreground">{getRequestCategoryLabel(ticket.category, categories)}</p>
             {ticket.subcategory && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories)}
               </p>
             )}
@@ -226,11 +219,11 @@ export function RequestDetailPanel({
         {/* Additional custom fields */}
         {extraFields.length > 0 && (
           <div className="rounded-md border border-border bg-background px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Additional details</p>
+            <p className="eyebrow">Additional details</p>
             <div className={`mt-1.5 grid gap-2 ${twoColumns}`}>
               {extraFields.map((field) => (
                 <div key={field.key} className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground">{field.label}</p>
+                  <p className="text-xs text-muted-foreground">{field.label}</p>
                   <p className={`${additionalFieldValueClass} text-sm text-foreground`}>{field.value}</p>
                 </div>
               ))}
@@ -240,7 +233,7 @@ export function RequestDetailPanel({
 
         {/* Description */}
         <div className="rounded-md border bg-background px-3 py-2">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Request detail</p>
+          <p className="mb-1 eyebrow">Request detail</p>
           <p className="whitespace-pre-line text-sm leading-5 text-foreground">{ticket.description}</p>
         </div>
 
@@ -249,7 +242,7 @@ export function RequestDetailPanel({
           <div className={`grid gap-2 ${twoColumns}`}>
             {ticket.desired_outcome && (
               <div className="rounded-md border border-border px-3 py-2">
-                <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <p className="flex items-center gap-1.5 eyebrow">
                   <CheckCircle2 className="h-3 w-3" />
                   Desired outcome
                 </p>
@@ -258,7 +251,7 @@ export function RequestDetailPanel({
             )}
             {ticket.business_impact && (
               <div className="rounded-md border border-border px-3 py-2">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Business impact</p>
+                <p className="eyebrow">Business impact</p>
                 <p className="mt-1 text-sm leading-5 text-foreground">{ticket.business_impact}</p>
               </div>
             )}
@@ -269,7 +262,7 @@ export function RequestDetailPanel({
         {(ticket.status === 'resolved' || ticket.status === 'closed' || ticket.resolution_note) && (
           <div className="space-y-2 rounded-md border border-border bg-secondary/20 px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Resolution note</p>
+              <p className="eyebrow">Resolution note</p>
               <Button
                 variant="outline"
                 size="sm"
@@ -287,7 +280,7 @@ export function RequestDetailPanel({
               rows={3}
               disabled={saving}
             />
-            <p className="text-[11px] text-muted-foreground">Shown to the requester when their request is resolved or closed.</p>
+            <p className="text-xs text-muted-foreground">Shown to the requester when their request is resolved or closed.</p>
           </div>
         )}
 
@@ -295,7 +288,7 @@ export function RequestDetailPanel({
 
         {/* Comment / discussion */}
         <div className="space-y-2 rounded-md border border-border px-3 py-2.5">
-          <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="flex items-center gap-1.5 eyebrow">
             <MessageSquare className="h-3 w-3" />
             Discussion
           </p>

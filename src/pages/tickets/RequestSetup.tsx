@@ -4,6 +4,8 @@ import { Route, Settings2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { MetricCard } from '@/components/shared/MetricCard';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { AttachmentSettingsEditor } from './request-setup/AttachmentSettingsEditor';
@@ -55,30 +57,18 @@ export default function RequestSetup() {
 
   return (
     <div className="w-full space-y-4">
-      <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Internal Requests</p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground">Request Operations Setup</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">
-              Shape the requester experience, routing logic, and attachment controls from one workspace.
-            </p>
-          </div>
-          <div className="grid w-full grid-cols-2 gap-2 text-center sm:w-auto sm:min-w-[460px] sm:grid-cols-3">
-            <div className="rounded-lg border bg-background px-3 py-2">
-              <p className="text-lg font-semibold tabular-nums text-foreground">{activeCounts.categories}</p>
-              <p className="text-[11px] text-muted-foreground">Categories</p>
-            </div>
-            <div className="rounded-lg border bg-background px-3 py-2">
-              <p className="text-lg font-semibold tabular-nums text-foreground">{activeCounts.fields}</p>
-              <p className="text-[11px] text-muted-foreground">Fields</p>
-            </div>
-            <div className="rounded-lg border bg-background px-3 py-2">
-              <p className="text-lg font-semibold tabular-nums text-foreground">{activeCounts.rules}</p>
-              <p className="text-[11px] text-muted-foreground">Rules</p>
-            </div>
-          </div>
-        </div>
+      <div className="[&>div]:mb-0">
+        <PageHeader
+          title="Request Operations Setup"
+          description="Shape the requester experience, routing logic, and attachment controls from one workspace."
+          breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'Setup' }]}
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MetricCard label="Categories" value={activeCounts.categories} tone="blue" />
+        <MetricCard label="Fields" value={activeCounts.fields} tone="violet" />
+        <MetricCard label="Routing rules" value={activeCounts.rules} tone="emerald" />
       </div>
 
       <Card className="overflow-hidden shadow-sm">

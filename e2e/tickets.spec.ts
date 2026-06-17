@@ -83,10 +83,10 @@ test("New Request submits successfully and returns to request history", async ({
   ).toBeVisible({ timeout: 10000 });
 
   await page.getByLabel(/request title/i).fill("Cannot access sales dashboard");
-  const categorySelect = page.getByRole("combobox", { name: /^category/i });
-  await categorySelect.click();
-  await page.getByLabel("General Support").click();
-  await expect(categorySelect).toContainText("General Support");
+  // Category is a dropdown; the only configured category auto-selects.
+  await expect(page.getByRole("combobox", { name: /^category/i })).toContainText("General Support");
+  // Description auto-fills from the category description (no subcategory configured).
+  await expect(page.getByLabel(/description/i)).toHaveValue(/general internal support requests/i);
   await page.getByLabel(/description/i).fill(
     "I get a 403 error whenever I open the sales dashboard after login.",
   );

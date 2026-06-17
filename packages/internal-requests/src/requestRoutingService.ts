@@ -325,6 +325,34 @@ export async function moveRoutingRule(
 }
 
 /**
+ * Persist an arbitrary new evaluation order (e.g. from drag-and-drop) by
+ * writing `sort_order = index` for each id. App-layer like {@link moveRoutingRule}.
+ */
+export async function reorderRoutingRules(
+  orderedIds: string[],
+  context: RoutingRuleContext,
+): Promise<{ error: string | null }> {
+  const timestamp = new Date().toISOString();
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase.from('request_routing_rules')
+        .update({ sort_order: index, updated_at: timestamp })
+        .eq('id', id)
+        .eq('company_id', context.companyId),
+    ),
+  );
+  const failed = results.find((result) => result.error);
+  if (failed?.error) return { error: (failed.error as { message: string }).message };
+
+  void logUserAction(context.actorId, 'update', 'request_routing_rule', orderedIds[0] ?? '', {
+    component: 'RequestRoutingService',
+    reorder: orderedIds.length,
+  });
+
+  return { error: null };
+}
+
+/**
  * Evaluate routing rules in priority order.
  * Returns the assign_to_user_id of the first active matching rule, or null.
  * Gracefully returns null if rules cannot be loaded (ticket is still created unassigned).

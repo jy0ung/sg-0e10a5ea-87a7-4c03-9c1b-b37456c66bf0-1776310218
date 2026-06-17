@@ -1,30 +1,33 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { formatDistanceToNow } from 'date-fns';
 import {
   AlertCircle,
   AlertTriangle,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   Clock,
   Download,
   Inbox,
-  Loader2,
   RefreshCcw,
   ShieldCheck,
   SlidersHorizontal,
   User,
   UserX,
-  X,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { PanelErrorBoundary } from '@/components/shared/PanelErrorBoundary';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
+import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
+import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { RequestDetailPanel } from '@/components/tickets/RequestDetailPanel';
+import { RequestPriorityBadge, RequestStatusBadge } from '@/components/tickets/RequestBadge';
+import { TicketApprovalSummary } from '@/components/tickets/TicketApprovalSummary';
+import { TicketSlaSummary } from '@/components/tickets/TicketSlaSummary';
 import {
   RequestQueueFilters,
   type AssigneeFilter,
@@ -32,7 +35,6 @@ import {
   type SlaFilter,
   type StatusFilter,
 } from '@/components/tickets/RequestQueueFilters';
-import { RequestQueueList } from '@/components/tickets/RequestQueueList';
 import { RequestQueueMetricGrid } from '@/components/tickets/RequestQueueMetricGrid';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -48,9 +50,12 @@ import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
 import { usePersistedDraftMap } from '@/hooks/usePersistedDraftMap';
 import {
-  Drawer,
-  DrawerContent,
-} from '@/components/ui/drawer';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   Dialog,
   DialogContent,
@@ -104,32 +109,12 @@ const priorityOptions: Array<{ value: TicketPriority; label: string }> = [
 
 const REQUEST_QUEUE_PAGE_SIZE = 25;
 
-function useIsLargeScreen() {
-  const [isLargeScreen, setIsLargeScreen] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return window.matchMedia('(min-width: 1024px)').matches;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-
-    const mediaQuery = window.matchMedia('(min-width: 1024px)');
-    const handleChange = () => setIsLargeScreen(mediaQuery.matches);
-    handleChange();
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
-
-  return isLargeScreen;
-}
-
 // formatTicketLabel, isOpenStatus, isApprovalAssignedToUser, csvCell, downloadCsv
 // are now imported from '@/lib/requestFormatters'
 
 export default function RequestQueue() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const isLargeScreen = useIsLargeScreen();
   const { categories } = useRequestCategories(user?.company_id, true);
   const { subcategories } = useRequestSubcategories(user?.company_id, { includeInactive: true });
   const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
@@ -144,7 +129,6 @@ export default function RequestQueue() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSaving, setBulkSaving] = useState(false);
-  const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
   const [metricsExpanded, setMetricsExpanded] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.localStorage.getItem('requestQueue.metricsExpanded') !== 'false';
@@ -340,10 +324,6 @@ export default function RequestQueue() {
   }, [ticketPage, user]);
 
   useEffect(() => {
-    if (isLargeScreen) setDetailDrawerOpen(false);
-  }, [isLargeScreen]);
-
-  useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem('requestQueue.metricsExpanded', String(metricsExpanded));
   }, [metricsExpanded]);
@@ -372,21 +352,10 @@ export default function RequestQueue() {
     });
   }, [categories, searchTerm, subcategories, tickets]);
 
-  const selectedTicket = useMemo(() => {
-    return filteredTickets.find((ticket) => ticket.id === selectedTicketId) ?? filteredTickets[0] ?? null;
-  }, [filteredTickets, selectedTicketId]);
-
-  const totalPages = Math.max(1, Math.ceil(totalCount / REQUEST_QUEUE_PAGE_SIZE));
-
-  useEffect(() => {
-    if (!selectedTicket) {
-      setSelectedTicketId(null);
-      return;
-    }
-    if (selectedTicket.id !== selectedTicketId) {
-      setSelectedTicketId(selectedTicket.id);
-    }
-  }, [selectedTicket, selectedTicketId]);
+  const selectedTicket = useMemo(
+    () => filteredTickets.find((ticket) => ticket.id === selectedTicketId) ?? null,
+    [filteredTickets, selectedTicketId],
+  );
 
   const queueMetrics = useMemo(() => ({
     unassigned: tickets.filter((ticket) => isOpenStatus(ticket.status) && !ticket.assigned_to).length,
@@ -764,46 +733,99 @@ export default function RequestQueue() {
     downloadCsv(`internal-requests-selected-${new Date().toISOString().slice(0, 10)}.csv`, rows);
   };
 
-  return (
-    <div className="flex h-full min-h-[720px] w-full flex-col gap-2 overflow-hidden lg:min-h-0">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
+  const columns: StandardTableColumn<CompanyTicketRecord>[] = [
+    {
+      key: 'subject',
+      label: 'Request',
+      className: 'min-w-[260px] max-w-[460px]',
+      render: (ticket) => (
         <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">Request Queue</h1>
-          <p className="text-[11px] text-muted-foreground">Triage, assign, and resolve internal requests</p>
+          <p className="truncate font-medium text-foreground">{ticket.subject}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {ticket.submitted_by_name ?? 'Unknown'} · {getRequestCategoryLabel(ticket.category, categories)}
+            {ticket.subcategory ? ` / ${getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories)}` : ''}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setMetricsExpanded((current) => !current)}
-            className="h-8 gap-1.5 text-xs"
-            aria-expanded={metricsExpanded}
-          >
-            {metricsExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-            Summary
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportCsv} className="h-8 gap-1.5 text-xs" disabled={loading || filteredTickets.length === 0}>
-            <Download className="h-3.5 w-3.5" />
-            CSV
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void refetchTickets()}
-            className="h-8 gap-1.5 text-xs"
-            disabled={ticketsFetching}
-          >
-            <RefreshCcw className={`h-3.5 w-3.5 ${ticketsFetching ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+      ),
+    },
+    {
+      key: 'priority',
+      label: 'Priority',
+      render: (ticket) => <RequestPriorityBadge priority={ticket.priority} />,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (ticket) => (
+        <div className="flex flex-wrap items-center gap-1">
+          <RequestStatusBadge status={ticket.status} />
+          {ticket.approval_status === 'pending' && <TicketApprovalSummary ticket={ticket} compact />}
         </div>
-      </div>
+      ),
+    },
+    {
+      key: 'sla',
+      label: 'SLA',
+      sortable: false,
+      render: (ticket) => <TicketSlaSummary ticket={ticket} compact />,
+    },
+    {
+      key: 'assigned_to_name',
+      label: 'Owner',
+      render: (ticket) =>
+        ticket.assigned_to_name
+          ? <span className="text-sm text-foreground">{ticket.assigned_to_name}</span>
+          : <span className="text-sm text-muted-foreground">Unassigned</span>,
+    },
+    {
+      key: 'created_at',
+      label: 'Submitted',
+      className: 'text-right',
+      render: (ticket) => (
+        <span className="whitespace-nowrap text-xs text-muted-foreground">
+          {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}
+        </span>
+      ),
+    },
+  ];
 
-      {metricsExpanded && (
-        <div className="shrink-0">
-          <RequestQueueMetricGrid metrics={queueMetrics} />
-        </div>
-      )}
+  return (
+    <div className="flex h-full w-full flex-col gap-4">
+      <PageHeader
+        title="Request Queue"
+        description="Triage, assign, and resolve internal requests"
+        breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'Queue' }]}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMetricsExpanded((current) => !current)}
+              className="gap-1.5"
+              aria-expanded={metricsExpanded}
+            >
+              {metricsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              Summary
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportCsv} className="gap-1.5" disabled={loading || filteredTickets.length === 0}>
+              <Download className="h-4 w-4" />
+              CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void refetchTickets()}
+              className="gap-1.5"
+              disabled={ticketsFetching}
+            >
+              <RefreshCcw className={`h-4 w-4 ${ticketsFetching ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </>
+        }
+      />
+
+      {metricsExpanded && <RequestQueueMetricGrid metrics={queueMetrics} />}
 
       {/* Saved views */}
       <div className="flex shrink-0 gap-1 overflow-x-auto pb-0.5">
@@ -828,56 +850,6 @@ export default function RequestQueue() {
         })}
       </div>
 
-      {/* Bulk action toolbar */}
-      {selectedIds.size > 0 && (
-        <div className="flex shrink-0 items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 shadow-sm">
-          <span className="text-xs font-medium text-foreground">{selectedIds.size} selected</span>
-          <div className="h-4 w-px bg-border" />
-          <Select value="" onValueChange={(value) => void handleBulkAssign(value)} disabled={bulkSaving}>
-            <SelectTrigger className="h-7 w-[150px] text-xs">
-              <SelectValue placeholder="Assign to..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unassigned">Unassigned</SelectItem>
-              {assignees.map((assignee) => (
-                <SelectItem key={assignee.id} value={assignee.id}>{assignee.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value="" onValueChange={(value) => void handleBulkStatus(value as TicketStatus)} disabled={bulkSaving}>
-            <SelectTrigger className="h-7 w-[150px] text-xs">
-              <SelectValue placeholder="Set status..." />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((status) => (
-                <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1 text-xs"
-            onClick={handleBulkExportCsv}
-            disabled={bulkSaving}
-          >
-            <Download className="h-3 w-3" />
-            CSV
-          </Button>
-          <div className="flex-1" />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 text-xs text-muted-foreground"
-            onClick={() => setSelectedIds(new Set())}
-            disabled={bulkSaving}
-          >
-            <X className="h-3 w-3" />
-            Clear
-          </Button>
-        </div>
-      )}
-
       <div className="shrink-0">
         <RequestQueueFilters
           searchTerm={searchTerm}
@@ -897,140 +869,105 @@ export default function RequestQueue() {
         />
       </div>
 
-      {loading ? (
-        <Card className="flex min-h-0 flex-1">
-          <CardContent className="flex flex-1 items-center justify-center gap-3 py-12 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Loading the request queue...</span>
-          </CardContent>
-        </Card>
-      ) : error ? (
-        <Card className="flex min-h-0 flex-1">
-          <CardContent className="flex flex-1 flex-col items-center justify-center gap-4 py-12 text-center">
-            <AlertCircle className="h-8 w-8 text-destructive" />
-            <div className="space-y-1">
-              <p className="font-medium text-foreground">Unable to load the request queue</p>
-              <p className="text-sm text-muted-foreground">{error}</p>
-            </div>
-            <Button onClick={() => void refetchTickets()} variant="outline" className="gap-2">
-              <RefreshCcw className="h-4 w-4" />
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      ) : filteredTickets.length === 0 ? (
-        <Card className="flex min-h-0 flex-1">
-          <CardContent className="flex flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-            <ShieldCheck className="h-8 w-8 text-muted-foreground" />
-            <div className="space-y-1">
-              {hasActiveFilters ? (
-                <>
-                  <p className="font-medium text-foreground">No requests match the current filters</p>
-                  <p className="text-sm text-muted-foreground">Try adjusting the filters, or clear them to see all requests.</p>
-                </>
-              ) : (
-                <>
-                  <p className="font-medium text-foreground">No requests in the queue yet</p>
-                  <p className="text-sm text-muted-foreground">New requests will appear here when submitted.</p>
-                </>
-              )}
-            </div>
-            {hasActiveFilters && (
-              <Button variant="outline" size="sm" onClick={handleClearFilters} className="gap-2">
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                Clear filters
-              </Button>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {loading ? (
+          <TableSkeleton rows={8} cols={6} />
+        ) : error ? (
+          <HrmsEmptyState
+            icon={AlertCircle}
+            title="Unable to load the request queue"
+            description={error}
+            action={{ label: 'Retry', onClick: () => void refetchTickets() }}
+          />
+        ) : filteredTickets.length === 0 ? (
+          <HrmsEmptyState
+            icon={hasActiveFilters ? SlidersHorizontal : ShieldCheck}
+            title={hasActiveFilters ? 'No requests match the current filters' : 'No requests in the queue yet'}
+            description={
+              hasActiveFilters
+                ? 'Try adjusting the filters, or clear them to see all requests.'
+                : 'New requests will appear here when submitted.'
+            }
+            action={hasActiveFilters ? { label: 'Clear filters', onClick: handleClearFilters } : undefined}
+          />
+        ) : (
+          <StandardTable
+            data={filteredTickets}
+            columns={columns}
+            rowKey="id"
+            hideSearch
+            mobileLayout="cards"
+            serverSide
+            totalCount={totalCount}
+            currentPage={page}
+            pageSizes={[REQUEST_QUEUE_PAGE_SIZE]}
+            onPageChange={(next) => {
+              setPage(next);
+              setSelectedIds(new Set());
+            }}
+            selectable
+            selected={selectedIds}
+            onSelectionChange={setSelectedIds}
+            bulkActions={() => (
+              <>
+                <Select value="" onValueChange={(value) => void handleBulkAssign(value)} disabled={bulkSaving}>
+                  <SelectTrigger className="h-7 w-[150px] text-xs">
+                    <SelectValue placeholder="Assign to..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {assignees.map((assignee) => (
+                      <SelectItem key={assignee.id} value={assignee.id}>{assignee.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value="" onValueChange={(value) => void handleBulkStatus(value as TicketStatus)} disabled={bulkSaving}>
+                  <SelectTrigger className="h-7 w-[150px] text-xs">
+                    <SelectValue placeholder="Set status..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={handleBulkExportCsv} disabled={bulkSaving}>
+                  <Download className="h-3 w-3" />
+                  CSV
+                </Button>
+              </>
             )}
-          </CardContent>
-        </Card>
-      ) : selectedTicket ? (
-        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[minmax(340px,0.9fr)_minmax(560px,1.6fr)] xl:grid-cols-[minmax(380px,0.8fr)_minmax(640px,1.7fr)]">
-          <RequestQueueList
-            tickets={filteredTickets}
-            selectedTicketId={selectedTicket.id}
-            openCount={statusCounts.open}
-            categories={categories}
-            subcategories={subcategories}
-            attachmentsByTicket={attachmentsByTicket}
-            selectedIds={selectedIds}
-            onToggleSelect={(ticketId) =>
-              setSelectedIds((prev) => {
-                const next = new Set(prev);
-                if (next.has(ticketId)) next.delete(ticketId);
-                else next.add(ticketId);
-                return next;
-              })
-            }
-            onToggleSelectAll={(allIds) =>
-              setSelectedIds((prev) => {
-                const allSelected = allIds.every((id) => prev.has(id));
-                if (allSelected) {
-                  const next = new Set(prev);
-                  allIds.forEach((id) => next.delete(id));
-                  return next;
-                }
-                return new Set([...prev, ...allIds]);
-              })
-            }
-            onSelectTicket={(ticketId) => {
-              setSelectedTicketId(ticketId);
-              void handleTicketOpen(ticketId);
-              if (!isLargeScreen) setDetailDrawerOpen(true);
+            onRowClick={(ticket) => {
+              setSelectedTicketId(ticket.id);
+              void handleTicketOpen(ticket.id);
             }}
           />
+        )}
+      </div>
 
-          <section className="hidden min-h-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm lg:block">
-            <PanelErrorBoundary scope="request-queue:detail" resetKey={selectedTicket.id}>
-              {renderDetailPanel(selectedTicket)}
-            </PanelErrorBoundary>
-          </section>
-        </div>
-      ) : null}
-
-      {!loading && !error && totalCount > 0 && (
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
-          <span>
-            {((page - 1) * REQUEST_QUEUE_PAGE_SIZE + 1).toLocaleString()}–{Math.min(page * REQUEST_QUEUE_PAGE_SIZE, totalCount).toLocaleString()} of {totalCount.toLocaleString()}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 text-xs"
-              disabled={page <= 1 || ticketsFetching}
-              onClick={() => { setPage((current) => Math.max(1, current - 1)); setSelectedIds(new Set()); }}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              Prev
-            </Button>
-            <span className="min-w-[70px] text-center text-[11px] text-foreground tabular-nums">
-              {page} / {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 text-xs"
-              disabled={page >= totalPages || ticketsFetching}
-              onClick={() => { setPage((current) => Math.min(totalPages, current + 1)); setSelectedIds(new Set()); }}
-            >
-              Next
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <Drawer open={!isLargeScreen && detailDrawerOpen && !!selectedTicket} onOpenChange={setDetailDrawerOpen}>
-        <DrawerContent className="max-h-[92vh]">
+      {/* Request detail drawer */}
+      <Sheet
+        open={!!selectedTicket}
+        onOpenChange={(open) => {
+          if (!open) setSelectedTicketId(null);
+        }}
+      >
+        <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl">
           {selectedTicket && (
-            <div className="overflow-y-auto px-4 pb-6 pt-3">
-              <PanelErrorBoundary scope="request-queue:detail-drawer" resetKey={selectedTicket.id}>
-                {renderDetailPanel(selectedTicket, 'drawer')}
-              </PanelErrorBoundary>
-            </div>
+            <>
+              <SheetHeader className="sr-only">
+                <SheetTitle>{selectedTicket.subject}</SheetTitle>
+                <SheetDescription>Internal request detail</SheetDescription>
+              </SheetHeader>
+              <div className="px-4 py-4">
+                <PanelErrorBoundary scope="request-queue:detail" resetKey={selectedTicket.id}>
+                  {renderDetailPanel(selectedTicket, 'drawer')}
+                </PanelErrorBoundary>
+              </div>
+            </>
           )}
-        </DrawerContent>
-      </Drawer>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={!!reviewTarget} onOpenChange={(open) => {
         if (!open) {
