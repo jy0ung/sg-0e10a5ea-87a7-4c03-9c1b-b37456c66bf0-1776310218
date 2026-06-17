@@ -14,7 +14,7 @@ export function TicketActivityList({ activities }: { activities: TicketActivityR
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="eyebrow">
         Activity timeline
       </p>
 

@@ -4,6 +4,7 @@ export {
   deleteRequestCategory,
   listRequestCategories,
   moveRequestCategory,
+  reorderRequestCategories,
   updateRequestCategory,
 } from '@flc/internal-requests';
 export type {

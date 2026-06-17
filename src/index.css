@@ -188,6 +188,11 @@
   .status-badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold;
   }
+  /* Canonical small-caps eyebrow/label. Use instead of ad-hoc
+     text-[11px]/text-[10px] uppercase label styling. */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-muted-foreground;
+  }
   .executive-gradient {
     @apply bg-card;
   }

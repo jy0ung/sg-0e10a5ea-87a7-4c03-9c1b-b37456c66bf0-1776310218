@@ -19,24 +19,24 @@ function DecisionRow({ decision }: { decision: ApprovalDecision }) {
         <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
       )}
       <div className="min-w-0">
-        <p className="text-[11px] font-medium text-foreground">
+        <p className="text-sm font-medium text-foreground">
           {decision.stepName ?? `Step ${decision.stepOrder}`}
           <span
             className={cn(
-              'ml-1.5 text-[10px] font-semibold uppercase tracking-wide',
-              approved ? 'text-emerald-600' : 'text-red-500',
+              'ml-1.5 text-xs font-semibold uppercase tracking-wide',
+              approved ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400',
             )}
           >
             {decision.decision}
           </span>
         </p>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {decision.approverName ?? 'Unknown approver'}
           {' · '}
           {formatDistanceToNow(new Date(decision.decidedAt), { addSuffix: true })}
         </p>
         {decision.note && (
-          <p className="mt-0.5 text-[11px] italic text-muted-foreground">
+          <p className="mt-0.5 text-xs italic text-muted-foreground">
             &ldquo;{decision.note}&rdquo;
           </p>
         )}
@@ -64,7 +64,7 @@ export function TicketApprovalHistory({ ticketId }: Props) {
 
   if (isLoading) {
     return (
-      <div className="mt-2 flex items-center gap-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
+      <div className="mt-2 flex items-center gap-2 border-t border-border pt-2 text-xs text-muted-foreground">
         <Loader2 className="h-3 w-3 animate-spin" />
         Loading approval trail…
       </div>
@@ -78,7 +78,7 @@ export function TicketApprovalHistory({ ticketId }: Props) {
 
   return (
     <div className="border-t border-border pt-2.5">
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <p className="mb-2 eyebrow">
         Approval trail
       </p>
       <ol className="space-y-2.5">
@@ -91,10 +91,10 @@ export function TicketApprovalHistory({ ticketId }: Props) {
           <li className="flex items-start gap-2">
             <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
             <div>
-              <p className="text-[11px] font-medium text-foreground">
+              <p className="text-sm font-medium text-foreground">
                 {approval.currentStepName ?? 'Pending step'}
               </p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {approval.currentApproverRole
                   ? `Awaiting: ${approval.currentApproverRole.replace(/_/g, ' ')}`
                   : 'Awaiting approval'}

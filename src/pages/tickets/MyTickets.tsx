@@ -1,14 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertCircle,
   CalendarDays,
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
+  Inbox,
   Loader2,
   MessageSquare,
   Plus,
@@ -20,7 +19,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -40,11 +38,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { MetricCard } from '@/components/shared/MetricCard';
+import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
+import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
+import { TableSkeleton } from '@/components/ui/TableSkeleton';
+import { RequestBadge, RequestPriorityBadge, RequestStatusBadge } from '@/components/tickets/RequestBadge';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
 import { TicketAttachmentList } from '@/components/tickets/TicketAttachmentList';
 import { TicketApprovalSummary } from '@/components/tickets/TicketApprovalSummary';
 import { TicketSlaSummary } from '@/components/tickets/TicketSlaSummary';
-import { Textarea } from '@/components/ui/textarea';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
@@ -54,9 +65,6 @@ import { getRequestCategoryLabel } from '@/lib/requestCategories';
 
 import {
   formatDueDate,
-  formatTicketLabel,
-  statusColorMap,
-  priorityColorMap,
   customFieldEntries,
   isOpenStatus,
 } from '@/lib/requestFormatters';
@@ -65,6 +73,7 @@ import {
   cancelMyTicket,
   listMyTickets,
   listTicketActivity,
+  type RequestTicketRecord,
   type TicketActivityRecord,
 } from '@/services/ticketService';
 import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@flc/platform-services';
@@ -73,6 +82,7 @@ type MyStatusFilter = 'all' | 'active' | 'resolved' | 'cancelled';
 
 export default function MyTickets() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { categories } = useRequestCategories(user?.company_id, true);
   useRequestSubcategories(user?.company_id, { includeInactive: true });
@@ -85,7 +95,7 @@ export default function MyTickets() {
   );
   const [savingCommentId, setSavingCommentId] = useState<string | null>(null);
   const [cancellingTicketId, setCancellingTicketId] = useState<string | null>(null);
-  const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<MyStatusFilter>('all');
 
@@ -233,66 +243,120 @@ export default function MyTickets() {
     });
   }, [tickets, searchTerm, statusFilter, categories]);
 
-  const isExpanded = (ticketId: string) => expandedTicketId === ticketId;
-  const toggleExpand = (ticketId: string) => {
-    setExpandedTicketId((current) => (current === ticketId ? null : ticketId));
-  };
+  const selectedTicket = useMemo(
+    () => filteredTickets.find((ticket) => ticket.id === selectedTicketId) ?? null,
+    [filteredTickets, selectedTicketId],
+  );
+
+  const columns = useMemo<StandardTableColumn<RequestTicketRecord>[]>(() => [
+    {
+      key: 'subject',
+      label: 'Request',
+      className: 'min-w-[240px] max-w-[420px]',
+      render: (ticket) => (
+        <div className="min-w-0">
+          <p className="truncate font-medium text-foreground">{ticket.subject}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {ticket.assigned_to_name ? `Owner: ${ticket.assigned_to_name}` : 'Awaiting assignment'}
+            {ticket.vso_number ? ` · VSO ${ticket.vso_number}` : ''}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      render: (ticket) => (
+        <span className="text-sm text-foreground">{getRequestCategoryLabel(ticket.category, categories)}</span>
+      ),
+    },
+    {
+      key: 'priority',
+      label: 'Priority',
+      render: (ticket) => <RequestPriorityBadge priority={ticket.priority} />,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (ticket) => <RequestStatusBadge status={ticket.status} />,
+    },
+    {
+      key: 'created_at',
+      label: 'Submitted',
+      className: 'text-right',
+      render: (ticket) => (
+        <span className="whitespace-nowrap text-xs text-muted-foreground">
+          {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}
+        </span>
+      ),
+    },
+  ], [categories]);
+
+  const metrics: Array<{ key: MyStatusFilter; label: string; value: number; icon: React.ElementType; tone: 'slate' | 'blue' | 'emerald'; hint?: string }> = [
+    { key: 'all', label: 'Total', value: counts.all, icon: Ticket, tone: 'slate' },
+    { key: 'active', label: 'Active', value: counts.active, icon: Inbox, tone: 'blue', hint: 'In progress or awaiting you' },
+    { key: 'resolved', label: 'Resolved', value: counts.resolved, icon: CheckCircle2, tone: 'emerald' },
+    { key: 'cancelled', label: 'Cancelled', value: counts.cancelled, icon: XCircle, tone: 'slate' },
+  ];
+
+  const selectedExtraFields = selectedTicket ? customFieldEntries(selectedTicket, customFieldLabelMap) : [];
+  const selectedCanCancel = selectedTicket?.status === 'open' && !selectedTicket.assigned_to;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full w-full flex-col gap-2">
-      {/* ── Header ──────────────────────────────────────────── */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-4 py-2.5 shadow-sm">
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-foreground">My Requests</h1>
-          <p className="text-[11px] text-muted-foreground">Track your submitted requests and follow up</p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => void refreshTickets()} disabled={loading}>
-            <RefreshCcw className="h-3.5 w-3.5" />
-            Refresh
-          </Button>
-          <Button asChild size="sm" className="h-8 gap-1.5 text-xs">
-            <Link to="/portal/tickets/new">
-              <Plus className="h-3.5 w-3.5" />
-              New Request
-            </Link>
-          </Button>
-        </div>
-      </div>
+    <div className="flex h-full w-full flex-col gap-4">
+      <PageHeader
+        title="My Requests"
+        description="Track your submitted requests and follow up"
+        breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'My Requests' }]}
+        actions={
+          <>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void refreshTickets()} disabled={loading}>
+              <RefreshCcw className="h-4 w-4" />
+              Refresh
+            </Button>
+            <Button asChild size="sm" className="gap-1.5">
+              <Link to="/portal/tickets/new">
+                <Plus className="h-4 w-4" />
+                New request
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
-      {/* ── Summary stats ───────────────────────────────────── */}
+      {/* Metric strip — also acts as a status filter */}
       {!loading && !error && tickets.length > 0 && (
-        <div className="flex flex-wrap items-stretch gap-2">
-          {[
-            { label: 'Total', value: counts.all, color: 'text-foreground' },
-            { label: 'Active', value: counts.active, color: counts.active > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground' },
-            { label: 'Resolved', value: counts.resolved, color: counts.resolved > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground' },
-            { label: 'Cancelled', value: counts.cancelled, color: 'text-muted-foreground' },
-          ].map((stat) => (
-            <div key={stat.label} className="kpi-card flex min-w-[100px] flex-1 items-center gap-2.5 !p-2.5">
-              <p className={`text-lg font-semibold tabular-nums leading-none ${stat.color}`}>{stat.value}</p>
-              <p className="text-[11px] text-muted-foreground">{stat.label}</p>
-            </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {metrics.map((metric) => (
+            <MetricCard
+              key={metric.key}
+              label={metric.label}
+              value={metric.value}
+              icon={metric.icon}
+              tone={metric.tone}
+              hint={metric.hint}
+              onClick={() => setStatusFilter(metric.key)}
+            />
           ))}
         </div>
       )}
 
-      {/* ── Filters ─────────────────────────────────────────── */}
+      {/* Filter bar */}
       {!loading && !error && tickets.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-lg border bg-card p-2.5 shadow-sm sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search by subject, category, VSO..."
               className="h-9 pl-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as MyStatusFilter)}>
-            <SelectTrigger className="h-9 w-[160px]">
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as MyStatusFilter)}>
+            <SelectTrigger className="h-9 w-full sm:w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -305,259 +369,188 @@ export default function MyTickets() {
         </div>
       )}
 
-      {/* ── Content ─────────────────────────────────────────── */}
+      {/* Content */}
       {loading ? (
-        <div className="flex flex-1 items-center justify-center gap-3 rounded-lg border bg-card py-16 text-muted-foreground shadow-sm">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="text-sm">Loading your requests...</span>
-        </div>
+        <TableSkeleton rows={6} cols={5} />
       ) : error ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border bg-card py-16 text-center shadow-sm">
-          <AlertCircle className="h-8 w-8 text-destructive" />
-          <div className="space-y-1">
-            <p className="font-medium text-foreground">Unable to load requests</p>
-            <p className="text-sm text-muted-foreground">{error}</p>
-          </div>
-          <Button onClick={() => void refreshTickets()} variant="outline" className="gap-2">
-            <RefreshCcw className="h-4 w-4" />
-            Retry
-          </Button>
-        </div>
+        <HrmsEmptyState
+          icon={AlertCircle}
+          title="Unable to load requests"
+          description={error}
+          action={{ label: 'Retry', onClick: () => void refreshTickets() }}
+        />
       ) : tickets.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border bg-card py-16 text-center shadow-sm">
-          <Ticket className="h-8 w-8 text-muted-foreground" />
-          <div className="space-y-1">
-            <p className="font-medium text-foreground">No requests yet</p>
-            <p className="text-sm text-muted-foreground">
-              Submit a new internal request from the New Request page.
-            </p>
-          </div>
-          <Button asChild size="sm" className="gap-2">
-            <Link to="/portal/tickets/new">
-              <Plus className="h-4 w-4" />
-              New Request
-            </Link>
-          </Button>
-        </div>
-      ) : filteredTickets.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border bg-card py-12 text-center shadow-sm">
-          <Search className="h-6 w-6 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">No requests match your search or filter.</p>
-        </div>
+        <HrmsEmptyState
+          icon={Ticket}
+          title="No requests yet"
+          description="Submit a new internal request to get started."
+          action={{ label: 'New request', onClick: () => navigate('/portal/tickets/new') }}
+        />
       ) : (
-        <div className="flex-1 overflow-auto rounded-lg border bg-card shadow-sm">
-          {/* Table header */}
-          <div className="sticky top-0 z-10 grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 border-b bg-muted/50 px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground backdrop-blur sm:grid-cols-[1fr_120px_90px_100px_100px]">
-            <span>Request</span>
-            <span className="hidden sm:block">Category</span>
-            <span className="hidden sm:block">Priority</span>
-            <span className="hidden sm:block">Status</span>
-            <span className="text-right">Date</span>
-          </div>
+        <StandardTable
+          data={filteredTickets}
+          columns={columns}
+          rowKey="id"
+          hideSearch
+          mobileLayout="cards"
+          emptyMessage="No requests match your search or filter."
+          onRowClick={(ticket) => setSelectedTicketId(ticket.id)}
+        />
+      )}
 
-          {/* Rows */}
-          {filteredTickets.map((ticket) => {
-            const expanded = isExpanded(ticket.id);
-            const extraFields = customFieldEntries(ticket, customFieldLabelMap);
-            const canCancel = ticket.status === 'open' && !ticket.assigned_to;
+      {/* Request detail drawer */}
+      <Sheet
+        open={!!selectedTicket}
+        onOpenChange={(open) => {
+          if (!open) setSelectedTicketId(null);
+        }}
+      >
+        <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl">
+          {selectedTicket && (
+            <>
+              <SheetHeader className="space-y-2 border-b border-border px-5 py-4 text-left">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <RequestStatusBadge status={selectedTicket.status} />
+                  <RequestPriorityBadge priority={selectedTicket.priority} />
+                  {selectedTicket.requested_due_date && (
+                    <RequestBadge
+                      tone="slate"
+                      icon={CalendarDays}
+                      label={`Due ${formatDueDate(selectedTicket.requested_due_date)}`}
+                    />
+                  )}
+                </div>
+                <SheetTitle className="text-base leading-6">{selectedTicket.subject}</SheetTitle>
+                <SheetDescription>
+                  {getRequestCategoryLabel(selectedTicket.category, categories)}
+                  {' · Submitted '}
+                  {formatDistanceToNow(new Date(selectedTicket.created_at), { addSuffix: true })}
+                  {selectedTicket.vso_number ? ` · VSO ${selectedTicket.vso_number}` : ''}
+                </SheetDescription>
+              </SheetHeader>
 
-            return (
-              <div key={ticket.id} className="border-b border-border last:border-b-0">
-                {/* Compact row */}
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(ticket.id)}
-                  className={`w-full grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-2.5 text-left transition-colors sm:grid-cols-[1fr_120px_90px_100px_100px] ${
-                    expanded ? 'bg-primary/[0.03]' : 'hover:bg-muted/40'
-                  }`}
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    {expanded
-                      ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    }
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">{ticket.subject}</p>
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {ticket.assigned_to_name ? `Owner: ${ticket.assigned_to_name}` : 'Awaiting assignment'}
-                        {ticket.vso_number ? ` · VSO ${ticket.vso_number}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="hidden truncate text-xs text-muted-foreground capitalize sm:block">
-                    {getRequestCategoryLabel(ticket.category, categories)}
-                  </span>
-                  <span className="hidden sm:block">
-                    <Badge variant="outline" className={`border text-[10px] capitalize ${priorityColorMap[ticket.priority]}`}>
-                      {ticket.priority}
-                    </Badge>
-                  </span>
-                  <span className="hidden sm:block">
-                    <Badge variant="outline" className={`border text-[10px] capitalize ${statusColorMap[ticket.status]}`}>
-                      {formatTicketLabel(ticket.status)}
-                    </Badge>
-                  </span>
-                  <div className="text-right">
-                    <p className="text-[11px] text-muted-foreground">
-                      {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}
-                    </p>
-                    {/* Mobile badges */}
-                    <div className="mt-0.5 flex justify-end gap-1 sm:hidden">
-                      <Badge variant="outline" className={`border text-[9px] capitalize ${statusColorMap[ticket.status]}`}>
-                        {formatTicketLabel(ticket.status)}
-                      </Badge>
-                      <Badge variant="outline" className={`border text-[9px] capitalize ${priorityColorMap[ticket.priority]}`}>
-                        {ticket.priority}
-                      </Badge>
-                    </div>
-                  </div>
-                </button>
+              <div className="space-y-3 px-5 py-4">
+                <div className="rounded-md border bg-background px-3 py-2">
+                  <p className="eyebrow mb-1">Description</p>
+                  <p className="whitespace-pre-line text-sm leading-5 text-foreground">{selectedTicket.description}</p>
+                </div>
 
-                {/* Expanded detail */}
-                {expanded && (
-                  <div className="border-t border-border bg-muted/10 px-4 py-3 sm:pl-10">
-                    <div className="space-y-3">
-                      {/* Badges row */}
-                      <div className="flex flex-wrap gap-1.5">
-                        <TicketApprovalSummary ticket={ticket} compact />
-                        <TicketSlaSummary ticket={ticket} compact />
-                        {ticket.requested_due_date && (
-                          <Badge variant="outline" className="gap-1 text-[10px]">
-                            <CalendarDays className="h-3 w-3" />
-                            Due {formatDueDate(ticket.requested_due_date)}
-                          </Badge>
-                        )}
-                        {canCancel && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-6 gap-1 text-[10px] text-destructive hover:text-destructive"
-                                disabled={cancellingTicketId === ticket.id}
-                              >
-                                {cancellingTicketId === ticket.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3" />}
-                                Cancel
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Cancel request?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This request is still open and unassigned. Cancelling it will close the request and remove it from the active queue.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Keep request</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  onClick={() => void handleCancelTicket(ticket.id)}
-                                >
-                                  Cancel request
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
+                <TicketSlaSummary ticket={selectedTicket} />
+                <TicketApprovalSummary ticket={selectedTicket} />
+
+                {(selectedTicket.desired_outcome || selectedTicket.business_impact) && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {selectedTicket.desired_outcome && (
+                      <div className="rounded-md border border-border bg-background px-3 py-2">
+                        <p className="eyebrow flex items-center gap-1.5">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Desired outcome
+                        </p>
+                        <p className="mt-1 text-sm leading-5 text-foreground">{selectedTicket.desired_outcome}</p>
                       </div>
-
-                      {/* Description */}
-                      <div className="rounded-md border bg-background px-3 py-2">
-                        <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Description</p>
-                        <p className="whitespace-pre-line text-sm leading-5 text-foreground">{ticket.description}</p>
+                    )}
+                    {selectedTicket.business_impact && (
+                      <div className="rounded-md border border-border bg-background px-3 py-2">
+                        <p className="eyebrow">Business impact</p>
+                        <p className="mt-1 text-sm leading-5 text-foreground">{selectedTicket.business_impact}</p>
                       </div>
+                    )}
+                  </div>
+                )}
 
-                      <TicketSlaSummary ticket={ticket} />
-                      <TicketApprovalSummary ticket={ticket} />
-
-                      {/* Desired outcome / Business impact */}
-                      {(ticket.desired_outcome || ticket.business_impact) && (
-                        <div className="grid gap-2 md:grid-cols-2">
-                          {ticket.desired_outcome && (
-                            <div className="rounded-md border border-border bg-background px-3 py-2">
-                              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                                <CheckCircle2 className="h-3 w-3" />
-                                Desired outcome
-                              </p>
-                              <p className="mt-1 text-sm leading-5 text-foreground">{ticket.desired_outcome}</p>
-                            </div>
-                          )}
-                          {ticket.business_impact && (
-                            <div className="rounded-md border border-border bg-background px-3 py-2">
-                              <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Business impact</p>
-                              <p className="mt-1 text-sm leading-5 text-foreground">{ticket.business_impact}</p>
-                            </div>
-                          )}
+                {selectedExtraFields.length > 0 && (
+                  <div className="rounded-md border border-border bg-background px-3 py-2">
+                    <p className="eyebrow">Additional details</p>
+                    <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+                      {selectedExtraFields.map((field) => (
+                        <div key={field.key} className="min-w-0">
+                          <p className="text-xs text-muted-foreground">{field.label}</p>
+                          <p className="truncate text-sm text-foreground">{field.value}</p>
                         </div>
-                      )}
-
-                      {/* Custom fields */}
-                      {extraFields.length > 0 && (
-                        <div className="rounded-md border border-border bg-background px-3 py-2">
-                          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Additional details</p>
-                          <div className="mt-1.5 grid gap-2 md:grid-cols-2">
-                            {extraFields.map((field) => (
-                              <div key={field.key} className="min-w-0">
-                                <p className="text-[11px] text-muted-foreground">{field.label}</p>
-                                <p className="truncate text-sm text-foreground">{field.value}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Resolution note */}
-                      {ticket.resolution_note && (
-                        <div className="rounded-md border border-border bg-secondary/30 px-3 py-2">
-                          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Resolution note</p>
-                          <p className="mt-1 text-sm leading-5 text-foreground">{ticket.resolution_note}</p>
-                        </div>
-                      )}
-
-                      <TicketAttachmentList attachments={attachmentsByTicket[ticket.id] ?? []} />
-
-                      {/* Discussion */}
-                      {ticket.status !== 'closed' && ticket.status !== 'cancelled' && (
-                        <div className="space-y-2 rounded-md border border-border bg-background px-3 py-2.5">
-                          <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                            <MessageSquare className="h-3 w-3" />
-                            Discussion
-                          </p>
-                          <Textarea
-                            value={commentDrafts[ticket.id] ?? ''}
-                            onChange={(event) => setCommentDrafts((current) => ({
-                              ...current,
-                              [ticket.id]: event.target.value,
-                            }))}
-                            placeholder="Add a clarification or follow-up note."
-                            rows={3}
-                            disabled={savingCommentId === ticket.id}
-                          />
-                          <div className="flex justify-end">
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="h-8 gap-1.5 text-xs"
-                              onClick={() => void handleAddComment(ticket.id)}
-                              disabled={savingCommentId === ticket.id || !commentDrafts[ticket.id]?.trim()}
-                            >
-                              {savingCommentId === ticket.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                              Add comment
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-
-                      <TicketActivityList activities={activitiesByTicket[ticket.id] ?? []} />
+                      ))}
                     </div>
                   </div>
                 )}
+
+                {selectedTicket.resolution_note && (
+                  <div className="rounded-md border border-border bg-secondary/30 px-3 py-2">
+                    <p className="eyebrow">Resolution note</p>
+                    <p className="mt-1 text-sm leading-5 text-foreground">{selectedTicket.resolution_note}</p>
+                  </div>
+                )}
+
+                <TicketAttachmentList attachments={attachmentsByTicket[selectedTicket.id] ?? []} />
+
+                {selectedTicket.status !== 'closed' && selectedTicket.status !== 'cancelled' && (
+                  <div className="space-y-2 rounded-md border border-border bg-background px-3 py-2.5">
+                    <p className="eyebrow flex items-center gap-1.5">
+                      <MessageSquare className="h-3 w-3" />
+                      Discussion
+                    </p>
+                    <Textarea
+                      value={commentDrafts[selectedTicket.id] ?? ''}
+                      onChange={(event) =>
+                        setCommentDrafts((current) => ({ ...current, [selectedTicket.id]: event.target.value }))
+                      }
+                      placeholder="Add a clarification or follow-up note."
+                      rows={3}
+                      disabled={savingCommentId === selectedTicket.id}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => void handleAddComment(selectedTicket.id)}
+                        disabled={savingCommentId === selectedTicket.id || !commentDrafts[selectedTicket.id]?.trim()}
+                      >
+                        {savingCommentId === selectedTicket.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                        Add comment
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <TicketActivityList activities={activitiesByTicket[selectedTicket.id] ?? []} />
+
+                {selectedCanCancel && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-1.5 text-destructive hover:text-destructive"
+                        disabled={cancellingTicketId === selectedTicket.id}
+                      >
+                        {cancellingTicketId === selectedTicket.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                        Cancel request
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel request?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This request is still open and unassigned. Cancelling it will close the request and remove it from the active queue.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep request</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => void handleCancelTicket(selectedTicket.id)}
+                        >
+                          Cancel request
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
               </div>
-            );
-          })}
-        </div>
-      )}
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

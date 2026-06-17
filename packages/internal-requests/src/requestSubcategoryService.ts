@@ -307,3 +307,115 @@ export async function moveRequestSubcategory(
 
   return { error: null };
 }
+
+/**
+ * Persist an arbitrary new order for the subcategories of a single category
+ * (e.g. from drag-and-drop). Writes `sort_order = index` for each id; app-layer
+ * like {@link moveRequestSubcategory}. `categoryKey` scopes the reorder for
+ * the audit log; the writes are keyed by id.
+ */
+export async function reorderRequestSubcategories(
+  categoryKey: string,
+  orderedIds: string[],
+  context: RequestSubcategoryContext,
+): Promise<{ error: string | null }> {
+  const timestamp = new Date().toISOString();
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from('request_subcategories')
+        .update({ sort_order: index, updated_by: context.actorId, updated_at: timestamp })
+        .eq('id', id)
+        .eq('company_id', context.companyId),
+    ),
+  );
+  const failed = results.find((result) => result.error);
+  if (failed?.error) return { error: failed.error.message };
+
+  void logUserAction(context.actorId, 'update', 'request_subcategory', orderedIds[0] ?? '', {
+    component: 'RequestSubcategoryService',
+    reorder: orderedIds.length,
+    categoryKey,
+  });
+
+  return { error: null };
+}
+
+export interface DeleteRequestSubcategoryResult {
+  error: string | null;
+  inUse?: boolean;
+  conflict?: boolean;
+}
+
+/**
+ * Deletes a subcategory if no ticket or template references its key. If it is
+ * in use, returns `{ inUse: true }` — the caller should offer deactivation
+ * instead. Scoped `request_form_fields` are removed by the FK `on delete cascade`.
+ * Mirrors {@link deleteRequestCategory}.
+ */
+export async function deleteRequestSubcategory(
+  subcategoryId: string,
+  context: RequestSubcategoryContext,
+  expectedUpdatedAt?: string,
+): Promise<DeleteRequestSubcategoryResult> {
+  const { data: row, error: fetchError } = await supabase
+    .from('request_subcategories')
+    .select('id, category_key, subcategory_key, label')
+    .eq('id', subcategoryId)
+    .eq('company_id', context.companyId)
+    .single();
+
+  if (fetchError || !row) {
+    return { error: 'Subcategory not found.' };
+  }
+
+  const categoryKey = (row as { category_key: string }).category_key;
+  const subcategoryKey = (row as { subcategory_key: string }).subcategory_key;
+  const label = (row as { label: string }).label;
+
+  // Ticket usage — tickets.subcategory stores the subcategory_key.
+  const { count: ticketCount, error: ticketError } = await supabase
+    .from('tickets')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', context.companyId)
+    .eq('category', categoryKey)
+    .eq('subcategory', subcategoryKey);
+  if (ticketError) return { error: ticketError.message };
+  if ((ticketCount ?? 0) > 0) {
+    return { error: 'This subcategory has been used in existing requests. Deactivate it instead.', inUse: true };
+  }
+
+  // Template usage.
+  const { count: templateCount, error: templateError } = await supabase
+    .from('request_templates')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', context.companyId)
+    .eq('category_key', categoryKey)
+    .eq('subcategory_key', subcategoryKey);
+  if (templateError) return { error: templateError.message };
+  if ((templateCount ?? 0) > 0) {
+    return { error: 'This subcategory is used by one or more templates. Deactivate it instead.', inUse: true };
+  }
+
+  let deleteQuery = supabase
+    .from('request_subcategories')
+    .delete()
+    .eq('id', subcategoryId)
+    .eq('company_id', context.companyId);
+  if (expectedUpdatedAt) deleteQuery = deleteQuery.eq('updated_at', expectedUpdatedAt);
+
+  const { data: deletedRows, error: deleteError } = await deleteQuery.select('id');
+  if (deleteError) return { error: deleteError.message };
+  if (expectedUpdatedAt && (!deletedRows || deletedRows.length === 0)) {
+    return { error: OPTIMISTIC_CONFLICT_MESSAGE, conflict: true };
+  }
+
+  void logUserAction(context.actorId, 'delete', 'request_subcategory', subcategoryId, {
+    component: 'RequestSubcategoryService',
+    category_key: categoryKey,
+    subcategory_key: subcategoryKey,
+    before: { label, subcategory_key: subcategoryKey },
+  });
+
+  return { error: null };
+}

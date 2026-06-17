@@ -389,3 +389,33 @@ export async function moveRequestCategory(
 
   return { error: null };
 }
+
+/**
+ * Persist an arbitrary new order (e.g. from a drag-and-drop reorder) by
+ * writing `sort_order = index` for each id. App-layer like {@link moveRequestCategory}
+ * — no RPC. Updates run in parallel; the first failure is returned.
+ */
+export async function reorderRequestCategories(
+  orderedIds: string[],
+  context: RequestCategoryContext,
+): Promise<{ error: string | null }> {
+  const timestamp = new Date().toISOString();
+  const results = await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from('request_categories')
+        .update({ sort_order: index, updated_by: context.actorId, updated_at: timestamp })
+        .eq('id', id)
+        .eq('company_id', context.companyId),
+    ),
+  );
+  const failed = results.find((result) => result.error);
+  if (failed?.error) return { error: failed.error.message };
+
+  void logUserAction(context.actorId, 'update', 'request_category', orderedIds[0] ?? '', {
+    component: 'RequestCategoryService',
+    reorder: orderedIds.length,
+  });
+
+  return { error: null };
+}

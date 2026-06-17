@@ -4,6 +4,7 @@ import type { UseFormReturn } from 'react-hook-form';
 import { z } from 'zod';
 import {
   AlertCircle,
+  AlignLeft,
   Check,
   CheckCircle2,
   ChevronRight,
@@ -43,6 +44,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { SectionCard } from '@/components/shared/SectionCard';
 import {
   type InternalRequestApprovalPlan,
   listRequestFieldOptions,
@@ -636,6 +638,11 @@ interface RequestHeaderCardProps {
   onSubcategoryChange: (subcategoryKey: string) => void;
   subjectValue: string;
   subjectStatus: 'valid' | 'invalid' | 'untouched';
+  /** Per-category custom fields, rendered as "Additional information" inside this card. */
+  customFields: RequestFormFieldRecord[];
+  customFieldValues: Record<string, string>;
+  setCustomFieldValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  companyId?: string;
 }
 
 export function RequestHeaderCard({
@@ -653,91 +660,82 @@ export function RequestHeaderCard({
   onSubcategoryChange,
   subjectValue,
   subjectStatus,
+  customFields,
+  customFieldValues,
+  setCustomFieldValues,
+  companyId,
 }: RequestHeaderCardProps) {
   return (
-    <Card className="border-border/80 shadow-sm">
-      <CardHeader className="border-b bg-muted/20 px-5 py-4">
-        <p className="text-sm font-semibold text-foreground">Request Details</p>
-      </CardHeader>
-      <CardContent className="space-y-5 p-5">
+    <SectionCard title="Request details" icon={FileText} bodyClassName="space-y-5">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="subject">
+            Request title <span className="text-destructive">*</span>
+          </Label>
+          {subjectStatus === 'valid' && (
+            <CheckCircle2 className="h-4 w-4 text-success" />
+          )}
+          {subjectStatus === 'invalid' && (
+            <XCircle className="h-4 w-4 text-destructive" />
+          )}
+        </div>
+        <Input
+          id="subject"
+          placeholder="e.g. Urgent invoice correction for customer delivery"
+          {...form.register('subject')}
+          className={cn(
+            'h-10 transition-colors',
+            subjectStatus === 'valid' && 'border-success/50 focus-visible:ring-success/50',
+            subjectStatus === 'invalid' && 'border-destructive',
+          )}
+        />
+        {form.formState.errors.subject ? (
+          <p className="flex items-center gap-1 text-xs text-destructive">
+            <AlertCircle className="h-3 w-3" />
+            {form.formState.errors.subject.message}
+          </p>
+        ) : subjectValue.length > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {subjectValue.length} character{subjectValue.length !== 1 ? 's' : ''}
+          </p>
+        ) : null}
+      </div>
+
+      {/* Category + Subcategory dropdowns */}
+      <div className={cn('grid gap-4', requiresSubcategory && 'md:grid-cols-2')}>
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="subject">
-              Request Title <span className="text-destructive">*</span>
-            </Label>
-            {subjectStatus === 'valid' && (
-              <CheckCircle2 className="h-4 w-4 text-success" />
-            )}
-            {subjectStatus === 'invalid' && (
-              <XCircle className="h-4 w-4 text-destructive" />
-            )}
-          </div>
-          <Input
-            id="subject"
-            placeholder="e.g. Urgent invoice correction for customer delivery"
-            {...form.register('subject')}
-            className={cn(
-              'h-10 transition-colors',
-              subjectStatus === 'valid' && 'border-success/50 focus-visible:ring-success/50',
-              subjectStatus === 'invalid' && 'border-destructive',
-            )}
-          />
-          {form.formState.errors.subject ? (
+          <Label htmlFor="category">
+            Category <span className="text-destructive">*</span>
+          </Label>
+          <Select value={selectedCategoryKey} onValueChange={onCategoryChange} disabled={categorySelectionDisabled}>
+            <SelectTrigger
+              id="category"
+              className={cn(
+                'h-10',
+                form.formState.errors.category && 'border-destructive',
+                !form.formState.errors.category && form.formState.touchedFields.category && 'border-success/50',
+              )}
+            >
+              <SelectValue placeholder={categoriesLoading ? 'Loading categories...' : 'Select a category'} />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map(({ key, label }) => (
+                <SelectItem key={key} value={key}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {form.formState.errors.category && (
             <p className="flex items-center gap-1 text-xs text-destructive">
               <AlertCircle className="h-3 w-3" />
-              {form.formState.errors.subject.message}
+              {form.formState.errors.category.message}
             </p>
-          ) : subjectValue.length > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {subjectValue.length} character{subjectValue.length !== 1 ? 's' : ''}
-            </p>
-          ) : null}
+          )}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="category">
-              Category <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              value={selectedCategoryKey}
-              onValueChange={onCategoryChange}
-              disabled={categorySelectionDisabled}
-            >
-              <SelectTrigger
-                id="category"
-                className={cn(
-                  'h-10',
-                  form.formState.errors.category ? 'border-destructive' : '',
-                  !form.formState.errors.category && form.formState.touchedFields.category && 'border-success/50',
-                )}
-              >
-                <SelectValue
-                  placeholder={
-                    categoriesLoading ? 'Loading categories...' : 'Select a category'
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map(({ key, label }) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {form.formState.errors.category && (
-              <p className="flex items-center gap-1 text-xs text-destructive">
-                <AlertCircle className="h-3 w-3" />
-                {form.formState.errors.category.message}
-              </p>
-            )}
-          </div>
-
+        {requiresSubcategory && (
           <div className="space-y-1.5">
             <Label htmlFor="subcategory">
-              Subcategory
-              {requiresSubcategory && <span className="text-destructive"> *</span>}
+              Subcategory <span className="text-destructive">*</span>
             </Label>
             <Select
               value={selectedSubcategoryKey}
@@ -748,25 +746,15 @@ export function RequestHeaderCard({
                 id="subcategory"
                 className={cn(
                   'h-10',
-                  form.formState.errors.subcategory ? 'border-destructive' : '',
+                  form.formState.errors.subcategory && 'border-destructive',
                   !form.formState.errors.subcategory && form.formState.touchedFields.subcategory && 'border-success/50',
                 )}
               >
-                <SelectValue
-                  placeholder={
-                    subcategoriesLoading
-                      ? 'Loading subcategories...'
-                      : availableSubcategories.length === 0
-                        ? 'No subcategories for this category'
-                        : 'Select a subcategory'
-                  }
-                />
+                <SelectValue placeholder={subcategoriesLoading ? 'Loading subcategories...' : 'Select a subcategory'} />
               </SelectTrigger>
               <SelectContent>
                 {availableSubcategories.map(({ key, label }) => (
-                  <SelectItem key={key} value={key}>
-                    {label}
-                  </SelectItem>
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -782,17 +770,90 @@ export function RequestHeaderCard({
               </p>
             ) : null}
           </div>
+        )}
+      </div>
+
+      {/* Additional information — per-category custom fields */}
+      {customFields.length > 0 && (
+        <div className="space-y-3 border-t border-border pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-foreground">Additional information</p>
+            <Badge variant="secondary" className="shrink-0">
+              {customFields.length} field{customFields.length === 1 ? '' : 's'}
+            </Badge>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {customFields.map((field) => {
+              const inputId = `cf-${field.key}`;
+              const value = customFieldValues[field.key] ?? '';
+              const hasValue = value.trim().length > 0;
+              const updateValue = (nextValue: string) => {
+                setCustomFieldValues((prev) => ({ ...prev, [field.key]: nextValue }));
+              };
+              return (
+                <div
+                  key={field.id}
+                  className={cn('space-y-1.5', field.field_type === 'textarea' && 'sm:col-span-2')}
+                >
+                  <Label htmlFor={inputId}>
+                    {field.label}
+                    {field.is_required && <span className="text-destructive"> *</span>}
+                  </Label>
+                  {field.field_type === 'textarea' ? (
+                    <Textarea
+                      id={inputId}
+                      value={value}
+                      onChange={(event) => updateValue(event.target.value)}
+                      placeholder={field.placeholder}
+                      rows={3}
+                      className={cn(field.is_required && hasValue && 'border-success/50')}
+                    />
+                  ) : field.field_type === 'database_select' ? (
+                    <DatabaseFieldSelect
+                      companyId={companyId}
+                      field={field}
+                      value={value}
+                      inputId={inputId}
+                      onChange={updateValue}
+                    />
+                  ) : (
+                    <Input
+                      id={inputId}
+                      type={
+                        field.field_type === 'number'
+                          ? 'number'
+                          : field.field_type === 'date'
+                            ? 'date'
+                            : 'text'
+                      }
+                      value={value}
+                      onChange={(event) => updateValue(event.target.value)}
+                      placeholder={field.placeholder}
+                      className={cn(field.is_required && hasValue && 'border-success/50')}
+                    />
+                  )}
+                  {field.help_text && (
+                    <p className="text-xs text-muted-foreground">{field.help_text}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </SectionCard>
   );
 }
+
+export type DescriptionSource = 'subcategory' | 'category' | 'custom';
 
 interface RequestDescriptionCardProps {
   form: UseFormReturn<TicketFormData>;
   roleContext: RoleContext;
   descriptionValue: string;
   descriptionStatus: 'valid' | 'invalid' | 'untouched';
+  descriptionSource: DescriptionSource;
+  onDescriptionSourceChange: (source: DescriptionSource) => void;
 }
 
 export function RequestDescriptionCard({
@@ -800,52 +861,66 @@ export function RequestDescriptionCard({
   roleContext,
   descriptionValue,
   descriptionStatus,
+  descriptionSource,
+  onDescriptionSourceChange,
 }: RequestDescriptionCardProps) {
   return (
-    <Card className="border-border/80 shadow-sm">
-      <CardHeader className="border-b bg-muted/20 px-5 py-4">
-        <p className="text-sm font-semibold text-foreground">
-          Contents / Description <span className="text-destructive">*</span>
-        </p>
-      </CardHeader>
-      <CardContent className="p-5">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-end gap-2">
-            <span
-              className={cn(
-                'flex items-center gap-1 text-xs tabular-nums transition-colors',
-                descriptionStatus === 'valid'
-                  ? 'text-success'
-                  : descriptionStatus === 'invalid'
-                    ? 'text-destructive'
-                    : 'text-muted-foreground',
-              )}
-            >
-              {descriptionStatus === 'valid' && <CheckCircle2 className="h-3 w-3" />}
-              {descriptionValue.length} / 20 min
-            </span>
-          </div>
-          <Textarea
-            id="description"
-            aria-label="Contents / Description"
-            placeholder={roleContext.descriptionPlaceholder}
-            rows={14}
-            {...form.register('description')}
-            className={cn(
-              'min-h-[320px] resize-y transition-colors',
-              descriptionStatus === 'valid' && 'border-success/50 focus-visible:ring-success/50',
-              descriptionStatus === 'invalid' && 'border-destructive',
-            )}
-          />
-          {form.formState.errors.description && (
-            <p className="flex items-center gap-1 text-xs text-destructive">
-              <AlertCircle className="h-3 w-3" />
-              {form.formState.errors.description.message}
-            </p>
-          )}
+    <SectionCard
+      title="Description"
+      icon={AlignLeft}
+      bodyClassName="space-y-1.5"
+      headerRight={
+        <div className="flex items-center gap-1.5">
+          <span className="hidden text-xs text-muted-foreground sm:inline">Source</span>
+          <Select value={descriptionSource} onValueChange={(value) => onDescriptionSourceChange(value as DescriptionSource)}>
+            <SelectTrigger className="h-7 w-[150px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="subcategory">From subcategory</SelectItem>
+              <SelectItem value="category">From category</SelectItem>
+              <SelectItem value="custom">Custom</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      </CardContent>
-    </Card>
+      }
+    >
+      <Textarea
+        id="description"
+        aria-label="Description"
+        placeholder={roleContext.descriptionPlaceholder}
+        rows={14}
+        {...form.register('description')}
+        className={cn(
+          'min-h-[320px] resize-y transition-colors',
+          descriptionStatus === 'valid' && 'border-success/50 focus-visible:ring-success/50',
+          descriptionStatus === 'invalid' && 'border-destructive',
+        )}
+      />
+      <div className="flex items-start justify-between gap-2">
+        {form.formState.errors.description ? (
+          <p className="flex items-center gap-1 text-xs text-destructive">
+            <AlertCircle className="h-3 w-3" />
+            {form.formState.errors.description.message}
+          </p>
+        ) : (
+          <span />
+        )}
+        <span
+          className={cn(
+            'flex shrink-0 items-center gap-1 text-xs tabular-nums transition-colors',
+            descriptionStatus === 'valid'
+              ? 'text-success'
+              : descriptionStatus === 'invalid'
+                ? 'text-destructive'
+                : 'text-muted-foreground',
+          )}
+        >
+          {descriptionStatus === 'valid' && <CheckCircle2 className="h-3 w-3" />}
+          {descriptionValue.length} / 20 chars min
+        </span>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -1045,26 +1120,21 @@ export function RequestSummaryCard({
   requestorName,
 }: RequestSummaryCardProps) {
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-sm">
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        Request Summary
-      </p>
-      <div className="space-y-2.5 text-sm">
-        <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-muted-foreground">Title</span>
-          <span className="min-w-0 text-right font-medium text-foreground">
-            {title.trim() || 'Untitled request'}
-          </span>
-        </div>
-        <Separator />
-        <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-muted-foreground">Requestor</span>
-          <span className="min-w-0 text-right font-medium text-foreground">
-            {requestorName}
-          </span>
-        </div>
+    <SectionCard title="Request summary" icon={FileText} bodyClassName="space-y-2.5 text-sm">
+      <div className="flex items-start justify-between gap-3">
+        <span className="shrink-0 text-muted-foreground">Title</span>
+        <span className="min-w-0 text-right font-medium text-foreground">
+          {title.trim() || 'Untitled request'}
+        </span>
       </div>
-    </div>
+      <Separator />
+      <div className="flex items-start justify-between gap-3">
+        <span className="shrink-0 text-muted-foreground">Requestor</span>
+        <span className="min-w-0 text-right font-medium text-foreground">
+          {requestorName}
+        </span>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -1477,25 +1547,17 @@ export function CustomFieldsSection({
   if (customFields.length === 0) return null;
 
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="border-b bg-muted/20 px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-sm font-semibold text-foreground">
-              Additional information
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Extra details required for{' '}
-              {selectedCategory?.label.toLowerCase() ?? 'this category'} requests.
-            </p>
-          </div>
-          <Badge variant="secondary" className="shrink-0">
-            {customFields.length} field{customFields.length === 1 ? '' : 's'}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="p-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+    <SectionCard
+      title="Additional information"
+      description={`Extra details for ${selectedCategory?.label.toLowerCase() ?? 'this category'} requests`}
+      icon={Info}
+      headerRight={
+        <Badge variant="secondary" className="shrink-0">
+          {customFields.length} field{customFields.length === 1 ? '' : 's'}
+        </Badge>
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
           {customFields.map((field) => {
             const inputId = `cf-${field.key}`;
             const value = customFieldValues[field.key] ?? '';
@@ -1561,8 +1623,7 @@ export function CustomFieldsSection({
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+    </SectionCard>
   );
 }
 
@@ -1597,33 +1658,24 @@ export function AttachmentsSection({
   const isLimitReached = attachedFiles.length >= attachmentSettings.max_files_per_ticket;
 
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="border-b bg-muted/20 px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-sm font-semibold text-foreground">
-              Attachments
-              <span className="ml-1 text-xs font-normal text-muted-foreground">
-                (optional)
-              </span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              PDF, Word, Excel, images, CSV, TXT
-            </p>
-          </div>
-          <span
-            className={cn(
-              'shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums',
-              attachedFiles.length > 0
-                ? 'border-primary/30 bg-primary/5 text-primary'
-                : 'border-border bg-muted/40 text-muted-foreground',
-            )}
-          >
-            {attachedFiles.length} / {attachmentSettings.max_files_per_ticket}
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent className={cn('space-y-3', compact ? 'p-3' : 'p-4')}>
+    <SectionCard
+      title="Attachments"
+      description="Optional — PDF, Word, Excel, images, CSV, TXT"
+      icon={Paperclip}
+      bodyClassName={cn('space-y-3', compact && 'p-3')}
+      headerRight={
+        <span
+          className={cn(
+            'shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums',
+            attachedFiles.length > 0
+              ? 'border-primary/30 bg-primary/5 text-primary'
+              : 'border-border bg-muted/40 text-muted-foreground',
+          )}
+        >
+          {attachedFiles.length} / {attachmentSettings.max_files_per_ticket}
+        </span>
+      }
+    >
         <div
           role="button"
           tabIndex={0}
@@ -1692,7 +1744,7 @@ export function AttachmentsSection({
                   <p className="truncate text-xs font-medium text-foreground">
                     {file.name}
                   </p>
-                  <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
+                  <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="tabular-nums">{formatBytes(file.size)}</span>
                     <span aria-hidden="true">·</span>
                     <span className={cn(uploading ? 'text-primary' : 'text-success')}>
@@ -1727,8 +1779,7 @@ export function AttachmentsSection({
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+    </SectionCard>
   );
 }
 

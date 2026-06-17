@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Loader2, Plus, Save, Trash2, X } from 'lucide-react';
+import { AlertCircle, ListPlus, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import { useRequestCategories } from '@/hooks/useRequestCategories';
@@ -259,28 +261,16 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
         )}
       </div>
 
-      <Dialog open={isAdding} onOpenChange={(open) => {
+      <Sheet open={isAdding} onOpenChange={(open) => {
         setIsAdding(open);
         if (!open) resetCreateForm();
       }}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>New custom field</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => { setIsAdding(false); resetCreateForm(); }}
-              disabled={creating}
-              aria-label="Cancel"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>New custom field</SheetTitle>
+            <SheetDescription>Add a per-category field requesters complete before submitting.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="field-create-category">Category <span className="text-destructive">*</span></Label>
@@ -386,18 +376,28 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
             <Switch checked={createRequired} onCheckedChange={setCreateRequired} disabled={creating} />
           </div>
 
-          <Button
-            type="button"
-            onClick={() => void handleCreate()}
-            disabled={creating || !createCategoryKey || !createLabel.trim()}
-            className="gap-2"
-          >
-            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Add field
-          </Button>
+          <SheetFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setIsAdding(false); resetCreateForm(); }}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleCreate()}
+              disabled={creating || !createCategoryKey || !createLabel.trim()}
+              className="gap-2"
+            >
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Add field
+            </Button>
+          </SheetFooter>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {loading ? (
         <div className="flex items-center justify-center gap-3 rounded-xl border border-border py-12 text-muted-foreground">
@@ -405,23 +405,19 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
           <span>Loading form fields...</span>
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border py-12 text-center">
-          <AlertCircle className="h-8 w-8 text-destructive" />
-          <div className="space-y-1">
-            <p className="font-medium text-foreground">Unable to load form fields</p>
-            <p className="text-sm text-muted-foreground">{error}</p>
-          </div>
-          <Button variant="outline" onClick={() => void reload()}>Retry</Button>
-        </div>
+        <HrmsEmptyState
+          icon={AlertCircle}
+          title="Unable to load form fields"
+          description={error}
+          action={{ label: 'Retry', onClick: () => void reload() }}
+        />
       ) : fields.length === 0 ? (
-        !isAdding ? (
-          <div className="flex items-center justify-center py-16">
-            <Button type="button" onClick={() => setIsAdding(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Field
-            </Button>
-          </div>
-        ) : null
+        <HrmsEmptyState
+          icon={ListPlus}
+          title="No custom fields yet"
+          description="Add per-category fields requesters must complete before submitting a request."
+          action={{ label: 'Add field', onClick: () => setIsAdding(true) }}
+        />
       ) : (
         <div className="space-y-5">
           {categories.map((category) => {
@@ -468,12 +464,12 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                           </Button>
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
                             size="icon"
                             aria-label={`Delete ${field.label}`}
                             onClick={() => setDeletingField(field)}
                             disabled={isBusy}
-                            className="text-destructive hover:text-destructive"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                           >
                             {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           </Button>
@@ -488,13 +484,14 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
         </div>
       )}
 
-      <Dialog open={!!editingField} onOpenChange={(open) => { if (!open) { setEditingFieldId(null); setConflictFieldId(null); } }}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Edit custom field</DialogTitle>
-          </DialogHeader>
+      <Sheet open={!!editingField} onOpenChange={(open) => { if (!open) { setEditingFieldId(null); setConflictFieldId(null); } }}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>Edit custom field</SheetTitle>
+            <SheetDescription>{editingField ? editingField.label : ''}</SheetDescription>
+          </SheetHeader>
           {editingField && editingDraft && (
-            <div className="space-y-4">
+            <div className="mt-4 space-y-4">
               {conflictFieldId === editingField.id && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
@@ -594,7 +591,7 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
               </div>
             </div>
           )}
-          <DialogFooter>
+          <SheetFooter className="mt-4 gap-2">
             <Button type="button" variant="outline" onClick={() => setEditingFieldId(null)} disabled={editingBusy}>Cancel</Button>
             <Button
               type="button"
@@ -605,9 +602,9 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
               {editingBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Save changes
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       <ConfirmDialog
         open={deletingField !== null}

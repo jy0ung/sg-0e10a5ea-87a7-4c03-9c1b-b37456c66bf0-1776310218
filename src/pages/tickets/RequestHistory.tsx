@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { RequestDetailPanel } from '@/components/tickets/RequestDetailPanel';
 import {
   Drawer,
@@ -268,16 +269,29 @@ export default function RequestHistory() {
     <div className="flex h-full flex-col gap-4 p-4 lg:p-6">
       {/* Header + filters */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Archive className="h-4 w-4" />
-            <span className="text-sm font-medium">
-              {loading ? '…' : `${totalCount.toLocaleString()} record${totalCount !== 1 ? 's' : ''}`}
-            </span>
-          </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => void loadTickets()} disabled={loading} aria-label="Refresh request history">
-            <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
+        <div className="[&>div]:mb-0">
+          <PageHeader
+            title="Request History"
+            description="Browse resolved, closed, and cancelled requests."
+            breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'History' }]}
+            actions={
+              <>
+                <span className="text-sm text-muted-foreground">
+                  {loading ? '…' : `${totalCount.toLocaleString()} record${totalCount !== 1 ? 's' : ''}`}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => void loadTickets()}
+                  disabled={loading}
+                >
+                  <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </>
+            }
+          />
         </div>
 
         {/* Search + filters */}

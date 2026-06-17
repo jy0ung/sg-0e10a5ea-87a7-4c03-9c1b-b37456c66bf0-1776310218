@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
-  ArrowDown,
-  ArrowUp,
+  FileText,
   Loader2,
   Plus,
   Save,
   Trash2,
-  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -22,8 +20,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
+import { SortableList } from '@/components/ui/SortableList';
 
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
@@ -31,7 +39,7 @@ import { useRequestTemplates } from '@/hooks/useRequestTemplates';
 import {
   createRequestTemplate,
   deleteRequestTemplate,
-  moveRequestTemplate,
+  reorderRequestTemplates,
   updateRequestTemplate,
   type RequestTemplateRecord,
   type TemplatePriority,
@@ -74,6 +82,11 @@ export function TemplateEditor({ companyId, actorId, onActiveCountChange }: Prop
   const [templateDrafts, setTemplateDrafts] = useState<Record<string, TemplateDraft>>({});
   const [busyTemplateId, setBusyTemplateId] = useState<string | null>(null);
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
+
+  // Local mirror for optimistic drag-and-drop reorder; re-synced from server.
+  const [orderedTemplates, setOrderedTemplates] = useState<RequestTemplateRecord[]>(templates);
+  const [reordering, setReordering] = useState(false);
+  useEffect(() => { setOrderedTemplates(templates); }, [templates]);
 
   useEffect(() => {
     setTemplateDrafts(
@@ -187,12 +200,15 @@ export function TemplateEditor({ companyId, actorId, onActiveCountChange }: Prop
     setBusyTemplateId(null);
   };
 
-  const handleMove = async (templateId: string, direction: 'up' | 'down') => {
-    setBusyTemplateId(templateId);
-    const result = await moveRequestTemplate(templateId, direction, { actorId, companyId });
+  const handleReorder = async (orderedIds: string[]) => {
+    const byId = new Map(orderedTemplates.map((t) => [t.id, t]));
+    const next = orderedIds.map((id) => byId.get(id)).filter((t): t is RequestTemplateRecord => Boolean(t));
+    setOrderedTemplates(next);
+    setReordering(true);
+    const result = await reorderRequestTemplates(orderedIds, { actorId, companyId });
     if (result.error) toast.error('Unable to reorder templates', { description: result.error });
-    else await reload();
-    setBusyTemplateId(null);
+    await reload();
+    setReordering(false);
   };
 
   const handleDelete = async (templateId: string, templateName: string) => {
@@ -208,24 +224,25 @@ export function TemplateEditor({ companyId, actorId, onActiveCountChange }: Prop
     setBusyTemplateId(null);
   };
 
+  const editingTemplate = templates.find((t) => t.id === expandedTemplateId) ?? null;
+  const editingDraft = editingTemplate ? templateDrafts[editingTemplate.id] : undefined;
+  const editingDirty = editingTemplate ? hasTemplateChanges(editingTemplate, editingDraft) : false;
+  const editingSubcategories = editingDraft
+    ? activeSubcategoriesForKey(editingDraft.category_key)
+    : [];
+
   return (
     <div className="space-y-4">
-      {isAdding && (
-        <div className="space-y-4 rounded-lg border border-dashed border-border/70 bg-secondary/20 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-foreground">New template</p>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => { setIsAdding(false); resetCreateForm(); }}
-              disabled={creating}
-              aria-label="Cancel"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
+      <Sheet
+        open={isAdding}
+        onOpenChange={(open) => { setIsAdding(open); if (!open) resetCreateForm(); }}
+      >
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>New template</SheetTitle>
+            <SheetDescription>Pre-fill a request so employees start from a ready draft.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="template-create-name">Template name <span className="text-destructive">*</span></Label>
@@ -325,23 +342,34 @@ export function TemplateEditor({ companyId, actorId, onActiveCountChange }: Prop
             />
           </div>
 
-          <Button
-            type="button"
-            onClick={() => void handleCreate()}
-            disabled={
-              creating
-              || createName.trim().length === 0
-              || !createCategoryKey
-              || createSubject.trim().length === 0
-              || createBody.trim().length === 0
-            }
-            className="gap-2"
-          >
-            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Add template
-          </Button>
-        </div>
-      )}
+          <SheetFooter className="mt-4 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setIsAdding(false); resetCreateForm(); }}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleCreate()}
+              disabled={
+                creating
+                || createName.trim().length === 0
+                || !createCategoryKey
+                || createSubject.trim().length === 0
+                || createBody.trim().length === 0
+              }
+              className="gap-2"
+            >
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Add template
+            </Button>
+          </SheetFooter>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {loading ? (
         <div className="flex items-center justify-center gap-3 rounded-xl border border-border py-12 text-muted-foreground">
@@ -349,23 +377,19 @@ export function TemplateEditor({ companyId, actorId, onActiveCountChange }: Prop
           <span>Loading templates...</span>
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border py-12 text-center">
-          <AlertCircle className="h-8 w-8 text-destructive" />
-          <div className="space-y-1">
-            <p className="font-medium text-foreground">Unable to load templates</p>
-            <p className="text-sm text-muted-foreground">{error}</p>
-          </div>
-          <Button variant="outline" onClick={() => void reload()}>Retry</Button>
-        </div>
+        <HrmsEmptyState
+          icon={AlertCircle}
+          title="Unable to load templates"
+          description={error}
+          action={{ label: 'Retry', onClick: () => void reload() }}
+        />
       ) : templates.length === 0 ? (
-        !isAdding ? (
-          <div className="flex items-center justify-center py-16">
-            <Button type="button" onClick={() => setIsAdding(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Template
-            </Button>
-          </div>
-        ) : null
+        <HrmsEmptyState
+          icon={FileText}
+          title="No templates yet"
+          description="Add a template so requesters can start from a ready-made draft."
+          action={{ label: 'Add template', onClick: () => setIsAdding(true) }}
+        />
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -380,203 +404,204 @@ export function TemplateEditor({ companyId, actorId, onActiveCountChange }: Prop
             )}
           </div>
 
-          {templates.map((template, tIdx) => {
-            const draft = templateDrafts[template.id];
-            const isBusy = busyTemplateId === template.id;
-            const isDirty = hasTemplateChanges(template, draft);
-            const isExpanded = expandedTemplateId === template.id;
-            const draftCategoryKey = draft?.category_key ?? template.category_key;
-            const draftSubcategories = activeSubcategoriesForKey(draftCategoryKey);
+          <SortableList
+            items={orderedTemplates}
+            getId={(template) => template.id}
+            onReorder={(ids) => void handleReorder(ids)}
+            disabled={reordering}
+            className="space-y-4"
+          >
+            {(template, { handle }) => {
+              const isBusy = busyTemplateId === template.id;
 
-            return (
-              <div key={template.id} className="space-y-4 rounded-xl border border-border bg-background p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-base font-semibold text-foreground">{template.name}</p>
-                      <Badge variant={template.is_active ? 'secondary' : 'outline'}>
-                        {template.is_active ? 'Active' : 'Archived'}
-                      </Badge>
-                      <Badge variant="outline" className="capitalize">{template.priority}</Badge>
-                    </div>
-                    {template.description && (
-                      <p className="text-sm text-muted-foreground">{template.description}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Category: <span className="font-medium">{categories.find((c) => c.key === template.category_key)?.label ?? template.category_key}</span>
-                      {template.subcategory_key && (
-                        <> · Subcategory: <span className="font-medium">{subcategories.find((s) => s.key === template.subcategory_key)?.label ?? template.subcategory_key}</span></>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={`Move ${template.name} up`}
-                      onClick={() => void handleMove(template.id, 'up')}
-                      disabled={isBusy || tIdx === 0}
-                    >
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={`Move ${template.name} down`}
-                      onClick={() => void handleMove(template.id, 'down')}
-                      disabled={isBusy || tIdx === templates.length - 1}
-                    >
-                      <ArrowDown className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setExpandedTemplateId(isExpanded ? null : template.id)}
-                      disabled={isBusy}
-                    >
-                      {isExpanded ? 'Collapse' : 'Edit'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={`Delete ${template.name}`}
-                      onClick={() => void handleDelete(template.id, template.name)}
-                      disabled={isBusy}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                {isExpanded && draft && (
-                  <div className="space-y-4 rounded-xl border border-dashed border-border/70 bg-secondary/10 p-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor={`template-name-${template.id}`}>Template name</Label>
-                        <Input
-                          id={`template-name-${template.id}`}
-                          value={draft.name}
-                          onChange={(event) => updateDraft(template, { name: event.target.value })}
-                          disabled={isBusy}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`template-desc-${template.id}`}>Description</Label>
-                        <Input
-                          id={`template-desc-${template.id}`}
-                          value={draft.description}
-                          onChange={(event) => updateDraft(template, { description: event.target.value })}
-                          disabled={isBusy}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label htmlFor={`template-cat-${template.id}`}>Category</Label>
-                        <Select
-                          value={draft.category_key}
-                          onValueChange={(v) => updateDraft(template, { category_key: v, subcategory_key: '' })}
-                          disabled={isBusy || categories.length === 0}
-                        >
-                          <SelectTrigger id={`template-cat-${template.id}`}><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {categories.map((c) => (
-                              <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`template-subcat-${template.id}`}>Subcategory</Label>
-                        <Select
-                          value={draft.subcategory_key || NONE_SELECT_VALUE}
-                          onValueChange={(value) => updateDraft(template, { subcategory_key: optionalSelectValue(value) })}
-                          disabled={isBusy || draftSubcategories.length === 0}
-                        >
-                          <SelectTrigger id={`template-subcat-${template.id}`}>
-                            <SelectValue placeholder="None" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={NONE_SELECT_VALUE}>None</SelectItem>
-                            {draftSubcategories.map((s) => (
-                              <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`template-priority-${template.id}`}>Priority</Label>
-                        <Select
-                          value={draft.priority}
-                          onValueChange={(v) => updateDraft(template, { priority: v as TemplatePriority })}
-                          disabled={isBusy}
-                        >
-                          <SelectTrigger id={`template-priority-${template.id}`}><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {PRIORITY_OPTIONS.map((p) => (
-                              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor={`template-subject-${template.id}`}>Subject</Label>
-                      <Input
-                        id={`template-subject-${template.id}`}
-                        value={draft.subject}
-                        onChange={(event) => updateDraft(template, { subject: event.target.value })}
-                        disabled={isBusy}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor={`template-body-${template.id}`}>Body</Label>
-                      <Textarea
-                        id={`template-body-${template.id}`}
-                        value={draft.body}
-                        onChange={(event) => updateDraft(template, { body: event.target.value })}
-                        rows={5}
-                        disabled={isBusy}
-                      />
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Available to requesters</p>
+              return (
+                <div className="space-y-4 rounded-xl border border-border bg-background p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex min-w-0 items-start gap-2">
+                      <div className="pt-0.5">{handle}</div>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-semibold text-foreground">{template.name}</p>
+                          <Badge variant={template.is_active ? 'secondary' : 'outline'}>
+                            {template.is_active ? 'Active' : 'Archived'}
+                          </Badge>
+                          <Badge variant="outline" className="capitalize">{template.priority}</Badge>
+                        </div>
+                        {template.description && (
+                          <p className="text-sm text-muted-foreground">{template.description}</p>
+                        )}
                         <p className="text-xs text-muted-foreground">
-                          Archive to hide this template without deleting it.
+                          Category: <span className="font-medium">{categories.find((c) => c.key === template.category_key)?.label ?? template.category_key}</span>
+                          {template.subcategory_key && (
+                            <> · Subcategory: <span className="font-medium">{subcategories.find((s) => s.key === template.subcategory_key)?.label ?? template.subcategory_key}</span></>
+                          )}
                         </p>
                       </div>
-                      <Switch
-                        checked={draft.is_active}
-                        onCheckedChange={(checked) => updateDraft(template, { is_active: checked })}
-                        disabled={isBusy}
-                      />
                     </div>
-
-                    <Button
-                      type="button"
-                      onClick={() => void handleSave(template)}
-                      disabled={isBusy || !isDirty}
-                      className="gap-2"
-                    >
-                      {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      Save changes
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setExpandedTemplateId(template.id)}
+                        disabled={isBusy}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete ${template.name}`}
+                        onClick={() => void handleDelete(template.id, template.name)}
+                        disabled={isBusy}
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            }}
+          </SortableList>
         </div>
       )}
+
+      {/* Edit template drawer */}
+      <Sheet
+        open={!!editingTemplate}
+        onOpenChange={(open) => { if (!open) setExpandedTemplateId(null); }}
+      >
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>Edit template</SheetTitle>
+            <SheetDescription>{editingTemplate?.name ?? ''}</SheetDescription>
+          </SheetHeader>
+          {editingTemplate && editingDraft && (
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor={`template-name-${editingTemplate.id}`}>Template name</Label>
+                  <Input
+                    id={`template-name-${editingTemplate.id}`}
+                    value={editingDraft.name}
+                    onChange={(event) => updateDraft(editingTemplate, { name: event.target.value })}
+                    disabled={busyTemplateId === editingTemplate.id}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`template-desc-${editingTemplate.id}`}>Description</Label>
+                  <Input
+                    id={`template-desc-${editingTemplate.id}`}
+                    value={editingDraft.description}
+                    onChange={(event) => updateDraft(editingTemplate, { description: event.target.value })}
+                    disabled={busyTemplateId === editingTemplate.id}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor={`template-cat-${editingTemplate.id}`}>Category</Label>
+                  <Select
+                    value={editingDraft.category_key}
+                    onValueChange={(v) => updateDraft(editingTemplate, { category_key: v, subcategory_key: '' })}
+                    disabled={busyTemplateId === editingTemplate.id || categories.length === 0}
+                  >
+                    <SelectTrigger id={`template-cat-${editingTemplate.id}`}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c) => (
+                        <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`template-subcat-${editingTemplate.id}`}>Subcategory</Label>
+                  <Select
+                    value={editingDraft.subcategory_key || NONE_SELECT_VALUE}
+                    onValueChange={(value) => updateDraft(editingTemplate, { subcategory_key: optionalSelectValue(value) })}
+                    disabled={busyTemplateId === editingTemplate.id || editingSubcategories.length === 0}
+                  >
+                    <SelectTrigger id={`template-subcat-${editingTemplate.id}`}>
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE_SELECT_VALUE}>None</SelectItem>
+                      {editingSubcategories.map((s) => (
+                        <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`template-priority-${editingTemplate.id}`}>Priority</Label>
+                  <Select
+                    value={editingDraft.priority}
+                    onValueChange={(v) => updateDraft(editingTemplate, { priority: v as TemplatePriority })}
+                    disabled={busyTemplateId === editingTemplate.id}
+                  >
+                    <SelectTrigger id={`template-priority-${editingTemplate.id}`}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PRIORITY_OPTIONS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor={`template-subject-${editingTemplate.id}`}>Subject</Label>
+                <Input
+                  id={`template-subject-${editingTemplate.id}`}
+                  value={editingDraft.subject}
+                  onChange={(event) => updateDraft(editingTemplate, { subject: event.target.value })}
+                  disabled={busyTemplateId === editingTemplate.id}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor={`template-body-${editingTemplate.id}`}>Body</Label>
+                <Textarea
+                  id={`template-body-${editingTemplate.id}`}
+                  value={editingDraft.body}
+                  onChange={(event) => updateDraft(editingTemplate, { body: event.target.value })}
+                  rows={5}
+                  disabled={busyTemplateId === editingTemplate.id}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Available to requesters</p>
+                  <p className="text-xs text-muted-foreground">
+                    Archive to hide this template without deleting it.
+                  </p>
+                </div>
+                <Switch
+                  checked={editingDraft.is_active}
+                  onCheckedChange={(checked) => updateDraft(editingTemplate, { is_active: checked })}
+                  disabled={busyTemplateId === editingTemplate.id}
+                />
+              </div>
+            </div>
+          )}
+          <SheetFooter className="mt-4 gap-2">
+            <Button type="button" variant="outline" onClick={() => setExpandedTemplateId(null)} disabled={!!busyTemplateId}>Cancel</Button>
+            <Button
+              type="button"
+              onClick={() => { if (editingTemplate) void handleSave(editingTemplate); }}
+              disabled={!editingTemplate || busyTemplateId === editingTemplate?.id || !editingDirty}
+              className="gap-2"
+            >
+              {editingTemplate && busyTemplateId === editingTemplate.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save changes
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
