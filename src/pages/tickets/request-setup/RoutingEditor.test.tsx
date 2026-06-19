@@ -7,8 +7,8 @@ import { CONFLICT_RELOAD_MESSAGE } from './shared';
 import { deleteRoutingRule, updateRoutingRule } from '@flc/internal-requests';
 
 // Hoisted so the (hoisted) vi.mock factories below can reference them.
-const { RULE, reload } = vi.hoisted(() => ({
-  RULE: {
+const { RULE, RULES, reload } = vi.hoisted(() => {
+  const RULE = {
     id: 'rule-1',
     company_id: 'company-1',
     name: 'Sales → Alice',
@@ -22,12 +22,17 @@ const { RULE, reload } = vi.hoisted(() => ({
     created_at: '2026-05-01T00:00:00.000Z',
     updated_at: '2026-05-01T00:00:00.000Z',
     created_by: null,
-  },
-  reload: vi.fn(),
-}));
+  };
+
+  return {
+    RULE,
+    RULES: [RULE],
+    reload: vi.fn(),
+  };
+});
 
 vi.mock('@/hooks/useRoutingRules', () => ({
-  useRoutingRules: () => ({ rules: [RULE], loading: false, error: null, reload }),
+  useRoutingRules: () => ({ rules: RULES, loading: false, error: null, reload }),
 }));
 vi.mock('@/hooks/useRequestCategories', () => ({ useRequestCategories: () => ({ categories: [] }) }));
 vi.mock('@/hooks/useRequestSubcategories', () => ({ useRequestSubcategories: () => ({ subcategories: [] }) }));
@@ -38,7 +43,7 @@ vi.mock('@flc/internal-requests', () => ({
   createRoutingRule: vi.fn(),
   updateRoutingRule: vi.fn(),
   deleteRoutingRule: vi.fn(),
-  moveRoutingRule: vi.fn(),
+  reorderRoutingRules: vi.fn(),
 }));
 
 function renderEditor() {
