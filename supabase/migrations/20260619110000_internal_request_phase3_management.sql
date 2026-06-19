@@ -10,7 +10,7 @@ alter table public.request_module_settings
 
 create table if not exists public.request_saved_filters (
   id uuid primary key default gen_random_uuid(),
-  company_id uuid not null references public.companies(id) on delete cascade,
+  company_id text not null references public.companies(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   scope text not null default 'queue',
@@ -30,8 +30,8 @@ drop policy if exists "Users manage own request saved filters" on public.request
 create policy "Users manage own request saved filters"
   on public.request_saved_filters
   for all
-  using (auth.uid() = user_id and public.is_user_in_company(company_id))
-  with check (auth.uid() = user_id and public.is_user_in_company(company_id));
+  using (auth.uid() = user_id and public.is_same_company(company_id))
+  with check (auth.uid() = user_id and public.is_same_company(company_id));
 
 create or replace function public.set_request_saved_filters_updated_at()
 returns trigger
