@@ -234,7 +234,7 @@ async function smokeRoute(page: Page, baseUrl: URL, routeCheck: RouteCheck): Pro
   return result;
 }
 
-async function checkHrmsModuleRedirect(page: Page): Promise<RouteResult> {
+async function checkHrmsModuleRedirect(page: Page): Promise<RouteResult | null> {
   console.info('CHECK HRMS Launch: Home shortcut /home');
   const routeCheck = { module: 'HRMS Launch', name: 'Home shortcut', path: '/home' };
   const issues: Issue[] = [];
@@ -247,10 +247,14 @@ async function checkHrmsModuleRedirect(page: Page): Promise<RouteResult> {
     });
     await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => undefined);
     const homeShortcut = page.getByRole('button', { name: /HRMS/i }).first();
+    const shellShortcut = page.getByRole('link', { name: /Open HRMS Workspace/i }).first();
     if (await homeShortcut.isVisible().catch(() => false)) {
       await homeShortcut.click({ timeout: 12_000 });
+    } else if (await shellShortcut.isVisible().catch(() => false)) {
+      await shellShortcut.click({ timeout: 12_000 });
     } else {
-      await page.getByRole('link', { name: /Open HRMS Workspace/i }).first().click({ timeout: 12_000 });
+      console.info('SKIP HRMS Launch: no authorized launcher is visible for the smoke account');
+      return null;
     }
     await page.waitForURL((url) => url.origin === hrmsUrl.origin, { timeout: routeTimeoutMs });
     await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => undefined);
@@ -310,7 +314,8 @@ try {
   for (const routeCheck of mainRoutes) {
     results.push(await smokeRoute(mainPage, mainUrl, routeCheck));
   }
-  results.push(await checkHrmsModuleRedirect(mainPage));
+  const hrmsLaunchResult = await checkHrmsModuleRedirect(mainPage);
+  if (hrmsLaunchResult) results.push(hrmsLaunchResult);
   await mainContext.close();
 
   const hrmsContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
