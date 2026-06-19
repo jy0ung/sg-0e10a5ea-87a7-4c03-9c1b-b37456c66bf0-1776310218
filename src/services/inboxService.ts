@@ -90,8 +90,8 @@ export function reconciliationToInbox(row: ReconciliationMatch): InboxItem {
 
 export function ticketToInbox(row: RequestTicketRecord): InboxItem {
   const tone: InboxTone =
-    row.priority === 'critical' || row.priority === 'high' ? 'red'
-    : row.status === 'awaiting_requester' ? 'amber'
+    row.status === 'pending_requester' || row.status === 'completed_by_owner' ? 'amber'
+    : row.priority === 'critical' || row.priority === 'high' ? 'red'
     : 'blue';
   return {
     id:        `ticket:${row.id}`,
@@ -131,7 +131,7 @@ export function notificationToInbox(row: NotificationRow): InboxItem {
  * Fan-out fetch of all four inbox streams; per-source errors are collected
  * rather than propagated so the page can render whatever did load.
  *
- * Open tickets are kept; resolved/closed/cancelled are dropped.
+ * Open tickets are kept; closed/cancelled are dropped.
  * Reconciliation rows are filtered to action-needed statuses (candidate, conflict).
  */
 export async function loadInbox(
@@ -174,7 +174,7 @@ export async function loadInbox(
     .slice(0, limit)
     .map(reconciliationToInbox);
 
-  const openTicketStatuses = new Set(['open', 'in_progress', 'awaiting_requester']);
+  const openTicketStatuses = new Set(['open', 'in_progress', 'pending_requester', 'pending_owner_review', 'completed_by_owner', 'reopened']);
   const ticketItems = ((ticketsR.data ?? []) as RequestTicketRecord[])
     .filter(t => openTicketStatuses.has(t.status))
     .slice(0, limit)

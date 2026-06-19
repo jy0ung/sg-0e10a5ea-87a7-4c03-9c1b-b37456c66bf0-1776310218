@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from 'date-fns';
-import { CheckCircle2, Loader2, MessageSquare, Send, UserRound, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock3, Loader2, ShieldAlert, UserRound, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +18,11 @@ import { TicketActivityList } from '@/components/tickets/TicketActivityList';
 import { TicketAttachmentList } from '@/components/tickets/TicketAttachmentList';
 import { TicketApprovalHistory } from '@/components/tickets/TicketApprovalHistory';
 import { TicketApprovalSummary } from '@/components/tickets/TicketApprovalSummary';
+import { TicketChatPanel } from '@/components/tickets/TicketChatPanel';
+import { TicketInternalNotesPanel } from '@/components/tickets/TicketInternalNotesPanel';
+import { TicketOperationalIndicatorGrid } from '@/components/tickets/TicketOperationalIndicators';
+import { TicketSlaSummary } from '@/components/tickets/TicketSlaSummary';
+import { getTicketSlaSummary } from '@/lib/ticketSla';
 import type { RequestCategoryRecord } from '@/services/requestCategoryService';
 import type { RequestSubcategoryRecord } from '@/services/requestSubcategoryService';
 import type { ProfileRow } from '@flc/auth';
@@ -25,9 +30,11 @@ import type { TicketAttachmentRecord } from '@flc/platform-services';
 import type {
   CompanyTicketRecord,
   TicketActivityRecord,
+  TicketInternalNoteRecord,
   TicketPriority,
   TicketStatus,
 } from '@/services/ticketService';
+import type { RequestOperationalIndicator } from '@/services/requestManagementService';
 
 interface RequestDetailPanelProps {
   ticket: CompanyTicketRecord;
@@ -35,14 +42,20 @@ interface RequestDetailPanelProps {
   subcategories: RequestSubcategoryRecord[];
   assignees: ProfileRow[];
   activities: TicketActivityRecord[];
+  internalNotes?: TicketInternalNoteRecord[];
+  operationalIndicator?: RequestOperationalIndicator;
   attachments: TicketAttachmentRecord[];
   customFieldLabelMap: Record<string, string>;
   statusOptions: Array<{ value: TicketStatus; label: string }>;
   priorityOptions: Array<{ value: TicketPriority; label: string }>;
+  currentUserId?: string | null;
   saving: boolean;
   noteDraft: string;
   commentDraft: string;
+  internalNoteDraft?: string;
   canReviewApproval: boolean;
+  canManageWorkflow?: boolean;
+  canCloseAsRequester?: boolean;
   variant?: 'pane' | 'drawer';
   onStatusChange: (ticketId: string, status: TicketStatus) => void;
   onPriorityChange: (ticketId: string, priority: TicketPriority) => void;
@@ -51,6 +64,12 @@ interface RequestDetailPanelProps {
   onResolutionNoteSave: (ticketId: string) => void;
   onCommentChange: (ticketId: string, value: string) => void;
   onAddComment: (ticketId: string) => void;
+  onInternalNoteChange?: (ticketId: string, value: string) => void;
+  onAddInternalNote?: (ticketId: string) => void;
+  onRequestMoreInformation?: (ticketId: string) => void;
+  onMarkCompleted?: (ticketId: string) => void;
+  onCloseRequest?: (ticketId: string) => void;
+  onChatFilesSelected?: (ticketId: string, files: File[]) => void;
   onReviewApproval: (ticketId: string, decision: 'approved' | 'rejected') => void;
 }
 
@@ -60,28 +79,43 @@ export function RequestDetailPanel({
   subcategories,
   assignees,
   activities,
+  internalNotes = [],
+  operationalIndicator,
   attachments,
   customFieldLabelMap,
-  statusOptions,
   priorityOptions,
+  currentUserId,
   saving,
   noteDraft,
   commentDraft,
+  internalNoteDraft = '',
   canReviewApproval,
+  canManageWorkflow = false,
+  canCloseAsRequester = false,
   variant = 'pane',
-  onStatusChange,
   onPriorityChange,
   onAssignmentChange,
   onResolutionNoteChange,
   onResolutionNoteSave,
   onCommentChange,
   onAddComment,
+  onInternalNoteChange,
+  onAddInternalNote,
+  onRequestMoreInformation,
+  onMarkCompleted,
+  onCloseRequest,
+  onChatFilesSelected,
   onReviewApproval,
 }: RequestDetailPanelProps) {
   const extraFields = customFieldEntries(ticket, customFieldLabelMap);
   const gridColumns = variant === 'drawer' ? 'sm:grid-cols-3' : 'md:grid-cols-3';
   const twoColumns = variant === 'drawer' ? 'sm:grid-cols-2' : 'md:grid-cols-2';
   const additionalFieldValueClass = variant === 'drawer' ? 'break-words' : 'truncate';
+  const sla = getTicketSlaSummary(ticket);
+  const needsBreachReason = sla.overall === 'breached' && !ticket.sla_breach_reason;
+  const canRequestInfo = canManageWorkflow && (ticket.status === 'open' || ticket.status === 'in_progress' || ticket.status === 'pending_owner_review' || ticket.status === 'reopened');
+  const canMarkCompleted = canManageWorkflow && ticket.status !== 'closed' && ticket.status !== 'cancelled' && ticket.status !== 'completed_by_owner';
+  const canClose = canCloseAsRequester && ticket.status === 'completed_by_owner';
 
   return (
     <div className={variant === 'drawer' ? undefined : 'flex h-full min-h-0 flex-col'}>
@@ -145,22 +179,12 @@ export function RequestDetailPanel({
           </div>
         )}
 
-        {/* Admin controls: status, priority, owner */}
+        {/* Workflow, priority, owner */}
         <div className={`grid gap-2 ${gridColumns}`}>
-          <div className="space-y-1.5">
-            <p className="eyebrow">Status</p>
-            <Select
-              value={ticket.status}
-              onValueChange={(value) => onStatusChange(ticket.id, value as TicketStatus)}
-              disabled={saving}
-            >
-              <SelectTrigger className="h-9"><SelectValue placeholder="Set status" /></SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="rounded-md border border-border bg-background px-3 py-2">
+            <p className="eyebrow">Current responsible party</p>
+            <p className="mt-1 text-sm font-medium text-foreground">{ticket.current_responsible_party}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{ticket.next_action}</p>
           </div>
           <div className="space-y-1.5">
             <p className="eyebrow">Priority</p>
@@ -195,6 +219,25 @@ export function RequestDetailPanel({
           </div>
         </div>
 
+        <div className="rounded-md border border-border bg-background px-3 py-2">
+          <p className="eyebrow flex items-center gap-1.5">
+            <Clock3 className="h-3 w-3" />
+            Workflow timing
+          </p>
+          <div className={`mt-1.5 grid gap-2 ${twoColumns}`}>
+            <div>
+              <p className="text-xs text-muted-foreground">Time in current status</p>
+              <p className="text-sm text-foreground">
+                {formatDistanceToNow(new Date(ticket.status_changed_at), { addSuffix: false })}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Last action by</p>
+              <p className="text-sm text-foreground">{ticket.last_action_by_name ?? 'System'}</p>
+            </div>
+          </div>
+        </div>
+
         {/* Metadata cards */}
         <div className={`grid gap-2 ${gridColumns}`}>
           <div className="rounded-md border border-border bg-background px-3 py-2">
@@ -214,7 +257,20 @@ export function RequestDetailPanel({
               </p>
             )}
           </div>
+          <div className="rounded-md border border-border bg-background px-3 py-2">
+            <p className="eyebrow">Owner / PIC</p>
+            <p className="mt-1 text-sm font-medium text-foreground">{ticket.assigned_to_name ?? ticket.responsible_queue}</p>
+            <p className="text-xs text-muted-foreground">Backup: {ticket.backup_owner_name ?? 'Not assigned'}</p>
+          </div>
+          <div className="rounded-md border border-border bg-background px-3 py-2">
+            <p className="eyebrow">Escalation owner</p>
+            <p className="mt-1 text-sm font-medium text-foreground">{ticket.escalation_owner_name ?? 'Not assigned'}</p>
+            <p className="text-xs text-muted-foreground">Manager / approver: {ticket.current_approval_step_name ?? 'Not applicable'}</p>
+          </div>
         </div>
+
+        <TicketSlaSummary ticket={ticket} />
+        <TicketOperationalIndicatorGrid indicator={operationalIndicator} />
 
         {/* Additional custom fields */}
         {extraFields.length > 0 && (
@@ -259,7 +315,7 @@ export function RequestDetailPanel({
         )}
 
         {/* Resolution note */}
-        {(ticket.status === 'resolved' || ticket.status === 'closed' || ticket.resolution_note) && (
+        {(ticket.status === 'completed_by_owner' || ticket.status === 'closed' || ticket.resolution_note || canManageWorkflow) && (
           <div className="space-y-2 rounded-md border border-border bg-secondary/20 px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <p className="eyebrow">Resolution note</p>
@@ -280,38 +336,77 @@ export function RequestDetailPanel({
               rows={3}
               disabled={saving}
             />
-            <p className="text-xs text-muted-foreground">Shown to the requester when their request is resolved or closed.</p>
+            <p className="text-xs text-muted-foreground">Shown to the requester before final closure.</p>
+            {needsBreachReason && (
+              <p className="flex items-center gap-1 text-xs text-destructive">
+                <ShieldAlert className="h-3 w-3" />
+                Add a breach reason before completing or closing this request.
+              </p>
+            )}
           </div>
         )}
 
         <TicketAttachmentList attachments={attachments} />
 
-        {/* Comment / discussion */}
-        <div className="space-y-2 rounded-md border border-border px-3 py-2.5">
-          <p className="flex items-center gap-1.5 eyebrow">
-            <MessageSquare className="h-3 w-3" />
-            Discussion
-          </p>
-          <Textarea
-            value={commentDraft}
-            onChange={(event) => onCommentChange(ticket.id, event.target.value)}
-            placeholder="Ask for clarification, add an update, or document the next step."
-            rows={3}
-            disabled={saving}
-          />
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 gap-1.5 text-xs"
-              onClick={() => onAddComment(ticket.id)}
-              disabled={saving || !commentDraft.trim()}
-            >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              Add comment
-            </Button>
+        {(canRequestInfo || canMarkCompleted || canClose) && (
+          <div className="flex flex-wrap gap-2 rounded-md border border-border bg-background px-3 py-2.5">
+            {canRequestInfo && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => onRequestMoreInformation?.(ticket.id)}
+                disabled={saving || !commentDraft.trim()}
+              >
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Need more information
+              </Button>
+            )}
+            {canMarkCompleted && (
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => onMarkCompleted?.(ticket.id)}
+                disabled={saving || !noteDraft.trim() || needsBreachReason}
+              >
+                Mark as completed
+              </Button>
+            )}
+            {canClose && (
+              <Button
+                type="button"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => onCloseRequest?.(ticket.id)}
+                disabled={saving || needsBreachReason}
+              >
+                Close request
+              </Button>
+            )}
           </div>
-        </div>
+        )}
+
+        <TicketChatPanel
+          activities={activities}
+          currentUserId={currentUserId}
+          draft={commentDraft}
+          saving={saving}
+          onDraftChange={(value) => onCommentChange(ticket.id, value)}
+          onSend={() => onAddComment(ticket.id)}
+          onAttachFiles={onChatFilesSelected ? (files) => onChatFilesSelected(ticket.id, files) : undefined}
+        />
+
+        {canManageWorkflow && (
+          <TicketInternalNotesPanel
+            notes={internalNotes}
+            draft={internalNoteDraft}
+            saving={saving}
+            onDraftChange={(value) => onInternalNoteChange?.(ticket.id, value)}
+            onSend={() => onAddInternalNote?.(ticket.id)}
+          />
+        )}
 
         <TicketActivityList activities={activities} />
       </div>

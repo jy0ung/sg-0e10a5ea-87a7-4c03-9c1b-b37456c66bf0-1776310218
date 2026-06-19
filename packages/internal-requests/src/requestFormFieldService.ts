@@ -12,8 +12,23 @@ import {
  *  before it reaches a raw PostgREST filter string (filter-injection guard). */
 const SLUG_KEY_PATTERN = /^[a-z0-9_]+$/;
 
-export type RequestFormFieldType = 'text' | 'textarea' | 'number' | 'date' | 'database_select';
+export type RequestFormFieldType =
+  | 'text'
+  | 'textarea'
+  | 'number'
+  | 'date'
+  | 'database_select'
+  | 'select'
+  | 'multiselect'
+  | 'checkbox'
+  | 'radio'
+  | 'file';
 export type RequestFieldDataSource = 'branches' | 'employees' | 'vehicles';
+
+export interface RequestFormFieldOption {
+  label: string;
+  value: string;
+}
 
 export interface RequestFormFieldRecord {
   id: string;
@@ -24,6 +39,10 @@ export interface RequestFormFieldRecord {
   label: string;
   field_type: RequestFormFieldType;
   data_source: RequestFieldDataSource | null;
+  options: RequestFormFieldOption[];
+  default_value: string;
+  validation_rules: Record<string, unknown>;
+  conditional_logic: Record<string, unknown>;
   placeholder: string;
   help_text: string;
   is_required: boolean;
@@ -43,6 +62,10 @@ interface RequestFormFieldRow {
   label: string;
   field_type: RequestFormFieldType;
   data_source: RequestFieldDataSource | null;
+  options?: RequestFormFieldOption[] | null;
+  default_value?: string | null;
+  validation_rules?: Record<string, unknown> | null;
+  conditional_logic?: Record<string, unknown> | null;
   placeholder: string | null;
   help_text: string | null;
   is_required: boolean;
@@ -64,6 +87,10 @@ export interface CreateRequestFormFieldInput {
   label: string;
   field_type: RequestFormFieldType;
   data_source?: RequestFieldDataSource | null;
+  options?: RequestFormFieldOption[];
+  default_value?: string;
+  validation_rules?: Record<string, unknown>;
+  conditional_logic?: Record<string, unknown>;
   placeholder?: string;
   help_text?: string;
   is_required?: boolean;
@@ -73,6 +100,10 @@ export interface UpdateRequestFormFieldInput {
   label?: string;
   field_type?: RequestFormFieldType;
   data_source?: RequestFieldDataSource | null;
+  options?: RequestFormFieldOption[];
+  default_value?: string;
+  validation_rules?: Record<string, unknown>;
+  conditional_logic?: Record<string, unknown>;
   placeholder?: string;
   help_text?: string;
   is_required?: boolean;
@@ -96,6 +127,7 @@ function requestFormFieldsTable() {
 }
 
 function mapField(row: RequestFormFieldRow): RequestFormFieldRecord {
+  const options = Array.isArray(row.options) ? row.options : [];
   return {
     id: row.id,
     company_id: row.company_id,
@@ -105,6 +137,12 @@ function mapField(row: RequestFormFieldRow): RequestFormFieldRecord {
     label: row.label,
     field_type: row.field_type,
     data_source: row.data_source,
+    options: options
+      .filter((option): option is RequestFormFieldOption => Boolean(option && typeof option === 'object' && 'label' in option && 'value' in option))
+      .map((option) => ({ label: String(option.label), value: String(option.value) })),
+    default_value: row.default_value ?? '',
+    validation_rules: row.validation_rules ?? {},
+    conditional_logic: row.conditional_logic ?? {},
     placeholder: row.placeholder ?? '',
     help_text: row.help_text ?? '',
     is_required: row.is_required,
@@ -119,6 +157,15 @@ function mapField(row: RequestFormFieldRow): RequestFormFieldRecord {
 
 function normalizeFieldSource(fieldType: RequestFormFieldType, dataSource?: RequestFieldDataSource | null) {
   return fieldType === 'database_select' ? dataSource ?? 'branches' : null;
+}
+
+function normalizeFieldOptions(options?: RequestFormFieldOption[]) {
+  return (options ?? [])
+    .map((option) => ({
+      label: option.label.trim(),
+      value: option.value.trim() || option.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''),
+    }))
+    .filter((option) => option.label && option.value);
 }
 
 /**
@@ -210,6 +257,10 @@ export async function createRequestFormField(
     label,
     field_type: input.field_type,
     data_source: normalizeFieldSource(input.field_type, input.data_source),
+    options: normalizeFieldOptions(input.options),
+    default_value: input.default_value?.trim() ?? '',
+    validation_rules: input.validation_rules ?? {},
+    conditional_logic: input.conditional_logic ?? {},
     placeholder: input.placeholder?.trim() ?? '',
     help_text: input.help_text?.trim() ?? '',
     is_required: input.is_required ?? false,
@@ -266,6 +317,10 @@ export async function updateRequestFormField(
   if (input.data_source !== undefined || input.field_type !== undefined) {
     patch.data_source = normalizeFieldSource(input.field_type ?? 'text', input.data_source);
   }
+  if (input.options !== undefined) patch.options = normalizeFieldOptions(input.options);
+  if (input.default_value !== undefined) patch.default_value = input.default_value.trim();
+  if (input.validation_rules !== undefined) patch.validation_rules = input.validation_rules;
+  if (input.conditional_logic !== undefined) patch.conditional_logic = input.conditional_logic;
   if (input.placeholder !== undefined) patch.placeholder = input.placeholder.trim();
   if (input.help_text !== undefined) patch.help_text = input.help_text.trim();
   if (input.is_required !== undefined) patch.is_required = input.is_required;

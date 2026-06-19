@@ -75,8 +75,8 @@ export default function PortalLanding() {
   });
 
   const myOpen = myTickets?.filter((t) => isOpenStatus(t.status)).length ?? 0;
-  const myAwaiting = myTickets?.filter((t) => t.status === 'awaiting_requester').length ?? 0;
-  const myResolved = myTickets?.filter((t) => t.status === 'resolved' || t.status === 'closed').length ?? 0;
+  const myAwaiting = myTickets?.filter((t) => t.status === 'pending_requester' || t.status === 'completed_by_owner').length ?? 0;
+  const myCompleted = myTickets?.filter((t) => t.status === 'closed').length ?? 0;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
@@ -103,7 +103,7 @@ export default function PortalLanding() {
             className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ClipboardList className="h-4 w-4" aria-hidden />
-            My requests
+            Pending requests
           </Link>
         </div>
       </header>
@@ -129,12 +129,12 @@ export default function PortalLanding() {
           data-testid="portal-metric-awaiting"
         />
         <MetricCard
-          label="Resolved"
-          value={myResolved}
+          label="Completed"
+          value={myCompleted}
           icon={CheckCircle2}
           tone="emerald"
-          hint="Resolved or closed"
-          onClick={() => navigate('/portal/tickets')}
+          hint="Closed by requester"
+          onClick={() => navigate('/portal/tickets/completed')}
           data-testid="portal-metric-resolved"
         />
       </div>
@@ -162,9 +162,9 @@ export default function PortalLanding() {
             </div>
             <div>
               <p className="text-2xl font-bold leading-none tracking-tight text-foreground">
-                {queueCounts?.awaiting_requester ?? '—'}
+                {queueCounts?.pending_requester ?? '—'}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">Awaiting requester</p>
+              <p className="mt-1 text-xs text-muted-foreground">Pending requester</p>
             </div>
           </div>
         </SectionCard>
@@ -182,22 +182,28 @@ export default function PortalLanding() {
           <QuickLinkCard
             to="/portal/tickets"
             icon={ClipboardList}
-            title="My Requests"
+            title="Pending Requests"
             description="View and follow up on your submitted requests"
+          />
+          <QuickLinkCard
+            to="/portal/tickets/completed"
+            icon={Archive}
+            title="Completed Requests"
+            description="Browse requester-confirmed closed requests"
           />
           {canManageQueue && (
             <>
               <QuickLinkCard
                 to="/portal/queue"
                 icon={ClipboardList}
-                title="Request Queue"
+                title="Pending / Active Requests"
                 description="Triage, assign, and resolve open requests"
               />
               <QuickLinkCard
                 to="/portal/history"
                 icon={Archive}
-                title="Request History"
-                description="Browse resolved and closed requests"
+                title="Completed Requests"
+                description="Browse requester-confirmed closed requests"
               />
             </>
           )}

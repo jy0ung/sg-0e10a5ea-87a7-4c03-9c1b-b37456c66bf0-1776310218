@@ -13,6 +13,7 @@ import type { RequestSubcategoryRecord } from '@/services/requestSubcategoryServ
 import type {
   RequestFieldDataSource,
   RequestFormFieldRecord,
+  RequestFormFieldOption,
   RequestFormFieldType,
   RequestTemplateRecord,
   TemplatePriority,
@@ -106,6 +107,10 @@ export interface FormFieldDraft {
   label: string;
   field_type: RequestFormFieldType;
   data_source: RequestFieldDataSource | null;
+  options: RequestFormFieldOption[];
+  default_value: string;
+  validation_rules: Record<string, unknown>;
+  conditional_logic: Record<string, unknown>;
   placeholder: string;
   help_text: string;
   is_required: boolean;
@@ -121,6 +126,10 @@ export function hasFormFieldChanges(
     draft.label !== field.label
     || draft.field_type !== field.field_type
     || draft.data_source !== field.data_source
+    || JSON.stringify(draft.options) !== JSON.stringify(field.options)
+    || draft.default_value !== field.default_value
+    || JSON.stringify(draft.validation_rules) !== JSON.stringify(field.validation_rules)
+    || JSON.stringify(draft.conditional_logic) !== JSON.stringify(field.conditional_logic)
     || draft.placeholder !== field.placeholder
     || draft.help_text !== field.help_text
     || draft.is_required !== field.is_required
@@ -165,8 +174,13 @@ export const PRIORITY_OPTIONS: { value: TemplatePriority; label: string }[] = [
 export const FIELD_TYPE_OPTIONS: { value: RequestFormFieldType; label: string }[] = [
   { value: 'text', label: 'Short text' },
   { value: 'textarea', label: 'Long text' },
+  { value: 'select', label: 'Dropdown' },
+  { value: 'multiselect', label: 'Multi-select' },
   { value: 'number', label: 'Number' },
   { value: 'date', label: 'Date' },
+  { value: 'checkbox', label: 'Checkbox' },
+  { value: 'radio', label: 'Radio buttons' },
+  { value: 'file', label: 'File upload' },
   { value: 'database_select', label: 'Database dropdown' },
 ];
 

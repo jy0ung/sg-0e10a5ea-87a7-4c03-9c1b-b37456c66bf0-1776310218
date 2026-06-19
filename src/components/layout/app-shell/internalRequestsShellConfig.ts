@@ -1,4 +1,4 @@
-import { ArrowLeft, Archive, ClipboardList, FolderOpen, Home, ListTodo, Megaphone, Settings2, TicketCheck } from 'lucide-react';
+import { ArrowLeft, Archive, BarChart3, ClipboardList, FileSpreadsheet, FolderOpen, Home, ListTodo, Megaphone, Settings2, TicketCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { canAccessMainApp, canManagePortalQueue, canManagePortalSetup } from '@/lib/portalAccess';
@@ -7,7 +7,8 @@ import type { AppShellNavItem, AppShellRouteChromeMatch } from '@flc/shell';
 const baseNavItems: AppShellNavItem[] = [
   { label: 'Overview', path: '/portal', icon: Home, group: 'My Work', end: true },
   { label: 'New Request', path: '/portal/tickets/new', icon: TicketCheck, group: 'My Work', end: true },
-  { label: 'My Requests', path: '/portal/tickets', icon: ClipboardList, group: 'My Work', end: true },
+  { label: 'Pending Requests', path: '/portal/tickets', icon: ClipboardList, group: 'My Work', end: true },
+  { label: 'Completed Requests', path: '/portal/tickets/completed', icon: Archive, group: 'My Work', end: true },
 ];
 
 const resourceNavItems: AppShellNavItem[] = [
@@ -16,8 +17,10 @@ const resourceNavItems: AppShellNavItem[] = [
 ];
 
 const queueNavItems: AppShellNavItem[] = [
-  { label: 'Request Queue', path: '/portal/queue', icon: ListTodo, group: 'Operations' },
-  { label: 'Request History', path: '/portal/history', icon: Archive, group: 'Operations' },
+  { label: 'Manager Dashboard', path: '/portal/dashboard', icon: BarChart3, group: 'Operations' },
+  { label: 'Pending / Active Requests', path: '/portal/queue', icon: ListTodo, group: 'Operations' },
+  { label: 'Completed Requests', path: '/portal/history', icon: Archive, group: 'Operations' },
+  { label: 'Reports', path: '/portal/reports', icon: FileSpreadsheet, group: 'Operations' },
 ];
 
 const setupNavItem: AppShellNavItem = { label: 'Request Setup', path: '/portal/setup', icon: Settings2, group: 'Administration' };
@@ -25,9 +28,12 @@ const setupNavItem: AppShellNavItem = { label: 'Request Setup', path: '/portal/s
 const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/portal\/?$/, title: 'Overview', kicker: 'Internal requests workspace' },
   { pattern: /^\/portal\/tickets\/new/, title: 'New Request', kicker: 'Submit and track internal support demand' },
-  { pattern: /^\/portal\/tickets$/, title: 'My Requests', kicker: 'Requester history and updates' },
-  { pattern: /^\/portal\/queue/, title: 'Request Queue', kicker: 'Triage, assign, and resolve requests' },
-  { pattern: /^\/portal\/history/, title: 'Request History', kicker: 'Resolved and closed requests' },
+  { pattern: /^\/portal\/tickets\/completed/, title: 'Completed Requests', kicker: 'Closed requester-confirmed requests' },
+  { pattern: /^\/portal\/tickets$/, title: 'Pending Requests', kicker: 'Requester actions and active updates' },
+  { pattern: /^\/portal\/dashboard/, title: 'Manager Dashboard', kicker: 'SLA, workload, and bottleneck visibility' },
+  { pattern: /^\/portal\/queue/, title: 'Pending / Active Requests', kicker: 'Triage, assign, and resolve requests' },
+  { pattern: /^\/portal\/history/, title: 'Completed Requests', kicker: 'Closed requester-confirmed requests' },
+  { pattern: /^\/portal\/reports/, title: 'Reports', kicker: 'SLA, owner, category, aging, and export views' },
   { pattern: /^\/portal\/setup/, title: 'Request Setup', kicker: 'Configure categories, routing, and forms' },
   { pattern: /^\/portal\/announcements/, title: 'Announcements', kicker: 'Internal Request notices, process updates, and memos' },
   { pattern: /^\/portal\/documents/, title: 'Documents & Forms', kicker: 'Downloadable forms, templates, SOPs, and supporting documents' },

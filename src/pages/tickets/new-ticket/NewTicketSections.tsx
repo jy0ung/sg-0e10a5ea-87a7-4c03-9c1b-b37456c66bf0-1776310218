@@ -23,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Command,
   CommandEmpty,
@@ -34,6 +35,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -252,6 +254,114 @@ function DatabaseFieldSelect({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function RequestCustomFieldControl({
+  companyId,
+  field,
+  value,
+  inputId,
+  onChange,
+}: {
+  companyId?: string;
+  field: RequestFormFieldRecord;
+  value: string;
+  inputId: string;
+  onChange: (value: string) => void;
+}) {
+  if (field.field_type === 'textarea') {
+    return (
+      <Textarea
+        id={inputId}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={field.placeholder}
+        rows={3}
+      />
+    );
+  }
+
+  if (field.field_type === 'database_select') {
+    return <DatabaseFieldSelect companyId={companyId} field={field} value={value} inputId={inputId} onChange={onChange} />;
+  }
+
+  if (field.field_type === 'select') {
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={inputId}><SelectValue placeholder={field.placeholder || 'Select'} /></SelectTrigger>
+        <SelectContent>
+          {field.options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  if (field.field_type === 'multiselect') {
+    const selected = new Set(value ? value.split(',').filter(Boolean) : []);
+    return (
+      <div id={inputId} className="space-y-2 rounded-md border border-border px-3 py-2">
+        {field.options.map((option) => (
+          <label key={option.value} className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={selected.has(option.value)}
+              onCheckedChange={(checked) => {
+                const next = new Set(selected);
+                if (checked) next.add(option.value);
+                else next.delete(option.value);
+                onChange(Array.from(next).join(','));
+              }}
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  if (field.field_type === 'checkbox') {
+    return (
+      <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+        <Checkbox checked={value === 'true'} onCheckedChange={(checked) => onChange(checked ? 'true' : '')} />
+        {field.placeholder || 'Yes'}
+      </label>
+    );
+  }
+
+  if (field.field_type === 'radio') {
+    return (
+      <RadioGroup id={inputId} value={value} onValueChange={onChange} className="gap-2">
+        {field.options.map((option) => (
+          <label key={option.value} className="flex items-center gap-2 text-sm">
+            <RadioGroupItem value={option.value} />
+            {option.label}
+          </label>
+        ))}
+      </RadioGroup>
+    );
+  }
+
+  if (field.field_type === 'file') {
+    return (
+      <Input
+        id={inputId}
+        type="file"
+        multiple
+        onChange={(event) => onChange(Array.from(event.target.files ?? []).map((file) => file.name).join(', '))}
+      />
+    );
+  }
+
+  return (
+    <Input
+      id={inputId}
+      type={field.field_type === 'number' ? 'number' : field.field_type === 'date' ? 'date' : 'text'}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={field.placeholder}
+    />
   );
 }
 
@@ -638,6 +748,7 @@ interface RequestHeaderCardProps {
   onSubcategoryChange: (subcategoryKey: string) => void;
   subjectValue: string;
   subjectStatus: 'valid' | 'invalid' | 'untouched';
+  subjectPlaceholder: string;
   /** Per-category custom fields, rendered as "Additional information" inside this card. */
   customFields: RequestFormFieldRecord[];
   customFieldValues: Record<string, string>;
@@ -660,6 +771,7 @@ export function RequestHeaderCard({
   onSubcategoryChange,
   subjectValue,
   subjectStatus,
+  subjectPlaceholder,
   customFields,
   customFieldValues,
   setCustomFieldValues,
@@ -681,7 +793,7 @@ export function RequestHeaderCard({
         </div>
         <Input
           id="subject"
-          placeholder="e.g. Urgent invoice correction for customer delivery"
+          placeholder={subjectPlaceholder}
           {...form.register('subject')}
           className={cn(
             'h-10 transition-colors',
@@ -799,39 +911,15 @@ export function RequestHeaderCard({
                     {field.label}
                     {field.is_required && <span className="text-destructive"> *</span>}
                   </Label>
-                  {field.field_type === 'textarea' ? (
-                    <Textarea
-                      id={inputId}
-                      value={value}
-                      onChange={(event) => updateValue(event.target.value)}
-                      placeholder={field.placeholder}
-                      rows={3}
-                      className={cn(field.is_required && hasValue && 'border-success/50')}
-                    />
-                  ) : field.field_type === 'database_select' ? (
-                    <DatabaseFieldSelect
+                  <div className={cn(field.is_required && hasValue && '[&_*]:border-success/50')}>
+                    <RequestCustomFieldControl
                       companyId={companyId}
                       field={field}
                       value={value}
                       inputId={inputId}
                       onChange={updateValue}
                     />
-                  ) : (
-                    <Input
-                      id={inputId}
-                      type={
-                        field.field_type === 'number'
-                          ? 'number'
-                          : field.field_type === 'date'
-                            ? 'date'
-                            : 'text'
-                      }
-                      value={value}
-                      onChange={(event) => updateValue(event.target.value)}
-                      placeholder={field.placeholder}
-                      className={cn(field.is_required && hasValue && 'border-success/50')}
-                    />
-                  )}
+                  </div>
                   {field.help_text && (
                     <p className="text-xs text-muted-foreground">{field.help_text}</p>
                   )}
@@ -854,6 +942,7 @@ interface RequestDescriptionCardProps {
   descriptionStatus: 'valid' | 'invalid' | 'untouched';
   descriptionSource: DescriptionSource;
   onDescriptionSourceChange: (source: DescriptionSource) => void;
+  onDescriptionEdited: () => void;
 }
 
 export function RequestDescriptionCard({
@@ -863,7 +952,10 @@ export function RequestDescriptionCard({
   descriptionStatus,
   descriptionSource,
   onDescriptionSourceChange,
+  onDescriptionEdited,
 }: RequestDescriptionCardProps) {
+  const descriptionField = form.register('description');
+
   return (
     <SectionCard
       title="Description"
@@ -890,7 +982,11 @@ export function RequestDescriptionCard({
         aria-label="Description"
         placeholder={roleContext.descriptionPlaceholder}
         rows={14}
-        {...form.register('description')}
+        {...descriptionField}
+        onChange={(event) => {
+          void descriptionField.onChange(event);
+          onDescriptionEdited();
+        }}
         className={cn(
           'min-h-[320px] resize-y transition-colors',
           descriptionStatus === 'valid' && 'border-success/50 focus-visible:ring-success/50',
@@ -1579,43 +1675,15 @@ export function CustomFieldsSection({
                     <span className="text-destructive"> *</span>
                   )}
                 </Label>
-                {field.field_type === 'textarea' ? (
-                  <Textarea
-                    id={inputId}
-                    value={value}
-                    onChange={(event) => updateValue(event.target.value)}
-                    placeholder={field.placeholder}
-                    rows={3}
-                    className={cn(
-                      field.is_required && hasValue && 'border-success/50',
-                    )}
-                  />
-                ) : field.field_type === 'database_select' ? (
-                  <DatabaseFieldSelect
+                <div className={cn(field.is_required && hasValue && '[&_*]:border-success/50')}>
+                  <RequestCustomFieldControl
                     companyId={companyId}
                     field={field}
                     value={value}
                     inputId={inputId}
                     onChange={updateValue}
                   />
-                ) : (
-                  <Input
-                    id={inputId}
-                    type={
-                      field.field_type === 'number'
-                        ? 'number'
-                        : field.field_type === 'date'
-                          ? 'date'
-                          : 'text'
-                    }
-                    value={value}
-                    onChange={(event) => updateValue(event.target.value)}
-                    placeholder={field.placeholder}
-                    className={cn(
-                      field.is_required && hasValue && 'border-success/50',
-                    )}
-                  />
-                )}
+                </div>
                 {field.help_text && (
                   <p className="text-xs text-muted-foreground">{field.help_text}</p>
                 )}

@@ -44,11 +44,11 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("My Requests renders empty state when the user has no tickets", async ({ page }) => {
+test("Pending Requests renders empty state when the user has no tickets", async ({ page }) => {
   await page.goto("/portal/tickets");
 
   await expect(
-    page.getByRole("heading", { name: /my requests/i }),
+    page.getByRole("heading", { name: /pending requests/i }),
   ).toBeVisible({ timeout: 10000 });
 
   // Empty-state copy lives in MyTickets.tsx

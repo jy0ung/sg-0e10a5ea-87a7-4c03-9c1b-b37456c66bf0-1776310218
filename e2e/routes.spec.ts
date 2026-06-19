@@ -58,13 +58,13 @@ test.describe("Customer portal", () => {
   test("Portal default route (/portal) shows landing page", async ({ page }) => {
     await page.goto("/portal", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/portal$/, { timeout: 8000 });
-    await expect(page.locator("text=/new request|my requests|welcome/i").first()).toBeVisible({ timeout: 8000 });
+    await expect(page.locator("text=/new request|pending requests|welcome/i").first()).toBeVisible({ timeout: 8000 });
   });
 
-  test("My Tickets (/portal/tickets)", async ({ page }) => {
+  test("Pending Requests (/portal/tickets)", async ({ page }) => {
     await page.goto("/portal/tickets", { waitUntil: "domcontentloaded" });
     await expect(page.locator("text=Route Error")).toHaveCount(0);
-    await expect(page.locator("text=/my requests/i").first()).toBeVisible({ timeout: 8000 });
+    await expect(page.locator("text=/pending requests/i").first()).toBeVisible({ timeout: 8000 });
   });
 });
 

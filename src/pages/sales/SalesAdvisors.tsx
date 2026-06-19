@@ -54,7 +54,7 @@ export default function SalesAdvisors() {
     enabled: !!companyId,
     staleTime: STALE.reference,
   });
-  const branchRecords: BranchRecord[] = branchesQuery.data ?? [];
+  const branchRecords: BranchRecord[] = useMemo(() => branchesQuery.data ?? [], [branchesQuery.data]);
 
   const branchNameMap = useMemo(() => {
     const map: Record<string, string> = {};

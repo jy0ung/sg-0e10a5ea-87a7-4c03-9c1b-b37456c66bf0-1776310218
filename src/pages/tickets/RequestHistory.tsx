@@ -50,15 +50,12 @@ import { formatTicketLabel, priorityColorMap, statusColorMap } from '@/lib/reque
 import { getRequestAssignees } from '@/lib/requestAssignees';
 import { formatDistanceToNow } from 'date-fns';
 
-type HistoryStatusFilter = 'archived' | TicketStatus;
+type HistoryStatusFilter = 'closed';
 
 const HISTORY_PAGE_SIZE = 25;
 
 const historyStatusOptions: Array<{ value: HistoryStatusFilter; label: string }> = [
-  { value: 'archived', label: 'All resolved' },
-  { value: 'resolved', label: 'Resolved' },
   { value: 'closed', label: 'Closed' },
-  { value: 'cancelled', label: 'Cancelled' },
 ];
 
 const priorityOptions: Array<{ value: TicketPriority; label: string }> = [
@@ -70,9 +67,11 @@ const priorityOptions: Array<{ value: TicketPriority; label: string }> = [
 const statusOptions: Array<{ value: TicketStatus; label: string }> = [
   { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'awaiting_requester', label: 'Awaiting Requester' },
-  { value: 'resolved', label: 'Resolved' },
+  { value: 'pending_requester', label: 'Pending Requester' },
+  { value: 'pending_owner_review', label: 'Pending Owner Review' },
+  { value: 'completed_by_owner', label: 'Completed by Owner' },
   { value: 'closed', label: 'Closed' },
+  { value: 'reopened', label: 'Reopened' },
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
@@ -122,7 +121,7 @@ export default function RequestHistory() {
   const { data: historyData, isLoading: loading, error: queryError } = useQuery({
     queryKey: historyKey,
     queryFn: async () => {
-      const statusParam: TicketStatusFilter = statusFilter === 'archived' ? 'archived' : statusFilter;
+      const statusParam: TicketStatusFilter = 'closed';
       const [{ data, error: fetchError }, profileResult] = await Promise.all([
         listCompanyTicketsPage(user!.company_id, { page, pageSize: HISTORY_PAGE_SIZE, status: statusParam, search: searchTerm }),
         listProfiles(user!.company_id),
@@ -237,6 +236,7 @@ export default function RequestHistory() {
       customFieldLabelMap={customFieldLabelMap}
       statusOptions={statusOptions}
       priorityOptions={priorityOptions}
+      currentUserId={user?.id}
       saving={savingTicketId === ticket.id}
       // Drafts overlay the server state: an entry in noteDrafts means the
       // user has typed something; otherwise we show the ticket's current
@@ -245,8 +245,10 @@ export default function RequestHistory() {
       noteDraft={noteDrafts[ticket.id] ?? ticket.resolution_note ?? ''}
       commentDraft={commentDrafts[ticket.id] ?? ''}
       canReviewApproval={false}
+      canManageWorkflow={false}
+      canCloseAsRequester={false}
       variant={variant}
-      onStatusChange={(ticketId, status) => void handleUpdateTicket(ticketId, { status })}
+      onStatusChange={() => undefined}
       onPriorityChange={(ticketId, priority) => void handleUpdateTicket(ticketId, { priority })}
       onAssignmentChange={(ticketId, value) =>
         void handleUpdateTicket(ticketId, { assigned_to: value === 'unassigned' ? null : value })
@@ -271,9 +273,9 @@ export default function RequestHistory() {
       <div className="flex flex-col gap-3">
         <div className="[&>div]:mb-0">
           <PageHeader
-            title="Request History"
-            description="Browse resolved, closed, and cancelled requests."
-            breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'History' }]}
+            title="Completed Requests"
+            description="Browse requester-confirmed closed requests."
+            breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'Completed Requests' }]}
             actions={
               <>
                 <span className="text-sm text-muted-foreground">
@@ -325,7 +327,7 @@ export default function RequestHistory() {
           {loading ? (
             <div className="flex items-center justify-center gap-3 py-16 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Loading history…</span>
+              <span>Loading completed requests...</span>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center gap-4 py-16 text-center">
@@ -335,7 +337,7 @@ export default function RequestHistory() {
           ) : tickets.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center">
               <Archive className="h-10 w-10 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">No resolved requests found.</p>
+              <p className="text-sm text-muted-foreground">No completed requests found.</p>
             </div>
           ) : (
             <>

@@ -25,7 +25,6 @@
  *   }
  */
 
-// deno-lint-ignore no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 export interface RateLimitInput {
@@ -45,6 +44,24 @@ export interface RateLimitDecision {
   headers: Record<string, string>;
   /** Human-readable message. Only useful when !allowed. */
   message: string;
+}
+
+interface RateLimitRpcRow {
+  allowed?: boolean;
+  remaining?: number;
+  reset_at?: string;
+}
+
+interface RateLimitRpcClient {
+  rpc(
+    fn: 'bump_rate_limit',
+    args: {
+      p_caller_id: string;
+      p_action: string;
+      p_max_calls: number;
+      p_window_seconds: number;
+    },
+  ): Promise<{ data: RateLimitRpcRow[] | RateLimitRpcRow | null; error: { message: string } | null }>;
 }
 
 /**
@@ -67,8 +84,7 @@ export async function checkRateLimit(input: RateLimitInput): Promise<RateLimitDe
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // deno-lint-ignore no-explicit-any
-  const { data, error } = await (client as any).rpc('bump_rate_limit', {
+  const { data, error } = await (client as unknown as RateLimitRpcClient).rpc('bump_rate_limit', {
     p_caller_id: callerId,
     p_action: action,
     p_max_calls: maxCalls,

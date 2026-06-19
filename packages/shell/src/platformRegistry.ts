@@ -157,8 +157,11 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
   { id: 'platform-internal-requests-shortcut', label: 'Internal Requests', path: '/portal/tickets/new', shell: 'portal', section: 'Platform', icon: 'headphones', moduleGate: 'support', navShell: 'main' },
 
   { id: 'portal-new-request', label: 'New Ticket', path: '/portal/tickets/new', shell: 'portal', section: 'Internal Requests', icon: 'headphones', moduleGate: 'support', smoke: { app: 'main' } },
-  { id: 'portal-my-requests', label: 'My Tickets', path: '/portal/tickets', shell: 'portal', section: 'Internal Requests', icon: 'file-text', moduleGate: 'support', smoke: { app: 'main' } },
-  { id: 'portal-queue', label: 'Request Queue', path: '/portal/queue', shell: 'portal', section: 'Internal Requests', icon: 'inbox', moduleGate: 'support', roles: ['super_admin', 'company_admin', 'portal_admin', 'portal_manager'], smoke: { app: 'main' } },
+  { id: 'portal-my-requests', label: 'Pending Requests', path: '/portal/tickets', shell: 'portal', section: 'Internal Requests', icon: 'file-text', moduleGate: 'support', smoke: { app: 'main' } },
+  { id: 'portal-completed-requests', label: 'Completed Requests', path: '/portal/tickets/completed', shell: 'portal', section: 'Internal Requests', icon: 'archive', moduleGate: 'support', smoke: { app: 'main' } },
+  { id: 'portal-manager-dashboard', label: 'Manager Dashboard', path: '/portal/dashboard', shell: 'portal', section: 'Internal Requests', icon: 'layout-dashboard', moduleGate: 'support', roles: ['super_admin', 'company_admin', 'portal_admin', 'portal_manager'], smoke: { app: 'main' } },
+  { id: 'portal-queue', label: 'Pending / Active Requests', path: '/portal/queue', shell: 'portal', section: 'Internal Requests', icon: 'inbox', moduleGate: 'support', roles: ['super_admin', 'company_admin', 'portal_admin', 'portal_manager'], smoke: { app: 'main' } },
+  { id: 'portal-request-reports', label: 'Reports', path: '/portal/reports', shell: 'portal', section: 'Internal Requests', icon: 'file-spreadsheet', moduleGate: 'support', roles: ['super_admin', 'company_admin', 'portal_admin', 'portal_manager'], smoke: { app: 'main' } },
   { id: 'portal-setup', label: 'Request Setup', path: '/portal/setup', shell: 'portal', section: 'Internal Requests', icon: 'settings', moduleGate: 'support', roles: ['super_admin', 'company_admin', 'portal_admin'], smoke: { app: 'main' } },
 
   { id: 'auto-aging-overview', label: 'Auto Aging Overview', path: '/auto-aging', shell: 'main', section: 'Auto Aging', icon: 'timer', group: 'Overview', end: true, moduleGate: 'auto-aging', navShell: 'main', smoke: { app: 'main', name: 'Overview' } },

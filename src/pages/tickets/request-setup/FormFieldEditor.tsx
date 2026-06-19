@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -75,6 +76,10 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
   const [createSource, setCreateSource] = useState<RequestFieldDataSource>('branches');
   const [createPlaceholder, setCreatePlaceholder] = useState('');
   const [createHelpText, setCreateHelpText] = useState('');
+  const [createDefaultValue, setCreateDefaultValue] = useState('');
+  const [createOptionsText, setCreateOptionsText] = useState('');
+  const [createValidationRules, setCreateValidationRules] = useState('');
+  const [createConditionalLogic, setCreateConditionalLogic] = useState('');
   const [createRequired, setCreateRequired] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -97,6 +102,10 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
             label: field.label,
             field_type: field.field_type,
             data_source: field.data_source,
+            options: field.options,
+            default_value: field.default_value,
+            validation_rules: field.validation_rules,
+            conditional_logic: field.conditional_logic,
             placeholder: field.placeholder,
             help_text: field.help_text,
             is_required: field.is_required,
@@ -142,7 +151,32 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
     setCreateSource('branches');
     setCreatePlaceholder('');
     setCreateHelpText('');
+    setCreateDefaultValue('');
+    setCreateOptionsText('');
+    setCreateValidationRules('');
+    setCreateConditionalLogic('');
     setCreateRequired(false);
+  };
+
+  const parseOptions = (value: string) =>
+    value.split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [label, explicitValue] = line.split('|').map((part) => part.trim());
+        return { label, value: explicitValue || label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') };
+      });
+
+  const parseJsonObject = (value: string, label: string) => {
+    if (!value.trim()) return {};
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('object expected');
+      return parsed as Record<string, unknown>;
+    } catch {
+      toast.error(`${label} must be valid JSON object syntax.`);
+      return null;
+    }
   };
 
   const updateDraft = (field: RequestFormFieldRecord, patch: Partial<FormFieldDraft>) => {
@@ -153,6 +187,10 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
         label: field.label,
         field_type: field.field_type,
         data_source: field.data_source,
+        options: field.options,
+        default_value: field.default_value,
+        validation_rules: field.validation_rules,
+        conditional_logic: field.conditional_logic,
         placeholder: field.placeholder,
         help_text: field.help_text,
         is_required: field.is_required,
@@ -164,6 +202,9 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
 
   const handleCreate = async () => {
     if (!createCategoryKey || !createLabel.trim()) return;
+    const validationRules = parseJsonObject(createValidationRules, 'Validation rules');
+    const conditionalLogic = parseJsonObject(createConditionalLogic, 'Conditional logic');
+    if (!validationRules || !conditionalLogic) return;
     setCreating(true);
     const result = await createRequestFormField(
       {
@@ -172,6 +213,10 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
         label: createLabel,
         field_type: createType,
         data_source: createType === 'database_select' ? createSource : null,
+        options: parseOptions(createOptionsText),
+        default_value: createDefaultValue,
+        validation_rules: validationRules,
+        conditional_logic: conditionalLogic,
         placeholder: createPlaceholder,
         help_text: createHelpText,
         is_required: createRequired,
@@ -199,6 +244,10 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
         label: draft.label,
         field_type: draft.field_type,
         data_source: draft.field_type === 'database_select' ? draft.data_source ?? 'branches' : null,
+        options: draft.options,
+        default_value: draft.default_value,
+        validation_rules: draft.validation_rules,
+        conditional_logic: draft.conditional_logic,
         placeholder: draft.placeholder,
         help_text: draft.help_text,
         is_required: draft.is_required,
@@ -327,6 +376,20 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
             </div>
           )}
 
+          {(['select', 'multiselect', 'radio'].includes(createType)) && (
+            <div className="space-y-2">
+              <Label htmlFor="field-create-options">Options</Label>
+              <Textarea
+                id="field-create-options"
+                value={createOptionsText}
+                onChange={(event) => setCreateOptionsText(event.target.value)}
+                placeholder={'One option per line. Use Label | value when needed.'}
+                rows={4}
+                disabled={creating}
+              />
+            </div>
+          )}
+
           <div className="max-w-xs space-y-2">
             <Label htmlFor="field-create-subcategory">Subcategory</Label>
             <Select
@@ -363,6 +426,40 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                 id="field-create-help"
                 value={createHelpText}
                 onChange={(event) => setCreateHelpText(event.target.value)}
+                disabled={creating}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="field-create-default">Default value</Label>
+              <Input
+                id="field-create-default"
+                value={createDefaultValue}
+                onChange={(event) => setCreateDefaultValue(event.target.value)}
+                disabled={creating}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="field-create-validation">Validation rules</Label>
+              <Textarea
+                id="field-create-validation"
+                value={createValidationRules}
+                onChange={(event) => setCreateValidationRules(event.target.value)}
+                placeholder='{"minLength": 3}'
+                rows={3}
+                disabled={creating}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="field-create-conditional">Conditional logic</Label>
+              <Textarea
+                id="field-create-conditional"
+                value={createConditionalLogic}
+                onChange={(event) => setCreateConditionalLogic(event.target.value)}
+                placeholder='{"showWhen": {"field": "urgency", "equals": "high"}}'
+                rows={3}
                 disabled={creating}
               />
             </div>
@@ -452,9 +549,14 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                             </Badge>
                             {field.is_required && <Badge variant="outline">Required</Badge>}
                           </div>
-                          {field.data_source && (
+              {field.data_source && (
                             <p className="text-xs text-muted-foreground">
                               Source: {DATA_SOURCE_OPTIONS.find((option) => option.value === field.data_source)?.label ?? field.data_source}
+                            </p>
+                          )}
+                          {field.options.length > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Options: {field.options.map((option) => option.label).join(', ')}
                             </p>
                           )}
                         </div>
@@ -552,6 +654,20 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                 )}
               </div>
 
+              {(['select', 'multiselect', 'radio'].includes(editingDraft.field_type)) && (
+                <div className="space-y-2">
+                  <Label htmlFor={`field-options-${editingField.id}`}>Options</Label>
+                  <Textarea
+                    id={`field-options-${editingField.id}`}
+                    value={editingDraft.options.map((option) => `${option.label}${option.value !== option.label ? ` | ${option.value}` : ''}`).join('\n')}
+                    onChange={(event) => updateDraft(editingField, { options: parseOptions(event.target.value) })}
+                    placeholder={'One option per line. Use Label | value when needed.'}
+                    rows={4}
+                    disabled={editingBusy}
+                  />
+                </div>
+              )}
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor={`field-placeholder-${editingField.id}`}>Placeholder</Label>
@@ -568,6 +684,44 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                     id={`field-help-${editingField.id}`}
                     value={editingDraft.help_text}
                     onChange={(event) => updateDraft(editingField, { help_text: event.target.value })}
+                    disabled={editingBusy}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`field-default-${editingField.id}`}>Default value</Label>
+                  <Input
+                    id={`field-default-${editingField.id}`}
+                    value={editingDraft.default_value}
+                    onChange={(event) => updateDraft(editingField, { default_value: event.target.value })}
+                    disabled={editingBusy}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor={`field-validation-${editingField.id}`}>Validation rules</Label>
+                  <Textarea
+                    id={`field-validation-${editingField.id}`}
+                    value={JSON.stringify(editingDraft.validation_rules, null, 2)}
+                    onChange={(event) => {
+                      const parsed = parseJsonObject(event.target.value, 'Validation rules');
+                      if (parsed) updateDraft(editingField, { validation_rules: parsed });
+                    }}
+                    rows={4}
+                    disabled={editingBusy}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`field-conditional-${editingField.id}`}>Conditional logic</Label>
+                  <Textarea
+                    id={`field-conditional-${editingField.id}`}
+                    value={JSON.stringify(editingDraft.conditional_logic, null, 2)}
+                    onChange={(event) => {
+                      const parsed = parseJsonObject(event.target.value, 'Conditional logic');
+                      if (parsed) updateDraft(editingField, { conditional_logic: parsed });
+                    }}
+                    rows={4}
                     disabled={editingBusy}
                   />
                 </div>

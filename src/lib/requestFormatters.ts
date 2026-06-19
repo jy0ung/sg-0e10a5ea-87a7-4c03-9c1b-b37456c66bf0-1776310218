@@ -27,7 +27,14 @@ export function formatDueDate(value: string): string {
 
 /** Returns true for statuses that represent active/open work. */
 export function isOpenStatus(status: TicketStatus): boolean {
-  return status === 'open' || status === 'in_progress' || status === 'awaiting_requester';
+  return [
+    'open',
+    'in_progress',
+    'pending_requester',
+    'pending_owner_review',
+    'completed_by_owner',
+    'reopened',
+  ].includes(status);
 }
 
 /** Returns true when a ticket's requested due date has passed while still open. */
@@ -84,18 +91,22 @@ type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 export const statusVariantMap: Record<TicketStatus, BadgeVariant> = {
   open: 'default',
   in_progress: 'secondary',
-  awaiting_requester: 'outline',
-  resolved: 'outline',
+  pending_requester: 'outline',
+  pending_owner_review: 'secondary',
+  completed_by_owner: 'outline',
   closed: 'outline',
+  reopened: 'secondary',
   cancelled: 'outline',
 };
 
 export const statusColorMap: Record<TicketStatus, string> = {
   open: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800',
   in_progress: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800',
-  awaiting_requester: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800',
-  resolved: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800',
+  pending_requester: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800',
+  pending_owner_review: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-300 dark:border-cyan-800',
+  completed_by_owner: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800',
   closed: 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
+  reopened: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-800',
   cancelled: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
 };
 export const priorityVariantMap: Record<TicketPriority, BadgeVariant> = {

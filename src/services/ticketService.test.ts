@@ -1,6 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { supabase } from '@/integrations/supabase/client';
-import { addTicketComment, cancelMyTicket, createTicket, listMyTickets, listTicketActivity, updateTicket } from './ticketService';
+import {
+  addTicketComment,
+  cancelMyTicket,
+  closeTicketByRequester,
+  createTicket,
+  getTicketNextAction,
+  listMyTickets,
+  listTicketActivity,
+  markTicketCompletedByOwner,
+  requestTicketMoreInformation,
+  reopenTicketByRequester,
+  submitRequesterTicketUpdate,
+  updateTicket,
+  type TicketStatus,
+} from './ticketService';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
 import { evaluateRoutingRules } from '@flc/internal-requests';
@@ -89,6 +103,72 @@ describe('ticketService', () => {
     const entityEq = vi.fn(() => ({ in: inFn }));
     const select = vi.fn(() => ({ eq: entityEq }));
     return { select, entityEq, inFn };
+  }
+
+  function workflowTicket(status: TicketStatus) {
+    return {
+      id: 'ticket-workflow',
+      company_id: 'company-1',
+      subject: 'Workflow request',
+      category: 'operations_support',
+      subcategory: null,
+      priority: 'medium',
+      status,
+      description: 'Verify the automated workflow.',
+      submitted_by: 'requester-1',
+      assigned_to: 'owner-1',
+      assigned_at: '2026-06-19T09:00:00.000Z',
+      first_response_due_at: '2026-06-19T13:00:00.000Z',
+      resolution_due_at: '2026-06-20T09:00:00.000Z',
+      first_responded_at: '2026-06-19T09:30:00.000Z',
+      resolved_at: null,
+      resolution_note: null,
+      custom_fields: {},
+      sla_status: 'on_track',
+      sla_breach_reason: null,
+      created_at: '2026-06-19T08:00:00.000Z',
+      updated_at: '2026-06-19T09:30:00.000Z',
+    };
+  }
+
+  function mockTicketFetch(ticket: ReturnType<typeof workflowTicket>) {
+    const single = vi.fn().mockResolvedValue({ data: ticket, error: null });
+    const idEq = vi.fn(() => ({ single }));
+    const companyEq = vi.fn(() => ({ eq: idEq }));
+    const select = vi.fn(() => ({ eq: companyEq }));
+    return { select };
+  }
+
+  function mockTicketUpdate(ticket: ReturnType<typeof workflowTicket>) {
+    const single = vi.fn().mockResolvedValue({ data: ticket, error: null });
+    const select = vi.fn(() => ({ single }));
+    const idEq = vi.fn(() => ({ select }));
+    const companyEq = vi.fn(() => ({ eq: idEq }));
+    const update = vi.fn(() => ({ eq: companyEq }));
+    return { update };
+  }
+
+  function mockCommentInsert(ticketId: string, actorId: string, message: string) {
+    const single = vi.fn().mockResolvedValue({
+      data: {
+        id: `comment-${ticketId}`,
+        ticket_id: ticketId,
+        company_id: 'company-1',
+        actor_id: actorId,
+        event_type: 'comment_added',
+        message,
+        metadata: { comment: true },
+        created_at: '2026-06-19T10:00:00.000Z',
+      },
+      error: null,
+    });
+    const select = vi.fn(() => ({ single }));
+    const insert = vi.fn(() => ({ select }));
+    return { insert };
+  }
+
+  function mockActivityInsert() {
+    return { insert: vi.fn().mockResolvedValue({ error: null }) };
   }
 
   it('lists only tickets submitted by the current user inside the current company', async () => {
@@ -223,6 +303,7 @@ describe('ticketService', () => {
       assigned_to: 'user-2',
       assigned_at: expect.any(String),
       first_responded_at: expect.any(String),
+      last_action_by: 'user-1',
       resolution_note: 'Following up with the outlet.',
     });
     expect(currentCompanyEq).toHaveBeenCalledWith('company_id', 'company-1');
@@ -242,6 +323,7 @@ describe('ticketService', () => {
       assigned_to: 'user-2',
       assigned_at: expect.any(String),
       first_responded_at: expect.any(String),
+      last_action_by: 'user-1',
       resolution_note: 'Following up with the outlet.',
     });
   });
@@ -580,5 +662,331 @@ describe('ticketService', () => {
     expect(result.error).toBeNull();
     expect(result.data?.status).toBe('open');
     expect(supabase.from).toHaveBeenCalledTimes(1);
+  });
+
+  it('auto-starts an assigned open ticket without changing its owner', async () => {
+    const currentTicket = {
+      id: 'ticket-9',
+      company_id: 'company-1',
+      subject: 'Assigned request',
+      category: 'operations_support',
+      subcategory: null,
+      priority: 'medium',
+      status: 'open',
+      description: 'Already assigned.',
+      submitted_by: 'requestor-1',
+      assigned_to: 'owner-1',
+      assigned_at: '2026-04-30T09:30:00.000Z',
+      first_response_due_at: '2026-04-30T13:00:00.000Z',
+      resolution_due_at: '2026-05-02T09:00:00.000Z',
+      first_responded_at: null,
+      resolved_at: null,
+      resolution_note: null,
+      custom_fields: {},
+      created_at: '2026-04-30T09:00:00.000Z',
+      updated_at: '2026-04-30T09:30:00.000Z',
+    };
+    const currentSingle = vi.fn().mockResolvedValue({ data: currentTicket, error: null });
+    const currentIdEq = vi.fn(() => ({ single: currentSingle }));
+    const currentCompanyEq = vi.fn(() => ({ eq: currentIdEq }));
+    const currentSelect = vi.fn(() => ({ eq: currentCompanyEq }));
+
+    const updatedSingle = vi.fn().mockResolvedValue({
+      data: {
+        ...currentTicket,
+        status: 'in_progress',
+        first_responded_at: '2026-04-30T10:00:00.000Z',
+        updated_at: '2026-04-30T10:00:00.000Z',
+      },
+      error: null,
+    });
+    const updatedSelect = vi.fn(() => ({ single: updatedSingle }));
+    const updatedIdEq = vi.fn(() => ({ select: updatedSelect }));
+    const updatedCompanyEq = vi.fn(() => ({ eq: updatedIdEq }));
+    const update = vi.fn(() => ({ eq: updatedCompanyEq }));
+    const approvalMetadataSelect = mockNoInternalRequestApprovalMetadata();
+    const activityInsert = vi.fn().mockResolvedValue({ error: null });
+
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: currentSelect }) as never)
+      .mockImplementationOnce(() => ({ update }) as never)
+      .mockImplementationOnce(() => ({ select: approvalMetadataSelect.select }) as never)
+      .mockImplementationOnce(() => ({ insert: activityInsert }) as never);
+
+    const result = await updateTicket(
+      'ticket-9',
+      { mark_opened: true },
+      { userId: 'manager-1', companyId: 'company-1' },
+    );
+
+    expect(result.error).toBeNull();
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'in_progress',
+      assigned_to: 'owner-1',
+      assigned_at: '2026-04-30T09:30:00.000Z',
+      first_responded_at: expect.any(String),
+    }));
+    expect(activityInsert).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ ticket_id: 'ticket-9', event_type: 'status_changed' }),
+    ]));
+    expect(activityInsert).not.toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ ticket_id: 'ticket-9', event_type: 'owner_changed' }),
+    ]));
+  });
+
+  it('keeps the automated status model tied to the correct responsible party and next action', () => {
+    expect(getTicketNextAction('open')).toEqual({
+      responsibleParty: 'Owner',
+      nextAction: 'Owner to review request',
+    });
+    expect(getTicketNextAction('in_progress')).toEqual({
+      responsibleParty: 'Owner',
+      nextAction: 'Owner to resolve request',
+    });
+    expect(getTicketNextAction('pending_requester')).toEqual({
+      responsibleParty: 'Requester',
+      nextAction: 'Requester to provide information',
+    });
+    expect(getTicketNextAction('pending_owner_review')).toEqual({
+      responsibleParty: 'Owner',
+      nextAction: 'Owner to review requester response',
+    });
+    expect(getTicketNextAction('completed_by_owner')).toEqual({
+      responsibleParty: 'Requester',
+      nextAction: 'Requester to confirm and close',
+    });
+    expect(getTicketNextAction('reopened')).toEqual({
+      responsibleParty: 'Owner',
+      nextAction: 'Owner to review reopened request',
+    });
+  });
+
+  it('moves an owner information request to Pending Requester and records the workflow event', async () => {
+    const current = workflowTicket('in_progress');
+    const updated = {
+      ...current,
+      status: 'pending_requester' as const,
+      current_responsible_party: 'Requester',
+      next_action: 'Requester to provide information',
+      updated_at: '2026-06-19T10:00:00.000Z',
+    };
+    const currentForComment = mockTicketFetch(current);
+    const commentInsert = mockCommentInsert(current.id, 'owner-1', 'Please provide the signed form.');
+    const currentForWorkflow = mockTicketFetch(current);
+    const ticketUpdate = mockTicketUpdate(updated);
+    const approvalMetadata = mockNoInternalRequestApprovalMetadata();
+    const activityInsert = mockActivityInsert();
+
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: currentForComment.select }) as never)
+      .mockImplementationOnce(() => ({ insert: commentInsert.insert }) as never)
+      .mockImplementationOnce(() => ({ select: currentForWorkflow.select }) as never)
+      .mockImplementationOnce(() => ({ update: ticketUpdate.update }) as never)
+      .mockImplementationOnce(() => ({ select: approvalMetadata.select }) as never)
+      .mockImplementationOnce(() => ({ insert: activityInsert.insert }) as never);
+
+    const result = await requestTicketMoreInformation(
+      current.id,
+      { message: 'Please provide the signed form.' },
+      { userId: 'owner-1', companyId: 'company-1' },
+    );
+
+    expect(result.data?.status).toBe('pending_requester');
+    expect(ticketUpdate.update).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'pending_requester',
+      current_responsible_party: 'Requester',
+      next_action: 'Requester to provide information',
+    }));
+    expect(activityInsert.insert).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ event_type: 'owner_requested_more_information' }),
+      expect.objectContaining({ event_type: 'status_changed' }),
+    ]));
+  });
+
+  it('moves a requester reply to Pending Owner Review and records the workflow event', async () => {
+    const current = workflowTicket('pending_requester');
+    const updated = {
+      ...current,
+      status: 'pending_owner_review' as const,
+      current_responsible_party: 'Owner',
+      next_action: 'Owner to review requester response',
+      updated_at: '2026-06-19T10:30:00.000Z',
+    };
+    const currentForComment = mockTicketFetch(current);
+    const commentInsert = mockCommentInsert(current.id, 'requester-1', 'The signed form is attached.');
+    const currentForWorkflow = mockTicketFetch(current);
+    const ticketUpdate = mockTicketUpdate(updated);
+    const approvalMetadata = mockNoInternalRequestApprovalMetadata();
+    const activityInsert = mockActivityInsert();
+
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: currentForComment.select }) as never)
+      .mockImplementationOnce(() => ({ insert: commentInsert.insert }) as never)
+      .mockImplementationOnce(() => ({ select: currentForWorkflow.select }) as never)
+      .mockImplementationOnce(() => ({ update: ticketUpdate.update }) as never)
+      .mockImplementationOnce(() => ({ select: approvalMetadata.select }) as never)
+      .mockImplementationOnce(() => ({ insert: activityInsert.insert }) as never);
+
+    const result = await submitRequesterTicketUpdate(
+      current.id,
+      { message: 'The signed form is attached.' },
+      { userId: 'requester-1', companyId: 'company-1' },
+    );
+
+    expect(result.data?.status).toBe('pending_owner_review');
+    expect(ticketUpdate.update).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'pending_owner_review',
+      current_responsible_party: 'Owner',
+      next_action: 'Owner to review requester response',
+    }));
+    expect(activityInsert.insert).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ event_type: 'requester_update_submitted' }),
+      expect.objectContaining({ event_type: 'status_changed' }),
+    ]));
+  });
+
+  it('moves owner completion to requester confirmation with the required completion controls', async () => {
+    const current = workflowTicket('in_progress');
+    const updated = {
+      ...current,
+      status: 'completed_by_owner' as const,
+      current_responsible_party: 'Requester',
+      next_action: 'Requester to confirm and close',
+      resolution_note: 'Access restored and verified.',
+      updated_at: '2026-06-19T11:00:00.000Z',
+    };
+    const currentForWorkflow = mockTicketFetch(current);
+    const ticketUpdate = mockTicketUpdate(updated);
+    const approvalMetadata = mockNoInternalRequestApprovalMetadata();
+    const activityInsert = mockActivityInsert();
+
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: currentForWorkflow.select }) as never)
+      .mockImplementationOnce(() => ({ update: ticketUpdate.update }) as never)
+      .mockImplementationOnce(() => ({ select: approvalMetadata.select }) as never)
+      .mockImplementationOnce(() => ({ insert: activityInsert.insert }) as never);
+
+    const result = await markTicketCompletedByOwner(
+      current.id,
+      {
+        resolutionNote: 'Access restored and verified.',
+        completionCategory: 'resolved',
+        checklistConfirmed: true,
+      },
+      { userId: 'owner-1', companyId: 'company-1' },
+    );
+
+    expect(result.data?.status).toBe('completed_by_owner');
+    expect(ticketUpdate.update).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'completed_by_owner',
+      current_responsible_party: 'Requester',
+      next_action: 'Requester to confirm and close',
+      completion_category: 'resolved',
+      completion_checklist_confirmed: true,
+    }));
+    expect(activityInsert.insert).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ event_type: 'owner_completed_request' }),
+      expect.objectContaining({ event_type: 'status_changed' }),
+    ]));
+  });
+
+  it('moves requester closure to Closed and persists feedback outside the active queue', async () => {
+    const current = {
+      ...workflowTicket('completed_by_owner'),
+      resolution_note: 'Access restored and verified.',
+    };
+    const updated = {
+      ...current,
+      status: 'closed' as const,
+      current_responsible_party: 'None',
+      next_action: 'No further action',
+      closed_at: '2026-06-19T11:30:00.000Z',
+      updated_at: '2026-06-19T11:30:00.000Z',
+    };
+    const currentForWorkflow = mockTicketFetch(current);
+    const ticketUpdate = mockTicketUpdate(updated);
+    const approvalMetadata = mockNoInternalRequestApprovalMetadata();
+    const workflowActivity = mockActivityInsert();
+    const feedbackInsert = vi.fn().mockResolvedValue({ error: null });
+    const feedbackActivity = mockActivityInsert();
+
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: currentForWorkflow.select }) as never)
+      .mockImplementationOnce(() => ({ update: ticketUpdate.update }) as never)
+      .mockImplementationOnce(() => ({ select: approvalMetadata.select }) as never)
+      .mockImplementationOnce(() => ({ insert: workflowActivity.insert }) as never)
+      .mockImplementationOnce(() => ({ insert: feedbackInsert }) as never)
+      .mockImplementationOnce(() => ({ insert: feedbackActivity.insert }) as never);
+
+    const result = await closeTicketByRequester(
+      current.id,
+      {
+        confirmedResolved: true,
+        satisfactionRating: 5,
+        feedbackComment: 'Resolved promptly.',
+      },
+      { userId: 'requester-1', companyId: 'company-1' },
+    );
+
+    expect(result.data?.status).toBe('closed');
+    expect(ticketUpdate.update).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'closed',
+      current_responsible_party: 'None',
+      next_action: 'No further action',
+      closure_confirmed: true,
+      satisfaction_rating: 5,
+      closure_feedback: 'Resolved promptly.',
+      closed_at: expect.any(String),
+    }));
+    expect(workflowActivity.insert).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ event_type: 'requester_closed_request' }),
+      expect.objectContaining({ event_type: 'status_changed' }),
+    ]));
+    expect(feedbackInsert).toHaveBeenCalledWith(expect.objectContaining({
+      requester_id: 'requester-1',
+      confirmed_resolved: true,
+      satisfaction_rating: 5,
+    }));
+  });
+
+  it('blocks owner completion until Phase 2 closure controls are supplied', async () => {
+    const missingSummary = await markTicketCompletedByOwner(
+      'ticket-1',
+      { resolutionNote: ' ', completionCategory: 'resolved', checklistConfirmed: true },
+      { userId: 'owner-1', companyId: 'company-1' },
+    );
+    expect(missingSummary.error?.message).toBe('Resolution summary is required.');
+
+    const missingChecklist = await markTicketCompletedByOwner(
+      'ticket-1',
+      { resolutionNote: 'Completed the request.', completionCategory: 'resolved', checklistConfirmed: false },
+      { userId: 'owner-1', companyId: 'company-1' },
+    );
+    expect(missingChecklist.error?.message).toContain('Confirm the completion checklist');
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it('blocks requester closure and reopen without required confirmation data', async () => {
+    const noConfirmation = await closeTicketByRequester(
+      'ticket-1',
+      { confirmedResolved: false, satisfactionRating: 5 },
+      { userId: 'requester-1', companyId: 'company-1' },
+    );
+    expect(noConfirmation.error?.message).toBe('Confirm the request is resolved before closing it.');
+
+    const badRating = await closeTicketByRequester(
+      'ticket-1',
+      { confirmedResolved: true, satisfactionRating: 0 },
+      { userId: 'requester-1', companyId: 'company-1' },
+    );
+    expect(badRating.error?.message).toBe('Satisfaction rating must be between 1 and 5.');
+
+    const noReopenReason = await reopenTicketByRequester(
+      'ticket-1',
+      { reason: ' ' },
+      { userId: 'requester-1', companyId: 'company-1' },
+    );
+    expect(noReopenReason.error?.message).toBe('Reopen reason is required.');
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 });

@@ -1,17 +1,7 @@
 import { differenceInMilliseconds, formatDistanceToNow } from 'date-fns';
 import { type TicketStatus } from '@/services/ticketService';
 
-// NOTE: SLA clock pausing / hold tracking is NOT currently implemented.
-// The schema has no `sla_paused_at` column and the `on_hold` status is not part
-// of the TicketStatus union.  All SLA deadlines are fixed at ticket-creation
-// time and count down continuously.
-//
-// TODO (future): Add `sla_paused_at` / `sla_pause_duration_ms` columns,
-// set them when a ticket is moved to an "on_hold" status, and factor the
-// accumulated pause duration into `getTicketSlaSummary` so that time spent
-// waiting for a 3rd-party or on-hold is excluded from SLA calculations.
-
-export type TicketSlaState = 'not_configured' | 'met' | 'pending' | 'at_risk' | 'breached';
+export type TicketSlaState = 'not_configured' | 'met' | 'pending' | 'at_risk' | 'breached' | 'paused';
 export type TicketSlaTarget = 'response' | 'resolution';
 
 export interface TicketSlaInput {
@@ -20,6 +10,8 @@ export interface TicketSlaInput {
   resolution_due_at: string | null;
   first_responded_at: string | null;
   resolved_at: string | null;
+  sla_status?: string | null;
+  sla_paused_at?: string | null;
 }
 
 export interface TicketSlaCheck {
@@ -38,7 +30,7 @@ export interface TicketSlaSummary {
 const AT_RISK_WINDOW_MS = 4 * 60 * 60 * 1000;
 
 function isTerminalStatus(status: TicketStatus) {
-  return status === 'resolved' || status === 'closed' || status === 'cancelled';
+  return status === 'closed' || status === 'cancelled';
 }
 
 function evaluateSlaTarget(
@@ -77,6 +69,15 @@ function evaluateSlaTarget(
 }
 
 export function getTicketSlaSummary(ticket: TicketSlaInput): TicketSlaSummary {
+  if (ticket.sla_status === 'paused' || (ticket.status === 'pending_requester' && ticket.sla_paused_at)) {
+    const paused = { state: 'paused' as TicketSlaState, dueAt: null, completedAt: null };
+    return {
+      overall: 'paused',
+      response: { target: 'response', ...paused },
+      resolution: { target: 'resolution', ...paused },
+    };
+  }
+
   const response = evaluateSlaTarget(
     'response',
     ticket.first_response_due_at,
@@ -112,6 +113,8 @@ export function formatSlaState(state: TicketSlaState) {
       return 'Due soon';
     case 'pending':
       return 'On track';
+    case 'paused':
+      return 'Paused';
     case 'met':
       return 'SLA met';
     case 'not_configured':
@@ -121,6 +124,7 @@ export function formatSlaState(state: TicketSlaState) {
 
 export function formatSlaCheck(check: TicketSlaCheck) {
   if (check.state === 'not_configured' || !check.dueAt) return 'Not configured';
+  if (check.state === 'paused') return 'Paused';
   if (check.completedAt) {
     return check.state === 'met'
       ? `Met ${formatDistanceToNow(new Date(check.completedAt), { addSuffix: true })}`

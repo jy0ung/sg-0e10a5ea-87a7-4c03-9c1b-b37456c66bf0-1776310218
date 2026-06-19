@@ -50,6 +50,9 @@ test.describe("responsive shell", () => {
       "/purchasing/invoices",
       "/hrms/",
       "/reports",
+      "/portal/tickets/new",
+      "/portal/queue",
+      "/portal/setup",
     ]) {
       await page.goto(path, { waitUntil: "domcontentloaded" });
       await expect(page.locator("text=Route Error")).toHaveCount(0);

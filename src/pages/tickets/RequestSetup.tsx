@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AttachmentSettingsEditor } from './request-setup/AttachmentSettingsEditor';
 import { CategoryEditor } from './request-setup/CategoryEditor';
 import { FormFieldEditor } from './request-setup/FormFieldEditor';
+import { ModuleSettingsEditor } from './request-setup/ModuleSettingsEditor';
 import { RoutingEditor } from './request-setup/RoutingEditor';
 
 /**
@@ -139,6 +140,7 @@ export default function RequestSetup() {
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-4">
+              <ModuleSettingsEditor companyId={companyId} actorId={actorId} />
               <AttachmentSettingsEditor companyId={companyId} actorId={actorId} />
             </TabsContent>
           </Tabs>

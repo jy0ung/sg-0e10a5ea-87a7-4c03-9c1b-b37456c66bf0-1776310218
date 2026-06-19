@@ -55,7 +55,10 @@ subscribeWebVitals();
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const CustomerServiceLayout = lazy(() => import("./components/layout/CustomerServiceLayout"));
 const MyTickets = lazy(() => import("./pages/tickets/MyTickets"));
+const CompletedRequests = lazy(() => import("./pages/tickets/CompletedRequests"));
 const NewTicket = lazy(() => import("./pages/tickets/NewTicket"));
+const ManagerDashboard = lazy(() => import("./pages/tickets/ManagerDashboard"));
+const RequestReports = lazy(() => import("./pages/tickets/RequestReports"));
 const RequestQueue = lazy(() => import("./pages/tickets/RequestQueue"));
 const RequestSetup = lazy(() => import("./pages/tickets/RequestSetup"));
 const RequestHistory = lazy(() => import("./pages/tickets/RequestHistory"));const PortalLanding = lazy(() => import('./pages/tickets/PortalLanding'));const PortalAnnouncements = lazy(() => import('./pages/tickets/PortalAnnouncements'));const PortalDocuments = lazy(() => import('./pages/tickets/PortalDocuments'));const LoginPage = lazy(() => import("./pages/LoginPage"));
@@ -312,10 +315,13 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <S><PortalLanding /></S> },
-      { path: "tickets", element: <S><R scope="My Tickets"><MyTickets /></R></S> },
+      { path: "tickets", element: <S><R scope="Pending Requests"><MyTickets /></R></S> },
+      { path: "tickets/completed", element: <S><R scope="Completed Requests"><CompletedRequests /></R></S> },
       { path: "tickets/new", element: <S><R scope="New Ticket"><NewTicket /></R></S> },
-      { path: "queue", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Request Queue"><RequestQueue /></R></S></RequireRole> },
-      { path: "history", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Request History"><RequestHistory /></R></S></RequireRole> },
+      { path: "dashboard", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Manager Dashboard"><ManagerDashboard /></R></S></RequireRole> },
+      { path: "queue", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Pending / Active Requests"><RequestQueue /></R></S></RequireRole> },
+      { path: "history", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Completed Requests"><RequestHistory /></R></S></RequireRole> },
+      { path: "reports", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Reports"><RequestReports /></R></S></RequireRole> },
       { path: "setup", element: <RequireRole roles={PORTAL_SETUP_ROLES} section="Platform"><S><R scope="Request Setup"><RequestSetup /></R></S></RequireRole> },
       { path: "announcements", element: <S><R scope="Portal Announcements"><PortalAnnouncements /></R></S> },
       { path: "documents", element: <S><R scope="Portal Documents"><PortalDocuments /></R></S> },

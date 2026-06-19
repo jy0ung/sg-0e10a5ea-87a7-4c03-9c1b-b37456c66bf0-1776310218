@@ -128,10 +128,6 @@ const SEED_SLUGS = [
   "daily.php",
 ];
 
-// Mutation guard — never click buttons/links matching this pattern
-const MUTATION_PATTERN =
-  /\b(delete|remove|cancel|create|add\s|new\s|submit|export|upload|import|save|edit|update|modify|approve|reject|confirm|send|print|download)\b/i;
-
 // Links to skip even if discovered (logout / destructive / file attachments / PII docs)
 const SKIP_HREF_PATTERN =
   /sign[_-]?out|logout|log[_-]?out|delete|remove|purge|drop|reset[_-]?pass|uploadDoc\/|\/upload\//i;
@@ -174,7 +170,7 @@ function detectPageType(
 
 /** Extract all internal page links from the current page */
 async function extractLinks(page: import("@playwright/test").Page): Promise<string[]> {
-  const hrefs: string[] = await page.evaluate((base) => {
+  const hrefs: string[] = await page.evaluate(() => {
     const anchors = Array.from(document.querySelectorAll("a[href]"));
     return anchors
       .map((a) => {

@@ -154,15 +154,15 @@ async function main() {
   const passed = all.filter((r) => r.pass).length;
   const failed = all.filter((r) => !r.pass);
 
-  console.log(`\nSecurity smoke: ${passed}/${all.length} checks passed.\n`);
+  console.info(`\nSecurity smoke: ${passed}/${all.length} checks passed.\n`);
   if (failed.length > 0) {
-    console.log('Failures:');
+    console.info('Failures:');
     for (const f of failed) {
-      console.log(`  ✗ ${f.probe} [${f.variant}] — expected ${f.expected}, got ${f.actual}`);
+      console.info(`  ✗ ${f.probe} [${f.variant}] — expected ${f.expected}, got ${f.actual}`);
     }
     process.exit(1);
   }
-  console.log('All boundary checks behaved as expected.');
+  console.info('All boundary checks behaved as expected.');
 }
 
 main().catch((err) => {

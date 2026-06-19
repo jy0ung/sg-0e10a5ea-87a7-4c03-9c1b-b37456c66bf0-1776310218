@@ -22,7 +22,12 @@ import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useAttachmentSettings } from '@/hooks/useAttachmentSettings';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
-import { createTicket } from '@/services/ticketService';
+import {
+  createTicket,
+  findDuplicateTickets,
+  type DuplicateTicketCandidate,
+} from '@/services/ticketService';
+import { getRequestModuleSettings } from '@/services/requestModuleSettingsService';
 import { uploadTicketAttachment } from '@flc/platform-services';
 import { getInternalRequestApprovalPlan } from '@flc/internal-requests';
 import type { AppRole } from '@/types';
@@ -42,6 +47,8 @@ import {
   type TicketFormData,
 } from './new-ticket/NewTicketSections';
 
+const DRAFT_SAVE_DELAY_MS = 400;
+
 export default function NewTicket() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -55,12 +62,15 @@ export default function NewTicket() {
   const [fileErrors, setFileErrors] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
-  const [approvalConfirmData, setApprovalConfirmData] = useState<TicketFormData | null>(null);
+  const [approvalConfirmData, setApprovalConfirmData] = useState<{ data: TicketFormData; duplicateOfTicketId?: string | null } | null>(null);
+  const [duplicateReview, setDuplicateReview] = useState<{ data: TicketFormData; candidates: DuplicateTicketCandidate[] } | null>(null);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
-  const [descriptionSource, setDescriptionSource] = useState<DescriptionSource>('subcategory');
+  const [descriptionSource, setDescriptionSource] = useState<DescriptionSource>('category');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draftRestoredRef = useRef(false);
   const skipDraftSaveRef = useRef(false);
+  const draftSaveTimerRef = useRef<number | null>(null);
   // Tracks the last description text we auto-filled from a category/subcategory,
   // so we only overwrite the body while it still holds that suggested text.
   const autoFilledDescriptionRef = useRef('');
@@ -105,20 +115,32 @@ export default function NewTicket() {
 
     const persistDraft = (values: Partial<TicketFormData>) => {
       if (skipDraftSaveRef.current) return;
-      try {
-        window.localStorage.setItem(
-          draftKey,
-          JSON.stringify({ values, customFieldValues, updatedAt: new Date().toISOString() }),
-        );
-        setDraftSavedAt(new Date());
-      } catch {
-        // Ignore storage quota/private-mode errors; the live form state still works.
-      }
+      if (draftSaveTimerRef.current !== null) window.clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = window.setTimeout(() => {
+        try {
+          const savedAt = new Date();
+          window.localStorage.setItem(
+            draftKey,
+            JSON.stringify({ values, customFieldValues, updatedAt: savedAt.toISOString() }),
+          );
+          setDraftSavedAt(savedAt);
+        } catch {
+          // Ignore storage quota/private-mode errors; the live form state still works.
+        } finally {
+          draftSaveTimerRef.current = null;
+        }
+      }, DRAFT_SAVE_DELAY_MS);
     };
 
     persistDraft(form.getValues());
     const subscription = form.watch((values) => persistDraft(values));
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (draftSaveTimerRef.current !== null) {
+        window.clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+    };
   }, [customFieldValues, draftKey, form]);
 
   useEffect(() => {
@@ -135,23 +157,48 @@ export default function NewTicket() {
 
   const selectedCategoryKey = form.watch('category');
   const selectedSubcategoryKeyForFields = form.watch('subcategory');
-  const { fields: customFields } = useRequestFormFields(user?.company_id, {
+  const { fields: customFields } = useRequestFormFields(selectedCategoryKey ? user?.company_id : undefined, {
     categoryKey: selectedCategoryKey || undefined,
     subcategoryKey: selectedSubcategoryKeyForFields || undefined,
   });
 
+  useEffect(() => {
+    if (customFields.length === 0) return;
+    setCustomFieldValues((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const field of customFields) {
+        if (next[field.key] === undefined && field.default_value) {
+          next[field.key] = field.default_value;
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [customFields]);
+
+  const { data: requestModuleSettings } = useQuery({
+    queryKey: ['request-module-settings', user?.company_id],
+    queryFn: () => getRequestModuleSettings(user!.company_id),
+    enabled: !!user?.company_id,
+    staleTime: STALE.reference,
+  });
+
   const { data: approvalPlan = 'loading' } = useQuery<ApprovalPlanState>({
-    queryKey: ['approval-plan', user?.company_id, user?.id, selectedCategoryKey],
+    queryKey: ['approval-plan', user?.company_id, user?.id, selectedCategoryKey, selectedSubcategoryKeyForFields],
     queryFn: async (): Promise<ApprovalPlanState> => {
       const { data, error } = await getInternalRequestApprovalPlan(
         user!.company_id,
         user!.id,
-        { categoryKey: selectedCategoryKey || null },
+        {
+          categoryKey: selectedCategoryKey || null,
+          subcategoryKey: selectedSubcategoryKeyForFields || null,
+        },
       );
       if (error) return 'error';
       return data;
     },
-    enabled: !!user?.company_id && !!user?.id,
+    enabled: !!user?.company_id && !!user?.id && !!selectedCategoryKey,
     staleTime: STALE.reference,
     placeholderData: 'loading' as ApprovalPlanState,
   });
@@ -176,18 +223,14 @@ export default function NewTicket() {
   );
 
   useEffect(() => {
-    const nextSubcategory = availableSubcategories[0]?.key ?? '';
     const currentSubcategory = form.getValues('subcategory');
 
-    if (!nextSubcategory) {
+    if (availableSubcategories.length === 0) {
       if (currentSubcategory) form.setValue('subcategory', '', { shouldValidate: true });
       return;
     }
-    if (
-      !currentSubcategory ||
-      !availableSubcategories.some((subcategory) => subcategory.key === currentSubcategory)
-    ) {
-      form.setValue('subcategory', nextSubcategory, { shouldValidate: true });
+    if (currentSubcategory && !availableSubcategories.some((subcategory) => subcategory.key === currentSubcategory)) {
+      form.setValue('subcategory', '', { shouldValidate: true });
     }
   }, [availableSubcategories, form]);
 
@@ -200,25 +243,17 @@ export default function NewTicket() {
 
   useEffect(() => {
     if (descriptionSource === 'custom') return;
-    const suggested = descriptionSource === 'category'
-      ? selectedCategoryDescription
-      : (selectedSubcategoryDescription || selectedCategoryDescription);
+    const suggested = selectedSubcategoryKey
+      ? selectedSubcategoryDescription
+      : selectedCategoryDescription;
     const current = form.getValues('description') ?? '';
     // Respect text the user typed or a restored draft.
     if (current !== '' && current !== autoFilledDescriptionRef.current) return;
+    autoFilledDescriptionRef.current = suggested;
     if (suggested !== current) {
       form.setValue('description', suggested, { shouldValidate: true });
     }
-    autoFilledDescriptionRef.current = suggested;
-  }, [descriptionSource, selectedCategoryDescription, selectedSubcategoryDescription, form]);
-
-  // Once the body diverges from the suggested text, switch to "Custom" so
-  // later category/subcategory changes stop overwriting it.
-  useEffect(() => {
-    if (descriptionSource !== 'custom' && descriptionValue !== autoFilledDescriptionRef.current) {
-      setDescriptionSource('custom');
-    }
-  }, [descriptionValue, descriptionSource]);
+  }, [descriptionSource, selectedCategoryDescription, selectedSubcategoryDescription, selectedSubcategoryKey, form]);
 
   const validateAndAddFiles = useCallback(
     (incoming: File[]) => {
@@ -279,7 +314,7 @@ export default function NewTicket() {
     validateAndAddFiles(Array.from(event.dataTransfer.files));
   };
 
-  const submitTicket = async (data: TicketFormData) => {
+  const submitTicket = async (data: TicketFormData, duplicateOfTicketId?: string | null) => {
     if (!user) return;
 
     const missingRequiredField = customFields.find((field) =>
@@ -348,6 +383,7 @@ export default function NewTicket() {
             .filter(([, value]) => Boolean(value)),
         ),
         vso_number: null,
+        duplicate_of_ticket_id: duplicateOfTicketId ?? null,
       },
       { userId: user.id, companyId: user.company_id, submitterRole: user.role },
     );
@@ -375,20 +411,22 @@ export default function NewTicket() {
     }
 
     const firstCategoryKey = categories[0]?.key ?? '';
-    const firstSubcategoryKey =
-      subcategories.find((subcategory) => subcategory.category_key === firstCategoryKey)?.key ?? '';
 
     skipDraftSaveRef.current = true;
+    if (draftSaveTimerRef.current !== null) {
+      window.clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
     setAttachedFiles([]);
     setFileErrors([]);
     form.reset({
       ...DEFAULT_FORM,
       category: firstCategoryKey,
-      subcategory: firstSubcategoryKey,
+      subcategory: '',
     });
     setCustomFieldValues({});
     autoFilledDescriptionRef.current = '';
-    setDescriptionSource('subcategory');
+    setDescriptionSource('category');
     if (draftKey) window.localStorage.removeItem(draftKey);
     toast.success('Request submitted', {
       description: 'Your request has been recorded and will be reviewed shortly.',
@@ -397,9 +435,45 @@ export default function NewTicket() {
     setSubmitting(false);
   };
 
-  const handleValidatedSubmit = async (data: TicketFormData) => {
+  const continueAfterDuplicateReview = async (data: TicketFormData, duplicateOfTicketId?: string | null) => {
+    setDuplicateReview(null);
     if (approvalPlan && approvalPlan !== 'loading' && approvalPlan !== 'error') {
-      setApprovalConfirmData(data);
+      setApprovalConfirmData({ data, duplicateOfTicketId });
+      return;
+    }
+    await submitTicket(data, duplicateOfTicketId);
+  };
+
+  const handleValidatedSubmit = async (data: TicketFormData) => {
+    if (!user) return;
+    setCheckingDuplicates(true);
+    const { data: duplicateCandidates, error: duplicateError } = await findDuplicateTickets(
+      {
+        subject: data.subject.trim(),
+        category: data.category,
+        subcategory: data.subcategory ?? null,
+        priority: data.priority,
+        description: data.description,
+        custom_fields: Object.fromEntries(
+          customFields
+            .map((field) => [field.key, customFieldValues[field.key]?.trim() ?? ''])
+            .filter(([, value]) => Boolean(value)),
+        ),
+      },
+      { userId: user.id, companyId: user.company_id },
+    );
+    setCheckingDuplicates(false);
+    if (duplicateError) {
+      toast.warning('Duplicate check unavailable', {
+        description: 'You can still submit the request.',
+      });
+    } else if (duplicateCandidates && duplicateCandidates.length > 0) {
+      setDuplicateReview({ data, candidates: duplicateCandidates });
+      return;
+    }
+
+    if (approvalPlan && approvalPlan !== 'loading' && approvalPlan !== 'error') {
+      setApprovalConfirmData({ data });
       return;
     }
 
@@ -418,6 +492,7 @@ export default function NewTicket() {
 
   const canSubmit =
     !submitting &&
+    !checkingDuplicates &&
     form.formState.isValid &&
     !categorySelectionDisabled &&
     !(requiresSubcategory && !selectedSubcategoryKey) &&
@@ -428,10 +503,20 @@ export default function NewTicket() {
     form.setValue('category', categoryKey as TicketFormData['category'], {
       shouldValidate: true,
     });
+    form.setValue('subcategory', '', { shouldValidate: true });
+    if (descriptionSource !== 'custom') setDescriptionSource('category');
   };
 
   const handleSubcategoryChange = (subcategoryKey: string) => {
     form.setValue('subcategory', subcategoryKey, { shouldValidate: true });
+    if (descriptionSource !== 'custom') setDescriptionSource('subcategory');
+  };
+
+  const handleDescriptionSourceChange = (source: DescriptionSource) => {
+    if (source !== 'custom') {
+      autoFilledDescriptionRef.current = form.getValues('description') ?? '';
+    }
+    setDescriptionSource(source);
   };
 
   const draftSavedLabel = draftSavedAt
@@ -520,6 +605,7 @@ export default function NewTicket() {
               onSubcategoryChange={handleSubcategoryChange}
               subjectValue={subjectValue}
               subjectStatus={fieldValidationStatus.subject}
+              subjectPlaceholder={requestModuleSettings?.request_title_placeholder ?? 'Customer Name'}
               customFields={customFields}
               customFieldValues={customFieldValues}
               setCustomFieldValues={setCustomFieldValues}
@@ -532,7 +618,8 @@ export default function NewTicket() {
               descriptionValue={descriptionValue}
               descriptionStatus={fieldValidationStatus.description}
               descriptionSource={descriptionSource}
-              onDescriptionSourceChange={setDescriptionSource}
+              onDescriptionSourceChange={handleDescriptionSourceChange}
+              onDescriptionEdited={() => setDescriptionSource('custom')}
             />
           </div>
 
@@ -593,12 +680,61 @@ export default function NewTicket() {
               disabled={submitting}
               onClick={() => {
                 if (!approvalConfirmData) return;
-                const data = approvalConfirmData;
+                const { data, duplicateOfTicketId } = approvalConfirmData;
                 setApprovalConfirmData(null);
-                void submitTicket(data);
+                void submitTicket(data, duplicateOfTicketId);
               }}
             >
               Submit for approval
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(duplicateReview)} onOpenChange={(open) => { if (!open) setDuplicateReview(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Similar requests already exist</AlertDialogTitle>
+            <AlertDialogDescription>
+              Similar requests already exist. Please review before submitting a new request.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            {duplicateReview?.candidates.map((candidate) => (
+              <div key={candidate.id} className="rounded-md border border-border px-3 py-2">
+                <p className="text-sm font-medium text-foreground">{candidate.subject}</p>
+                <p className="text-xs text-muted-foreground">
+                  {candidate.status.replace(/_/g, ' ')} · Updated {new Date(candidate.updated_at).toLocaleDateString()} · Match {candidate.score}%
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => navigate('/portal/tickets')}>
+                    Open existing
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => {
+                      if (!duplicateReview) return;
+                      void continueAfterDuplicateReview(duplicateReview.data, candidate.id);
+                    }}
+                  >
+                    Link and submit
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={submitting}
+              onClick={() => {
+                if (!duplicateReview) return;
+                void continueAfterDuplicateReview(duplicateReview.data, null);
+              }}
+            >
+              Continue without linking
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

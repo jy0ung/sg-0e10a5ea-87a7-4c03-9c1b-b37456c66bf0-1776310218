@@ -18,18 +18,22 @@ import type { TicketSlaState } from '@/lib/ticketSla';
 const STATUS_TONE: Record<TicketStatus, Tone> = {
   open: 'blue',
   in_progress: 'violet',
-  awaiting_requester: 'amber',
-  resolved: 'emerald',
+  pending_requester: 'amber',
+  pending_owner_review: 'blue',
+  completed_by_owner: 'emerald',
   closed: 'slate',
+  reopened: 'amber',
   cancelled: 'slate',
 };
 
 const STATUS_LABEL: Record<TicketStatus, string> = {
   open: 'Open',
   in_progress: 'In progress',
-  awaiting_requester: 'Awaiting reply',
-  resolved: 'Resolved',
+  pending_requester: 'Pending requester',
+  pending_owner_review: 'Pending owner review',
+  completed_by_owner: 'Completed by owner',
   closed: 'Closed',
+  reopened: 'Reopened',
   cancelled: 'Cancelled',
 };
 
@@ -59,6 +63,7 @@ const SLA_TONE: Record<TicketSlaState, Tone> = {
   breached: 'red',
   at_risk: 'amber',
   pending: 'blue',
+  paused: 'slate',
   met: 'emerald',
   not_configured: 'slate',
 };

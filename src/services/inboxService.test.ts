@@ -108,8 +108,9 @@ describe('ticketToInbox', () => {
     expect(ticketToInbox({ ...baseTicket, priority: 'critical' }).badgeTone).toBe('red');
   });
 
-  it('marks awaiting_requester as amber regardless of priority', () => {
-    expect(ticketToInbox({ ...baseTicket, priority: 'low', status: 'awaiting_requester' }).badgeTone).toBe('amber');
+  it('marks requester-action ticket statuses as amber regardless of priority', () => {
+    expect(ticketToInbox({ ...baseTicket, priority: 'low', status: 'pending_requester' }).badgeTone).toBe('amber');
+    expect(ticketToInbox({ ...baseTicket, priority: 'critical', status: 'completed_by_owner' }).badgeTone).toBe('amber');
   });
 });
 

@@ -132,4 +132,4 @@ if (findings.length > 0) {
   process.exit(1);
 }
 
-console.log('✓ No service-role token references in client-reachable code.');
+console.info('✓ No service-role token references in client-reachable code.');

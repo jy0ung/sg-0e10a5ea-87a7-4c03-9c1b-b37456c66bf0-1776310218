@@ -25,9 +25,20 @@ import {
  * generated types the next time `supabase gen types` runs.
  */
 
-export type TicketStatus = 'open' | 'in_progress' | 'awaiting_requester' | 'resolved' | 'closed' | 'cancelled';
+export type TicketStatus =
+  | 'open'
+  | 'in_progress'
+  | 'pending_requester'
+  | 'pending_owner_review'
+  | 'completed_by_owner'
+  | 'closed'
+  | 'reopened'
+  | 'cancelled';
 export type TicketPriority = 'low' | 'medium' | 'high';
 export type TicketCategory = RequestCategoryValue;
+export type TicketResponsibleParty = 'Owner' | 'Requester' | 'Backup Owner' | 'Manager' | 'Escalation Owner' | 'Admin' | 'None';
+export type TicketSlaStatus = 'on_track' | 'at_risk' | 'breached' | 'paused';
+export type TicketCompletionCategory = 'resolved' | 'rejected' | 'duplicate' | 'cancelled' | 'not_applicable';
 
 export interface TicketRecord {
   id: string;
@@ -45,6 +56,17 @@ export interface TicketRecord {
   vso_number: string | null;
   submitted_by: string;
   assigned_to: string | null;
+  backup_owner_id: string | null;
+  escalation_owner_id: string | null;
+  responsible_queue: string;
+  current_responsible_party: TicketResponsibleParty;
+  next_action: string;
+  status_changed_at: string;
+  last_action_by: string | null;
+  sla_status: TicketSlaStatus;
+  sla_paused_at: string | null;
+  sla_pause_duration_ms: number;
+  sla_breach_reason: string | null;
   assigned_at: string | null;
   first_response_due_at: string | null;
   resolution_due_at: string | null;
@@ -56,6 +78,17 @@ export interface TicketRecord {
   current_approver_user_id: string | null;
   resolved_at: string | null;
   resolution_note: string | null;
+  completion_category: TicketCompletionCategory | null;
+  completion_checklist_confirmed: boolean;
+  completion_attachment_required: boolean;
+  closure_confirmed: boolean | null;
+  satisfaction_rating: number | null;
+  closure_feedback: string | null;
+  closed_at: string | null;
+  reopen_count: number;
+  reopened_at: string | null;
+  last_reopen_reason: string | null;
+  previous_owner_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +96,9 @@ export interface TicketRecord {
 export interface RequestTicketRecord extends TicketRecord {
   assigned_to_name: string | null;
   assigned_to_email: string | null;
+  backup_owner_name: string | null;
+  escalation_owner_name: string | null;
+  last_action_by_name: string | null;
 }
 
 export interface CompanyTicketRecord extends RequestTicketRecord {
@@ -81,18 +117,25 @@ export interface CreateTicketInput {
   desired_outcome?: string | null;
   custom_fields?: Record<string, unknown>;
   vso_number?: string | null;
+  duplicate_of_ticket_id?: string | null;
 }
 
 export interface UpdateTicketInput {
   status?: TicketStatus;
   priority?: TicketPriority;
   assigned_to?: string | null;
+  backup_owner_id?: string | null;
+  escalation_owner_id?: string | null;
   resolution_note?: string | null;
   mark_opened?: boolean;
+  admin_override_reason?: string | null;
+  sla_breach_reason?: string | null;
 }
 
 export interface AddTicketCommentInput {
   message: string;
+  attachmentNames?: string[];
+  emoji?: string | null;
 }
 
 export interface CancelTicketInput {
@@ -111,11 +154,11 @@ export interface PaginatedTicketResult<T> {
   pageSize: number;
 }
 
-/** 'active' = open|in_progress|awaiting_requester; 'archived' = resolved|closed|cancelled */
+/** 'active' = open/in progress/requester/owner review/owner-completed; 'archived' = closed/cancelled */
 export type TicketStatusFilter = TicketStatus | 'all' | 'active' | 'archived';
 
-const ACTIVE_STATUSES: TicketStatus[] = ['open', 'in_progress', 'awaiting_requester'];
-const ARCHIVED_STATUSES: TicketStatus[] = ['resolved', 'closed', 'cancelled'];
+const ACTIVE_STATUSES: TicketStatus[] = ['open', 'in_progress', 'pending_requester', 'pending_owner_review', 'completed_by_owner', 'reopened'];
+const ARCHIVED_STATUSES: TicketStatus[] = ['closed', 'cancelled'];
 
 /**
  * SLA filter values that can be applied server-side before pagination.
@@ -141,9 +184,39 @@ export interface CompanyTicketListOptions {
   sla?: TicketSlaFilter;
   /** Filter by assignee. 'unassigned' returns only tickets with null assigned_to. */
   assignedTo?: string | 'unassigned';
+  category?: string;
+  subcategory?: string;
+  responsibleParty?: TicketResponsibleParty;
+  submittedFrom?: string;
+  submittedTo?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
+  reopenedOnly?: boolean;
 }
 
-export type TicketActivityEventType = 'status_changed' | 'owner_changed' | 'resolution_note_updated' | 'priority_changed' | 'comment_added';
+export type TicketActivityEventType =
+  | 'status_changed'
+  | 'owner_changed'
+  | 'resolution_note_updated'
+  | 'priority_changed'
+  | 'comment_added'
+  | 'request_created'
+  | 'category_changed'
+  | 'subcategory_changed'
+  | 'sla_paused'
+  | 'sla_resumed'
+  | 'sla_breached'
+  | 'requester_update_submitted'
+  | 'owner_requested_more_information'
+  | 'owner_completed_request'
+  | 'requester_closed_request'
+  | 'attachment_added'
+  | 'escalation_triggered'
+  | 'admin_manual_override'
+  | 'internal_note_added'
+  | 'duplicate_linked'
+  | 'request_reopened'
+  | 'closure_feedback_submitted';
 
 export interface TicketActivityRecord {
   id: string;
@@ -156,8 +229,38 @@ export interface TicketActivityRecord {
   created_at: string | null;
 }
 
+export interface TicketChatSummary {
+  ticket_id: string;
+  message_count: number;
+  unread_count: number;
+  latest_message_at: string | null;
+}
+
+export interface TicketInternalNoteRecord {
+  id: string;
+  ticket_id: string;
+  author_id: string;
+  author_name: string | null;
+  note: string;
+  mentions: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DuplicateTicketCandidate {
+  id: string;
+  subject: string;
+  category: TicketCategory;
+  subcategory: string | null;
+  status: TicketStatus;
+  created_at: string;
+  updated_at: string;
+  assigned_to_name: string | null;
+  score: number;
+}
+
 type TicketRow = TicketRecord;
-type TicketUpdate = Database['public']['Tables']['tickets']['Update'];
+type TicketUpdate = Database['public']['Tables']['tickets']['Update'] & Record<string, unknown>;
 type TicketActivityDbInsert = Database['public']['Tables']['ticket_activity']['Insert'];
 
 interface ProfileLookupRow {
@@ -187,26 +290,99 @@ interface TicketActivityInsert extends TicketActivityDbInsert {
 }
 
 const TICKET_SELECT =
-  'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, custom_fields, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, first_response_due_at, resolution_due_at, first_responded_at, resolved_at, resolution_note';
+  'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, custom_fields, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, backup_owner_id, escalation_owner_id, responsible_queue, current_responsible_party, next_action, status_changed_at, last_action_by, sla_status, sla_paused_at, sla_pause_duration_ms, sla_breach_reason, assigned_at, first_response_due_at, resolution_due_at, first_responded_at, resolved_at, resolution_note, completion_category, completion_checklist_confirmed, completion_attachment_required, closure_confirmed, satisfaction_rating, closure_feedback, closed_at, reopen_count, reopened_at, last_reopen_reason, previous_owner_id';
+
+const TICKET_STATUSES = new Set<TicketStatus>([
+  'open',
+  'in_progress',
+  'pending_requester',
+  'pending_owner_review',
+  'completed_by_owner',
+  'closed',
+  'reopened',
+  'cancelled',
+]);
+
+function normalizeStatus(status: unknown): TicketStatus {
+  if (status === 'awaiting_requester') return 'pending_requester';
+  if (status === 'resolved') return 'completed_by_owner';
+  return typeof status === 'string' && TICKET_STATUSES.has(status as TicketStatus)
+    ? status as TicketStatus
+    : 'open';
+}
+
+function normalizePriority(priority: unknown): TicketPriority {
+  return priority === 'low' || priority === 'high' ? priority : 'medium';
+}
+
+function normalizeSlaStatus(status: unknown): TicketSlaStatus {
+  return status === 'at_risk' || status === 'breached' || status === 'paused'
+    ? status
+    : 'on_track';
+}
+
+function normalizeTimestamp(value: unknown, fallback: string) {
+  if (typeof value !== 'string') return fallback;
+  return Number.isNaN(new Date(value).getTime()) ? fallback : value;
+}
+
+export function getTicketNextAction(status: TicketStatus): { responsibleParty: TicketResponsibleParty; nextAction: string } {
+  switch (status) {
+    case 'open':
+      return { responsibleParty: 'Owner', nextAction: 'Owner to review request' };
+    case 'in_progress':
+      return { responsibleParty: 'Owner', nextAction: 'Owner to resolve request' };
+    case 'pending_requester':
+      return { responsibleParty: 'Requester', nextAction: 'Requester to provide information' };
+    case 'pending_owner_review':
+      return { responsibleParty: 'Owner', nextAction: 'Owner to review requester response' };
+    case 'completed_by_owner':
+      return { responsibleParty: 'Requester', nextAction: 'Requester to confirm and close' };
+    case 'reopened':
+      return { responsibleParty: 'Owner', nextAction: 'Owner to review reopened request' };
+    case 'closed':
+    case 'cancelled':
+      return { responsibleParty: 'None', nextAction: 'No further action' };
+  }
+}
 
 function mapTicket(row: TicketRow): TicketRecord {
+  const now = new Date().toISOString();
+  const status = normalizeStatus(row.status);
+  const workflow = getTicketNextAction(status);
+  const createdAt = normalizeTimestamp(row.created_at, now);
+  const updatedAt = normalizeTimestamp(row.updated_at, createdAt);
+
   return {
-    id: row.id,
-    company_id: row.company_id,
-    subject: row.subject,
-    category: row.category,
-    subcategory: row.subcategory,
-    priority: row.priority,
-    status: row.status,
-    description: row.description,
+    id: row.id ?? '',
+    company_id: row.company_id ?? '',
+    subject: row.subject?.trim() || 'Untitled request',
+    category: (row.category || 'uncategorized') as TicketCategory,
+    subcategory: row.subcategory || null,
+    priority: normalizePriority(row.priority),
+    status,
+    description: row.description ?? '',
     requested_due_date: row.requested_due_date ?? null,
     business_impact: row.business_impact ?? null,
     desired_outcome: row.desired_outcome ?? null,
-    custom_fields: row.custom_fields ?? {},
+    custom_fields: row.custom_fields && typeof row.custom_fields === 'object' && !Array.isArray(row.custom_fields)
+      ? row.custom_fields
+      : {},
     vso_number: row.vso_number ?? null,
-    submitted_by: row.submitted_by,
-    assigned_to: row.assigned_to,
-    assigned_at: row.assigned_at,
+    submitted_by: row.submitted_by ?? '',
+    assigned_to: row.assigned_to ?? null,
+    backup_owner_id: row.backup_owner_id ?? null,
+    escalation_owner_id: row.escalation_owner_id ?? null,
+    responsible_queue: row.responsible_queue ?? 'Unassigned',
+    current_responsible_party: (row.current_responsible_party ?? workflow.responsibleParty) as TicketResponsibleParty,
+    next_action: row.next_action || workflow.nextAction,
+    status_changed_at: normalizeTimestamp(row.status_changed_at, updatedAt),
+    last_action_by: row.last_action_by ?? null,
+    sla_status: normalizeSlaStatus(row.sla_status),
+    sla_paused_at: row.sla_paused_at ?? null,
+    sla_pause_duration_ms: Number(row.sla_pause_duration_ms ?? 0),
+    sla_breach_reason: row.sla_breach_reason ?? null,
+    assigned_at: row.assigned_at ?? null,
     first_response_due_at: row.first_response_due_at ?? null,
     resolution_due_at: row.resolution_due_at ?? null,
     first_responded_at: row.first_responded_at ?? null,
@@ -215,10 +391,21 @@ function mapTicket(row: TicketRow): TicketRecord {
     current_approval_step_name: row.current_approval_step_name ?? null,
     current_approver_role: row.current_approver_role ?? null,
     current_approver_user_id: row.current_approver_user_id ?? null,
-    resolved_at: row.resolved_at,
-    resolution_note: row.resolution_note,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
+    resolved_at: row.resolved_at ?? null,
+    resolution_note: row.resolution_note ?? null,
+    completion_category: row.completion_category ?? null,
+    completion_checklist_confirmed: Boolean(row.completion_checklist_confirmed ?? false),
+    completion_attachment_required: Boolean(row.completion_attachment_required ?? false),
+    closure_confirmed: row.closure_confirmed ?? null,
+    satisfaction_rating: row.satisfaction_rating ?? null,
+    closure_feedback: row.closure_feedback ?? null,
+    closed_at: row.closed_at ?? null,
+    reopen_count: Number(row.reopen_count ?? 0),
+    reopened_at: row.reopened_at ?? null,
+    last_reopen_reason: row.last_reopen_reason ?? null,
+    previous_owner_id: row.previous_owner_id ?? null,
+    created_at: createdAt,
+    updated_at: updatedAt,
   };
 }
 
@@ -242,6 +429,9 @@ function mapRequestTicket(ticket: TicketRecord, profilesById: Map<string, Profil
     ...ticket,
     assigned_to_name: ticket.assigned_to ? profilesById.get(ticket.assigned_to)?.name ?? null : null,
     assigned_to_email: ticket.assigned_to ? profilesById.get(ticket.assigned_to)?.email ?? null : null,
+    backup_owner_name: ticket.backup_owner_id ? profilesById.get(ticket.backup_owner_id)?.name ?? null : null,
+    escalation_owner_name: ticket.escalation_owner_id ? profilesById.get(ticket.escalation_owner_id)?.name ?? null : null,
+    last_action_by_name: ticket.last_action_by ? profilesById.get(ticket.last_action_by)?.name ?? null : null,
   };
 }
 
@@ -253,6 +443,10 @@ function ticketActivityTable() {
   return supabase.from('ticket_activity');
 }
 
+function table(name: string) {
+  return (supabase as never as { from: (tableName: string) => ReturnType<typeof supabase.from> }).from(name);
+}
+
 function toJsonObject(value: Record<string, unknown> | null | undefined): Json {
   return (value ?? {}) as Json;
 }
@@ -262,11 +456,39 @@ function formatTicketLabel(value: string) {
 }
 
 function isResolvedTicketStatus(status: TicketStatus) {
-  return status === 'resolved' || status === 'closed' || status === 'cancelled';
+  return status === 'closed' || status === 'cancelled';
 }
 
 function isFirstResponseTicketStatus(status: TicketStatus) {
-  return status === 'in_progress' || status === 'awaiting_requester' || status === 'resolved' || status === 'closed';
+  return status === 'in_progress' || status === 'pending_requester' || status === 'pending_owner_review' || status === 'completed_by_owner' || status === 'closed';
+}
+
+function isSlaBreached(ticket: Pick<TicketRecord, 'first_response_due_at' | 'first_responded_at' | 'resolution_due_at' | 'resolved_at' | 'status'>) {
+  const now = Date.now();
+  const responseBreached = Boolean(
+    ticket.first_response_due_at
+    && !ticket.first_responded_at
+    && new Date(ticket.first_response_due_at).getTime() < now,
+  );
+  const resolutionBreached = Boolean(
+    ticket.resolution_due_at
+    && !ticket.resolved_at
+    && ticket.status !== 'closed'
+    && ticket.status !== 'cancelled'
+    && new Date(ticket.resolution_due_at).getTime() < now,
+  );
+  return responseBreached || resolutionBreached || ticket.status === 'closed' && false;
+}
+
+function withWorkflowPatch(status: TicketStatus, extra: TicketUpdate = {}): TicketUpdate {
+  const workflow = getTicketNextAction(status);
+  return {
+    ...extra,
+    status,
+    current_responsible_party: workflow.responsibleParty,
+    next_action: workflow.nextAction,
+    status_changed_at: new Date().toISOString(),
+  } as TicketUpdate;
 }
 
 async function fetchTicketForUpdate(ticketId: string, companyId: string) {
@@ -301,6 +523,28 @@ function buildTicketActivityEntries(before: TicketRecord, after: TicketRecord, a
       event_type: 'owner_changed',
       message: after.assigned_to ? 'Request owner assigned.' : 'Request owner cleared.',
       metadata: { before: before.assigned_to, after: after.assigned_to },
+    });
+  }
+
+  if (before.backup_owner_id !== after.backup_owner_id) {
+    entries.push({
+      ticket_id: after.id,
+      company_id: after.company_id,
+      actor_id: actorId,
+      event_type: 'owner_changed',
+      message: after.backup_owner_id ? 'Backup owner assigned.' : 'Backup owner cleared.',
+      metadata: { field: 'backup_owner_id', before: before.backup_owner_id, after: after.backup_owner_id },
+    });
+  }
+
+  if (before.escalation_owner_id !== after.escalation_owner_id) {
+    entries.push({
+      ticket_id: after.id,
+      company_id: after.company_id,
+      actor_id: actorId,
+      event_type: 'owner_changed',
+      message: after.escalation_owner_id ? 'Escalation owner assigned.' : 'Escalation owner cleared.',
+      metadata: { field: 'escalation_owner_id', before: before.escalation_owner_id, after: after.escalation_owner_id },
     });
   }
 
@@ -421,6 +665,9 @@ async function enrichCompanyTickets(rows: TicketRecord[], companyId: string): Pr
     ticketsWithApproval.flatMap((ticket) => {
       const people = [ticket.submitted_by];
       if (ticket.assigned_to) people.push(ticket.assigned_to);
+      if (ticket.backup_owner_id) people.push(ticket.backup_owner_id);
+      if (ticket.escalation_owner_id) people.push(ticket.escalation_owner_id);
+      if (ticket.last_action_by) people.push(ticket.last_action_by);
       return people;
     }),
   );
@@ -494,7 +741,12 @@ export async function listMyTickets(userId: string, companyId: string): Promise<
     const rows = await applyApprovalMetadata(((data ?? []) as TicketRow[]).map(mapTicket));
     const profilesById = await fetchProfilesById(
       companyId,
-      rows.map((ticket) => ticket.assigned_to).filter((ticketId): ticketId is string => Boolean(ticketId)),
+      rows.flatMap((ticket) => [
+        ticket.assigned_to,
+        ticket.backup_owner_id,
+        ticket.escalation_owner_id,
+        ticket.last_action_by,
+      ]).filter((ticketId): ticketId is string => Boolean(ticketId)),
     );
 
     return { data: rows.map((ticket) => mapRequestTicket(ticket, profilesById)), error: null };
@@ -575,6 +827,30 @@ export async function listCompanyTicketsPage(
         query = query.eq('assigned_to', normalized.assignedTo);
       }
     }
+    if (normalized.category && normalized.category !== 'all') {
+      query = query.eq('category', normalized.category);
+    }
+    if (normalized.subcategory && normalized.subcategory !== 'all') {
+      query = query.eq('subcategory', normalized.subcategory);
+    }
+    if (normalized.responsibleParty && normalized.responsibleParty !== 'None') {
+      query = query.eq('current_responsible_party', normalized.responsibleParty);
+    }
+    if (normalized.submittedFrom) {
+      query = query.gte('created_at', `${normalized.submittedFrom}T00:00:00`);
+    }
+    if (normalized.submittedTo) {
+      query = query.lte('created_at', `${normalized.submittedTo}T23:59:59`);
+    }
+    if (normalized.updatedFrom) {
+      query = query.gte('updated_at', `${normalized.updatedFrom}T00:00:00`);
+    }
+    if (normalized.updatedTo) {
+      query = query.lte('updated_at', `${normalized.updatedTo}T23:59:59`);
+    }
+    if (normalized.reopenedOnly) {
+      query = query.or('status.eq.reopened,reopen_count.gt.0');
+    }
     if (search) {
       query = query.or(buildTicketSearchOrFilter(search, profileIds));
     }
@@ -606,9 +882,11 @@ export interface TicketStatusCounts {
   all: number;
   open: number;
   in_progress: number;
-  awaiting_requester: number;
-  resolved: number;
+  pending_requester: number;
+  pending_owner_review: number;
+  completed_by_owner: number;
   closed: number;
+  reopened: number;
   cancelled: number;
 }
 
@@ -622,7 +900,7 @@ export async function getCompanyTicketStatusCounts(
   options: Pick<CompanyTicketListOptions, 'priority' | 'search'> = {},
 ): Promise<TicketServiceResult<TicketStatusCounts>> {
   const search = sanitizeTicketSearchTerm(options.search ?? '');
-  const statuses: TicketStatus[] = ['open', 'in_progress', 'awaiting_requester', 'resolved', 'closed', 'cancelled'];
+  const statuses: TicketStatus[] = ['open', 'in_progress', 'pending_requester', 'pending_owner_review', 'completed_by_owner', 'closed', 'reopened', 'cancelled'];
 
   try {
     const profileIds = search ? await findMatchingProfileIds(companyId, search) : [];
@@ -648,8 +926,8 @@ export async function getCompanyTicketStatusCounts(
     );
 
     const result: TicketStatusCounts = {
-      all: 0, open: 0, in_progress: 0, awaiting_requester: 0,
-      resolved: 0, closed: 0, cancelled: 0,
+      all: 0, open: 0, in_progress: 0, pending_requester: 0, pending_owner_review: 0,
+      completed_by_owner: 0, closed: 0, reopened: 0, cancelled: 0,
     };
     for (const { status, count } of perStatus) {
       result[status] = count;
@@ -706,6 +984,252 @@ export async function listTicketActivity(
   }
 }
 
+export async function listTicketChatSummaries(
+  ticketIds: string[],
+  userId: string,
+  companyId: string,
+): Promise<TicketServiceResult<Record<string, TicketChatSummary>>> {
+  const empty = Object.fromEntries(ticketIds.map((ticketId) => [
+    ticketId,
+    { ticket_id: ticketId, message_count: 0, unread_count: 0, latest_message_at: null } satisfies TicketChatSummary,
+  ]));
+  if (ticketIds.length === 0) return { data: empty, error: null };
+
+  try {
+    const [{ data: messages, error: messagesError }, { data: reads, error: readsError }] = await Promise.all([
+      ticketActivityTable()
+        .select('ticket_id, actor_id, created_at')
+        .eq('company_id', companyId)
+        .eq('event_type', 'comment_added')
+        .in('ticket_id', ticketIds),
+      table('ticket_chat_reads')
+        .select('ticket_id, read_at')
+        .eq('company_id', companyId)
+        .eq('user_id', userId)
+        .in('ticket_id', ticketIds),
+    ]);
+
+    if (messagesError) throw messagesError;
+    if (readsError) throw readsError;
+
+    const readByTicket = new Map(
+      ((reads ?? []) as Array<{ ticket_id: string; read_at: string | null }>)
+        .map((row) => [row.ticket_id, row.read_at ? new Date(row.read_at).getTime() : 0]),
+    );
+    const summaries: Record<string, TicketChatSummary> = { ...empty };
+
+    for (const row of (messages ?? []) as Array<{ ticket_id: string; actor_id: string; created_at: string | null }>) {
+      const summary = summaries[row.ticket_id];
+      if (!summary) continue;
+      const createdAt = row.created_at ? new Date(row.created_at).getTime() : 0;
+      summary.message_count += 1;
+      if (!summary.latest_message_at || (row.created_at && createdAt > new Date(summary.latest_message_at).getTime())) {
+        summary.latest_message_at = row.created_at;
+      }
+      if (row.actor_id !== userId && createdAt > (readByTicket.get(row.ticket_id) ?? 0)) {
+        summary.unread_count += 1;
+      }
+    }
+
+    return { data: summaries, error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to load chat summaries');
+    loggingService.error('Failed to load chat summaries', { error: error.message }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+export async function markTicketChatRead(
+  ticketId: string,
+  context: { userId: string; companyId: string },
+): Promise<TicketServiceResult<true>> {
+  try {
+    const { error } = await table('ticket_chat_reads').upsert({
+      ticket_id: ticketId,
+      company_id: context.companyId,
+      user_id: context.userId,
+      read_at: new Date().toISOString(),
+    }, { onConflict: 'ticket_id,user_id' });
+    if (error) throw error;
+    return { data: true, error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to mark chat read');
+    loggingService.error('Failed to mark chat read', { error: error.message, ticketId }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+export async function listTicketInternalNotes(
+  ticketIds: string[],
+  companyId: string,
+): Promise<TicketServiceResult<Record<string, TicketInternalNoteRecord[]>>> {
+  const grouped = Object.fromEntries(ticketIds.map((ticketId) => [ticketId, [] as TicketInternalNoteRecord[]]));
+  if (ticketIds.length === 0) return { data: grouped, error: null };
+
+  try {
+    const { data, error } = await table('ticket_internal_notes')
+      .select('id, ticket_id, author_id, note, mentions, created_at, updated_at')
+      .eq('company_id', companyId)
+      .in('ticket_id', ticketIds)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      ticket_id: string;
+      author_id: string;
+      note: string;
+      mentions: unknown;
+      created_at: string;
+      updated_at: string;
+    }>;
+    const profilesById = await fetchProfilesById(companyId, rows.map((row) => row.author_id));
+
+    rows.forEach((row) => {
+      grouped[row.ticket_id]?.push({
+        id: row.id,
+        ticket_id: row.ticket_id,
+        author_id: row.author_id,
+        author_name: profilesById.get(row.author_id)?.name ?? null,
+        note: row.note,
+        mentions: Array.isArray(row.mentions) ? row.mentions.map(String) : [],
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      });
+    });
+
+    return { data: grouped, error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to load internal notes');
+    loggingService.error('Failed to load internal notes', { error: error.message }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+function tokenizeTicketText(value: string | null | undefined) {
+  return new Set((value ?? '').toLowerCase().split(/[^a-z0-9]+/).filter((token) => token.length >= 3));
+}
+
+function tokenOverlapScore(left: Set<string>, right: Set<string>) {
+  if (left.size === 0 || right.size === 0) return 0;
+  let overlap = 0;
+  left.forEach((token) => {
+    if (right.has(token)) overlap += 1;
+  });
+  return overlap / Math.max(left.size, right.size);
+}
+
+export async function findDuplicateTickets(
+  input: CreateTicketInput,
+  context: { userId: string; companyId: string },
+): Promise<TicketServiceResult<DuplicateTicketCandidate[]>> {
+  try {
+    const recentClosedCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await ticketsTable()
+      .select(TICKET_SELECT)
+      .eq('company_id', context.companyId)
+      .eq('submitted_by', context.userId)
+      .or(`status.in.(${ACTIVE_STATUSES.join(',')}),and(status.eq.closed,closed_at.gte.${recentClosedCutoff})`)
+      .order('updated_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+
+    const incomingTitleTokens = tokenizeTicketText(input.subject);
+    const incomingDescriptionTokens = tokenizeTicketText(input.description);
+    const candidates = await enrichCompanyTickets(((data ?? []) as TicketRow[]).map(mapTicket), context.companyId);
+
+    const scored = candidates.map((ticket) => {
+      let score = 0;
+      if (ticket.category === input.category) score += 25;
+      if (input.subcategory && ticket.subcategory === input.subcategory) score += 25;
+      if (ticket.subject.trim().toLowerCase() === input.subject.trim().toLowerCase()) score += 35;
+      score += tokenOverlapScore(incomingTitleTokens, tokenizeTicketText(ticket.subject)) * 25;
+      score += tokenOverlapScore(incomingDescriptionTokens, tokenizeTicketText(ticket.description)) * 15;
+      return {
+        id: ticket.id,
+        subject: ticket.subject,
+        category: ticket.category,
+        subcategory: ticket.subcategory,
+        status: ticket.status,
+        created_at: ticket.created_at,
+        updated_at: ticket.updated_at,
+        assigned_to_name: ticket.assigned_to_name,
+        score: Math.round(score),
+      } satisfies DuplicateTicketCandidate;
+    })
+      .filter((candidate) => candidate.score >= 35)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+
+    return { data: scored, error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to check for duplicate requests');
+    loggingService.error('Failed to check for duplicate tickets', { error: error.message }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+export async function addTicketInternalNote(
+  ticketId: string,
+  input: { note: string; mentions?: string[] },
+  context: { userId: string; companyId: string },
+): Promise<TicketServiceResult<TicketInternalNoteRecord>> {
+  const note = input.note.trim();
+  if (!note) return { data: null, error: new Error('Internal note cannot be empty.') };
+
+  try {
+    const mentions = input.mentions ?? Array.from(note.matchAll(/@([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|[A-Za-z][A-Za-z\s.'-]{1,80})/g)).map((match) => match[1].trim());
+    const { data, error } = await table('ticket_internal_notes')
+      .insert({
+        ticket_id: ticketId,
+        company_id: context.companyId,
+        author_id: context.userId,
+        note,
+        mentions,
+      })
+      .select('id, ticket_id, author_id, note, mentions, created_at, updated_at')
+      .single();
+    if (error) throw error;
+
+    await ticketActivityTable().insert({
+      ticket_id: ticketId,
+      company_id: context.companyId,
+      actor_id: context.userId,
+      event_type: 'internal_note_added',
+      message: 'Internal note added.',
+      metadata: { mentions },
+    });
+
+    const row = data as unknown as {
+      id: string;
+      ticket_id: string;
+      author_id: string;
+      note: string;
+      mentions: unknown;
+      created_at: string;
+      updated_at: string;
+    };
+    const profilesById = await fetchProfilesById(context.companyId, [row.author_id]);
+    return {
+      data: {
+        id: row.id,
+        ticket_id: row.ticket_id,
+        author_id: row.author_id,
+        author_name: profilesById.get(row.author_id)?.name ?? null,
+        note: row.note,
+        mentions: Array.isArray(row.mentions) ? row.mentions.map(String) : [],
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      },
+      error: null,
+    };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to add internal note');
+    loggingService.error('Failed to add internal note', { error: error.message, ticketId }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
 export async function createTicket(
   input: CreateTicketInput,
   context: { userId: string; companyId: string; submitterRole?: string | null },
@@ -742,6 +1266,12 @@ export async function createTicket(
       status: 'open',
       assigned_to: autoAssignTo,
       assigned_at: autoAssignTo ? new Date().toISOString() : null,
+      responsible_queue: autoAssignTo ? 'Owner' : 'Unassigned',
+      current_responsible_party: 'Owner',
+      next_action: 'Owner to review request',
+      status_changed_at: new Date().toISOString(),
+      last_action_by: context.userId,
+      sla_status: 'on_track',
       resolution_note: null,
     };
 
@@ -753,6 +1283,34 @@ export async function createTicket(
     if (error) throw error;
 
     const ticketId = (data as { id: string }).id;
+
+    void Promise.resolve().then(() => ticketActivityTable().insert({
+      ticket_id: ticketId,
+      company_id: context.companyId,
+      actor_id: context.userId,
+      event_type: 'request_created',
+      message: autoAssignTo ? 'Request created and owner assigned automatically.' : 'Request created and routed to Unassigned.',
+      metadata: { assigned_to: autoAssignTo, queue: autoAssignTo ? 'Owner' : 'Unassigned' },
+    })).catch(() => undefined);
+
+    if (input.duplicate_of_ticket_id) {
+      void Promise.allSettled([
+        table('ticket_duplicate_links').insert({
+          company_id: context.companyId,
+          ticket_id: ticketId,
+          duplicate_of_ticket_id: input.duplicate_of_ticket_id,
+          linked_by: context.userId,
+        }),
+        ticketActivityTable().insert({
+          ticket_id: ticketId,
+          company_id: context.companyId,
+          actor_id: context.userId,
+          event_type: 'duplicate_linked',
+          message: 'Request linked to a possible duplicate.',
+          metadata: { duplicate_of_ticket_id: input.duplicate_of_ticket_id },
+        }),
+      ]);
+    }
 
     if (approvalPlan.data) {
       const approvalResult = await createInternalRequestApprovalInstance(
@@ -803,12 +1361,23 @@ export async function updateTicket(
 ): Promise<TicketServiceResult<TicketRecord>> {
   const patch: TicketUpdate = {};
 
-  if (input.status) patch.status = input.status;
+  if (input.status) {
+    if (!input.admin_override_reason?.trim()) {
+      return { data: null, error: new Error('Manual status changes require an admin override reason.') };
+    }
+    Object.assign(patch, withWorkflowPatch(input.status, {
+      last_action_by: context.userId,
+    }));
+  }
   if (input.priority) patch.priority = input.priority;
   if (input.assigned_to !== undefined) patch.assigned_to = input.assigned_to;
+  if (input.backup_owner_id !== undefined) patch.backup_owner_id = input.backup_owner_id;
+  if (input.escalation_owner_id !== undefined) patch.escalation_owner_id = input.escalation_owner_id;
+  if (input.sla_breach_reason !== undefined) patch.sla_breach_reason = input.sla_breach_reason?.trim() ? input.sla_breach_reason.trim() : null;
   if (input.resolution_note !== undefined) {
     patch.resolution_note = input.resolution_note?.trim() ? input.resolution_note.trim() : null;
   }
+  if (Object.keys(patch).length > 0) patch.last_action_by = context.userId;
 
   try {
     const current = await fetchTicketForUpdate(ticketId, context.companyId);
@@ -817,14 +1386,14 @@ export async function updateTicket(
       input.mark_opened
       && current.submitted_by !== context.userId
       && current.status === 'open'
-      && !current.assigned_to
-      && !current.first_responded_at
     ) {
       const now = new Date().toISOString();
-      patch.status = 'in_progress';
-      patch.assigned_to = context.userId;
-      patch.assigned_at = now;
-      patch.first_responded_at = now;
+      Object.assign(patch, withWorkflowPatch('in_progress', {
+        assigned_to: current.assigned_to ?? context.userId,
+        assigned_at: current.assigned_at ?? now,
+        first_responded_at: current.first_responded_at ?? now,
+        last_action_by: context.userId,
+      }));
     }
 
     if (Object.keys(patch).length === 0) {
@@ -834,7 +1403,7 @@ export async function updateTicket(
       return { data: null, error: new Error('No request updates were provided') };
     }
 
-    if (input.status && (input.status === 'resolved' || input.status === 'closed')) {
+    if (input.status && (input.status === 'completed_by_owner' || input.status === 'closed')) {
       const approvalGate = await getInternalRequestApprovalGate(ticketId);
       if (approvalGate.error) throw new Error(approvalGate.error);
       if (approvalGate.data?.status === 'pending') {
@@ -882,6 +1451,16 @@ export async function updateTicket(
 
     const [nextTicket] = await applyApprovalMetadata([mapTicket(data as unknown as TicketRow)]);
     const activityEntries = buildTicketActivityEntries(current, nextTicket, context.userId);
+    if (input.status && input.admin_override_reason?.trim()) {
+      activityEntries.push({
+        ticket_id: nextTicket.id,
+        company_id: nextTicket.company_id,
+        actor_id: context.userId,
+        event_type: 'admin_manual_override',
+        message: `Admin manually changed status to ${formatTicketLabel(nextTicket.status)}.`,
+        metadata: { before: current.status, after: nextTicket.status, reason: input.admin_override_reason.trim() },
+      });
+    }
     const notifications = buildTicketNotifications(current, nextTicket, context.userId);
 
     const sideEffects: Promise<unknown>[] = [];
@@ -905,6 +1484,283 @@ export async function updateTicket(
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to update ticket');
     loggingService.error('Failed to update ticket', { error: error.message, ticketId, ...patch }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+async function applyTicketWorkflowAction(
+  ticketId: string,
+  status: TicketStatus,
+  context: { userId: string; companyId: string },
+  options: {
+    eventType: TicketActivityEventType;
+    message: string;
+    resolutionNote?: string | null;
+    slaBreachReason?: string | null;
+    metadata?: Record<string, unknown>;
+    patch?: TicketUpdate;
+  },
+): Promise<TicketServiceResult<TicketRecord>> {
+  try {
+    const current = await fetchTicketForUpdate(ticketId, context.companyId);
+
+    if ((status === 'completed_by_owner' || status === 'closed') && isSlaBreached(current) && !options.slaBreachReason?.trim() && !current.sla_breach_reason) {
+      return { data: null, error: new Error('A breach reason is required before this SLA-breached request can be completed or closed.') };
+    }
+
+    const now = new Date().toISOString();
+    const patch = withWorkflowPatch(status, {
+      last_action_by: context.userId,
+      resolution_note: options.resolutionNote?.trim() ? options.resolutionNote.trim() : current.resolution_note,
+      sla_breach_reason: options.slaBreachReason?.trim() ? options.slaBreachReason.trim() : current.sla_breach_reason,
+      ...(options.patch ?? {}),
+    });
+
+    if (!current.first_responded_at && status !== 'open') {
+      patch.first_responded_at = now;
+    }
+    if (status === 'closed') {
+      patch.resolved_at = now;
+    }
+
+    const { data, error } = await ticketsTable()
+      .update(patch)
+      .eq('company_id', context.companyId)
+      .eq('id', ticketId)
+      .select(TICKET_SELECT)
+      .single();
+
+    if (error) throw error;
+
+    const [nextTicket] = await applyApprovalMetadata([mapTicket(data as unknown as TicketRow)]);
+    const activityEntries = buildTicketActivityEntries(current, nextTicket, context.userId);
+    activityEntries.push({
+      ticket_id: nextTicket.id,
+      company_id: nextTicket.company_id,
+      actor_id: context.userId,
+      event_type: options.eventType,
+      message: options.message,
+      metadata: {
+        before: current.status,
+        after: nextTicket.status,
+        ...options.metadata,
+      },
+    });
+
+    const notifications = buildTicketNotifications(current, nextTicket, context.userId);
+    const sideEffects: Promise<unknown>[] = [
+      Promise.resolve(ticketActivityTable().insert(activityEntries).then(res => res)),
+    ];
+    if (notifications.length > 0) sideEffects.push(createNotifications(notifications));
+    await Promise.allSettled(sideEffects);
+
+    void logUserAction(context.userId, 'update', 'ticket', ticketId, {
+      component: 'TicketService',
+      workflow_action: options.eventType,
+      status,
+    });
+
+    return { data: nextTicket, error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to update request workflow');
+    loggingService.error('Failed to update request workflow', { error: error.message, ticketId, status }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+export async function requestTicketMoreInformation(
+  ticketId: string,
+  input: AddTicketCommentInput,
+  context: { userId: string; companyId: string },
+): Promise<TicketServiceResult<TicketRecord>> {
+  const comment = await addTicketComment(ticketId, input, context);
+  if (comment.error) return { data: null, error: comment.error };
+  return applyTicketWorkflowAction(ticketId, 'pending_requester', context, {
+    eventType: 'owner_requested_more_information',
+    message: 'Owner requested more information from the requester.',
+  });
+}
+
+export async function submitRequesterTicketUpdate(
+  ticketId: string,
+  input: AddTicketCommentInput,
+  context: { userId: string; companyId: string },
+): Promise<TicketServiceResult<TicketRecord>> {
+  const comment = await addTicketComment(ticketId, input, context);
+  if (comment.error) return { data: null, error: comment.error };
+  return applyTicketWorkflowAction(ticketId, 'pending_owner_review', context, {
+    eventType: 'requester_update_submitted',
+    message: 'Requester submitted an update for owner review.',
+  });
+}
+
+export async function markTicketCompletedByOwner(
+  ticketId: string,
+  input: {
+    resolutionNote: string;
+    completionCategory: TicketCompletionCategory;
+    checklistConfirmed: boolean;
+    slaBreachReason?: string | null;
+  },
+  context: { userId: string; companyId: string },
+): Promise<TicketServiceResult<TicketRecord>> {
+  if (!input.resolutionNote.trim()) {
+    return { data: null, error: new Error('Resolution summary is required.') };
+  }
+  if (!input.completionCategory) {
+    return { data: null, error: new Error('Completion category is required.') };
+  }
+  if (!input.checklistConfirmed) {
+    return { data: null, error: new Error('Confirm the completion checklist before marking this request completed.') };
+  }
+  return applyTicketWorkflowAction(ticketId, 'completed_by_owner', context, {
+    eventType: 'owner_completed_request',
+    message: 'Owner marked the request as completed.',
+    resolutionNote: input.resolutionNote,
+    slaBreachReason: input.slaBreachReason,
+    metadata: { completion_category: input.completionCategory },
+    patch: {
+      completion_category: input.completionCategory,
+      completion_checklist_confirmed: input.checklistConfirmed,
+      previous_owner_id: context.userId,
+    },
+  });
+}
+
+export async function closeTicketByRequester(
+  ticketId: string,
+  input: {
+    confirmedResolved: boolean;
+    satisfactionRating: number;
+    feedbackComment?: string | null;
+    slaBreachReason?: string | null;
+  },
+  context: { userId: string; companyId: string },
+): Promise<TicketServiceResult<TicketRecord>> {
+  if (!input.confirmedResolved) {
+    return { data: null, error: new Error('Confirm the request is resolved before closing it.') };
+  }
+  if (!Number.isFinite(input.satisfactionRating) || input.satisfactionRating < 1 || input.satisfactionRating > 5) {
+    return { data: null, error: new Error('Satisfaction rating must be between 1 and 5.') };
+  }
+  const result = await applyTicketWorkflowAction(ticketId, 'closed', context, {
+    eventType: 'requester_closed_request',
+    message: 'Requester closed the request.',
+    slaBreachReason: input.slaBreachReason,
+    metadata: { satisfaction_rating: input.satisfactionRating },
+    patch: {
+      closure_confirmed: input.confirmedResolved,
+      satisfaction_rating: input.satisfactionRating,
+      closure_feedback: input.feedbackComment?.trim() ? input.feedbackComment.trim() : null,
+      closed_at: new Date().toISOString(),
+    },
+  });
+  if (result.data) {
+    await Promise.allSettled([
+      table('ticket_closure_feedback').insert({
+        ticket_id: ticketId,
+        company_id: context.companyId,
+        requester_id: context.userId,
+        confirmed_resolved: input.confirmedResolved,
+        satisfaction_rating: input.satisfactionRating,
+        feedback_comment: input.feedbackComment?.trim() ? input.feedbackComment.trim() : null,
+      }),
+      ticketActivityTable().insert({
+        ticket_id: ticketId,
+        company_id: context.companyId,
+        actor_id: context.userId,
+        event_type: 'closure_feedback_submitted',
+        message: 'Requester submitted closure feedback.',
+        metadata: { satisfaction_rating: input.satisfactionRating },
+      }),
+    ]);
+  }
+  return result;
+}
+
+export async function reopenTicketByRequester(
+  ticketId: string,
+  input: { reason: string },
+  context: { userId: string; companyId: string },
+): Promise<TicketServiceResult<TicketRecord>> {
+  const reason = input.reason.trim();
+  if (!reason) return { data: null, error: new Error('Reopen reason is required.') };
+
+  try {
+    const current = await fetchTicketForUpdate(ticketId, context.companyId);
+    if (current.submitted_by !== context.userId) {
+      return { data: null, error: new Error('Only the requester can reopen this request.') };
+    }
+    if (current.status !== 'closed') {
+      return { data: null, error: new Error('Only closed requests can be reopened.') };
+    }
+
+    const { data: settings } = await table('request_module_settings')
+      .select('reopen_window_days')
+      .eq('company_id', context.companyId)
+      .maybeSingle();
+    const reopenWindowDays = Number((settings as { reopen_window_days?: number } | null)?.reopen_window_days ?? 14);
+    if (reopenWindowDays > 0) {
+      const closedAt = current.closed_at ?? current.updated_at;
+      const elapsedMs = Date.now() - new Date(closedAt).getTime();
+      if (elapsedMs > reopenWindowDays * 24 * 60 * 60 * 1000) {
+        return { data: null, error: new Error(`This request can only be reopened within ${reopenWindowDays} days of closure.`) };
+      }
+    }
+
+    const now = new Date().toISOString();
+    const owner = current.previous_owner_id ?? current.assigned_to;
+    const patch = withWorkflowPatch('reopened', {
+      assigned_to: owner,
+      responsible_queue: owner ? 'Owner' : current.responsible_queue || 'Unassigned',
+      current_responsible_party: owner ? 'Owner' : 'Admin',
+      next_action: owner ? 'Owner to review reopened request' : 'Admin to assign reopened request',
+      reopened_at: now,
+      last_reopen_reason: reason,
+      reopen_count: current.reopen_count + 1,
+      resolved_at: null,
+      closed_at: null,
+      closure_confirmed: null,
+      last_action_by: context.userId,
+    });
+
+    const { data, error } = await ticketsTable()
+      .update(patch)
+      .eq('company_id', context.companyId)
+      .eq('id', ticketId)
+      .select(TICKET_SELECT)
+      .single();
+    if (error) throw error;
+
+    const nextTicket = mapTicket(data as unknown as TicketRow);
+    await Promise.allSettled([
+      ticketActivityTable().insert([
+        ...buildTicketActivityEntries(current, nextTicket, context.userId),
+        {
+          ticket_id: ticketId,
+          company_id: context.companyId,
+          actor_id: context.userId,
+          event_type: 'request_reopened',
+          message: 'Requester reopened the request.',
+          metadata: { reason, reopen_count: nextTicket.reopen_count },
+        },
+      ]),
+      createNotifications(
+        [nextTicket.assigned_to, nextTicket.backup_owner_id, nextTicket.escalation_owner_id]
+          .filter((recipientId): recipientId is string => Boolean(recipientId && recipientId !== context.userId))
+          .map((userId) => ({
+            userId,
+            title: 'Request reopened',
+            message: `"${nextTicket.subject}" was reopened by the requester.`,
+            type: 'warning',
+          })),
+      ),
+    ]);
+
+    return { data: nextTicket, error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to reopen request');
+    loggingService.error('Failed to reopen ticket', { error: error.message, ticketId }, 'TicketService');
     return { data: null, error };
   }
 }
@@ -973,6 +1829,10 @@ export async function addTicketComment(
   try {
     const ticket = await fetchTicketForUpdate(ticketId, context.companyId);
 
+    const metadata: Record<string, unknown> = { comment: true };
+    if (input.attachmentNames?.length) metadata.attachment_names = input.attachmentNames;
+    if (input.emoji) metadata.emoji = input.emoji;
+
     const { data, error } = await ticketActivityTable()
       .insert({
         ticket_id: ticketId,
@@ -980,7 +1840,7 @@ export async function addTicketComment(
         actor_id: context.userId,
         event_type: 'comment_added',
         message,
-        metadata: { comment: true },
+        metadata,
       })
       .select('id, ticket_id, company_id, actor_id, event_type, message, metadata, created_at')
       .single();
