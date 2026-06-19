@@ -246,7 +246,12 @@ async function checkHrmsModuleRedirect(page: Page): Promise<RouteResult> {
       timeout: routeTimeoutMs,
     });
     await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => undefined);
-    await page.getByRole('button', { name: /HRMS/i }).click({ timeout: 12_000 });
+    const homeShortcut = page.getByRole('button', { name: /HRMS/i }).first();
+    if (await homeShortcut.isVisible().catch(() => false)) {
+      await homeShortcut.click({ timeout: 12_000 });
+    } else {
+      await page.getByRole('link', { name: /Open HRMS Workspace/i }).first().click({ timeout: 12_000 });
+    }
     await page.waitForURL((url) => url.origin === hrmsUrl.origin, { timeout: routeTimeoutMs });
     await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => undefined);
     finalUrl = page.url();
