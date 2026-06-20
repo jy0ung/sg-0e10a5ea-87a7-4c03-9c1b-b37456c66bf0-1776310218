@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ListPlus, Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronUp, ListPlus, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -286,6 +286,34 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
     setBusyFieldId(null);
   };
 
+  const moveField = async (fieldId: string, direction: 'up' | 'down') => {
+    const field = fields.find((f) => f.id === fieldId);
+    if (!field) return;
+    const categoryFields = fieldsByCategory[field.category_key] ?? [];
+    const index = categoryFields.findIndex((f) => f.id === fieldId);
+    if (index < 0) return;
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= categoryFields.length) return;
+    const other = categoryFields[swapIndex];
+
+    const fieldSort = field.sort_order;
+    const otherSort = other.sort_order;
+
+    setBusyFieldId(fieldId);
+    const [r1, r2] = await Promise.all([
+      updateRequestFormField(field.id, { sort_order: otherSort, expectedUpdatedAt: field.updated_at }, { actorId, companyId }),
+      updateRequestFormField(other.id, { sort_order: fieldSort, expectedUpdatedAt: other.updated_at }, { actorId, companyId }),
+    ]);
+    if (r1.error || r2.error) {
+      toast.error('Unable to reorder field', { description: (r1.error ?? r2.error) as string });
+    } else {
+      toast.success('Field reordered');
+      await reload();
+    }
+    setBusyFieldId(null);
+  };
+
+
   const editingField = fields.find((field) => field.id === editingFieldId) ?? null;
   const editingDraft = editingField ? fieldDrafts[editingField.id] : null;
   const editingBusy = editingField ? busyFieldId === editingField.id : false;
@@ -561,6 +589,26 @@ export function FormFieldEditor({ companyId, actorId, onActiveCountChange }: Pro
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Move ${field.label} up`}
+                            onClick={() => void moveField(field.id, 'up')}
+                            disabled={isBusy || categoryFields.indexOf(field) === 0}
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Move ${field.label} down`}
+                            onClick={() => void moveField(field.id, 'down')}
+                            disabled={isBusy || categoryFields.indexOf(field) === categoryFields.length - 1}
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
                           <Button type="button" variant="outline" onClick={() => setEditingFieldId(field.id)} disabled={isBusy}>
                             Edit
                           </Button>

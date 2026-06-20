@@ -108,6 +108,7 @@ export interface UpdateRequestFormFieldInput {
   help_text?: string;
   is_required?: boolean;
   is_active?: boolean;
+  sort_order?: number;
   /**
    * Optimistic-lock token: the `updated_at` the caller last read. When
    * provided, the update only applies if the row still has that timestamp;
@@ -325,6 +326,7 @@ export async function updateRequestFormField(
   if (input.help_text !== undefined) patch.help_text = input.help_text.trim();
   if (input.is_required !== undefined) patch.is_required = input.is_required;
   if (input.is_active !== undefined) patch.is_active = input.is_active;
+  if (input.sort_order !== undefined) patch.sort_order = input.sort_order;
 
   // Snapshot the prior state for the audit trail before mutating.
   const { data: beforeRow } = await requestFormFieldsTable()

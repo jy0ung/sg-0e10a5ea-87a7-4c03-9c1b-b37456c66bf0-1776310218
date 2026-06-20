@@ -340,6 +340,60 @@ export default function TicketWorkspace() {
     if (!user || !ticket || activeTab !== 'chat') return;
     void markTicketChatRead(ticket.id, { userId: user.id, companyId: user.company_id });
   }, [activeTab, ticket, user]);
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      const tagName = target.tagName.toLowerCase();
+      const isEditable = target.isContentEditable;
+      const isInput = tagName === 'input' || tagName === 'textarea' || isEditable;
+
+      // Escape: close any open dialog
+      if (event.key === 'Escape') {
+        setInfoDialogOpen(false);
+        setRequesterUpdateOpen(false);
+        setCompletionOpen(false);
+        setCloseOpen(false);
+        setReopenOpen(false);
+        setAssignOpen(false);
+        setPriorityOpen(false);
+        setOverrideOpen(false);
+        setReviewDecision(null);
+        return;
+      }
+
+      // Ctrl+Enter / Cmd+Enter: send chat message or internal note
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        if (activeTab === 'chat') {
+          event.preventDefault();
+          void handleAddComment();
+        } else if (activeTab === 'internal-notes') {
+          event.preventDefault();
+          void handleAddInternalNote();
+        }
+        return;
+      }
+
+      // Remaining shortcuts only fire when no input is focused
+      if (isInput) return;
+
+      // Tab switching: 1-5
+      if (event.key === '1') { setTab('details'); return; }
+      if (event.key === '2') { setTab('chat'); return; }
+      if (event.key === '3') { setTab('activity'); return; }
+      if (event.key === '4' && canManageQueue) { setTab('internal-notes'); return; }
+      if (event.key === '5' && canManageQueue) { setTab('audit-trail'); return; }
+
+      // r: reopen dialog
+      if (event.key === 'r' && ticket?.status === 'closed' && data?.permissions.canCloseAsRequester) {
+        setReopenOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activeTab, ticket, data, canManageQueue, handleAddComment, handleAddInternalNote, setTab]);
+
 
   const refreshWorkspace = useCallback(
     () => queryClient.invalidateQueries({ queryKey: workspaceQueryKey }),
@@ -372,9 +426,9 @@ export default function TicketWorkspace() {
     navigate(getFallbackTicketListPath(canManageQueue, ticket.status === 'closed'));
   };
 
-  const setTab = (nextTab: string) => {
+  const setTab = useCallback((nextTab: string) => {
     setSearchParams(nextTab === 'overview' ? {} : { tab: nextTab });
-  };
+  }, [setSearchParams]);
 
   const handlePrimaryAction = async () => {
     if (!ticket || !user || !data) return;
@@ -1266,6 +1320,65 @@ function MessageDialog({
   );
 }
 
+function formatAuditChanges(changes: Record<string, unknown>) {
+  const fieldLabels: Record<string, string> = {
+    status: 'Status',
+    assigned_to: 'Owner',
+    assigned_to_name: 'Owner',
+    priority: 'Priority',
+    subject: 'Title',
+    category: 'Category',
+    subcategory: 'Subcategory',
+    current_responsible_party: 'Responsible party',
+    next_action: 'Next action',
+    resolution_note: 'Resolution note',
+    completion_category: 'Completion type',
+    satisfaction_rating: 'Satisfaction rating',
+    closure_confirmed: 'Closure confirmed',
+    closed_at: 'Closed at',
+    first_responded_at: 'First responded',
+    resolved_at: 'Resolved at',
+    sla_breach_reason: 'SLA breach reason',
+    previous_owner_id: 'Previous owner',
+  };
+
+  return (
+    <>
+      {Object.entries(changes).map(([key, value]) => {
+        if (value === null || value === undefined) return null;
+        const label = fieldLabels[key] ?? key.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+        const isBeforeAfter =
+          value !== null &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          ('before' in (value as Record<string, unknown>) || 'after' in (value as Record<string, unknown>));
+
+        if (isBeforeAfter) {
+          const { before, after } = value as Record<string, unknown>;
+          if (before === undefined && after === undefined) return null;
+          const beforeStr = before === null || before === undefined ? '(empty)' : String(before);
+          const afterStr = after === null || after === undefined ? '(empty)' : String(after);
+          return (
+            <p key={key} className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{label}:</span>{' '}
+              <span className="line-through opacity-60">{beforeStr}</span>{' '}
+              <span aria-hidden>→</span>{' '}
+              <span>{afterStr}</span>
+            </p>
+          );
+        }
+
+        return (
+          <p key={key} className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{label}:</span> {String(value)}
+          </p>
+        );
+      })}
+    </>
+  );
+}
+
 function AuditTrailPanel({
   entries,
   activities,
@@ -1292,9 +1405,9 @@ function AuditTrailPanel({
                   <p className="text-xs text-muted-foreground">{entry.created_at ? formatDateTime(entry.created_at) : ''}</p>
                 </div>
                 {entry.changes && Object.keys(entry.changes).length > 0 && (
-                  <pre className="mt-2 max-h-40 overflow-auto rounded-md bg-muted/40 p-2 text-xs text-muted-foreground">
-                    {JSON.stringify(entry.changes, null, 2)}
-                  </pre>
+                  <div className="mt-2 space-y-1 rounded-md bg-muted/40 p-2">
+                    {formatAuditChanges(entry.changes)}
+                  </div>
                 )}
               </div>
             ))}
