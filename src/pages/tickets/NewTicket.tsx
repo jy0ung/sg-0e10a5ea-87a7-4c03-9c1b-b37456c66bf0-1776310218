@@ -23,6 +23,7 @@ import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useAttachmentSettings } from '@/hooks/useAttachmentSettings';
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning';
+import { usePersistedDraft } from '@/hooks/usePersistedDraft';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import {
   createTicket,
@@ -50,8 +51,6 @@ import {
   type TicketFormData,
 } from './new-ticket/NewTicketSections';
 
-const DRAFT_SAVE_DELAY_MS = 400;
-
 export default function NewTicket() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -68,12 +67,8 @@ export default function NewTicket() {
   const [approvalConfirmData, setApprovalConfirmData] = useState<{ data: TicketFormData; duplicateOfTicketId?: string | null } | null>(null);
   const [duplicateReview, setDuplicateReview] = useState<{ data: TicketFormData; candidates: DuplicateTicketCandidate[] } | null>(null);
   const [checkingDuplicates, setCheckingDuplicates] = useState(false);
-  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [descriptionSource, setDescriptionSource] = useState<DescriptionSource>('category');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const draftRestoredRef = useRef(false);
-  const skipDraftSaveRef = useRef(false);
-  const draftSaveTimerRef = useRef<number | null>(null);
   // Tracks the last description text we auto-filled from a category/subcategory,
   // so we only overwrite the body while it still holds that suggested text.
   const autoFilledDescriptionRef = useRef('');
@@ -99,58 +94,31 @@ export default function NewTicket() {
     [userCompanyId, userId],
   );
 
+  const { draft, saveDraft, clearDraft, draftSavedAt } = usePersistedDraft({ key: draftKey });
+
+  // Restore draft on mount (once).
+  const draftRestoredRef = useRef(false);
   useEffect(() => {
-    if (!draftKey || draftRestoredRef.current) return;
+    if (!draft || draftRestoredRef.current) return;
     draftRestoredRef.current = true;
-
-    try {
-      const rawDraft = window.localStorage.getItem(draftKey);
-      if (!rawDraft) return;
-      const parsed = JSON.parse(rawDraft) as {
-        values?: Partial<TicketFormData>;
-        customFieldValues?: Record<string, string>;
-      };
-      if (parsed.values) {
-        form.reset({ ...DEFAULT_FORM, ...parsed.values });
-      }
-      setCustomFieldValues(parsed.customFieldValues ?? {});
-    } catch {
-      window.localStorage.removeItem(draftKey);
+    if (draft.values) {
+      form.reset({ ...DEFAULT_FORM, ...(draft.values as Partial<TicketFormData>) });
     }
-  }, [draftKey, form]);
+    if (draft.customFieldValues) {
+      setCustomFieldValues(draft.customFieldValues as Record<string, string>);
+    }
+  }, [draft, form]);
 
+  // Persist form changes via the hook.
+  const skipDraftSaveRef = useRef(false);
   useEffect(() => {
-    if (!draftKey || !draftRestoredRef.current) return;
-
-    const persistDraft = (values: Partial<TicketFormData>) => {
-      if (skipDraftSaveRef.current) return;
-      if (draftSaveTimerRef.current !== null) window.clearTimeout(draftSaveTimerRef.current);
-      draftSaveTimerRef.current = window.setTimeout(() => {
-        try {
-          const savedAt = new Date();
-          window.localStorage.setItem(
-            draftKey,
-            JSON.stringify({ values, customFieldValues, updatedAt: savedAt.toISOString() }),
-          );
-          setDraftSavedAt(savedAt);
-        } catch {
-          // Ignore storage quota/private-mode errors; the live form state still works.
-        } finally {
-          draftSaveTimerRef.current = null;
-        }
-      }, DRAFT_SAVE_DELAY_MS);
-    };
-
-    persistDraft(form.getValues());
-    const subscription = form.watch((values) => persistDraft(values));
-    return () => {
-      subscription.unsubscribe();
-      if (draftSaveTimerRef.current !== null) {
-        window.clearTimeout(draftSaveTimerRef.current);
-        draftSaveTimerRef.current = null;
-      }
-    };
-  }, [customFieldValues, draftKey, form]);
+    if (!draftRestoredRef.current || skipDraftSaveRef.current) return;
+    saveDraft({ values: form.getValues(), customFieldValues });
+    const subscription = form.watch((values) => {
+      if (!skipDraftSaveRef.current) saveDraft({ values, customFieldValues });
+    });
+    return () => { subscription.unsubscribe(); };
+  }, [customFieldValues, saveDraft, form]);
 
   useEffect(() => {
     const nextCategory = categories[0]?.key ?? '';
@@ -422,10 +390,7 @@ export default function NewTicket() {
     const firstCategoryKey = categories[0]?.key ?? '';
 
     skipDraftSaveRef.current = true;
-    if (draftSaveTimerRef.current !== null) {
-      window.clearTimeout(draftSaveTimerRef.current);
-      draftSaveTimerRef.current = null;
-    }
+    clearDraft();
     setAttachedFiles([]);
     setFileErrors([]);
     form.reset({
@@ -436,7 +401,6 @@ export default function NewTicket() {
     setCustomFieldValues({});
     autoFilledDescriptionRef.current = '';
     setDescriptionSource('category');
-    if (draftKey) window.localStorage.removeItem(draftKey);
     toast.success('Request submitted', {
       description: 'Your request has been recorded and will be reviewed shortly.',
     });

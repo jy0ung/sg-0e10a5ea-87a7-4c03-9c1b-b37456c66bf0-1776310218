@@ -7,6 +7,7 @@ import {
   Plus,
   Route,
   Save,
+  TestTube2,
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -32,6 +33,7 @@ import {
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { ROLE_LABELS } from '@/config/rolePermissions';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
 import { SortableList } from '@/components/ui/SortableList';
@@ -543,6 +545,58 @@ export function RoutingEditor({ companyId, actorId, onActiveCountChange }: Props
                       >
                         {isRuleBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                       </Button>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Test ${rule.name}`}
+                          >
+                            <TestTube2 className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-80">
+                          <div className="space-y-3">
+                            <p className="text-sm font-semibold text-foreground">Match criteria preview</p>
+                            <div className="space-y-1.5">
+                              {rule.match_category ? (
+                                <p className="text-sm">
+                                  <span className="text-muted-foreground">When category is:</span>{" "}
+                                  <span className="font-medium">{categories.find((c) => c.key === rule.match_category)?.label ?? rule.match_category}</span>
+                                </p>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">When category is: <span className="italic">Any</span></p>
+                              )}
+                              {rule.match_subcategory && (
+                                <p className="text-sm">
+                                  <span className="text-muted-foreground">When subcategory is:</span>{" "}
+                                  <span className="font-medium">{subcategories.find((s) => s.key === rule.match_subcategory)?.label ?? rule.match_subcategory}</span>
+                                </p>
+                              )}
+                              {rule.match_submitter_role && (
+                                <p className="text-sm">
+                                  <span className="text-muted-foreground">When submitter role is:</span>{" "}
+                                  <span className="font-medium">{ROLE_LABELS[rule.match_submitter_role as keyof typeof ROLE_LABELS] ?? rule.match_submitter_role}</span>
+                                </p>
+                              )}
+                              {rule.match_priority && (
+                                <p className="text-sm">
+                                  <span className="text-muted-foreground">When priority is:</span>{" "}
+                                  <span className="font-medium capitalize">{rule.match_priority}</span>
+                                </p>
+                              )}
+                            </div>
+                            <p className="text-sm">
+                              <span className="text-muted-foreground">Assign to:</span>{" "}
+                              <span className="font-medium">{assignee ? (assignee.name || assignee.email) : rule.assign_to_user_id}</span>
+                            </p>
+                            {!rule.match_category && !rule.match_subcategory && !rule.match_submitter_role && !rule.match_priority && (
+                              <Badge variant="secondary" className="text-xs">Matches all tickets</Badge>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 
