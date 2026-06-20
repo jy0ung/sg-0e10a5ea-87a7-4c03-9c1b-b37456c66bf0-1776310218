@@ -420,19 +420,39 @@ export default function TicketWorkspace() {
   const handleChatFilesSelected = async (files: File[]) => {
     if (!ticket || !user || files.length === 0) return;
     setSaving(true);
-    const results = await Promise.all(files.map((file) => uploadTicketAttachment(file, ticket.id, user.company_id, user.id)));
-    const uploadedNames = files.filter((_, index) => !results[index].error).map((file) => file.name);
-    if (uploadedNames.length > 0) {
-      await addTicketComment(
-        ticket.id,
-        { message: `Attached ${uploadedNames.length} file${uploadedNames.length === 1 ? '' : 's'}.`, attachmentNames: uploadedNames },
-        { userId: user.id, companyId: user.company_id },
+    try {
+      const settled = await Promise.allSettled(
+        files.map((file) => uploadTicketAttachment(file, ticket.id, user.company_id, user.id)),
       );
+
+      const successfulNames: string[] = [];
+      const failedNames: string[] = [];
+
+      settled.forEach((result, index) => {
+        if (result.status === 'fulfilled' && !result.value.error) {
+          successfulNames.push(files[index].name);
+        } else {
+          failedNames.push(files[index].name);
+        }
+      });
+
+      if (successfulNames.length > 0) {
+        await addTicketComment(
+          ticket.id,
+          { message: `Attached ${successfulNames.length} file${successfulNames.length === 1 ? '' : 's'}.`, attachmentNames: successfulNames },
+          { userId: user.id, companyId: user.company_id },
+        );
+      }
+
+      if (failedNames.length > 0 && successfulNames.length > 0) {
+        toast.warning(`${failedNames.length} file${failedNames.length === 1 ? '' : 's'} failed to upload: ${failedNames.join(', ')}`);
+      } else if (failedNames.length > 0) {
+        toast.error(`All ${failedNames.length} file${failedNames.length === 1 ? '' : 's'} failed to upload.`);
+      }
+    } finally {
+      setSaving(false);
+      await refreshWorkspace();
     }
-    setSaving(false);
-    const failedCount = results.filter((result) => result.error).length;
-    if (failedCount > 0) toast.error(`${failedCount} attachment${failedCount === 1 ? '' : 's'} failed to upload.`);
-    await refreshWorkspace();
   };
 
   const handleAddInternalNote = useCallback(async () => {
