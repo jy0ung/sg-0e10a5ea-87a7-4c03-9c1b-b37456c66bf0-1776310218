@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
@@ -25,12 +26,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { STALE } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PanelErrorBoundary } from '@/components/shared/PanelErrorBoundary';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
-import { RequestDetailPanel } from '@/components/tickets/RequestDetailPanel';
 import { RequestStatusBadge } from '@/components/tickets/RequestBadge';
 import { TicketApprovalSummary } from '@/components/tickets/TicketApprovalSummary';
 import { TicketOperationalBadges } from '@/components/tickets/TicketOperationalIndicators';
@@ -52,17 +51,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
-import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
-import { usePersistedDraftMap } from '@/hooks/usePersistedDraftMap';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import {
   Dialog,
   DialogContent,
@@ -71,27 +61,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { TicketChatPanel } from '@/components/tickets/TicketChatPanel';
 import {
-  addTicketInternalNote,
-  addTicketComment,
-  closeTicketByRequester,
   getCompanyTicketStatusCounts,
   listTicketChatSummaries,
-  listTicketInternalNotes,
   listCompanyTicketsPage,
   listTicketActivity,
-  markTicketChatRead,
-  markTicketCompletedByOwner,
-  requestTicketMoreInformation,
   type CompanyTicketRecord,
   type PaginatedTicketResult,
   type TicketActivityRecord,
   type TicketChatSummary,
-  type TicketCompletionCategory,
-  type TicketInternalNoteRecord,
   type TicketPriority,
   type TicketResponsibleParty,
   type TicketStatus,
@@ -109,9 +87,6 @@ import {
   type RequestOperationalIndicator,
   type RequestSavedFilterRecord,
 } from '@/services/requestManagementService';
-import { uploadTicketAttachment } from '@flc/platform-services';
-import { reviewInternalRequestApproval } from '@flc/internal-requests';
-import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@flc/platform-services';
 import { listProfiles } from '@flc/auth';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
@@ -120,11 +95,9 @@ import { formatSlaState, getTicketSlaSummary } from '@/lib/ticketSla';
 import {
   downloadCsv,
   formatTicketLabel,
-  isApprovalAssignedToUser,
   isOpenStatus,
 } from '@/lib/requestFormatters';
-
-type ApprovalReviewTarget = { ticketId: string; decision: 'approved' | 'rejected' } | null;
+import { openTicketWorkspace, type TicketWorkspaceReturnState } from '@/lib/ticketWorkspaceNavigation';
 
 const statusOptions: Array<{ value: TicketStatus; label: string }> = [
   { value: 'open', label: 'Open' },
@@ -145,19 +118,18 @@ const priorityOptions: Array<{ value: TicketPriority; label: string }> = [
 
 const REQUEST_QUEUE_PAGE_SIZE = 25;
 
-// formatTicketLabel, isOpenStatus, isApprovalAssignedToUser, csvCell, downloadCsv
-// are now imported from '@/lib/requestFormatters'
+// formatTicketLabel, isOpenStatus, csvCell, downloadCsv are imported from '@/lib/requestFormatters'
 
 export default function RequestQueue() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+  const contentScrollRef = useRef<HTMLDivElement | null>(null);
   const { categories } = useRequestCategories(user?.company_id, true);
   const { subcategories } = useRequestSubcategories(user?.company_id, { includeInactive: true });
-  const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
   const [activitiesByTicket, setActivitiesByTicket] = useState<Record<string, TicketActivityRecord[]>>({});
-  const [attachmentsByTicket, setAttachmentsByTicket] = useState<Record<string, TicketAttachmentRecord[]>>({});
   const [chatSummariesByTicket, setChatSummariesByTicket] = useState<Record<string, TicketChatSummary>>({});
-  const [internalNotesByTicket, setInternalNotesByTicket] = useState<Record<string, TicketInternalNoteRecord[]>>({});
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
   const [slaFilter, setSlaFilter] = useState<SlaFilter>('all');
@@ -174,20 +146,12 @@ export default function RequestQueue() {
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSaving, setBulkSaving] = useState(false);
   const [metricsExpanded, setMetricsExpanded] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.localStorage.getItem('requestQueue.metricsExpanded') !== 'false';
   });
-  const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
-  const [reviewTarget, setReviewTarget] = useState<ApprovalReviewTarget>(null);
-  const [reviewNote, setReviewNote] = useState('');
-  const [completionTargetId, setCompletionTargetId] = useState<string | null>(null);
-  const [completionCategory, setCompletionCategory] = useState<TicketCompletionCategory>('resolved');
-  const [completionChecklistConfirmed, setCompletionChecklistConfirmed] = useState(false);
-  const [chatTicketId, setChatTicketId] = useState<string | null>(null);
   const [savedFilterName, setSavedFilterName] = useState('');
   const [bulkPriorityDialogOpen, setBulkPriorityDialogOpen] = useState(false);
   const [bulkPriority, setBulkPriority] = useState<TicketPriority>('medium');
@@ -196,32 +160,6 @@ export default function RequestQueue() {
   const [bulkNotifyAudience, setBulkNotifyAudience] = useState<'requesters' | 'owners'>('requesters');
   const [bulkNotifyMessage, setBulkNotifyMessage] = useState('');
   const [bulkArchiveDialogOpen, setBulkArchiveDialogOpen] = useState(false);
-  // Drafts overlay the server state — see usePersistedDraftMap. Cycle 3.5's
-  // realtime invalidations made it routine for the ticket page to refetch
-  // while a queue manager was mid-comment; without persistence those drafts
-  // were silently destroyed every time a colleague mutated any ticket.
-  const [noteDrafts, setNoteDrafts, clearNoteDraft] = usePersistedDraftMap(
-    'queue:note',
-    user?.company_id,
-    user?.id,
-  );
-  const [commentDrafts, setCommentDrafts, clearCommentDraft] = usePersistedDraftMap(
-    'queue:comment',
-    user?.company_id,
-    user?.id,
-  );
-  const [internalNoteDrafts, setInternalNoteDrafts, clearInternalNoteDraft] = usePersistedDraftMap(
-    'queue:internal-note',
-    user?.company_id,
-    user?.id,
-  );
-  const [queueError, setQueueError] = useState<string | null>(null);
-
-  const customFieldLabelMap = useMemo(
-    () => Object.fromEntries(formFields.map((field) => [`${field.category_key}:${field.key}`, field.label])),
-    [formFields],
-  );
-
   // ─── Saved view presets ────────────────────────────────────────────────────
   type SavedViewDef = {
     id: string;
@@ -383,7 +321,7 @@ export default function RequestQueue() {
   const tickets = useMemo(() => ticketPage?.rows ?? [], [ticketPage]);
   const totalCount = ticketPage?.totalCount ?? 0;
   const loading = ticketsLoading && !ticketPage; // only hard-loading on the very first fetch
-  const error = queueError ?? (ticketQueryError ? (ticketQueryError as Error).message : null);
+  const error = ticketQueryError ? (ticketQueryError as Error).message : null;
 
   const assignees = useMemo(
     () => getRequestAssignees(profileRows ?? []),
@@ -426,21 +364,15 @@ export default function RequestQueue() {
     const ticketIds = nextTickets.map((ticket) => ticket.id);
     if (ticketIds.length === 0) {
       setActivitiesByTicket({});
-      setAttachmentsByTicket({});
       setChatSummariesByTicket({});
-      setInternalNotesByTicket({});
       return;
     }
     void Promise.all([
       listTicketActivity(ticketIds, user.company_id),
-      listAttachmentsForTickets(ticketIds, user.company_id),
       listTicketChatSummaries(ticketIds, user.id, user.company_id),
-      listTicketInternalNotes(ticketIds, user.company_id),
-    ]).then(([{ data: activityData }, { data: attachmentData }, { data: chatSummaryData }, { data: internalNoteData }]) => {
+    ]).then(([{ data: activityData }, { data: chatSummaryData }]) => {
       setActivitiesByTicket(activityData ?? {});
-      setAttachmentsByTicket(attachmentData ?? {});
       setChatSummariesByTicket(chatSummaryData ?? {});
-      setInternalNotesByTicket(internalNoteData ?? {});
     });
   }, [ticketPage, user]);
 
@@ -503,15 +435,6 @@ export default function RequestQueue() {
     [activitiesByTicket, chatSummariesByTicket, filteredTickets],
   );
 
-  const selectedTicket = useMemo(
-    () => filteredTickets.find((ticket) => ticket.id === selectedTicketId) ?? null,
-    [filteredTickets, selectedTicketId],
-  );
-  const chatTicket = useMemo(
-    () => filteredTickets.find((ticket) => ticket.id === chatTicketId) ?? null,
-    [chatTicketId, filteredTickets],
-  );
-
   const queueMetrics = useMemo(() => ({
     unassigned: tickets.filter((ticket) => isOpenStatus(ticket.status) && !ticket.assigned_to).length,
     slaBreached: tickets.filter((ticket) => getTicketSlaSummary(ticket).overall === 'breached').length,
@@ -544,70 +467,6 @@ export default function RequestQueue() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [queryClient, ...ticketQueryKey],
   );
-
-  const handleStatusChange = async (_ticketId: string, _status: TicketStatus) => {
-    setQueueError('Manual status updates are restricted. Use the workflow actions in the request detail panel.');
-  };
-
-  const handleAssignmentChange = async (ticketId: string, value: string) => {
-    if (!user) return;
-
-    const assignedTo = value === 'unassigned' ? null : value;
-    const assignee = assignees.find((profile) => profile.id === assignedTo) ?? null;
-
-    setSavingTicketId(ticketId);
-    setQueueError(null);
-
-    const { data, error: updateError } = await updateTicket(
-      ticketId,
-      { assigned_to: assignedTo },
-      { userId: user.id, companyId: user.company_id },
-    );
-
-    if (updateError || !data) {
-      setQueueError(updateError?.message || 'Unable to update request owner.');
-      setSavingTicketId(null);
-      return;
-    }
-
-    applyOptimisticTicketUpdate(ticketId, {
-      assigned_to: data.assigned_to,
-      assigned_at: data.assigned_at,
-      resolved_at: data.resolved_at,
-      resolution_note: data.resolution_note,
-      updated_at: data.updated_at,
-      assigned_to_name: assignee?.name ?? null,
-      assigned_to_email: assignee?.email ?? null,
-    });
-    setSavingTicketId(null);
-    void refreshTicketActivity(ticketId);
-  };
-
-  const handlePriorityChange = async (ticketId: string, priority: TicketPriority) => {
-    if (!user) return;
-
-    setSavingTicketId(ticketId);
-    setQueueError(null);
-
-    const { data, error: updateError } = await updateTicket(
-      ticketId,
-      { priority },
-      { userId: user.id, companyId: user.company_id },
-    );
-
-    if (updateError || !data) {
-      setQueueError(updateError?.message || 'Unable to update request priority.');
-      setSavingTicketId(null);
-      return;
-    }
-
-    applyOptimisticTicketUpdate(ticketId, {
-      priority: data.priority,
-      updated_at: data.updated_at,
-    });
-    setSavingTicketId(null);
-    void refreshTicketActivity(ticketId);
-  };
 
   const handleTicketOpen = async (ticketId: string) => {
     if (!user) return;
@@ -648,251 +507,15 @@ export default function RequestQueue() {
     void refreshTicketActivity(ticketId);
   };
 
-  const handleResolutionNoteSave = async (ticketId: string) => {
-    if (!user) return;
-    // Resolve the saveable note: prefer the user's in-progress draft;
-    // if no draft, fall back to whatever resolution_note is already on
-    // the ticket (this matches what the textarea is currently showing).
-    const ticket = tickets.find((t) => t.id === ticketId);
-    const nextNote = noteDrafts[ticketId] ?? ticket?.resolution_note ?? '';
-
-    setSavingTicketId(ticketId);
-    setQueueError(null);
-
-    const { data, error: updateError } = await updateTicket(
-      ticketId,
-      { resolution_note: nextNote },
-      { userId: user.id, companyId: user.company_id },
-    );
-
-    if (updateError || !data) {
-      setQueueError(updateError?.message || 'Unable to save the resolution note.');
-      setSavingTicketId(null);
-      return;
-    }
-
-    applyOptimisticTicketUpdate(ticketId, {
-      resolution_note: data.resolution_note,
-      resolved_at: data.resolved_at,
-      updated_at: data.updated_at,
-    });
-    // Drop the draft; the textarea now reads from the optimistically-updated
-    // server state via `noteDrafts[id] ?? ticket.resolution_note`.
-    clearNoteDraft(ticketId);
-    setSavingTicketId(null);
-    void refreshTicketActivity(ticketId);
-  };
-
-  const handleAddComment = async (ticketId: string) => {
-    if (!user) return;
-    const message = commentDrafts[ticketId]?.trim() ?? '';
-    if (!message) return;
-
-    setSavingTicketId(ticketId);
-    setQueueError(null);
-
-    const { error: commentError } = await addTicketComment(
-      ticketId,
-      { message },
-      { userId: user.id, companyId: user.company_id },
-    );
-
-    if (commentError) {
-      setQueueError(commentError.message || 'Unable to add comment.');
-      setSavingTicketId(null);
-      return;
-    }
-
-    clearCommentDraft(ticketId);
-    setSavingTicketId(null);
-    void refreshTicketActivity(ticketId);
-  };
-
-  const handleAddInternalNote = async (ticketId: string) => {
-    if (!user) return;
-    const note = internalNoteDrafts[ticketId]?.trim() ?? '';
-    if (!note) return;
-
-    setSavingTicketId(ticketId);
-    setQueueError(null);
-    const { error: noteError } = await addTicketInternalNote(
-      ticketId,
-      { note },
-      { userId: user.id, companyId: user.company_id },
-    );
-    if (noteError) {
-      setQueueError(noteError.message || 'Unable to add internal note.');
-      setSavingTicketId(null);
-      return;
-    }
-    clearInternalNoteDraft(ticketId);
-    setSavingTicketId(null);
-    const [{ data: notes }, { data: activity }] = await Promise.all([
-      listTicketInternalNotes([ticketId], user.company_id),
-      listTicketActivity([ticketId], user.company_id),
-    ]);
-    if (notes) setInternalNotesByTicket((current) => ({ ...current, ...notes }));
-    if (activity) setActivitiesByTicket((current) => ({ ...current, ...activity }));
-  };
-
-  const handleOpenChat = async (ticketId: string) => {
-    if (!user) return;
-    setChatTicketId(ticketId);
-    await markTicketChatRead(ticketId, { userId: user.id, companyId: user.company_id });
-    setChatSummariesByTicket((current) => ({
-      ...current,
-      [ticketId]: {
-        ticket_id: ticketId,
-        message_count: current[ticketId]?.message_count ?? 0,
-        unread_count: 0,
-        latest_message_at: current[ticketId]?.latest_message_at ?? null,
-      },
-    }));
-  };
-
-  const handleRequestMoreInformation = async (ticketId: string) => {
-    if (!user) return;
-    const message = commentDrafts[ticketId]?.trim() ?? '';
-    if (!message) {
-      setQueueError('Add a chat message before requesting more information.');
-      return;
-    }
-    setSavingTicketId(ticketId);
-    setQueueError(null);
-    const { data, error: workflowError } = await requestTicketMoreInformation(
-      ticketId,
-      { message },
-      { userId: user.id, companyId: user.company_id },
-    );
-    if (workflowError || !data) {
-      setQueueError(workflowError?.message || 'Unable to request more information.');
-      setSavingTicketId(null);
-      return;
-    }
-    clearCommentDraft(ticketId);
-    applyOptimisticTicketUpdate(ticketId, {
-      status: data.status,
-      current_responsible_party: data.current_responsible_party,
-      next_action: data.next_action,
-      updated_at: data.updated_at,
-      status_changed_at: data.status_changed_at,
-    });
-    setSavingTicketId(null);
-    void refreshTicketActivity(ticketId);
-  };
-
-  const handleMarkCompleted = async (ticketId: string) => {
-    setCompletionTargetId(ticketId);
-    setCompletionCategory('resolved');
-    setCompletionChecklistConfirmed(false);
-  };
-
-  const submitCompletion = async () => {
-    if (!user) return;
-    const ticketId = completionTargetId;
-    if (!ticketId) return;
-    const ticket = tickets.find((row) => row.id === ticketId);
-    const resolutionNote = noteDrafts[ticketId] ?? ticket?.resolution_note ?? '';
-    setSavingTicketId(ticketId);
-    setQueueError(null);
-    const { data, error: workflowError } = await markTicketCompletedByOwner(
-      ticketId,
-      {
-        resolutionNote,
-        completionCategory,
-        checklistConfirmed: completionChecklistConfirmed,
-        slaBreachReason: ticket?.sla_breach_reason ?? null,
-      },
-      { userId: user.id, companyId: user.company_id },
-    );
-    if (workflowError || !data) {
-      setQueueError(workflowError?.message || 'Unable to mark request completed.');
-      setSavingTicketId(null);
-      return;
-    }
-    clearNoteDraft(ticketId);
-    applyOptimisticTicketUpdate(ticketId, {
-      status: data.status,
-      resolution_note: data.resolution_note,
-      current_responsible_party: data.current_responsible_party,
-      next_action: data.next_action,
-      updated_at: data.updated_at,
-      status_changed_at: data.status_changed_at,
-    });
-    setSavingTicketId(null);
-    setCompletionTargetId(null);
-    setCompletionChecklistConfirmed(false);
-    void refreshTicketActivity(ticketId);
-  };
-
-  const handleCloseRequest = async (ticketId: string) => {
-    if (!user) return;
-    setSavingTicketId(ticketId);
-    setQueueError(null);
-    const { data, error: workflowError } = await closeTicketByRequester(
-      ticketId,
-      { confirmedResolved: true, satisfactionRating: 5 },
-      { userId: user.id, companyId: user.company_id },
-    );
-    if (workflowError || !data) {
-      setQueueError(workflowError?.message || 'Unable to close request.');
-      setSavingTicketId(null);
-      return;
-    }
-    applyOptimisticTicketUpdate(ticketId, {
-      status: data.status,
-      current_responsible_party: data.current_responsible_party,
-      next_action: data.next_action,
-      updated_at: data.updated_at,
-      status_changed_at: data.status_changed_at,
-      resolved_at: data.resolved_at,
-    });
-    setSavingTicketId(null);
-    void refreshTicketActivity(ticketId);
-  };
-
-  const handleChatFilesSelected = async (ticketId: string, files: File[]) => {
-    if (!user || files.length === 0) return;
-    setSavingTicketId(ticketId);
-    setQueueError(null);
-    const results = await Promise.all(files.map((file) => uploadTicketAttachment(file, ticketId, user.company_id, user.id)));
-    const failed = results.filter((result) => result.error);
-    const uploadedNames = files.filter((_, index) => !results[index].error).map((file) => file.name);
-    if (uploadedNames.length > 0) {
-      await addTicketComment(
-        ticketId,
-        { message: `Attached ${uploadedNames.length} file${uploadedNames.length === 1 ? '' : 's'}.`, attachmentNames: uploadedNames },
-        { userId: user.id, companyId: user.company_id },
-      );
-    }
-    if (failed.length > 0) setQueueError(`${failed.length} attachment${failed.length === 1 ? '' : 's'} failed to upload.`);
-    setSavingTicketId(null);
-    void refreshTicketActivity(ticketId);
-  };
-
-  const handleApprovalReview = async () => {
-    if (!user || !reviewTarget) return;
-
-    setSavingTicketId(reviewTarget.ticketId);
-    setQueueError(null);
-    const { error: reviewError } = await reviewInternalRequestApproval(
-      reviewTarget.ticketId,
-      reviewTarget.decision,
-      reviewNote,
-      { userId: user.id, companyId: user.company_id },
-    );
-    setSavingTicketId(null);
-
-    if (reviewError) {
-      setQueueError(reviewError);
-      return;
-    }
-
-    toast.success(reviewTarget.decision === 'approved' ? 'Request approval recorded' : 'Request rejected');
-    setReviewTarget(null);
-    setReviewNote('');
-    // Invalidate so the next render fetches fresh data from the server
-    await queryClient.invalidateQueries({ queryKey: ['ticketQueue', user.company_id] });
+  const handleOpenChat = (ticketId: string) => {
+    openTicketWorkspace(navigate, ticketId, {
+      source: 'queue',
+      path: `${location.pathname}${location.search}`,
+      page,
+      activeSavedView: activeSavedView ?? undefined,
+      filters: currentFilterPayload,
+      scrollTop: contentScrollRef.current?.scrollTop ?? 0,
+    }, 'chat');
   };
 
   const handleExportCsv = () => {
@@ -915,55 +538,6 @@ export default function RequestQueue() {
 
     downloadCsv(`internal-requests-${new Date().toISOString().slice(0, 10)}.csv`, rows);
   };
-
-  const renderDetailPanel = (ticket: CompanyTicketRecord, variant: 'pane' | 'drawer' = 'pane') => (
-    <RequestDetailPanel
-      ticket={ticket}
-      categories={categories}
-      subcategories={subcategories}
-      assignees={assignees}
-      activities={activitiesByTicket[ticket.id] ?? []}
-      internalNotes={internalNotesByTicket[ticket.id] ?? []}
-      operationalIndicator={indicatorsByTicket[ticket.id]}
-      attachments={attachmentsByTicket[ticket.id] ?? []}
-      customFieldLabelMap={customFieldLabelMap}
-      statusOptions={statusOptions}
-      priorityOptions={priorityOptions}
-      currentUserId={user?.id}
-      saving={savingTicketId === ticket.id}
-      // Drafts overlay the server state — see usePersistedDraftMap.
-      noteDraft={noteDrafts[ticket.id] ?? ticket.resolution_note ?? ''}
-      commentDraft={commentDrafts[ticket.id] ?? ''}
-      internalNoteDraft={internalNoteDrafts[ticket.id] ?? ''}
-      canReviewApproval={isApprovalAssignedToUser(ticket, user)}
-      canManageWorkflow={ticket.submitted_by !== user?.id}
-      canCloseAsRequester={ticket.submitted_by === user?.id}
-      variant={variant}
-      onStatusChange={(ticketId, status) => void handleStatusChange(ticketId, status)}
-      onPriorityChange={(ticketId, priority) => void handlePriorityChange(ticketId, priority)}
-      onAssignmentChange={(ticketId, value) => void handleAssignmentChange(ticketId, value)}
-      onResolutionNoteChange={(ticketId, value) => setNoteDrafts((current) => ({
-        ...current,
-        [ticketId]: value,
-      }))}
-      onResolutionNoteSave={(ticketId) => void handleResolutionNoteSave(ticketId)}
-      onCommentChange={(ticketId, value) => setCommentDrafts((current) => ({
-        ...current,
-        [ticketId]: value,
-      }))}
-      onAddComment={(ticketId) => void handleAddComment(ticketId)}
-      onInternalNoteChange={(ticketId, value) => setInternalNoteDrafts((current) => ({
-        ...current,
-        [ticketId]: value,
-      }))}
-      onAddInternalNote={(ticketId) => void handleAddInternalNote(ticketId)}
-      onRequestMoreInformation={(ticketId) => void handleRequestMoreInformation(ticketId)}
-      onMarkCompleted={(ticketId) => void handleMarkCompleted(ticketId)}
-      onCloseRequest={(ticketId) => void handleCloseRequest(ticketId)}
-      onChatFilesSelected={(ticketId, files) => void handleChatFilesSelected(ticketId, files)}
-      onReviewApproval={(ticketId, decision) => setReviewTarget({ ticketId, decision })}
-    />
-  );
 
   const hasActiveFilters =
     statusFilter !== 'active'
@@ -1029,6 +603,45 @@ export default function RequestQueue() {
     updatedFrom,
     updatedTo,
   ]);
+
+  useEffect(() => {
+    const state = (location.state as { ticketWorkspaceReturnState?: TicketWorkspaceReturnState } | null)?.ticketWorkspaceReturnState;
+    if (!state || state.source !== 'queue') return;
+    const filters = state.filters as Partial<typeof currentFilterPayload> | undefined;
+    if (filters) {
+      setStatusFilter((filters.statusFilter as StatusFilter) ?? 'active');
+      setPriorityFilter((filters.priorityFilter as PriorityFilter) ?? 'all');
+      setSlaFilter((filters.slaFilter as SlaFilter) ?? 'all');
+      setAssignedToFilter((filters.assignedToFilter as AssigneeFilter) ?? 'all');
+      setCategoryFilter(String(filters.categoryFilter ?? 'all'));
+      setSubcategoryFilter(String(filters.subcategoryFilter ?? 'all'));
+      setResponsiblePartyFilter((filters.responsiblePartyFilter as TicketResponsibleParty | 'all') ?? 'all');
+      setSubmittedFrom(String(filters.submittedFrom ?? ''));
+      setSubmittedTo(String(filters.submittedTo ?? ''));
+      setUpdatedFrom(String(filters.updatedFrom ?? ''));
+      setUpdatedTo(String(filters.updatedTo ?? ''));
+      setUnreadOnly(Boolean(filters.unreadOnly));
+      setReopenedOnly(Boolean(filters.reopenedOnly));
+      setSearchTerm(String(filters.searchTerm ?? ''));
+    }
+    if (state.page) setPage(state.page);
+    window.setTimeout(() => {
+      if (contentScrollRef.current && typeof state.scrollTop === 'number') {
+        contentScrollRef.current.scrollTop = state.scrollTop;
+      }
+    }, 0);
+  }, [location.state]);
+
+  const handleOpenTicketWorkspace = (ticketId: string) => {
+    openTicketWorkspace(navigate, ticketId, {
+      source: 'queue',
+      path: `${location.pathname}${location.search}`,
+      page,
+      activeSavedView: activeSavedView ?? undefined,
+      filters: currentFilterPayload,
+      scrollTop: contentScrollRef.current?.scrollTop ?? 0,
+    });
+  };
 
   const applySavedFilter = (filter: RequestSavedFilterRecord) => {
     const filters = filter.filters as Partial<typeof currentFilterPayload>;
@@ -1424,7 +1037,7 @@ export default function RequestQueue() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={contentScrollRef} className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
           <TableSkeleton rows={8} cols={6} />
         ) : error ? (
@@ -1495,103 +1108,12 @@ export default function RequestQueue() {
               </>
             )}
             onRowClick={(ticket) => {
-              setSelectedTicketId(ticket.id);
               void handleTicketOpen(ticket.id);
+              handleOpenTicketWorkspace(ticket.id);
             }}
           />
         )}
       </div>
-
-      {/* Request detail drawer */}
-      <Sheet
-        open={!!selectedTicket}
-        onOpenChange={(open) => {
-          if (!open) setSelectedTicketId(null);
-        }}
-      >
-        <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl">
-          {selectedTicket && (
-            <>
-              <SheetHeader className="sr-only">
-                <SheetTitle>{selectedTicket.subject}</SheetTitle>
-                <SheetDescription>Internal request detail</SheetDescription>
-              </SheetHeader>
-              <div className="px-4 py-4">
-                <PanelErrorBoundary scope="request-queue:detail" resetKey={selectedTicket.id}>
-                  {renderDetailPanel(selectedTicket, 'drawer')}
-                </PanelErrorBoundary>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={!!chatTicket} onOpenChange={(open) => { if (!open) setChatTicketId(null); }}>
-        <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-md">
-          {chatTicket && (
-            <>
-              <SheetHeader className="space-y-1 border-b border-border px-5 py-4 text-left">
-                <SheetTitle className="text-base leading-6">Discussion</SheetTitle>
-                <SheetDescription>{chatTicket.subject}</SheetDescription>
-              </SheetHeader>
-              <div className="px-5 py-4">
-                <TicketChatPanel
-                  activities={activitiesByTicket[chatTicket.id] ?? []}
-                  currentUserId={user?.id}
-                  draft={commentDrafts[chatTicket.id] ?? ''}
-                  saving={savingTicketId === chatTicket.id}
-                  onDraftChange={(value) => setCommentDrafts((current) => ({ ...current, [chatTicket.id]: value }))}
-                  onSend={() => void handleAddComment(chatTicket.id)}
-                  onAttachFiles={(files) => void handleChatFilesSelected(chatTicket.id, files)}
-                />
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      <Dialog open={!!completionTargetId} onOpenChange={(open) => {
-        if (!open) {
-          setCompletionTargetId(null);
-          setCompletionChecklistConfirmed(false);
-        }
-      }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Mark request completed</DialogTitle>
-            <DialogDescription>Confirm the owner completion details before the requester closes the request.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Completion category</Label>
-              <Select value={completionCategory} onValueChange={(value) => setCompletionCategory(value as TicketCompletionCategory)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="resolved">Resolved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="duplicate">Duplicate</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                  <SelectItem value="not_applicable">Not Applicable</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <label htmlFor="request-completion-checklist" className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
-              <Checkbox
-                id="request-completion-checklist"
-                checked={completionChecklistConfirmed}
-                onCheckedChange={(checked) => setCompletionChecklistConfirmed(Boolean(checked))}
-              />
-              <span>Resolution summary, attachments, checklist items, and breach reason are complete where required.</span>
-            </label>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setCompletionTargetId(null)}>Cancel</Button>
-            <Button onClick={() => void submitCompletion()} disabled={!completionChecklistConfirmed || (!!completionTargetId && savingTicketId === completionTargetId)}>
-              {!!completionTargetId && savingTicketId === completionTargetId ? 'Saving...' : 'Mark completed'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={bulkPriorityDialogOpen} onOpenChange={(open) => {
         setBulkPriorityDialogOpen(open);
@@ -1663,41 +1185,6 @@ export default function RequestQueue() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!reviewTarget} onOpenChange={(open) => {
-        if (!open) {
-          setReviewTarget(null);
-          setReviewNote('');
-        }
-      }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{reviewTarget?.decision === 'approved' ? 'Approve request' : 'Reject request'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              {reviewTarget?.decision === 'approved'
-                ? 'Record your approval decision for the current workflow step.'
-                : 'Rejecting this approval will cancel the request and notify the requester.'}
-            </p>
-            <Textarea
-              value={reviewNote}
-              onChange={(event) => setReviewNote(event.target.value)}
-              rows={3}
-              placeholder="Optional approval note"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setReviewTarget(null)}>Cancel</Button>
-            <Button
-              onClick={() => void handleApprovalReview()}
-              disabled={!!reviewTarget && savingTicketId === reviewTarget.ticketId}
-              variant={reviewTarget?.decision === 'rejected' ? 'destructive' : 'default'}
-            >
-              {!!reviewTarget && savingTicketId === reviewTarget.ticketId ? 'Saving...' : reviewTarget?.decision === 'approved' ? 'Approve' : 'Reject'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

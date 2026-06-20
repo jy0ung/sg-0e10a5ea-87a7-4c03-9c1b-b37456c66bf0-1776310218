@@ -29,6 +29,7 @@ const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/portal\/?$/, title: 'Overview', kicker: 'Internal requests workspace' },
   { pattern: /^\/portal\/tickets\/new/, title: 'New Request', kicker: 'Submit and track internal support demand' },
   { pattern: /^\/portal\/tickets\/completed/, title: 'Completed Requests', kicker: 'Closed requester-confirmed requests' },
+  { pattern: /^\/portal\/tickets\/[^/]+/, title: 'Ticket Workspace', kicker: 'Full request handling and accountability view' },
   { pattern: /^\/portal\/tickets$/, title: 'Pending Requests', kicker: 'Requester actions and active updates' },
   { pattern: /^\/portal\/dashboard/, title: 'Manager Dashboard', kicker: 'SLA, workload, and bottleneck visibility' },
   { pattern: /^\/portal\/queue/, title: 'Pending / Active Requests', kicker: 'Triage, assign, and resolve requests' },

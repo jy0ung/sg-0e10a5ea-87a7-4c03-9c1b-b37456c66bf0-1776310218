@@ -21,6 +21,7 @@ const requestQueueRoles = new Set<AppRole>(ADMIN_ONLY);
 
 const INTERNAL_REQUESTS_ROUTE_CHROME: AppShellRouteChromeMatch[] = [
   { pattern: /^\/portal\/tickets\/new/, title: 'New Request', kicker: 'Submit and track internal support demand' },
+  { pattern: /^\/portal\/tickets\/[^/]+/, title: 'Ticket Workspace', kicker: 'Full request handling and accountability view' },
   { pattern: /^\/portal\/tickets$/, title: 'My Requests', kicker: 'Requester history and updates' },
   { pattern: /^\/portal\/queue/, title: 'Request Queue', kicker: 'Triage, assign, and resolve requests' },
   { pattern: /^\/portal\/history/, title: 'Request History', kicker: 'Resolved and closed requests' },

@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ListTodo } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import {
   type DuplicateTicketCandidate,
 } from '@/services/ticketService';
 import { getRequestModuleSettings } from '@/services/requestModuleSettingsService';
+import { canManagePortalQueue } from '@/lib/portalAccess';
 import { uploadTicketAttachment } from '@flc/platform-services';
 import { getInternalRequestApprovalPlan } from '@flc/internal-requests';
 import type { AppRole } from '@/types';
@@ -76,6 +78,7 @@ export default function NewTicket() {
   const autoFilledDescriptionRef = useRef('');
 
   const roleContext = ROLE_CONTEXT[user?.role as AppRole] ?? DEFAULT_ROLE_CONTEXT;
+  const canManageQueue = canManagePortalQueue(user);
 
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
@@ -563,6 +566,14 @@ export default function NewTicket() {
             { label: 'Internal Requests', path: '/portal' },
             { label: 'New request' },
           ]}
+          actions={canManageQueue ? (
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link to="/portal/queue">
+                <ListTodo className="h-4 w-4" />
+                Open queue
+              </Link>
+            </Button>
+          ) : undefined}
         />
       </div>
 

@@ -247,6 +247,35 @@ export interface TicketInternalNoteRecord {
   updated_at: string;
 }
 
+export interface TicketAuditEntryRecord {
+  id: string;
+  user_id: string;
+  actor_name: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  table_name: string | null;
+  changes: Record<string, unknown> | null;
+  created_at: string | null;
+}
+
+export interface TicketWorkspacePermissions {
+  canManageWorkflow: boolean;
+  canCloseAsRequester: boolean;
+  canViewInternalNotes: boolean;
+  canViewAuditTrail: boolean;
+  canReviewApproval: boolean;
+}
+
+export interface TicketWorkspaceData {
+  ticket: CompanyTicketRecord;
+  activities: TicketActivityRecord[];
+  chatSummary: TicketChatSummary;
+  internalNotes: TicketInternalNoteRecord[];
+  auditEntries: TicketAuditEntryRecord[];
+  permissions: TicketWorkspacePermissions;
+}
+
 export interface DuplicateTicketCandidate {
   id: string;
   subject: string;
@@ -287,6 +316,17 @@ interface TicketActivityInsert extends TicketActivityDbInsert {
   event_type: TicketActivityEventType;
   message: string;
   metadata: Json;
+}
+
+interface TicketAuditRow {
+  id: string;
+  user_id: string;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  table_name: string | null;
+  changes: Record<string, unknown> | null;
+  created_at: string | null;
 }
 
 const TICKET_SELECT =
@@ -878,6 +918,88 @@ export async function listCompanyTicketsPage(
   }
 }
 
+async function getCompanyTicketById(ticketId: string, companyId: string): Promise<CompanyTicketRecord | null> {
+  const { data, error } = await ticketsTable()
+    .select(TICKET_SELECT)
+    .eq('company_id', companyId)
+    .eq('id', ticketId)
+    .single();
+  if (error) throw error;
+  const [ticket] = await enrichCompanyTickets([mapTicket(data as unknown as TicketRow)], companyId);
+  return ticket ?? null;
+}
+
+function canReviewTicketApproval(
+  ticket: CompanyTicketRecord,
+  user: { id: string; role?: string | null },
+) {
+  if (ticket.approval_status !== 'pending') return false;
+  if (ticket.current_approver_user_id) return ticket.current_approver_user_id === user.id;
+  if (ticket.current_approver_role) return user.role === 'super_admin' || user.role === 'company_admin';
+  return false;
+}
+
+export async function getTicketWorkspaceData(
+  ticketId: string,
+  context: { userId: string; companyId: string; userRole?: string | null; canManagePortalQueue?: boolean },
+): Promise<TicketServiceResult<TicketWorkspaceData>> {
+  try {
+    const ticket = await getCompanyTicketById(ticketId, context.companyId);
+    if (!ticket) return { data: null, error: new Error('Request not found.') };
+
+    const canManagePortalQueue = Boolean(context.canManagePortalQueue);
+    const isRequester = ticket.submitted_by === context.userId;
+    if (!isRequester && !canManagePortalQueue) {
+      return { data: null, error: new Error('You do not have access to this request.') };
+    }
+
+    const permissions: TicketWorkspacePermissions = {
+      canManageWorkflow: canManagePortalQueue && !isRequester,
+      canCloseAsRequester: isRequester,
+      canViewInternalNotes: canManagePortalQueue,
+      canViewAuditTrail: canManagePortalQueue,
+      canReviewApproval: canReviewTicketApproval(ticket, { id: context.userId, role: context.userRole }),
+    };
+
+    const [{ data: activitiesByTicket }, { data: chatSummariesByTicket }, internalNoteResult, auditResult] = await Promise.all([
+      listTicketActivity([ticket.id], context.companyId),
+      listTicketChatSummaries([ticket.id], context.userId, context.companyId),
+      permissions.canViewInternalNotes
+        ? listTicketInternalNotes([ticket.id], context.companyId)
+        : Promise.resolve({ data: { [ticket.id]: [] as TicketInternalNoteRecord[] }, error: null }),
+      permissions.canViewAuditTrail
+        ? listTicketAuditEntries(ticket.id, context.companyId)
+        : Promise.resolve({ data: [] as TicketAuditEntryRecord[], error: null }),
+    ]);
+
+    if (internalNoteResult.error) throw internalNoteResult.error;
+    if (auditResult.error) throw auditResult.error;
+
+    const fallbackChatSummary: TicketChatSummary = {
+      ticket_id: ticket.id,
+      message_count: 0,
+      unread_count: 0,
+      latest_message_at: null,
+    };
+
+    return {
+      data: {
+        ticket,
+        activities: activitiesByTicket?.[ticket.id] ?? [],
+        chatSummary: chatSummariesByTicket?.[ticket.id] ?? fallbackChatSummary,
+        internalNotes: internalNoteResult.data?.[ticket.id] ?? [],
+        auditEntries: auditResult.data ?? [],
+        permissions,
+      },
+      error: null,
+    };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to load request workspace');
+    loggingService.error('Failed to load request workspace', { error: error.message, ticketId }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
 export interface TicketStatusCounts {
   all: number;
   open: number;
@@ -1102,6 +1224,42 @@ export async function listTicketInternalNotes(
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to load internal notes');
     loggingService.error('Failed to load internal notes', { error: error.message }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+export async function listTicketAuditEntries(
+  ticketId: string,
+  companyId: string,
+): Promise<TicketServiceResult<TicketAuditEntryRecord[]>> {
+  try {
+    const { data, error } = await table('audit_logs')
+      .select('id, user_id, action, entity_type, entity_id, table_name, changes, created_at')
+      .eq('entity_id', ticketId)
+      .or('entity_type.eq.ticket,entity_type.eq.internal_request,table_name.eq.tickets,table_name.eq.user_actions')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+
+    const rows = (data ?? []) as TicketAuditRow[];
+    const profilesById = await fetchProfilesById(companyId, rows.map((row) => row.user_id));
+    return {
+      data: rows.map((row) => ({
+        id: row.id,
+        user_id: row.user_id,
+        actor_name: profilesById.get(row.user_id)?.name ?? null,
+        action: row.action,
+        entity_type: row.entity_type,
+        entity_id: row.entity_id,
+        table_name: row.table_name,
+        changes: row.changes,
+        created_at: row.created_at,
+      })),
+      error: null,
+    };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to load request audit trail');
+    loggingService.error('Failed to load request audit trail', { error: error.message, ticketId }, 'TicketService');
     return { data: null, error };
   }
 }

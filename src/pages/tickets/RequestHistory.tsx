@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { STALE } from '@/lib/queryClient';
-import { toast } from 'sonner';
 import {
   Archive,
   ChevronLeft,
@@ -22,32 +22,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { RequestDetailPanel } from '@/components/tickets/RequestDetailPanel';
-import {
-  Drawer,
-  DrawerContent,
-} from '@/components/ui/drawer';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
-import { useRequestFormFields } from '@/hooks/useRequestFormFields';
-import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
-import { usePersistedDraftMap } from '@/hooks/usePersistedDraftMap';
 import {
   listCompanyTicketsPage,
-  listTicketActivity,
-  type CompanyTicketRecord,
-  type TicketActivityRecord,
-  type TicketPriority,
-  type TicketStatus,
   type TicketStatusFilter,
-  updateTicket,
-  addTicketComment,
 } from '@/services/ticketService';
-import { listAttachmentsForTickets, type TicketAttachmentRecord } from '@flc/platform-services';
-import { listProfiles } from '@flc/auth';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { formatTicketLabel, priorityColorMap, statusColorMap } from '@/lib/requestFormatters';
-import { getRequestAssignees } from '@/lib/requestAssignees';
+import { openTicketWorkspace } from '@/lib/ticketWorkspaceNavigation';
 import { formatDistanceToNow } from 'date-fns';
 
 type HistoryStatusFilter = 'closed';
@@ -58,58 +41,16 @@ const historyStatusOptions: Array<{ value: HistoryStatusFilter; label: string }>
   { value: 'closed', label: 'Closed' },
 ];
 
-const priorityOptions: Array<{ value: TicketPriority; label: string }> = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-];
-
-const statusOptions: Array<{ value: TicketStatus; label: string }> = [
-  { value: 'open', label: 'Open' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'pending_requester', label: 'Pending Requester' },
-  { value: 'pending_owner_review', label: 'Pending Owner Review' },
-  { value: 'completed_by_owner', label: 'Completed by Owner' },
-  { value: 'closed', label: 'Closed' },
-  { value: 'reopened', label: 'Reopened' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
-
-function useIsLargeScreen() {
-  const [isLargeScreen, setIsLargeScreen] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return window.matchMedia('(min-width: 1024px)').matches;
-  });
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const mq = window.matchMedia('(min-width: 1024px)');
-    const onChange = () => setIsLargeScreen(mq.matches);
-    onChange();
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return isLargeScreen;
-}
-
 export default function RequestHistory() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
-  const isLargeScreen = useIsLargeScreen();
   const { categories } = useRequestCategories(user?.company_id, true);
-  const { subcategories } = useRequestSubcategories(user?.company_id, { includeInactive: true });
-  const { fields: formFields } = useRequestFormFields(user?.company_id, { includeInactive: true });
 
-  const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>('archived');
+  const [statusFilter, setStatusFilter] = useState<HistoryStatusFilter>('closed');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [detailDrawerOpen, setDetailDrawerOpen] = useState(false);
-  const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
-
-  const customFieldLabelMap = useMemo(
-    () => Object.fromEntries(formFields.map((f) => [`${f.category_key}:${f.key}`, f.label])),
-    [formFields],
-  );
 
   // Reset page when filters change
   useEffect(() => {
@@ -122,24 +63,12 @@ export default function RequestHistory() {
     queryKey: historyKey,
     queryFn: async () => {
       const statusParam: TicketStatusFilter = 'closed';
-      const [{ data, error: fetchError }, profileResult] = await Promise.all([
-        listCompanyTicketsPage(user!.company_id, { page, pageSize: HISTORY_PAGE_SIZE, status: statusParam, search: searchTerm }),
-        listProfiles(user!.company_id),
-      ]);
+      const { data, error: fetchError } = await listCompanyTicketsPage(user!.company_id, { page, pageSize: HISTORY_PAGE_SIZE, status: statusParam, search: searchTerm });
       if (fetchError) throw new Error(fetchError.message || 'Unable to load request history.');
-      if (profileResult.error) throw new Error(profileResult.error || 'Unable to load profiles.');
       const nextTickets = data?.rows ?? [];
-      const ticketIds = nextTickets.map((t) => t.id);
-      const [{ data: activityData }, { data: attachmentData }] = await Promise.all([
-        listTicketActivity(ticketIds, user!.company_id),
-        listAttachmentsForTickets(ticketIds, user!.company_id),
-      ]);
       return {
         tickets: nextTickets,
         totalCount: data?.totalCount ?? 0,
-        assignees: getRequestAssignees(profileResult.data),
-        activitiesByTicket: activityData ?? {} as Record<string, TicketActivityRecord[]>,
-        attachmentsByTicket: attachmentData ?? {} as Record<string, TicketAttachmentRecord[]>,
       };
     },
     enabled: !!user,
@@ -149,24 +78,6 @@ export default function RequestHistory() {
   const error = queryError ? (queryError as Error).message : null;
   const tickets = useMemo(() => historyData?.tickets ?? [], [historyData]);
   const totalCount = historyData?.totalCount ?? 0;
-  const assignees = useMemo(() => historyData?.assignees ?? [], [historyData]);
-  const activitiesByTicket = useMemo(() => historyData?.activitiesByTicket ?? {}, [historyData]);
-  const attachmentsByTicket = useMemo(() => historyData?.attachmentsByTicket ?? {}, [historyData]);
-
-  // Drafts overlay the server state — present in the map only when the user
-  // has actually typed something. The textarea read pattern below falls back
-  // to the ticket's resolution_note when no draft exists, so we no longer
-  // need a seed effect that pre-populated every ticket id.
-  const [noteDrafts, setNoteDrafts, clearNoteDraft] = usePersistedDraftMap(
-    'history:note',
-    user?.company_id,
-    user?.id,
-  );
-  const [commentDrafts, setCommentDrafts, clearCommentDraft] = usePersistedDraftMap(
-    'history:comment',
-    user?.company_id,
-    user?.id,
-  );
 
   const loadTickets = () => void queryClient.invalidateQueries({ queryKey: historyKey });
 
@@ -184,86 +95,14 @@ export default function RequestHistory() {
     onChange: invalidateHistory,
   });
 
-  const selectedTicket = useMemo(
-    () => tickets.find((t) => t.id === selectedTicketId) ?? null,
-    [tickets, selectedTicketId],
-  );
-
   function handleSelectTicket(ticketId: string) {
-    setSelectedTicketId(ticketId);
-    if (!isLargeScreen) setDetailDrawerOpen(true);
+    openTicketWorkspace(navigate, ticketId, {
+      source: 'history',
+      path: `${location.pathname}${location.search}`,
+      page,
+      filters: { statusFilter, searchTerm },
+    });
   }
-
-  async function handleUpdateTicket(ticketId: string, updates: Parameters<typeof updateTicket>[1]) {
-    if (!user) return;
-    setSavingTicketId(ticketId);
-    const result = await updateTicket(ticketId, updates, { userId: user.id, companyId: user.company_id });
-    if (result.error) {
-      toast.error('Failed to update request', { description: result.error.message });
-    } else {
-      await loadTickets();
-      toast.success('Request updated');
-    }
-    setSavingTicketId(null);
-  }
-
-  async function handleAddComment(ticketId: string) {
-    if (!user) return;
-    const message = commentDrafts[ticketId]?.trim();
-    if (!message) return;
-
-    setSavingTicketId(ticketId);
-    const result = await addTicketComment(ticketId, { message }, { userId: user.id, companyId: user.company_id });
-    if (result.error) {
-      toast.error('Failed to add comment', { description: result.error.message });
-    } else {
-      clearCommentDraft(ticketId);
-      // Activity is owned by the historyKey query — invalidate to refetch the
-      // ticket's updated activity timeline alongside everything else.
-      await queryClient.invalidateQueries({ queryKey: historyKey });
-    }
-    setSavingTicketId(null);
-  }
-
-  const renderDetailPanel = (ticket: CompanyTicketRecord, variant: 'pane' | 'drawer' = 'pane') => (
-    <RequestDetailPanel
-      ticket={ticket}
-      categories={categories}
-      subcategories={subcategories}
-      assignees={assignees}
-      activities={activitiesByTicket[ticket.id] ?? []}
-      attachments={attachmentsByTicket[ticket.id] ?? []}
-      customFieldLabelMap={customFieldLabelMap}
-      statusOptions={statusOptions}
-      priorityOptions={priorityOptions}
-      currentUserId={user?.id}
-      saving={savingTicketId === ticket.id}
-      // Drafts overlay the server state: an entry in noteDrafts means the
-      // user has typed something; otherwise we show the ticket's current
-      // resolution_note. After a successful save the draft is cleared and
-      // the textarea naturally falls back to the new server value.
-      noteDraft={noteDrafts[ticket.id] ?? ticket.resolution_note ?? ''}
-      commentDraft={commentDrafts[ticket.id] ?? ''}
-      canReviewApproval={false}
-      canManageWorkflow={false}
-      canCloseAsRequester={false}
-      variant={variant}
-      onStatusChange={() => undefined}
-      onPriorityChange={(ticketId, priority) => void handleUpdateTicket(ticketId, { priority })}
-      onAssignmentChange={(ticketId, value) =>
-        void handleUpdateTicket(ticketId, { assigned_to: value === 'unassigned' ? null : value })
-      }
-      onResolutionNoteChange={(ticketId, value) => setNoteDrafts((prev) => ({ ...prev, [ticketId]: value }))}
-      onResolutionNoteSave={async (ticketId) => {
-        const nextNote = noteDrafts[ticketId] ?? ticket.resolution_note ?? '';
-        await handleUpdateTicket(ticketId, { resolution_note: nextNote });
-        clearNoteDraft(ticketId);
-      }}
-      onCommentChange={(ticketId, value) => setCommentDrafts((prev) => ({ ...prev, [ticketId]: value }))}
-      onAddComment={(ticketId) => void handleAddComment(ticketId)}
-      onReviewApproval={() => undefined}
-    />
-  );
 
   const totalPages = Math.ceil(totalCount / HISTORY_PAGE_SIZE);
 
@@ -323,7 +162,7 @@ export default function RequestHistory() {
       {/* Content */}
       <div className="flex flex-1 gap-4 overflow-hidden">
         {/* Left: ticket list */}
-        <div className={`flex flex-col gap-2 overflow-y-auto ${isLargeScreen && selectedTicketId ? 'w-[420px] flex-shrink-0' : 'flex-1'}`}>
+        <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center gap-3 py-16 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -343,13 +182,12 @@ export default function RequestHistory() {
             <>
               {tickets.map((ticket) => {
                 const categoryLabel = getRequestCategoryLabel(ticket.category, categories);
-                const isSelected = ticket.id === selectedTicketId;
                 return (
                   <button
                     key={ticket.id}
                     type="button"
                     onClick={() => handleSelectTicket(ticket.id)}
-                    className={`w-full rounded-lg border bg-card p-3.5 text-left shadow-sm transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSelected ? 'border-primary/50 bg-accent/60 ring-1 ring-primary/30' : ''}`}
+                    className="w-full rounded-lg border bg-card p-3.5 text-left shadow-sm transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
@@ -407,25 +245,7 @@ export default function RequestHistory() {
             </>
           )}
         </div>
-
-        {/* Right: detail panel (large screens) */}
-        {isLargeScreen && selectedTicket && (
-          <div className="flex-1 overflow-y-auto rounded-lg border bg-card shadow-sm">
-            {renderDetailPanel(selectedTicket)}
-          </div>
-        )}
       </div>
-
-      {/* Mobile drawer */}
-      {!isLargeScreen && selectedTicket && (
-        <Drawer open={detailDrawerOpen} onOpenChange={setDetailDrawerOpen}>
-          <DrawerContent className="max-h-[90vh]">
-            <div className="overflow-y-auto p-4">
-              {renderDetailPanel(selectedTicket, 'drawer')}
-            </div>
-          </DrawerContent>
-        </Drawer>
-      )}
     </div>
   );
 }

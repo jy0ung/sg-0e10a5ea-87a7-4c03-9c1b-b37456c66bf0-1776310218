@@ -2,8 +2,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Archive,
+  BarChart3,
   CheckCircle2,
   ClipboardList,
+  FileSpreadsheet,
   FolderOpen,
   Inbox,
   Megaphone,
@@ -194,6 +196,12 @@ export default function PortalLanding() {
           {canManageQueue && (
             <>
               <QuickLinkCard
+                to="/portal/dashboard"
+                icon={BarChart3}
+                title="Manager Dashboard"
+                description="Review SLA, workload, and bottleneck signals"
+              />
+              <QuickLinkCard
                 to="/portal/queue"
                 icon={ClipboardList}
                 title="Pending / Active Requests"
@@ -204,6 +212,12 @@ export default function PortalLanding() {
                 icon={Archive}
                 title="Completed Requests"
                 description="Browse requester-confirmed closed requests"
+              />
+              <QuickLinkCard
+                to="/portal/reports"
+                icon={FileSpreadsheet}
+                title="Reports"
+                description="Analyze SLA, owner, category, and aging trends"
               />
             </>
           )}

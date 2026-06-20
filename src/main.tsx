@@ -57,6 +57,7 @@ const CustomerServiceLayout = lazy(() => import("./components/layout/CustomerSer
 const MyTickets = lazy(() => import("./pages/tickets/MyTickets"));
 const CompletedRequests = lazy(() => import("./pages/tickets/CompletedRequests"));
 const NewTicket = lazy(() => import("./pages/tickets/NewTicket"));
+const TicketWorkspace = lazy(() => import("./pages/tickets/TicketWorkspace"));
 const ManagerDashboard = lazy(() => import("./pages/tickets/ManagerDashboard"));
 const RequestReports = lazy(() => import("./pages/tickets/RequestReports"));
 const RequestQueue = lazy(() => import("./pages/tickets/RequestQueue"));
@@ -318,6 +319,7 @@ const router = createBrowserRouter([
       { path: "tickets", element: <S><R scope="Pending Requests"><MyTickets /></R></S> },
       { path: "tickets/completed", element: <S><R scope="Completed Requests"><CompletedRequests /></R></S> },
       { path: "tickets/new", element: <S><R scope="New Ticket"><NewTicket /></R></S> },
+      { path: "tickets/:ticketId", element: <S><R scope="Ticket Workspace"><TicketWorkspace /></R></S> },
       { path: "dashboard", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Manager Dashboard"><ManagerDashboard /></R></S></RequireRole> },
       { path: "queue", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Pending / Active Requests"><RequestQueue /></R></S></RequireRole> },
       { path: "history", element: <RequireRole roles={PORTAL_QUEUE_ROLES} section="Platform"><S><R scope="Completed Requests"><RequestHistory /></R></S></RequireRole> },
