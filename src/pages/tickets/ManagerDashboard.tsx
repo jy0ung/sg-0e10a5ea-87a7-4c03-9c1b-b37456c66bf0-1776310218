@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +24,9 @@ import { RequestPriorityBadge, RequestStatusBadge } from '@/components/tickets/R
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { openTicketWorkspace } from '@/lib/ticketWorkspaceNavigation';
+import type { DashboardPeriod } from '@/lib/dashboardFilters';
+import { DASHBOARD_PERIOD_OPTIONS, getDashboardPeriodRange, loadDashboardFilterState, saveDashboardFilterState } from '@/lib/dashboardFilters';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getRequestManagementDashboard } from '@/services/requestManagementService';
 
 function formatDuration(ms: number | null) {
@@ -54,10 +57,19 @@ export default function ManagerDashboard() {
   const navigate = useNavigate();
   const { categories } = useRequestCategories(user?.company_id, true);
 
+  const [period, setPeriod] = useState<DashboardPeriod>(() => loadDashboardFilterState('manager-dashboard').period);
+  const dateRange = useMemo(() => getDashboardPeriodRange(period), [period]);
+
+  const handlePeriodChange = (newPeriod: DashboardPeriod) => {
+    setPeriod(newPeriod);
+    const current = loadDashboardFilterState('manager-dashboard');
+    saveDashboardFilterState('manager-dashboard', { ...current, period: newPeriod });
+  };
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['request-manager-dashboard', user?.company_id, user?.id],
+    queryKey: ['request-manager-dashboard', user?.company_id, user?.id, period, dateRange.from?.toISOString(), dateRange.to?.toISOString()],
     queryFn: async () => {
-      const result = await getRequestManagementDashboard(user!.company_id, user!.id);
+      const result = await getRequestManagementDashboard(user!.company_id, user!.id, dateRange.from, dateRange.to);
       if (result.error) throw result.error;
       return result.data!;
     },
@@ -82,6 +94,17 @@ export default function ManagerDashboard() {
         breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'Manager Dashboard' }]}
       />
 
+      <div className="flex items-center gap-3">
+        <Select value={period} onValueChange={(value) => handlePeriodChange(value as DashboardPeriod)}>
+          <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {DASHBOARD_PERIOD_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {isLoading ? (
         <TableSkeleton rows={8} cols={4} />
       ) : error || !data ? (
@@ -89,12 +112,12 @@ export default function ManagerDashboard() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <MetricCard label="Pending" value={data.total_pending} icon={Inbox} tone="slate" />
-            <MetricCard label="Unassigned" value={data.unassigned} icon={Inbox} tone={data.unassigned > 0 ? 'amber' : 'slate'} />
-            <MetricCard label="In Progress" value={data.in_progress} icon={UserCheck} tone="blue" />
+            <MetricCard label="Pending" value={data.total_pending} icon={Inbox} tone="slate" onClick={() => navigate("/portal/queue?status=pending")} />
+            <MetricCard label="Unassigned" value={data.unassigned} icon={Inbox} tone={data.unassigned > 0 ? 'amber' : 'slate'} onClick={() => navigate("/portal/queue?status=unassigned")} />
+            <MetricCard label="In Progress" value={data.in_progress} icon={UserCheck} tone="blue" onClick={() => navigate("/portal/queue?status=in_progress")} />
             <MetricCard label="Pending Requester" value={data.pending_requester} icon={Clock3} tone={data.pending_requester > 0 ? 'amber' : 'slate'} />
             <MetricCard label="Pending Owner Review" value={data.pending_owner_review} icon={Clock3} tone="violet" />
-            <MetricCard label="SLA breached" value={data.sla_breached} icon={AlertTriangle} tone={data.sla_breached > 0 ? 'red' : 'slate'} />
+            <MetricCard label="SLA breached" value={data.sla_breached} icon={AlertTriangle} tone={data.sla_breached > 0 ? 'red' : 'slate'} onClick={() => navigate("/portal/queue?status=sla_breached")} />
             <MetricCard label="At Risk" value={data.at_risk} icon={AlertTriangle} tone={data.at_risk > 0 ? 'amber' : 'slate'} />
             <MetricCard label="Completed" value={data.completed} icon={Archive} tone="emerald" />
             <MetricCard label="Reopened" value={data.reopened} icon={RotateCcw} tone={data.reopened > 0 ? 'amber' : 'slate'} />

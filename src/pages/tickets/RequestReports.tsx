@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, FileSpreadsheet, Printer, Search } from 'lucide-react';
+import { Download, Printer, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { DashboardPeriod } from '@/lib/dashboardFilters';
+import { DASHBOARD_PERIOD_OPTIONS, getDashboardPeriodRange, loadDashboardFilterState, saveDashboardFilterState } from '@/lib/dashboardFilters';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
@@ -65,30 +67,27 @@ function durationDays(start: string, end?: string | null) {
   return Math.max(0, Math.round((endMs - startMs) / (24 * 60 * 60 * 1000)));
 }
 
-function downloadExcel(filename: string, rows: string[][]) {
-  const html = `<table>${rows.map((row) => `<tr>${row.map((cell) => `<td>${String(cell ?? '').replace(/[<&>]/g, '')}</td>`).join('')}</tr>`).join('')}</table>`;
-  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 export default function RequestReports() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { categories } = useRequestCategories(user?.company_id, true);
   const [reportType, setReportType] = useState<ReportType>('sla');
   const [searchTerm, setSearchTerm] = useState('');
+  const [period, setPeriod] = useState<DashboardPeriod>(() => loadDashboardFilterState('request-reports').period);
+  const dateRange = getDashboardPeriodRange(period);
+
+  const handlePeriodChange = (newPeriod: DashboardPeriod) => {
+    setPeriod(newPeriod);
+    const current = loadDashboardFilterState('request-reports');
+    saveDashboardFilterState('request-reports', { ...current, period: newPeriod });
+  };
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['request-reports', user?.company_id, user?.id],
+    queryKey: ['request-reports', user?.company_id, user?.id, period, dateRange.from?.toISOString(), dateRange.to?.toISOString()],
     queryFn: async () => {
       const [ticketsResult, dashboardResult] = await Promise.all([
         listCompanyTickets(user!.company_id),
-        getRequestManagementDashboard(user!.company_id, user!.id),
+        getRequestManagementDashboard(user!.company_id, user!.id, dateRange.from, dateRange.to),
       ]);
       if (ticketsResult.error) throw ticketsResult.error;
       if (dashboardResult.error) throw dashboardResult.error;
@@ -99,7 +98,12 @@ export default function RequestReports() {
   });
 
   const rows = useMemo<ReportRow[]>(() => {
-    const tickets = data?.tickets ?? [];
+    const allTickets = data?.tickets ?? [];
+    const tickets = allTickets.filter((ticket) => {
+      if (!dateRange.from || !dateRange.to) return true;
+      const created = new Date(ticket.created_at);
+      return created >= dateRange.from && created <= dateRange.to;
+    });
     const dashboard = data?.dashboard;
     const base = (ticket: CompanyTicketRecord, metric: string, detail: string): ReportRow => ({
       id: ticket.id,
@@ -168,7 +172,7 @@ export default function RequestReports() {
       case 'unassigned':
         return tickets.filter((ticket) => !ticket.assigned_to && ticket.status !== 'closed').map((ticket) => base(ticket, 'Unassigned', ticket.next_action));
     }
-  }, [categories, data?.dashboard, data?.tickets, reportType]);
+  }, [categories, data?.dashboard, data?.tickets, reportType, dateRange.from, dateRange.to]);
 
   const filteredRows = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -208,10 +212,6 @@ export default function RequestReports() {
               <Download className="h-4 w-4" />
               CSV
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => downloadExcel(`${reportType}-request-report.xls`, exportRows)}>
-              <FileSpreadsheet className="h-4 w-4" />
-              Excel
-            </Button>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => window.print()}>
               <Printer className="h-4 w-4" />
               PDF / Print
@@ -226,6 +226,14 @@ export default function RequestReports() {
         </CardHeader>
         <CardContent className="space-y-3 p-3">
           <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <Select value={period} onValueChange={(value) => handlePeriodChange(value as DashboardPeriod)}>
+              <SelectTrigger className="h-9 md:w-[180px]"><SelectValue placeholder="Period" /></SelectTrigger>
+              <SelectContent>
+                {DASHBOARD_PERIOD_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={reportType} onValueChange={(value) => setReportType(value as ReportType)}>
               <SelectTrigger className="h-9 md:w-[260px]"><SelectValue /></SelectTrigger>
               <SelectContent>

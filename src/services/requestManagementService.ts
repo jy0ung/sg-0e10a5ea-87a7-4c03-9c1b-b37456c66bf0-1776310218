@@ -129,11 +129,19 @@ export function buildRequestOperationalIndicators(
 export async function getRequestManagementDashboard(
   companyId: string,
   userId: string,
+  dateFrom?: Date | null,
+  dateTo?: Date | null,
 ): Promise<{ data: RequestManagementDashboard | null; error: Error | null }> {
   try {
     const { data: tickets, error } = await listCompanyTickets(companyId);
     if (error) throw error;
-    const rows = tickets ?? [];
+    const rawRows = tickets ?? [];
+    const rows = rawRows.filter((ticket) => {
+      const created = new Date(ticket.created_at);
+      if (dateFrom && created < dateFrom) return false;
+      if (dateTo && created > dateTo) return false;
+      return true;
+    });
     const pending = rows.filter((ticket) => isOpenStatus(ticket.status));
     const indicatorTicketIds = pending.map((ticket) => ticket.id);
     const [{ data: activitiesByTicket }, { data: chatSummariesByTicket }] = await Promise.all([
