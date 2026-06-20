@@ -9,6 +9,7 @@ import {
   Clock3,
   Inbox,
   RotateCcw,
+  RefreshCcw,
   Star,
   UserCheck,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ import { STALE } from '@/lib/queryClient';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
+import { Button } from '@/components/ui/button';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RequestPriorityBadge, RequestStatusBadge } from '@/components/tickets/RequestBadge';
@@ -66,7 +68,7 @@ export default function ManagerDashboard() {
     saveDashboardFilterState('manager-dashboard', { ...current, period: newPeriod });
   };
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ['request-manager-dashboard', user?.company_id, user?.id, period, dateRange.from?.toISOString(), dateRange.to?.toISOString()],
     queryFn: async () => {
       const result = await getRequestManagementDashboard(user!.company_id, user!.id, dateRange.from, dateRange.to);
@@ -75,6 +77,7 @@ export default function ManagerDashboard() {
     },
     enabled: !!user?.company_id && !!user?.id,
     staleTime: STALE.transactional,
+    refetchInterval: 60_000,
   });
 
   const maxCategory = useMemo(
@@ -103,6 +106,20 @@ export default function ManagerDashboard() {
             ))}
           </SelectContent>
         </Select>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 gap-1.5"
+          onClick={() => refetch()}
+          disabled={isFetching}
+        >
+          <RefreshCcw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+        {isFetching && (
+          <span className="text-xs text-muted-foreground opacity-70">Updating…</span>
+        )}
       </div>
 
       {isLoading ? (

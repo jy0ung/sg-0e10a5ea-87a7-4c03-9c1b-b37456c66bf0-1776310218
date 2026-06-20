@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useBlocker } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
@@ -22,6 +22,7 @@ import {
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useAttachmentSettings } from '@/hooks/useAttachmentSettings';
+import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import {
   createTicket,
@@ -79,7 +80,6 @@ export default function NewTicket() {
 
   const roleContext = ROLE_CONTEXT[user?.role as AppRole] ?? DEFAULT_ROLE_CONTEXT;
   const canManageQueue = canManagePortalQueue(user);
-
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
     defaultValues: DEFAULT_FORM,
@@ -88,6 +88,12 @@ export default function NewTicket() {
 
   const userId = user?.id;
   const userCompanyId = user?.company_id;
+  const hasUnsavedChanges = form.formState.isDirty || draftSavedAt !== null;
+  useBeforeUnloadWarning(hasUnsavedChanges);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => (
+    hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
+  ));
+
   const draftKey = useMemo(
     () => userId && userCompanyId ? `flc.internal-request-draft:${userCompanyId}:${userId}` : null,
     [userCompanyId, userId],
@@ -746,6 +752,34 @@ export default function NewTicket() {
               }}
             >
               Continue without linking
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={blocker.state === 'blocked'}
+        onOpenChange={(open) => {
+          if (!open && blocker.state === 'blocked') blocker.reset();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to this request. If you leave now, your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => blocker.state === 'blocked' && blocker.reset()}>
+              Keep editing
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (blocker.state === 'blocked') blocker.proceed();
+              }}
+            >
+              Discard
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
