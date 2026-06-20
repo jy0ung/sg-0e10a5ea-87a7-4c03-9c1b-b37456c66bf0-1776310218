@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   Archive,
@@ -22,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RequestPriorityBadge, RequestStatusBadge } from '@/components/tickets/RequestBadge';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
+import { openTicketWorkspace } from '@/lib/ticketWorkspaceNavigation';
 import { getRequestManagementDashboard } from '@/services/requestManagementService';
 
 function formatDuration(ms: number | null) {
@@ -49,6 +51,7 @@ function BarRow({ label, value, max, tone = 'bg-primary' }: { label: string; val
 
 export default function ManagerDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { categories } = useRequestCategories(user?.company_id, true);
 
   const { data, isLoading, error } = useQuery({
@@ -112,7 +115,16 @@ export default function ManagerDashboard() {
                 ) : (
                   <div className="divide-y divide-border">
                     {data.oldest_pending.map((ticket) => (
-                      <div key={ticket.id} className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_160px_140px] md:items-center">
+                      <button
+                        key={ticket.id}
+                        type="button"
+                        className="grid w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus:outline-none focus:ring-2 focus:ring-primary/40 md:grid-cols-[minmax(0,1fr)_160px_140px] md:items-center"
+                        onClick={() => openTicketWorkspace(navigate, ticket.id, {
+                          source: 'dashboard',
+                          path: '/portal/dashboard',
+                          scrollTop: window.scrollY,
+                        })}
+                      >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-foreground">{ticket.subject}</p>
                           <p className="truncate text-xs text-muted-foreground">
@@ -126,7 +138,7 @@ export default function ManagerDashboard() {
                         <div className="text-xs text-muted-foreground md:text-right">
                           {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}

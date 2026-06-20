@@ -193,6 +193,71 @@ test('Pending and Completed pages keep Completed by Owner separate from Closed',
   await expect(page.getByText('Awaiting requester confirmation')).toHaveCount(0);
 });
 
+test('Ticket Workspace preserves chat draft across browser tab focus changes', async ({ page, context }) => {
+  await page.route(`${SUPABASE_URL}/rest/v1/tickets*`, (route) => {
+    const accept = route.request().headers()['accept'] ?? '';
+    const wantsSingle = accept.includes('pgrst.object');
+    const workspaceTicket = ticketRow({
+      id: 'ticket-focus',
+      subject: 'Focus stability request',
+      status: 'in_progress',
+      description: 'Check that tab focus changes do not reload the workspace.',
+      assigned_to: '00000000-0000-0000-0000-000000000001',
+      assigned_to_name: 'Test Admin',
+      responsible_queue: 'Owner',
+      current_responsible_party: 'Owner',
+      next_action: 'Owner to complete request',
+      first_response_due_at: '2026-06-20T17:00:00.000Z',
+      resolution_due_at: '2026-06-21T17:00:00.000Z',
+    });
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(wantsSingle ? workspaceTicket : [workspaceTicket]),
+    });
+  });
+  await page.route(`${SUPABASE_URL}/rest/v1/ticket_activities*`, (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 'activity-focus',
+          ticket_id: 'ticket-focus',
+          company_id: '00000000-0000-0000-0000-000000000099',
+          actor_id: '00000000-0000-0000-0000-000000000001',
+          actor_name: 'Test Admin',
+          event_type: 'comment_added',
+          message: 'Initial workspace message.',
+          metadata: {},
+          created_at: '2026-06-20T09:00:00.000Z',
+        },
+      ]),
+    });
+  });
+
+  const failures = collectRuntimeFailures(page);
+  await page.goto('/portal/tickets/ticket-focus?tab=chat', { waitUntil: 'domcontentloaded' });
+  await expectRouteStable(page, /focus stability request/i, failures);
+
+  const messageDraft = page.getByPlaceholder('Write a message');
+  await expect(messageDraft).toBeVisible();
+  await messageDraft.fill('Do not lose this draft');
+  const workspaceUrl = page.url();
+
+  const otherTab = await context.newPage();
+  await otherTab.goto('about:blank');
+  await otherTab.bringToFront();
+  await page.bringToFront();
+  await page.waitForTimeout(300);
+
+  await expect(page).toHaveURL(workspaceUrl);
+  await expect(messageDraft).toHaveValue('Do not lose this draft');
+  await expect(page.getByText(CRASH_TEXT)).toHaveCount(0);
+  await otherTab.close();
+  expect(failures).toEqual([]);
+});
+
 test('requester roles cannot access manager, queue, report, or setup routes', async ({ page }) => {
   const requesterProfile = {
     id: '00000000-0000-0000-0000-000000000001',

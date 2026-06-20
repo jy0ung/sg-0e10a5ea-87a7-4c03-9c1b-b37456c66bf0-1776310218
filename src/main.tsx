@@ -411,12 +411,10 @@ if (!shouldRedirectInviteToSignup()) {
 }
 
 // After a redeploy, hashed asset filenames change. Any tab that was open
-// before the deploy still holds the old index.html → when React tries to
-// lazy-load a route chunk it gets a 404 and throws:
-//   "Failed to fetch dynamically imported module: .../assets/xxx.js"
-// We catch that one specific error and do a single auto-reload so users
-// silently pick up the new build instead of seeing an error page. Uses
-// sessionStorage to prevent an infinite loop if the reload itself fails.
+// before the deploy still holds the old index.html and a lazy route chunk may
+// fail to load. Do not auto-reload here: active ticket workspaces can contain
+// drafts and workflow state. Report once so UI/runtime monitoring can surface a
+// manual refresh path without destroying in-progress work.
 function isChunkLoadError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? '');
   return (
@@ -425,17 +423,18 @@ function isChunkLoadError(err: unknown): boolean {
     || /ChunkLoadError/i.test(msg)
   );
 }
-function reloadOnce() {
-  const key = 'flc.chunk-reloaded';
+function reportChunkLoadError() {
+  const key = 'flc.chunk-load-error-reported';
   if (sessionStorage.getItem(key) === '1') return;
   sessionStorage.setItem(key, '1');
-  window.location.reload();
+  window.dispatchEvent(new CustomEvent('flc:chunk-load-error'));
+  console.warn('A lazy route chunk failed to load. Refresh manually when your current work is saved.');
 }
 window.addEventListener('error', (e) => {
-  if (isChunkLoadError(e.error ?? e.message)) reloadOnce();
+  if (isChunkLoadError(e.error ?? e.message)) reportChunkLoadError();
 });
 window.addEventListener('unhandledrejection', (e) => {
-  if (isChunkLoadError(e.reason)) reloadOnce();
+  if (isChunkLoadError(e.reason)) reportChunkLoadError();
 });
 
 export default App;

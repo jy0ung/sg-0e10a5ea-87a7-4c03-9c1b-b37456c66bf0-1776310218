@@ -13,19 +13,20 @@ function isChunkLoadError(err: unknown): boolean {
   );
 }
 
-function reloadOnce() {
-  const key = 'flc.hrms.chunk-reloaded';
+function reportChunkLoadError() {
+  const key = 'flc.hrms.chunk-load-error-reported';
   if (sessionStorage.getItem(key) === '1') return;
   sessionStorage.setItem(key, '1');
-  window.location.reload();
+  window.dispatchEvent(new CustomEvent('flc:chunk-load-error'));
+  console.warn('A lazy route chunk failed to load. Refresh manually when your current work is saved.');
 }
 
 window.addEventListener('error', (event) => {
-  if (isChunkLoadError(event.error ?? event.message)) reloadOnce();
+  if (isChunkLoadError(event.error ?? event.message)) reportChunkLoadError();
 });
 
 window.addEventListener('unhandledrejection', (event) => {
-  if (isChunkLoadError(event.reason)) reloadOnce();
+  if (isChunkLoadError(event.reason)) reportChunkLoadError();
 });
 
 createRoot(document.getElementById('root')!).render(

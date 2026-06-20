@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
@@ -13,7 +13,7 @@ import {
   ShieldAlert,
   UserRound,
 } from 'lucide-react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { listProfiles } from '@flc/auth';
 import { listAttachmentsForTickets, uploadTicketAttachment, type TicketAttachmentRecord } from '@flc/platform-services';
@@ -45,6 +45,8 @@ import { TicketSlaSummary } from '@/components/tickets/TicketSlaSummary';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestFormFields } from '@/hooks/useRequestFormFields';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
+import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning';
+import { usePersistedDraftMap } from '@/hooks/usePersistedDraftMap';
 import { STALE } from '@/lib/queryClient';
 import { canManagePortalQueue } from '@/lib/portalAccess';
 import { getRequestAssignees } from '@/lib/requestAssignees';
@@ -115,17 +117,17 @@ function formatDateTime(value: string | null | undefined) {
 
 function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-md border border-border bg-background px-3 py-2">
-      <p className="text-xs font-medium uppercase text-muted-foreground">{label}</p>
-      <div className="mt-1 break-words text-sm font-medium text-foreground">{value}</div>
+    <div className="min-w-0 rounded-md bg-muted/30 px-3 py-2 ring-1 ring-border/60">
+      <p className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
+      <div className="mt-1 break-words text-sm font-medium leading-5 text-foreground">{value}</div>
     </div>
   );
 }
 
 function Section({ title, icon: Icon, children }: { title: string; icon?: ElementType; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
+    <section className="rounded-lg bg-card p-4 shadow-sm ring-1 ring-border/70">
+      <div className="mb-3 flex items-center gap-2 border-b border-border/70 pb-2.5">
         {Icon && <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />}
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
       </div>
@@ -157,6 +159,66 @@ function primaryActionLabel(ticket: CompanyTicketRecord, permissions: TicketWork
   return null;
 }
 
+const workflowSteps: Array<{ status: TicketStatus; label: string }> = [
+  { status: 'open', label: 'Open' },
+  { status: 'in_progress', label: 'In Progress' },
+  { status: 'pending_requester', label: 'Pending Requester' },
+  { status: 'pending_owner_review', label: 'Owner Review' },
+  { status: 'completed_by_owner', label: 'Completed by Owner' },
+  { status: 'closed', label: 'Closed' },
+];
+
+function WorkflowStrip({ status }: { status: TicketStatus }) {
+  const activeIndex = workflowSteps.findIndex((step) => step.status === status);
+  const terminal = status === 'cancelled' || status === 'reopened';
+  return (
+    <div className="overflow-x-auto rounded-md bg-muted/30 px-3 py-2 ring-1 ring-border/60">
+      <div className="flex min-w-max items-center gap-2">
+        {workflowSteps.map((step, index) => {
+          const active = step.status === status;
+          const complete = !terminal && activeIndex >= 0 && index < activeIndex;
+          return (
+            <div key={step.status} className="flex items-center gap-2">
+              <span
+                className={[
+                  'flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-semibold',
+                  active ? 'bg-primary text-primary-foreground' : complete ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-background text-muted-foreground ring-1 ring-border',
+                ].join(' ')}
+              >
+                {index + 1}
+              </span>
+              <span className={active ? 'text-xs font-semibold text-foreground' : 'text-xs text-muted-foreground'}>{step.label}</span>
+              {index < workflowSteps.length - 1 && <span className="h-px w-6 bg-border" aria-hidden />}
+            </div>
+          );
+        })}
+        {terminal && <Badge variant="outline" className="ml-2 capitalize">{formatTicketLabel(status)}</Badge>}
+      </div>
+    </div>
+  );
+}
+
+function useTicketDraftField(
+  scope: string,
+  ticketId: string,
+  companyId: string | null | undefined,
+  userId: string | null | undefined,
+  fallback = '',
+) {
+  const [drafts, setDrafts, clearDraft] = usePersistedDraftMap(scope, companyId, userId);
+  const hasDraft = Boolean(ticketId) && Object.prototype.hasOwnProperty.call(drafts, ticketId);
+  const value = hasDraft ? drafts[ticketId] : fallback;
+  const setValue = useCallback((nextValue: string) => {
+    if (!ticketId) return;
+    setDrafts((current) => ({ ...current, [ticketId]: nextValue }));
+  }, [setDrafts, ticketId]);
+  const clearValue = useCallback(() => {
+    if (!ticketId) return;
+    clearDraft(ticketId);
+  }, [clearDraft, ticketId]);
+  return { value, setValue, clearValue, hasDraft };
+}
+
 export default function TicketWorkspace() {
   const { ticketId = '' } = useParams();
   const navigate = useNavigate();
@@ -166,8 +228,6 @@ export default function TicketWorkspace() {
   const canManageQueue = canManagePortalQueue(user);
 
   const [saving, setSaving] = useState(false);
-  const [commentDraft, setCommentDraft] = useState('');
-  const [internalNoteDraft, setInternalNoteDraft] = useState('');
   const [infoDialogOpen, setInfoDialogOpen] = useState(false);
   const [requesterUpdateOpen, setRequesterUpdateOpen] = useState(false);
   const [completionOpen, setCompletionOpen] = useState(false);
@@ -177,20 +237,13 @@ export default function TicketWorkspace() {
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [reviewDecision, setReviewDecision] = useState<'approved' | 'rejected' | null>(null);
-  const [workflowMessage, setWorkflowMessage] = useState('');
-  const [resolutionSummary, setResolutionSummary] = useState('');
   const [completionCategory, setCompletionCategory] = useState<TicketCompletionCategory>('resolved');
   const [completionChecklistConfirmed, setCompletionChecklistConfirmed] = useState(false);
-  const [completionBreachReason, setCompletionBreachReason] = useState('');
   const [closeConfirmed, setCloseConfirmed] = useState(false);
   const [satisfactionRating, setSatisfactionRating] = useState('5');
-  const [closureFeedback, setClosureFeedback] = useState('');
-  const [reopenReason, setReopenReason] = useState('');
   const [selectedAssignee, setSelectedAssignee] = useState('unassigned');
   const [selectedPriority, setSelectedPriority] = useState<TicketPriority>('medium');
   const [overrideStatus, setOverrideStatus] = useState<TicketStatus>('in_progress');
-  const [overrideReason, setOverrideReason] = useState('');
-  const [reviewNote, setReviewNote] = useState('');
 
   const activeTabParam = searchParams.get('tab') as TicketWorkspaceTab | null;
   const visibleTabs = useMemo(
@@ -247,6 +300,27 @@ export default function TicketWorkspace() {
   const ticket = data?.ticket ?? null;
   const sla = ticket ? getTicketSlaSummary(ticket) : null;
   const needsBreachReason = sla?.overall === 'breached' && !ticket?.sla_breach_reason;
+  const chatDraft = useTicketDraftField('workspace:chat', ticketId, user?.company_id, user?.id);
+  const internalNote = useTicketDraftField('workspace:internal-note', ticketId, user?.company_id, user?.id);
+  const workflowMessage = useTicketDraftField('workspace:workflow-message', ticketId, user?.company_id, user?.id);
+  const resolutionDraft = useTicketDraftField('workspace:resolution', ticketId, user?.company_id, user?.id, ticket?.resolution_note ?? '');
+  const breachReason = useTicketDraftField('workspace:breach-reason', ticketId, user?.company_id, user?.id, ticket?.sla_breach_reason ?? '');
+  const closureFeedback = useTicketDraftField('workspace:closure-feedback', ticketId, user?.company_id, user?.id);
+  const reopenReason = useTicketDraftField('workspace:reopen-reason', ticketId, user?.company_id, user?.id);
+  const overrideReason = useTicketDraftField('workspace:override-reason', ticketId, user?.company_id, user?.id);
+  const reviewNote = useTicketDraftField('workspace:review-note', ticketId, user?.company_id, user?.id);
+  const resolutionSummary = resolutionDraft.value;
+  const completionBreachReason = breachReason.value;
+  const resolutionDirty = Boolean(
+    ticket
+    && resolutionDraft.hasDraft
+    && resolutionSummary.trim() !== (ticket.resolution_note ?? '').trim(),
+  );
+  const breachReasonDirty = Boolean(
+    ticket
+    && breachReason.hasDraft
+    && completionBreachReason.trim() !== (ticket.sla_breach_reason ?? '').trim(),
+  );
   const customFieldLabelMap = useMemo(
     () => Object.fromEntries(formFields.map((field) => [`${field.category_key}:${field.key}`, field.label])),
     [formFields],
@@ -257,30 +331,22 @@ export default function TicketWorkspace() {
 
   useEffect(() => {
     if (!ticket) return;
-    setResolutionSummary(ticket.resolution_note ?? '');
-    setCompletionBreachReason(ticket.sla_breach_reason ?? '');
-    setSelectedAssignee(ticket.assigned_to ?? 'unassigned');
-    setSelectedPriority(ticket.priority);
-    setOverrideStatus(ticket.status === 'closed' ? 'in_progress' : ticket.status);
-  }, [ticket]);
-
-  useEffect(() => {
-    if (!user || !ticket || !data?.permissions.canManageWorkflow || ticket.status !== 'open') return;
-    void updateTicket(ticket.id, { mark_opened: true }, { userId: user.id, companyId: user.company_id })
-      .then((result) => {
-        if (result.data) void queryClient.invalidateQueries({ queryKey: workspaceQueryKey });
-      });
-  }, [data?.permissions.canManageWorkflow, queryClient, ticket, user, workspaceQueryKey]);
+    if (!assignOpen) setSelectedAssignee(ticket.assigned_to ?? 'unassigned');
+    if (!priorityOpen) setSelectedPriority(ticket.priority);
+    if (!overrideOpen) setOverrideStatus(ticket.status === 'closed' ? 'in_progress' : ticket.status);
+  }, [assignOpen, overrideOpen, priorityOpen, ticket]);
 
   useEffect(() => {
     if (!user || !ticket || activeTab !== 'chat') return;
-    void markTicketChatRead(ticket.id, { userId: user.id, companyId: user.company_id })
-      .then(() => void queryClient.invalidateQueries({ queryKey: workspaceQueryKey }));
-  }, [activeTab, queryClient, ticket, user, workspaceQueryKey]);
+    void markTicketChatRead(ticket.id, { userId: user.id, companyId: user.company_id });
+  }, [activeTab, ticket, user]);
 
-  const refreshWorkspace = () => queryClient.invalidateQueries({ queryKey: workspaceQueryKey });
+  const refreshWorkspace = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: workspaceQueryKey }),
+    [queryClient, workspaceQueryKey],
+  );
 
-  const runWorkflow = async (operation: () => Promise<{ error: Error | string | null }>, successMessage: string) => {
+  const runWorkflow = useCallback(async (operation: () => Promise<{ error: Error | string | null }>, successMessage: string) => {
     setSaving(true);
     const result = await operation();
     setSaving(false);
@@ -291,7 +357,7 @@ export default function TicketWorkspace() {
     toast.success(successMessage);
     await refreshWorkspace();
     return true;
-  };
+  }, [refreshWorkspace]);
 
   const handleBack = () => {
     if (!ticket) {
@@ -340,15 +406,16 @@ export default function TicketWorkspace() {
     }
   };
 
-  const handleAddComment = async () => {
-    if (!ticket || !user || !commentDraft.trim()) return;
-    const message = commentDraft.trim();
+  const handleAddComment = useCallback(async () => {
+    const message = chatDraft.value.trim();
+    if (!ticket || !user || !message) return true;
     const ok = await runWorkflow(
       () => addTicketComment(ticket.id, { message }, { userId: user.id, companyId: user.company_id }),
       'Message sent',
     );
-    if (ok) setCommentDraft('');
-  };
+    if (ok) chatDraft.clearValue();
+    return ok;
+  }, [chatDraft, runWorkflow, ticket, user]);
 
   const handleChatFilesSelected = async (files: File[]) => {
     if (!ticket || !user || files.length === 0) return;
@@ -368,14 +435,125 @@ export default function TicketWorkspace() {
     await refreshWorkspace();
   };
 
-  const handleAddInternalNote = async () => {
-    if (!ticket || !user || !internalNoteDraft.trim()) return;
-    const note = internalNoteDraft.trim();
+  const handleAddInternalNote = useCallback(async () => {
+    const note = internalNote.value.trim();
+    if (!ticket || !user || !note) return true;
     const ok = await runWorkflow(
       () => addTicketInternalNote(ticket.id, { note }, { userId: user.id, companyId: user.company_id }),
       'Internal note added',
     );
-    if (ok) setInternalNoteDraft('');
+    if (ok) internalNote.clearValue();
+    return ok;
+  }, [internalNote, runWorkflow, ticket, user]);
+
+  const hasUnsavedChanges = Boolean(
+    chatDraft.value.trim()
+    || internalNote.value.trim()
+    || workflowMessage.value.trim()
+    || closureFeedback.value.trim()
+    || reopenReason.value.trim()
+    || overrideReason.value.trim()
+    || reviewNote.value.trim()
+    || resolutionDirty
+    || breachReasonDirty
+    || (closeOpen && closeConfirmed)
+    || (ticket && assignOpen && selectedAssignee !== (ticket.assigned_to ?? 'unassigned'))
+    || (ticket && priorityOpen && selectedPriority !== ticket.priority)
+    || (ticket && overrideOpen && overrideStatus !== (ticket.status === 'closed' ? 'in_progress' : ticket.status))
+  );
+
+  useBeforeUnloadWarning(hasUnsavedChanges);
+
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => (
+    hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
+  ));
+
+  const discardWorkspaceChanges = useCallback(() => {
+    chatDraft.clearValue();
+    internalNote.clearValue();
+    workflowMessage.clearValue();
+    resolutionDraft.clearValue();
+    breachReason.clearValue();
+    closureFeedback.clearValue();
+    reopenReason.clearValue();
+    overrideReason.clearValue();
+    reviewNote.clearValue();
+    setCompletionChecklistConfirmed(false);
+    setCloseConfirmed(false);
+    if (ticket) {
+      setSelectedAssignee(ticket.assigned_to ?? 'unassigned');
+      setSelectedPriority(ticket.priority);
+      setOverrideStatus(ticket.status === 'closed' ? 'in_progress' : ticket.status);
+    }
+  }, [breachReason, chatDraft, closureFeedback, internalNote, overrideReason, reopenReason, resolutionDraft, reviewNote, ticket, workflowMessage]);
+
+  const saveWorkspaceChanges = useCallback(async () => {
+    if (!ticket || !user) {
+      toast.error('Unable to save changes without an active request session.');
+      return false;
+    }
+
+    let ok = true;
+    if (chatDraft.value.trim()) ok = (await handleAddComment()) && ok;
+    if (internalNote.value.trim()) ok = (await handleAddInternalNote()) && ok;
+
+    if (resolutionDirty || breachReasonDirty) {
+      const result = await runWorkflow(
+        () => updateTicket(
+          ticket.id,
+          {
+            ...(resolutionDirty ? { resolution_note: resolutionSummary } : {}),
+            ...(breachReasonDirty ? { sla_breach_reason: completionBreachReason } : {}),
+          },
+          { userId: user.id, companyId: user.company_id },
+        ),
+        'Workspace fields saved',
+      );
+      if (result) {
+        resolutionDraft.clearValue();
+        breachReason.clearValue();
+      }
+      ok = result && ok;
+    }
+
+    if (ok && (
+      workflowMessage.value.trim()
+      || closureFeedback.value.trim()
+      || reopenReason.value.trim()
+      || overrideReason.value.trim()
+      || reviewNote.value.trim()
+    )) {
+      toast.info('Workflow dialog text is saved as a local draft until you submit that action.');
+    }
+
+    return ok;
+  }, [
+    breachReason,
+    breachReasonDirty,
+    chatDraft.value,
+    closureFeedback.value,
+    completionBreachReason,
+    handleAddComment,
+    handleAddInternalNote,
+    internalNote.value,
+    overrideReason.value,
+    reopenReason.value,
+    resolutionDirty,
+    resolutionDraft,
+    resolutionSummary,
+    reviewNote.value,
+    runWorkflow,
+    ticket,
+    user,
+    workflowMessage.value,
+  ]);
+
+  const requestRefreshWorkspace = () => {
+    if (hasUnsavedChanges) {
+      toast.info('Save or discard workspace changes before refreshing.');
+      return;
+    }
+    void refreshWorkspace();
   };
 
   if (isLoading) {
@@ -448,7 +626,7 @@ export default function TicketWorkspace() {
                     </>
                   )}
                   {data.permissions.canViewAuditTrail && <DropdownMenuItem onClick={() => setTab('audit-trail')}>View audit trail</DropdownMenuItem>}
-                  <DropdownMenuItem onClick={() => void refreshWorkspace()}>Refresh workspace</DropdownMenuItem>
+                  <DropdownMenuItem onClick={requestRefreshWorkspace}>Refresh workspace</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -466,36 +644,39 @@ export default function TicketWorkspace() {
         )}
 
         <div className="sticky top-[96px] z-10 rounded-lg border border-border bg-background/95 p-3 shadow-sm backdrop-blur">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="grid gap-2 text-sm md:grid-cols-3 lg:flex lg:flex-wrap">
-              <InfoRow label="Responsible party" value={ticket.current_responsible_party} />
-              <InfoRow label="Next action" value={ticket.next_action} />
-              <InfoRow label="SLA status" value={sla ? formatTicketLabel(sla.overall) : 'Not configured'} />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {data.permissions.canReviewApproval && (
-                <>
-                  <Button type="button" variant="outline" className="gap-1.5" onClick={() => setReviewDecision('approved')} disabled={saving}>
-                    <CheckCircle2 className="h-4 w-4" />
-                    Approve
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="grid gap-2 text-sm md:grid-cols-3 lg:flex lg:flex-wrap">
+                <InfoRow label="Responsible party" value={ticket.current_responsible_party} />
+                <InfoRow label="Next action" value={ticket.next_action} />
+                <InfoRow label="SLA status" value={sla ? formatTicketLabel(sla.overall) : 'Not configured'} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {data.permissions.canReviewApproval && (
+                  <>
+                    <Button type="button" variant="outline" className="gap-1.5" onClick={() => setReviewDecision('approved')} disabled={saving}>
+                      <CheckCircle2 className="h-4 w-4" />
+                      Approve
+                    </Button>
+                    <Button type="button" variant="outline" className="gap-1.5 border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800" onClick={() => setReviewDecision('rejected')} disabled={saving}>
+                      Reject
+                    </Button>
+                  </>
+                )}
+                {data.permissions.canManageWorkflow && (
+                  <Button type="button" variant="outline" onClick={() => setInfoDialogOpen(true)} disabled={saving || ticket.status === 'closed' || ticket.status === 'cancelled'}>
+                    Request More Info
                   </Button>
-                  <Button type="button" variant="outline" className="gap-1.5 border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800" onClick={() => setReviewDecision('rejected')} disabled={saving}>
-                    Reject
+                )}
+                {primaryLabel && (
+                  <Button type="button" onClick={() => void handlePrimaryAction()} disabled={saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {primaryLabel}
                   </Button>
-                </>
-              )}
-              {data.permissions.canManageWorkflow && (
-                <Button type="button" variant="outline" onClick={() => setInfoDialogOpen(true)} disabled={saving || ticket.status === 'closed' || ticket.status === 'cancelled'}>
-                  Request More Info
-                </Button>
-              )}
-              {primaryLabel && (
-                <Button type="button" onClick={() => void handlePrimaryAction()} disabled={saving}>
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {primaryLabel}
-                </Button>
-              )}
+                )}
+              </div>
             </div>
+            <WorkflowStrip status={ticket.status} />
           </div>
         </div>
 
@@ -578,9 +759,9 @@ export default function TicketWorkspace() {
                 <TicketChatPanel
                   activities={data.activities}
                   currentUserId={user?.id}
-                  draft={commentDraft}
+                  draft={chatDraft.value}
                   saving={saving}
-                  onDraftChange={setCommentDraft}
+                  onDraftChange={chatDraft.setValue}
                   onSend={() => void handleAddComment()}
                   onAttachFiles={(files) => void handleChatFilesSelected(files)}
                 />
@@ -612,9 +793,9 @@ export default function TicketWorkspace() {
                 <TabsContent value="internal-notes">
                   <TicketInternalNotesPanel
                     notes={data.internalNotes}
-                    draft={internalNoteDraft}
+                    draft={internalNote.value}
                     saving={saving}
-                    onDraftChange={setInternalNoteDraft}
+                    onDraftChange={internalNote.setValue}
                     onSend={() => void handleAddInternalNote()}
                   />
                 </TabsContent>
@@ -639,6 +820,10 @@ export default function TicketWorkspace() {
               <div className="space-y-2">
                 <InfoRow label="Requester" value={ticket.submitted_by_name ?? ticket.submitted_by_email ?? 'Unknown'} />
                 <InfoRow label="Owner / PIC" value={ticket.assigned_to_name ?? ticket.responsible_queue} />
+                <InfoRow label="Category" value={getRequestCategoryLabel(ticket.category, categories)} />
+                <InfoRow label="Subcategory" value={ticket.subcategory ? getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories) : 'Not selected'} />
+                <InfoRow label="Priority" value={formatTicketLabel(ticket.priority)} />
+                <InfoRow label="Next action" value={ticket.next_action} />
                 <InfoRow label="Backup owner" value={ticket.backup_owner_name ?? 'Not assigned'} />
                 <InfoRow label="Escalation owner" value={ticket.escalation_owner_name ?? 'Not assigned'} />
                 <InfoRow label="Last action by" value={ticket.last_action_by_name ?? 'System'} />
@@ -648,6 +833,8 @@ export default function TicketWorkspace() {
             <TicketOperationalIndicatorGrid indicator={data.operationalIndicator} />
             <Section title="Accountability">
               <div className="space-y-2">
+                <InfoRow label="First response due" value={formatDateTime(ticket.first_response_due_at)} />
+                <InfoRow label="Resolution due" value={formatDateTime(ticket.resolution_due_at)} />
                 <InfoRow label="Time in current status" value={formatDistanceToNow(new Date(ticket.status_changed_at), { addSuffix: false })} />
                 <InfoRow label="Request age" value={formatDistanceToNow(new Date(ticket.created_at), { addSuffix: false })} />
                 <InfoRow label="Chat messages" value={String(data.chatSummary.message_count)} />
@@ -662,18 +849,18 @@ export default function TicketWorkspace() {
         open={infoDialogOpen}
         title="Request more information"
         description="This moves the request to Pending Requester and records the message in chat."
-        value={workflowMessage}
-        onValueChange={setWorkflowMessage}
+        value={workflowMessage.value}
+        onValueChange={workflowMessage.setValue}
         saving={saving}
-        onOpenChange={(open) => { setInfoDialogOpen(open); if (!open) setWorkflowMessage(''); }}
+        onOpenChange={setInfoDialogOpen}
         onSubmit={async () => {
-          if (!user || !workflowMessage.trim()) return;
+          if (!user || !workflowMessage.value.trim()) return;
           const ok = await runWorkflow(
-            () => requestTicketMoreInformation(ticket.id, { message: workflowMessage.trim() }, { userId: user.id, companyId: user.company_id }),
+            () => requestTicketMoreInformation(ticket.id, { message: workflowMessage.value.trim() }, { userId: user.id, companyId: user.company_id }),
             'Information requested',
           );
           if (ok) {
-            setWorkflowMessage('');
+            workflowMessage.clearValue();
             setInfoDialogOpen(false);
           }
         }}
@@ -683,18 +870,18 @@ export default function TicketWorkspace() {
         open={requesterUpdateOpen}
         title="Submit update"
         description="This moves the request to Pending Owner Review."
-        value={workflowMessage}
-        onValueChange={setWorkflowMessage}
+        value={workflowMessage.value}
+        onValueChange={workflowMessage.setValue}
         saving={saving}
-        onOpenChange={(open) => { setRequesterUpdateOpen(open); if (!open) setWorkflowMessage(''); }}
+        onOpenChange={setRequesterUpdateOpen}
         onSubmit={async () => {
-          if (!user || !workflowMessage.trim()) return;
+          if (!user || !workflowMessage.value.trim()) return;
           const ok = await runWorkflow(
-            () => submitRequesterTicketUpdate(ticket.id, { message: workflowMessage.trim() }, { userId: user.id, companyId: user.company_id }),
+            () => submitRequesterTicketUpdate(ticket.id, { message: workflowMessage.value.trim() }, { userId: user.id, companyId: user.company_id }),
             'Update submitted',
           );
           if (ok) {
-            setWorkflowMessage('');
+            workflowMessage.clearValue();
             setRequesterUpdateOpen(false);
           }
         }}
@@ -709,7 +896,7 @@ export default function TicketWorkspace() {
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="resolution-summary">Resolution summary</Label>
-              <Textarea id="resolution-summary" value={resolutionSummary} onChange={(event) => setResolutionSummary(event.target.value)} rows={4} />
+              <Textarea id="resolution-summary" value={resolutionSummary} onChange={(event) => resolutionDraft.setValue(event.target.value)} rows={4} />
             </div>
             <div className="space-y-1.5">
               <Label>Completion category</Label>
@@ -727,7 +914,7 @@ export default function TicketWorkspace() {
             {needsBreachReason && (
               <div className="space-y-1.5">
                 <Label htmlFor="breach-reason">Breach reason</Label>
-                <Textarea id="breach-reason" value={completionBreachReason} onChange={(event) => setCompletionBreachReason(event.target.value)} rows={3} />
+                <Textarea id="breach-reason" value={completionBreachReason} onChange={(event) => breachReason.setValue(event.target.value)} rows={3} />
               </div>
             )}
             <label htmlFor="completion-checklist" className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
@@ -755,7 +942,11 @@ export default function TicketWorkspace() {
                   ),
                   'Request marked completed',
                 );
-                if (ok) setCompletionOpen(false);
+                if (ok) {
+                  resolutionDraft.clearValue();
+                  breachReason.clearValue();
+                  setCompletionOpen(false);
+                }
               }}
             >
               Mark completed
@@ -784,7 +975,7 @@ export default function TicketWorkspace() {
                 </SelectContent>
               </Select>
             </div>
-            <Textarea value={closureFeedback} onChange={(event) => setClosureFeedback(event.target.value)} rows={3} placeholder="Optional feedback" />
+            <Textarea value={closureFeedback.value} onChange={(event) => closureFeedback.setValue(event.target.value)} rows={3} placeholder="Optional feedback" />
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setCloseOpen(false)}>Cancel</Button>
@@ -796,12 +987,15 @@ export default function TicketWorkspace() {
                 const ok = await runWorkflow(
                   () => closeTicketByRequester(
                     ticket.id,
-                    { confirmedResolved: closeConfirmed, satisfactionRating: Number(satisfactionRating), feedbackComment: closureFeedback },
+                    { confirmedResolved: closeConfirmed, satisfactionRating: Number(satisfactionRating), feedbackComment: closureFeedback.value },
                     { userId: user.id, companyId: user.company_id },
                   ),
                   'Request closed',
                 );
-                if (ok) setCloseOpen(false);
+                if (ok) {
+                  closureFeedback.clearValue();
+                  setCloseOpen(false);
+                }
               }}
             >
               Close request
@@ -814,18 +1008,18 @@ export default function TicketWorkspace() {
         open={reopenOpen}
         title="Reopen request"
         description="Provide the reason so the owner understands what needs attention."
-        value={reopenReason}
-        onValueChange={setReopenReason}
+        value={reopenReason.value}
+        onValueChange={reopenReason.setValue}
         saving={saving}
-        onOpenChange={(open) => { setReopenOpen(open); if (!open) setReopenReason(''); }}
+        onOpenChange={setReopenOpen}
         onSubmit={async () => {
-          if (!user || !reopenReason.trim()) return;
+          if (!user || !reopenReason.value.trim()) return;
           const ok = await runWorkflow(
-            () => reopenTicketByRequester(ticket.id, { reason: reopenReason }, { userId: user.id, companyId: user.company_id }),
+            () => reopenTicketByRequester(ticket.id, { reason: reopenReason.value }, { userId: user.id, companyId: user.company_id }),
             'Request reopened',
           );
           if (ok) {
-            setReopenReason('');
+            reopenReason.clearValue();
             setReopenOpen(false);
           }
         }}
@@ -898,7 +1092,7 @@ export default function TicketWorkspace() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={overrideOpen} onOpenChange={(open) => { setOverrideOpen(open); if (!open) setOverrideReason(''); }}>
+      <Dialog open={overrideOpen} onOpenChange={setOverrideOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Admin override status</DialogTitle>
@@ -911,21 +1105,21 @@ export default function TicketWorkspace() {
                 {statusOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Textarea value={overrideReason} onChange={(event) => setOverrideReason(event.target.value)} rows={3} placeholder="Required reason" />
+            <Textarea value={overrideReason.value} onChange={(event) => overrideReason.setValue(event.target.value)} rows={3} placeholder="Required reason" />
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setOverrideOpen(false)}>Cancel</Button>
             <Button
               type="button"
-              disabled={saving || !overrideReason.trim()}
+              disabled={saving || !overrideReason.value.trim()}
               onClick={async () => {
                 if (!user) return;
                 const ok = await runWorkflow(
-                  () => updateTicket(ticket.id, { status: overrideStatus, admin_override_reason: overrideReason }, { userId: user.id, companyId: user.company_id }),
+                  () => updateTicket(ticket.id, { status: overrideStatus, admin_override_reason: overrideReason.value }, { userId: user.id, companyId: user.company_id }),
                   'Status overridden',
                 );
                 if (ok) {
-                  setOverrideReason('');
+                  overrideReason.clearValue();
                   setOverrideOpen(false);
                 }
               }}
@@ -936,13 +1130,13 @@ export default function TicketWorkspace() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={reviewDecision !== null} onOpenChange={(open) => { if (!open) { setReviewDecision(null); setReviewNote(''); } }}>
+      <Dialog open={reviewDecision !== null} onOpenChange={(open) => { if (!open) setReviewDecision(null); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>{reviewDecision === 'approved' ? 'Approve request' : 'Reject request'}</DialogTitle>
             <DialogDescription>{reviewDecision === 'approved' ? 'Record approval for the current step.' : 'Rejecting approval may stop the request workflow.'}</DialogDescription>
           </DialogHeader>
-          <Textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} rows={3} placeholder="Optional note" />
+          <Textarea value={reviewNote.value} onChange={(event) => reviewNote.setValue(event.target.value)} rows={3} placeholder="Optional note" />
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setReviewDecision(null)}>Cancel</Button>
             <Button
@@ -952,18 +1146,60 @@ export default function TicketWorkspace() {
                 if (!user || !reviewDecision) return;
                 const decision = reviewDecision;
                 const ok = await runWorkflow(
-                  () => reviewInternalRequestApproval(ticket.id, decision, reviewNote, { userId: user.id, companyId: user.company_id })
+                  () => reviewInternalRequestApproval(ticket.id, decision, reviewNote.value, { userId: user.id, companyId: user.company_id })
                     .then((result) => ({ error: result.error ? new Error(result.error) : null })),
                   decision === 'approved' ? 'Approval recorded' : 'Rejection recorded',
                 );
                 if (ok) {
                   setReviewDecision(null);
-                  setReviewNote('');
+                  reviewNote.clearValue();
                 }
               }}
             >
               {reviewDecision === 'approved' ? 'Approve' : 'Reject'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={blocker.state === 'blocked'} onOpenChange={(open) => { if (!open && blocker.state === 'blocked') blocker.reset(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Unsaved workspace changes</DialogTitle>
+            <DialogDescription>
+              Save fields that can be persisted now, discard local drafts, or keep editing this request.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            Workflow action text is kept as a local draft until you submit that action.
+          </div>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button type="button" variant="ghost" onClick={() => blocker.state === 'blocked' && blocker.reset()}>
+              Continue editing
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  discardWorkspaceChanges();
+                  if (blocker.state === 'blocked') blocker.proceed();
+                }}
+              >
+                Discard
+              </Button>
+              <Button
+                type="button"
+                disabled={saving}
+                onClick={async () => {
+                  const ok = await saveWorkspaceChanges();
+                  if (ok && blocker.state === 'blocked') blocker.proceed();
+                }}
+              >
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

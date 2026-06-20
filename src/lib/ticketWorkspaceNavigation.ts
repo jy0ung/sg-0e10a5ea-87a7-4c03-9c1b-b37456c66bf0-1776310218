@@ -11,7 +11,7 @@ export type TicketWorkspaceTab =
   | 'audit-trail';
 
 export interface TicketWorkspaceReturnState {
-  source: 'pending' | 'completed' | 'queue' | 'history';
+  source: 'pending' | 'completed' | 'queue' | 'history' | 'dashboard' | 'reports';
   path: string;
   scrollTop?: number;
   filters?: Record<string, unknown>;

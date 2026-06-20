@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, FileSpreadsheet, Printer, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { STALE } from '@/lib/queryClient';
@@ -16,6 +17,7 @@ import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { downloadCsv, formatTicketLabel } from '@/lib/requestFormatters';
 import { formatSlaState, getTicketSlaSummary } from '@/lib/ticketSla';
+import { openTicketWorkspace } from '@/lib/ticketWorkspaceNavigation';
 import { getRequestManagementDashboard } from '@/services/requestManagementService';
 import { listCompanyTickets, type CompanyTicketRecord } from '@/services/ticketService';
 
@@ -46,6 +48,7 @@ const REPORTS: Array<{ value: ReportType; label: string }> = [
 
 interface ReportRow {
   id: string;
+  ticketId?: string;
   request: string;
   category: string;
   owner: string;
@@ -75,6 +78,7 @@ function downloadExcel(filename: string, rows: string[][]) {
 
 export default function RequestReports() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { categories } = useRequestCategories(user?.company_id, true);
   const [reportType, setReportType] = useState<ReportType>('sla');
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,6 +103,7 @@ export default function RequestReports() {
     const dashboard = data?.dashboard;
     const base = (ticket: CompanyTicketRecord, metric: string, detail: string): ReportRow => ({
       id: ticket.id,
+      ticketId: ticket.id,
       request: ticket.subject,
       category: getRequestCategoryLabel(ticket.category, categories),
       owner: ticket.assigned_to_name ?? ticket.responsible_queue,
@@ -170,6 +175,7 @@ export default function RequestReports() {
     if (!query) return rows;
     return rows.filter((row) => Object.values(row).join(' ').toLowerCase().includes(query));
   }, [rows, searchTerm]);
+  const hasTicketRows = filteredRows.some((row) => row.ticketId);
 
   const exportRows = useMemo(
     () => [
@@ -246,6 +252,17 @@ export default function RequestReports() {
               hideSearch
               mobileLayout="cards"
               emptyMessage="No rows match this report."
+              onRowClick={hasTicketRows
+                ? (row) => {
+                    if (!row.ticketId) return;
+                    openTicketWorkspace(navigate, row.ticketId, {
+                      source: 'reports',
+                      path: '/portal/reports',
+                      scrollTop: window.scrollY,
+                      filters: { reportType, searchTerm },
+                    });
+                  }
+                : undefined}
             />
           )}
         </CardContent>
