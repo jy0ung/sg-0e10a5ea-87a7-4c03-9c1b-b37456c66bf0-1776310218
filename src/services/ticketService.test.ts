@@ -117,17 +117,17 @@ describe('ticketService', () => {
       description: 'Verify the automated workflow.',
       submitted_by: 'requester-1',
       assigned_to: 'owner-1',
-      assigned_at: '2026-06-19T09:00:00.000Z',
-      first_response_due_at: '2026-06-19T13:00:00.000Z',
-      resolution_due_at: '2026-06-20T09:00:00.000Z',
-      first_responded_at: '2026-06-19T09:30:00.000Z',
+      assigned_at: '2099-01-15T09:00:00.000Z',
+      first_response_due_at: '2099-01-15T13:00:00.000Z',
+      resolution_due_at: '2099-01-16T09:00:00.000Z',
+      first_responded_at: '2099-01-15T09:30:00.000Z',
       resolved_at: null,
       resolution_note: null,
       custom_fields: {},
       sla_status: 'on_track',
       sla_breach_reason: null,
-      created_at: '2026-06-19T08:00:00.000Z',
-      updated_at: '2026-06-19T09:30:00.000Z',
+      created_at: '2099-01-15T08:00:00.000Z',
+      updated_at: '2099-01-15T09:30:00.000Z',
     };
   }
 
@@ -158,7 +158,7 @@ describe('ticketService', () => {
         event_type: 'comment_added',
         message,
         metadata: { comment: true },
-        created_at: '2026-06-19T10:00:00.000Z',
+        created_at: '2099-01-15T10:00:00.000Z',
       },
       error: null,
     });
@@ -768,7 +768,7 @@ describe('ticketService', () => {
       status: 'pending_requester' as const,
       current_responsible_party: 'Requester',
       next_action: 'Requester to provide information',
-      updated_at: '2026-06-19T10:00:00.000Z',
+      updated_at: '2099-01-15T10:00:00.000Z',
     };
     const currentForComment = mockTicketFetch(current);
     const commentInsert = mockCommentInsert(current.id, 'owner-1', 'Please provide the signed form.');
@@ -853,7 +853,7 @@ describe('ticketService', () => {
       current_responsible_party: 'Requester',
       next_action: 'Requester to confirm and close',
       resolution_note: 'Access restored and verified.',
-      updated_at: '2026-06-19T11:00:00.000Z',
+      updated_at: '2099-01-15T11:00:00.000Z',
     };
     const currentForWorkflow = mockTicketFetch(current);
     const ticketUpdate = mockTicketUpdate(updated);
@@ -900,8 +900,8 @@ describe('ticketService', () => {
       status: 'closed' as const,
       current_responsible_party: 'None',
       next_action: 'No further action',
-      closed_at: '2026-06-19T11:30:00.000Z',
-      updated_at: '2026-06-19T11:30:00.000Z',
+      closed_at: '2099-01-15T11:30:00.000Z',
+      updated_at: '2099-01-15T11:30:00.000Z',
     };
     const currentForWorkflow = mockTicketFetch(current);
     const ticketUpdate = mockTicketUpdate(updated);
