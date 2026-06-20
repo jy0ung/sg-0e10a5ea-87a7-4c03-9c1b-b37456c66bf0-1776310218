@@ -759,6 +759,8 @@ function buildTicketSearchOrFilter(search: string, profileIds: string[]): string
     `subject.ilike.%${search}%`,
     `description.ilike.%${search}%`,
     `vso_number.ilike.%${search}%`,
+    `desired_outcome.ilike.%${search}%`,
+    `business_impact.ilike.%${search}%`,
   ];
   if (profileIds.length > 0) {
     const ids = profileIds.join(',');

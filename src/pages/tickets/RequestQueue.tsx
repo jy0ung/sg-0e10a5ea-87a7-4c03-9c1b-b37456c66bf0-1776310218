@@ -381,54 +381,11 @@ export default function RequestQueue() {
     window.localStorage.setItem('requestQueue.metricsExpanded', String(metricsExpanded));
   }, [metricsExpanded]);
 
-  // ─── Filtered view (client-side refinement on top of server-filtered page) ─
+  // ─── Filtered view: only unreadOnly cannot be applied server-side ─────────
   const filteredTickets = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    return tickets.filter((ticket) => {
-      if (categoryFilter !== 'all' && ticket.category !== categoryFilter) return false;
-      if (subcategoryFilter !== 'all' && ticket.subcategory !== subcategoryFilter) return false;
-      if (responsiblePartyFilter !== 'all' && ticket.current_responsible_party !== responsiblePartyFilter) return false;
-      if (unreadOnly && (chatSummariesByTicket[ticket.id]?.unread_count ?? 0) === 0) return false;
-      if (reopenedOnly && ticket.status !== 'reopened' && ticket.reopen_count === 0) return false;
-      if (submittedFrom && new Date(ticket.created_at) < new Date(`${submittedFrom}T00:00:00`)) return false;
-      if (submittedTo && new Date(ticket.created_at) > new Date(`${submittedTo}T23:59:59`)) return false;
-      if (updatedFrom && new Date(ticket.updated_at) < new Date(`${updatedFrom}T00:00:00`)) return false;
-      if (updatedTo && new Date(ticket.updated_at) > new Date(`${updatedTo}T23:59:59`)) return false;
-      if (!normalizedSearch) return true;
-
-      const haystack = [
-        ticket.id,
-        ticket.subject,
-        ticket.description,
-        ticket.desired_outcome,
-        ticket.business_impact,
-        ...Object.values(ticket.custom_fields ?? {}).map((value) => String(value)),
-        ticket.vso_number,
-        ticket.submitted_by_name,
-        ticket.submitted_by_email,
-        ticket.assigned_to_name,
-        getRequestCategoryLabel(ticket.category, categories),
-        ticket.subcategory ? getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories) : '',
-      ].filter(Boolean).join(' ').toLowerCase();
-
-      return haystack.includes(normalizedSearch);
-    });
-  }, [
-    categories,
-    categoryFilter,
-    chatSummariesByTicket,
-    responsiblePartyFilter,
-    reopenedOnly,
-    searchTerm,
-    subcategories,
-    subcategoryFilter,
-    submittedFrom,
-    submittedTo,
-    tickets,
-    unreadOnly,
-    updatedFrom,
-    updatedTo,
-  ]);
+    if (!unreadOnly) return tickets;
+    return tickets.filter((ticket) => (chatSummariesByTicket[ticket.id]?.unread_count ?? 0) > 0);
+  }, [tickets, unreadOnly, chatSummariesByTicket]);
 
   const indicatorsByTicket = useMemo<Record<string, RequestOperationalIndicator>>(
     () => buildRequestOperationalIndicators(filteredTickets, activitiesByTicket, chatSummariesByTicket),
