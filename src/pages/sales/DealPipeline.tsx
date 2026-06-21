@@ -117,6 +117,21 @@ export default function DealPipeline() {
             ))}
           </SelectContent>
         </Select>
+        {branches.length > 0 && (
+          <Select value={branchFilter} onValueChange={setBranchFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="All Branches" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Branches</SelectItem>
+              {branches.map(branch => (
+                <SelectItem key={branch.id} value={branch.id}>
+                  {branch.code}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Button variant="outline" size="sm" onClick={loadPipeline}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh

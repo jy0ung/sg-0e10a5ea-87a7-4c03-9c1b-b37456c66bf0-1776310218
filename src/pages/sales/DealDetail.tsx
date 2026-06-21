@@ -776,18 +776,105 @@ function RegistrationTab({ deal, onUpdate }: { deal: Deal; onUpdate: () => void 
   );
 }
 
-function DocumentsTab({ deal: _deal }: { deal: Deal }) {
+function DocumentsTab({ deal }: { deal: Deal }) {
+  const { user } = useAuth();
+  const [documents, setDocuments] = useState<DealDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [docType, setDocType] = useState("other");
+
+  const loadDocuments = useCallback(async () => {
+    setLoading(true);
+    const { data } = await getDocuments(deal.id);
+    setDocuments(data);
+    setLoading(false);
+  }, [deal.id]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploading(true);
+    try {
+      const { error } = await uploadDocument(deal.id, deal.company_id, user.id, docType, file);
+      if (error) {
+        toast.error("Failed to upload document");
+        return;
+      }
+      toast.success("Document uploaded");
+      loadDocuments();
+    } catch {
+      toast.error("Failed to upload document");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Documents</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">Documents ({documents.length})</CardTitle>
+          <div className="flex items-center gap-2">
+            <Select value={docType} onValueChange={setDocType}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ic_copy">IC Copy</SelectItem>
+                <SelectItem value="license">License</SelectItem>
+                <SelectItem value="deposit_receipt">Deposit Receipt</SelectItem>
+                <SelectItem value="loan_form">Loan Form</SelectItem>
+                <SelectItem value="lou">LOU</SelectItem>
+                <SelectItem value="insurance">Insurance</SelectItem>
+                <SelectItem value="registration">Registration</SelectItem>
+                <SelectItem value="delivery_signoff">Delivery Sign-off</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <input id="deal-doc-upload" type="file" className="hidden" onChange={handleUpload} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" />
+            <Button size="sm" disabled={uploading} onClick={() => document.getElementById("deal-doc-upload")?.click()}>
+              {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Upload
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="text-center py-8 text-muted-foreground">
-          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>Document upload coming soon</p>
-          <p className="text-sm">Upload IC, license, loan forms, insurance docs, etc.</p>
-        </div>
+        {loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No documents uploaded</p>
+            <p className="text-sm">Upload IC, license, loan forms, insurance docs, etc.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {documents.map(doc => (
+              <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium text-sm">{doc.file_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {doc.doc_type.replace(/_/g, " ")} · {new Date(doc.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline">{doc.doc_type.replace(/_/g, " ")}</Badge>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
