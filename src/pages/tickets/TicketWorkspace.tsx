@@ -258,59 +258,6 @@ export default function TicketWorkspace() {
     if (!user || !ticket || activeTab !== 'chat') return;
     void markTicketChatRead(ticket.id, { userId: user.id, companyId: user.company_id });
   }, [activeTab, ticket, user]);
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement;
-      const tagName = target.tagName.toLowerCase();
-      const isEditable = target.isContentEditable;
-      const isInput = tagName === 'input' || tagName === 'textarea' || isEditable;
-
-      // Escape: close any open dialog
-      if (event.key === 'Escape') {
-        setInfoDialogOpen(false);
-        setRequesterUpdateOpen(false);
-        setCompletionOpen(false);
-        setCloseOpen(false);
-        setReopenOpen(false);
-        setAssignOpen(false);
-        setPriorityOpen(false);
-        setOverrideOpen(false);
-        setReviewDecision(null);
-        return;
-      }
-
-      // Ctrl+Enter / Cmd+Enter: send chat message or internal note
-      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-        if (activeTab === 'chat') {
-          event.preventDefault();
-          void handleAddComment();
-        } else if (activeTab === 'internal-notes') {
-          event.preventDefault();
-          void handleAddInternalNote();
-        }
-        return;
-      }
-
-      // Remaining shortcuts only fire when no input is focused
-      if (isInput) return;
-
-      // Tab switching: 1-5
-      if (event.key === '1') { setTab('details'); return; }
-      if (event.key === '2') { setTab('chat'); return; }
-      if (event.key === '3') { setTab('activity'); return; }
-      if (event.key === '4' && canManageQueue) { setTab('internal-notes'); return; }
-      if (event.key === '5' && canManageQueue) { setTab('audit-trail'); return; }
-
-      // r: reopen dialog
-      if (event.key === 'r' && ticket?.status === 'closed' && data?.permissions.canCloseAsRequester) {
-        setReopenOpen(true);
-      }
-    };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [activeTab, ticket, data, canManageQueue, handleAddComment, handleAddInternalNote, setTab]);
 
   const refreshWorkspace = useCallback(
     () => queryClient.invalidateQueries({ queryKey: workspaceQueryKey }),
@@ -436,6 +383,60 @@ export default function TicketWorkspace() {
     if (ok) internalNote.clearValue();
     return ok;
   }, [internalNote, runWorkflow, ticket, user]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      const tagName = target.tagName.toLowerCase();
+      const isEditable = target.isContentEditable;
+      const isInput = tagName === 'input' || tagName === 'textarea' || isEditable;
+
+      // Escape: close any open dialog
+      if (event.key === 'Escape') {
+        setInfoDialogOpen(false);
+        setRequesterUpdateOpen(false);
+        setCompletionOpen(false);
+        setCloseOpen(false);
+        setReopenOpen(false);
+        setAssignOpen(false);
+        setPriorityOpen(false);
+        setOverrideOpen(false);
+        setReviewDecision(null);
+        return;
+      }
+
+      // Ctrl+Enter / Cmd+Enter: send chat message or internal note
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        if (activeTab === 'chat') {
+          event.preventDefault();
+          void handleAddComment();
+        } else if (activeTab === 'internal-notes') {
+          event.preventDefault();
+          void handleAddInternalNote();
+        }
+        return;
+      }
+
+      // Remaining shortcuts only fire when no input is focused
+      if (isInput) return;
+
+      // Tab switching: 1-5
+      if (event.key === '1') { setTab('details'); return; }
+      if (event.key === '2') { setTab('chat'); return; }
+      if (event.key === '3') { setTab('activity'); return; }
+      if (event.key === '4' && canManageQueue) { setTab('internal-notes'); return; }
+      if (event.key === '5' && canManageQueue) { setTab('audit-trail'); return; }
+
+      // r: reopen dialog
+      if (event.key === 'r' && ticket?.status === 'closed' && data?.permissions.canCloseAsRequester) {
+        setReopenOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activeTab, ticket, data, canManageQueue, handleAddComment, handleAddInternalNote, setTab]);
 
   const hasUnsavedChanges = Boolean(
     chatDraft.value.trim()
