@@ -91,6 +91,9 @@ export default defineConfig(({ mode }) => {
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      devOptions: {
+        enabled: false,
+      },
       includeAssets: ["favicon.ico", "robots.txt", "offline.html", "icons/logo.png", "icons/Fook Loi Corp (Sabah) Sdn. Bhd. Logo.png", "icons/Fook Loi Logo_with white bg.png"],
       manifest: {
         name: "FLC BI App",
@@ -108,6 +111,8 @@ export default defineConfig(({ mode }) => {
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         // Navigations must boot the SPA so client-side redirects (such as the
         // main-app HRMS launcher) can run. Using offline.html here causes any
