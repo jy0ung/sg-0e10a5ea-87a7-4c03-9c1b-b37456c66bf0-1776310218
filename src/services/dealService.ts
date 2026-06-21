@@ -913,3 +913,52 @@ export async function getDashboard(companyId: string): Promise<{ data: Dashboard
     return { data: null, error };
   }
 }
+
+
+// ============================================================
+// SLA Monitoring (Stalled Deals)
+// ============================================================
+
+export async function checkStalledDeals(companyId: string): Promise<{ notified: number; error: Error | null }> {
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: stalled, error } = await supabase
+      .from("deals")
+      .select("id, deal_no, vso_no, customer_name, model_name, stage, stage_entered_at, sales_advisor_id, branch_id")
+      .eq("company_id", companyId)
+      .neq("stage", "completed")
+      .lt("stage_entered_at", sevenDaysAgo);
+
+    if (error) return { notified: 0, error: new Error(error.message) };
+    if (!stalled || stalled.length === 0) return { notified: 0, error: null };
+
+    // Group by sales advisor
+    const byAdvisor = new Map<string, typeof stalled>();
+    for (const deal of stalled) {
+      if (!deal.sales_advisor_id) continue;
+      const list = byAdvisor.get(deal.sales_advisor_id) || [];
+      list.push(deal);
+      byAdvisor.set(deal.sales_advisor_id, list);
+    }
+
+    // Send notifications
+    let notified = 0;
+    for (const [advisorId, deals] of byAdvisor) {
+      const message = deals.length === 1
+        ? deals[0].customer_name + " has been in " + getStageLabel(deals[0].stage as DealStage) + " for over 7 days"
+        : deals.length + " deals have been stalled for over 7 days";
+      await createNotifications([{
+        userId: advisorId,
+        title: "Stalled deals alert",
+        message,
+        type: "warning",
+      }]);
+      notified++;
+    }
+
+    return { notified, error: null };
+  } catch (err) {
+    return { notified: 0, error: err instanceof Error ? err : new Error("Failed to check stalled deals") };
+  }
+}
