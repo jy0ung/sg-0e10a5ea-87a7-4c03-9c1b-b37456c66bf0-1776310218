@@ -27,12 +27,19 @@ export default function DealPipeline() {
   const [columns, setColumns] = useState<PipelineColumn[]>([]);
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<string>('all');
+  const [branchFilter, setBranchFilter] = useState<string>('all');
+  const [branches, setBranches] = useState<Array<{id: string; code: string; name: string}>>([]);
+  const [advisorFilter, setAdvisorFilter] = useState<string>('all');
+  const [advisors, setAdvisors] = useState<Array<{id: string; name: string}>>([]);
 
   const loadPipeline = useCallback(async () => {
     if (!user?.company_id) return;
     setLoading(true);
     try {
-      const { data, error } = await getPipeline(user.company_id);
+      const filters: Record<string, string> = {};
+      if (branchFilter !== "all") filters.branch_id = branchFilter;
+      if (advisorFilter !== "all") filters.sales_advisor_id = advisorFilter;
+      const { data, error } = await getPipeline(user.company_id, filters);
       if (error) {
         toast.error('Failed to load pipeline');
         return;
@@ -43,11 +50,34 @@ export default function DealPipeline() {
     } finally {
       setLoading(false);
     }
-  }, [user?.company_id]);
+  }, [user?.company_id, branchFilter, advisorFilter]);
 
   useEffect(() => {
     loadPipeline();
   }, [loadPipeline]);
+
+  // Load branches
+  useEffect(() => {
+    if (!user?.company_id) return;
+    import("@/services/branchService").then(({ listBranches }) => {
+      listBranches(user.company_id).then((data) => {
+        if (data) setBranches(data);
+      });
+    }).catch(() => {});
+  }, [user?.company_id, branchFilter, advisorFilter]);
+
+  // Derive advisors from pipeline data
+  useEffect(() => {
+    const advisorMap = new Map<string, string>();
+    columns.forEach(col => {
+      col.deals.forEach(deal => {
+        if (deal.sales_advisor_id && deal.sales_advisor_name) {
+          advisorMap.set(deal.sales_advisor_id, deal.sales_advisor_name);
+        }
+      });
+    });
+    setAdvisors(Array.from(advisorMap.entries()).map(([id, name]) => ({ id, name })));
+  }, [columns]);
 
   const filteredColumns = columns.map(col => ({
     ...col,
