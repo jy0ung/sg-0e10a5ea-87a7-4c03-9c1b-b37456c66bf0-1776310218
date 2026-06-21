@@ -1,171 +1,185 @@
-import React, { useMemo, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { StandardTable } from '@/components/shared/StandardTable';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Search, RefreshCw, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSales } from '@/contexts/SalesContext';
-import { Invoice } from '@/types';
-import { AlertTriangle, Clock, DollarSign } from 'lucide-react';
-
-type AgingBucket = '0-30' | '31-60' | '61-90' | '90+';
-
-function agingBucket(dueDate: string | undefined): AgingBucket {
-  if (!dueDate) return '90+';
-  const days = Math.floor((Date.now() - new Date(dueDate).getTime()) / 86_400_000);
-  if (days <= 30) return '0-30';
-  if (days <= 60) return '31-60';
-  if (days <= 90) return '61-90';
-  return '90+';
-}
-
-const BUCKET_STYLE: Record<AgingBucket, string> = {
-  '0-30': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  '31-60': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
-  '61-90': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  '90+': 'bg-red-200 text-red-900 dark:bg-red-800/50 dark:text-red-200',
-};
+import { toast } from 'sonner';
+import { listDeals, getStageLabel, type Deal } from '@/services/dealService';
 
 export default function OutstandingCollection() {
-  const { user: _user } = useAuth();
-  const { invoices, loading } = useSales();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [search, setSearch] = useState('');
 
-  const [bucketFilter, setBucketFilter] = useState<'all' | AgingBucket>('all');
+  const loadDeals = useCallback(async () => {
+    if (!user?.company_id) return;
+    setLoading(true);
+    try {
+      // Get all active deals (not completed)
+      const { data, error } = await listDeals({
+        company_id: user.company_id,
+        stage: 'disbursement',
+        limit: 100,
+      });
+      if (error) {
+        toast.error('Failed to load outstanding deals');
+        return;
+      }
+      setDeals(data);
+    } catch {
+      toast.error('Failed to load outstanding deals');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.company_id]);
 
-  // Only unpaid / partial
-  const outstanding: (Invoice & { bucket: AgingBucket; owedAmount: number })[] = useMemo(() => {
-    return invoices
-      .filter(i => i.paymentStatus === 'unpaid' || i.paymentStatus === 'partial')
-      .map(i => ({
-        ...i,
-        bucket: agingBucket(i.dueDate),
-        owedAmount: i.totalAmount - (i.paidAmount ?? 0),
-      }))
-      .filter(i => bucketFilter === 'all' || i.bucket === bucketFilter)
-      .sort((a, b) => b.owedAmount - a.owedAmount);
-  }, [invoices, bucketFilter]);
+  useEffect(() => {
+    loadDeals();
+  }, [loadDeals]);
 
-  const bucketTotals = useMemo(() => {
-    const all = invoices.filter(i => i.paymentStatus === 'unpaid' || i.paymentStatus === 'partial');
-    const sum = (b: AgingBucket) => all.filter(i => agingBucket(i.dueDate) === b).reduce((s, i) => s + i.totalAmount - (i.paidAmount ?? 0), 0);
-    return { '0-30': sum('0-30'), '31-60': sum('31-60'), '61-90': sum('61-90'), '90+': sum('90+') };
-  }, [invoices]);
-
-  if (loading) {
+  const filteredDeals = deals.filter(deal => {
+    if (!search) return true;
     return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="h-8 w-48 bg-muted rounded animate-pulse" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="glass-panel p-4 animate-pulse">
-              <div className="h-4 w-24 bg-muted rounded mb-2" />
-              <div className="h-8 w-28 bg-muted rounded" />
-            </div>
-          ))}
-        </div>
-        <div className="glass-panel p-4 animate-pulse">
-          <div className="h-8 w-32 bg-muted rounded mb-4" />
-          <div className="h-64 bg-muted rounded" />
-        </div>
-      </div>
+      deal.customer_name.toLowerCase().includes(search.toLowerCase()) ||
+      deal.deal_no.toLowerCase().includes(search.toLowerCase()) ||
+      deal.model_name?.toLowerCase().includes(search.toLowerCase())
     );
-  }
+  });
 
-  const totalOutstanding = Object.values(bucketTotals).reduce((s, v) => s + v, 0);
+  const totalOutstanding = filteredDeals.reduce((sum, d) => sum + (d.total_amount || 0), 0);
 
-  const kpis = [
-    { label: 'Total Outstanding', value: `RM ${totalOutstanding.toLocaleString()}`, icon: DollarSign, color: 'text-red-500' },
-    { label: '0–30 Days', value: `RM ${bucketTotals['0-30'].toLocaleString()}`, icon: Clock, color: 'text-yellow-500' },
-    { label: '31–60 Days', value: `RM ${bucketTotals['31-60'].toLocaleString()}`, icon: Clock, color: 'text-orange-500' },
-    { label: '90+ Days (Critical)', value: `RM ${bucketTotals['90+'].toLocaleString()}`, icon: AlertTriangle, color: 'text-red-600' },
+  const handleExport = () => {
+    const headers = ['Deal No', 'Customer', 'Vehicle', 'Amount', 'Days in Stage'];
+    const rows = filteredDeals.map(d => {
+      const days = Math.floor((Date.now() - new Date(d.stage_entered_at).getTime()) / (1000 * 60 * 60 * 24));
+      return [d.deal_no, d.customer_name, `${d.model_name || ''} ${d.variant || ''}`.trim(), d.total_amount?.toString() || '', days.toString()];
+    });
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `outstanding-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const columns = [
+    {
+      key: 'deal_no',
+      header: 'Deal No',
+      render: (deal: Deal) => <span className="font-medium">{deal.deal_no}</span>,
+    },
+    {
+      key: 'customer',
+      header: 'Customer',
+      render: (deal: Deal) => (
+        <div>
+          <p className="font-medium">{deal.customer_name}</p>
+          {deal.customer_ic && <p className="text-xs text-muted-foreground">{deal.customer_ic}</p>}
+        </div>
+      ),
+    },
+    {
+      key: 'vehicle',
+      header: 'Vehicle',
+      render: (deal: Deal) => (
+        <div>
+          <p>{deal.model_name}</p>
+          {deal.variant && <p className="text-xs text-muted-foreground">{deal.variant}</p>}
+        </div>
+      ),
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      render: (deal: Deal) => deal.total_amount ? `RM ${deal.total_amount.toLocaleString()}` : '—',
+    },
+    {
+      key: 'days',
+      header: 'Days in Stage',
+      render: (deal: Deal) => {
+        const days = Math.floor((Date.now() - new Date(deal.stage_entered_at).getTime()) / (1000 * 60 * 60 * 24));
+        return <span className={days > 14 ? 'text-destructive font-medium' : ''}>{days} days</span>;
+      },
+    },
+    {
+      key: 'stage',
+      header: 'Stage',
+      render: (deal: Deal) => <Badge variant="outline">{getStageLabel(deal.stage)}</Badge>,
+    },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       <PageHeader
         title="Outstanding Collection"
-        description="Unpaid and partially paid invoices by aging bucket"
-        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Outstanding Collection' }]}
+        subtitle={`${filteredDeals.length} deals · RM ${totalOutstanding.toLocaleString()} pending`}
       />
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {kpis.map(k => (
-          <div key={k.label} className="glass-panel p-4 flex items-start gap-3">
-            <k.icon className={`h-5 w-5 mt-0.5 ${k.color}`} />
-            <div>
-              <p className="text-xs text-muted-foreground">{k.label}</p>
-              <p className={`text-xl font-bold mt-1 ${k.color}`}>{k.value}</p>
-            </div>
-          </div>
-        ))}
+      {/* Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="p-4 rounded-lg border bg-card">
+          <p className="text-sm text-muted-foreground">Pending Disbursement</p>
+          <p className="text-2xl font-bold">{filteredDeals.length}</p>
+        </div>
+        <div className="p-4 rounded-lg border bg-card">
+          <p className="text-sm text-muted-foreground">Total Outstanding</p>
+          <p className="text-2xl font-bold">RM {totalOutstanding.toLocaleString()}</p>
+        </div>
+        <div className="p-4 rounded-lg border bg-card">
+          <p className="text-sm text-muted-foreground">Overdue (&gt;14 days)</p>
+          <p className="text-2xl font-bold text-destructive">
+            {filteredDeals.filter(d => {
+              const days = Math.floor((Date.now() - new Date(d.stage_entered_at).getTime()) / (1000 * 60 * 60 * 24));
+              return days > 14;
+            }).length}
+          </p>
+        </div>
       </div>
 
-      {/* Aging bucket visual bars */}
-      <div className="glass-panel p-4 space-y-3">
-        <h3 className="text-sm font-medium text-muted-foreground">Aging Breakdown</h3>
-        {(['0-30','31-60','61-90','90+'] as AgingBucket[]).map(b => {
-          const pct = totalOutstanding > 0 ? (bucketTotals[b] / totalOutstanding) * 100 : 0;
-          return (
-            <div key={b} className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="font-medium">{b} days</span>
-                <span className="text-muted-foreground">RM {bucketTotals[b].toLocaleString()} ({pct.toFixed(1)}%)</span>
-              </div>
-              <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${b === '0-30' ? 'bg-yellow-400' : b === '31-60' ? 'bg-orange-400' : b === '61-90' ? 'bg-red-400' : 'bg-red-600'}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Filter */}
-      <div>
-        <Select value={bucketFilter} onValueChange={v => setBucketFilter(v as typeof bucketFilter)}>
-          <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="All Aging" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Aging</SelectItem>
-            <SelectItem value="0-30">0–30 Days</SelectItem>
-            <SelectItem value="31-60">31–60 Days</SelectItem>
-            <SelectItem value="61-90">61–90 Days</SelectItem>
-            <SelectItem value="90+">90+ Days</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search deals..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Button variant="outline" size="sm" onClick={loadDeals}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="h-4 w-4 mr-2" />
+          Export CSV
+        </Button>
       </div>
 
       {/* Table */}
-      <div className="glass-panel overflow-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              {['Invoice No','Customer','Issue Date','Due Date','Total','Paid','Outstanding','Aging'].map(h => (
-                <th key={h} className="px-3 py-2 font-medium">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {outstanding.map(inv => (
-              <tr key={inv.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
-                <td className="px-3 py-2 font-mono text-xs">{inv.invoiceNo}</td>
-                <td className="px-3 py-2">{inv.customerName ?? '—'}</td>
-                <td className="px-3 py-2 text-muted-foreground">{inv.issueDate}</td>
-                <td className="px-3 py-2 text-muted-foreground">{inv.dueDate ?? '—'}</td>
-                <td className="px-3 py-2 font-medium">RM {inv.totalAmount.toLocaleString()}</td>
-                <td className="px-3 py-2 text-muted-foreground">RM {(inv.paidAmount ?? 0).toLocaleString()}</td>
-                <td className="px-3 py-2 font-semibold text-red-600 dark:text-red-400">RM {inv.owedAmount.toLocaleString()}</td>
-                <td className="px-3 py-2">
-                  <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium ${BUCKET_STYLE[inv.bucket]}`}>{inv.bucket} days</span>
-                </td>
-              </tr>
-            ))}
-            {outstanding.length === 0 && (
-              <tr><td colSpan={8} className="py-8 text-center text-muted-foreground text-xs">No outstanding invoices</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : (
+        <StandardTable
+          data={filteredDeals}
+          columns={columns}
+          onRowClick={(deal) => navigate(`/sales/deals/${deal.id}`)}
+        />
+      )}
     </div>
   );
 }
