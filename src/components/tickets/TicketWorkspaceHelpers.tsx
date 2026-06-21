@@ -60,6 +60,20 @@ export function EmptyPanel({ title, description }: { title: string; description:
 
 // ─── Workflow strip ──────────────────────────────────────────────────────
 
+export function primaryActionLabel(ticket: CompanyTicketRecord, permissions: TicketWorkspaceData["permissions"]) {
+  if (permissions.canManageWorkflow) {
+    if (ticket.status === "open") return "Start Request";
+    if (ticket.status === "in_progress" || ticket.status === "pending_owner_review" || ticket.status === "reopened") return "Mark as Completed";
+    if (ticket.status === "pending_requester") return "Request More Info";
+  }
+  if (permissions.canCloseAsRequester) {
+    if (ticket.status === "pending_requester") return "Submit Update";
+    if (ticket.status === "completed_by_owner") return "Close Request";
+    if (ticket.status === "closed") return "Reopen Request";
+  }
+  return null;
+}
+
 const workflowSteps: Array<{ status: TicketStatus; label: string }> = [
   { status: 'open', label: 'Open' },
   { status: 'in_progress', label: 'In Progress' },
