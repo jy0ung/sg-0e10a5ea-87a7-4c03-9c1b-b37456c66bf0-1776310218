@@ -83,18 +83,20 @@ export default function NewTicket() {
 
   const userId = user?.id;
   const userCompanyId = user?.company_id;
-  const hasUnsavedChanges = form.formState.isDirty || draftSavedAt !== null;
-  useBeforeUnloadWarning(hasUnsavedChanges);
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => (
-    hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
-  ));
-
   const draftKey = useMemo(
     () => userId && userCompanyId ? `flc.internal-request-draft:${userCompanyId}:${userId}` : null,
     [userCompanyId, userId],
   );
 
   const { draft, saveDraft, clearDraft, draftSavedAt } = usePersistedDraft({ key: draftKey });
+
+  const hasUnsavedChanges = form.formState.isDirty || draftSavedAt !== null;
+  useBeforeUnloadWarning(hasUnsavedChanges);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => (
+    hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
+  ));
+
+
 
   // Restore draft on mount (once).
   const draftRestoredRef = useRef(false);
