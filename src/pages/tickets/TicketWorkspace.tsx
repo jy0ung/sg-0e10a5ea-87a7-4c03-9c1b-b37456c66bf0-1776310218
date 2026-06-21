@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import {
   AlertCircle,
   ArrowLeft,
@@ -19,8 +19,16 @@ import { listProfiles } from '@flc/auth';
 import { listAttachmentsForTickets, uploadTicketAttachment, type TicketAttachmentRecord } from '@flc/platform-services';
 
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  formatDateTime,
+  InfoRow,
+  Section,
+  EmptyPanel,
+  WorkflowStrip,
+  MessageDialog,
+  AuditTrailPanel,
+} from '@/components/tickets/TicketWorkspaceHelpers';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
@@ -72,12 +80,12 @@ import {
   requestTicketMoreInformation,
   submitRequesterTicketUpdate,
   updateTicket,
-  type CompanyTicketRecord,
-  type TicketAuditEntryRecord,
+
+
   type TicketCompletionCategory,
   type TicketPriority,
   type TicketStatus,
-  type TicketWorkspaceData,
+
 } from '@/services/ticketService';
 
 const tabs: Array<{ value: TicketWorkspaceTab; label: string }> = [
@@ -107,96 +115,6 @@ const statusOptions: Array<{ value: TicketStatus; label: string }> = [
   { value: 'reopened', label: 'Reopened' },
   { value: 'cancelled', label: 'Cancelled' },
 ];
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return 'Not available';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Not available';
-  return format(date, 'PP p');
-}
-
-function InfoRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="min-w-0 rounded-md bg-muted/30 px-3 py-2 ring-1 ring-border/60">
-      <p className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
-      <div className="mt-1 break-words text-sm font-medium leading-5 text-foreground">{value}</div>
-    </div>
-  );
-}
-
-function Section({ title, icon: Icon, children }: { title: string; icon?: ElementType; children: ReactNode }) {
-  return (
-    <section className="rounded-lg bg-card p-4 shadow-sm ring-1 ring-border/70">
-      <div className="mb-3 flex items-center gap-2 border-b border-border/70 pb-2.5">
-        {Icon && <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />}
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function EmptyPanel({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-8 text-center">
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
-function primaryActionLabel(ticket: CompanyTicketRecord, permissions: TicketWorkspaceData['permissions']) {
-  if (permissions.canManageWorkflow) {
-    if (ticket.status === 'open') return 'Start Request';
-    if (ticket.status === 'in_progress' || ticket.status === 'pending_owner_review' || ticket.status === 'reopened') return 'Mark as Completed';
-    if (ticket.status === 'pending_requester') return 'Request More Info';
-  }
-  if (permissions.canCloseAsRequester) {
-    if (ticket.status === 'pending_requester') return 'Submit Update';
-    if (ticket.status === 'completed_by_owner') return 'Close Request';
-    if (ticket.status === 'closed') return 'Reopen Request';
-  }
-  return null;
-}
-
-const workflowSteps: Array<{ status: TicketStatus; label: string }> = [
-  { status: 'open', label: 'Open' },
-  { status: 'in_progress', label: 'In Progress' },
-  { status: 'pending_requester', label: 'Pending Requester' },
-  { status: 'pending_owner_review', label: 'Owner Review' },
-  { status: 'completed_by_owner', label: 'Completed by Owner' },
-  { status: 'closed', label: 'Closed' },
-];
-
-function WorkflowStrip({ status }: { status: TicketStatus }) {
-  const activeIndex = workflowSteps.findIndex((step) => step.status === status);
-  const terminal = status === 'cancelled' || status === 'reopened';
-  return (
-    <div className="overflow-x-auto rounded-md bg-muted/30 px-3 py-2 ring-1 ring-border/60">
-      <div className="flex min-w-max items-center gap-2">
-        {workflowSteps.map((step, index) => {
-          const active = step.status === status;
-          const complete = !terminal && activeIndex >= 0 && index < activeIndex;
-          return (
-            <div key={step.status} className="flex items-center gap-2">
-              <span
-                className={[
-                  'flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-semibold',
-                  active ? 'bg-primary text-primary-foreground' : complete ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-background text-muted-foreground ring-1 ring-border',
-                ].join(' ')}
-              >
-                {index + 1}
-              </span>
-              <span className={active ? 'text-xs font-semibold text-foreground' : 'text-xs text-muted-foreground'}>{step.label}</span>
-              {index < workflowSteps.length - 1 && <span className="h-px w-6 bg-border" aria-hidden />}
-            </div>
-          );
-        })}
-        {terminal && <Badge variant="outline" className="ml-2 capitalize">{formatTicketLabel(status)}</Badge>}
-      </div>
-    </div>
-  );
-}
 
 function useTicketDraftField(
   scope: string,
@@ -393,7 +311,6 @@ export default function TicketWorkspace() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [activeTab, ticket, data, canManageQueue, handleAddComment, handleAddInternalNote, setTab]);
-
 
   const refreshWorkspace = useCallback(
     () => queryClient.invalidateQueries({ queryKey: workspaceQueryKey }),
@@ -1281,144 +1198,3 @@ export default function TicketWorkspace() {
   );
 }
 
-function MessageDialog({
-  open,
-  title,
-  description,
-  value,
-  saving,
-  onValueChange,
-  onOpenChange,
-  onSubmit,
-}: {
-  open: boolean;
-  title: string;
-  description: string;
-  value: string;
-  saving: boolean;
-  onValueChange: (value: string) => void;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <Textarea value={value} onChange={(event) => onValueChange(event.target.value)} rows={4} placeholder="Write a clear update" />
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" disabled={saving || !value.trim()} onClick={onSubmit}>
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Submit
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function formatAuditChanges(changes: Record<string, unknown>) {
-  const fieldLabels: Record<string, string> = {
-    status: 'Status',
-    assigned_to: 'Owner',
-    assigned_to_name: 'Owner',
-    priority: 'Priority',
-    subject: 'Title',
-    category: 'Category',
-    subcategory: 'Subcategory',
-    current_responsible_party: 'Responsible party',
-    next_action: 'Next action',
-    resolution_note: 'Resolution note',
-    completion_category: 'Completion type',
-    satisfaction_rating: 'Satisfaction rating',
-    closure_confirmed: 'Closure confirmed',
-    closed_at: 'Closed at',
-    first_responded_at: 'First responded',
-    resolved_at: 'Resolved at',
-    sla_breach_reason: 'SLA breach reason',
-    previous_owner_id: 'Previous owner',
-  };
-
-  return (
-    <>
-      {Object.entries(changes).map(([key, value]) => {
-        if (value === null || value === undefined) return null;
-        const label = fieldLabels[key] ?? key.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
-        const isBeforeAfter =
-          value !== null &&
-          typeof value === 'object' &&
-          !Array.isArray(value) &&
-          ('before' in (value as Record<string, unknown>) || 'after' in (value as Record<string, unknown>));
-
-        if (isBeforeAfter) {
-          const { before, after } = value as Record<string, unknown>;
-          if (before === undefined && after === undefined) return null;
-          const beforeStr = before === null || before === undefined ? '(empty)' : String(before);
-          const afterStr = after === null || after === undefined ? '(empty)' : String(after);
-          return (
-            <p key={key} className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{label}:</span>{' '}
-              <span className="line-through opacity-60">{beforeStr}</span>{' '}
-              <span aria-hidden>→</span>{' '}
-              <span>{afterStr}</span>
-            </p>
-          );
-        }
-
-        return (
-          <p key={key} className="text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">{label}:</span> {String(value)}
-          </p>
-        );
-      })}
-    </>
-  );
-}
-
-function AuditTrailPanel({
-  entries,
-  activities,
-}: {
-  entries: TicketAuditEntryRecord[];
-  activities: TicketWorkspaceData['activities'];
-}) {
-  const systemActivities = activities.filter((activity) => activity.event_type !== 'comment_added');
-
-  if (entries.length === 0 && systemActivities.length === 0) {
-    return <EmptyPanel title="No audit trail yet" description="Auditable changes and workflow events will appear here." />;
-  }
-
-  return (
-    <div className="space-y-3">
-      {entries.length > 0 && (
-        <Section title="Audit log">
-          <div className="space-y-2">
-            {entries.map((entry) => (
-              <div key={entry.id} className="rounded-md border border-border bg-card px-3 py-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="capitalize">{entry.action}</Badge>
-                  <p className="text-sm font-medium text-foreground">{entry.actor_name ?? 'User action'}</p>
-                  <p className="text-xs text-muted-foreground">{entry.created_at ? formatDateTime(entry.created_at) : ''}</p>
-                </div>
-                {entry.changes && Object.keys(entry.changes).length > 0 && (
-                  <div className="mt-2 space-y-1 rounded-md bg-muted/40 p-2">
-                    {formatAuditChanges(entry.changes)}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
-      {systemActivities.length > 0 && (
-        <Section title="Workflow activity">
-          <TicketActivityList activities={activities} />
-        </Section>
-      )}
-    </div>
-  );
-}

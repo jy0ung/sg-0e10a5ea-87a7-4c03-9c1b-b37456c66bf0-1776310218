@@ -42,7 +42,6 @@ import {
   type StatusFilter,
 } from '@/components/tickets/RequestQueueFilters';
 import { RequestQueueMetricGrid } from '@/components/tickets/RequestQueueMetricGrid';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -53,14 +52,7 @@ import {
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useRequestSubcategories } from '@/hooks/useRequestSubcategories';
 import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { useBulkDialogs } from '@/components/tickets/RequestQueueBulkDialogs';
 import {
   getCompanyTicketStatusCounts,
   listTicketChatSummaries,
@@ -78,9 +70,6 @@ import {
 } from '@/services/ticketService';
 import {
   buildRequestOperationalIndicators,
-  bulkArchiveRequests,
-  bulkNotifyRequestParticipants,
-  bulkUpdateRequestPriority,
   deleteRequestSavedFilter,
   listRequestSavedFilters,
   saveRequestFilter,
@@ -147,19 +136,11 @@ export default function RequestQueue() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkSaving, setBulkSaving] = useState(false);
   const [metricsExpanded, setMetricsExpanded] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.localStorage.getItem('requestQueue.metricsExpanded') !== 'false';
   });
   const [savedFilterName, setSavedFilterName] = useState('');
-  const [bulkPriorityDialogOpen, setBulkPriorityDialogOpen] = useState(false);
-  const [bulkPriority, setBulkPriority] = useState<TicketPriority>('medium');
-  const [bulkReason, setBulkReason] = useState('');
-  const [bulkNotifyDialogOpen, setBulkNotifyDialogOpen] = useState(false);
-  const [bulkNotifyAudience, setBulkNotifyAudience] = useState<'requesters' | 'owners'>('requesters');
-  const [bulkNotifyMessage, setBulkNotifyMessage] = useState('');
-  const [bulkArchiveDialogOpen, setBulkArchiveDialogOpen] = useState(false);
   // ─── Saved view presets ────────────────────────────────────────────────────
   type SavedViewDef = {
     id: string;
@@ -693,66 +674,10 @@ export default function RequestQueue() {
     [filteredTickets, selectedIds],
   );
 
-  const handleBulkPriorityUpdate = async () => {
-    if (!user || selectedTickets.length === 0) return;
-    setBulkSaving(true);
-    const result = await bulkUpdateRequestPriority(
-      selectedTickets.map((ticket) => ticket.id),
-      bulkPriority,
-      bulkReason,
-      { userId: user.id, companyId: user.company_id },
-    );
-    setBulkSaving(false);
-    if (result.error) {
-      toast.error('Bulk priority update failed', { description: result.error.message });
-      return;
-    }
-    setBulkPriorityDialogOpen(false);
-    setBulkReason('');
-    setSelectedIds(new Set());
-    await queryClient.invalidateQueries({ queryKey: ['ticketQueue', user.company_id] });
-    toast.success(`${result.updated} request${result.updated === 1 ? '' : 's'} updated`);
-  };
+  const bulk = useBulkDialogs({ selectedTickets, userId: user?.id ?? '', companyId: user?.company_id ?? '' });
 
-  const handleBulkArchive = async () => {
-    if (!user || selectedTickets.length === 0) return;
-    setBulkSaving(true);
-    const result = await bulkArchiveRequests(
-      selectedTickets.map((ticket) => ticket.id),
-      bulkReason,
-      { userId: user.id, companyId: user.company_id },
-    );
-    setBulkSaving(false);
-    if (result.error) {
-      toast.error('Bulk archive failed', { description: result.error.message });
-      return;
-    }
-    setBulkArchiveDialogOpen(false);
-    setBulkReason('');
-    setSelectedIds(new Set());
-    await queryClient.invalidateQueries({ queryKey: ['ticketQueue', user.company_id] });
-    toast.success(`${result.updated} request${result.updated === 1 ? '' : 's'} archived`);
-  };
 
-  const handleBulkNotify = async () => {
-    if (!user || selectedTickets.length === 0) return;
-    setBulkSaving(true);
-    const result = await bulkNotifyRequestParticipants(
-      selectedTickets,
-      { audience: bulkNotifyAudience, message: bulkNotifyMessage },
-      { userId: user.id, companyId: user.company_id },
-    );
-    setBulkSaving(false);
-    if (result.error) {
-      toast.error('Bulk notification failed', { description: result.error.message });
-      return;
-    }
-    setBulkNotifyDialogOpen(false);
-    setBulkNotifyMessage('');
-    setSelectedIds(new Set());
-    await queryClient.invalidateQueries({ queryKey: ['ticketQueue', user.company_id] });
-    toast.success(`${result.notified} notification${result.notified === 1 ? '' : 's'} queued`);
-  };
+
 
   const columns: StandardTableColumn<CompanyTicketRecord>[] = [
     {
@@ -1035,7 +960,7 @@ export default function RequestQueue() {
             onSelectionChange={setSelectedIds}
             bulkActions={() => (
               <>
-                <Select value="" onValueChange={(value) => void handleBulkAssign(value)} disabled={bulkSaving}>
+                <Select value="" onValueChange={(value) => void handleBulkAssign(value)} disabled={bulk.bulkSaving}>
                   <SelectTrigger className="h-7 w-[150px] text-xs">
                     <SelectValue placeholder="Assign to..." />
                   </SelectTrigger>
@@ -1046,19 +971,19 @@ export default function RequestQueue() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={handleBulkExportCsv} disabled={bulkSaving}>
+                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={handleBulkExportCsv} disabled={bulk.bulkSaving}>
                   <Download className="h-3 w-3" />
                   CSV
                 </Button>
-                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setBulkPriorityDialogOpen(true)} disabled={bulkSaving}>
+                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={bulk.openPriorityDialog} disabled={bulk.bulkSaving}>
                   <SlidersHorizontal className="h-3 w-3" />
                   Priority
                 </Button>
-                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setBulkNotifyDialogOpen(true)} disabled={bulkSaving}>
+                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={bulk.openNotifyDialog} disabled={bulk.bulkSaving}>
                   <Bell className="h-3 w-3" />
                   Notify
                 </Button>
-                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs text-destructive hover:text-destructive" onClick={() => setBulkArchiveDialogOpen(true)} disabled={bulkSaving}>
+                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs text-destructive hover:text-destructive" onClick={bulk.openArchiveDialog} disabled={bulk.bulkSaving}>
                   <Archive className="h-3 w-3" />
                   Archive
                 </Button>
@@ -1072,76 +997,7 @@ export default function RequestQueue() {
         )}
       </div>
 
-      <Dialog open={bulkPriorityDialogOpen} onOpenChange={(open) => {
-        setBulkPriorityDialogOpen(open);
-        if (!open) setBulkReason('');
-      }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Bulk update priority</DialogTitle>
-            <DialogDescription>Reason is required and will be recorded in the request activity trail.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Select value={bulkPriority} onValueChange={(value) => setBulkPriority(value as TicketPriority)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {priorityOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Textarea value={bulkReason} onChange={(event) => setBulkReason(event.target.value)} rows={3} placeholder="Reason for priority change" />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setBulkPriorityDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => void handleBulkPriorityUpdate()} disabled={bulkSaving || !bulkReason.trim()}>Update {selectedTickets.length}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={bulkArchiveDialogOpen} onOpenChange={(open) => {
-        setBulkArchiveDialogOpen(open);
-        if (!open) setBulkReason('');
-      }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Bulk archive requests</DialogTitle>
-            <DialogDescription>Selected active requests will be cancelled with an admin override reason.</DialogDescription>
-          </DialogHeader>
-          <Textarea value={bulkReason} onChange={(event) => setBulkReason(event.target.value)} rows={3} placeholder="Reason for archiving" />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setBulkArchiveDialogOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => void handleBulkArchive()} disabled={bulkSaving || !bulkReason.trim()}>Archive {selectedTickets.length}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={bulkNotifyDialogOpen} onOpenChange={(open) => {
-        setBulkNotifyDialogOpen(open);
-        if (!open) setBulkNotifyMessage('');
-      }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Bulk notify participants</DialogTitle>
-            <DialogDescription>Send a request notification to the selected audience and record the action.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Select value={bulkNotifyAudience} onValueChange={(value) => setBulkNotifyAudience(value as 'requesters' | 'owners')}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="requesters">Requesters</SelectItem>
-                <SelectItem value="owners">Owners</SelectItem>
-              </SelectContent>
-            </Select>
-            <Textarea value={bulkNotifyMessage} onChange={(event) => setBulkNotifyMessage(event.target.value)} rows={3} placeholder="Notification message" />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setBulkNotifyDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => void handleBulkNotify()} disabled={bulkSaving || !bulkNotifyMessage.trim()}>Notify {selectedTickets.length}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      {bulk.dialogs}
     </div>
   );
 }
