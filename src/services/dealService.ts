@@ -601,6 +601,39 @@ export async function setupInsurance(dealId: string, companyId: string, input: P
   }
 }
 
+export async function updateInsuranceStatus(dealId: string, companyId: string, status: InsuranceStatus, userId: string): Promise<{ error: Error | null }> {
+  try {
+    const updates: Record<string, unknown> = { status };
+    switch (status) {
+      case "cover_note_issued": updates.cover_note_issued_at = new Date().toISOString(); break;
+      case "policy_active": updates.policy_issued_at = new Date().toISOString(); break;
+    }
+    const { error } = await supabase.from("deal_insurance").update(updates).eq("deal_id", dealId);
+    if (error) return { error: new Error(error.message) };
+    await logActivity(dealId, companyId, userId, "insurance_status_changed", { status });
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err : new Error("Failed to update insurance status") };
+  }
+}
+
+export async function updateRegistrationStatus(dealId: string, companyId: string, status: RegistrationStatus, userId: string): Promise<{ error: Error | null }> {
+  try {
+    const updates: Record<string, unknown> = { status };
+    switch (status) {
+      case "submitted": updates.submitted_at = new Date().toISOString(); break;
+      case "registered": updates.registered_at = new Date().toISOString(); break;
+      case "plate_received": updates.plate_received_at = new Date().toISOString(); break;
+    }
+    const { error } = await supabase.from("deal_registration").update(updates).eq("deal_id", dealId);
+    if (error) return { error: new Error(error.message) };
+    await logActivity(dealId, companyId, userId, "registration_status_changed", { status });
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err : new Error("Failed to update registration status") };
+  }
+}
+
 export async function setupRegistration(dealId: string, companyId: string, input: Partial<DealRegistration>, userId: string): Promise<{ data: DealRegistration | null; error: Error | null }> {
   try {
     const { data, error } = await supabase
