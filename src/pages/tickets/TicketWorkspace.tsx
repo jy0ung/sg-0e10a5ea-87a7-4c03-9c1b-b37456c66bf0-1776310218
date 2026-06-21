@@ -27,6 +27,7 @@ import {
   WorkflowStrip,
   MessageDialog,
   AuditTrailPanel,
+  primaryActionLabel,
 } from '@/components/tickets/TicketWorkspaceHelpers';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
