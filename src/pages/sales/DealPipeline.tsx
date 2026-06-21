@@ -132,6 +132,21 @@ export default function DealPipeline() {
             </SelectContent>
           </Select>
         )}
+        {advisors.length > 0 && (
+          <Select value={advisorFilter} onValueChange={setAdvisorFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All Advisors" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Advisors</SelectItem>
+              {advisors.map(advisor => (
+                <SelectItem key={advisor.id} value={advisor.id}>
+                  {advisor.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Button variant="outline" size="sm" onClick={loadPipeline}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
