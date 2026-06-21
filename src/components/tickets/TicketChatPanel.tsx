@@ -17,7 +17,7 @@ interface TicketChatPanelProps {
   readOnly?: boolean;
 }
 
-const EMOJI_CHOICES = ['👍', '🙏', '✅', '⚠️'];
+const EMOJI_CHOICES = ['\u{1F44D}', '\u{1F64F}', '\u2705', '\u26A0\uFE0F'];
 
 export function TicketChatPanel({
   activities,
@@ -30,6 +30,15 @@ export function TicketChatPanel({
   readOnly = false,
 }: TicketChatPanelProps) {
   const messages = activities.filter((activity) => activity.event_type === 'comment_added').slice().reverse();
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      if (draft.trim() && !saving) {
+        onSend();
+      }
+    }
+  };
 
   return (
     <section className="space-y-2 rounded-md border border-border bg-background px-3 py-2.5">
@@ -91,7 +100,8 @@ export function TicketChatPanel({
           <Textarea
             value={draft}
             onChange={(event) => onDraftChange(event.target.value)}
-            placeholder="Write a message"
+            onKeyDown={handleKeyDown}
+            placeholder="Write a message (Ctrl+Enter to send)"
             rows={3}
             disabled={saving}
           />

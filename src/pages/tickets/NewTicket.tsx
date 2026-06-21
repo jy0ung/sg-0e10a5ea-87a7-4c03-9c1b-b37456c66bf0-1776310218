@@ -495,7 +495,9 @@ export default function NewTicket() {
   const draftSavedLabel = draftSavedAt
     ? `Draft saved ${draftSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     : null;
-  const submitBlocker = missingRequiredCustomFields.length > 0
+  const submitBlocker = requiresSubcategory && !selectedSubcategoryKey
+    ? "Please select a subcategory."
+    : missingRequiredCustomFields.length > 0
     ? `${missingRequiredCustomFields.length} required field${missingRequiredCustomFields.length === 1 ? '' : 's'} remaining: ${missingRequiredCustomFields
       .map((field) => field.label)
       .join(', ')}`
