@@ -93,6 +93,7 @@ export default function DealDashboard() {
           title="Completed"
           value={data.completed_this_month}
           icon={<TrendingUp className="h-4 w-4" />}
+          onClick={() => navigate("/sales/deals?stage=completed")}
         />
         <KpiCard
           title="Revenue"
@@ -110,25 +111,25 @@ export default function DealDashboard() {
           <CardContent className="space-y-2">
             {data.loan_pending > 0 && (
               <div className="flex items-center justify-between p-2 rounded bg-muted">
-                <span>Loan approvals pending</span>
+                <Button variant="link" className="h-auto p-0" onClick={() => navigate("/sales/deals?stage=loan_submission")}>Loan approvals pending</Button>
                 <Badge variant="secondary">{data.loan_pending}</Badge>
               </div>
             )}
             {data.registration_pending > 0 && (
               <div className="flex items-center justify-between p-2 rounded bg-muted">
-                <span>Registration pending</span>
+                <Button variant="link" className="h-auto p-0" onClick={() => navigate("/sales/deals?stage=registration")}>Registration pending</Button>
                 <Badge variant="secondary">{data.registration_pending}</Badge>
               </div>
             )}
             {data.disbursement_pending > 0 && (
               <div className="flex items-center justify-between p-2 rounded bg-muted">
-                <span>Disbursement pending</span>
+                <Button variant="link" className="h-auto p-0" onClick={() => navigate("/sales/deals?stage=disbursement")}>Disbursement pending</Button>
                 <Badge variant="secondary">{data.disbursement_pending}</Badge>
               </div>
             )}
             {data.overdue > 0 && (
               <div className="flex items-center justify-between p-2 rounded bg-destructive/10">
-                <span className="text-destructive">Overdue deals</span>
+                <Button variant="link" className="h-auto p-0 text-destructive" onClick={() => navigate("/sales/deals?stage=stalled")}>Overdue deals</Button>
                 <Badge variant="destructive">{data.overdue}</Badge>
               </div>
             )}
