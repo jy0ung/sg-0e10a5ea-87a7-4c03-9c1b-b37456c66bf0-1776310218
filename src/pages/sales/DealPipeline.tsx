@@ -183,7 +183,7 @@ export default function DealPipeline() {
         <div className="h-8 w-48 bg-muted rounded animate-pulse mb-4" />
         <div className="flex gap-3 overflow-x-auto pb-4">
           {PIPELINE_STAGES.map((_, i) => (
-            <div key={i} className="flex-shrink-0 w-60 rounded-xl border border-border bg-secondary/20 animate-pulse">
+            <div key={i} className="flex-shrink-0 w-52 md:w-60 rounded-xl border border-border bg-secondary/20 animate-pulse">
               <div className="px-3 py-2 border-b border-border">
                 <div className="h-4 w-20 bg-muted rounded" />
               </div>
@@ -207,8 +207,8 @@ export default function DealPipeline() {
       />
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap items-center gap-2 md:gap-3">
+        <div className="relative flex-1 w-full md:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search deals..."
@@ -314,7 +314,7 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex-shrink-0 w-60 rounded-xl border transition-colors ${
+      className={`flex-shrink-0 w-52 md:w-60 rounded-xl border transition-colors ${
         isOver ? 'border-primary bg-primary/5' : 'border-border bg-secondary/20'
       }`}
     >

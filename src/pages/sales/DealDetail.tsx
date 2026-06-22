@@ -156,7 +156,7 @@ export default function DealDetail() {
     <div className="space-y-4 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate('/sales/deals')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -275,7 +275,7 @@ export default function DealDetail() {
 
         {/* Overview Tab */}
         <TabsContent value="overview">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Customer Info */}
             <Card>
               <CardHeader>
@@ -549,7 +549,7 @@ function LoanTab({ deal, onUpdate }: { deal: Deal; onUpdate: () => void }) {
         <CardTitle className="text-base">Loan Details</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label>Bank</Label>
             <Input value={form.bank_name} onChange={(e) => setForm(f => ({ ...f, bank_name: e.target.value }))} />
@@ -664,7 +664,7 @@ function InsuranceTab({ deal, onUpdate }: { deal: Deal; onUpdate: () => void }) 
         <CardTitle className="text-base">Insurance Details</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label>Insurer</Label>
             <Input value={form.insurer_name} onChange={(e) => setForm(f => ({ ...f, insurer_name: e.target.value }))} />
@@ -743,7 +743,7 @@ function RegistrationTab({ deal, onUpdate }: { deal: Deal; onUpdate: () => void 
         <CardTitle className="text-base">Registration Details</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label>JPJ Reference</Label>
             <Input value={form.jpj_ref} onChange={(e) => setForm(f => ({ ...f, jpj_ref: e.target.value }))} />
@@ -861,7 +861,7 @@ function DocumentsTab({ deal }: { deal: Deal }) {
           <div className="space-y-2">
             {documents.map(doc => (
               <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 md:gap-3">
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="font-medium text-sm">{doc.file_name}</p>

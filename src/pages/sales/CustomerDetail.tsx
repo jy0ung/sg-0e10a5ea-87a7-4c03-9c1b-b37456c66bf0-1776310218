@@ -166,7 +166,7 @@ export default function CustomerDetail() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Deals</p>
@@ -194,7 +194,7 @@ export default function CustomerDetail() {
       </div>
 
       {/* Contact Info + Vehicle History */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">

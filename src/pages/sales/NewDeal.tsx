@@ -78,7 +78,7 @@ export default function NewDeal() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
           {/* Customer */}
           <Card>
             <CardHeader>
@@ -245,7 +245,7 @@ export default function NewDeal() {
         </div>
 
         {/* Submit */}
-        <div className="flex justify-end gap-3 mt-6">
+        <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 mt-6">
           <Button variant="outline" type="button" onClick={() => navigate('/sales/deals')}>
             Cancel
           </Button>
