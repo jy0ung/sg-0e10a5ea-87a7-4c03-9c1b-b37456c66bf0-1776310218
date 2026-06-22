@@ -299,6 +299,7 @@ export default function SettingsPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
           {canManageModules && <TabsTrigger value="modules">Modules</TabsTrigger>}
           {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
           {isAdmin && <TabsTrigger value="organization">Organization</TabsTrigger>}
@@ -323,6 +324,10 @@ export default function SettingsPage() {
             changingPassword={changingPassword}
             onChangePassword={handleChangePassword}
           />
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <NotificationSettings />
         </TabsContent>
 
         {canManageModules && (
