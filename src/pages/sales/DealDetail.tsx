@@ -899,9 +899,16 @@ function ActivityTab({ activities }: { activities: DealActivity[] }) {
                 <div className="flex-1">
                   <p className="font-medium text-sm">{activity.action.replace(/_/g, ' ')}</p>
                   {activity.metadata && (
-                    <pre className="text-xs text-muted-foreground mt-1">
-                      {JSON.stringify(activity.metadata, null, 2)}
-                    </pre>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {(() => {
+                      const m = activity.metadata as Record<string, unknown>;
+                      if (m.before && m.after) return String(m.before) + " \u2192 " + String(m.after);
+                      if (m.status) return "Status: " + String(m.status);
+                      if (m.doc_type) return String(m.doc_type).replace(/_/g, " ") + ": " + String(m.file_name || "");
+                      if (m.source) return "Source: " + String(m.source);
+                      return Object.entries(m).filter(([,v]) => v != null).map(([k, v]) => k.replace(/_/g, " ") + ": " + String(v)).join(", ");
+                    })()}
+                  </p>
                   )}
                 </div>
                 <span className="text-xs text-muted-foreground">
