@@ -33,6 +33,7 @@ export interface Deal {
   variant: string | null;
   colour: string | null;
   chassis_no: string | null;
+  vehicle_id: string | null;
   selling_price: number | null;
   deposit_amount: number | null;
   deposit_date: string | null;
@@ -801,6 +802,55 @@ export async function getDocuments(dealId: string): Promise<{ data: DealDocument
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to get documents');
     return { data: [], error };
+  }
+}
+
+// ============================================================
+// Vehicle Linking
+// ============================================================
+
+export async function linkDealToVehicle(dealId: string, vehicleId: string, userId: string): Promise<{ error: Error | null }> {
+  try {
+    const { error } = await supabase
+      .from("deals")
+      .update({ vehicle_id: vehicleId })
+      .eq("id", dealId);
+    if (error) return { error: new Error(error.message) };
+    await logActivity(dealId, "", userId, "vehicle_linked", { vehicle_id: vehicleId });
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err : new Error("Failed to link vehicle") };
+  }
+}
+
+export async function unlinkDealFromVehicle(dealId: string, userId: string): Promise<{ error: Error | null }> {
+  try {
+    const { error } = await supabase
+      .from("deals")
+      .update({ vehicle_id: null })
+      .eq("id", dealId);
+    if (error) return { error: new Error(error.message) };
+    await logActivity(dealId, "", userId, "vehicle_unlinked", {});
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err : new Error("Failed to unlink vehicle") };
+  }
+}
+
+export async function getDealByVehicleId(vehicleId: string): Promise<{ data: Deal | null; error: Error | null }> {
+  try {
+    const { data, error } = await supabase
+      .from("deals")
+      .select("*")
+      .eq("vehicle_id", vehicleId)
+      .neq("stage", "completed")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) return { data: null, error: new Error(error.message) };
+    return { data, error: null };
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err : new Error("Failed to get deal") };
   }
 }
 

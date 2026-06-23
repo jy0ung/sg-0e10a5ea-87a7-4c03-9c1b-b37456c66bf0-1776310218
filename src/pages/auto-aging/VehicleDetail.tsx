@@ -7,7 +7,7 @@ import { useData } from '@/contexts/DataContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { getVehicleByChassis } from '@/services/vehicleService';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, Pencil, TrendingUp } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, AlertTriangle, Loader2, Pencil, Plus, TrendingUp } from 'lucide-react';
 import { KPI_DEFINITIONS } from '@/data/kpi-definitions';
 import { VehicleEditDialog } from '@/components/vehicles/VehicleEditDialog';
 import { forecastVehicleMilestones, getVehicleRisk } from '@/utils/forecasting';
@@ -111,6 +111,9 @@ export default function VehicleDetail() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+            </Button>
+            <Button size="sm" onClick={() => navigate('/sales/deals/new?chassis=' + encodeURIComponent(vehicle.chassis_no || '') + '&model=' + encodeURIComponent(vehicle.model || '') + '&colour=' + encodeURIComponent(vehicle.colour || ''))}>
+              <Plus className="h-3.5 w-3.5 mr-1" />Create Deal
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-3.5 w-3.5 mr-1" />Back

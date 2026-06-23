@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { createDeal, type CreateDealInput } from '@/services/dealService';
 
 export default function NewDeal() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<CreateDealInput>({
@@ -22,15 +23,16 @@ export default function NewDeal() {
     customer_ic: '',
     customer_phone: '',
     customer_email: '',
-    model_name: '',
-    variant: '',
-    colour: '',
+    model_name: searchParams.get('model') || '',
+    variant: searchParams.get('variant') || '',
+    colour: searchParams.get('colour') || '',
+    chassis_no: searchParams.get('chassis') || '',
     selling_price: 0,
     deposit_amount: 0,
     discount_amount: 0,
     accessories_amount: 0,
-    lead_source: '',
-    lead_source_detail: '',
+    lead_source: 'auto_aging',
+    lead_source_detail: searchParams.get('chassis') ? 'From Auto Aging vehicle explorer' : '',
     notes: '',
   });
 
