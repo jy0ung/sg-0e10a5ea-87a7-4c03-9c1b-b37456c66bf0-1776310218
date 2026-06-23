@@ -13,7 +13,7 @@ import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getRoleHomeKpis, type RoleHomeKpi } from '@/services/kpiHomeService';
 import { getNotifications } from '@flc/platform-services';
-import { listDeals, getStageLabel } from '@/services/dealService';
+import { listDeals, getStageLabel, getStageOrder } from '@/services/dealService';
 import { loadInbox } from '@/services/inboxService';
 import { hrefForKpi } from './home/hrefForKpi';
 import { isHrmsWorkspacePath, openDedicatedHrmsWorkspace } from '@/lib/hrmsWorkspace';
@@ -151,6 +151,27 @@ export default function Home() {
     staleTime: 30_000,
   });
 
+  const pipelineQuery = useQuery({
+    queryKey: ['home-pipeline', companyId],
+    queryFn: async () => {
+      const { data, error } = await listDeals({
+        company_id: companyId,
+        limit: 500,
+      });
+      if (error) throw error;
+      const active = data.filter(d => d.stage !== 'completed');
+      const stages = getStageOrder().filter(s => s !== 'completed');
+      return stages.map(stage => ({
+        stage,
+        label: getStageLabel(stage),
+        count: active.filter(d => d.stage === stage).length,
+        value: active.filter(d => d.stage === stage).reduce((s, d) => s + (d.total_amount || 0), 0),
+      }));
+    },
+    enabled: !!companyId,
+    staleTime: 60_000,
+  });
+
   const inboxQuery = useQuery({
     queryKey: ['unified-inbox', companyId, user?.id, includeReconciliation],
     queryFn: () => loadInbox(companyId, {
@@ -202,6 +223,9 @@ export default function Home() {
     return days > 7;
   });
   const urgentDeals = stalledDeals.slice(0, 5);
+  const pipelineData = pipelineQuery.data ?? [];
+  const totalPipelineValue = pipelineData.reduce((s, p) => s + p.value, 0);
+  const totalPipelineCount = pipelineData.reduce((s, p) => s + p.count, 0);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -316,6 +340,61 @@ export default function Home() {
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* Pipeline Overview */}
+      {pipelineData.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pipeline Overview</h2>
+              <p className="mt-1 text-xs text-muted-foreground">{totalPipelineCount} active deals · RM {(totalPipelineValue / 1000).toFixed(0)}k total value</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate('/sales/pipeline')}>
+              Open pipeline
+              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {pipelineData.filter(p => p.count > 0).map(item => (
+              <button
+                key={item.stage}
+                type="button"
+                onClick={() => navigate('/sales/deals?stage=' + item.stage)}
+                className="surface-card surface-card-hover flex-shrink-0 flex flex-col gap-1 p-3 min-w-[120px] text-left"
+              >
+                <span className="text-lg font-bold text-foreground">{item.count}</span>
+                <span className="text-xs text-muted-foreground truncate">{item.label}</span>
+                {item.value > 0 && (
+                  <span className="text-[10px] text-muted-foreground">RM {(item.value / 1000).toFixed(0)}k</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* System Alerts */}
+      {stalledDeals.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">System Alerts</h2>
+            <Badge variant="destructive" className="text-[10px]">{stalledDeals.length}</Badge>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              {stalledDeals.length} deal{stalledDeals.length > 1 ? 's' : ''} stuck for over 7 days
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+              These deals need attention. Review and advance or escalate.
+            </p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate('/sales/deals')}>
+              Review stalled deals
+              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+            </Button>
           </div>
         </section>
       )}
