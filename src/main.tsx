@@ -81,6 +81,7 @@ const ImportReviewQueue = lazy(() => import("./pages/auto-aging/ImportReviewQueu
 const ImportReviewDetail = lazy(() => import("./pages/auto-aging/ImportReviewDetail"));
 const SLAAdmin = lazy(() => import("./pages/auto-aging/SLAAdmin"));
 const MappingAdmin = lazy(() => import("./pages/auto-aging/MappingAdmin"));
+const VehicleLifecycle = lazy(() => import("./pages/auto-aging/VehicleLifecycle"));
 const VehicleDetail = lazy(() => import("./pages/auto-aging/VehicleDetail"));
 const CommissionDashboard = lazy(() => import("./pages/auto-aging/CommissionDashboard"));
 const ReportCenter = lazy(() => import("./pages/auto-aging/ReportCenter"));
@@ -226,6 +227,7 @@ const router = createBrowserRouter([
       { path: "auto-aging", element: withModuleAccess('auto-aging', <R scope="Auto-Aging"><S><AutoAgingDashboard /></S></R>) },
       { path: "auto-aging/vehicles", element: withModuleAccess('auto-aging', <R scope="Vehicle Explorer"><S><VehicleExplorer /></S></R>) },
       { path: "auto-aging/vehicles/:chassisNo", element: withModuleAccess('auto-aging', <R scope="Vehicle Detail"><S><VehicleDetail /></S></R>) },
+      { path: "auto-aging/lifecycle/:chassisNo", element: withModuleAccess("auto-aging", <R scope="Vehicle Lifecycle"><S><VehicleLifecycle /></S></R>) },
       { path: "auto-aging/import", element: withModuleAccess('auto-aging', <RequireRole roles={MANAGER_AND_UP} section="Auto Aging"><R scope="Import Center"><S><ImportCenter /></S></R></RequireRole>) },
       { path: "auto-aging/review", element: withModuleAccess('auto-aging', <RequireRole roles={MANAGER_AND_UP} section="Auto Aging"><R scope="Import Review Queue"><S><ImportReviewQueue /></S></R></RequireRole>) },
       { path: "auto-aging/review/:batchId", element: withModuleAccess('auto-aging', <RequireRole roles={MANAGER_AND_UP} section="Auto Aging"><R scope="Import Review Detail"><S><ImportReviewDetail /></S></R></RequireRole>) },
