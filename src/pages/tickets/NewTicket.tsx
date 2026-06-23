@@ -53,6 +53,8 @@ import {
 
 export default function NewTicket() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const linkedDealId = searchParams.get('deal_id') || null;
   
   const { user } = useAuth();
   const { categories, loading: categoriesLoading, error: categoriesError } =
@@ -364,6 +366,7 @@ export default function NewTicket() {
         ),
         vso_number: null,
         duplicate_of_ticket_id: duplicateOfTicketId ?? null,
+        deal_id: linkedDealId,
       },
       { userId: user.id, companyId: user.company_id, submitterRole: user.role },
     );

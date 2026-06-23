@@ -152,6 +152,16 @@ export default function DealList() {
       />
 
       {/* Filters */}
+      <div className="rounded-lg border bg-card p-3 shadow-sm">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-bold">
+              ⚙
+            </div>
+            <p className="text-sm font-semibold leading-tight text-foreground">Filters</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 pt-2">
       <div className="flex flex-wrap items-center gap-2 md:gap-3">
         <div className="relative flex-1 w-full md:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -187,6 +197,9 @@ export default function DealList() {
           <Plus className="h-4 w-4 mr-2" />
           New Deal
         </Button>
+      </div>
+
+        </div>
       </div>
 
       {/* Table */}
