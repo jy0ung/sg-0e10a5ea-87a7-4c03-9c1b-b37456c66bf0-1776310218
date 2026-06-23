@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useData } from '@/contexts/DataContext';
 import { searchVehicles, type VehicleSearchParams } from '@/services/vehicleService';
-import { Search, Package, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Package, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { getAutoAgingFieldLabel } from '@/config/autoAgingFieldLabels';
+import { useNavigate } from 'react-router-dom';
 
 const PAGE_SIZE = 50;
 
@@ -30,6 +31,7 @@ function deriveStatus(v: { delivery_date?: string; reg_date?: string; date_recei
 
 export default function StockBalance() {
   const { availableBranches, loading: contextLoading } = useData();
+  const navigate = useNavigate();
   const [search, setSearch]         = useState('');
   const [branchFilter, setBranch]   = useState('all');
   const [page, setPage]             = useState(0);
@@ -89,6 +91,18 @@ export default function StockBalance() {
         description="Live vehicle inventory by chassis number and location"
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Inventory', path: '/inventory/stock' }, { label: 'Stock Balance' }]}
       />
+
+      {/* Unification banner */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 px-4 py-3 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Stock view is merging with Auto Aging</p>
+          <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">All stock and aging data will be consolidated into one unified view.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => navigate("/auto-aging")}>
+          Open Auto Aging
+          <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+        </Button>
+      </div>
 
       <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-5">
         {(Object.entries(statusCounts) as [string, number][]).map(([s, n]) => (
