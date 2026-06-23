@@ -53,6 +53,7 @@ import {
 
 export default function NewTicket() {
   const navigate = useNavigate();
+  
   const { user } = useAuth();
   const { categories, loading: categoriesLoading, error: categoriesError } =
     useRequestCategories(user?.company_id);
