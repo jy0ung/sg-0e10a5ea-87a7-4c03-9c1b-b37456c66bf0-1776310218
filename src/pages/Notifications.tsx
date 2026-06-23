@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { getNotifications, markAsRead, markAllAsRead, NotificationRow } from '@flc/platform-services';
 import { useSupabaseChannel, type SupabasePayload } from '@flc/supabase';
 import { STALE } from '@/lib/queryClient';
@@ -14,6 +15,7 @@ import { EmptyState, PageErrorState } from '@/components/shared/PageState';
 
 export default function Notifications() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const notifKey = ['notifications', user?.id ?? ''] as const;
 
@@ -111,8 +113,8 @@ export default function Notifications() {
               type="button"
               key={n.id}
               className={`glass-panel w-full p-4 flex items-start gap-3 text-left transition-colors hover:bg-secondary/30 ${!n.read ? 'border-l-2 border-primary cursor-pointer' : 'cursor-default'}`}
-              onClick={() => !n.read && handleMarkRead(n.id)}
-              disabled={n.read}
+              onClick={() => { if (!n.read) handleMarkRead(n.id); if (n.action_url) navigate(n.action_url); }}
+              disabled={n.read && !n.action_url}
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
@@ -120,6 +122,9 @@ export default function Notifications() {
                   <StatusBadge status={n.type} />
                 </div>
                 <p className="text-xs text-muted-foreground">{n.message}</p>
+                {n.action_url && (
+                  <p className="text-[10px] text-primary mt-1 font-medium">Click to view &rarr;</p>
+                )}
                 <p className="text-[10px] text-muted-foreground mt-1">
                   {n.created_at ? new Date(n.created_at).toLocaleString() : ''}
                 </p>

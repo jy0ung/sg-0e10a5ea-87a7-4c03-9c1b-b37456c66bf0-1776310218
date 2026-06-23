@@ -953,6 +953,7 @@ export async function checkStalledDeals(companyId: string): Promise<{ notified: 
         title: "Stalled deals alert",
         message,
         type: "warning",
+        actionUrl: "/sales/deals",
       }]);
       notified++;
     }
