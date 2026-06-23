@@ -65,11 +65,24 @@ export default function SalesOrders() {
   const [vehicleSearchLoading, setVehicleSearchLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [unlinkTarget, setUnlinkTarget] = useState<SalesOrder | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   const filtered = salesOrders.filter(o =>
     (statusFilter === 'all' || o.status === statusFilter) &&
     [o.orderNo, o.customerName, o.model, o.branchCode, o.salesmanName].join(' ').toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+
+
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const invoicedOrderIds = new Set(invoices.map(inv => inv.salesOrderId).filter(Boolean));
 
@@ -179,6 +192,16 @@ export default function SalesOrders() {
             </SelectContent>
           </Select>
           <span className="rounded-md border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">{filtered.length} orders</span>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
+          <span className="text-xs text-muted-foreground">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
+          <span className="text-xs text-muted-foreground">Page {page} of {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
+        </div>
         </div>
 
         <ScrollableRegion className="hidden min-h-0 flex-1 overflow-auto sm:block" label="Sales orders table">
@@ -197,7 +220,7 @@ export default function SalesOrders() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(o => (
+              {paged.map(o => (
                 <tr key={o.id} className="border-b border-border last:border-0 hover:bg-secondary/20">
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-medium">{o.orderNo}</td>
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-muted-foreground">{o.vsoNo ?? '—'}</td>
@@ -236,7 +259,7 @@ export default function SalesOrders() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-muted-foreground text-xs">No orders found</td></tr>}
+              {paged.length === 0 && <tr><td colSpan={9} className="py-8 text-center text-muted-foreground text-xs">No orders found</td></tr>}
             </tbody>
           </table>
         </ScrollableRegion>

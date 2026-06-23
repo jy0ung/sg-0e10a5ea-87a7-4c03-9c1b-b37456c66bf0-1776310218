@@ -13,6 +13,7 @@ import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getRoleHomeKpis, type RoleHomeKpi } from '@/services/kpiHomeService';
 import { getNotifications } from '@flc/platform-services';
+import { listDeals, getStageLabel } from '@/services/dealService';
 import { loadInbox } from '@/services/inboxService';
 import { hrefForKpi } from './home/hrefForKpi';
 import { isHrmsWorkspacePath, openDedicatedHrmsWorkspace } from '@/lib/hrmsWorkspace';
@@ -135,6 +136,21 @@ export default function Home() {
     staleTime: 30_000,
   });
 
+  const dealActionsQuery = useQuery({
+    queryKey: ['home-deal-actions', companyId, user?.id],
+    queryFn: async () => {
+      const { data, error } = await listDeals({
+        company_id: companyId,
+        sales_advisor_id: user!.id,
+        limit: 50,
+      });
+      if (error) throw error;
+      return data.filter(d => d.stage !== 'completed');
+    },
+    enabled: !!companyId && !!user?.id,
+    staleTime: 30_000,
+  });
+
   const inboxQuery = useQuery({
     queryKey: ['unified-inbox', companyId, user?.id, includeReconciliation],
     queryFn: () => loadInbox(companyId, {
@@ -180,6 +196,12 @@ export default function Home() {
   const inboxItems = inboxQuery.data?.items ?? [];
   const unreadCount = (notificationsQuery.data ?? []).filter(n => !n.read).length;
   const dash = (n: number | undefined) => (n === undefined ? '—' : String(n));
+  const myDeals = dealActionsQuery.data ?? [];
+  const stalledDeals = myDeals.filter(d => {
+    const days = Math.floor((Date.now() - new Date(d.stage_entered_at).getTime()) / (1000 * 60 * 60 * 24));
+    return days > 7;
+  });
+  const urgentDeals = stalledDeals.slice(0, 5);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -244,6 +266,59 @@ export default function Home() {
           data-testid="home-metric-modules"
         />
       </section>
+
+      {/* My Action Items */}
+      {myDeals.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">My Action Items</h2>
+              <p className="mt-1 text-xs text-muted-foreground">{myDeals.length} deals requiring your attention</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate('/sales/deals')}>
+              View all deals
+              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {urgentDeals.map(deal => {
+              const days = Math.floor((Date.now() - new Date(deal.stage_entered_at).getTime()) / (1000 * 60 * 60 * 24));
+              return (
+                <button
+                  key={deal.id}
+                  type="button"
+                  onClick={() => navigate(`/sales/deals/${deal.id}`)}
+                  className="surface-card surface-card-hover flex flex-col gap-1.5 p-3 text-left"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-foreground truncate">{deal.customer_name}</span>
+                    <span className={`text-xs font-medium ${days > 7 ? 'text-destructive' : 'text-muted-foreground'}`}>{days}d</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">{deal.model_name || '—'} {deal.variant}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      {getStageLabel(deal.stage)}
+                    </span>
+                    {deal.total_amount && (
+                      <span className="text-xs font-medium text-foreground">RM {deal.total_amount.toLocaleString()}</span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+            {stalledDeals.length > 5 && (
+              <button
+                type="button"
+                onClick={() => navigate('/sales/deals')}
+                className="surface-card surface-card-hover flex items-center justify-center gap-2 p-3 text-sm text-muted-foreground"
+              >
+                +{stalledDeals.length - 5} more stalled deals
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Main grid */}
       <div className="grid gap-4 lg:grid-cols-3">
