@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, RefreshCw, ChevronRight, GripVertical } from 'lucide-react';
+import { Plus, Search, RefreshCw, ChevronRight, GripVertical, CheckSquare, Square, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
@@ -49,6 +49,7 @@ export default function DealPipeline() {
   const [advisorFilter, setAdvisorFilter] = useState<string>('all');
   const [advisors, setAdvisors] = useState<Array<{id: string; name: string}>>([]);
   const [activeDeal, setActiveDeal] = useState<Deal | null>(null);
+  const [selectedDeals, setSelectedDeals] = useState<Set<string>>(new Set());
   const [movingDeal, setMovingDeal] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -177,6 +178,43 @@ export default function DealPipeline() {
     setMovingDeal(null);
   };
 
+  const toggleSelect = (dealId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedDeals(prev => {
+      const next = new Set(prev);
+      if (next.has(dealId)) next.delete(dealId);
+      else next.add(dealId);
+      return next;
+    });
+  };
+
+  // Compute valid bulk target stages (intersection of all selected deals' valid transitions)
+  const allDeals = columns.flatMap(c => c.deals);
+  const selectedDealObjects = allDeals.filter(d => selectedDeals.has(d.id));
+  const bulkTargetStages = selectedDeals.size > 0
+    ? selectedDealObjects.reduce<DealStage[]>((common, deal) => {
+        const targets = getValidTransitions(deal.stage as DealStage);
+        if (common === null) return targets;
+        return common.filter(s => targets.includes(s));
+      }, null as unknown as DealStage[])
+    : [];
+
+  const handleBulkAdvance = async (targetStage: DealStage) => {
+    if (!user || selectedDeals.size === 0) return;
+    const dealIds = Array.from(selectedDeals);
+    let successCount = 0;
+    let failCount = 0;
+    for (const dealId of dealIds) {
+      const { error } = await advanceStage(dealId, targetStage, user.id);
+      if (error) failCount++;
+      else successCount++;
+    }
+    if (successCount > 0) toast.success(`${successCount} deal(s) moved to ${getStageLabel(targetStage)}`);
+    if (failCount > 0) toast.error(`${failCount} deal(s) failed to move`);
+    setSelectedDeals(new Set());
+    loadPipeline();
+  };
+
   if (loading) {
     return (
       <div className="space-y-4 animate-fade-in overflow-hidden">
@@ -284,6 +322,8 @@ export default function DealPipeline() {
               key={column.stage}
               column={column}
               movingDeal={movingDeal}
+              selectedDeals={selectedDeals}
+              onToggleSelect={toggleSelect}
               onDealClick={(dealId) => navigate(`/sales/deals/${dealId}`)}
             />
           ))}
@@ -292,6 +332,29 @@ export default function DealPipeline() {
           {activeDeal ? <DraggableDealCard deal={activeDeal} isDragging /> : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Bulk Action Bar */}
+      {selectedDeals.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-background border rounded-lg shadow-lg px-4 py-3 flex items-center gap-4">
+          <span className="text-sm font-medium">{selectedDeals.size} deal(s) selected</span>
+          {bulkTargetStages.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Move to:</span>
+              {bulkTargetStages.map(stage => (
+                <Button key={stage} size="sm" variant="outline" onClick={() => handleBulkAdvance(stage)}>
+                  {getStageLabel(stage)}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">No common stage transition available</span>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => setSelectedDeals(new Set())}>
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -303,10 +366,14 @@ export default function DealPipeline() {
 function DroppableColumn({
   column,
   movingDeal,
+  selectedDeals,
+  onToggleSelect,
   onDealClick,
 }: {
   column: PipelineColumn;
   movingDeal: string | null;
+  selectedDeals: Set<string>;
+  onToggleSelect: (dealId: string, e: React.MouseEvent) => void;
   onDealClick: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.stage });
@@ -349,6 +416,8 @@ function DroppableColumn({
                 key={deal.id}
                 deal={deal}
                 isMoving={movingDeal === deal.id}
+                isSelected={selectedDeals.has(deal.id)}
+                onToggleSelect={(e) => onToggleSelect(deal.id, e)}
                 onClick={() => onDealClick(deal.id)}
               />
             ))
@@ -367,11 +436,15 @@ function DraggableDealCard({
   deal,
   isDragging,
   isMoving,
+  isSelected,
+  onToggleSelect,
   onClick,
 }: {
   deal: Deal;
   isDragging?: boolean;
   isMoving?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (e: React.MouseEvent) => void;
   onClick?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: deal.id });
@@ -390,11 +463,25 @@ function DraggableDealCard({
       style={style}
       className={`transition-all ${
         isDragging ? 'opacity-90 shadow-lg rotate-2 scale-105' : ''
-      } ${isMoving ? 'opacity-50' : ''} ${onClick ? 'cursor-pointer hover:shadow-md' : ''}`}
+      } ${isMoving ? 'opacity-50' : ''} ${onClick ? 'cursor-pointer hover:shadow-md' : ''} ${
+        isSelected ? 'ring-2 ring-primary' : ''
+      }`}
       onClick={onClick}
     >
       <CardContent className="p-3">
         <div className="flex items-start gap-2">
+          {onToggleSelect && (
+            <button
+              type="button"
+              className="flex-shrink-0 p-0.5 mt-0.5"
+              onClick={onToggleSelect}
+              aria-label={isSelected ? 'Deselect deal' : 'Select deal'}
+            >
+              {isSelected
+                ? <CheckSquare className="h-4 w-4 text-primary" />
+                : <Square className="h-4 w-4 text-muted-foreground" />}
+            </button>
+          )}
           <div
             {...attributes}
             {...listeners}
