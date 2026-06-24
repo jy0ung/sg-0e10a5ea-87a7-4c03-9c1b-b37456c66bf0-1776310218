@@ -67,19 +67,11 @@ export default function SalesOrders() {
   const [unlinkTarget, setUnlinkTarget] = useState<SalesOrder | null>(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 25;
 
   const filtered = salesOrders.filter(o =>
     (statusFilter === 'all' || o.status === statusFilter) &&
     [o.orderNo, o.customerName, o.model, o.branchCode, o.salesmanName].join(' ').toLowerCase().includes(search.toLowerCase())
   );
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-
-
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -192,11 +184,6 @@ export default function SalesOrders() {
             </SelectContent>
           </Select>
           <span className="rounded-md border bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">{filtered.length} orders</span>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
-          <span className="text-xs text-muted-foreground">Page {page} of {totalPages}</span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
-        </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
           <span className="text-xs text-muted-foreground">Page {page} of {totalPages}</span>
