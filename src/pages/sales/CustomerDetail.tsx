@@ -7,10 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StandardTable } from '@/components/shared/StandardTable';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText, Phone, Mail, CreditCard, Car, History, User } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, FileText, Phone, Mail, CreditCard, Car, History, User, MessageSquare, MapPin, StickyNote, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { listDeals, getActivities, getStageLabel, type Deal, type DealActivity } from '@/services/dealService';
+import { listCommunications, createCommunication, deleteCommunication, type CustomerCommunication, type CommunicationType } from '@/services/customerCommunicationService';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +23,9 @@ export default function CustomerDetail() {
   const [loading, setLoading] = useState(true);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [activities, setActivities] = useState<DealActivity[]>([]);
+  const [comms, setComms] = useState<CustomerCommunication[]>([]);
+  const [newComm, setNewComm] = useState<{ type: CommunicationType; subject: string; body: string }>({ type: 'call', subject: '', body: '' });
+  const [showCommForm, setShowCommForm] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerIc, setCustomerIc] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -55,6 +62,10 @@ export default function CustomerDetail() {
       }
       allActivities.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setActivities(allActivities.slice(0, 50));
+      // Fetch communications
+      listCommunications(user.company_id, id!).then(({ data: commData }) => {
+        if (commData) setComms(commData);
+      }).catch(() => {});
     } catch {
       toast.error('Failed to load customer data');
     } finally {
@@ -261,6 +272,7 @@ export default function CustomerDetail() {
         <TabsList>
           <TabsTrigger value="deals">Deal History ({deals.length})</TabsTrigger>
           <TabsTrigger value="activity">Activity ({activities.length})</TabsTrigger>
+          <TabsTrigger value="comms">Communications ({comms.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="deals">
@@ -319,6 +331,81 @@ export default function CustomerDetail() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="comms">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Customer Communications
+                <Button variant="outline" size="sm" className="ml-auto" onClick={() => setShowCommForm(!showCommForm)}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Log Communication
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {showCommForm && (
+                <div className="space-y-3 p-4 rounded border bg-muted/30">
+                  <div className="flex gap-3">
+                    <Select value={newComm.type} onValueChange={v => setNewComm(c => ({ ...c, type: v as CommunicationType }))}>
+                      <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="call">Call</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="visit">Visit</SelectItem>
+                        <SelectItem value="message">Message</SelectItem>
+                        <SelectItem value="meeting">Meeting</SelectItem>
+                        <SelectItem value="note">Note</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input placeholder="Subject" value={newComm.subject} onChange={e => setNewComm(c => ({ ...c, subject: e.target.value }))} className="h-8" />
+                  </div>
+                  <Textarea placeholder="Details..." value={newComm.body} onChange={e => setNewComm(c => ({ ...c, body: e.target.value }))} rows={3} />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={async () => {
+                      if (!user?.company_id || !id) return;
+                      const { data } = await createCommunication(user.company_id, user.id, { customerId: id, ...newComm });
+                      if (data) { setComms(prev => [data, ...prev]); setNewComm({ type: 'call', subject: '', body: '' }); setShowCommForm(false); }
+                    }}>Save</Button>
+                    <Button variant="outline" size="sm" onClick={() => setShowCommForm(false)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
+              {comms.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No communications logged</p>
+              ) : (
+                <div className="space-y-2">
+                  {comms.map(c => (
+                    <div key={c.id} className="flex items-start gap-3 p-3 rounded border hover:bg-muted/30">
+                      <div className="mt-0.5">
+                        {c.type === 'call' && <Phone className="h-4 w-4 text-blue-500" />}
+                        {c.type === 'email' && <Mail className="h-4 w-4 text-green-500" />}
+                        {c.type === 'visit' && <MapPin className="h-4 w-4 text-orange-500" />}
+                        {c.type === 'meeting' && <MessageSquare className="h-4 w-4 text-purple-500" />}
+                        {c.type === 'message' && <MessageSquare className="h-4 w-4 text-cyan-500" />}
+                        {c.type === 'note' && <StickyNote className="h-4 w-4 text-yellow-500" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium capitalize">{c.type}</span>
+                          {c.subject && <span className="text-sm text-muted-foreground">— {c.subject}</span>}
+                        </div>
+                        {c.body && <p className="text-sm text-muted-foreground mt-1">{c.body}</p>}
+                        <span className="text-xs text-muted-foreground">{new Date(c.communicationDate).toLocaleString()}</span>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={async () => {
+                        if (!user?.company_id) return;
+                        await deleteCommunication(user.company_id, c.id);
+                        setComms(prev => prev.filter(x => x.id !== c.id));
+                      }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
