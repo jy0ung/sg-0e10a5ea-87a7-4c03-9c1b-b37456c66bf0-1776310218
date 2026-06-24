@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { Download, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Download, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, FileDown } from 'lucide-react';
+import { exportReportPdf } from '@/lib/pdfExport';
 import { REPORT_PAGE_SIZE, REPORT_EXPORT_CAP, type ReportConfig, type ReportRow, REPORTS } from '@flc/platform-services';
 
 function ReportTab({ config, companyId }: { config: ReportConfig; companyId: string }) {
@@ -61,6 +62,21 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
     }
   };
 
+  const exportPDF = async () => {
+    setExporting(true);
+    try {
+      const result = await config.fetchAll(companyId, from, to);
+      exportReportPdf({
+        title: config.label,
+        subtitle: config.description + (from && to ? ` (${from} to ${to})` : ''),
+        columns: config.columns,
+        rows: result.rows,
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <Card className="shrink-0 shadow-sm">
@@ -82,10 +98,16 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
               {loading ? 'Generating…' : 'Generate'}
             </Button>
             {generated && totalCount > 0 && (
+              <>
               <Button variant="outline" size="sm" onClick={exportCSV} disabled={exporting}>
                 <Download className="h-3.5 w-3.5 mr-1" />
                 {exporting ? 'Exporting…' : `Export CSV (${totalCount.toLocaleString()})`}
               </Button>
+              <Button variant="outline" size="sm" onClick={exportPDF} disabled={exporting}>
+                <FileDown className="h-3.5 w-3.5 mr-1" />
+                {exporting ? 'Exporting…' : 'Export PDF'}
+              </Button>
+              </>
             )}
           </div>
         </CardContent>
