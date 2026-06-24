@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, ChevronsUpDown, Search } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronsUpDown, Search, Columns3 } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
@@ -73,6 +73,13 @@ export function StandardTable<T extends object>({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(pageSizes[0]);
   const [internalSelected, setInternalSelected] = useState<Set<string>>(new Set());
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('st-hidden-cols');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); /* localStorage unavailable */ }
+  });
+  const [showColToggle, setShowColToggle] = useState(false);
 
   const selected = controlledSelected ?? internalSelected;
   const setSelected = (next: Set<string>) => {
@@ -155,6 +162,16 @@ export function StandardTable<T extends object>({
 
   const clearSelection = () => setSelected(new Set());
 
+  const visibleColumns = columns.filter(c => !hiddenCols.has(c.key));
+  const toggleCol = (key: string) => {
+    setHiddenCols(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { localStorage.setItem('st-hidden-cols', JSON.stringify([...next])); } catch { /* localStorage unavailable */ }
+      return next;
+    });
+  };
+
   const SortIcon = ({ col }: { col: StandardTableColumn<T> }) => {
     if (col.sortable === false) return null;
     if (sortKey !== col.key) return <ChevronsUpDown className="ml-1 h-3 w-3 text-muted-foreground/50" />;
@@ -179,7 +196,7 @@ export function StandardTable<T extends object>({
                 />
               </th>
             )}
-            {columns.map(col => (
+            {visibleColumns.map(col => (
               <th
                 key={col.key}
                 className={cn(
@@ -221,7 +238,7 @@ export function StandardTable<T extends object>({
                     />
                   </td>
                 )}
-                {columns.map(col => (
+                {visibleColumns.map(col => (
                   <td key={col.key} className={cn('px-4 py-3 text-foreground', col.className)}>
                     {col.render ? col.render(item, index) : String(getValue(item, col.key) ?? '-')}
                   </td>
@@ -292,9 +309,32 @@ export function StandardTable<T extends object>({
               />
             </div>
           )}
-          <span className="ml-auto text-xs text-muted-foreground">
-            {totalRecords} {totalRecords === 1 ? 'result' : 'results'}
-          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <div className="relative">
+              <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={() => setShowColToggle(v => !v)} aria-label="Toggle column visibility">
+                <Columns3 className="h-3.5 w-3.5" />
+                Columns
+              </Button>
+              {showColToggle && (
+                <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-md border bg-popover p-2 shadow-md">
+                  {columns.map(col => (
+                    <label key={col.key} className="flex items-center gap-2 py-1 px-1 text-xs hover:bg-accent rounded cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!hiddenCols.has(col.key)}
+                        onChange={() => toggleCol(col.key)}
+                        className="h-3 w-3 accent-primary"
+                      />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {totalRecords} {totalRecords === 1 ? 'result' : 'results'}
+            </span>
+          </div>
         </div>
       )}
 
@@ -363,7 +403,7 @@ export function StandardTable<T extends object>({
                       <span aria-hidden>Select</span>
                     </div>
                   )}
-                  {columns.map(col => {
+                  {visibleColumns.map(col => {
                     const cell = col.render ? col.render(item, index) : String(getValue(item, col.key) ?? '-');
                     return (
                       <div key={col.key} className="flex items-baseline justify-between gap-3">
