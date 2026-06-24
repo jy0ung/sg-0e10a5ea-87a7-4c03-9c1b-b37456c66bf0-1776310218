@@ -326,6 +326,8 @@ export default function UserManagement() {
   const handleSave = async () => {
     if (!editUser) return;
     const data = editForm.getValues();
+    const oldRole = editUser.role;
+    const oldScope = editUser.access_scope;
     setSaving(true);
     const { error } = await updateProfile({
       id: editUser.id,
@@ -343,6 +345,13 @@ export default function UserManagement() {
     if (error) {
       toast.error('Failed to update user: ' + error);
     } else {
+      // Log role/permission changes to audit trail
+      if (user?.id && (data.role !== oldRole || data.access_scope !== oldScope)) {
+        const changes: Record<string, { before: unknown; after: unknown }> = {};
+        if (data.role !== oldRole) changes.role = { before: oldRole, after: data.role };
+        if (data.access_scope !== oldScope) changes.access_scope = { before: oldScope, after: data.access_scope };
+        logPermissionChange(user.id, editUser.id, changes).catch(() => {});
+      }
       toast.success('User updated successfully');
       queryClient.setQueryData<ProfileRow[]>(['profiles'], (prev = []) =>
         prev.map(p => p.id === editUser.id ? {
