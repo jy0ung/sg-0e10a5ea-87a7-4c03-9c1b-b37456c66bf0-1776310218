@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { useBlocker } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { NotificationSettings } from '@/components/shared/NotificationSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import { changePassword, listProfiles, updateProfile, type ProfileRow } from '@flc/auth';
 import { saveBranding, uploadBrandingAsset } from '@flc/platform-services';
