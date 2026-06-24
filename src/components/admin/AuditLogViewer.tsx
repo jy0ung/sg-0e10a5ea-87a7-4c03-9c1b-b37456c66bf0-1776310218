@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { getAllAuditLogs, AuditLogWithProfile } from '@/services/auditService';
-import { History, Search, Filter, Download, ChevronRight, ChevronDown, X } from 'lucide-react';
+import { listProfiles, type ProfileRow } from '@/services/profileService';
+import { useAuth } from '@/contexts/AuthContext';
+import { History, Filter, Download, ChevronRight, ChevronDown, X, Users } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { loggingService } from '@flc/platform-services';
 
@@ -18,6 +20,8 @@ export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerP
   const [logs, setLogs] = useState<AuditLogWithProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const { user } = useAuth();
+  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [filters, setFilters] = useState({
     userId: '',
     action: '',
@@ -25,13 +29,27 @@ export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerP
     dateTo: '',
   });
 
+  useEffect(() => {
+    if (user?.company_id) {
+      listProfiles(user.company_id).then(({ data }) => {
+        if (data) setProfiles(data);
+      }).catch(() => {});
+    }
+  }, [user?.company_id]);
+
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getAllAuditLogs(
-        100,
+        200,
         0,
-        entityId ? { entityType, fromDate: undefined, toDate: undefined } : undefined
+        {
+          entityType: entityId ? entityType : undefined,
+          fromDate: filters.dateFrom ? new Date(filters.dateFrom) : undefined,
+          toDate: filters.dateTo ? new Date(filters.dateTo + 'T23:59:59') : undefined,
+          userId: filters.userId || undefined,
+          action: filters.action || undefined,
+        }
       );
       if (result.data) {
         setLogs(result.data);
@@ -41,11 +59,11 @@ export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerP
     } finally {
       setLoading(false);
     }
-  }, [entityId, entityType]);
+  }, [entityId, entityType, filters.userId, filters.action, filters.dateFrom, filters.dateTo]);
 
   useEffect(() => {
     loadLogs();
-  }, [entityId, entityType, loadLogs]);
+  }, [entityId, entityType, filters.userId, filters.action, filters.dateFrom, filters.dateTo, loadLogs]);
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
@@ -124,13 +142,17 @@ export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerP
         {/* Filters */}
         <div className="flex flex-wrap gap-4 mb-4 p-4 bg-secondary/50 rounded-lg">
           <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="User ID..."
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <select
               value={filters.userId}
               onChange={e => setFilters({ ...filters, userId: e.target.value })}
-              className="h-8 w-40"
-            />
+              className="h-8 rounded-md bg-background border border-border px-3 text-sm max-w-[200px]"
+            >
+              <option value="">All Users</option>
+              {profiles.map(p => (
+                <option key={p.id} value={p.id}>{p.name || p.email || p.id.slice(0, 8)}</option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
@@ -145,6 +167,14 @@ export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerP
               <option value="delete">Delete</option>
               <option value="permission_change">Permission Change</option>
             </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">From</span>
+            <Input type="date" value={filters.dateFrom} onChange={e => setFilters({ ...filters, dateFrom: e.target.value })} className="h-8 w-36" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">To</span>
+            <Input type="date" value={filters.dateTo} onChange={e => setFilters({ ...filters, dateTo: e.target.value })} className="h-8 w-36" />
           </div>
           <Button variant="ghost" size="sm" onClick={() => setFilters({ userId: '', action: '', dateFrom: '', dateTo: '' })}>
             <X className="h-3 w-3 mr-1" />Clear
