@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import {
-  ArrowLeft, CheckCircle, ThumbsUp, CreditCard, Loader2, Pencil, Truck, RotateCcw,
+  ArrowLeft, CheckCircle, ThumbsUp, CreditCard, Loader2, Pencil, Truck, RotateCcw, Link2, AlertTriangle,
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -366,6 +366,54 @@ export default function PurchaseInvoiceDetail() {
             </dl>
           </CardContent>
         </Card>
+
+        {/* ── PO Reference ─────────────────────────────────────────────── */}
+        {invoice.poLineId && (
+          <Card className={invoice.poNo && invoice.amount && invoice.poUnitPrice && Math.abs(invoice.amount - invoice.poUnitPrice) > 1 ? 'border-warning' : ''}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Link2 className="h-3.5 w-3.5" />
+                Purchase Order Reference
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid grid-cols-2 gap-3">
+                <div>
+                  <dt className="text-xs text-muted-foreground">PO Number</dt>
+                  <dd className="text-sm font-medium">
+                    {invoice.poNo ? (
+                      <Button variant="link" className="h-auto p-0" onClick={() => navigate(`/purchasing/orders/${invoice.poLineId?.split('-')[0] || ''}`)}>
+                        {invoice.poNo}
+                      </Button>
+                    ) : '—'}
+                  </dd>
+                </div>
+                {invoice.poQuantity != null && (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">PO Quantity</dt>
+                    <dd className="text-sm">{invoice.poQuantity}</dd>
+                  </div>
+                )}
+                {invoice.poUnitPrice != null && (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">PO Unit Price</dt>
+                    <dd className="text-sm">{fmt(invoice.poUnitPrice)}</dd>
+                  </div>
+                )}
+                {invoice.poUnitPrice != null && invoice.amount != null && Math.abs(invoice.amount - invoice.poUnitPrice) > 1 && (
+                  <div className="col-span-full">
+                    <div className="flex items-center gap-2 p-2 rounded bg-warning/10 text-warning">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <p className="text-xs">
+                        Amount mismatch: Invoice {fmt(invoice.amount)} vs PO {fmt(invoice.poUnitPrice)} (diff: {fmt(Math.abs(invoice.amount - invoice.poUnitPrice))})
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </dl>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ── AP Lifecycle + Actions ──────────────────────────────────────── */}
         <Card>

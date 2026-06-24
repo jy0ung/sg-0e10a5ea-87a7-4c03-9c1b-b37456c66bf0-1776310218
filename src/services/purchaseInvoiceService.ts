@@ -27,6 +27,11 @@ export interface PurchaseInvoiceRecord {
   verifiedBy?: string;
   approvedAt?: string;
   approvedBy?: string;
+  // PO matching
+  poLineId?: string;
+  poNo?: string;
+  poQuantity?: number;
+  poUnitPrice?: number;
 }
 
 function rowToInvoice(row: Record<string, unknown>): PurchaseInvoiceRecord {
@@ -51,6 +56,21 @@ function rowToInvoice(row: Record<string, unknown>): PurchaseInvoiceRecord {
     verifiedBy: row.verified_by ? String(row.verified_by) : undefined,
     approvedAt: row.approved_at ? String(row.approved_at) : undefined,
     approvedBy: row.approved_by ? String(row.approved_by) : undefined,
+    // PO matching
+    poLineId: row.po_line_id ? String(row.po_line_id) : undefined,
+    poNo: (() => {
+      const po = row._po as Record<string, unknown> | undefined;
+      const poHeader = po?.purchase_orders as Record<string, unknown> | undefined;
+      return poHeader?.po_no ? String(poHeader.po_no) : undefined;
+    })(),
+    poQuantity: (() => {
+      const po = row._po as Record<string, unknown> | undefined;
+      return po?.quantity != null ? Number(po.quantity) : undefined;
+    })(),
+    poUnitPrice: (() => {
+      const po = row._po as Record<string, unknown> | undefined;
+      return po?.unit_price != null ? Number(po.unit_price) : undefined;
+    })(),
   };
 }
 
@@ -173,7 +193,7 @@ export async function getPurchaseInvoiceById(
 ): Promise<PurchaseInvoiceRecord | null> {
   const { data, error } = await supabase
     .from('purchase_invoices')
-    .select('*')
+    .select('*, _po:purchase_order_lines!po_line_id(purchase_order_id, quantity, unit_price, purchase_orders!purchase_order_id(po_no))')
     .eq('company_id', companyId)
     .eq('id', id)
     .maybeSingle();
