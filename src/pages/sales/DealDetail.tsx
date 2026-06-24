@@ -10,17 +10,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   ArrowLeft,
+  Car,
+  ChevronRight,
+  CreditCard,
   Edit,
-  Save,
-  X,
   FileText,
   History,
-  Car,
-  CreditCard,
-  ChevronRight,
+  Link as LinkIcon,
   Loader2,
+  Save,
+  Search,
+  Unlink,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -38,11 +42,14 @@ import {
   getStageOrder,
   getResponsibleParty,
   getNextAction,
+  linkDealToVehicle,
+  unlinkDealFromVehicle,
   type Deal,
   type DealStage,
   type DealActivity,
   type LoanStatus,
 } from '@/services/dealService';
+import { searchVehicles } from '@/services/vehicleService';
 
 const STAGE_ORDER = getStageOrder();
 
@@ -56,6 +63,11 @@ export default function DealDetail() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Deal>>({});
+  const [vehicleDialogOpen, setVehicleDialogOpen] = useState(false);
+  const [vehicleSearch, setVehicleSearch] = useState('');
+  const [vehicleResults, setVehicleResults] = useState<Array<{id: string; chassis_no: string; model: string; colour: string; branch_code: string}>>([]);
+  const [vehicleSearching, setVehicleSearching] = useState(false);
+  const [linkingVehicle, setLinkingVehicle] = useState(false);
 
   const loadDeal = useCallback(async () => {
     if (!id) return;
@@ -86,6 +98,69 @@ export default function DealDetail() {
     loadDeal();
     loadActivities();
   }, [loadDeal, loadActivities]);
+
+  const handleVehicleSearch = async () => {
+    if (!vehicleSearch.trim() || !user) return;
+    setVehicleSearching(true);
+    try {
+      const { data, error } = await searchVehicles({ search: vehicleSearch.trim(), limit: 10 });
+      if (!error && data?.rows) {
+        setVehicleResults(data.rows.map((v: Record<string, unknown>) => ({
+          id: String(v.id || v.chassis_no || ''),
+          chassis_no: String(v.chassis_no || v.chassisNo || ''),
+          model: String(v.model || v.model_name || ''),
+          colour: String(v.colour || ''),
+          branch_code: String(v.branch_code || v.branchCode || ''),
+        })));
+      }
+    } catch {
+      toast.error('Failed to search vehicles');
+    } finally {
+      setVehicleSearching(false);
+    }
+  };
+
+  const handleLinkVehicle = async (vehicleId: string) => {
+    if (!deal || !user) return;
+    setLinkingVehicle(true);
+    try {
+      const { error } = await linkDealToVehicle(deal.id, vehicleId, user.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success('Vehicle linked');
+      setVehicleDialogOpen(false);
+      setVehicleSearch('');
+      setVehicleResults([]);
+      loadDeal();
+      loadActivities();
+    } catch {
+      toast.error('Failed to link vehicle');
+    } finally {
+      setLinkingVehicle(false);
+    }
+  };
+
+  const handleUnlinkVehicle = async () => {
+    if (!deal || !user) return;
+    if (!confirm('Unlink this vehicle from the deal?')) return;
+    setLinkingVehicle(true);
+    try {
+      const { error } = await unlinkDealFromVehicle(deal.id, user.id);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success('Vehicle unlinked');
+      loadDeal();
+      loadActivities();
+    } catch {
+      toast.error('Failed to unlink vehicle');
+    } finally {
+      setLinkingVehicle(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!deal || !user) return;
@@ -378,6 +453,48 @@ export default function DealDetail() {
                   <Label className="text-xs text-muted-foreground">Chassis No</Label>
                   <p>{deal.chassis_no || 'Pending allocation'}</p>
                 </div>
+                {deal.vehicle_id ? (
+                  <div className="pt-2 border-t space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1 text-xs text-green-600">
+                        <LinkIcon className="h-3 w-3" />
+                        <span>Linked to Auto Aging</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-destructive hover:text-destructive"
+                        onClick={handleUnlinkVehicle}
+                        disabled={linkingVehicle}
+                      >
+                        <Unlink className="h-3 w-3 mr-1" />
+                        Unlink
+                      </Button>
+                    </div>
+                    {deal.chassis_no && (
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => navigate('/auto-aging/lifecycle/' + encodeURIComponent(deal.chassis_no || ''))}
+                      >
+                        View Vehicle Lifecycle →
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="pt-2 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setVehicleDialogOpen(true)}
+                    >
+                      <LinkIcon className="h-4 w-4 mr-2" />
+                      Link Vehicle from Auto Aging
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -479,6 +596,52 @@ export default function DealDetail() {
           <ActivityTab activities={activities} />
         </TabsContent>
       </Tabs>
+
+      {/* Vehicle Allocation Dialog */}
+      <Dialog open={vehicleDialogOpen} onOpenChange={setVehicleDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Link Vehicle from Auto Aging</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Search by chassis no, model, or colour..."
+                value={vehicleSearch}
+                onChange={(e) => setVehicleSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleVehicleSearch()}
+              />
+              <Button onClick={handleVehicleSearch} disabled={vehicleSearching} size="icon">
+                {vehicleSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              </Button>
+            </div>
+            {vehicleResults.length > 0 ? (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {vehicleResults.map((v) => (
+                  <div
+                    key={v.id}
+                    className="flex items-center justify-between p-3 border rounded hover:bg-muted/50 cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleLinkVehicle(v.id); }}
+                    onClick={() => handleLinkVehicle(v.id)}
+                  >
+                    <div>
+                      <p className="font-medium text-sm">{v.chassis_no}</p>
+                      <p className="text-xs text-muted-foreground">{v.model} · {v.colour} · {v.branch_code}</p>
+                    </div>
+                    <Button size="sm" variant="outline" disabled={linkingVehicle}>
+                      {linkingVehicle ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Link'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : vehicleSearch && !vehicleSearching ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No vehicles found. Try a different search.</p>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
