@@ -93,6 +93,7 @@ const ReconciliationQueue = lazy(() => import("./pages/admin/ReconciliationQueue
 const ReconciliationDetail = lazy(() => import("./pages/admin/ReconciliationDetail"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
+const SystemHealth = lazy(() => import("./pages/admin/SystemHealth"));
 const SettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
 const SalesDashboard = lazy(() => import("./pages/sales/SalesDashboard"));
 const DealPipeline = lazy(() => import("./pages/sales/DealPipeline"));
@@ -290,6 +291,7 @@ const router = createBrowserRouter([
       { path: "admin/reconciliation/:matchId", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Reconciliation Match"><S><ReconciliationDetail /></S></R></RequireRole> },
       { path: "admin/users", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Users"><S><UserManagement /></S></R></RequireRole> },
       { path: "admin/audit", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Audit Log"><S><AuditLog /></S></R></RequireRole> },
+      { path: "admin/health", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="System Health"><S><SystemHealth /></S></R></RequireRole> },
       // admin/settings intentionally has NO RequireRole guard — it doubles as
       // the /profile redirect target (personal name/password/branch editing).
       // Admin-only features (branding, modules, user roles) are gated internally
