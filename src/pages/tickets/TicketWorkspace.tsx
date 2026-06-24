@@ -265,18 +265,36 @@ export default function TicketWorkspace() {
     [queryClient, workspaceQueryKey],
   );
 
-  const runWorkflow = useCallback(async (operation: () => Promise<{ error: Error | string | null }>, successMessage: string) => {
+  const runWorkflow = useCallback(async (
+    operation: () => Promise<{ error: Error | string | null }>,
+    successMessage: string,
+    optimisticPatch?: Record<string, unknown>,
+  ) => {
     setSaving(true);
+    // Optimistic: apply patch to query cache immediately
+    const previousData = optimisticPatch
+      ? queryClient.getQueryData(workspaceQueryKey)
+      : undefined;
+    if (optimisticPatch && previousData) {
+      queryClient.setQueryData(workspaceQueryKey, (old: Record<string, unknown> | undefined) => {
+        if (!old?.ticket) return old;
+        return { ...old, ticket: { ...old.ticket, ...optimisticPatch } };
+      });
+    }
     const result = await operation();
     setSaving(false);
     if (result.error) {
+      // Rollback
+      if (optimisticPatch && previousData) {
+        queryClient.setQueryData(workspaceQueryKey, previousData);
+      }
       toast.error(typeof result.error === 'string' ? result.error : result.error.message);
       return false;
     }
     toast.success(successMessage);
     await refreshWorkspace();
     return true;
-  }, [refreshWorkspace]);
+  }, [refreshWorkspace, queryClient, workspaceQueryKey]);
 
   const handleBack = () => {
     if (!ticket) {

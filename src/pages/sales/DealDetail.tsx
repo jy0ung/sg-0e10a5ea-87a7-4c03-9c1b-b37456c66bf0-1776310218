@@ -184,10 +184,15 @@ export default function DealDetail() {
 
   const handleAdvanceStage = async (targetStage: DealStage) => {
     if (!deal || !user) return;
+    const previousDeal = { ...deal };
+    // Optimistic: update stage immediately
+    setDeal({ ...deal, stage: targetStage, stage_entered_at: new Date().toISOString() });
     setSaving(true);
     try {
       const { data, error } = await advanceStage(deal.id, targetStage, user.id);
       if (error) {
+        // Rollback
+        setDeal(previousDeal);
         toast.error(error.message);
         return;
       }
@@ -195,6 +200,8 @@ export default function DealDetail() {
       toast.success(`Stage advanced to ${getStageLabel(targetStage)}`);
       loadActivities();
     } catch {
+      // Rollback
+      setDeal(previousDeal);
       toast.error('Failed to advance stage');
     } finally {
       setSaving(false);
