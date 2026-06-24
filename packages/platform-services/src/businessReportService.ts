@@ -216,4 +216,92 @@ export const REPORTS: ReportConfig[] = [
     query: (companyId, from, to, page) => queryTable('sales_invoices', companyId, from, to, 'invoice_date', 'invoice_no,customer_name,model,chassis_no,invoice_amount,invoice_date', page),
     fetchAll: (companyId, from, to) => fetchAllPages('sales_invoices', companyId, from, to, 'invoice_date', 'invoice_no,customer_name,model,chassis_no,invoice_amount,invoice_date'),
   },
+
+  {
+    id: 'vehicle-lifecycle',
+    label: 'Vehicle Lifecycle',
+    description: 'Cross-module vehicle journey from procurement to delivery',
+    columns: [
+      { key: 'chassis_no', label: 'Chassis No' },
+      { key: 'model', label: 'Model' },
+      { key: 'branch_code', label: 'Branch' },
+      { key: 'vehicle_stage', label: 'Stock Stage' },
+      { key: 'bg_date', label: 'Procurement Date' },
+      { key: 'days_in_stock', label: 'Days in Stock', numeric: true },
+      { key: 'deal_stage', label: 'Deal Stage' },
+      { key: 'customer_name', label: 'Customer' },
+      { key: 'total_amount', label: 'Sale Price (RM)', numeric: true },
+      { key: 'delivery_date', label: 'Delivery Date' },
+    ],
+    query: async (companyId, from, to, page) => {
+      let q = supabase
+        .from('vehicles')
+        .select(
+          'chassis_no, model, branch_code, stage, bg_date, delivery_date, deals!vehicle_id(stage, customer_name, total_amount)',
+          { count: 'exact' },
+        )
+        .eq('company_id', companyId)
+        .neq('is_deleted', true)
+        .order('bg_date', { ascending: true, nullsFirst: false })
+        .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
+      if (from) q = q.gte('bg_date', from);
+      if (to) q = q.lte('bg_date', to);
+      const { data, count } = await q;
+      const now = Date.now();
+      const rows: ReportRow[] = (data ?? []).map((v: Record<string, unknown>) => {
+        const deal = Array.isArray(v.deals) && v.deals.length > 0 ? v.deals[0] as Record<string, unknown> : null;
+        const bg = v.bg_date ? new Date(v.bg_date as string).getTime() : null;
+        return {
+          chassis_no: v.chassis_no,
+          model: v.model,
+          branch_code: v.branch_code,
+          vehicle_stage: v.stage,
+          bg_date: v.bg_date,
+          days_in_stock: bg != null ? Math.floor((now - bg) / 86_400_000) : null,
+          deal_stage: deal?.stage ?? null,
+          customer_name: deal?.customer_name ?? null,
+          total_amount: deal?.total_amount ?? null,
+          delivery_date: v.delivery_date,
+        };
+      });
+      return { data: rows, count: count ?? 0 };
+    },
+    fetchAll: async (companyId, from, to) => {
+      const results: ReportRow[] = [];
+      let totalCount = 0;
+      let page = 0;
+      const now = Date.now();
+      while (results.length < REPORT_EXPORT_CAP) {
+        let q = supabase
+          .from('vehicles')
+          .select(
+            'chassis_no, model, branch_code, stage, bg_date, delivery_date, deals!vehicle_id(stage, customer_name, total_amount)',
+            { count: page === 0 ? 'exact' : undefined },
+          )
+          .eq('company_id', companyId)
+          .neq('is_deleted', true)
+          .order('bg_date', { ascending: true, nullsFirst: false })
+          .range(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE - 1);
+        if (from) q = q.gte('bg_date', from);
+        if (to) q = q.lte('bg_date', to);
+        const { data, count } = await q;
+        if (page === 0) totalCount = count ?? 0;
+        const mapped = (data ?? []).map((v: Record<string, unknown>) => {
+          const deal = Array.isArray(v.deals) && v.deals.length > 0 ? v.deals[0] as Record<string, unknown> : null;
+          const bg = v.bg_date ? new Date(v.bg_date as string).getTime() : null;
+          return {
+            chassis_no: v.chassis_no, model: v.model, branch_code: v.branch_code,
+            vehicle_stage: v.stage, bg_date: v.bg_date,
+            days_in_stock: bg != null ? Math.floor((now - bg) / 86_400_000) : null,
+            deal_stage: deal?.stage ?? null, customer_name: deal?.customer_name ?? null,
+            total_amount: deal?.total_amount ?? null, delivery_date: v.delivery_date,
+          } as ReportRow;
+        });
+        results.push(...mapped);
+        if (mapped.length < REPORT_PAGE_SIZE) break;
+        page += 1;
+      }
+      return { rows: results.slice(0, REPORT_EXPORT_CAP), totalCount };
+    },
+  },
 ];
