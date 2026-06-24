@@ -29,6 +29,8 @@ export default function DealList() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<string>(searchParams.get('stage') || 'all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const pageSize = 25;
@@ -41,6 +43,8 @@ export default function DealList() {
         company_id: user.company_id,
         stage: stageFilter === 'all' ? undefined : stageFilter as DealStage,
         search: search || undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo ? dateTo + 'T23:59:59' : undefined,
         limit: pageSize,
         offset: (page - 1) * pageSize,
       });
@@ -56,7 +60,7 @@ export default function DealList() {
     } finally {
       setLoading(false);
     }
-  }, [user?.company_id, stageFilter, search, page]);
+  }, [user?.company_id, stageFilter, search, dateFrom, dateTo, page]);
 
   useEffect(() => {
     loadDeals();
@@ -185,6 +189,14 @@ export default function DealList() {
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground">From</span>
+          <Input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className="h-9 w-36" />
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-muted-foreground">To</span>
+          <Input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className="h-9 w-36" />
+        </div>
         <Button variant="outline" size="sm" onClick={loadDeals}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
