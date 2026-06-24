@@ -6,16 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiCard } from '@/components/shared/KpiCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw, AlertTriangle, TrendingUp, Users, Clock, DollarSign } from 'lucide-react';
+import { RefreshCw, AlertTriangle, TrendingUp, Users, Clock, DollarSign, Timer, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { getDashboard, type DashboardData } from '@/services/dealService';
+import { getDashboard, type DashboardData, getAgedVehicles, type AgedVehicle } from '@/services/dealService';
 
 export default function DealDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
+  const [agedVehicles, setAgedVehicles] = useState<AgedVehicle[]>([]);
 
   const loadDashboard = useCallback(async () => {
     if (!user?.company_id) return;
@@ -27,6 +28,10 @@ export default function DealDashboard() {
         return;
       }
       setData(data);
+      // Fetch aged vehicles (fire-and-forget)
+      getAgedVehicles(user.company_id, 10).then(({ data: aged }) => {
+        if (aged) setAgedVehicles(aged);
+      }).catch(() => {});
     } catch {
       toast.error('Failed to load dashboard');
     } finally {
@@ -184,6 +189,46 @@ export default function DealDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Aged Vehicle Alerts */}
+      {agedVehicles.length > 0 && (
+        <Card className="border-warning">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Timer className="h-4 w-4 text-warning" />
+              Aged Vehicles Without Deals
+              <Badge variant="secondary">{agedVehicles.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {agedVehicles.map(v => (
+                <div key={v.id} className="flex items-center justify-between p-2 rounded bg-muted gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{v.model}</p>
+                    <p className="text-xs text-muted-foreground">{v.chassis_no} &middot; {v.branch_code}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant={v.days_aged > 365 ? 'destructive' : 'secondary'}>
+                      {v.days_aged > 365
+                        ? `${Math.floor(v.days_aged / 365)}y ${v.days_aged % 365}d`
+                        : `${v.days_aged}d`}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/sales/deals/new?chassis=${encodeURIComponent(v.chassis_no)}&model=${encodeURIComponent(v.model)}`)}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Create Deal
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Refresh */}
       <div className="flex justify-end">

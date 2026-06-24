@@ -966,6 +966,67 @@ export async function getDashboard(companyId: string): Promise<{ data: Dashboard
 
 
 // ============================================================
+// ============================================================
+// Aged Vehicle Alerts (for Sales Dashboard)
+// ============================================================
+
+export interface AgedVehicle {
+  id: string;
+  chassis_no: string;
+  model: string;
+  branch_code: string;
+  bg_date: string | null;
+  days_aged: number;
+}
+
+export async function getAgedVehicles(companyId: string, limit = 10): Promise<{ data: AgedVehicle[]; error: Error | null }> {
+  try {
+    // Get vehicles with bg_date set, not deleted
+    const { data: vehicles, error } = await supabase
+      .from('vehicles')
+      .select('id, chassis_no, model, branch_code, bg_date')
+      .eq('company_id', companyId)
+      .not('is_deleted', 'eq', true)
+      .not('bg_date', 'is', null)
+      .order('bg_date', { ascending: true })
+      .limit(200);
+
+    if (error) return { data: [], error: new Error(error.message) };
+
+    // Get vehicle_ids that already have deals
+    const { data: existingDeals } = await supabase
+      .from('deals')
+      .select('vehicle_id')
+      .eq('company_id', companyId)
+      .not('vehicle_id', 'is', null);
+
+    const linkedVehicleIds = new Set((existingDeals || []).map(d => d.vehicle_id));
+
+    const now = new Date();
+    const aged: AgedVehicle[] = (vehicles || [])
+      .filter(v => !linkedVehicleIds.has(v.id))
+      .map(v => {
+        const bgDate = new Date(v.bg_date);
+        const daysAged = Math.floor((now.getTime() - bgDate.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          id: v.id,
+          chassis_no: v.chassis_no,
+          model: v.model,
+          branch_code: v.branch_code,
+          bg_date: v.bg_date,
+          days_aged: daysAged,
+        };
+      })
+      .filter(v => v.days_aged > 90)
+      .sort((a, b) => b.days_aged - a.days_aged)
+      .slice(0, limit);
+
+    return { data: aged, error: null };
+  } catch (err) {
+    return { data: [], error: err instanceof Error ? err : new Error('Failed to get aged vehicles') };
+  }
+}
+
 // SLA Monitoring (Stalled Deals)
 // ============================================================
 
