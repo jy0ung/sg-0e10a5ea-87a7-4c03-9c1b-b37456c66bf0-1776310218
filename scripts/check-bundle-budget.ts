@@ -21,6 +21,7 @@ const chunkBudgets: ChunkBudget[] = [
   { label: 'forms vendor', pattern: /^vendor-forms-[\w-]+\.js$/, rawKb: 180, gzipKb: 55 },
   { label: 'charts vendor', pattern: /^vendor-charts-[\w-]+\.js$/, rawKb: 520, gzipKb: 145 },
   { label: 'Excel async vendor', pattern: /^vendor-excel-[\w-]+\.js$/, rawKb: 1_150, gzipKb: 330 },
+  { label: 'PDF export async chunk', pattern: /^pdfExport-[\w-]+\.js$/, rawKb: 450, gzipKb: 150 },
 ];
 
 const routeChunkBudget = { label: 'lazy route chunk', rawKb: 250, gzipKb: 80 };

@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { Download, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, FileDown, Clock, Trash2, Plus } from 'lucide-react';
-import { exportReportPdf } from '@/lib/pdfExport';
 import { listScheduledReports, createScheduledReport, toggleScheduledReport, deleteScheduledReport, type ScheduledReport, type ReportFrequency } from '@/services/scheduledReportService';
 import { useAuth } from '@/contexts/AuthContext';
 import { Switch } from '@/components/ui/switch';
@@ -71,6 +70,7 @@ function ReportTab({ config, companyId }: { config: ReportConfig; companyId: str
     setExporting(true);
     try {
       const result = await config.fetchAll(companyId, from, to);
+      const { exportReportPdf } = await import('@/lib/pdfExport');
       exportReportPdf({
         title: config.label,
         subtitle: config.description + (from && to ? ` (${from} to ${to})` : ''),
