@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDown, ChevronUp, ChevronsUpDown, Search, Columns3 } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
@@ -37,6 +38,9 @@ export interface StandardTableProps<T extends object> {
   onPageChange?: (page: number) => void;
   onSortChange?: (key: string | null, dir: SortDir) => void;
   onSearchChange?: (term: string) => void;
+  /** Enable virtual scrolling for large lists (activates when rows > virtualThreshold) */
+  virtual?: boolean;
+  virtualThreshold?: number;
 }
 
 const DEFAULT_PAGE_SIZES = [10, 25, 50];
@@ -66,7 +70,10 @@ export function StandardTable<T extends object>({
   onPageChange,
   onSortChange,
   onSearchChange,
+  virtual = false,
+  virtualThreshold = 200,
 }: StandardTableProps<T>) {
+  const parentRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -115,6 +122,13 @@ export function StandardTable<T extends object>({
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
   const safePage = serverSide ? (controlledPage ?? 1) : Math.min(page, totalPages);
   const pageData = serverSide ? displayData : displayData.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const useVirtual = virtual && pageData.length > virtualThreshold;
+  const rowVirtualizer = useVirtualizer({
+    count: pageData.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 44,
+    overscan: 10,
+  });
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -181,7 +195,7 @@ export function StandardTable<T extends object>({
   };
 
   const table = (
-    <div className="overflow-x-auto">
+    <div ref={parentRef} className={cn("overflow-x-auto", useVirtual && "max-h-[600px] overflow-y-auto")}>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-secondary/30">
@@ -215,7 +229,40 @@ export function StandardTable<T extends object>({
           </tr>
         </thead>
         <tbody>
-          {pageData.map((item, index) => {
+          {useVirtual ? (
+            <>
+              {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                const item = pageData[virtualRow.index];
+                const index = virtualRow.index;
+                return (
+                  <tr
+                    key={String(getValue(item, rowKey) ?? index)}
+                    style={{ height: `${virtualRow.size}px`, transform: `translateY(${virtualRow.start - (rowVirtualizer.getVirtualItems()[0]?.start ?? 0)}px)` }}
+                    className={cn('border-b border-border/50', onRowClick && 'cursor-pointer hover:bg-muted/50')}
+                    onClick={() => onRowClick?.(item)}
+                  >
+                    {selectable && (
+                      <td className="w-10 px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(String(getValue(item, rowKey) ?? ''))}
+                          onChange={() => toggleRow(String(getValue(item, rowKey) ?? ''))}
+                          aria-label="Select row"
+                          className="h-3.5 w-3.5 accent-primary"
+                        />
+                      </td>
+                    )}
+                    {visibleColumns.map(col => (
+                      <td key={col.key} className={cn('px-3 py-2.5 text-sm', col.className)}>
+                        {col.render ? col.render(item, index) : String(getValue(item, col.key) ?? '—')}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </>
+          ) : (
+          pageData.map((item, index) => {
             const key = String(getValue(item, rowKey) ?? index);
             return (
               <tr
@@ -245,7 +292,8 @@ export function StandardTable<T extends object>({
                 ))}
               </tr>
             );
-          })}
+          })
+          )}
         </tbody>
       </table>
     </div>
