@@ -8,6 +8,8 @@ import { KpiCard } from '@/components/shared/KpiCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, AlertTriangle, TrendingUp, Users, Clock, DollarSign, Timer, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { HelpTip } from '@/components/shared/HelpTip';
+import { GLOSSARY } from '@/lib/glossary';
 import { toast } from 'sonner';
 import { getDashboard, type DashboardData, getAgedVehicles, type AgedVehicle } from '@/services/dealService';
 
@@ -83,13 +85,13 @@ export default function DealDashboard() {
           icon={<TrendingUp className="h-4 w-4" />}
         />
         <KpiCard
-          title="Stuck (>7d)"
+          title={<HelpTip tip={GLOSSARY.days_in_stage} size={12}>Stuck (&gt;7d)</HelpTip>}
           value={data.stalled}
           icon={<AlertTriangle className="h-4 w-4" />}
           className={data.stalled > 0 ? 'border-destructive' : ''}
         />
         <KpiCard
-          title="Avg Days"
+          title={<HelpTip tip="Average calendar days from deal creation to completion, for deals closed this month." size={12}>Avg Days</HelpTip>}
           value={data.avg_days_to_close}
           icon={<Clock className="h-4 w-4" />}
           suffix="days"
