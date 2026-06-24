@@ -133,6 +133,7 @@ export default function UserManagement() {
   const [permissionUserId, setPermissionUserId] = useState<string>('');
   const [permissionUserName, setPermissionUserName] = useState<string>('');
   const [permissionUserRole, setPermissionUserRole] = useState<string>('');
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [signupUrl, setSignupUrl] = useState('');
@@ -367,6 +368,46 @@ export default function UserManagement() {
       setEditUser(null);
     }
     setSaving(false);
+  };
+
+  const handleBulkDeactivate = async () => {
+    const ids = Array.from(bulkSelected);
+    let success = 0;
+    for (const id of ids) {
+      const result = await deactivateUser(id, 'Bulk deactivation');
+      if (!result.error) success++;
+    }
+    toast.success(`${success} user(s) deactivated`);
+    setBulkSelected(new Set());
+    await refreshProfiles();
+  };
+
+  const handleBulkReactivate = async () => {
+    const ids = Array.from(bulkSelected);
+    let success = 0;
+    for (const id of ids) {
+      const result = await reactivateUser(id, 'Bulk reactivation');
+      if (!result.error) success++;
+    }
+    toast.success(`${success} user(s) reactivated`);
+    setBulkSelected(new Set());
+    await refreshProfiles();
+  };
+
+  const toggleBulk = (id: string) => {
+    setBulkSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllBulk = () => {
+    if (bulkSelected.size === displayedUsers.length) {
+      setBulkSelected(new Set());
+    } else {
+      setBulkSelected(new Set(displayedUsers.map(u => u.id)));
+    }
   };
 
   const getSignupUrl = () => `${window.location.origin}/signup`;
@@ -677,10 +718,27 @@ export default function UserManagement() {
               <TableHead>Employee</TableHead>
               <TableHead>Role & Scope</TableHead>
               <TableHead>Branch</TableHead>
+              <TableHead className="w-10">
+                <input
+                  type="checkbox"
+                  checked={bulkSelected.size === displayedUsers.length && displayedUsers.length > 0}
+                  onChange={toggleAllBulk}
+                  className="h-3.5 w-3.5 accent-primary"
+                  aria-label="Select all users"
+                />
+              </TableHead>
               <TableHead className="w-56 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
+            {bulkSelected.size > 0 && (
+              <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 mb-3">
+                <span className="text-xs font-medium text-primary">{bulkSelected.size} selected</span>
+                <Button size="sm" variant="outline" onClick={handleBulkDeactivate}>Deactivate</Button>
+                <Button size="sm" variant="outline" onClick={handleBulkReactivate}>Reactivate</Button>
+                <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setBulkSelected(new Set())}>Clear</Button>
+              </div>
+            )}
             {displayedUsers.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
@@ -695,6 +753,15 @@ export default function UserManagement() {
 
               return (
                 <TableRow key={p.id} className={cn('data-table-row', (p.status === 'inactive' || p.status === 'resigned') && 'bg-muted/25 text-muted-foreground')}>
+                  <TableCell>
+                    <input
+                      type="checkbox"
+                      checked={bulkSelected.has(p.id)}
+                      onChange={() => toggleBulk(p.id)}
+                      className="h-3.5 w-3.5 accent-primary"
+                      aria-label={`Select ${p.name || p.email}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className={cn(
