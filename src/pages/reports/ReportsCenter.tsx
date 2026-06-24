@@ -5,9 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useCompanyId } from '@/hooks/useCompanyId';
-import { Download, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, FileDown } from 'lucide-react';
+import { Download, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, FileDown, Clock, Trash2, Plus } from 'lucide-react';
 import { exportReportPdf } from '@/lib/pdfExport';
+import { listScheduledReports, createScheduledReport, toggleScheduledReport, deleteScheduledReport, type ScheduledReport, type ReportFrequency } from '@/services/scheduledReportService';
+import { useAuth } from '@/contexts/AuthContext';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { REPORT_PAGE_SIZE, REPORT_EXPORT_CAP, type ReportConfig, type ReportRow, REPORTS } from '@flc/platform-services';
 
 function ReportTab({ config, companyId }: { config: ReportConfig; companyId: string }) {
@@ -183,13 +188,133 @@ export default function ReportsCenter() {
           {REPORTS.map(r => (
             <TabsTrigger key={r.id} value={r.id}>{r.label}</TabsTrigger>
           ))}
+          <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
         </TabsList>
         {REPORTS.map(r => (
           <TabsContent key={r.id} value={r.id} className="mt-3 min-h-0 flex-1">
             <ReportTab config={r} companyId={companyId} />
           </TabsContent>
         ))}
+        <TabsContent value="scheduled" className="mt-3 min-h-0 flex-1">
+          <ScheduledTab companyId={companyId} />
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function ScheduledTab({ companyId }: { companyId: string }) {
+  const { user } = useAuth();
+  const [schedules, setSchedules] = React.useState<ScheduledReport[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [showForm, setShowForm] = React.useState(false);
+  const [form, setForm] = React.useState<{ reportId: string; frequency: ReportFrequency; recipients: string }>({
+    reportId: REPORTS[0]?.id ?? '',
+    frequency: 'weekly',
+    recipients: '',
+  });
+
+  React.useEffect(() => {
+    listScheduledReports(companyId).then(({ data }) => {
+      if (data) setSchedules(data);
+    }).finally(() => setLoading(false));
+  }, [companyId]);
+
+  const handleCreate = async () => {
+    if (!user?.company_id || !form.recipients.trim()) return;
+    const report = REPORTS.find(r => r.id === form.reportId);
+    const { data } = await createScheduledReport(user.company_id, user.id, {
+      reportId: form.reportId,
+      reportLabel: report?.label ?? form.reportId,
+      frequency: form.frequency,
+      recipients: form.recipients.split(',').map(e => e.trim()).filter(Boolean),
+    });
+    if (data) {
+      setSchedules(prev => [data, ...prev]);
+      setShowForm(false);
+      setForm({ reportId: REPORTS[0]?.id ?? '', frequency: 'weekly', recipients: '' });
+    }
+  };
+
+  if (loading) return <Skeleton className="h-48" />;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Clock className="h-4 w-4" />
+          Scheduled Reports
+          <Button variant="outline" size="sm" className="ml-auto" onClick={() => setShowForm(!showForm)}>
+            <Plus className="h-3 w-3 mr-1" />
+            New Schedule
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {showForm && (
+          <div className="space-y-3 p-4 rounded border bg-muted/30">
+            <div className="flex gap-3 flex-wrap">
+              <div className="space-y-1">
+                <label htmlFor="sched-report" className="text-xs text-muted-foreground">Report</label>
+                <Select value={form.reportId} onValueChange={v => setForm(f => ({ ...f, reportId: v }))}>
+                  <SelectTrigger id="sched-report" className="w-48 h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {REPORTS.map(r => <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="sched-freq" className="text-xs text-muted-foreground">Frequency</label>
+                <Select value={form.frequency} onValueChange={v => setForm(f => ({ ...f, frequency: v as ReportFrequency }))}>
+                  <SelectTrigger id="sched-freq" className="w-32 h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 flex-1 min-w-[200px]">
+                <label htmlFor="sched-recipients" className="text-xs text-muted-foreground">Recipients (comma-separated)</label>
+                <Input id="sched-recipients" placeholder="email1@example.com, email2@example.com" value={form.recipients} onChange={e => setForm(f => ({ ...f, recipients: e.target.value }))} className="h-8" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleCreate}>Save Schedule</Button>
+              <Button variant="outline" size="sm" onClick={() => setShowForm(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+
+        {schedules.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">No scheduled reports configured. Reports will be delivered to the listed email addresses.</p>
+        ) : (
+          <div className="space-y-2">
+            {schedules.map(s => (
+              <div key={s.id} className="flex items-center gap-4 p-3 rounded border">
+                <Switch checked={s.isActive} onCheckedChange={async (checked) => {
+                  await toggleScheduledReport(companyId, s.id, checked);
+                  setSchedules(prev => prev.map(x => x.id === s.id ? { ...x, isActive: checked } : x));
+                }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{s.reportLabel}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.frequency} &middot; {s.recipients.join(', ')}
+                    {s.lastRunAt && ` &middot; Last run: ${new Date(s.lastRunAt).toLocaleDateString()}`}
+                  </p>
+                </div>
+                <Badge variant={s.isActive ? 'secondary' : 'outline'}>{s.frequency}</Badge>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => {
+                  await deleteScheduledReport(companyId, s.id);
+                  setSchedules(prev => prev.filter(x => x.id !== s.id));
+                }}>
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
