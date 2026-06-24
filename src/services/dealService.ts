@@ -516,6 +516,13 @@ export async function advanceStage(id: string, targetStage: DealStage, userId: s
       after: targetStage,
     });
 
+    // Auto-create IR ticket when deal reaches registration stage
+    if (targetStage === 'registration') {
+      autoCreateRegistrationTicket(data, userId).catch(err => {
+        loggingService.warn('Auto-registration ticket creation failed', { err, dealId: id }, 'DealService');
+      });
+    }
+
     return { data, error: null };
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to advance stage');
@@ -1025,6 +1032,62 @@ export async function getAgedVehicles(companyId: string, limit = 10): Promise<{ 
   } catch (err) {
     return { data: [], error: err instanceof Error ? err : new Error('Failed to get aged vehicles') };
   }
+}
+
+
+// ============================================================
+// Auto Ticket Creation on Stage Change
+// ============================================================
+
+async function autoCreateRegistrationTicket(deal: Deal, userId: string): Promise<void> {
+  // Check if a registration ticket already exists for this deal
+  const { data: existing } = await supabase
+    .from('tickets')
+    .select('id')
+    .eq('deal_id', deal.id)
+    .eq('category', 'deal_registration')
+    .limit(1);
+
+  if (existing && existing.length > 0) return; // Already has a registration ticket
+
+  const desc = [
+    'Auto-created when deal moved to Registration stage.',
+    '',
+    'Customer: ' + (deal.customer_name || 'N/A'),
+    'Model: ' + (deal.model_name || 'N/A'),
+    'Chassis: ' + (deal.chassis_no || 'N/A'),
+    'Branch: ' + (deal.branch_id || 'N/A'),
+  ].join('\n');
+
+  const { error } = await supabase
+    .from('tickets')
+    .insert({
+      subject: 'Registration request for ' + (deal.customer_name || 'customer') + ' - ' + (deal.model_name || 'vehicle'),
+      category: 'deal_registration',
+      priority: 'medium',
+      description: desc,
+      deal_id: deal.id,
+      chassis_no: deal.chassis_no || null,
+      vso_number: deal.vso_no || null,
+      company_id: deal.company_id,
+      submitted_by: userId,
+      status: 'open',
+      current_responsible_party: 'Owner',
+      next_action: 'Owner to process registration',
+      status_changed_at: new Date().toISOString(),
+      last_action_by: userId,
+      sla_status: 'on_track',
+    });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  // Log activity on the deal
+  await logActivity(deal.id, deal.company_id, userId, 'ticket_auto_created', {
+    category: 'deal_registration',
+    message: 'Registration ticket auto-created',
+  });
 }
 
 // SLA Monitoring (Stalled Deals)
