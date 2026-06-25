@@ -32,6 +32,12 @@ vi.mock('@/services/invoiceService', () => ({
 vi.mock('@/services/salesTargetService', () => ({
   getSalesmanTargets: vi.fn(() => Promise.resolve({ data: mockTargets })),
 }));
+vi.mock('@/services/dealStageService', () => ({
+  getDealStages: vi.fn(() => Promise.resolve({
+    data: mockDealStages.map(d => ({ id: d.id, companyId: d.company_id, name: d.name, stageOrder: d.stage_order, color: d.color })),
+    error: null,
+  })),
+}));
 vi.mock('@/services/branchService', () => ({
   resolveBranchCode: vi.fn(() => Promise.resolve(null)),
 }));

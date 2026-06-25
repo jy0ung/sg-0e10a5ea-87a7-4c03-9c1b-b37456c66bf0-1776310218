@@ -16,31 +16,12 @@ import { STALE } from '@/lib/queryClient';
 export const salesQueryKey = (companyId: string, branchId?: string | null) =>
   ['sales', companyId, branchId ?? 'all'] as const;
 
-interface SalesData {
-  customers: Customer[];
-  salesOrders: SalesOrder[];
-  dealStages: DealStage[];
-  invoices: Invoice[];
-  salesmanTargets: SalesmanTarget[];
-}
-
-async function fetchSalesData(companyId: string, branchCode?: string | null): Promise<SalesData> {
-  const [customersRes, ordersRes, stagesRes, invoicesRes, targetsRes] = await Promise.all([
-    getCustomers(companyId),
-    getSalesOrders(companyId, branchCode),
-    getDealStages(companyId),
-    getInvoices(companyId),
-    getSalesmanTargets(companyId),
-  ]);
-
-  return {
-    customers: customersRes.data,
-    salesOrders: ordersRes.data,
-    dealStages: stagesRes.data,
-    invoices: invoicesRes.data,
-    salesmanTargets: targetsRes.data,
-  };
-}
+// Individual query keys for per-entity caching
+export const customersKey = (companyId: string) => ['sales-customers', companyId] as const;
+export const ordersKey = (companyId: string, branchCode?: string | null) => ['sales-orders', companyId, branchCode ?? 'all'] as const;
+export const stagesKey = (companyId: string) => ['sales-stages', companyId] as const;
+export const invoicesKey = (companyId: string) => ['sales-invoices', companyId] as const;
+export const targetsKey = (companyId: string) => ['sales-targets', companyId] as const;
 
 interface SalesContextValue {
   customers: Customer[];
@@ -61,56 +42,94 @@ export function SalesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Branch-scoped users only see their branch's sales orders.
   const branchId = user?.access_scope === 'branch' ? (user.branch_id ?? null) : null;
 
-  const { data, isLoading } = useQuery({
-    queryKey: salesQueryKey(companyId, branchId),
-    queryFn: async () => {
-      let branchCode: string | null = null;
-      if (branchId) {
-        branchCode = await resolveBranchCode(branchId);
-      }
-      return fetchSalesData(companyId, branchCode);
-    },
+  // Resolve branch code lazily
+  const { data: branchCode } = useQuery({
+    queryKey: ['branch-code', branchId],
+    queryFn: () => resolveBranchCode(branchId!),
+    enabled: !!branchId,
+    staleTime: STALE.reference,
+  });
+
+  // Independent queries — each loads only when needed
+  const { data: customers = [], isLoading: customersLoading } = useQuery({
+    queryKey: customersKey(companyId),
+    queryFn: async () => (await getCustomers(companyId)).data,
+    enabled: !!companyId,
+    staleTime: STALE.reference,
+  });
+
+  const { data: salesOrders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ordersKey(companyId, branchCode),
+    queryFn: async () => (await getSalesOrders(companyId, branchCode)).data,
     enabled: !!companyId,
     staleTime: STALE.transactional,
   });
 
-  /** Invalidates the cache and awaits the next successful fetch. */
+  const { data: dealStages = [], isLoading: stagesLoading } = useQuery({
+    queryKey: stagesKey(companyId),
+    queryFn: async () => (await getDealStages(companyId)).data,
+    enabled: !!companyId,
+    staleTime: STALE.reference,
+  });
+
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
+    queryKey: invoicesKey(companyId),
+    queryFn: async () => (await getInvoices(companyId)).data,
+    enabled: !!companyId,
+    staleTime: STALE.transactional,
+  });
+
+  const { data: salesmanTargets = [], isLoading: targetsLoading } = useQuery({
+    queryKey: targetsKey(companyId),
+    queryFn: async () => (await getSalesmanTargets(companyId)).data,
+    enabled: !!companyId,
+    staleTime: STALE.reference,
+  });
+
+  const loading = customersLoading || ordersLoading || stagesLoading || invoicesLoading || targetsLoading;
+
+  /** Invalidates all sales caches and awaits refetch. */
   const reloadSales = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: salesQueryKey(companyId, branchId) });
-  }, [queryClient, companyId, branchId]);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: customersKey(companyId) }),
+      queryClient.invalidateQueries({ queryKey: ordersKey(companyId, branchCode) }),
+      queryClient.invalidateQueries({ queryKey: stagesKey(companyId) }),
+      queryClient.invalidateQueries({ queryKey: invoicesKey(companyId) }),
+      queryClient.invalidateQueries({ queryKey: targetsKey(companyId) }),
+    ]);
+  }, [queryClient, companyId, branchCode]);
 
   /** Optimistically update deal-stage in cache then persist via audited RPC. */
   const moveOrderStage = useCallback(async (orderId: string, stageId: string) => {
     await transitionOrderStage(companyId, orderId, stageId, user?.id);
-    queryClient.setQueryData<SalesData>(salesQueryKey(companyId, branchId), prev =>
-      prev ? { ...prev, salesOrders: prev.salesOrders.map(o => o.id === orderId ? { ...o, dealStageId: stageId } : o) } : prev
+    queryClient.setQueryData<SalesOrder[]>(ordersKey(companyId, branchCode), prev =>
+      prev ? prev.map(o => o.id === orderId ? { ...o, dealStageId: stageId } : o) : prev
     );
-  }, [queryClient, companyId, branchId, user?.id]);
+  }, [queryClient, companyId, branchCode, user?.id]);
 
   /** Optimistically update order fields in cache then persist to DB. */
   const updateOrder = useCallback(async (id: string, fields: Partial<SalesOrder>) => {
     await updateSalesOrder(companyId, id, fields, user?.id);
-    queryClient.setQueryData<SalesData>(salesQueryKey(companyId, branchId), prev =>
-      prev ? { ...prev, salesOrders: prev.salesOrders.map(o => o.id === id ? { ...o, ...fields } : o) } : prev
+    queryClient.setQueryData<SalesOrder[]>(ordersKey(companyId, branchCode), prev =>
+      prev ? prev.map(o => o.id === id ? { ...o, ...fields } : o) : prev
     );
-  }, [queryClient, companyId, branchId, user?.id]);
+  }, [queryClient, companyId, branchCode, user?.id]);
 
   const contextValue = useMemo(
     () => ({
-      customers: data?.customers ?? [],
-      salesOrders: data?.salesOrders ?? [],
-      dealStages: data?.dealStages ?? [],
-      invoices: data?.invoices ?? [],
-      salesmanTargets: data?.salesmanTargets ?? [],
-      loading: isLoading,
+      customers,
+      salesOrders,
+      dealStages,
+      invoices,
+      salesmanTargets,
+      loading,
       reloadSales,
       moveOrderStage,
       updateOrder,
     }),
-    [data, isLoading, reloadSales, moveOrderStage, updateOrder],
+    [customers, salesOrders, dealStages, invoices, salesmanTargets, loading, reloadSales, moveOrderStage, updateOrder],
   );
 
   return (
