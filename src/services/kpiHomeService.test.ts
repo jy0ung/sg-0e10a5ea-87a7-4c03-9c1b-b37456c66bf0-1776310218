@@ -87,7 +87,7 @@ describe('getRoleHomeKpis', () => {
         { code: 'sales.weekly_revenue', label: 'Revenue', description: null,
           formula: { source: 'sales_orders' }, landing_route: '/sales', position: 1 },
         { code: 'sales.open_orders', label: 'Open SOs', description: 'open',
-          formula: { source: 'sales_orders' }, landing_route: '/sales/orders', position: 2 },
+          formula: { source: 'sales_orders' }, landing_route: '/sales/deals', position: 2 },
       ],
       error: null,
     } as never);
@@ -100,7 +100,7 @@ describe('getRoleHomeKpis', () => {
     expect(result.data.map(k => k.code)).toEqual(['sales.weekly_revenue', 'sales.open_orders']);
     expect(result.data[0].position).toBe(1);
     expect(result.data[0].landingRoute).toBe('/sales');
-    expect(result.data[1].landingRoute).toBe('/sales/orders');
+    expect(result.data[1].landingRoute).toBe('/sales/deals');
   });
 
   it('surfaces landingRoute as null when the RPC omits it (pre-5a row)', async () => {

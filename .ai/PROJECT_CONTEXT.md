@@ -2,7 +2,7 @@
 
 CRITICAL: Read this file first in every session before asking project basics. This repo has already deployed to production. The current working copy may be on the production server with live Supabase data; treat commands and edits as production-sensitive. Do not run destructive database, git, Docker, or deployment commands unless explicitly requested.
 
-Current phase as of 2026-05-21: **Stages 0–6 complete; Stage 7 is next.** All three canonical-table normalizers, Sales Pipeline RPCs, AR/AP immutable ledger foundations, Full-Stack Refactor, and General Ledger foundation are committed. Six HRMS feature migrations were applied 2026-05-13–14 (half-day leave/attachments, HRMS role system, company branding, leave type rules, `staff` role consolidation, `creator_updater` default cleanup). CI failures from commit `940f6d3` (TS2322 in `approvalRouting.ts`, `QueryClient` in `HrmsLayout.test.tsx`) were fixed in `5f9d68f`. HRMS `super_admin`/`company_admin` access bypass added in `e61a4ec`. Five migrations applied 2026-05-18: `20260518000000` (approval flow `conditions` JSONB + `match_priority`), `20260518010000` (RLS master-data company scope), `20260518020000` (customer dedup + unique indexes), `20260518030000` (`request_categories.approval_flow_id` FK pin), `20260518040000` (`sales_advisors` table). Internal Request Phase 2 shipped: condition-based flow routing, category flow pin, `TicketApprovalHistory` component, Request Queue saved views + bulk actions. `PurchaseInvoiceDetail` page live at `/purchasing/invoices/:id`. `fookloi.net` legacy data seeded: 22,345 customers, 1,919 official receipts, 438 purchase invoices, 195 sales advisors, and supporting master data (26,254 total rows). Post-launch HRMS enterprise UX redesign commit `2dfa3bc` completed the dedicated HRMS dashboard, grouped navigation, shared shell primitives, employee profile route, and workflow-focused upgrades for attendance, announcements, approvals, payroll, appraisals, leave calendar, and employee directory. Use `docs/DEVELOPMENT_PLAN.md` Phase Checklist as the live task tracker.
+Current phase as of 2026-06-25: **Enterprise Redesign phases 1–4 complete and production-verified.** Main is at `15786da` for Phase 4 completion plus follow-up production fixes (`648fcd9`). Local verification passed (`check:auth-service-boundary`, typecheck, lint, build, bundle budget, vitest). GitHub CI `28145808450` passed. Production Deploy `28145931350` passed, including verify, RPC canaries, and production module smoke. **Deals are now the canonical sales workflow. Sales Orders are legacy/read-only and should be deprecated from primary navigation and future workflow development.** Use Deal Lifecycle (`/sales/deals`, `/sales/pipeline`, `/sales/deals/:id`) for new sales features, reporting, and cross-module automation.
 
 ## Users/Roles
 
@@ -112,6 +112,109 @@ Current phase as of 2026-05-21: **Stages 0–6 complete; Stage 7 is next.** All 
 - Launch checklist still has open production evidence: rotated prod env, host bootstrap/reverse proxy confirmation, live RLS/security sign-off, CORS production pinning, Sentry/alerts/source maps, PITR/backups/restore drill, uptime, load test, coverage target, rollback drill, OSV/CodeQL evidence.
 - Dependency audit accepted exceptions in `docs/SECURITY.md`: moderate `esbuild`/`vite` dev-server issue and low test-runtime transitive issues; production static nginx bundle is considered not exposed.
 
+## 2026-06-21 Full Repository Exploration Snapshot
+
+This section was added after an explicit full-codebase exploration request. The goal was to read and retain project-wide context, not to change product behavior. The worktree was clean before this memory-file update.
+
+### Inventory summary
+
+- Repository inventory excluding heavy/generated folders (`.git`, `node_modules`, `dist`, `coverage`, `playwright-report`, `test-results`, `.turbo`) found **1,425 files**.
+- Largest top-level areas: `apps/` (479), `src/` (423), `packages/` (171), `supabase/` (152), `docs/` (44), `scripts/` (38), `e2e/` (30), `.husky/` (19), `.softgen/` (13), `public/` (9), `.github/` (6).
+- Main file types: TypeScript/TSX dominate (`.ts` 547, `.tsx` 400), followed by SQL migrations (`.sql` 138), JavaScript (`.js` 109), Markdown (`.md` 65), source maps (`.map` 55), JSON (`.json` 27), shell scripts (`.sh` 10), HTML/CSS/assets/config.
+- Important root files: `README.md`, `AUDIT.md`, `CHANGELOG.md`, `PRODUCT_RECONSTRUCTION.md`, `UI-UX-IMPLEMENTATION-PLAN.md`, `package.json`, `vite.config.ts`, `vitest.config.ts`, `vitest.rls.config.ts`, `playwright.config.ts`, `tailwind.config.ts`, `Dockerfile`, `docker/nginx.conf`, `.env.example`, `.env.staging.example`, `.mcp.json`, `ecosystem.config.cjs`, `turbo.json`.
+- There is an oddly named root file: `upabase_db_rbmsbppvpgcrmtkdfahy psql -U postgres -t -A -c SELECT category_key, label FROM request_categories ORDER BY sort_order;`. Treat it as a stray/export artifact unless intentionally referenced.
+
+### Documentation corpus covered
+
+Documentation read/summarized during the exploration includes:
+
+- Root: `.ai/PROJECT_CONTEXT.md`, `README.md`, `AUDIT.md`, `CHANGELOG.md`, `PRODUCT_RECONSTRUCTION.md`, `UI-UX-IMPLEMENTATION-PLAN.md`.
+- Mobile/migration docs: `apps/hrms-mobile/SETUP.md`, `migration/RUNBOOK.md`.
+- Main docs: `docs/ARCHITECTURE.md`, `docs/ENTERPRISE_REARCHITECTURE.md`, `docs/DEPLOY.md`, `docs/ENV.md`, `docs/SECURITY.md`, `docs/RLS_MATRIX.md`, `docs/RELEASE.md`, `docs/BACKUP_DR.md`, `docs/DR_DRILLS.md`, `docs/INCIDENT_RESPONSE.md`, `docs/ONCALL.md`, `docs/LAUNCH_CHECKLIST.md`, `docs/PRODUCTION_RECOVERY.md`, `docs/IMPLEMENTATION_MAP.md`, `docs/DEVELOPMENT_PLAN.md`, `docs/SECURITY_SIGNOFF.md`, `docs/EDGE_KEY_ROTATION.md`, `docs/ACCESS_LAYER_SHARING_PROPOSAL.md`, phase closeout/evidence docs, HRMS/workforce docs, sales/internal-request gap/refactor/QA/security/stabilization docs, and auto-aging import/remediation docs.
+- ADRs: `docs/adr/README.md`, `0001-internal-saas-ready-platform.md`, `0002-canonical-shell-and-packages.md`, `0003-approval-instances-workflow-runtime.md`.
+- Softgen/task notes: `.softgen/docs/permission-management.md`, `.softgen/tasks/config.md`, `.softgen/tasks/task-1.md` through `.softgen/tasks/task-11.md`.
+
+Key documentation conclusion: the product is **Fook Loi UBS / FLC BI**, an internal SaaS-ready business operating system for a Proton/Fook Loi automotive dealer group. The phrase “BI app” is legacy/incomplete; current scope is a unified business suite spanning vehicle lifecycle, sales, purchasing, finance, HRMS, internal requests, portal, DMS/legacy reconciliation, audit, notification, and platform administration.
+
+### Product/domain map
+
+- **Platform/home/admin**: role-aware home, module activation, branded shell flags, KPI studio, global search, notifications, audit logs, user/profile management, role sections, branch/master-data management, webhooks, DMS sync operations, reconciliation queue.
+- **Auto Aging / vehicle lifecycle**: vehicle explorer/detail, import center/review/history, SLA admin, mapping admin, commissions, data quality, reports, server-side search/KPI/dashboard/report RPCs, DMS/UBS/legacy source ledger.
+- **Sales**: pipeline, lead intake/detail, sales orders, customers, invoices, sales advisors, salesman performance, margin analysis, outstanding collection, dealer invoices, official receipt verification, existing-vehicle link/unlink, DMS normalizers.
+- **Inventory**: stock balance, vehicle transfers, chassis movement, advanced chassis filter/search.
+- **Purchasing/AP**: purchase invoices/detail, purchase orders/detail, goods receipt notes, three-way matching, AP ledger and lifecycle state machine.
+- **Finance/GL/accounts**: chart of accounts, accounting periods, trial balance, journal entries, profit & loss, balance sheet, aging by branch, cash position, period close, AR/AP immutable payment ledger pattern.
+- **HRMS**: standalone HRMS web app and Capacitor mobile app; dashboard, employees/profile, departments/job titles, leave, leave calendar, attendance, payroll, appraisals, announcements, approvals, approval flows, leave quota/rules, rollover, HRMS role assignments.
+- **Internal Requests / Portal**: requester portal, manager/admin queue, request setup, categories/subcategories/templates/dynamic fields/routing rules, approval governance, ticket activity/comments/attachments, SLA and operational fields, saved views/bulk actions/history/reports, announcements/documents.
+- **DMS/legacy/reconciliation**: raw staging tables, sync runs, normalizer contracts, canonical row matching, source reconciliation events, DMS sync worker skeleton, DMS sync ops RPCs, reconciliation review/queue.
+
+### Architecture and layering rules
+
+- Stack: npm workspaces monorepo, Vite, React 18, React Router 6, TanStack Query 5, Tailwind, Radix/shadcn-style UI, Supabase/Postgres/Auth/Storage/Edge Functions, Vitest, Playwright, Docker/nginx.
+- Workspaces: `packages/*` and `apps/*`. Root app lives in `src/`; HRMS web app in `apps/hrms-web`; HRMS mobile app in `apps/hrms-mobile`.
+- `docs/ARCHITECTURE.md` explicitly says `docs/ENTERPRISE_REARCHITECTURE.md` is the active enterprise architecture source of truth, and durable decisions live in `docs/adr/`.
+- Pages/components must not call `supabase.from()` or `supabase.rpc()` directly. Data access belongs in service packages/files. This is enforced by boundary scripts and ESLint-style checks.
+- React Query is the cache boundary. Query keys should be tenant/company/branch/module scoped. Long lists are server-paginated; avoid full-fleet client fetches.
+- Route gates (`RequireRole`, HRMS access wrappers, module guards) are UX controls only. RLS and SECURITY DEFINER RPC validation are the real security boundaries.
+- Services own SQL shape and map Supabase rows to app/domain types. Contexts compose services and expose memoized state.
+- Static production runtime: the Docker image builds static assets and serves them with nginx on port 8080. There is no Node application server at runtime. `ecosystem.config.cjs` is local/dev only.
+- PWA service-worker configuration must denylist same-origin Supabase proxy paths so Auth/REST/Functions/Storage/Reatime paths are not served as SPA navigation fallback.
+- New feature guidance: scaffold new post-refactor modules under `src/features/{module}/` when practical, but existing `src/pages`, `src/services`, and package locations remain valid and are migrated incrementally.
+
+### App and route structure
+
+- Root app entry: `src/main.tsx`.
+- Main route domains found in `src/main.tsx`:
+  - `/`, `/home`, `/welcome`, `/login`, `/forgot-password`, `/reset-password`, `/signup`, `/auth/v1/verify`, `/account-pending`, `*`.
+  - Auto Aging: `/auto-aging`, `/auto-aging/vehicles`, `/auto-aging/vehicles/:chassisNo`, `/auto-aging/import`, `/auto-aging/review`, `/auto-aging/review/:batchId`, `/auto-aging/sla`, `/auto-aging/mappings`, `/auto-aging/commissions`, `/auto-aging/quality`, `/auto-aging/history`, `/auto-aging/reports`.
+  - Sales: `/sales/pipeline`, `/sales/lead-intake`, `/sales/lead-intake/:kind/:rawId`, `/sales/orders`, `/sales/customers`, `/sales/invoices`, `/sales/performance`, `/sales/advisors`, `/sales/margin`, `/sales/outstanding`, `/sales/dealer-invoices`, `/sales/verify-or`.
+  - Inventory/purchasing/accounts/admin/reports/HRMS: `/inventory/stock`, `/inventory/transfers`, `/inventory/chassis`, `/inventory/chassis-filter`, `/purchasing/invoices`, `/purchasing/invoices/:id`, `/purchasing/orders`, `/purchasing/orders/new`, `/purchasing/orders/:id`, `/purchasing/grn`, `/purchasing/grn/new`, `/purchasing/grn/:id`, `/purchasing/three-way-match`, `/accounts/chart`, `/accounts/periods`, `/accounts/trial-balance`, `/accounts/profit-loss`, `/accounts/balance-sheet`, `/accounts/aging-by-branch`, `/accounts/cash-position`, `/accounts/period-close`, `/accounts/journal`, `/admin/activity`, `/admin/kpi-studio`, `/admin/webhooks`, `/admin/dms-sync`, `/admin/reconciliation`, `/admin/reconciliation/:matchId`, `/admin/users`, `/admin/audit`, `/admin/settings`, `/admin/branches`, `/admin/master-data`, `/admin/suppliers`, `/admin/dealers`, `/admin/user-groups`, `/admin/role-permissions`, `/reports`, `/hrms`, `/hrms/*`.
+  - Portal: `/portal`, `/portal/tickets`, `/portal/tickets/completed`, `/portal/tickets/new`, `/portal/tickets/:ticketId`, `/portal/dashboard`, `/portal/queue`, `/portal/history`, `/portal/reports`, `/portal/setup`, `/portal/announcements`, `/portal/documents`.
+- Root `src/` directories: `components`, `config`, `contexts`, `data`, `hooks`, `integrations/supabase`, `lib`, `pages`, `services`, `test`, `types`, `utils`. Major page folders: `accounts`, `admin`, `auto-aging`, `home`, `hrms`, `inventory`, `purchasing`, `reports`, `sales`, `tickets`.
+- Dedicated HRMS web app: `apps/hrms-web/src/App.tsx`, `apps/hrms-web/src/routes.ts`, `apps/hrms-web/src/layout`, shared copied/adapted areas under `components`, `contexts`, `hooks`, `lib`, `pages/hrms`, `services`. It has redirects from legacy embedded paths such as `hrms/leave`, `hrms/attendance`, `hrms/approvals`, `hrms/appraisals`, `hrms/announcements`, `hrms/employees`, `hrms/payroll`, `hrms/admin`, and `hrms/approval-flows` to standalone HRMS routes.
+- HRMS mobile app: `apps/hrms-mobile` uses Vite + Capacitor. Scripts include `dev`, `build`, `cap:sync`, `cap:run:ios`, `cap:run:android`. It uses shared `@flc/supabase`, `@flc/types`, `@flc/hrms-services`, and `@flc/hrms-schemas`.
+
+### Package map and boundaries
+
+- `@flc/types` (`packages/types`): shared domain contracts for app roles, HRMS entities, approvals/workflows, vehicles, import pipeline, master data, sales, platform.
+- `@flc/supabase` (`packages/supabase`): shared typed browser Supabase client, auth storage key, generated `database.types.ts`, realtime channel hook. Do not expose service-role keys here.
+- `@flc/auth` (`packages/auth`): auth context/flows, access control, route roles, role permissions, profile service, permission service, role section service, HRMS config.
+- `@flc/hrms-schemas` (`packages/hrms-schemas`): shared Zod schemas for HRMS web/mobile validation.
+- `@flc/hrms-services` (`packages/hrms-services`): React-free HRMS service layer for access, announcements, appraisals, approvals/routing, attendance, employees, leave, payroll, settings/rollover, shared identity/supabase helpers.
+- `@flc/internal-requests` (`packages/internal-requests`): request categories/subcategories/templates/form fields/routing rules, approval-flow resolver, request approval service, mutation support, fixtures/tests.
+- `@flc/platform-services` (`packages/platform-services`): cross-cutting audit/logging/error tracking/branding/business reports/notifications/module settings/performance/ticket attachments.
+- `@flc/shell` (`packages/shell`): pure app-shell registry/types/module access/nav utilities/route chrome/HRMS workspace metadata. Boundary checks protect this from importing app/runtime-heavy layers.
+- `@flc/ui` (`packages/ui`): shared UI primitives and patterns such as shadcn/Radix components, `StandardTable`, `ExcelTable`, `KpiCard`, `MetricCard`, `PageHeader`, `PageSpinner`, `MobileCardList`, `ValidationSummaryModal`, `UnauthorizedAccess`, `HrmsEmptyState`, `FilterBar`, `AuditDiffTable`, `StepperProgress`, toast/status helpers.
+
+### Supabase/backend map
+
+- Supabase assets live in `supabase/config.toml`, `supabase/migrations`, `supabase/functions`, `supabase/templates`, `supabase/snippets`.
+- Edge functions found: `invite-user`, `delete-user`, `update-user-status`, `send-push-notification`, `rollover-leave-balances`, `dms-sync-worker`, `webhook-deliverer`, plus shared CORS/logger/public-site/rate-limit helpers.
+- Latest migration tail at exploration time includes GL foundation, portal access/admin setup, workflow conditions, master-data RLS repair, customer dedup, sales advisors, sales data-model critical fixes, leave quota rules, portal announcements/documents, feature flags, rate limits, global search, finance RPCs (`profit_loss`, `balance_sheet`, `aging_by_branch`, `cash_position`, `period_close`), DMS sync ops/retry, reconciliation review, lead intake, purchase orders, GRNs, three-way match, role-aware home, branded shell flags, KPI home defects, webhook outbox, ticket input/attachment bounds, schema qualification/reload, request form field subcategory scope, and June 2026 Internal Request Phase 1 workflow / Phase 2 collaboration / Phase 3 management.
+- Tenant isolation is company-scoped through `profiles.company_id`, access-scope helpers, RLS policies, and SECURITY DEFINER RPC ownership checks. `profiles.access_scope = 'global'` is a privileged cross-company case.
+- Sensitive backend mutations should go through RPCs or Edge Functions, especially user provisioning/status, DMS staging/normalization, GL/AR/AP ledgers, webhook delivery, leave rollover, approval execution, and cross-user notifications.
+- Important backend patterns: RLS everywhere, no client service role, append-only payment event ledgers, advisory locks for idempotent batch jobs, CTE/reference preloads for RPC performance, generated Supabase types kept in sync only from intended schema.
+
+### Testing, quality gates, and operations
+
+- Root scripts in `package.json`: `dev`, `build`, `build:dev`, `build:budget`, `bundle:budget`, `lint`, `preview`, `typecheck`, `test`, `test:watch`, `test:coverage`, RPC/frontend/boundary checks, security checks, RLS seed/cleanup/test, admin bootstrap, env provisioning, production verify/smoke, RPC health canaries, Husky prepare.
+- `typecheck` is intentionally broad: `tsc --noEmit` plus checks for RPC contracts, RPC frontend/migration parity, workflow boundary, legacy approval debt, route registry parity, production smoke registry, shell module boundary, HRMS registry boundary, page data boundary, unavailable-state registry, UI boundary, platform/hrms/auth/internal-request service boundaries.
+- Test coverage locations include root `src/**/*.test.*`, package tests, HRMS web tests, live/RLS tests in `src/test`, and Playwright E2E specs under `e2e/` and `apps/hrms-web/e2e/`.
+- E2E specs cover accessibility, auth, navigation/routes, responsive behavior, module dashboards, inbox/tickets/internal requests, HRMS production, auto-aging import/review, sales lead intake, DMS sync ops, reconciliation queue, purchase orders, GRNs, three-way match, finance statements/reports, aging/cash/period close, and Proton exploration/extraction flows.
+- CI/deploy docs describe push-to-main CI, GHCR Docker image build, Cloudflare Access SSH deployment via `scripts/deploy-image.sh`, nginx static serving, Supabase same-origin proxying, backup/DR workflows, launch checklist, security signoff, and production smoke/verification scripts.
+
+### Safe-change rules for future sessions
+
+- Always read this `.ai/PROJECT_CONTEXT.md` first, then check `git status --short` before edits.
+- Treat the checkout as potentially production-sensitive. Avoid destructive DB, Docker, git, deployment, or filesystem commands unless explicitly requested.
+- Preserve user/server-local changes; never overwrite unrelated dirty files.
+- Do not add direct Supabase calls in pages/components/contexts; route database access through services/packages.
+- Keep RLS and SECURITY DEFINER/RPC validation as the authorization source of truth. Client gates are not security boundaries.
+- For any new table or privileged operation: update migrations, generated types when appropriate, service layer, RLS matrix/docs/tests, and boundary checks.
+- Keep DMS credentials backend-only (`DMS_*`, never `VITE_DMS_*`) and keep sync/normalization read-only/staged unless reconciliation rules are explicit.
+- Do not present capped client samples as whole-fleet truth; use server-side summaries/RPCs for reports and dashboards.
+- Keep static bundle assumptions: no Node runtime in production, no service-role secret in Vite/client code, Supabase proxy paths denied from PWA navigation fallback.
+
 ## Last Updated
 
 - 2026-05-08: Initial PROJECT_CONTEXT.md created from live repo deep dive. Captured auth/profile flow, roles/scopes, module architecture, Supabase schema/API contracts, deploy workflow, production constraints, dirty worktree state, and current tech debt.
@@ -163,3 +266,5 @@ Current phase as of 2026-05-21: **Stages 0–6 complete; Stage 7 is next.** All 
 - 2026-05-11: `normalize_dms_vehicle_stock()` staged-data normalizer implemented + dms-sync-worker registered. Applied `20260511020000_normalize_dms_vehicle_stock.sql` (initial) and corrective `20260511030000_normalize_dms_vehicle_stock_v2.sql`. Key lesson: `vehicles.stage` is fully owned by the `recompute_vehicle_stage` BEFORE trigger (fires on UPDATE OF `delivery_date`, `reg_date`, `reg_no`, `disb_date`, `stage_override`); normalizer must NOT set stage directly. Valid stage/stage_override values: `pending_register_free_stock`, `pending_deliver_loan_disburse`, `complete`. Added 4 vehicle stock normalizer tests to `dms-normalizer.spec.ts`. Added `[functions.*]` sections for all 6 Edge Functions in `supabase/config.toml` (all `verify_jwt = true`). Documented `SUPABASE_INTERNAL_FUNCTIONS_CONFIG` JSON array in `docs/ENV.md`. **111/111 tests passed.** Types regenerated.
 - 2026-05-11: `normalize_dms_customer()` staged-data normalizer implemented. Applied `20260511040000_normalize_dms_customer.sql`: adds `canonical_customer_id` back-link column to `dms_raw_sales_orders`; Postgres function reads accepted `source_reconciliation_matches` rows with `object_type='customer'` for `dms_raw_sales_orders` rows; resolves canonical `customers` row via canonical_record_id → dms_customer_id unique index → dms_customer_business_id; applies always (dms_customer_id, dms_customer_business_id, dms_last_synced_at) and if_null (name, ic_no, phone, email extracted from provisional raw_payload JSONB paths) rules; never touches notes; back-links canonical_customer_id; stamps match; appends normalized audit event. 4 focused tests added. **115/115 tests passed.** Types regenerated. Typecheck/lint/build/budget all green. **Stage 1 checklist fully closed.**
 - 2026-05-21: Updated Project Context after the dedicated HRMS enterprise redesign shipped. Recorded the redesigned dashboard, grouped navigation, shared shell primitives, employee profile route, redesigned attendance/announcement/approval/payroll/appraisal/calendar/directory flows, and the fact that Stage 7 Financial Reporting UI is still the next cross-repo implementation target.
+- 2026-06-21: Full repository exploration snapshot added. Captured inventory counts, documentation corpus covered, product/domain map, app/route structure, package boundaries, Supabase/backend map, tests/quality gates/ops, and safe-change rules for future sessions.
+- 2026-06-25: Production verification after Enterprise Redesign Phase 4: local gates, GitHub CI `28145808450`, and Production Deploy `28145931350` all passed. Deals are the canonical sales workflow; Sales Orders are legacy/read-only and should be deprecated from primary navigation. Next work: DataContext split-query optimization and Sales Orders deprecation cleanup.

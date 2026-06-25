@@ -120,7 +120,7 @@ export default function LeadIntakeDetail() {
             </Button>
             <Button
               size="sm"
-              onClick={() => navigate(`/sales/orders/new?dmsCustomerId=${encodeURIComponent(detail.dmsCustomerId ?? '')}`)}
+              onClick={() => navigate(`/sales/deals/new?dmsCustomerId=${encodeURIComponent(detail.dmsCustomerId ?? '')}`)}
               data-testid="convert-to-so"
             >
               <ShoppingCart className="h-3.5 w-3.5 mr-1" />Convert to Sales Order

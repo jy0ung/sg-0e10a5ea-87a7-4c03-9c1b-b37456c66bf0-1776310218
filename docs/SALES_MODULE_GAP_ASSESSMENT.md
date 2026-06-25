@@ -5,6 +5,7 @@
 > **Overall Readiness:** ~38% — functional shells exist, but critical workflow, data-model, relationship, and UI/UX gaps block production viability at scale.
 
 ---
+> **Superseded status (2026-06-25):** This gap assessment describes the pre-Deal-Lifecycle Sales module. The remediation direction has changed: **Deals is now the canonical sales workflow** (`/sales/deals`, `/sales/pipeline`, `/sales/deals/:id`). Sales Orders are legacy/read-only and should not receive new workflow investments except redirects, compatibility links, and historical reference. See `.ai/PROJECT_CONTEXT.md` and `docs/DEVELOPMENT_PLAN.md` for the completed Enterprise Redesign status.
 
 ## A. Executive Summary
 

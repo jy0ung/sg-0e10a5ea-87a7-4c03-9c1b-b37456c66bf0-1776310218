@@ -1,7 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
 import { VehicleCanonical, ImportBatch, DataQualityIssue, SlaPolicy, KpiSummary } from '@/types';
 import { computeKpiSummaries } from '@/utils/kpi-computation';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,14 +10,17 @@ import { loggingService } from '@flc/platform-services';
 import { resolveBranchCode } from '@/services/branchService';
 import { useToast } from '@/hooks/use-toast';
 import {
-  fetchAutoAgingContextData,
+  fetchAutoAgingImportBatches,
+  fetchAutoAgingQualityIssues,
+  fetchAutoAgingSlaPolicies,
+  fetchAutoAgingSummary,
+  fetchAutoAgingVehicles,
   insertAutoAgingQualityIssues,
   subscribeToAutoAgingVehicleChanges,
   updateAutoAgingImportBatch,
   updateAutoAgingSlaPolicy,
   upsertAutoAgingImportBatch,
   upsertAutoAgingVehicles,
-  type AutoAgingContextData,
 } from '@/services/autoAgingDataService';
 
 interface DataContextType {
@@ -45,17 +47,13 @@ const DataContext = createContext<DataContextType | null>(null);
 
 export const dataQueryKey = (companyId: string, branchId?: string | null) =>
   ['data', companyId, branchId ?? 'all'] as const;
-
-type DataLoadMode = 'full' | 'summary-only';
-
-/**
- * All routes now use summary-only mode — no full vehicle hydration.
- * Pages that need vehicle rows use direct service calls (searchVehicles,
- * getVehicleByChassis) instead of reading from DataContext.
- */
-function getDataLoadMode(_pathname: string): DataLoadMode {
-  return 'summary-only';
-}
+export const dataVehiclesKey = (companyId: string, branchCode?: string | null) =>
+  ['data', 'vehicles', companyId, branchCode ?? 'all'] as const;
+export const dataSummaryKey = (companyId: string, branchCode?: string | null) =>
+  ['data', 'summary', companyId, branchCode ?? 'all'] as const;
+export const dataBatchesKey = (companyId: string) => ['data', 'batches', companyId] as const;
+export const dataIssuesKey = (companyId: string) => ['data', 'issues', companyId] as const;
+export const dataSlasKey = (companyId: string) => ['data', 'slas', companyId] as const;
 
 async function recoverSessionForDataLoad(): Promise<boolean> {
   try {
@@ -73,88 +71,120 @@ async function recoverSessionForDataLoad(): Promise<boolean> {
   }
 }
 
-type DataQueryResult = AutoAgingContextData;
-const emptyData: DataQueryResult = { vehicles: [], kpiSummaries: undefined, availableBranches: undefined, availableModels: undefined, batches: [], issues: [], slas: [], errors: [], hasAuthError: false };
+async function withAuthRecovery<T extends { hasAuthError: boolean }>(loader: () => Promise<T>): Promise<T> {
+  let result = await loader();
+  if (result.hasAuthError && await recoverSessionForDataLoad()) {
+    result = await loader();
+  }
+  return result;
+}
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const companyId = useCompanyId();
   const { user } = useAuth();
-  const location = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Branch-scoped users only see their branch's vehicles.
   const branchId = user?.access_scope === 'branch' ? (user.branch_id ?? null) : null;
-  const routeLoadMode = getDataLoadMode(location.pathname);
-  const activeDataQueryKey = useMemo(
-    () => [...dataQueryKey(companyId, branchId), routeLoadMode] as const,
-    [companyId, branchId, routeLoadMode],
-  );
 
-  // React Query is the single source of truth — no local useState mirrors.
-  const { data, isLoading, dataUpdatedAt } = useQuery({
-    queryKey: activeDataQueryKey,
-    queryFn: async () => {
-      const loadOnce = async () => {
-        let branchCode: string | null = null;
-        if (branchId) {
-          branchCode = await resolveBranchCode(branchId);
-        }
-        return fetchAutoAgingContextData(companyId, branchCode, routeLoadMode);
-      };
+  const { data: branchCode } = useQuery({
+    queryKey: ['data', 'branch-code', branchId],
+    queryFn: () => resolveBranchCode(branchId!),
+    enabled: !!branchId,
+    staleTime: 5 * 60_000,
+  });
 
-      let result = await loadOnce();
-      if (result.hasAuthError) {
-        const recovered = await recoverSessionForDataLoad();
-        if (recovered) {
-          result = await loadOnce();
-        }
-      }
+  const canLoadScopedData = !!companyId && (!branchId || branchCode !== undefined);
 
-      return result;
-    },
+  // Split queries: no single DataContext mount should block on all datasets.
+  const vehiclesQuery = useQuery({
+    queryKey: dataVehiclesKey(companyId, branchCode),
+    queryFn: async () => withAuthRecovery(() => fetchAutoAgingVehicles(companyId, branchCode)),
+    enabled: false, // full vehicle hydration is deprecated; pages use searchVehicles/getVehicleByChassis directly.
+    staleTime: 60_000,
+  });
+
+  const summaryQuery = useQuery({
+    queryKey: dataSummaryKey(companyId, branchCode),
+    queryFn: async () => withAuthRecovery(() => fetchAutoAgingSummary(branchCode)),
+    enabled: canLoadScopedData,
+    staleTime: 60_000,
+  });
+
+  const batchesQuery = useQuery({
+    queryKey: dataBatchesKey(companyId),
+    queryFn: async () => withAuthRecovery(() => fetchAutoAgingImportBatches(companyId)),
     enabled: !!companyId,
     staleTime: 60_000,
   });
 
-  // Derive all context values directly from query data (wrapped in useMemo to
-  // avoid new array references on every render when the underlying data is stable).
-  const vehicles = useMemo(() => data?.vehicles ?? [], [data]);
-  const importBatches = useMemo(() => data?.batches ?? [], [data]);
-  const qualityIssues = useMemo(() => data?.issues ?? [], [data]);
-  const slas = useMemo(() => data?.slas ?? [], [data]);
-  const loadErrors = useMemo(() => data?.errors ?? [], [data]);
-  const dbKpiSummaries = data?.kpiSummaries;
-  const kpiSummaries = useMemo(() => dbKpiSummaries ?? computeKpiSummaries(vehicles, slas), [dbKpiSummaries, vehicles, slas]);
-  const availableBranches = useMemo(() => data?.availableBranches ?? [], [data]);
-  const availableModels = useMemo(() => data?.availableModels ?? [], [data]);
-  const lastRefresh = dataUpdatedAt ? new Date(dataUpdatedAt).toISOString() : new Date().toISOString();
+  const issuesQuery = useQuery({
+    queryKey: dataIssuesKey(companyId),
+    queryFn: async () => withAuthRecovery(() => fetchAutoAgingQualityIssues(companyId)),
+    enabled: !!companyId,
+    staleTime: 60_000,
+  });
 
-  // Surface fetch errors to users via toast (only once per fetch).
+  const slasQuery = useQuery({
+    queryKey: dataSlasKey(companyId),
+    queryFn: async () => withAuthRecovery(() => fetchAutoAgingSlaPolicies(companyId)),
+    enabled: !!companyId,
+    staleTime: 5 * 60_000,
+  });
+
+  const vehicles = useMemo(() => vehiclesQuery.data?.data ?? [], [vehiclesQuery.data]);
+  const importBatches = useMemo(() => batchesQuery.data?.data ?? [], [batchesQuery.data]);
+  const qualityIssues = useMemo(() => issuesQuery.data?.data ?? [], [issuesQuery.data]);
+  const slas = useMemo(() => slasQuery.data?.data ?? [], [slasQuery.data]);
+  const kpiSummaries = useMemo(
+    () => summaryQuery.data?.kpiSummaries ?? computeKpiSummaries(vehicles, slas),
+    [summaryQuery.data?.kpiSummaries, vehicles, slas],
+  );
+  const availableBranches = useMemo(() => summaryQuery.data?.availableBranches ?? [], [summaryQuery.data]);
+  const availableModels = useMemo(() => summaryQuery.data?.availableModels ?? [], [summaryQuery.data]);
+  const loadErrors = useMemo(() => {
+    const errors = [
+      ...(summaryQuery.data?.errors ?? []),
+      batchesQuery.data?.error && 'import batches',
+      issuesQuery.data?.error && 'quality issues',
+      slasQuery.data?.error && 'SLA policies',
+    ].filter((value): value is string => Boolean(value));
+    return [...new Set(errors)];
+  }, [summaryQuery.data?.errors, batchesQuery.data?.error, issuesQuery.data?.error, slasQuery.data?.error]);
+  const lastRefreshMs = Math.max(
+    summaryQuery.dataUpdatedAt,
+    batchesQuery.dataUpdatedAt,
+    issuesQuery.dataUpdatedAt,
+    slasQuery.dataUpdatedAt,
+    vehiclesQuery.dataUpdatedAt,
+  );
+  const lastRefresh = lastRefreshMs ? new Date(lastRefreshMs).toISOString() : new Date().toISOString();
+  const loading = summaryQuery.isLoading || batchesQuery.isLoading || issuesQuery.isLoading || slasQuery.isLoading;
+
   const lastErrorRef = useRef<string | null>(null);
   useEffect(() => {
-    const errors = data?.errors ?? [];
-    if (errors.length > 0) {
-      const key = errors.join(',');
+    if (loadErrors.length > 0) {
+      const key = loadErrors.join(',');
       if (lastErrorRef.current !== key) {
         lastErrorRef.current = key;
-        toast({ title: `Failed to load: ${errors.join(', ')}`, variant: 'destructive' });
+        toast({ title: `Failed to load: ${loadErrors.join(', ')}`, variant: 'destructive' });
       }
     } else {
       lastErrorRef.current = null;
     }
-  }, [data?.errors, toast]);
+  }, [loadErrors, toast]);
 
   const reloadFromDb = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId, branchId) });
-  }, [queryClient, companyId, branchId]);
+    await queryClient.invalidateQueries({ queryKey: ['data'] });
+  }, [queryClient]);
 
   useEffect(() => {
     if (!companyId) return;
     return subscribeToAutoAgingVehicleChanges(companyId, () => {
-      queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId, branchId) });
+      queryClient.invalidateQueries({ queryKey: dataSummaryKey(companyId, branchCode) });
+      queryClient.invalidateQueries({ queryKey: dataVehiclesKey(companyId, branchCode) });
     });
-  }, [companyId, branchId, queryClient]);
+  }, [companyId, branchCode, queryClient]);
 
   const setVehicles = useCallback(async (v: VehicleCanonical[]) => {
     try {
@@ -172,17 +202,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         loggingService.error('Import batch insert error', { error, batch: b }, 'DataContext');
       } else {
-        queryClient.setQueryData<DataQueryResult>(activeDataQueryKey, prev => {
-          const base = prev ?? emptyData;
-          const remainingBatches = base.batches.filter(existingBatch => existingBatch.id !== b.id);
-          return { ...base, batches: [b, ...remainingBatches] };
-        });
+        queryClient.setQueryData<{ data: ImportBatch[]; error: unknown | null; hasAuthError: boolean }>(dataBatchesKey(companyId), prev => ({
+          data: [b, ...(prev?.data ?? []).filter(existingBatch => existingBatch.id !== b.id)],
+          error: prev?.error ?? null,
+          hasAuthError: prev?.hasAuthError ?? false,
+        }));
         loggingService.info('Import batch added', { batchId: b.id }, 'DataContext');
       }
     } catch (err) {
       loggingService.error('Unexpected error adding import batch', { error: err }, 'DataContext');
     }
-  }, [companyId, queryClient, activeDataQueryKey]);
+  }, [companyId, queryClient]);
 
   const updateImportBatch = useCallback(async (id: string, updates: Partial<ImportBatch>) => {
     try {
@@ -190,31 +220,33 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         loggingService.error('Import batch update error', { error, id, updates }, 'DataContext');
       } else {
-        queryClient.setQueryData<DataQueryResult>(activeDataQueryKey, prev => {
-          const base = prev ?? emptyData;
-          return { ...base, batches: base.batches.map(b => b.id === id ? { ...b, ...updates } : b) };
-        });
+        queryClient.setQueryData<{ data: ImportBatch[]; error: unknown | null; hasAuthError: boolean }>(dataBatchesKey(companyId), prev => ({
+          data: (prev?.data ?? []).map(b => b.id === id ? { ...b, ...updates } : b),
+          error: prev?.error ?? null,
+          hasAuthError: prev?.hasAuthError ?? false,
+        }));
         loggingService.info('Import batch updated', { batchId: id }, 'DataContext');
       }
     } catch (err) {
       loggingService.error('Unexpected error updating import batch', { error: err }, 'DataContext');
     }
-  }, [queryClient, companyId, activeDataQueryKey]);
+  }, [queryClient, companyId]);
 
   const addQualityIssues = useCallback(async (issues: DataQualityIssue[]) => {
     if (issues.length === 0) return;
 
     try {
       await insertAutoAgingQualityIssues(companyId, issues);
-      queryClient.setQueryData<DataQueryResult>(activeDataQueryKey, prev => {
-        const base = prev ?? emptyData;
-        return { ...base, issues: [...issues, ...base.issues] };
-      });
+      queryClient.setQueryData<{ data: DataQualityIssue[]; error: unknown | null; hasAuthError: boolean }>(dataIssuesKey(companyId), prev => ({
+        data: [...issues, ...(prev?.data ?? [])],
+        error: prev?.error ?? null,
+        hasAuthError: prev?.hasAuthError ?? false,
+      }));
       loggingService.info('Quality issues added', { count: issues.length }, 'DataContext');
     } catch (err) {
       loggingService.error('Unexpected error adding quality issues', { error: err }, 'DataContext');
     }
-  }, [companyId, queryClient, activeDataQueryKey]);
+  }, [companyId, queryClient]);
 
   const updateSla = useCallback(async (id: string, slaDays: number) => {
     try {
@@ -222,23 +254,22 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         loggingService.error('SLA update error', { error, id, slaDays }, 'DataContext');
       } else {
-        queryClient.setQueryData<DataQueryResult>(activeDataQueryKey, prev => {
-          const base = prev ?? emptyData;
-          return { ...base, slas: base.slas.map(s => s.id === id ? { ...s, slaDays } : s) };
-        });
+        queryClient.setQueryData<{ data: SlaPolicy[]; error: unknown | null; hasAuthError: boolean }>(dataSlasKey(companyId), prev => ({
+          data: (prev?.data ?? []).map(s => s.id === id ? { ...s, slaDays } : s),
+          error: prev?.error ?? null,
+          hasAuthError: prev?.hasAuthError ?? false,
+        }));
         loggingService.info('SLA updated', { slaId: id, slaDays }, 'DataContext');
       }
     } catch (err) {
       loggingService.error('Unexpected error updating SLA', { error: err }, 'DataContext');
     }
-  }, [queryClient, companyId, activeDataQueryKey]);
+  }, [queryClient, companyId]);
 
   const refreshKpis = useCallback(() => {
-    // KPIs are auto-derived via useMemo; this function triggers a cache touch
-    // to notify consumers. In practice, reloadFromDb is preferred.
-    queryClient.invalidateQueries({ queryKey: dataQueryKey(companyId, branchId) });
+    queryClient.invalidateQueries({ queryKey: dataSummaryKey(companyId, branchCode) });
     loggingService.info('KPIs refresh requested', { vehicleCount: vehicles.length }, 'DataContext');
-  }, [queryClient, companyId, branchId, vehicles.length]);
+  }, [queryClient, companyId, branchCode, vehicles.length]);
 
   const contextValue = useMemo(
     () => ({
@@ -251,7 +282,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       availableModels,
       loadErrors,
       lastRefresh,
-      loading: isLoading,
+      loading,
       setVehicles,
       addImportBatch,
       updateImportBatch,
@@ -270,7 +301,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       availableModels,
       loadErrors,
       lastRefresh,
-      isLoading,
+      loading,
       setVehicles,
       addImportBatch,
       updateImportBatch,

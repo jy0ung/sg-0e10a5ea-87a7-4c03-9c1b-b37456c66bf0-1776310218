@@ -102,7 +102,6 @@ const DealDetail = lazy(() => import("./pages/sales/DealDetail"));
 const NewDeal = lazy(() => import("./pages/sales/NewDeal"));
 const CustomerDetail = lazy(() => import("./pages/sales/CustomerDetail"));
 const OutstandingCollectionNew = lazy(() => import("./pages/sales/OutstandingCollection"));
-const SalesOrders = lazy(() => import("./pages/sales/SalesOrders"));
 const Customers = lazy(() => import("./pages/sales/Customers"));
 const Invoices = lazy(() => import("./pages/sales/Invoices"));
 const SalesmanPerformancePage = lazy(() => import("./pages/sales/SalesmanPerformance"));
@@ -251,7 +250,7 @@ const router = createBrowserRouter([
           { path: "outstanding-new", element: <R scope="Outstanding Collection"><S><OutstandingCollectionNew /></S></R> },
           { path: "lead-intake", element: <RequireRole roles={MANAGER_AND_UP} section="Sales"><R scope="Lead Intake"><S><LeadIntake /></S></R></RequireRole> },
           { path: "lead-intake/:kind/:rawId", element: <RequireRole roles={MANAGER_AND_UP} section="Sales"><R scope="Lead Detail"><S><LeadIntakeDetail /></S></R></RequireRole> },
-          { path: "orders", element: <R scope="Sales Orders"><S><SalesOrders /></S></R> },
+          { path: "orders", element: <Navigate to="/sales/deals" replace /> },
           { path: "customers", element: <R scope="Customers"><S><Customers /></S></R> },
           { path: "invoices", element: <RequireRole roles={MANAGER_AND_UP} section="Sales"><R scope="Invoices"><S><Invoices /></S></R></RequireRole> },
           { path: "performance", element: <RequireRole roles={MANAGER_AND_UP} section="Sales"><R scope="Salesman Performance"><S><SalesmanPerformancePage /></S></R></RequireRole> },

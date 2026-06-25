@@ -17,7 +17,7 @@
 const KPI_HREF_BY_CODE: Record<string, string> = {
   'vehicles.total_stock':     '/auto-aging/vehicles',
   'vehicles.aged_over_180':   '/auto-aging/vehicles?ageBucket=181%2B',
-  'sales.open_orders':        '/sales/orders',
+  'sales.open_orders':        '/sales/deals',
   'sales.weekly_revenue':     '/sales',
   'customers.new_this_month': '/sales/customers',
 };

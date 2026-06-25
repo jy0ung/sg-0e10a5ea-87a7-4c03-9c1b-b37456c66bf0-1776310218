@@ -137,6 +137,69 @@ function isAuthLikeError(error: unknown): boolean {
 
 const VEHICLE_PAGE_SIZE = 1_000;
 
+export async function fetchAutoAgingVehicles(
+  companyId: string,
+  branchCode?: string | null,
+): Promise<{ data: VehicleCanonical[]; error: unknown | null; hasAuthError: boolean }> {
+  const result = await fetchAllVehicles(companyId, branchCode);
+  return { ...result, hasAuthError: isAuthLikeError(result.error) };
+}
+
+export async function fetchAutoAgingSummary(
+  branchCode?: string | null,
+): Promise<Pick<AutoAgingContextData, 'kpiSummaries' | 'availableBranches' | 'availableModels' | 'errors' | 'hasAuthError'>> {
+  const { data, error } = await getAutoAgingDashboardSummary({ branch: branchCode });
+  if (error) loggingService.error('Failed to load summary', { error }, 'AutoAgingDataService');
+  return {
+    kpiSummaries: data?.kpiSummaries,
+    availableBranches: data?.availableBranches,
+    availableModels: data?.availableModels,
+    errors: error ? ['summary'] : [],
+    hasAuthError: isAuthLikeError(error),
+  };
+}
+
+export async function fetchAutoAgingImportBatches(companyId: string): Promise<{ data: ImportBatch[]; error: unknown | null; hasAuthError: boolean }> {
+  const { data, error } = await supabase
+    .from('import_batches')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false });
+  if (error) loggingService.error('Failed to load import batches', { error }, 'AutoAgingDataService');
+  return {
+    data: (data ?? []).map(row => mapDbBatch(row as unknown as Record<string, unknown>)),
+    error,
+    hasAuthError: isAuthLikeError(error),
+  };
+}
+
+export async function fetchAutoAgingQualityIssues(companyId: string): Promise<{ data: DataQualityIssue[]; error: unknown | null; hasAuthError: boolean }> {
+  const { data, error } = await supabase
+    .from('quality_issues')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false });
+  if (error) loggingService.error('Failed to load quality issues', { error }, 'AutoAgingDataService');
+  return {
+    data: (data ?? []).map(row => mapDbIssue(row as unknown as Record<string, unknown>)),
+    error,
+    hasAuthError: isAuthLikeError(error),
+  };
+}
+
+export async function fetchAutoAgingSlaPolicies(companyId: string): Promise<{ data: SlaPolicy[]; error: unknown | null; hasAuthError: boolean }> {
+  const { data, error } = await supabase
+    .from('sla_policies')
+    .select('*')
+    .eq('company_id', companyId);
+  if (error) loggingService.error('Failed to load SLA policies', { error }, 'AutoAgingDataService');
+  return {
+    data: (data ?? []).map(row => mapDbSla(row as unknown as Record<string, unknown>)),
+    error,
+    hasAuthError: isAuthLikeError(error),
+  };
+}
+
 async function fetchAllVehicles(
   companyId: string,
   branchCode?: string | null,

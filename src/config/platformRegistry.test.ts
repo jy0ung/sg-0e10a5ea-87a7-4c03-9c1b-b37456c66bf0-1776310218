@@ -129,14 +129,14 @@ describe('platformRegistry', () => {
   });
 
   it('resolves focused sections for nested enterprise routes', () => {
-    expect(getFocusedPlatformSection('/sales/orders/so-1')).toBe('Sales');
+    expect(getFocusedPlatformSection('/sales/deals/so-1')).toBe('Sales');
     expect(getFocusedPlatformSection('/portal/tickets/new')).toBe('Platform');
     expect(getFocusedPlatformSection('/admin/users')).toBe('Admin');
     expect(getFocusedPlatformSection('/admin/webhooks')).toBe('Admin');
   });
 
   it('keeps focused shell mode limited to standalone module paths', () => {
-    expect(isFocusedPlatformPath('/sales/orders')).toBe(true);
+    expect(isFocusedPlatformPath('/sales/deals')).toBe(true);
     expect(isFocusedPlatformPath('/admin/users')).toBe(true);
     expect(isFocusedPlatformPath('/hrms/leave')).toBe(true);
     expect(isFocusedPlatformPath('/portal/tickets/new')).toBe(false);

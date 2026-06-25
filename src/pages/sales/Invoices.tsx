@@ -74,7 +74,7 @@ export default function Invoices() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ invoiceNo: '', salesOrderId: '', customerId: '', issueDate: new Date().toISOString().split('T')[0], dueDate: '', subtotal: '', taxAmount: '', discountAmount: '', notes: '', invoiceType: 'customer_sales' as InvoiceType });
 
-  // Pre-fill from Sales Orders "Create Invoice" CTA
+  // Pre-fill from legacy Sales Orders / Deals CTA
   useEffect(() => {
     const prefillOrderId = (location.state as { prefillOrderId?: string } | null)?.prefillOrderId;
     if (!prefillOrderId) return;

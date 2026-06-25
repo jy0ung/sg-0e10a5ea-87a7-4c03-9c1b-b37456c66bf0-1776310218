@@ -120,7 +120,7 @@ Relevant evidence:
 
 ## Current Phase
 
-Current phase: Phase 5 / Stages 0–6 complete as of 2026-05-14. Stage 7 (financial reporting UI) is next. DMS staging foundation, DMS normalizers, Sales Pipeline RPCs, Full-Stack Refactor, AR Foundation (immutable `payment_events` ledger), AP Foundation (`supplier_payment_events` with lifecycle state machine), HRMS role-based access system (`hrms_roles`, `employee_hrms_role_assignments`, `useHrmsAccess` hook, `deriveFullHrmsAccess` admin bypass), and six HRMS feature migrations (half-day leave, company branding, leave type rules, staff role consolidation, `creator_updater` defaults) are all committed and locally validated.
+Current phase: Enterprise Redesign phases 1–4 are complete and production-verified as of 2026-06-25. Deals are the canonical Sales workflow; Sales Orders are legacy/read-only and should be removed from primary navigation over time. DMS staging foundation, DMS normalizers, Sales Pipeline RPCs, Full-Stack Refactor, AR Foundation (immutable `payment_events` ledger), AP Foundation (`supplier_payment_events` with lifecycle state machine), HRMS role-based access system (`hrms_roles`, `employee_hrms_role_assignments`, `useHrmsAccess` hook, `deriveFullHrmsAccess` admin bypass), and six HRMS feature migrations (half-day leave, company branding, leave type rules, staff role consolidation, `creator_updater` defaults) are all committed and locally validated.
 
 Stage 0 goal:
 
@@ -580,3 +580,13 @@ Required non-command evidence:
 - [RLS_MATRIX.md](RLS_MATRIX.md)
 - [SECURITY_SIGNOFF.md](SECURITY_SIGNOFF.md)
 - [DR_DRILLS.md](DR_DRILLS.md)
+
+## 2026-06-25 Enterprise Redesign Closeout
+
+- Phase 1 Stabilize & Fix Core UX: complete (8/10 original items; remaining trend/session items are lower-priority follow-ups).
+- Phase 2 Workflow-First Redesign: complete (10/10).
+- Phase 3 Module Integration & Automation: complete (10/10).
+- Phase 4 Enterprise Hardening: complete (10/10) and merged to `main` at `15786da`.
+- Verification: local gates passed (`check:auth-service-boundary`, typecheck, lint, build, bundle budget, vitest); GitHub CI `28145808450` passed; Production Deploy `28145931350` passed including verify, RPC canaries, and production module smoke.
+- Product decision: **Deals replaces Sales Orders as the canonical sales workflow.** Sales Orders remains only for legacy reference/backward compatibility until removed or redirected. New sales automation, reports, links, and workflow UX must target Deals.
+
