@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { getAllAuditLogs, AuditLogWithProfile } from '@/services/auditService';
-import { listProfiles, type ProfileRow } from '@/services/profileService';
+import { listProfiles, type ProfileRow } from '@flc/auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { History, Filter, Download, ChevronRight, ChevronDown, X, Users } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
