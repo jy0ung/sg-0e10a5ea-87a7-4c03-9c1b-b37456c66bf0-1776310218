@@ -216,11 +216,15 @@ export default function UserManagement() {
       email: '',
       name: '',
       role: DEFAULT_APP_ROLE,
+      company_id: user?.company_id ?? null,
       employee_id: null,
       portal_access_only: true,
     },
     mode: 'onChange',
   });
+  const selectedInviteCompanyId = isSuperAdmin
+    ? (inviteForm.watch('company_id') ?? '')
+    : (user?.company_id ?? '');
 
 
   const linkedEmployeeProfileIdByEmployeeId = useMemo(() => {
@@ -425,12 +429,18 @@ export default function UserManagement() {
   };
 
   const handleInvite = async (data: InviteUserFormData) => {
+    const companyId = isSuperAdmin ? (data.company_id ?? '') : (user?.company_id ?? '');
+    if (!companyId) {
+      toast.error('Select a company before sending the invitation.');
+      return;
+    }
+
     setInviting(true);
     const { error } = await inviteUser({
       email: data.email,
       name: data.name,
       role: data.role,
-      companyId: user?.company_id || '',
+      companyId,
       employeeId: data.employee_id,
       portalAccessOnly: data.portal_access_only ?? false,
     });
@@ -441,7 +451,14 @@ export default function UserManagement() {
     }
     toast.success(`Invitation sent to ${data.email}`);
     setSignupUrl(getSignupUrl());
-    inviteForm.reset({ email: '', name: '', role: DEFAULT_APP_ROLE, employee_id: null, portal_access_only: false } as InviteUserFormData);
+    inviteForm.reset({
+      email: '',
+      name: '',
+      role: DEFAULT_APP_ROLE,
+      company_id: isSuperAdmin ? null : (user?.company_id ?? null),
+      employee_id: null,
+      portal_access_only: false,
+    } as InviteUserFormData);
     await refreshProfiles();
   };
 
@@ -1110,6 +1127,30 @@ export default function UserManagement() {
                   </Select>
                 </div>
 
+                {isSuperAdmin && (
+                  <div className="space-y-2">
+                    <Label>Company</Label>
+                    <Select
+                      value={selectedInviteCompanyId || undefined}
+                      onValueChange={(value) => {
+                        inviteForm.setValue('company_id', value, { shouldDirty: true, shouldValidate: true });
+                        inviteForm.setValue('employee_id', null, { shouldDirty: true, shouldValidate: true });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map(company => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>Linked Employee</Label>
                   <Select
@@ -1119,7 +1160,7 @@ export default function UserManagement() {
                     <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No employee link</SelectItem>
-                      {getEmployeeOptions(user?.company_id).map(employee => (
+                      {getEmployeeOptions(selectedInviteCompanyId).map(employee => (
                         <SelectItem key={employee.id} value={employee.id}>
                           {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
                         </SelectItem>
@@ -1161,7 +1202,7 @@ export default function UserManagement() {
                   )}
                 </div>
 
-                <Button type="submit" className="w-full" disabled={inviting || !inviteForm.formState.isValid}>
+                <Button type="submit" className="w-full" disabled={inviting || !inviteForm.formState.isValid || !selectedInviteCompanyId}>
                   {inviting ? (
                     <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending invitation...</>
                   ) : (

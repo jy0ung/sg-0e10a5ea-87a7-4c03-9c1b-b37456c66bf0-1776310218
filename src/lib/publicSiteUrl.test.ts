@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { isLocalHostname, resolveInviteSiteUrl } from '../../supabase/functions/_shared/publicSiteUrl';
 
@@ -34,5 +36,24 @@ describe('isLocalHostname', () => {
 
   it('does not flag public hosts', () => {
     expect(isLocalHostname('ubs.protonfookloi.com')).toBe(false);
+  });
+});
+
+describe('auth email templates', () => {
+  it('uses ConfirmationURL for recovery links so redirectTo is preserved', () => {
+    const template = readFileSync(join(process.cwd(), 'supabase/templates/recovery.html'), 'utf8');
+
+    expect(template).toContain('{{ .ConfirmationURL }}');
+    expect(template).not.toContain('{{ .SiteURL }}/reset-password');
+  });
+});
+
+describe('invite-user edge function', () => {
+  it('uses the Supabase API origin for Admin Auth calls, not the browser site URL', () => {
+    const source = readFileSync(join(process.cwd(), 'supabase/functions/invite-user/index.ts'), 'utf8');
+
+    expect(source).toContain("Deno.env.get('SUPABASE_API_EXTERNAL_URL') || supabaseUrl");
+    expect(source).toContain('createClient(supabaseApiUrl, serviceRoleKey');
+    expect(source).not.toContain('createClient(siteUrl, serviceRoleKey');
   });
 });

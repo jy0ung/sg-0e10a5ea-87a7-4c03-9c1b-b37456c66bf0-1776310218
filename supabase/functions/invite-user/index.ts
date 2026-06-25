@@ -44,6 +44,7 @@ Deno.serve(withRequestLogging('invite-user', async ({ req }) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseApiUrl = Deno.env.get('SUPABASE_API_EXTERNAL_URL') || supabaseUrl;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
@@ -97,9 +98,9 @@ Deno.serve(withRequestLogging('invite-user', async ({ req }) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Use the public/proxied auth base for invite emails so GoTrue does not
-    // stamp internal loopback hosts into the action link.
-    const inviteClient = createClient(siteUrl, serviceRoleKey, {
+    // Use the Supabase API origin for Admin Auth calls. Email action-link
+    // origins are controlled by GoTrue site/external URL config plus redirectTo.
+    const inviteClient = createClient(supabaseApiUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
