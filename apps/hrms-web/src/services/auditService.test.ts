@@ -49,13 +49,14 @@ describe('auditService', () => {
   describe('getAuditLog', () => {
     it('fetches audit logs for a vehicle', async () => {
       const mockLogs = [
-        { id: 'log1', action: 'update', profiles: { full_name: 'Test User' } }
+        { id: 'log1', action: 'update', profiles: { name: 'Test User' } }
       ];
       
       const limitMock = vi.fn().mockResolvedValue({ data: mockLogs, error: null });
+      const selectMock = vi.fn().mockReturnThis();
       
       vi.mocked(supabase.from).mockImplementation(() => ({
-        select: vi.fn().mockReturnThis(),
+        select: selectMock,
         eq: vi.fn().mockReturnThis(),
         order: vi.fn().mockReturnThis(),
         limit: limitMock
@@ -65,6 +66,7 @@ describe('auditService', () => {
       
       expect(result.error).toBeNull();
       expect(result.data).toEqual(mockLogs);
+      expect(selectMock).toHaveBeenCalledWith('*, profiles(name, email, role)');
     });
   });
 });

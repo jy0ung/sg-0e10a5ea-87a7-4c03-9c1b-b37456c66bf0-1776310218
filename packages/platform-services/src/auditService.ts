@@ -11,7 +11,7 @@ export interface AuditChange<T = unknown> {
 
 export interface AuditLogWithProfile extends AuditLog {
   profiles?: {
-    full_name: string | null;
+    name: string | null;
     email: string;
     role: string;
   };
@@ -135,7 +135,7 @@ export async function getAuditLog(
 
   const { data, error } = await supabase
     .from("audit_logs")
-    .select("*, profiles(full_name, email, role)")
+    .select("*, profiles(name, email, role)")
     .eq("entity_id", vehicleId)
     .eq("entity_type", "vehicle")
     .order("created_at", { ascending: false })
@@ -250,7 +250,7 @@ export async function getAllAuditLogs(
 
   let query = supabase
     .from("audit_logs")
-    .select("*, profiles(full_name, email, role)", { count: "exact" })
+    .select("*, profiles(name, email, role)", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

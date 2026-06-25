@@ -228,7 +228,7 @@ export async function fetchVehicleAuditPage(
 ): Promise<{ events: AuditEventRecord[]; total: number; error: Error | null }> {
   const { data, error, count } = await supabase
     .from('audit_logs')
-    .select('id, action, entity_type, changes, created_at, profiles(full_name, email)', { count: 'exact' })
+    .select('id, action, entity_type, changes, created_at, profiles(name, email)', { count: 'exact' })
     .eq('entity_id', vehicleId)
     .order('created_at', { ascending: true })
     .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -246,7 +246,7 @@ export async function fetchVehicleAuditPage(
       entityType: r.entity_type as string,
       changes: r.changes as Record<string, unknown>,
       createdAt: r.created_at as string,
-      userName: (profile?.full_name ?? profile?.email ?? 'System') as string,
+      userName: (profile?.name ?? profile?.email ?? 'System') as string,
     };
   });
 

@@ -119,7 +119,7 @@ export default function ActivityDashboard() {
       if (!acc[userId]) {
         acc[userId] = {
           userId,
-          name: log.profiles?.full_name || 'Unknown',
+          name: log.profiles?.name || 'Unknown',
           email: log.profiles?.email || '',
           count: 0,
         };
@@ -387,7 +387,7 @@ export default function ActivityDashboard() {
                         <Badge variant="outline" className="text-xs">{log.entity_type}</Badge>
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        <span className="font-medium">{log.profiles?.full_name || 'Unknown'}</span>
+                        <span className="font-medium">{log.profiles?.name || 'Unknown'}</span>
                         {' '}• {formatDate(log.created_at)} {formatTime(log.created_at)}
                       </div>
                       {log.changes && Object.keys(log.changes).length > 0 && (

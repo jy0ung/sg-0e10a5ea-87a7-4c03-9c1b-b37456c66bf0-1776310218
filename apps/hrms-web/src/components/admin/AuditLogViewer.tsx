@@ -190,7 +190,7 @@ export function AuditLogViewer({ entityId, entityType = 'all' }: AuditLogViewerP
                       <td className="px-4 py-3 text-xs">{formatDate(log.created_at)}</td>
                       <td className="px-4 py-3">
                         <div>
-                          <div className="font-medium">{log.profiles?.full_name || 'Unknown'}</div>
+                          <div className="font-medium">{log.profiles?.name || 'Unknown'}</div>
                           <div className="text-xs text-muted-foreground">{log.profiles?.email}</div>
                         </div>
                       </td>

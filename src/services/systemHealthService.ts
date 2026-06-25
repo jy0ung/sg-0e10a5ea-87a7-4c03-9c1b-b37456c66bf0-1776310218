@@ -60,9 +60,10 @@ export async function fetchHealthMetrics(companyId: string): Promise<HealthMetri
 
     try {
       const { data: syncRun } = await supabase
-        .from('dms_sync_runs')
+        .from('sync_runs')
         .select('started_at, status')
         .eq('company_id', companyId)
+        .eq('source_system', 'dms')
         .order('started_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -71,7 +72,7 @@ export async function fetchHealthMetrics(companyId: string): Promise<HealthMetri
         results.lastDmsStatus = syncRun.status as string;
       }
     } catch {
-      // dms_sync_runs may not exist
+      // sync_runs may be empty or inaccessible; health page should stay usable
     }
   } catch (err) {
     loggingService.error('Health check failed', { err }, 'SystemHealthService');

@@ -275,7 +275,7 @@ export function VehicleDetailPanel({
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <span className="text-sm font-semibold text-foreground">
-                              {log.profiles?.full_name || 'Unknown User'}
+                              {log.profiles?.name || 'Unknown User'}
                             </span>
                             <Badge variant="outline" className="text-xs ml-2">
                               {log.profiles?.role || 'user'}
