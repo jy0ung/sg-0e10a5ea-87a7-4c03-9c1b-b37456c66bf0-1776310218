@@ -25,7 +25,7 @@ fi
 step "Secret pattern scan"
 # Fail on obvious leaked keys in tracked files. Intentionally narrow.
 PATTERNS='(sk_live_|SUPABASE_SERVICE_ROLE_KEY\s*=\s*[A-Za-z0-9._-]{20,}|BEGIN (RSA |EC )?PRIVATE KEY|AWS_SECRET_ACCESS_KEY\s*=\s*[A-Za-z0-9/+=]{20,})'
-if git ls-files -z | xargs -0 grep -E -n "$PATTERNS" 2>/dev/null | grep -v 'docs/\|.env.example\|.env.staging.example\|scripts/security-check.sh'; then
+if git ls-files -z | xargs -0 grep -E -n "$PATTERNS" 2>/dev/null | grep -v 'docs/\|.env.example\|.env.staging.example\|scripts/security-check.sh' | grep -v 'replace(/-----BEGIN PRIVATE KEY-----/g'; then
   red "Potential secret match above. Investigate before release."
   FAIL=1
 else

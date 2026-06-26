@@ -184,8 +184,7 @@ export async function resolveStepRouting(
       return { approverRole: null, approverUserId: null, error: `Approval step '${step.name}' is missing an HRMS role.` };
     }
     if (companyId) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: assignments, error } = await (supabase as any)
+      const { data: assignments, error } = await supabase
         .from('employee_hrms_role_assignments')
         .select('id')
         .eq('company_id', companyId)
@@ -216,8 +215,7 @@ export async function userHasAssignedHrmsRole(
   profileId: string,
   hrmsRoleId: string,
 ): Promise<{ data: boolean; error: string | null }> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profile, error: profileError } = await (supabase as any)
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('employee_id')
     .eq('id', profileId)
@@ -225,8 +223,7 @@ export async function userHasAssignedHrmsRole(
   if (profileError) return { data: false, error: profileError.message };
 
   const employeeId = profile?.employee_id ? String(profile.employee_id) : null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query = (supabase as any)
+  let query = supabase
     .from('employee_hrms_role_assignments')
     .select('id')
     .eq('company_id', companyId)

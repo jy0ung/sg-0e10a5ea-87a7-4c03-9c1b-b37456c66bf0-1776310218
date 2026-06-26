@@ -30,8 +30,10 @@ registration, secret rotation, and one-click requeue.
 
 Producers call `emitWebhookEvent(companyId, eventType, payload)` from
 `src/services/webhookOutboxService.ts`. The RPC inserts one outbox row
-per matching active endpoint. The `webhook-deliverer` edge function is
-service-role only and processes pending rows by `next_retry_at`.
+per matching active endpoint. The `webhook-deliverer` edge function accepts
+the service-role bearer for scheduled global delivery, and also allows active
+admin users to trigger delivery manually. Company admins are scoped to their
+own company.
 
 ---
 

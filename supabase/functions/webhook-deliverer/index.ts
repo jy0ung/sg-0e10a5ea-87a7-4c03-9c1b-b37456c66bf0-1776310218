@@ -14,7 +14,9 @@
  *     size (default 25, hard max 100).
  *
  * Authorization:
- *   Service-role only. Any non-service-role caller is rejected.
+ *   Service-role bearer drains the global queue for operator schedules.
+ *   Authenticated super admins may drain globally; company admins are scoped
+ *   to their company.
  *
  * Backoff:
  *   attempt 1 → 1 min, 2 → 5 min, 3 → 15 min, 4 → 1 h, 5 → 6 h,
@@ -28,6 +30,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withRequestLogging, type EdgeLogger } from '../_shared/logger.ts';
+import { buildCorsHeaders } from '../_shared/cors.ts';
 
 const BACKOFF_SECONDS = [60, 300, 900, 3600, 21600, 86400, 172800, 345600];
 const MAX_ATTEMPTS    = BACKOFF_SECONDS.length;
@@ -109,29 +112,72 @@ async function deliver(row: OutboxRow, log: EdgeLogger): Promise<DeliveryOutcome
 }
 
 Deno.serve(withRequestLogging('webhook-deliverer', async ({ req, log }) => {
+  const corsHeaders = buildCorsHeaders(req);
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
   const supabaseUrl    = Deno.env.get('SUPABASE_URL')!;
+  const anonKey        = Deno.env.get('SUPABASE_ANON_KEY')!;
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
   const authHeader = req.headers.get('Authorization') ?? '';
   const bearer     = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-  if (bearer !== serviceRoleKey) {
-    return new Response(JSON.stringify({ error: 'Forbidden' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' },
+  if (!bearer) {
+    return new Response(JSON.stringify({ error: 'Missing bearer token' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-
-  const url   = new URL(req.url);
-  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') ?? '25', 10) || 25));
 
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  let role = 'service_role';
+  let companyId: string | null = null;
+
+  if (bearer !== serviceRoleKey) {
+    const callerClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: { user: caller }, error: callerError } = await callerClient.auth.getUser();
+    if (callerError || !caller) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: callerProfile, error: profileError } = await admin
+      .from('profiles')
+      .select('id, role, company_id, access_scope, status')
+      .eq('id', caller.id)
+      .maybeSingle();
+    if (profileError || !callerProfile || callerProfile.status !== 'active') {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    role = String(callerProfile.role ?? '');
+    companyId = callerProfile.company_id == null ? null : String(callerProfile.company_id);
+    if (!['super_admin', 'company_admin'].includes(role)) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+  const url   = new URL(req.url);
+  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') ?? '25', 10) || 25));
+
   // Claim a batch atomically: set status='delivering' so a concurrent run
   // doesn't grab the same rows. PostgREST RPC could express this more
   // tightly, but a simple UPDATE…RETURNING is sufficient at this volume.
-  const { data: claimed, error: claimErr } = await admin
+  let claimQuery = admin
     .from('webhook_outbox')
     .update({ status: 'delivering', updated_at: new Date().toISOString() })
     .in('status', ['pending', 'failed'])
@@ -143,11 +189,23 @@ Deno.serve(withRequestLogging('webhook-deliverer', async ({ req, log }) => {
       endpoint:webhook_endpoints!inner ( url, secret, active )
     `);
 
+  if (role === 'company_admin') {
+    if (!companyId) {
+      return new Response(JSON.stringify({ error: 'Company scope required' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    claimQuery = claimQuery.eq('company_id', companyId);
+  }
+
+  const { data: claimed, error: claimErr } = await claimQuery;
+
   if (claimErr) {
     log.error('outbox.claim_failed', { error: claimErr.message });
     return new Response(JSON.stringify({ error: claimErr.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
@@ -232,6 +290,6 @@ Deno.serve(withRequestLogging('webhook-deliverer', async ({ req, log }) => {
     failed,
   }), {
     status:  200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }));
