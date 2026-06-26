@@ -28,7 +28,7 @@
     "lucide-react": "^0.577.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-hook-form": "^7.76.1",
+    "react-hook-form": "^7.80.0",
     "react-router-dom": "^6.30.1",
     "tailwind-merge": "^2.6.1",
     "tailwindcss-animate": "^1.0.7",
@@ -36,14 +36,14 @@
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
-    "@types/node": "^22.19.19",
+    "@types/node": "^22.20.0",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^4.3.1",
-    "autoprefixer": "^10.5.0",
+    "autoprefixer": "^10.5.2",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3",
-    "vite": "^7.3.5"
+    "vite": "^7.3.6"
   }
 }
