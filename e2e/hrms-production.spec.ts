@@ -1,11 +1,21 @@
 import { expect, test } from '@playwright/test';
 import { setupAuthMocks } from './helpers/auth-mock';
 
-const productionHrmsOrigin = process.env.E2E_EXPECTED_HRMS_APP_URL ?? 'https://hrms.protonfookloi.com';
-const productionHrmsBase = new URL(productionHrmsOrigin).origin;
+const externalHrmsAppUrl = process.env.E2E_EXPECTED_HRMS_APP_URL?.trim();
+const expectsExternalHrms = Boolean(externalHrmsAppUrl);
+const externalHrmsBase = externalHrmsAppUrl ? new URL(externalHrmsAppUrl).origin : null;
+const localAppBase = process.env.BASE_URL ?? 'http://127.0.0.1:3001';
 
-function expectedHrmsUrl(path: string, search = '', hash = '') {
-  const url = new URL(productionHrmsOrigin);
+function expectedHrmsUrl(path: string, search = '', hash = ''): string {
+  if (!externalHrmsAppUrl) {
+    const url = new URL(localAppBase);
+    url.pathname = `/hrms${path === '/' ? '/' : path.replace(/\/$/, '')}`;
+    url.search = search;
+    url.hash = hash;
+    return url.toString();
+  }
+
+  const url = new URL(externalHrmsAppUrl);
   url.pathname = path;
   url.search = search;
   url.hash = hash;
@@ -15,13 +25,15 @@ function expectedHrmsUrl(path: string, search = '', hash = '') {
 test.describe('HRMS production deployment handoff', () => {
   test.beforeEach(async ({ page }) => {
     await setupAuthMocks(page);
-    await page.route(`${productionHrmsBase}/**`, (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: '<!doctype html><title>FLC HRMS</title><main>Dedicated HRMS production app</main>',
+    if (externalHrmsBase) {
+      await page.route(`${externalHrmsBase}/**`, (route) => {
+        route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: '<!doctype html><title>FLC HRMS</title><main>Dedicated HRMS production app</main>',
+        });
       });
-    });
+    }
   });
 
   test('home page launches the dedicated HRMS production origin', async ({ page }) => {
@@ -46,6 +58,11 @@ test.describe('HRMS production deployment handoff', () => {
     await page.goto('/hrms/employees', { waitUntil: 'domcontentloaded' });
 
     await expect(page).toHaveURL(expectedHrmsUrl('/employees'), { timeout: 10_000 });
-    await expect(page.getByText('Dedicated HRMS production app')).toBeVisible();
+    if (expectsExternalHrms) {
+      await expect(page.getByText('Dedicated HRMS production app')).toBeVisible();
+    } else {
+      await expect(page.getByRole('heading', { name: 'Opening HRMS Workspace' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Open HRMS', exact: true })).toHaveAttribute('href', '/hrms/employees');
+    }
   });
 });

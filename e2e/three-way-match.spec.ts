@@ -98,7 +98,8 @@ test('3-way Match shows feature unavailable when flag is disabled', async ({ pag
   await setupMatchMocks(page, { featureEnabled: false });
 
   await page.goto('/purchasing/three-way-match', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /3-way match unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3e\.po-grn-v2/i)).toBeVisible({ timeout: 30_000 });
 });
 
 test('3-way Match shows empty state when queue is empty', async ({ page }) => {

@@ -184,11 +184,12 @@ test('Purchase Orders shows feature unavailable when flag is disabled', async ({
 
   await page.goto('/purchasing/orders', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /purchase orders unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3e\.po-grn-v2/i)).toBeVisible({ timeout: 30_000 });
 });
 
 test('Purchase Orders list shows empty state when no POs exist', async ({ page }) => {
-  await setupPoMocks(page, { list: [] });
+  await setupPoMocks(page, { list: [], detail: null, lines: [] });
 
   await page.goto('/purchasing/orders', { waitUntil: 'domcontentloaded' });
 

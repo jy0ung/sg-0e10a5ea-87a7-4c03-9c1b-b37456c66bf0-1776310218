@@ -72,6 +72,7 @@ export default function NewTicket() {
   const [checkingDuplicates, setCheckingDuplicates] = useState(false);
   const [descriptionSource, setDescriptionSource] = useState<DescriptionSource>('category');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const allowPostSubmitNavigationRef = useRef(false);
   // Tracks the last description text we auto-filled from a category/subcategory,
   // so we only overwrite the body while it still holds that suggested text.
   const autoFilledDescriptionRef = useRef('');
@@ -96,7 +97,9 @@ export default function NewTicket() {
   const hasUnsavedChanges = form.formState.isDirty || draftSavedAt !== null;
   useBeforeUnloadWarning(hasUnsavedChanges);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => (
-    hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
+    !allowPostSubmitNavigationRef.current &&
+    hasUnsavedChanges &&
+    currentLocation.pathname !== nextLocation.pathname
   ));
 
 
@@ -410,6 +413,7 @@ export default function NewTicket() {
     toast.success('Request submitted', {
       description: 'Your request has been recorded and will be reviewed shortly.',
     });
+    allowPostSubmitNavigationRef.current = true;
     navigate('/portal/tickets');
     setSubmitting(false);
   };

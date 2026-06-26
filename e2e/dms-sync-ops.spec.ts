@@ -123,7 +123,8 @@ test('DMS Sync Ops shows feature unavailable when flag is disabled', async ({ pa
 
   await page.goto('/admin/dms-sync', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /dms sync ops unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3c\.dms-sync-ops-v2/i)).toBeVisible({ timeout: 30_000 });
 });
 
 test('DMS Sync Ops shows empty state when no runs exist', async ({ page }) => {

@@ -108,8 +108,8 @@ test('Balance Sheet shows feature unavailable when flag is disabled', async ({ p
 
   await page.goto('/accounts/balance-sheet', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/financial reporting is not enabled/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /balance sheet unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3b\.financial-reports-v2/i)).toBeVisible({ timeout: 30_000 });
 });
 
 test('Balance Sheet shows empty state when period has no balances', async ({ page }) => {

@@ -1,5 +1,4 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
-import ExcelJS from 'exceljs';
 import { MOCK_PROFILE, setupAuthMocks, SUPABASE_URL } from './helpers/auth-mock';
 
 test.describe.configure({ timeout: 90_000 });
@@ -49,111 +48,31 @@ replacementOwnerRow[12] = '(OUTLET ADMIN) ANN';
 replacementOwnerRow[18] = '(SALES MANAGER) UMAR & ROSALIE';
 replacementOwnerRow[23] = '(OUTLET ADMIN) VEE';
 
-function addReplacementSheet(
-  workbook: ExcelJS.Workbook,
-  name: string,
-  rows: Array<Record<string, unknown>>,
-  sectionLabel?: string,
-) {
-  const worksheet = workbook.addWorksheet(name);
-  worksheet.addRow(replacementOwnerRow);
-  worksheet.addRow(replacementHeaders);
-  if (sectionLabel) {
-    worksheet.addRow([sectionLabel]);
-  }
-
-  rows.forEach((row, index) => {
-    worksheet.addRow([
-      row['NO'] ?? index + 1,
-      row['BRCH K1'] ?? '',
-      row['VAA DATE'] ?? '',
-      row['MODEL'] ?? '',
-      row['VAR'] ?? '',
-      row['COLOR'] ?? '',
-      row['CHASSIS NO.'] ?? '',
-      row['DTP'] ?? '',
-      row['PAYMENT METHOD'] ?? '',
-      row['BG DATE'] ?? '',
-      row['FULL PAYMENT TYPE'] ?? '',
-      row['FULL PAYMENT DATE'] ?? '',
-      row['SHIPMENT NAME'] ?? '',
-      row['SHIPMENT ETD PKG'] ?? '',
-      row['DATE SHIPMENT ETA KK/TWU/SDK'] ?? '',
-      row['RECEIVED BY OUTLET'] ?? '',
-      row['AGING'] ?? '',
-      row['Aging PYT as at Today'] ?? '',
-      row['SA NAME'] ?? '',
-      row['CUST NAME'] ?? '',
-      row['PENDING LOAN'] ?? '',
-      row['LOU'] ?? '',
-      row['CONTRA SOLA'] ?? '',
-      row['REG NO'] ?? '',
-      row['REG DATE'] ?? '',
-      row['INV NO'] ?? '',
-      row['OBR'] ?? '',
-      row['DELIVERY DATE'] ?? '',
-      row['INVOICE DATE'] ?? '',
-      row['DISB DATE'] ?? '',
-      row['AGING REG-DELIVER'] ?? '',
-      row['AGING DELIVER-DISB'] ?? '',
-      row['REMARK'] ?? '',
-      row['COMM PAYOUT'] ?? '',
-    ]);
-  });
+function csvCell(value: unknown): string {
+  const raw = String(value ?? '');
+  return /[",\n\r]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw;
 }
 
-async function workbookBuffer(): Promise<Buffer> {
-  const workbook = new ExcelJS.Workbook();
-  addReplacementSheet(workbook, 'Pending Deliver & Loan Disburse', [
-    {
-      'BRCH K1': ' FLAGSHIP ',
-      'VAA DATE': '2026-01-01',
-      'MODEL': 'Ativa',
-      'VAR': 'Ativa 1.0 Turbo',
-      'COLOR': 'Solid White',
-      'CHASSIS NO.': 'PW-IMPORT-0001',
-      'DTP': 45308,
-      'PAYMENT METHOD': 'PAS (BG)',
-      'BG DATE': '2026-01-01',
-      'FULL PAYMENT TYPE': 'FULL PAYMENT MBB FS',
-      'FULL PAYMENT DATE': '2026-01-02',
-      'SHIPMENT NAME': 'MTT BINTANGOR 26BG036E',
-      'SHIPMENT ETD PKG': '2026-01-05',
-      'DATE SHIPMENT ETA KK/TWU/SDK': '2026-01-10',
-      'RECEIVED BY OUTLET': '2026-01-15',
-      'REMARK': 'First duplicate row',
-      'COMM PAYOUT': 'Comm not paid',
-    },
-  ]);
-
-  addReplacementSheet(workbook, 'Pending Register & Free Stock', [
-    {
-      'BRCH K1': ' FLAGSHIP ',
-      'VAA DATE': '2026-01-01',
-      'MODEL': 'Ativa AV',
-      'VAR': 'Ativa 1.0 Turbo AV',
-      'COLOR': 'Solid White',
-      'CHASSIS NO.': 'PW-IMPORT-0001',
-      'DTP': 45308,
-      'PAYMENT METHOD': 'TT',
-      'BG DATE': '2026-01-01',
-      'FULL PAYMENT TYPE': 'FULL PAYMENT TT',
-      'FULL PAYMENT DATE': '2026-01-03',
-      'SHIPMENT NAME': 'MTT BINTANGOR 26BG036E',
-      'SHIPMENT ETD PKG': '2026-01-05',
-      'DATE SHIPMENT ETA KK/TWU/SDK': '2026-01-10',
-      'RECEIVED BY OUTLET': '2026-01-15',
-      'REMARK': 'Second duplicate row with more complete model',
-      'COMM PAYOUT': 'Paid 15/04',
-    },
-  ], 'PENDING REGISTER & FREE STOCK');
-
-  const misc = workbook.addWorksheet('MISC');
-  misc.addRow(['', 'BRANCH', '', 'BANK', '', '', 'MODEL', 'VARIANTS']);
-  misc.addRow([1, 'FLAGSHIP', 1, 'AFFIN', 'AFFIN BANK', 1, 'ATIVA', 'ATIVA 1.0 TURBO']);
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buffer);
+function replacementCsv(): string {
+  const rows: unknown[][] = [
+    replacementOwnerRow,
+    replacementHeaders,
+    [
+      1, ' FLAGSHIP ', '2026-01-01', 'Ativa', 'Ativa 1.0 Turbo', 'Solid White',
+      'PW-IMPORT-0001', 45308, 'PAS (BG)', '2026-01-01', 'FULL PAYMENT MBB FS',
+      '2026-01-02', 'MTT BINTANGOR 26BG036E', '2026-01-05', '2026-01-10',
+      '2026-01-15', '', '', 'ALEX TAN', 'LEE MEI', '', '', '', '', '', '', '', '',
+      '', '', '', '', 'Clean row', 'Comm not paid',
+    ],
+    [
+      2, ' FLAGSHIP ', '2026-01-01', 'Ativa AV', 'Ativa 1.0 Turbo AV', 'Solid White',
+      'PW-IMPORT-0002', 45308, 'TT', '2026-01-01', 'FULL PAYMENT TT',
+      '2026-01-03', 'MTT BINTANGOR 26BG036E', '2026-01-05', '2026-01-10',
+      '2026-01-15', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', 'Incomplete row queued for review', 'Paid 15/04',
+    ],
+  ];
+  return rows.map(row => row.map(csvCell).join(',')).join('\n');
 }
 
 function wantsSingleObject(route: Route): boolean {
@@ -169,9 +88,19 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
   });
 }
 
+async function fulfillCsv(route: Route, body: string) {
+  await route.fulfill({
+    status: 200,
+    contentType: 'text/csv',
+    headers: { 'access-control-allow-origin': '*' },
+    body,
+  });
+}
+
 async function setupAutoAgingImportMocks(page: Page) {
   const batchId = '11111111-1111-1111-1111-111111111111';
   const vehicleWrites: Array<Record<string, unknown>[]> = [];
+  const reviewWrites: Array<Record<string, unknown>[]> = [];
   const dialogs: string[] = [];
 
   page.on('dialog', async dialog => {
@@ -180,6 +109,31 @@ async function setupAutoAgingImportMocks(page: Page) {
   });
 
   await setupAuthMocks(page);
+
+  await page.route('**/spreadsheets/d/playwright-inventory/export**', async route => {
+    await fulfillCsv(route, replacementCsv());
+  });
+
+  await page.route(`${SUPABASE_URL}/rest/v1/feature_flags*`, async route => {
+    if (route.request().method() !== 'GET') {
+      await fulfillJson(route, {});
+      return;
+    }
+
+    await fulfillJson(route, [
+      {
+        id: 'flag-import-review',
+        code: 'phase3a.import-review-v2',
+        enabled: true,
+        rollout_pct: 100,
+        description: null,
+        company_id: null,
+        updated_by: null,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
+    ]);
+  });
 
   await page.route(`${SUPABASE_URL}/rest/v1/companies*`, async route => {
     if (route.request().method() !== 'GET') {
@@ -274,6 +228,17 @@ async function setupAutoAgingImportMocks(page: Page) {
     await fulfillJson(route, {});
   });
 
+  await page.route(`${SUPABASE_URL}/rest/v1/import_review_rows*`, async route => {
+    if (route.request().method() === 'POST') {
+      const payload = JSON.parse(route.request().postData() ?? '[]') as Record<string, unknown>[];
+      reviewWrites.push(payload);
+      await fulfillJson(route, [], 201);
+      return;
+    }
+
+    await fulfillJson(route, []);
+  });
+
   await page.route(`${SUPABASE_URL}/rest/v1/quality_issues*`, async route => {
     if (route.request().method() === 'GET') {
       await fulfillJson(route, []);
@@ -292,54 +257,62 @@ async function setupAutoAgingImportMocks(page: Page) {
     await fulfillJson(route, {});
   });
 
-  return { dialogs, vehicleWrites };
+  return { dialogs, reviewWrites, vehicleWrites };
 }
 
 async function gotoImportCenter(page: Page) {
   await page.goto('/auto-aging/import', { waitUntil: 'domcontentloaded' });
-  await expect(
-    page.getByRole('button', { name: /choose consolidated inventory workbook to import/i }),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByLabel(/import from google sheet/i)).toBeVisible({ timeout: 30_000 });
 }
 
-test('Auto-aging import smoke test uploads and publishes canonical data', async ({ page }) => {
-  const { dialogs, vehicleWrites } = await setupAutoAgingImportMocks(page);
+async function importGoogleSheet(page: Page) {
+  await page
+    .getByLabel(/import from google sheet/i)
+    .fill('https://docs.google.com/spreadsheets/d/playwright-inventory/edit#gid=0');
+  await page.getByRole('button', { name: /import from google sheet/i }).click();
+}
+
+test('Auto-aging import smoke test imports Google Sheet data and publishes canonical data', async ({ page }) => {
+  const { dialogs, reviewWrites, vehicleWrites } = await setupAutoAgingImportMocks(page);
 
   await gotoImportCenter(page);
+  await importGoogleSheet(page);
 
-  await page.locator('input[type="file"]').setInputFiles({
-    name: 'Inventory Report - Consolidate.xlsx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    buffer: await workbookBuffer(),
-  });
-
-  await expect(page.getByText('Inventory Report - Consolidate.xlsx', { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('google-sheet-playwright-inventory', { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/2 rows parsed/i)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/unknown branch codes/i)).toHaveCount(0);
-  await expect(page.getByText(/missing data — will be published as incomplete/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/1 record missing data — will be queued for review/i)).toBeVisible({ timeout: 30_000 });
 
-  await page.getByRole('button', { name: /publish/i }).click();
+  await page.getByRole('button', { name: /publish clean rows \(1 row queued for review\)/i }).click();
 
-  await expect(page.getByText(/import published successfully/i)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/published as incomplete/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/import processed successfully/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/1 record was queued for review/i)).toBeVisible({ timeout: 30_000 });
   expect(dialogs).toEqual([]);
 
   await expect.poll(() => vehicleWrites.length).toBeGreaterThan(0);
+  await expect.poll(() => reviewWrites.length).toBeGreaterThan(0);
 
   const canonicalWrite = vehicleWrites.find(payload =>
     payload.length === 1 && payload[0]?.chassis_no === 'PW-IMPORT-0001'
+  );
+  const reviewWrite = reviewWrites.find(payload =>
+    payload.length === 1 && payload[0]?.chassis_no === 'PW-IMPORT-0002'
   );
 
   expect(canonicalWrite).toBeDefined();
   expect(canonicalWrite?.[0]).toMatchObject({
     chassis_no: 'PW-IMPORT-0001',
     branch_code: 'KK',
-    salesman_name: 'Pending',
-    customer_name: 'Pending',
+    salesman_name: 'ALEX TAN',
+    customer_name: 'LEE MEI',
+  });
+  expect(reviewWrite?.[0]).toMatchObject({
+    chassis_no: 'PW-IMPORT-0002',
+    review_reason: 'incomplete',
   });
 });
 
-test('Auto-aging import touch regression opens native chooser in tablet desktop-site layout and publishes canonical data', async ({ browser }) => {
+test('Auto-aging import touch regression imports Google Sheet data in tablet desktop-site layout', async ({ browser }) => {
   const context = await browser.newContext({
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 2,
@@ -350,51 +323,41 @@ test('Auto-aging import touch regression opens native chooser in tablet desktop-
   const page = await context.newPage();
 
   try {
-    const { dialogs, vehicleWrites } = await setupAutoAgingImportMocks(page);
+    const { dialogs, reviewWrites, vehicleWrites } = await setupAutoAgingImportMocks(page);
 
     await gotoImportCenter(page);
+    await importGoogleSheet(page);
 
-    const fileInput = page.locator('#import-file-input');
-    const inputBox = await fileInput.boundingBox();
-    expect(inputBox).not.toBeNull();
-
-    const [fileChooser] = await Promise.all([
-      page.waitForEvent('filechooser'),
-      page.touchscreen.tap(
-        inputBox!.x + inputBox!.width / 2,
-        inputBox!.y + inputBox!.height / 2,
-      ),
-    ]);
-
-    await fileChooser.setFiles({
-      name: 'Inventory Report - Consolidate-Tablet.xlsx',
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: await workbookBuffer(),
-    });
-
-    await expect(page.getByText(/reading file/i)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Inventory Report - Consolidate-Tablet.xlsx', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('google-sheet-playwright-inventory', { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/2 rows parsed/i)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/missing data — will be published as incomplete/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/1 record missing data — will be queued for review/i)).toBeVisible({ timeout: 30_000 });
 
-    await page.getByRole('button', { name: /publish/i }).click();
+    await page.getByRole('button', { name: /publish clean rows \(1 row queued for review\)/i }).click();
 
-    await expect(page.getByText(/import published successfully/i)).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/published as incomplete/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/import processed successfully/i)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/1 record was queued for review/i)).toBeVisible({ timeout: 30_000 });
     expect(dialogs).toEqual([]);
 
     await expect.poll(() => vehicleWrites.length).toBeGreaterThan(0);
+    await expect.poll(() => reviewWrites.length).toBeGreaterThan(0);
 
     const canonicalWrite = vehicleWrites.find(payload =>
       payload.length === 1 && payload[0]?.chassis_no === 'PW-IMPORT-0001'
+    );
+    const reviewWrite = reviewWrites.find(payload =>
+      payload.length === 1 && payload[0]?.chassis_no === 'PW-IMPORT-0002'
     );
 
     expect(canonicalWrite).toBeDefined();
     expect(canonicalWrite?.[0]).toMatchObject({
       chassis_no: 'PW-IMPORT-0001',
       branch_code: 'KK',
-      salesman_name: 'Pending',
-      customer_name: 'Pending',
+      salesman_name: 'ALEX TAN',
+      customer_name: 'LEE MEI',
+    });
+    expect(reviewWrite?.[0]).toMatchObject({
+      chassis_no: 'PW-IMPORT-0002',
+      review_reason: 'incomplete',
     });
   } finally {
     await context.close();

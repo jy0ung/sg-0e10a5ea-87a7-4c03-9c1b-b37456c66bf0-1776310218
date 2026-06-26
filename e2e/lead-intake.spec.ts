@@ -141,7 +141,8 @@ test('Lead Intake shows feature unavailable when flag is disabled', async ({ pag
 
   await page.goto('/sales/lead-intake', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /lead intake unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3f\.lead-intake-v2/i)).toBeVisible({ timeout: 30_000 });
 });
 
 test('Lead Intake shows empty state when feed is empty', async ({ page }) => {

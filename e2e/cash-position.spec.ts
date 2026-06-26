@@ -67,10 +67,10 @@ test('Cash Position table shows daily rows with chart', async ({ page }) => {
 
   await page.goto('/accounts/cash-position', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText('2026-05-01')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('2026-05-02')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('2026-05-03')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/running balance/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('td').filter({ hasText: '2026-05-01' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('td').filter({ hasText: '2026-05-02' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('td').filter({ hasText: '2026-05-03' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /^running balance$/i })).toBeVisible({ timeout: 30_000 });
 });
 
 test('Cash Position shows feature unavailable when flag is disabled', async ({ page }) => {
@@ -78,7 +78,8 @@ test('Cash Position shows feature unavailable when flag is disabled', async ({ p
 
   await page.goto('/accounts/cash-position', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /cash position unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3b\.financial-reports-v2/i)).toBeVisible({ timeout: 30_000 });
 });
 
 test('Cash Position shows empty state when no cash account is seeded', async ({ page }) => {

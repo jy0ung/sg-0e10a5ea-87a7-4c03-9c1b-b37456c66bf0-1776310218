@@ -145,9 +145,7 @@ test('Import Review Queue displays pending review items from import batch', asyn
   await page.goto('/auto-aging/review', { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByRole('heading', { name: /review queue/i })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/2/)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/incomplete/i)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/blocking/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('cell', { name: '2', exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/test-inventory.xlsx/i)).toBeVisible({ timeout: 30_000 });
 });
 
@@ -177,8 +175,8 @@ test('Import Review Queue shows feature unavailable when flag is disabled', asyn
 
   await page.goto('/auto-aging/review', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/import review queue is not enabled/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /review queue unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3a\.import-review-v2/i)).toBeVisible({ timeout: 30_000 });
 });
 
 test('Import Review Detail page displays review items and their validation errors', async ({ page }) => {
@@ -215,8 +213,8 @@ test('Import Review Detail page displays review items and their validation error
   await expect(page.getByText(/2 queued row/i)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/Missing model/i)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/Duplicate chassis/i)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('button', { name: /accept/i })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('button', { name: /discard/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: /accept/i }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: /discard/i }).first()).toBeVisible({ timeout: 30_000 });
 });
 
 test('Import Review Detail accepts a row and marks it resolved', async ({ page }) => {

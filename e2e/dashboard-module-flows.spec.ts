@@ -58,7 +58,10 @@ test('deactivated modules disappear from Home and guard direct routes', async ({
   await page.goto('/admin/settings');
   await expect(page.getByRole('heading', { name: /settings/i })).toBeVisible({ timeout: 10000 });
 
-  const salesToggle = page.getByLabel('Toggle Sales Intelligence');
+  await page.getByRole('tab', { name: 'Modules' }).click();
+  await expect(page.getByRole('heading', { name: /module availability/i })).toBeVisible();
+
+  const salesToggle = page.getByRole('switch', { name: 'Toggle Sales Intelligence' });
   await expect(salesToggle).toHaveAttribute('aria-checked', 'true');
 
   await salesToggle.click();

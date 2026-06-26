@@ -108,8 +108,8 @@ test('Profit & Loss page shows feature unavailable when flag is disabled', async
 
   await page.goto('/accounts/profit-loss', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/financial reporting is not enabled/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /profit & loss unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3b\.financial-reports-v2/i)).toBeVisible({ timeout: 30_000 });
 });
 
 test('Profit & Loss shows empty state when period has no revenue or expense activity', async ({ page }) => {

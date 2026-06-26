@@ -82,7 +82,9 @@ async function setupInboxMocks(page: Page, opts: {
     await fulfillJson(route, []);
   });
   await page.route(`${SUPABASE_URL}/rest/v1/profiles*`, async route => {
-    await fulfillJson(route, []);
+    const accept = route.request().headers()['accept'] ?? '';
+    const wantsSingle = accept.includes('pgrst.object');
+    await fulfillJson(route, wantsSingle ? MOCK_PROFILE : [MOCK_PROFILE]);
   });
 }
 
@@ -92,7 +94,8 @@ test.describe('Unified Inbox', () => {
     await page.goto('/inbox');
 
     await expect(page.getByTestId('inbox-feature-off')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/feature not available/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /inbox unavailable/i })).toBeVisible();
+    await expect(page.getByText(/phase4\.unified-inbox/i)).toBeVisible();
   });
 
   test('renders the unified list with notifications and tickets', async ({ page }) => {

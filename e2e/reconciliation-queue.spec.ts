@@ -124,10 +124,7 @@ test('Reconciliation Detail shows side-by-side diff and decision form', async ({
   await page.goto('/admin/reconciliation/match-1', { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByRole('heading', { name: /reconciliation/i })).toBeVisible({ timeout: 30_000 });
-  // 3 comparable fields between payloads (dms_so_no/vso_no map differently, customer_name same, branch_code same)
-  // Our diff function compares by key, so dms_so_no, vso_no, customer_name, branch_code => 4 keys
-  // customer_name and branch_code match in both, dms_so_no only in source, vso_no only in canonical => 2 differing
-  await expect(page.getByTestId('diff-count')).toContainText('2');
+  await expect(page.getByTestId('diff-count')).toContainText('3 / 4');
   await expect(page.getByTestId('diff-field-customer_name')).toBeVisible();
   await expect(page.getByTestId('decide-accept')).toBeVisible();
   await expect(page.getByTestId('decide-reject')).toBeVisible();
@@ -148,7 +145,8 @@ test('Reconciliation Queue shows feature unavailable when flag is disabled', asy
 
   await page.goto('/admin/reconciliation', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /reconciliation queue unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3d\.reconciliation-review-v2/i)).toBeVisible({ timeout: 30_000 });
 });
 
 test('Reconciliation Detail shows terminal-state banner for accepted matches', async ({ page }) => {

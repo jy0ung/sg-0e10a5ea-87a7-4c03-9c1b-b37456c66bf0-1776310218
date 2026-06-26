@@ -83,7 +83,8 @@ test('Aging by Branch shows feature unavailable when flag is disabled', async ({
 
   await page.goto('/accounts/aging-by-branch', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /aging by branch unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3b\.financial-reports-v2/i)).toBeVisible({ timeout: 30_000 });
 });
 
 test('Aging by Branch shows empty AR state when no receivables outstanding', async ({ page }) => {

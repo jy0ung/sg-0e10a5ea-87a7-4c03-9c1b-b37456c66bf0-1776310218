@@ -16,6 +16,15 @@ export interface ImportReviewRowInsertInput {
 const HARD_BLOCKER_CODES = new Set(['DUPLICATE_CHASSIS', 'CHASSIS_TOO_SHORT', 'INVALID_DATE_FORMAT', 'INVALID_NUMBER']);
 const HARD_BLOCKER_FIELDS = new Set(['chassis_no']);
 
+function toRowNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
 function previewIssueToValidationError(issue: DataQualityIssue): ValidationError {
   return {
     field: issue.field,
@@ -65,7 +74,7 @@ export function splitImportRowsForPublish(
   });
 
   validationErrors.forEach(error => {
-    if (error.severity !== 'error' || typeof error.rowNumber !== 'number') {
+    if (typeof error.rowNumber !== 'number') {
       return;
     }
 
@@ -77,9 +86,17 @@ export function splitImportRowsForPublish(
   const cleanRows: VehicleRaw[] = [];
   const reviewRows: ImportReviewRowInsertInput[] = [];
 
-  mergedRows.forEach(row => {
-    const rowPreviewErrors = previewErrorsByRowNumber.get(row.row_number) ?? [];
-    const rowValidationErrors = validationErrorsByRowNumber.get(row.row_number) ?? [];
+  mergedRows.forEach((row, index) => {
+    const sourceRowNumber = toRowNumber(row.row_number);
+    const importRowNumber = index + 1;
+    const rowPreviewErrors = [
+      ...(sourceRowNumber !== null ? previewErrorsByRowNumber.get(sourceRowNumber) ?? [] : []),
+      ...(sourceRowNumber !== importRowNumber ? previewErrorsByRowNumber.get(importRowNumber) ?? [] : []),
+    ];
+    const rowValidationErrors = [
+      ...(sourceRowNumber !== null ? validationErrorsByRowNumber.get(sourceRowNumber) ?? [] : []),
+      ...(sourceRowNumber !== importRowNumber ? validationErrorsByRowNumber.get(importRowNumber) ?? [] : []),
+    ];
 
     if (rowPreviewErrors.length === 0 && rowValidationErrors.length === 0) {
       cleanRows.push(row);

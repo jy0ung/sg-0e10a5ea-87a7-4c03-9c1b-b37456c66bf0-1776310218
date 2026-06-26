@@ -48,6 +48,10 @@ const BULK_INCOMPLETE_FIELDS: Array<{
   { key: 'branch_code', label: 'Branch Code', placeholder: 'Enter the branch code' },
 ];
 
+const HARD_BLOCKER_CODES = ['DUPLICATE_CHASSIS', 'CHASSIS_TOO_SHORT', 'INVALID_DATE_FORMAT', 'INVALID_NUMBER'];
+const HARD_BLOCKER_FIELDS = ['chassis_no'];
+const INCOMPLETE_WARNING_CODES = ['OPTIONAL_FIELD_MISSING'];
+
 type GoogleSheetsImportModule = typeof import('@/lib/googleSheetsImport');
 
 let googleSheetsImportPromise: Promise<GoogleSheetsImportModule> | null = null;
@@ -59,6 +63,20 @@ function loadGoogleSheetsImport() {
 
 function areSameRowNumbers(left: number[], right: number[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function toRowNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function rowMatchesImportNumber(row: VehicleRaw, rowIndex: number, rowNumbers: Set<number>): boolean {
+  const sourceRowNumber = toRowNumber(row.row_number);
+  return (sourceRowNumber !== null && rowNumbers.has(sourceRowNumber)) || rowNumbers.has(rowIndex + 1);
 }
 
 function buildBlockingSuggestions(messages: string[]): string[] {
@@ -300,11 +318,6 @@ export default function ImportCenter() {
   const blockingValidationIssues = validationIssues.filter(issue => issue.severity === 'error');
   const warningValidationIssues = validationIssues.filter(issue => issue.severity === 'warning');
 
-  // Hard blockers: rows that genuinely cannot be published
-  const HARD_BLOCKER_CODES = ['DUPLICATE_CHASSIS', 'CHASSIS_TOO_SHORT', 'INVALID_DATE_FORMAT', 'INVALID_NUMBER'];
-  const HARD_BLOCKER_FIELDS = ['chassis_no']; // for REQUIRED_FIELD_MISSING
-  const INCOMPLETE_WARNING_CODES = ['OPTIONAL_FIELD_MISSING'];
-
   const hardBlockers = serverErrors.filter(
     e => e.severity === 'error' && (
       HARD_BLOCKER_CODES.includes(e.code) ||
@@ -333,14 +346,14 @@ export default function ImportCenter() {
   );
 
   // Count rows affected by incomplete data (deduplicate by row number)
-  const incompleteRowNums = [...new Set(incompleteErrors.map(e => e.rowNumber).filter(Boolean))];
+  const incompleteRowNums = [...new Set(incompleteErrors.map(e => toRowNumber(e.rowNumber)).filter((value): value is number => value !== null))];
 
   const previewBlockingRowNums = useMemo(
-    () => [...new Set(blockingValidationIssues.map(issue => issue.rowNumber).filter(Boolean))],
+    () => [...new Set(blockingValidationIssues.map(issue => toRowNumber(issue.rowNumber)).filter((value): value is number => value !== null))],
     [blockingValidationIssues]
   );
   const hardBlockerRowNums = useMemo(
-    () => [...new Set(hardBlockers.map(error => error.rowNumber).filter(Boolean))],
+    () => [...new Set(hardBlockers.map(error => toRowNumber(error.rowNumber)).filter((value): value is number => value !== null))],
     [hardBlockers]
   );
   const blockedRowNums = useMemo(
@@ -378,21 +391,22 @@ export default function ImportCenter() {
     [pendingReferenceErrors, incompleteErrors]
   );
   const blockingRows = useMemo(
-    () => mergedRawRows.filter(row => blockedRowNums.has(row.row_number)),
+    () => mergedRawRows.filter((row, index) => rowMatchesImportNumber(row, index, blockedRowNums)),
     [blockedRowNums, mergedRawRows]
   );
   const publishableIncompleteRowNums = useMemo(() => {
     const rowNums = new Set<number>();
     publishableIncompleteErrors.forEach(error => {
-      if (typeof error.rowNumber !== 'number' || blockedRowNums.has(error.rowNumber)) {
+      const rowNumber = toRowNumber(error.rowNumber);
+      if (rowNumber === null || blockedRowNums.has(rowNumber)) {
         return;
       }
-      rowNums.add(error.rowNumber);
+      rowNums.add(rowNumber);
     });
     return rowNums;
   }, [blockedRowNums, publishableIncompleteErrors]);
   const publishableIncompleteRows = useMemo(
-    () => mergedRawRows.filter(row => publishableIncompleteRowNums.has(row.row_number)),
+    () => mergedRawRows.filter((row, index) => rowMatchesImportNumber(row, index, publishableIncompleteRowNums)),
     [mergedRawRows, publishableIncompleteRowNums]
   );
   const blockingReasonsByRow = useMemo(() => {
@@ -431,14 +445,15 @@ export default function ImportCenter() {
   const publishableIncompleteReasonsByRow = useMemo(() => {
     const reasons = new Map<number, string[]>();
     publishableIncompleteErrors.forEach(error => {
-      if (typeof error.rowNumber !== 'number' || blockedRowNums.has(error.rowNumber)) {
+      const rowNumber = toRowNumber(error.rowNumber);
+      if (rowNumber === null || blockedRowNums.has(rowNumber)) {
         return;
       }
 
-      const existingReasons = reasons.get(error.rowNumber) ?? [];
+      const existingReasons = reasons.get(rowNumber) ?? [];
       if (!existingReasons.includes(error.message)) {
         existingReasons.push(error.message);
-        reasons.set(error.rowNumber, existingReasons);
+        reasons.set(rowNumber, existingReasons);
       }
     });
     return reasons;
@@ -451,10 +466,10 @@ export default function ImportCenter() {
             .filter(error => (
               error.code === 'REQUIRED_FIELD_MISSING' &&
               error.field === option.key &&
-              typeof error.rowNumber === 'number' &&
-              !blockedRowNums.has(error.rowNumber)
+              toRowNumber(error.rowNumber) !== null &&
+              !blockedRowNums.has(toRowNumber(error.rowNumber) as number)
             ))
-            .map(error => error.rowNumber as number)
+            .map(error => toRowNumber(error.rowNumber) as number)
         )];
 
         return {
@@ -470,7 +485,15 @@ export default function ImportCenter() {
     [bulkIncompleteField, bulkIncompleteTargets]
   );
   const publishableIncompleteRowsByNumber = useMemo(
-    () => new Map(publishableIncompleteRows.map(row => [row.row_number, row])),
+    () => new Map(
+      publishableIncompleteRows
+        .flatMap((row, index) => {
+          const sourceRowNumber = toRowNumber(row.row_number);
+          const entries: Array<[number, VehicleRaw]> = [[index + 1, row]];
+          if (sourceRowNumber !== null) entries.push([sourceRowNumber, row]);
+          return entries;
+        })
+    ),
     [publishableIncompleteRows]
   );
   const selectedBulkIncompleteRowNumbers = useMemo(
@@ -840,11 +863,16 @@ export default function ImportCenter() {
       return match ? !savedBranchMappings.has(match[1]) : true;
     });
 
+    const reviewQueueValidationIssues = [
+      ...effectiveValidationErrors,
+      ...reviewValidation.validationResult.warnings.filter(error => INCOMPLETE_WARNING_CODES.includes(error.code)),
+    ];
+
     const { cleanRows, reviewRows } = splitImportRowsForPublish(
       rawRows,
       mergedRawRows,
       reviewValidation.previewIssues,
-      effectiveValidationErrors,
+      reviewQueueValidationIssues,
       batchId,
       companyId,
     );

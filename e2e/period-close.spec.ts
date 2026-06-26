@@ -172,5 +172,6 @@ test('Period Close shows feature unavailable when flag is disabled', async ({ pa
 
   await page.goto('/accounts/period-close', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /period close unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3b\.financial-reports-v2/i)).toBeVisible({ timeout: 30_000 });
 });

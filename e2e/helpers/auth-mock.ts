@@ -17,11 +17,23 @@ import { fileURLToPath } from "url";
 const MODULE_DIR = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOTS = [process.cwd(), resolve(MODULE_DIR, "../..")] as const;
 
+function resolveBrowserOrigin(): string {
+  return (
+    process.env.BASE_URL ||
+    process.env.HRMS_WEB_E2E_BASE_URL ||
+    "http://localhost:3001"
+  ).replace(/\/$/, "");
+}
+
+function resolveSupabaseUrl(value: string): string {
+  return value.startsWith("/") ? `${resolveBrowserOrigin()}${value}` : value;
+}
+
 // Read VITE_SUPABASE_URL using Vite's env-file precedence so the mock targets
 // the same Supabase instance the app talks to at runtime.
 function readSupabaseUrl(): string {
   const envValue = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (envValue) return envValue;
+  if (envValue) return resolveSupabaseUrl(envValue);
 
   const envFiles = [
     ".env.development.local",
@@ -41,7 +53,7 @@ function readSupabaseUrl(): string {
       try {
         const content = readFileSync(envPath, "utf-8");
         const match = content.match(/(?:VITE_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL)\s*=\s*"?([^"\n]+)"?/);
-        if (match) return match[1];
+        if (match) return resolveSupabaseUrl(match[1]);
       } catch {
         // Ignore missing env files and continue down the precedence chain.
       }
@@ -78,7 +90,8 @@ export const MOCK_PROFILE = {
 };
 
 /** Build a fake JWT with far-future expiry (no server verification in browser SDK). */
-function fakeBearerToken(): string {
+function fakeBearerToken(method?: string): string {
+  const amr = method ? [{ method }] : undefined;
   const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }))
     .replace(/=/g, "")
     .replace(/\+/g, "-")
@@ -91,6 +104,7 @@ function fakeBearerToken(): string {
       iat: 1700000000,
       role: "authenticated",
       email: MOCK_USER.email,
+      ...(amr ? { amr } : {}),
     })
   )
     .replace(/=/g, "")
@@ -100,6 +114,7 @@ function fakeBearerToken(): string {
 }
 
 const ACCESS_TOKEN = fakeBearerToken();
+const RECOVERY_ACCESS_TOKEN = fakeBearerToken("recovery");
 
 const FAKE_SESSION = {
   access_token: ACCESS_TOKEN,
@@ -108,6 +123,11 @@ const FAKE_SESSION = {
   expires_at: 9999999999,
   refresh_token: "fake-refresh-token",
   user: MOCK_USER,
+};
+
+const FAKE_RECOVERY_SESSION = {
+  ...FAKE_SESSION,
+  access_token: RECOVERY_ACCESS_TOKEN,
 };
 
 const FAKE_SESSION_USER = { user: MOCK_USER };
@@ -149,7 +169,7 @@ export async function setupSessionForUpdateUser(page: Page) {
 
 export async function setupRecoveryCallbackMocks(page: Page) {
   await page.context().addInitScript(() => {
-    localStorage.setItem('flc.auth.session-code-verifier', 'fake-code-verifier/PASSWORD_RECOVERY');
+    localStorage.setItem('flc.auth.session-code-verifier', JSON.stringify('fake-code-verifier/recovery'));
   });
 
   await page.route(`${SUPABASE_URL}/auth/v1/verify*`, (route) => {
@@ -157,7 +177,7 @@ export async function setupRecoveryCallbackMocks(page: Page) {
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(FAKE_SESSION),
+        body: JSON.stringify(FAKE_RECOVERY_SESSION),
       });
     } else {
       route.continue();
@@ -169,7 +189,7 @@ export async function setupRecoveryCallbackMocks(page: Page) {
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(FAKE_SESSION),
+        body: JSON.stringify(FAKE_RECOVERY_SESSION),
       });
     } else {
       route.continue();

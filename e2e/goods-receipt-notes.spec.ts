@@ -183,5 +183,6 @@ test('GRN feature unavailable when flag disabled', async ({ page }) => {
   await setupGrnMocks(page, { featureEnabled: false });
 
   await page.goto('/purchasing/grn', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByText(/feature not available/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: /goods receipt notes unavailable/i })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/phase3e\.po-grn-v2/i)).toBeVisible({ timeout: 30_000 });
 });

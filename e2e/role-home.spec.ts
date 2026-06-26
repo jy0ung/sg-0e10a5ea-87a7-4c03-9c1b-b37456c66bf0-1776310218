@@ -79,11 +79,13 @@ async function setupHomeMocks(page: Page, opts: {
 }
 
 test.describe('Role-aware Home', () => {
-  test('shows feature-off banner when phase4.role-home is disabled', async ({ page }) => {
+  test('renders the operational workspace when phase4.role-home is disabled', async ({ page }) => {
     await setupHomeMocks(page, { featureEnabled: false });
     await page.goto('/home');
 
-    await expect(page.getByTestId('home-feature-off')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: /good (morning|afternoon|evening), test/i })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('home-kpi-grid')).toBeVisible();
+    await expect(page.getByTestId('home-feature-off')).toHaveCount(0);
   });
 
   test('renders curated KPI cards for the signed-in role', async ({ page }) => {
@@ -93,7 +95,7 @@ test.describe('Role-aware Home', () => {
     await expect(page.getByTestId('home-kpi-grid')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('home-kpi-sales.weekly_revenue')).toBeVisible();
     await expect(page.getByTestId('home-kpi-vehicles.total_stock')).toBeVisible();
-    await expect(page.getByText(/Welcome/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /good (morning|afternoon|evening), test/i })).toBeVisible();
   });
 
   test('shows empty state when no role defaults are configured', async ({ page }) => {
