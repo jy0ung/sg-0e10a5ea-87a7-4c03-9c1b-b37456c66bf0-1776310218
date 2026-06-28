@@ -1,0 +1,5 @@
+## prod sentry dsn check
+bundle assets/index-9XvA7eZx.js
+sentryDsnEmbedded false
+sentryCodePresent true
+sourceMapReferencePresent false

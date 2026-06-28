@@ -1,0 +1,5 @@
+## production bundle sentry/env check
+indexBundle assets/index-9XvA7eZx.js
+containsSentryCode true
+containsDsnMarker true
+containsHrmsUrl true

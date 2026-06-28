@@ -1,0 +1,2549 @@
+{
+  "generatedAt": "2026-06-25T05:43:16.247Z",
+  "base": "https://ubs.protonfookloi.com",
+  "samples": {
+    "deal": "a3111304-bf9b-426a-99e7-284803ce7ec1",
+    "ticket": "9f3748d5-6f83-4b9e-a03a-e7bad91ec030",
+    "vehicle": "PL1BT3SRRRB341114",
+    "customer": "f78846e0-671e-4619-a253-19bb2b6eac63",
+    "purchaseInvoice": "ca3b19a2-3983-41eb-b255-314bb27bcd81"
+  },
+  "totals": {
+    "routes": 84,
+    "routeIssues": 84,
+    "crashes": 0,
+    "mobileRoutes": 8,
+    "mobileIssues": 8,
+    "navChecks": 7,
+    "navIssues": 0,
+    "workflows": 1,
+    "workflowIssues": 1
+  },
+  "results": [
+    {
+      "module": "Platform",
+      "path": "/",
+      "name": "Home root",
+      "url": "https://ubs.protonfookloi.com/",
+      "status": "issue",
+      "loadMs": 1958,
+      "finalUrl": "https://ubs.protonfookloi.com/home",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "2 critical console message(s)",
+        "2 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:24.526Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "/rest/v1/profiles?select=*&id=eq.b4d2c7b9-a6ef-4e7f-9fcf-8286f75388db",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447",
+          "failure": "csp"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/root.png",
+      "mainText": "SUPER ADMIN WORKSPACE Good morning, Jamri Here's what needs your attention across the business today. New request Open inbox PENDING APPROVALS — Inbox not enabled OPEN REQUESTS — Internal service tickets NOTIFICATIONS 0 Unread alerts ACTIVE MODULES 8 Enabled for your company PIPELINE OVERVIEW 176 active deals · RM 3067k total value Open pipeline 23 Lead 102 Booking 51 LOU RM 3067k Action required Items waiting for you Unified inbox not enabled Approvals, reconciliation, and requests appear here once the inbox is enabled for your company. KPIs for your role Curated through the KPI Studio Vehicl"
+    },
+    {
+      "module": "Platform",
+      "path": "/home",
+      "name": "Home",
+      "url": "https://ubs.protonfookloi.com/home",
+      "status": "issue",
+      "loadMs": 1861,
+      "finalUrl": "https://ubs.protonfookloi.com/home",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "2 critical console message(s)",
+        "1 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:26.599Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447",
+          "failure": "csp"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/home.png",
+      "mainText": "SUPER ADMIN WORKSPACE Good morning, Jamri Here's what needs your attention across the business today. New request Open inbox PENDING APPROVALS — Inbox not enabled OPEN REQUESTS — Internal service tickets NOTIFICATIONS 0 Unread alerts ACTIVE MODULES 8 Enabled for your company PIPELINE OVERVIEW 176 active deals · RM 3067k total value Open pipeline 23 Lead 102 Booking 51 LOU RM 3067k Action required Items waiting for you Unified inbox not enabled Approvals, reconciliation, and requests appear here once the inbox is enabled for your company. KPIs for your role Curated through the KPI Studio Vehicl"
+    },
+    {
+      "module": "Platform",
+      "path": "/modules",
+      "name": "Modules",
+      "url": "https://ubs.protonfookloi.com/modules",
+      "status": "issue",
+      "loadMs": 1890,
+      "finalUrl": "https://ubs.protonfookloi.com/home",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "2 critical console message(s)",
+        "1 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:28.509Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447",
+          "failure": "csp"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/modules.png",
+      "mainText": "SUPER ADMIN WORKSPACE Good morning, Jamri Here's what needs your attention across the business today. New request Open inbox PENDING APPROVALS — Inbox not enabled OPEN REQUESTS — Internal service tickets NOTIFICATIONS 0 Unread alerts ACTIVE MODULES 8 Enabled for your company PIPELINE OVERVIEW 176 active deals · RM 3067k total value Open pipeline 23 Lead 102 Booking 51 LOU RM 3067k Action required Items waiting for you Unified inbox not enabled Approvals, reconciliation, and requests appear here once the inbox is enabled for your company. KPIs for your role Curated through the KPI Studio Vehicl"
+    },
+    {
+      "module": "Platform",
+      "path": "/inbox",
+      "name": "Inbox",
+      "url": "https://ubs.protonfookloi.com/inbox",
+      "status": "issue",
+      "loadMs": 1763,
+      "finalUrl": "https://ubs.protonfookloi.com/inbox",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "2 critical console message(s)",
+        "1 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:30.501Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447",
+          "failure": "csp"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/inbox.png",
+      "mainText": "FLC BI Inbox Inbox Unified workspace for approvals, reconciliation, requests, and notifications Inbox unavailable Inbox is registered in the platform catalogue, but it is disabled for this company or gated behind an inactive feature flag. Control: phase4.unified-inbox."
+    },
+    {
+      "module": "Platform",
+      "path": "/notifications",
+      "name": "Notifications",
+      "url": "https://ubs.protonfookloi.com/notifications",
+      "status": "issue",
+      "loadMs": 1881,
+      "finalUrl": "https://ubs.protonfookloi.com/notifications",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "2 critical console message(s)",
+        "1 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:32.344Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447",
+          "failure": "csp"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/notifications.png",
+      "mainText": "Notifications System alerts and updates New request comment info \"VSO:65767\" has a new comment: TEST 6/19/2026, 6:46:25 AM New request comment info \"VSO:123\" has a new comment: hi 6/9/2026, 1:24:57 AM Request assigned to you info You have been assigned \"VSO:123\". 5/19/2026, 9:15:07 AM Request assigned to you info You have been assigned \"CANCEL INVOICE AND VSO\". 5/8/2026, 6:46:57 AM"
+    },
+    {
+      "module": "Platform",
+      "path": "/not-a-real-route-audit",
+      "name": "404/Not Found",
+      "url": "https://ubs.protonfookloi.com/not-a-real-route-audit",
+      "status": "issue",
+      "loadMs": 1172,
+      "finalUrl": "https://ubs.protonfookloi.com/not-a-real-route-audit",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "Very little body text (39 chars)",
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:34.167Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/not-a-real-route-audit.png",
+      "mainText": ""
+    },
+    {
+      "module": "Portal",
+      "path": "/portal",
+      "name": "Portal landing",
+      "url": "https://ubs.protonfookloi.com/portal",
+      "status": "issue",
+      "loadMs": 1410,
+      "finalUrl": "https://ubs.protonfookloi.com/portal",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)",
+        "8 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:37.873Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.open",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.pending_requester",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.in_progress",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.pending_owner_review",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.completed_by_owner",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.closed",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.reopened",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.cancelled",
+          "failure": "net::ERR_ABORTED"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal.png",
+      "mainText": "Welcome back, Jamri Submit a request, track your tickets, or browse shared resources. New request Pending requests MY OPEN REQUESTS 1 In progress or awaiting action AWAITING YOUR REPLY 1 Needs information from you COMPLETED 0 Closed by requester Queue at a glance Company-wide request load Open queue 0 Needs triage 1 In progress 2 Pending requester Requests New Request Submit a new internal support request Pending Requests View and follow up on your submitted requests Completed Requests Browse requester-confirmed closed requests Manager Dashboard Review SLA, workload, and bottleneck signals Pen"
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/tickets/new",
+      "name": "New request",
+      "url": "https://ubs.protonfookloi.com/portal/tickets/new",
+      "status": "issue",
+      "loadMs": 1422,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/tickets/new",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:39.382Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-tickets-new.png",
+      "mainText": "Internal Requests New request New Request Submit an internal request for review and resolution. Open queue Request details Request title * Category * CANCEL DOCUMENTS CANCEL DOCUMENTS Deal Registration (Auto) REQUEST DEBIT NOTE / CREDIT NOTE UPDATE STOCK BALANCE @ CBU LISTING - FLC SYSTEM FOOK LOI SYSTEM - AMEND MONTHLY REPORT Subcategory * Select a subcategory OFFICIAL RECEIPT INVOICE VSO Additional information 3 fields VSO Number * INVOICE NO. * OR No. * Description Source From category From subcategory From category Custom 0 / 20 chars min Request summary Title Untitled request Requestor Ja"
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/tickets",
+      "name": "My tickets",
+      "url": "https://ubs.protonfookloi.com/portal/tickets",
+      "status": "issue",
+      "loadMs": 1456,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/tickets",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:40.894Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-tickets.png",
+      "mainText": "Internal Requests Pending Requests Pending Requests Track active requests, requester actions, and owner follow-up. Refresh New request TOTAL 1 IN PROGRESS 0 NEED YOUR ATTENTION 1 CANCELLED 0 All (1) REQUEST CATEGORY PRIORITY STATUS LAST UPDATED SUBMITTED OWNER / PIC Phase 4 E2E Test Request Owner: Alvin CANCEL DOCUMENTS Medium Completed by owner 4 days ago 5 days ago Alvin"
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/tickets/completed",
+      "name": "Completed tickets",
+      "url": "https://ubs.protonfookloi.com/portal/tickets/completed",
+      "status": "issue",
+      "loadMs": 1296,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/tickets/completed",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:42.419Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-tickets-completed.png",
+      "mainText": "Internal Requests Completed Requests Completed Requests Closed requests confirmed by the requester. Refresh No completed requests Closed requests will appear here after requester confirmation."
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/tickets/9f3748d5-6f83-4b9e-a03a-e7bad91ec030",
+      "name": "Ticket workspace",
+      "url": "https://ubs.protonfookloi.com/portal/tickets/9f3748d5-6f83-4b9e-a03a-e7bad91ec030",
+      "status": "issue",
+      "loadMs": 1587,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/tickets/9f3748d5-6f83-4b9e-a03a-e7bad91ec030",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:43.812Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-tickets-9f3748d5-6f83-4b9e-a03a-e7bad91ec030.png",
+      "mainText": ""
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/dashboard",
+      "name": "Manager dashboard",
+      "url": "https://ubs.protonfookloi.com/portal/dashboard",
+      "status": "issue",
+      "loadMs": 1489,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/dashboard",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:45.504Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-dashboard.png",
+      "mainText": "Internal Requests Manager Dashboard Manager Dashboard Live operating view for ownership, SLA exposure, workload, and closure quality. All time Refresh PENDING 5 UNASSIGNED 1 IN PROGRESS 1 PENDING REQUESTER 2 PENDING OWNER REVIEW 0 SLA BREACHED 2 AT RISK 0 COMPLETED 1 REOPENED 0 SATISFACTION No data Oldest pending requests CANCEL INVOICE AND VSO CANCEL DOCUMENTS · Alvin Completed by owner High about 2 months ago VSO:123 CANCEL DOCUMENTS · Jamri Saidi In progress Low about 1 month ago CANCEL INVOICE AND VSO CANCEL DOCUMENTS · Jamri Saidi Pending requester Medium 6 days ago 654765 MONTHLY REPORT "
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/queue",
+      "name": "Request queue",
+      "url": "https://ubs.protonfookloi.com/portal/queue",
+      "status": "issue",
+      "loadMs": 1700,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/queue",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)",
+        "8 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:47.077Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.pending_requester",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.open",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.in_progress",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.pending_owner_review",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.completed_by_owner",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.reopened",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.closed",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=*&company_id=eq.c1&status=eq.cancelled",
+          "failure": "net::ERR_ABORTED"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-queue.png",
+      "mainText": "Internal Requests Pending / Active Requests Pending / Active Requests Triage ownership, next action, SLA risk, and active request workflow. Summary CSV Refresh UNASSIGNED 1 IN PROGRESS 1 PENDING REQUESTER 2 SLA BREACHED 2 AT RISK 0 Pending / Active My Queue Unassigned High Priority Pending Requester Breached SLA Pending / active (5) All priorities All SLA states All assignees Advanced Save filter Columns 5 results REQUEST REQUESTER OWNER STATUS SLA LAST UPDATED SUBMITTED Phase 4 E2E Test Request Jamri Saidi · CANCEL DOCUMENTS / OFFICIAL RECEIPT Breached Inactive Jamri Saidi Alvin Completed by "
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/history",
+      "name": "Request history",
+      "url": "https://ubs.protonfookloi.com/portal/history",
+      "status": "issue",
+      "loadMs": 1285,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/history",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:48.880Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-history.png",
+      "mainText": "Internal Requests Completed Requests Completed Requests Browse requester-confirmed closed requests. 1 record Refresh Closed closed low VSO:65767 CANCEL DOCUMENTS · Alvin 6 days ago"
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/reports",
+      "name": "Request reports",
+      "url": "https://ubs.protonfookloi.com/portal/reports",
+      "status": "issue",
+      "loadMs": 1801,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/reports",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:50.230Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-reports.png",
+      "mainText": "Internal Requests Reports Reports Export operational reports using the same permissions and filters as the request queue. CSV PDF / Print SLA report All time SLA report REQUEST CATEGORY OWNER STATUS METRIC DETAIL Phase 4 E2E Test Request CANCEL DOCUMENTS Alvin completed by owner SLA breached Response: No SLA; Resolution: SLA breached 654765 MONTHLY REPORT Unassigned pending requester No SLA Response: No SLA; Resolution: No SLA CANCEL INVOICE AND VSO CANCEL DOCUMENTS Jamri Saidi pending requester SLA breached Response: No SLA; Resolution: SLA breached CANCEL INVOICE AND VSO434 REQUEST DEBIT NOT"
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/setup",
+      "name": "Request setup",
+      "url": "https://ubs.protonfookloi.com/portal/setup",
+      "status": "issue",
+      "loadMs": 1234,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/setup",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:52.136Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-setup.png",
+      "mainText": "Internal Requests Setup Request Operations Setup Shape the requester experience, routing logic, and attachment controls from one workspace. CATEGORIES 6 FIELDS 0 ROUTING RULES 0 Request Customization Manage categories and subcategories from one canvas. Changes take effect immediately for new requests. Categories 6 Form Builder Settings Routing 6 categories Add Category CANCEL DOCUMENTS 3 subcategories Edit Deal Registration (Auto) Auto-created when a deal reaches the Registration stage. Handles JPJ submission and plate assignment. Edit REQUEST DEBIT NOTE / CREDIT NOTE 2 subcategories Customer "
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/announcements",
+      "name": "Portal announcements",
+      "url": "https://ubs.protonfookloi.com/portal/announcements",
+      "status": "issue",
+      "loadMs": 1132,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/announcements",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:53.444Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-announcements.png",
+      "mainText": "Internal Requests Announcements Announcements Internal Request notices, process updates, and memos New Announcement All Types All Priorities All Statuses No announcements found. Create the first one"
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/documents",
+      "name": "Portal documents",
+      "url": "https://ubs.protonfookloi.com/portal/documents",
+      "status": "issue",
+      "loadMs": 1155,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/documents",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:54.631Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/portal-documents.png",
+      "mainText": "Internal Requests Documents & Forms Documents & Forms Downloadable forms, templates, SOPs, and supporting documents Upload Document All Categories All Statuses No documents found. Upload the first document"
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging",
+      "name": "Auto Aging dashboard",
+      "url": "https://ubs.protonfookloi.com/auto-aging",
+      "status": "issue",
+      "loadMs": 1963,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:55.865Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging.png",
+      "mainText": "FLC BI Auto Aging Overview Auto Aging Overview Vehicle aging analysis across operational milestones Filter Last refresh 6/25/2026, 5:40:56 AM Refresh Export All branches • All time • All models 22185 vehicles Charts use the first 2,000 filtered rows returned by the server. Process KPIs Median cycle time per milestone. Click a card to inspect the contributing vehicles. BG → DELIVERY 0 median days Avg: 0d • P90: 0d Valid: 0 Overdue: 0 BG → ETD 0 median days Avg: 0d • P90: 0d Valid: 0 Overdue: 0 ETD → OUTLET 0 median days Avg: 0d • P90: 0d Valid: 0 Overdue: 0 OUTLET → REG 0 median days Avg: 0d • "
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/vehicles",
+      "name": "Vehicle explorer",
+      "url": "https://ubs.protonfookloi.com/auto-aging/vehicles",
+      "status": "issue",
+      "loadMs": 1766,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/vehicles",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:57.968Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-vehicles.png",
+      "mainText": "FLC BI Auto Aging Vehicle Explorer Vehicle Explorer 22185 of 22185 vehicles Edit Export CSV Drill filters Search and segment vehicle aging results 22,185 results All Branches All Models All Payments All Stages Rows: 50 Sort NO. CHASSIS NO. BRCH K1 MODEL VAR COLOR CUST NAME SA NAME BG DATE SHIPMENT ETD PKG DATE SHIPMENT ETA KK/TWU/SDK RECEIVED BY OUTLET REG DATE REG NO DELIVERY DATE DISB. DATE PAYMENT METHOD FULL PAYMENT TYPE FULL PAYMENT DATE VAA DATE INV NO. OBR DTP (DEALER TRANSFER PRICE) SHIPMENT NAME LOU CONTRA SOLA D2D COMM PAYOUT COMM REMARK REMARK 1 PL1BH3LTRRG088321 001 PROTON IRIZ 1.3"
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/vehicles/PL1BT3SRRRB341114",
+      "name": "Vehicle detail",
+      "url": "https://ubs.protonfookloi.com/auto-aging/vehicles/PL1BT3SRRRB341114",
+      "status": "issue",
+      "loadMs": 1667,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/vehicles/PL1BT3SRRRB341114",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:40:59.828Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-vehicles-PL1BT3SRRRB341114.png",
+      "mainText": "FLC BI Auto Aging Vehicles PL1BT3SRRRB341114 PL1BT3SRRRB341114 PROTON SAGA 1.3 AUTOMATIK STANDARD • 005 • Unknown Edit Create Deal Back Vehicle Information CHASSIS NO. PL1BT3SRRRB341114 MODEL PROTON SAGA 1.3 AUTOMATIK STANDARD BRCH K1 005 PAYMENT METHOD Unknown SA NAME Unknown CUST NAME Unknown D2D No REMARK — Linked Sales Order No sales order is linked to this vehicle yet. Milestone Timeline BG DATE 2024-04-02 SHIPMENT ETD PKG Pending RECEIVED BY OUTLET Pending REG DATE Pending DELIVERY DATE Pending DISB. DATE Pending KPI Breakdown BG → DELIVERY — SLA: 45d BG → ETD — SLA: 14d ETD → OUTLET — S"
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/lifecycle/PL1BT3SRRRB341114",
+      "name": "Vehicle lifecycle",
+      "url": "https://ubs.protonfookloi.com/auto-aging/lifecycle/PL1BT3SRRRB341114",
+      "status": "issue",
+      "loadMs": 1586,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/lifecycle/PL1BT3SRRRB341114",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "Visible not-found text on registered route",
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:01.580Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-lifecycle-PL1BT3SRRRB341114.png",
+      "mainText": "Vehicle not found Back to Auto Aging"
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/import",
+      "name": "Import",
+      "url": "https://ubs.protonfookloi.com/auto-aging/import",
+      "status": "issue",
+      "loadMs": 1695,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/import",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:03.227Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-import.png",
+      "mainText": "FLC BI Auto Aging Import Center Import Center Import vehicle inventory data for corrections, backfill, or manual exception uploads 1 Upload 2 Validating 3 Review 4 Publishing 5 Done Import from Google Sheet Public or published sheets only. The app reads the sheet through Google's CSV export, which keeps the import path lightweight. Google Sheets import is intended for corrections, backfill, and exception uploads. Primary vehicle data will come from DMS sync once connected. Import From Google Sheet"
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/review",
+      "name": "Review",
+      "url": "https://ubs.protonfookloi.com/auto-aging/review",
+      "status": "issue",
+      "loadMs": 1679,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/review",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:05.007Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-review.png",
+      "mainText": "FLC BI Auto Aging Review Queue Review Queue Review rows held back from Auto Aging imports Review Queue unavailable Review Queue is registered in the platform catalogue, but it is disabled for this company or gated behind an inactive feature flag. Control: phase3a.import-review-v2."
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/history",
+      "name": "History",
+      "url": "https://ubs.protonfookloi.com/auto-aging/history",
+      "status": "issue",
+      "loadMs": 1823,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/history",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:06.750Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-history.png",
+      "mainText": "FLC BI Auto Aging Import History Import History Track all data import operations No Imports Yet Upload a vehicle data file to get started."
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/quality",
+      "name": "Quality",
+      "url": "https://ubs.protonfookloi.com/auto-aging/quality",
+      "status": "issue",
+      "loadMs": 1626,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/quality",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:08.649Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-quality.png",
+      "mainText": "FLC BI Auto Aging Data Quality Data Quality 0 issues detected across all imports All Clear No data quality issues found in the latest import."
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/sla",
+      "name": "SLA",
+      "url": "https://ubs.protonfookloi.com/auto-aging/sla",
+      "status": "issue",
+      "loadMs": 1870,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/sla",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:10.326Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-sla.png",
+      "mainText": "FLC BI Auto Aging SLA Policies SLA Policies Configure target days for each KPI milestone pair KPI Current SLA (days) New Value Action BG → Delivery 45 days Save BG → Disb 60 days Save BG → ETD 14 days Save Delivery → Disb 14 days Save ETD → Outlet 28 days Save Outlet → Reg 7 days Save Reg → Delivery 14 days Save"
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/mappings",
+      "name": "Mappings",
+      "url": "https://ubs.protonfookloi.com/auto-aging/mappings",
+      "status": "issue",
+      "loadMs": 1617,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/mappings",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:12.281Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-mappings.png",
+      "mainText": "FLC BI Auto Aging Mappings Mapping Administration Manage data normalisation rules used during imports Branch Mappings Map raw branch codes from imported files to canonical branch codes Add Raw Value Canonical Code Notes Actions BTU BTU Bintulu KK KK Kota Kinabalu LDU LDU Lahad Datu MYY MYY Miri SBW SBW Sibu SDK SDK Sandakan TWU TWU Tawau Payment Method Mappings Normalise payment method values from imported files Add Raw Value Canonical Value Notes Actions CASH Cash — GOV Government — GOVERNMENT Government — LOAN Loan — Column Owners (Auto-Aging) Reference grouping for the new Excel template. U"
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/commissions",
+      "name": "Commissions",
+      "url": "https://ubs.protonfookloi.com/auto-aging/commissions",
+      "status": "issue",
+      "loadMs": 1650,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/commissions",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:13.969Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-commissions.png",
+      "mainText": "FLC BI Auto Aging Commissions Commission Dashboard Manage commission rules and track incentive payouts per salesman Total Pending 0 Total Approved 0 Total Paid 0 Amount (2026-06) MYR 0 Commission Rules Rules applied to vehicles in each period New Rule No commission rules configured. Commission Records 0 record(s) 2026-06 All Salesmen All Statuses No commission records for this period."
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/reports",
+      "name": "Reports",
+      "url": "https://ubs.protonfookloi.com/auto-aging/reports",
+      "status": "issue",
+      "loadMs": 1764,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/reports",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:15.681Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/auto-aging-reports.png",
+      "mainText": "FLC BI Auto Aging Aging Reports Auto Aging Reports Generate and export vehicle-aging analytics, SLA compliance, and filtered KPI report sets. Report Type Aging KPI Summary Median, average, P90 and overdue counts per KPI Branch All Branches Model All Models BG DATE From BG DATE To Generate Median, average, P90 and overdue counts per KPI"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales",
+      "name": "Sales overview",
+      "url": "https://ubs.protonfookloi.com/sales",
+      "status": "issue",
+      "loadMs": 1796,
+      "finalUrl": "https://ubs.protonfookloi.com/sales",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:17.549Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales.png",
+      "mainText": "FLC BI Sales Overview Sales Overview Month-to-date sales performance, branch activity, and sales-to-vehicle linkage at a glance. MTD Orders 0 MTD Revenue RM0k Outstanding RM0k BG Linked 0/23398 Monthly Orders — Last 6 Months 1009 Jan 26 789 Feb 26 580 Mar 26 814 Apr 26 206 May 26 0 Jun 26 Orders by Branch (All Time) KK4S 5157 (22%) TWU3S 4823 (21%) SDK3S 3043 (13%) SDK1S 2736 (12%) LDU3S 2405 (10%) KK1S 1937 (8%) TWU1S 1479 (6%) LDU1S 1303 (6%) Auto Aging Integration Orders linked to BG entries: 0 of 23398 orders Total vehicles in Auto Aging: 22,185"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/pipeline",
+      "name": "Deal pipeline",
+      "url": "https://ubs.protonfookloi.com/sales/pipeline",
+      "status": "issue",
+      "loadMs": 1880,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/pipeline",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "Visible not-found text on registered route",
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:19.416Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-pipeline.png",
+      "mainText": "Deal Pipeline All Stages All Branches Refresh New Deal Lead 121 RM 1593k Sales Advisor ARMAN BIN MADJUDDIN — VSO/TWU3S/26/05/048 37d NUJILAM BIN ABD GAFAR MUSLIANA BINTI MUSTAFA — VSO/TWU3S/26/05/051 37d ANDI FAISAL BIN ANDI ARSYAD MOHAMAD ABRISHAM BIN HIRMANTO PROTON SAGA 1.5 PREMIUM VSO/SDK1S/26/05/016 37d RM 58,190 SANAWIAH BINTI HASYIM MUHAMMAD SHAFIQ BIN SABARUDIN PROTON SAGA 1.5 EXECUTIVE VSO/SDK3S/26/05/042 37d RM 46,990 CHIA HON TIN MOHD RIDZUAN FIRDAUS BIN ARDON — VSO/TWU3S/26/05/040 37d SUKRI BIN SAYUTI CHONG YIH YAU — VSO/KK4S/26/05/056 37d CHONG HOON SUNG RAPIDI BIN BUN — VSO/TWU3S"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/deals",
+      "name": "Deals list",
+      "url": "https://ubs.protonfookloi.com/sales/deals",
+      "status": "issue",
+      "loadMs": 1729,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/deals",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:21.461Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-deals.png",
+      "mainText": "Deals ⚙ Filters All Stages From To Refresh Export CSV New Deal Columns 25 results VSO/TWU1S/24/04/001 SURAIDAH BINTI SAHID 730101656768 Booking Sales Advisor ZULFIKA BIN YUSOF — 5/18/2026 VSO/TWU1S/24/04/002 MUHAMMAD ISA BIN ANIL HAMUN 810518125727 PROTON SAGA 1.3 AUTOMATIK STANDARD Completed — ISKANDAR BIN ONG KIAN PHIN @ ZAINUDDIN RM 40,800 5/18/2026 VSO/SDK3S/24/04/026 ASRIN CELLY BINTI MINEH 981028126184 PROTON SAGA 1.3 AUTOMATIK STANDARD Completed — CHIA HON TIN RM 40,800 5/18/2026 VSO/SDK3S/24/04/024 NORIAKAH BINTI JEPPY 771121125260 PROTON SAGA 1.3 AUTOMATIK PREMIUM Completed — CHIE YAT"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/deals/new",
+      "name": "New deal",
+      "url": "https://ubs.protonfookloi.com/sales/deals/new",
+      "status": "issue",
+      "loadMs": 1726,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/deals/new",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:23.262Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-deals-new.png",
+      "mainText": "New Deal Customer Information Customer Name * IC Number Phone Email Vehicle Interest Model Variant Colour Pricing Selling Price (RM) Deposit (RM) Discount (RM) Accessories (RM) Total: RM 0 Source & Notes Lead Source Walk-in Referral Online Event Repeat Customer Source Details Notes Cancel Create Deal"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/deals/a3111304-bf9b-426a-99e7-284803ce7ec1",
+      "name": "Deal detail",
+      "url": "https://ubs.protonfookloi.com/sales/deals/a3111304-bf9b-426a-99e7-284803ce7ec1",
+      "status": "issue",
+      "loadMs": 1657,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/deals/a3111304-bf9b-426a-99e7-284803ce7ec1",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:25.055Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-deals-a3111304-bf9b-426a-99e7-284803ce7ec1.png",
+      "mainText": "VSO/KGU3S/26/03/030 VSO: VSO/KGU3S/26/03/030 · Created 5/18/2026 Edit Status LOU Responsible Finance Team Next Action Verify LOU and arrange shipment Days in Stage 37 days 1 Lead 2 Prospect 3 Booking 4 Loan Submission 5 LOU 6 Shipment 7 Receive 8 Registration 9 Delivery 10 Disbursement 11 Completed Advance to Shipment Overview Loan Insurance Registration Documents Activity Customer Name JUNATAN BIN APIRI IC No 830703126519 Phone — Email — Vehicle Model PROTON SAGA 1.5 EXECUTIVE Variant — Colour RUBY RED Chassis No PL1BT2SRRTG027833 Link Vehicle from Auto Aging Pricing Selling Price RM 51,674.4"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/orders",
+      "name": "Legacy sales orders redirect",
+      "url": "https://ubs.protonfookloi.com/sales/orders",
+      "status": "issue",
+      "loadMs": 2153,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/deals",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:26.821Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-orders.png",
+      "mainText": "Deals ⚙ Filters All Stages From To Refresh Export CSV New Deal Columns 25 results VSO/TWU1S/24/04/001 SURAIDAH BINTI SAHID 730101656768 Booking Sales Advisor ZULFIKA BIN YUSOF — 5/18/2026 VSO/TWU1S/24/04/002 MUHAMMAD ISA BIN ANIL HAMUN 810518125727 PROTON SAGA 1.3 AUTOMATIK STANDARD Completed — ISKANDAR BIN ONG KIAN PHIN @ ZAINUDDIN RM 40,800 5/18/2026 VSO/SDK3S/24/04/026 ASRIN CELLY BINTI MINEH 981028126184 PROTON SAGA 1.3 AUTOMATIK STANDARD Completed — CHIA HON TIN RM 40,800 5/18/2026 VSO/SDK3S/24/04/024 NORIAKAH BINTI JEPPY 771121125260 PROTON SAGA 1.3 AUTOMATIK PREMIUM Completed — CHIE YAT"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/lead-intake",
+      "name": "Lead intake",
+      "url": "https://ubs.protonfookloi.com/sales/lead-intake",
+      "status": "issue",
+      "loadMs": 1722,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/lead-intake",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:29.067Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-lead-intake.png",
+      "mainText": "FLC BI Sales Lead Intake Lead Intake DMS leads & prospects with local follow-up tracking Lead Intake unavailable Lead Intake is registered in the platform catalogue, but it is disabled for this company or gated behind an inactive feature flag. Control: phase3f.lead-intake-v2."
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/performance",
+      "name": "Performance",
+      "url": "https://ubs.protonfookloi.com/sales/performance",
+      "status": "issue",
+      "loadMs": 1641,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/performance",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:30.847Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-performance.png",
+      "mainText": "FLC BI Sales Performance Salesman Performance Actual orders vs targets by salesman Set Target 2026 June Refresh Salesman Branch Total Orders Delivered Revenue Avg Deal Target Units Achievement No data for this period"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/margin",
+      "name": "Margin",
+      "url": "https://ubs.protonfookloi.com/sales/margin",
+      "status": "issue",
+      "loadMs": 1818,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/margin",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:32.584Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-margin.png",
+      "mainText": "FLC BI Sales Margin Analysis Margin Analysis Profit margin by vehicle model (estimated — link purchase invoices for actuals) Total Units 1000 26 models Total Est. Margin RM 172,621 Top model: PROTON SAGA 1.5 PREMIUM Avg Margin % 8.0% Actual Cost Coverage 0% 0/1000 units MARGIN WORKBENCH Compare model profitability and invoice cost coverage in the selected branch and booking period. All Branches All Periods Estimated Margin by Model Ranked by total model contribution in the current filter scope. 26 models PROTON SAGA 1.5 PREMIUM PROTON SAGA 1.5 EXECUTIVE PROTON SAGA 1.5 STANDARD PROTON SAGA 1.3"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/invoices",
+      "name": "Invoices",
+      "url": "https://ubs.protonfookloi.com/sales/invoices",
+      "status": "issue",
+      "loadMs": 1644,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/invoices",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:34.529Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-invoices.png",
+      "mainText": "FLC BI Sales Invoices Invoices Track invoices and payment status New Invoice Total Collected RM 0 Outstanding RM 0 Total Invoices 0 Customer Sales (0) Dealer Sales (0) Purchase (0) Invoice No Customer Issue Date Due Date Total Paid Status No invoices"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/customers",
+      "name": "Customers",
+      "url": "https://ubs.protonfookloi.com/sales/customers",
+      "status": "issue",
+      "loadMs": 1636,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/customers",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "Visible not-found text on registered route",
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:36.244Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-customers.png",
+      "mainText": "FLC BI Sales Customers Customers Manage customer records Add Customer 22,345 records Name Phone Email NRIC 'AINUL BASYIRAH BINTI MOHD NAIM @ MOHD ZUKI 0179859741 — 010529030656 99 TYRE SDN. BHD. 016-7006668 — 1096158T A HARIST BIN HAMSA 011-31204075 — 660210126597 A MASNONI BINTI MOHD YUNUS +60195848674 — 801226125050 A NURHUZAIFAH BIN MAILI 016-3646087 — 991018128767 A RAHIM BIN LAHID +01116036777 — 680625125957 A RAMLI BIN ABD JALI 019-8316141 — 741211125013 A. FADLEY DZULKARNEIN BIN BONGKASA +60168657615 — 830104125995 A.K.MOHD HANIF PG.ISMAIL +60128207041 — 710813125713 A.NUR YUSMARLIANA B"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/customers/f78846e0-671e-4619-a253-19bb2b6eac63",
+      "name": "Customer detail",
+      "url": "https://ubs.protonfookloi.com/sales/customers/f78846e0-671e-4619-a253-19bb2b6eac63",
+      "status": "issue",
+      "loadMs": 1658,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/customers/f78846e0-671e-4619-a253-19bb2b6eac63",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:38.007Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-customers-f78846e0-671e-4619-a253-19bb2b6eac63.png",
+      "mainText": "Customer Total Deals 0 Active 0 Completed 0 Total Value RM 0 Contact Information IC Number — Phone — Email — Vehicle History No vehicle history Deal History (0) Activity (0) Communications (0) No deals found for this customer"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/dealer-invoices",
+      "name": "Dealer invoices",
+      "url": "https://ubs.protonfookloi.com/sales/dealer-invoices",
+      "status": "issue",
+      "loadMs": 1630,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/dealer-invoices",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:39.718Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-dealer-invoices.png",
+      "mainText": "FLC BI Sales Dealer Invoices Dealer Invoices Manage vehicle dealer invoices New Invoice DEALER INVOICE QUEUE Review dealer billing records, status, and chassis references. 79 invoices Invoice No Dealer Name Car Model Colour Chassis No Sales Price (RM) Date Status OD/KK4S/26/05/001 SG MOTORSPORT (M) SDN BHD PROTON PERSONA 1.6 CVT STANDARD RUBY RED PL1BH6STRSG165311 48,118.00 2026-05-15 Active OD/KK1S/26/04/003 MELINAU AUTO SDN BHD (INANAM) PROTON PERSONA 1.6 CVT EXECUTIVE JET GREY PL1BH6STRTG190386 53,168.00 2026-04-23 Active OD/KK1S/26/04/001 HARAPAN MAJU SDN BHD PROTON IRIZ 1.6 CVT EXECUTIVE "
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/verify-or",
+      "name": "Verify OR",
+      "url": "https://ubs.protonfookloi.com/sales/verify-or",
+      "status": "issue",
+      "loadMs": 1837,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/verify-or",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:41.446Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-verify-or.png",
+      "mainText": "FLC BI Sales Verify OR Verify Official Receipts Review and verify customer payment receipts Add Receipt 1000 Total Receipts 999 Pending 1 Verified RECEIPT VERIFICATION QUEUE Review pending receipts, confirm payment evidence, and track verifier ownership. All Pending Verified OR No Date Amount (RM) Verified By Status Actions OR/KK1S/26/05/064 2026-05-18 47,500.00 flit092023@gmail.com Verified OR/SDK1S/26/05/102 2026-05-18 220.05 — Pending Verify OR/TWU3S/26/05/205 2026-05-18 2,169.80 — Pending Verify OR/SDK1S/26/05/103 2026-05-18 2,057.35 — Pending Verify OR/TWU3S/26/05/206 2026-05-18 34.70 — P"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/outstanding",
+      "name": "Outstanding legacy",
+      "url": "https://ubs.protonfookloi.com/sales/outstanding",
+      "status": "issue",
+      "loadMs": 1694,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/outstanding",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:43.447Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-outstanding.png",
+      "mainText": "Outstanding Collection Pending Disbursement 0 Total Outstanding RM 0 Overdue (>14 days) 0 Refresh Export CSV Columns 0 results No data available."
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/outstanding-new",
+      "name": "Outstanding deals",
+      "url": "https://ubs.protonfookloi.com/sales/outstanding-new",
+      "status": "issue",
+      "loadMs": 1643,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/outstanding-new",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:45.198Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-outstanding-new.png",
+      "mainText": "Outstanding Collection Pending Disbursement 0 Total Outstanding RM 0 Overdue (>14 days) 0 Refresh Export CSV Columns 0 results No data available."
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/advisors",
+      "name": "Sales advisors",
+      "url": "https://ubs.protonfookloi.com/sales/advisors",
+      "status": "issue",
+      "loadMs": 1605,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/advisors",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "Visible not-found text on registered route",
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:46.915Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/sales-advisors.png",
+      "mainText": "FLC BI Sales Sales Advisors Sales Advisors Sales advisor profiles and branch assignments New SA Active 182 Inactive 13 Total 195 All Statuses All Branches 195 advisors Code Name IC Contact Email Branch Join Date Status TWSD15 ABD LAZAN BIN ABU BAKAR 901014125487 01135773011 abdlazan89@gmail.com — 2024-11-01 Active Deactivate TWSD17 ABDUL LATIF 011216121439 016-5618825 abdullatif750@icloud.com — 2025-07-01 Inactive Activate SSSD06 ABU BAKAR BIN MOHD ARIS 820826125699 011-71111239 abubakarmohdaris@gmail.com — 2020-10-01 Active Deactivate LDSD19 AHMAD FARABI BIN SULAIMAN 980715126771 018-2895532 "
+    },
+    {
+      "module": "Inventory",
+      "path": "/inventory/stock",
+      "name": "Stock",
+      "url": "https://ubs.protonfookloi.com/inventory/stock",
+      "status": "issue",
+      "loadMs": 1963,
+      "finalUrl": "https://ubs.protonfookloi.com/inventory/stock",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:48.610Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/inventory-stock.png",
+      "mainText": "FLC BI Inventory Stock Balance Stock Balance Live vehicle inventory by chassis number and location Stock view is merging with Auto Aging All stock and aging data will be consolidated into one unified view. Open Auto Aging In Stock 0 Reserved 0 In Transit 50 Delivered 0 Registered 0 All Branches 22,185 vehicles STATUS CHASSIS NO. MODEL COLOUR/VARIANT PLATE NO BRCH K1 BG DATE SA NAME In Transit PL1ZU2RVRVG012812 PROTON X90 1.5TD PRIME X — — 001 2026-05-15 Unknown In Transit PL1DG2FVRVG171760 PROTON X50 1.5TD PREMIUM — — 007 2026-05-15 Unknown In Transit PL1NL2EVRVG085468 PROTON X70 1.5TD PREMIUM"
+    },
+    {
+      "module": "Inventory",
+      "path": "/inventory/chassis-filter",
+      "name": "Chassis filter",
+      "url": "https://ubs.protonfookloi.com/inventory/chassis-filter",
+      "status": "issue",
+      "loadMs": 1685,
+      "finalUrl": "https://ubs.protonfookloi.com/inventory/chassis-filter",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:50.694Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/inventory-chassis-filter.png",
+      "mainText": "FLC BI Inventory Advanced Search Advanced Search Advanced search for vehicles by chassis, plate, model, engine, colour, or owner INVENTORY SEARCH WORKBENCH Layer multiple identifiers to find the exact vehicle record quickly. Search"
+    },
+    {
+      "module": "Inventory",
+      "path": "/inventory/transfers",
+      "name": "Transfers",
+      "url": "https://ubs.protonfookloi.com/inventory/transfers",
+      "status": "issue",
+      "loadMs": 1678,
+      "finalUrl": "https://ubs.protonfookloi.com/inventory/transfers",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:52.442Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/inventory-transfers.png",
+      "mainText": "FLC BI Inventory Vehicle Transfer Vehicle Transfer Inter-branch chassis movement tracking New Transfer Pending 0 In Transit 0 Arrived 0 Cancelled 0 TRANSFER QUEUE Track branch-to-branch movements from request through arrival. All Statuses 0 records RUNNING NO ROUTE CHASSIS NO MODEL STATUS DATE ACTIONS No transfer records found"
+    },
+    {
+      "module": "Inventory",
+      "path": "/inventory/chassis",
+      "name": "Chassis movement",
+      "url": "https://ubs.protonfookloi.com/inventory/chassis",
+      "status": "issue",
+      "loadMs": 1709,
+      "finalUrl": "https://ubs.protonfookloi.com/inventory/chassis",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:54.202Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/inventory-chassis.png",
+      "mainText": "FLC BI Inventory Chassis Movement Chassis Movement Log Full audit trail for any vehicle chassis number Search"
+    },
+    {
+      "module": "Purchasing",
+      "path": "/purchasing/invoices",
+      "name": "Purchase invoices",
+      "url": "https://ubs.protonfookloi.com/purchasing/invoices",
+      "status": "issue",
+      "loadMs": 1689,
+      "finalUrl": "https://ubs.protonfookloi.com/purchasing/invoices",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "Visible not-found text on registered route",
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:55.975Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/purchasing-invoices.png",
+      "mainText": "FLC BI Purchasing Purchase Invoices Purchase Invoices CBU vehicle procurement invoices from suppliers New Invoice Total Outstanding (AP) RM 21,854,735.70 Due ≤ 30 Days RM 0.00 Overdue 31–60 Days RM 0.00 Overdue 60+ Days RM 0.00 AP INVOICE WORKBENCH Track invoice lifecycle, supplier payments, and aging exposure from one queue. All Statuses 438 invoices Invoice No Supplier Chassis No Invoice Date Amount Paid Lifecycle Payment Actions 102600043307 PROTON EDAR SDN BHD (TWU 3S) PL1CG2SVRTG043927 2026-04-21 RM 92,717.10 RM 0.00 Received Unpaid View Receive Verify 102600043624 PROTON EDAR SDN BHD (KG"
+    },
+    {
+      "module": "Purchasing",
+      "path": "/purchasing/invoices/ca3b19a2-3983-41eb-b255-314bb27bcd81",
+      "name": "Purchase invoice detail",
+      "url": "https://ubs.protonfookloi.com/purchasing/invoices/ca3b19a2-3983-41eb-b255-314bb27bcd81",
+      "status": "issue",
+      "loadMs": 1666,
+      "finalUrl": "https://ubs.protonfookloi.com/purchasing/invoices/ca3b19a2-3983-41eb-b255-314bb27bcd81",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:57.786Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/purchasing-invoices-ca3b19a2-3983-41eb-b255-314bb27bcd81.png",
+      "mainText": "FLC BI Purchasing Purchase Invoices 102600049776 102600049776 PROTON EDAR SDN BHD (KK 4S) · PL1BT2SRRTG040716 Back Edit INVOICE DETAILS Invoice No 102600049776 Supplier PROTON EDAR SDN BHD (KK 4S) Invoice Date 2026-04-30 Chassis No PL1BT2SRRTG040716 Model IMPORTED Invoice Amount RM 39,508.00 Paid RM 0.00 Outstanding RM 39,508.00 Lifecycle Received Payment Unpaid AP LIFECYCLE 1 Received Current 2 Verified 3 Approved 4 Paid Mark as Received Verify Invoice PAYMENT LEDGER No payment events recorded yet."
+    },
+    {
+      "module": "Purchasing",
+      "path": "/purchasing/orders",
+      "name": "Purchase orders",
+      "url": "https://ubs.protonfookloi.com/purchasing/orders",
+      "status": "issue",
+      "loadMs": 1804,
+      "finalUrl": "https://ubs.protonfookloi.com/purchasing/orders",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:41:59.515Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/purchasing-orders.png",
+      "mainText": "FLC BI Purchasing Purchase Orders Purchase Orders CBU procurement lifecycle: draft → submitted → approved → fulfilled → closed New PO All statuses No purchase orders match the current filters."
+    },
+    {
+      "module": "Purchasing",
+      "path": "/purchasing/orders/new",
+      "name": "New purchase order",
+      "url": "https://ubs.protonfookloi.com/purchasing/orders/new",
+      "status": "issue",
+      "loadMs": 1750,
+      "finalUrl": "https://ubs.protonfookloi.com/purchasing/orders/new",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:01.393Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/purchasing-orders-new.png",
+      "mainText": "FLC BI Purchasing Purchase Orders New New Purchase Order Create a draft PO. Submission and approval happen on the detail page once saved. Cancel PO Number Supplier Order Date Expected Delivery (optional) Notes (optional) Order lines Add line # Chassis (optional) Model Variant Qty Unit Price Line Total 1 0.00 PO TOTAL 0.00 Cancel Create PO (draft)"
+    },
+    {
+      "module": "Purchasing",
+      "path": "/purchasing/grn",
+      "name": "GRN list",
+      "url": "https://ubs.protonfookloi.com/purchasing/grn",
+      "status": "issue",
+      "loadMs": 1670,
+      "finalUrl": "https://ubs.protonfookloi.com/purchasing/grn",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:03.214Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/purchasing-grn.png",
+      "mainText": "FLC BI Purchasing GRN Goods Receipt Notes Receipts recorded against purchase orders. Immutable after creation. No goods receipt notes yet. Receive against an approved PO from the PO detail page."
+    },
+    {
+      "module": "Purchasing",
+      "path": "/purchasing/grn/new",
+      "name": "New GRN",
+      "url": "https://ubs.protonfookloi.com/purchasing/grn/new",
+      "status": "issue",
+      "loadMs": 1779,
+      "finalUrl": "https://ubs.protonfookloi.com/purchasing/grn/new",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:04.941Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/purchasing-grn-new.png",
+      "mainText": "FLC BI Purchasing Receive Receive Goods No purchase order specified. Open a PO from the Purchase Orders list and click Receive."
+    },
+    {
+      "module": "Purchasing",
+      "path": "/purchasing/three-way-match",
+      "name": "Three-way match",
+      "url": "https://ubs.protonfookloi.com/purchasing/three-way-match",
+      "status": "issue",
+      "loadMs": 1674,
+      "finalUrl": "https://ubs.protonfookloi.com/purchasing/three-way-match",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "Visible not-found text on registered route",
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:06.789Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/purchasing-three-way-match.png",
+      "mainText": "FLC BI Purchasing 3-way Match 3-way Match Compares purchase invoices against the linked PO line and GRN receipts. Tolerance: RM 1.00 on amount. 438 invoices need attention(0 variance, 0 pending receipt, 438 unmatched) AMOUNT VARIANCE 0 PENDING RECEIPT 0 UNMATCHED 438 MATCHED 0 All statuses Status PI No. Supplier Chassis PO Ordered Qty Received Expected PI Amount Variance Action Unmatched 102600055018 PROTON EDAR SDN BHD (LDU 3S) PL1DG2FVRVG171760 — — 0 — 99,376.60 — View PI Unmatched 102600054595 PROTON EDAR SDN BHD (SDK 1S) PL1BT2SRRVG043337 — — 0 — 39,508.00 — View PI Unmatched 102600054591 "
+    },
+    {
+      "module": "Finance",
+      "path": "/accounts/chart",
+      "name": "Chart of accounts",
+      "url": "https://ubs.protonfookloi.com/accounts/chart",
+      "status": "issue",
+      "loadMs": 1598,
+      "finalUrl": "https://ubs.protonfookloi.com/accounts/chart",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:08.555Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/accounts-chart.png",
+      "mainText": "Access Restricted You don't have permission to view this page. Contact your administrator if you believe this is an error."
+    },
+    {
+      "module": "Finance",
+      "path": "/accounts/periods",
+      "name": "Accounting periods",
+      "url": "https://ubs.protonfookloi.com/accounts/periods",
+      "status": "issue",
+      "loadMs": 1631,
+      "finalUrl": "https://ubs.protonfookloi.com/accounts/periods",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:10.211Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/accounts-periods.png",
+      "mainText": "Access Restricted You don't have permission to view this page. Contact your administrator if you believe this is an error."
+    },
+    {
+      "module": "Finance",
+      "path": "/accounts/trial-balance",
+      "name": "Trial balance",
+      "url": "https://ubs.protonfookloi.com/accounts/trial-balance",
+      "status": "issue",
+      "loadMs": 1618,
+      "finalUrl": "https://ubs.protonfookloi.com/accounts/trial-balance",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:11.923Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/accounts-trial-balance.png",
+      "mainText": "Access Restricted You don't have permission to view this page. Contact your administrator if you believe this is an error."
+    },
+    {
+      "module": "Finance",
+      "path": "/accounts/profit-loss",
+      "name": "Profit/loss",
+      "url": "https://ubs.protonfookloi.com/accounts/profit-loss",
+      "status": "issue",
+      "loadMs": 1623,
+      "finalUrl": "https://ubs.protonfookloi.com/accounts/profit-loss",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:13.632Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/accounts-profit-loss.png",
+      "mainText": "Access Restricted You don't have permission to view this page. Contact your administrator if you believe this is an error."
+    },
+    {
+      "module": "Finance",
+      "path": "/accounts/balance-sheet",
+      "name": "Balance sheet",
+      "url": "https://ubs.protonfookloi.com/accounts/balance-sheet",
+      "status": "issue",
+      "loadMs": 1643,
+      "finalUrl": "https://ubs.protonfookloi.com/accounts/balance-sheet",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:15.326Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/accounts-balance-sheet.png",
+      "mainText": "Access Restricted You don't have permission to view this page. Contact your administrator if you believe this is an error."
+    },
+    {
+      "module": "Finance",
+      "path": "/accounts/aging-by-branch",
+      "name": "Aging by branch",
+      "url": "https://ubs.protonfookloi.com/accounts/aging-by-branch",
+      "status": "issue",
+      "loadMs": 1662,
+      "finalUrl": "https://ubs.protonfookloi.com/accounts/aging-by-branch",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:17.025Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/accounts-aging-by-branch.png",
+      "mainText": "Access Restricted You don't have permission to view this page. Contact your administrator if you believe this is an error."
+    },
+    {
+      "module": "Finance",
+      "path": "/accounts/cash-position",
+      "name": "Cash position",
+      "url": "https://ubs.protonfookloi.com/accounts/cash-position",
+      "status": "issue",
+      "loadMs": 1657,
+      "finalUrl": "https://ubs.protonfookloi.com/accounts/cash-position",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:18.760Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/accounts-cash-position.png",
+      "mainText": "Access Restricted You don't have permission to view this page. Contact your administrator if you believe this is an error."
+    },
+    {
+      "module": "Finance",
+      "path": "/accounts/period-close",
+      "name": "Period close",
+      "url": "https://ubs.protonfookloi.com/accounts/period-close",
+      "status": "issue",
+      "loadMs": 1660,
+      "finalUrl": "https://ubs.protonfookloi.com/accounts/period-close",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:20.473Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/accounts-period-close.png",
+      "mainText": "Access Restricted You don't have permission to view this page. Contact your administrator if you believe this is an error."
+    },
+    {
+      "module": "Finance",
+      "path": "/accounts/journal",
+      "name": "Journal",
+      "url": "https://ubs.protonfookloi.com/accounts/journal",
+      "status": "issue",
+      "loadMs": 1762,
+      "finalUrl": "https://ubs.protonfookloi.com/accounts/journal",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:22.191Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/accounts-journal.png",
+      "mainText": "Access Restricted You don't have permission to view this page. Contact your administrator if you believe this is an error."
+    },
+    {
+      "module": "Reports",
+      "path": "/reports",
+      "name": "Reports center",
+      "url": "https://ubs.protonfookloi.com/reports",
+      "status": "issue",
+      "loadMs": 1592,
+      "finalUrl": "https://ubs.protonfookloi.com/reports",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:24.005Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/reports.png",
+      "mainText": "FLC BI Business Reports Business Reports Generate and export cross-module operational reports for inventory, sales, purchasing, and transfers. Stock Balance Vehicle Register Collection Booking Loan Disbursement Purchase Report Vehicle Transfer Sales Invoice Vehicle Lifecycle Scheduled Current vehicle stock balance by model and branch Date From Date To Generate"
+    },
+    {
+      "module": "HRMS",
+      "path": "/hrms",
+      "name": "HRMS redirect/entry",
+      "url": "https://ubs.protonfookloi.com/hrms",
+      "status": "issue",
+      "loadMs": 2160,
+      "finalUrl": "https://hrms.protonfookloi.com/dashboard",
+      "title": "FLC HRMS",
+      "issues": [
+        "4 critical console message(s)",
+        "1 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:25.730Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:26.113Z] [ERROR] [VehicleService] auto_aging_dashboard_summary RPC failed color: #ef4444 {params: Object, error: Object}"
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:26.113Z] [ERROR] [AutoAgingDataService] Failed to load summary color: #ef4444 {error: Object}"
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:26.280Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "POST",
+          "url": "/rest/v1/rpc/auto_aging_dashboard_summary",
+          "failure": "net::ERR_ABORTED"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/hrms.png",
+      "mainText": "JS Good morning, Jamri Administrator Thursday, 25 June 2026 Apply for leave Approvals LEAVE AVAILABLE — No balance data MY PENDING 0 leave requests ATTENDANCE TODAY Not Recorded UPCOMING LEAVE — None scheduled NEEDS MY ACTION 0 approvals pending My recent leave Requests in progress and upcoming time off View all No active or upcoming leave Apply for leave Recent announcements Company communications and notices View all No announcements yet Leave balances Entitlement remaining by type Manage Balances not initialised Contact HR to set up your leave balances. Quick actions Apply for leave Submit "
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/activity",
+      "name": "Activity",
+      "url": "https://ubs.protonfookloi.com/admin/activity",
+      "status": "issue",
+      "loadMs": 2318,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/activity",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "7 critical console message(s)",
+        "4 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:27.986Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 400 ()"
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:28.178Z] [ERROR] [AuditService] Failed to get all audit logs color: #ef4444 {filters: Object, error: Object}"
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:28.178Z] [ERROR] [ActivityDashboard] Error loading activity logs color: #ef4444 {error: Object}"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 400 ()"
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:29.255Z] [ERROR] [AuditService] Failed to get all audit logs color: #ef4444 {filters: Object, error: Object}"
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:29.256Z] [ERROR] [ActivityDashboard] Error loading activity logs color: #ef4444 {error: Object}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "POST",
+          "url": "https://hrms.protonfookloi.com/cdn-cgi/rum?",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "POST",
+          "url": "https://hrms.protonfookloi.com/cdn-cgi/rum?",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": 400,
+          "method": "GET",
+          "url": "/rest/v1/audit_logs?select=*%2Cprofiles%28full_name%2Cemail%2Crole%29&order=created_at.desc&offset=0&limit=200&created_at=gte.2026-06-25T00%3A00%3A00.000Z"
+        },
+        {
+          "status": 400,
+          "method": "GET",
+          "url": "/rest/v1/audit_logs?select=*%2Cprofiles%28full_name%2Cemail%2Crole%29&order=created_at.desc&offset=0&limit=200&created_at=gte.2026-06-25T00%3A00%3A00.000Z"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-activity.png",
+      "mainText": "FLC BI Admin Activity Overview Activity Overview Track user actions, inventory changes, and platform activity trends. Today Week Month Refresh Export Total Actions 0 Today Active Users 0 Users performed actions Vehicle Edits 0 Inventory changes Avg Actions/User 0 Actions per active user Action Distribution Breakdown of action types Activity Trend Actions by hour of day 1:00 4:00 7:00 10:00 14:00 18:00 23:00 0 1 2 3 4 User Activity Leaderboard Most active users No activity recorded Recent Actions Latest system activity No recent activity"
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/kpi-studio",
+      "name": "KPI studio",
+      "url": "https://ubs.protonfookloi.com/admin/kpi-studio",
+      "status": "issue",
+      "loadMs": 1623,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/kpi-studio",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:30.478Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-kpi-studio.png",
+      "mainText": "FLC BI Admin KPI Studio KPI Definition Studio Curate which KPIs each role sees on Home KPI Studio unavailable KPI Studio is registered in the platform catalogue, but it is disabled for this company or gated behind an inactive feature flag. Control: phase4.role-home."
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/dms-sync",
+      "name": "DMS sync",
+      "url": "https://ubs.protonfookloi.com/admin/dms-sync",
+      "status": "issue",
+      "loadMs": 1831,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/dms-sync",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:32.162Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-dms-sync.png",
+      "mainText": "FLC BI Admin DMS Sync Ops DMS Sync Operations Inspect sync runs and DMS staging counts DMS Sync Ops unavailable DMS Sync Ops is registered in the platform catalogue, but it is disabled for this company or gated behind an inactive feature flag. Control: phase3c.dms-sync-ops-v2."
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/reconciliation",
+      "name": "Reconciliation",
+      "url": "https://ubs.protonfookloi.com/admin/reconciliation",
+      "status": "issue",
+      "loadMs": 1642,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/reconciliation",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:34.060Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-reconciliation.png",
+      "mainText": "FLC BI Admin Reconciliation Queue Reconciliation Queue Review source-to-canonical match decisions Reconciliation Queue unavailable Reconciliation Queue is registered in the platform catalogue, but it is disabled for this company or gated behind an inactive feature flag. Control: phase3d.reconciliation-review-v2."
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/audit",
+      "name": "Audit",
+      "url": "https://ubs.protonfookloi.com/admin/audit",
+      "status": "issue",
+      "loadMs": 1731,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/audit",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "3 critical console message(s)",
+        "1 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:35.794Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 400 ()"
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:36.018Z] [ERROR] [AuditService] Failed to get all audit logs color: #ef4444 {filters: Object, error: Object}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": 400,
+          "method": "GET",
+          "url": "/rest/v1/audit_logs?select=*%2Cprofiles%28full_name%2Cemail%2Crole%29&order=created_at.desc&offset=0&limit=200"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-audit.png",
+      "mainText": "FLC BI Admin Audit Log Audit Log Track all system actions and changes Audit Log Track all changes made to the system Export All Users Jamri Saidi Md. Jamri Saidi Alvin Jamri Saidi Sean Thomas Jo King Lee Leong All Actions Create Update Delete Permission Change From To Clear Date User Action Entity Details No audit logs found"
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/webhooks",
+      "name": "Webhooks",
+      "url": "https://ubs.protonfookloi.com/admin/webhooks",
+      "status": "issue",
+      "loadMs": 1622,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/webhooks",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:37.631Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-webhooks.png",
+      "mainText": "Admin Webhooks Webhook Outbox Durable event fan-out to external HTTPS consumers Webhook Outbox unavailable Webhook Outbox is registered in the platform catalogue, but it is disabled for this company or gated behind an inactive feature flag. Control: phase6.webhook-outbox."
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/users",
+      "name": "Users",
+      "url": "https://ubs.protonfookloi.com/admin/users",
+      "status": "issue",
+      "loadMs": 1832,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/users",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:39.334Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-users.png",
+      "mainText": "FLC BI Admin Users & Roles Users & Roles Manage account status, roles, employee links, and application access Copy Sign-Up Link Invite User Active users 6 Pending activation 0 Inactive users 2 Portal-only 4 Active (6) Pending (0) Inactive (2) All (8) USER STATUS EMPLOYEE ROLE & SCOPE BRANCH ACTIONS JS Jamri Saidi flit092023@gmail.com active Unlinked Super Admin Global - all companies Kota Kinabalu Edit Deactivate AL Alvin alvin.flgroup@gmail.com active Unlinked Company Admin Company - full company All branches Edit Deactivate JS Jamri Saidi m.jamri.s1@gmail.com active Md Jamri Saidi (IT001) Ma"
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/user-groups",
+      "name": "User groups",
+      "url": "https://ubs.protonfookloi.com/admin/user-groups",
+      "status": "issue",
+      "loadMs": 1621,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/user-groups",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:41.261Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-user-groups.png",
+      "mainText": "FLC BI Admin User Groups User Groups Define groups for user access and permissions Add Group Columns 4 results GROUP NAME STATUS ACTIONS Administrator Active Manager Active Sales Advisor Active Viewer Active"
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/role-permissions",
+      "name": "Role permissions",
+      "url": "https://ubs.protonfookloi.com/admin/role-permissions",
+      "status": "issue",
+      "loadMs": 1812,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/role-permissions",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:42.944Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-role-permissions.png",
+      "mainText": "Role Permissions Control which navigation sections each role can access. Changes take effect after navigating. Reset defaults Save changes Section SUPER ADMIN toggle all COMPANY ADMIN toggle all DIRECTOR toggle all GENERAL MANAGER toggle all MANAGER toggle all SALES toggle all ACCOUNTS toggle all ANALYST (LEGACY) toggle all CREATOR / UPDATER toggle all all Platform all Auto Aging all Sales all Inventory all Purchasing all Reports all HRMS all Admin Section visible to role Section hidden from role Notes Permissions are stored in the company role matrix and apply to users after navigation refres"
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/branches",
+      "name": "Branches",
+      "url": "https://ubs.protonfookloi.com/admin/branches",
+      "status": "issue",
+      "loadMs": 1681,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/branches",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:44.833Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-branches.png",
+      "mainText": "FLC BI Admin Branches Branch Management Manage company branches and their document series Add Branch Columns 17 results CODE NAME OR SERIES VDO SERIES ACTIONS 001 KK4S - - 002 KK1S - - 003 SDK3S - - 004 SDK1S - - 005 TWU3S - - 006 TWU1S - - 007 LDU3S - - 008 LDU1S - - 009 KGU3S - - 888 TEST1 - - Rows per page 10 1-10 of 17 « ‹ › »"
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/master-data",
+      "name": "Master data",
+      "url": "https://ubs.protonfookloi.com/admin/master-data",
+      "status": "issue",
+      "loadMs": 1695,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/master-data",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:46.597Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-master-data.png",
+      "mainText": "FLC BI Admin Master Data Master Data Manage Finance Companies, Insurance Companies, Vehicle Models and Colours Finance Cos Insurance Models Colours TIN Types Reg. Fee Road Tax Insp. Fee Handling Fee Other Products Payment Types Banks Add Finance Co Columns 106 results CODE NAME ACTIONS AFIN Affin Bank Berhad AMB AmBank Islamic Berhad BIMB Bank Islam Malaysia Berhad CIMB CIMB Bank Berhad FC001 MALAYAN BANKING BERHAD (KL) FC002 AMBANK (M) BERHAD (SHAH ALAM, SELANGOR) FC003 RHB BANK BHD (KEDAH) FC004 HONG LEONG ISLAMIC BANK BERHAD (BANDAR INDAH) FC005 RHB ISLAMIC BANK BHD (BINTULU) FC006 HONG LEO"
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/suppliers",
+      "name": "Suppliers",
+      "url": "https://ubs.protonfookloi.com/admin/suppliers",
+      "status": "issue",
+      "loadMs": 1632,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/suppliers",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:48.450Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-suppliers.png",
+      "mainText": "FLC BI Admin Suppliers Suppliers Manage vehicle and parts suppliers Add Supplier Columns 12 results NAME CODE COMPANY REG NO CONTACT NO EMAIL STATUS ACTIONS HARAPAN MAJU SDN BHD 800-H001 - - . Active MELINAU AUTO SDN BHD 800-M001 - - steve.thien@melinauauto.com.my Active PROTON EDAR SDN BHD (KGU 3S) 800-P115 - - proton@gmall.com Active PROTON EDAR SDN BHD (KK 1S) 800-P002 - - . Active PROTON EDAR SDN BHD (KK 4S) 800-P001 - - . Active PROTON EDAR SDN BHD (LDU 1S) 800-P008 - - . Active PROTON EDAR SDN BHD (LDU 3S) 800-P007 - - . Active PROTON EDAR SDN BHD (SDK 1S) 800-P004 - - . Active PROTON ED"
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/dealers",
+      "name": "Dealers",
+      "url": "https://ubs.protonfookloi.com/admin/dealers",
+      "status": "issue",
+      "loadMs": 1705,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/dealers",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:50.165Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-dealers.png",
+      "mainText": "FLC BI Admin Dealers Dealers Manage authorised dealers and their accounts Add Dealer Columns 12 results NAME ACC. CODE COMPANY REG NO CONTACT NO EMAIL STATUS ACTIONS 700-A00309 AG AUTOWORLD (KLUANG) SDN. BHD. - - pesbkluang86@gmail.com Active 700-E00051 EDARAN OTOMOBIL NASIONAL BERHAD - - sabardin.h@eon.com.my Active 700-G00022 GHEE HWA MOTORPOL SDN BHD (LABUAN) - - gheehwaproton@gmail.com Active 700-H00135 HARAPAN MAJU SDN BHD - - HARAPAN@GMAIL.COM Active 700-M00534 MELINAU AUTO SDN BHD (INANAM) - - MELINAU@GMAIL.COM Active 700-M00538 MBF AUTOMOBILE SDN.BHD - - protonedarcrystal.4s@yahoo.com "
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/settings",
+      "name": "Settings",
+      "url": "https://ubs.protonfookloi.com/admin/settings",
+      "status": "issue",
+      "loadMs": 1889,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/settings",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:51.956Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-settings.png",
+      "mainText": "FLC-BI Settings Settings Manage your profile and preferences Profile Security Notifications Modules Users Organization Your Profile Email Display Name Role Branch Assignment Select branch No branch assigned KK4S KK1S SDK3S SDK1S TWU3S TWU1S LDU3S LDU1S KGU3S TEST1 TEST2 Kota Kinabalu Kudat Labuan Lahad Datu Sandakan Tawau Your Access Level Scope: Global • Role: Super Admin • Branch: Save Changes Company Information Company Fook Loi Group App Fook Loi UBS Company ID c1"
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/health",
+      "name": "System health",
+      "url": "https://ubs.protonfookloi.com/admin/health",
+      "status": "issue",
+      "loadMs": 1800,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/health",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "2 critical console message(s)",
+        "6 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:53.941Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 404 ()"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/profiles?select=id&company_id=eq.c1",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/deals?select=id&company_id=eq.c1",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/vehicles?select=id&company_id=eq.c1&is_deleted=neq.true",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/tickets?select=id&company_id=eq.c1",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "HEAD",
+          "url": "/rest/v1/audit_logs?select=id&created_at=gte.2026-06-24T05%3A42%3A54.694Z",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": 404,
+          "method": "GET",
+          "url": "/rest/v1/dms_sync_runs?select=started_at%2Cstatus&company_id=eq.c1&order=started_at.desc&limit=1"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/admin-health.png",
+      "mainText": "FLC BI Admin System Health System Health Monitor system status, data metrics, and sync health Database Connected Users 7 Active Deals 23,398 Vehicles 22,185 IR Tickets 7 Audit Events (24h) 2 Last DMS Sync Never Overall Status Healthy Refresh"
+    }
+  ],
+  "navChecks": [
+    {
+      "path": "/",
+      "status": "ok",
+      "issues": []
+    },
+    {
+      "path": "/portal/tickets",
+      "status": "ok",
+      "issues": []
+    },
+    {
+      "path": "/portal/tickets/9f3748d5-6f83-4b9e-a03a-e7bad91ec030",
+      "status": "ok",
+      "issues": []
+    },
+    {
+      "path": "/sales/deals",
+      "status": "ok",
+      "issues": []
+    },
+    {
+      "path": "/sales/deals/a3111304-bf9b-426a-99e7-284803ce7ec1",
+      "status": "ok",
+      "issues": []
+    },
+    {
+      "path": "/reports",
+      "status": "ok",
+      "issues": []
+    },
+    {
+      "path": "/admin/health",
+      "status": "ok",
+      "issues": []
+    }
+  ],
+  "mobileResults": [
+    {
+      "module": "Platform",
+      "path": "/",
+      "name": "Home root",
+      "url": "https://ubs.protonfookloi.com/",
+      "status": "issue",
+      "loadMs": 2154,
+      "finalUrl": "https://ubs.protonfookloi.com/home",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "2 critical console message(s)",
+        "2 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:42:58.088Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "/rest/v1/profiles?select=*&id=eq.b4d2c7b9-a6ef-4e7f-9fcf-8286f75388db",
+          "failure": "net::ERR_ABORTED"
+        },
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447",
+          "failure": "csp"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/mobile-root.png",
+      "mainText": "SUPER ADMIN WORKSPACE Good morning, Jamri Here's what needs your attention across the business today. New request Open inbox PENDING APPROVALS — Inbox not enabled OPEN REQUESTS — Internal service tickets NOTIFICATIONS 0 Unread alerts ACTIVE MODULES 8 Enabled for your company PIPELINE OVERVIEW 176 active deals · RM 3067k total value Open pipeline 23 Lead 102 Booking 51 LOU RM 3067k Action required Items waiting for you Unified inbox not enabled Approvals, reconciliation, and requests appear here once the inbox is enabled for your company. KPIs for your role Curated through the KPI Studio Vehicl"
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/tickets/new",
+      "name": "New request",
+      "url": "https://ubs.protonfookloi.com/portal/tickets/new",
+      "status": "issue",
+      "loadMs": 1953,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/tickets/new",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "2 critical console message(s)",
+        "1 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:43:00.344Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447",
+          "failure": "csp"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/mobile-portal-tickets-new.png",
+      "mainText": "Internal Requests New request New Request Submit an internal request for review and resolution. Open queue Request details Request title * Category * CANCEL DOCUMENTS CANCEL DOCUMENTS Deal Registration (Auto) REQUEST DEBIT NOTE / CREDIT NOTE UPDATE STOCK BALANCE @ CBU LISTING - FLC SYSTEM FOOK LOI SYSTEM - AMEND MONTHLY REPORT Subcategory * Select a subcategory OFFICIAL RECEIPT INVOICE VSO Additional information 3 fields VSO Number * INVOICE NO. * OR No. * Description From category From subcategory From category Custom 0 / 20 chars min Request summary Title Untitled request Requestor Jamri Sai"
+    },
+    {
+      "module": "Portal",
+      "path": "/portal/tickets",
+      "name": "My tickets",
+      "url": "https://ubs.protonfookloi.com/portal/tickets",
+      "status": "issue",
+      "loadMs": 1820,
+      "finalUrl": "https://ubs.protonfookloi.com/portal/tickets",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "2 critical console message(s)",
+        "1 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:43:02.359Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447",
+          "failure": "csp"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/mobile-portal-tickets.png",
+      "mainText": "Internal Requests Pending Requests Pending Requests Track active requests, requester actions, and owner follow-up. Refresh New request TOTAL 1 IN PROGRESS 0 NEED YOUR ATTENTION 1 CANCELLED 0 All (1) REQUEST CATEGORY PRIORITY STATUS LAST UPDATED SUBMITTED OWNER / PIC Phase 4 E2E Test Request Owner: Alvin CANCEL DOCUMENTS Medium Completed by owner 4 days ago 5 days ago Alvin"
+    },
+    {
+      "module": "Auto Aging",
+      "path": "/auto-aging/vehicles",
+      "name": "Vehicle explorer",
+      "url": "https://ubs.protonfookloi.com/auto-aging/vehicles",
+      "status": "issue",
+      "loadMs": 2133,
+      "finalUrl": "https://ubs.protonfookloi.com/auto-aging/vehicles",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "2 critical console message(s)",
+        "1 failed/4xx/5xx request(s)"
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Loading the script 'https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447' violates the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+        },
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:43:04.274Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "status": "FAILED",
+          "method": "GET",
+          "url": "https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447",
+          "failure": "csp"
+        }
+      ],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/mobile-auto-aging-vehicles.png",
+      "mainText": "FLC BI Auto Aging Vehicle Explorer Vehicle Explorer 22185 of 22185 vehicles Edit Export CSV Drill filters Search and segment vehicle aging results 22,185 results All Branches All Models All Payments All Stages Rows: 50 Sort NO. CHASSIS NO. BRCH K1 MODEL VAR COLOR CUST NAME SA NAME BG DATE SHIPMENT ETD PKG DATE SHIPMENT ETA KK/TWU/SDK RECEIVED BY OUTLET REG DATE REG NO DELIVERY DATE DISB. DATE PAYMENT METHOD FULL PAYMENT TYPE FULL PAYMENT DATE VAA DATE INV NO. OBR DTP (DEALER TRANSFER PRICE) SHIPMENT NAME LOU CONTRA SOLA D2D COMM PAYOUT COMM REMARK REMARK 1 PL1BH3LTRRG088321 001 PROTON IRIZ 1.3"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/deals",
+      "name": "Deals list",
+      "url": "https://ubs.protonfookloi.com/sales/deals",
+      "status": "issue",
+      "loadMs": 1995,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/deals",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:43:06.353Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/mobile-sales-deals.png",
+      "mainText": "Deals ⚙ Filters All Stages From To Refresh Export CSV New Deal Columns 25 results VSO/TWU1S/24/04/001 SURAIDAH BINTI SAHID 730101656768 Booking Sales Advisor ZULFIKA BIN YUSOF — 5/18/2026 VSO/TWU1S/24/04/002 MUHAMMAD ISA BIN ANIL HAMUN 810518125727 PROTON SAGA 1.3 AUTOMATIK STANDARD Completed — ISKANDAR BIN ONG KIAN PHIN @ ZAINUDDIN RM 40,800 5/18/2026 VSO/SDK3S/24/04/026 ASRIN CELLY BINTI MINEH 981028126184 PROTON SAGA 1.3 AUTOMATIK STANDARD Completed — CHIA HON TIN RM 40,800 5/18/2026 VSO/SDK3S/24/04/024 NORIAKAH BINTI JEPPY 771121125260 PROTON SAGA 1.3 AUTOMATIK PREMIUM Completed — CHIE YAT"
+    },
+    {
+      "module": "Sales",
+      "path": "/sales/deals/a3111304-bf9b-426a-99e7-284803ce7ec1",
+      "name": "Deal detail",
+      "url": "https://ubs.protonfookloi.com/sales/deals/a3111304-bf9b-426a-99e7-284803ce7ec1",
+      "status": "issue",
+      "loadMs": 1979,
+      "finalUrl": "https://ubs.protonfookloi.com/sales/deals/a3111304-bf9b-426a-99e7-284803ce7ec1",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:43:08.389Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/mobile-sales-deals-a3111304-bf9b-426a-99e7-284803ce7ec1.png",
+      "mainText": "VSO/KGU3S/26/03/030 VSO: VSO/KGU3S/26/03/030 · Created 5/18/2026 Edit Status LOU Responsible Finance Team Next Action Verify LOU and arrange shipment Days in Stage 37 days 1 2 3 4 5 6 7 8 9 10 11 Advance to Shipment Overview Loan Insurance Registration Documents Activity Customer Name JUNATAN BIN APIRI IC No 830703126519 Phone — Email — Vehicle Model PROTON SAGA 1.5 EXECUTIVE Variant — Colour RUBY RED Chassis No PL1BT2SRRTG027833 Link Vehicle from Auto Aging Pricing Selling Price RM 51,674.4 Deposit RM 288.7 Discount RM 0 Total RM 51,674.4 Notes No notes"
+    },
+    {
+      "module": "Reports",
+      "path": "/reports",
+      "name": "Reports center",
+      "url": "https://ubs.protonfookloi.com/reports",
+      "status": "issue",
+      "loadMs": 1998,
+      "finalUrl": "https://ubs.protonfookloi.com/reports",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:43:10.420Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/mobile-reports.png",
+      "mainText": "FLC BI Business Reports Business Reports Generate and export cross-module operational reports for inventory, sales, purchasing, and transfers. Stock Balance Vehicle Register Collection Booking Loan Disbursement Purchase Report Vehicle Transfer Sales Invoice Vehicle Lifecycle Scheduled Current vehicle stock balance by model and branch Date From Date To Generate"
+    },
+    {
+      "module": "Admin",
+      "path": "/admin/users",
+      "name": "Users",
+      "url": "https://ubs.protonfookloi.com/admin/users",
+      "status": "issue",
+      "loadMs": 1993,
+      "finalUrl": "https://ubs.protonfookloi.com/admin/users",
+      "title": "Fook Loi Group UBS",
+      "issues": [
+        "1 critical console message(s)"
+      ],
+      "console": [
+        {
+          "type": "info",
+          "text": "%c[2026-06-25T05:43:12.510Z] [INFO] [ErrorTracking] Error tracking running in local-only mode (no DSN) color: #3b82f6 {}"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/mobile-admin-users.png",
+      "mainText": "FLC BI Admin Users & Roles Users & Roles Manage account status, roles, employee links, and application access Copy Sign-Up Link Invite User Active users 6 Pending activation 0 Inactive users 2 Portal-only 4 Active (6) Pending (0) Inactive (2) All (8) USER STATUS EMPLOYEE ROLE & SCOPE BRANCH ACTIONS JS Jamri Saidi flit092023@gmail.com active Unlinked Super Admin Global - all companies Kota Kinabalu Edit Deactivate AL Alvin alvin.flgroup@gmail.com active Unlinked Company Admin Company - full company All branches Edit Deactivate JS Jamri Saidi m.jamri.s1@gmail.com active Md Jamri Saidi (IT001) Ma"
+    }
+  ],
+  "workflowResults": [
+    {
+      "name": "Portal new request draft persistence/tab switch",
+      "status": "issue",
+      "issues": [
+        "Draft input did not persist after route away/back"
+      ],
+      "details": {
+        "values": [
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
+      },
+      "screenshot": "/tmp/prod-webapp-audit-20260625/screenshots/workflow-draft-persistence.png"
+    }
+  ]
+}

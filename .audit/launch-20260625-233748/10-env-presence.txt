@@ -1,0 +1,7 @@
+## env presence
+PROD_LOGIN_EMAIL=missing
+PROD_LOGIN_PASSWORD=missing
+VITE_SENTRY_DSN=missing
+SENTRY_AUTH_TOKEN=missing
+SENTRY_ORG=missing
+SENTRY_PROJECT=missing

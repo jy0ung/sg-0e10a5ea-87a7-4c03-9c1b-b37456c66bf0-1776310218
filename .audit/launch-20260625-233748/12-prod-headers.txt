@@ -1,0 +1,13 @@
+## production headers
+HTTP/2 200
+date: Thu, 25 Jun 2026 15:56:25 GMT
+content-type: text/html
+cache-control: no-store, must-revalidate
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+last-modified: Thu, 25 Jun 2026 06:02:18 GMT
+server: cloudflare
+vary: Accept-Encoding
+cf-cache-status: DYNAMIC
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=Rxb31%2BXPrhQf4Jy6sFUsVnVGNhFHWaWRD%2Ftl8sEdyOLErkX52d7zeS%2Bw5otv%2BtQEuhyW%2BXvd9zqIIsePPFRUBTMcZ43%2BZYbJiZls%2BnYDLakczbHBbIiZGB8IFRvt3ZCBldMCwegj7l0%3D"}]}
+cf-ray: a11529832e6d86fb-SIN
+alt-svc: h3=":443"; ma=86400
