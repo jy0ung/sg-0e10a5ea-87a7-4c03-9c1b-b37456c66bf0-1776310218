@@ -32,6 +32,16 @@ const mainUrl = normalizeUrl(readEnv('PROD_URL') ?? DEFAULT_MAIN_URL);
 const hrmsUrl = normalizeUrl(
   readEnv('PROD_HRMS_URL') ?? readEnv('PROD_EXPECTED_HRMS_APP_URL') ?? DEFAULT_HRMS_URL,
 );
+const smokeApps = new Set(
+  (readEnv('PROD_SMOKE_APPS') ?? 'main,hrms')
+    .split(',')
+    .map((app) => app.trim().toLowerCase())
+    .filter(Boolean),
+);
+const unsupportedSmokeApps = [...smokeApps].filter((app) => app !== 'main' && app !== 'hrms');
+if (unsupportedSmokeApps.length > 0 || smokeApps.size === 0) {
+  throw new Error(`PROD_SMOKE_APPS must contain main and/or hrms. Received: ${[...smokeApps].join(', ') || '(empty)'}`);
+}
 const loginEmail = readEnv('PROD_LOGIN_EMAIL');
 const loginPassword = readEnv('PROD_LOGIN_PASSWORD');
 const routeTimeoutMs = parsePositiveInteger(readEnv('PROD_SMOKE_ROUTE_TIMEOUT_MS'), 45_000);
@@ -308,23 +318,29 @@ const browser = await chromium.launch({ headless: true });
 const results: RouteResult[] = [];
 
 try {
-  const mainContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-  const mainPage = await mainContext.newPage();
-  await login(mainPage, mainUrl, credentials, 'main app');
-  for (const routeCheck of mainRoutes) {
-    results.push(await smokeRoute(mainPage, mainUrl, routeCheck));
+  if (smokeApps.has('main')) {
+    const mainContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const mainPage = await mainContext.newPage();
+    await login(mainPage, mainUrl, credentials, 'main app');
+    for (const routeCheck of mainRoutes) {
+      results.push(await smokeRoute(mainPage, mainUrl, routeCheck));
+    }
+    if (smokeApps.has('hrms')) {
+      const hrmsLaunchResult = await checkHrmsModuleRedirect(mainPage);
+      if (hrmsLaunchResult) results.push(hrmsLaunchResult);
+    }
+    await mainContext.close();
   }
-  const hrmsLaunchResult = await checkHrmsModuleRedirect(mainPage);
-  if (hrmsLaunchResult) results.push(hrmsLaunchResult);
-  await mainContext.close();
 
-  const hrmsContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-  const hrmsPage = await hrmsContext.newPage();
-  await login(hrmsPage, hrmsUrl, credentials, 'HRMS');
-  for (const routeCheck of hrmsRoutes) {
-    results.push(await smokeRoute(hrmsPage, hrmsUrl, routeCheck));
+  if (smokeApps.has('hrms')) {
+    const hrmsContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    const hrmsPage = await hrmsContext.newPage();
+    await login(hrmsPage, hrmsUrl, credentials, 'HRMS');
+    for (const routeCheck of hrmsRoutes) {
+      results.push(await smokeRoute(hrmsPage, hrmsUrl, routeCheck));
+    }
+    await hrmsContext.close();
   }
-  await hrmsContext.close();
 } finally {
   await browser.close();
 }

@@ -9,8 +9,8 @@
 # Build args:
 #   BUILD_WORKSPACE, BUILD_OUTPUT_DIR — optional single workspace build target
 #   and dist directory. Defaults keep the root app behavior.
-#   BUILD_HRMS_WEB — when true, build the root app at `/`, HRMS web at `/hrms/`,
-#   and a root-mounted HRMS web bundle for hrms.protonfookloi.com.
+#   BUILD_HRMS_WEB — when true, additionally build HRMS web at `/hrms/` and
+#   a root-mounted HRMS web bundle for a dedicated HRMS host.
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_APP_ENV, VITE_SENTRY_DSN,
 #   VITE_APP_URL, VITE_HRMS_APP_URL, VITE_APP_VERSION — inlined into the client bundle. Only public values.
 # ============================================================================
@@ -49,15 +49,15 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_HRMS_APP_URL=$VITE_HRMS_APP_URL \
     VITE_APP_VERSION=$VITE_APP_VERSION
 
-# Guard: main-app builds (no BUILD_WORKSPACE) in production/staging MUST have
-# VITE_HRMS_APP_URL set, otherwise the HRMS module button falls back to the
-# local /hrms/ path and the service-worker serves the offline page instead.
+# Guard: dual UBS+HRMS production/staging builds require the dedicated HRMS URL.
+# UBS-only builds intentionally leave VITE_HRMS_APP_URL empty while the HRMS
+# standalone deployment is disabled.
 RUN if [ -z "$BUILD_WORKSPACE" ] \
     && { [ "$VITE_APP_ENV" = "production" ] || [ "$VITE_APP_ENV" = "staging" ]; } \
+    && [ "$BUILD_HRMS_WEB" = "true" ] \
     && [ -z "$VITE_HRMS_APP_URL" ]; then \
       echo "" >&2; \
-      echo "ERROR: VITE_HRMS_APP_URL is required for production/staging main-app builds." >&2; \
-      echo "       Without it the HRMS module button will show the offline error page." >&2; \
+      echo "ERROR: VITE_HRMS_APP_URL is required for dual UBS+HRMS production/staging builds." >&2; \
       echo "       Pass --build-arg VITE_HRMS_APP_URL=https://hrms.<domain>" >&2; \
       echo "" >&2; \
       exit 1; \

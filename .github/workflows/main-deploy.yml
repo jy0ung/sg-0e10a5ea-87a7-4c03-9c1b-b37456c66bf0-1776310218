@@ -10,14 +10,6 @@ on:
       image_tag:
         description: 'Existing image tag to deploy instead of building from source'
         required: false
-      build_target:
-        description: 'Build target when building from source'
-        type: choice
-        required: false
-        default: main-with-hrms
-        options:
-          - main-with-hrms
-          - main
 
 permissions:
   contents: read
@@ -37,6 +29,7 @@ jobs:
     env:
       REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}
+      UBS_PRODUCTION_URL: https://ubs.protonfookloi.com
     steps:
       - name: Resolve source ref
         id: source
@@ -67,7 +60,6 @@ jobs:
         shell: bash
         env:
           INPUT_IMAGE_TAG: ${{ github.event.inputs.image_tag }}
-          INPUT_BUILD_TARGET: ${{ github.event.inputs.build_target }}
           SHORT_SHA: ${{ steps.source.outputs.short_sha }}
           IMAGE_NAME: ${{ steps.img.outputs.name }}
         run: |
@@ -79,27 +71,14 @@ jobs:
             echo "build_target=existing-image" >> "$GITHUB_OUTPUT"
             echo "build_workspace=" >> "$GITHUB_OUTPUT"
             echo "build_output_dir=dist" >> "$GITHUB_OUTPUT"
-            echo "build_hrms_web=true" >> "$GITHUB_OUTPUT"
+            echo "build_hrms_web=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          target="${INPUT_BUILD_TARGET:-main-with-hrms}"
-          case "$target" in
-            main-with-hrms)
-              build_workspace=""
-              build_output_dir="dist"
-              build_hrms_web="true"
-              ;;
-            main)
-              build_workspace=""
-              build_output_dir="dist"
-              build_hrms_web="false"
-              ;;
-            *)
-              echo "Unsupported build target: $target" >&2
-              exit 1
-              ;;
-          esac
+          target="main"
+          build_workspace=""
+          build_output_dir="dist"
+          build_hrms_web="false"
 
           image_tag="sha-${SHORT_SHA}"
           echo "build=true" >> "$GITHUB_OUTPUT"
@@ -207,8 +186,8 @@ jobs:
             VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
             VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
             VITE_APP_ENV=production
-            VITE_APP_URL=${{ secrets.VITE_APP_URL }}
-            VITE_HRMS_APP_URL=${{ secrets.VITE_HRMS_APP_URL }}
+            VITE_APP_URL=${{ env.UBS_PRODUCTION_URL }}
+            VITE_HRMS_APP_URL=
             VITE_APP_VERSION=${{ steps.source.outputs.sha }}
             VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}
             SUPABASE_INTERNAL_URL=${{ steps.supabase-upstream.outputs.value }}
@@ -288,10 +267,11 @@ jobs:
         shell: bash
         env:
           PROD_APP: main
-          PROD_URL: ${{ secrets.VITE_APP_URL }}
+          PROD_URL: ${{ env.UBS_PRODUCTION_URL }}
           PROD_EXPECTED_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          PROD_EXPECTED_HRMS_APP_URL: ${{ secrets.VITE_HRMS_APP_URL }}
-          PROD_HEALTH_URL: ${{ format('{0}/healthz', secrets.VITE_APP_URL) }}
+          PROD_EXPECTED_HRMS_APP_URL: ''
+          PROD_VERIFY_HRMS_LINK: '0'
+          PROD_HEALTH_URL: ${{ format('{0}/healthz', env.UBS_PRODUCTION_URL) }}
           PROD_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
           PROD_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
           PROD_LOGIN_REQUIRED: '0'
@@ -312,8 +292,9 @@ jobs:
         if: steps.login.outputs.enabled == 'true'
         shell: bash
         env:
-          PROD_URL: ${{ secrets.VITE_APP_URL }}
-          PROD_HRMS_URL: ${{ secrets.VITE_HRMS_APP_URL }}
+          PROD_URL: ${{ env.UBS_PRODUCTION_URL }}
+          PROD_HRMS_URL: ''
+          PROD_SMOKE_APPS: main
           PROD_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
           PROD_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
         run: npm run smoke:production

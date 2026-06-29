@@ -28,6 +28,7 @@ const maxFetchAttempts = parsePositiveInteger(readEnv('PROD_VERIFY_FETCH_ATTEMPT
 const appMode = readEnv('PROD_APP') ?? 'main';
 const runningInGitHubActions = readEnv('GITHUB_ACTIONS') === 'true';
 const loginRequired = parseLoginRequired(readEnv('PROD_LOGIN_REQUIRED'), appMode, runningInGitHubActions);
+const verifyHrmsLink = parseEnabled(readEnv('PROD_VERIFY_HRMS_LINK'), true);
 const authStorageKey = appMode === 'hrms-web' ? 'flc.hrms.auth.session' : 'flc.ubs.auth.session';
 
 const MOCK_USER = {
@@ -83,6 +84,14 @@ function parseLoginRequired(rawValue: string | undefined, mode: string, runningI
   }
 
   return ['1', 'true'].includes(rawValue.toLowerCase());
+}
+
+function parseEnabled(rawValue: string | undefined, fallback: boolean): boolean {
+  if (!rawValue) {
+    return fallback;
+  }
+
+  return ['1', 'true', 'yes'].includes(rawValue.toLowerCase());
 }
 
 function wait(ms: number): Promise<void> {
@@ -305,8 +314,11 @@ async function checkBundleHrmsAppUrl() {
     addResult(name, true, `skipped for app mode ${JSON.stringify(appMode)}`);
     return;
   }
+  if (!verifyHrmsLink) {
+    addResult(name, true, 'skipped because PROD_VERIFY_HRMS_LINK is disabled');
+    return;
+  }
   if (!expectedHrmsAppUrl) {
-    // Fail: for main-app deployments this must always be set.
     addResult(name, false, 'PROD_EXPECTED_HRMS_APP_URL is not set — HRMS module button will use offline fallback');
     return;
   }
