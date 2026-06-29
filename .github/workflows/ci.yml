@@ -134,7 +134,7 @@ jobs:
         run: npx playwright test e2e/responsive.spec.ts --project=mobile-chromium --project=tablet-chromium
       - name: Run accessibility smoke specs
         run: npx playwright test e2e/accessibility.spec.ts --project=chromium
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
