@@ -35,6 +35,7 @@ describe('platformRegistry', () => {
       '/accounts/profit-loss',
       '/admin/settings',
     ]));
+    expect(MAIN_NAV_ROUTES.map((route) => route.path)).not.toContain('/hrms/');
   });
 
   it('drives HRMS shell navigation and chrome from the shared route registry', () => {

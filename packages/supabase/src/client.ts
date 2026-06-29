@@ -9,9 +9,13 @@ import { createSharedAuthStorage } from './authStorage';
  * so the same package can be consumed by the Next.js surfaces without change.
  * Missing config aborts early — we never silently ship an unconfigured client.
  */
+const isHrmsWebApp = import.meta.env.VITE_HRMS_WEB_APP === 'true';
+
 const _rawSupabaseUrl =
-  import.meta.env.VITE_SUPABASE_URL ||
-  import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
+  isHrmsWebApp
+    ? import.meta.env.VITE_HRMS_SUPABASE_URL
+    : import.meta.env.VITE_SUPABASE_URL ||
+      import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
 
 // Support a relative proxy path (e.g. "/__supabase") used in Codespaces / local dev
 // so the URL always resolves against whichever origin the browser loaded the app from
@@ -21,14 +25,19 @@ const SUPABASE_URL =
     ? `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}${_rawSupabaseUrl}`
     : _rawSupabaseUrl;
 const SUPABASE_PUBLISHABLE_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  isHrmsWebApp
+    ? import.meta.env.VITE_HRMS_SUPABASE_ANON_KEY
+    : import.meta.env.VITE_SUPABASE_ANON_KEY ||
+      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  const expected = isHrmsWebApp
+    ? 'VITE_HRMS_SUPABASE_URL and VITE_HRMS_SUPABASE_ANON_KEY'
+    : 'VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY';
   throw new Error(
-    'Missing Supabase environment variables. Expected VITE_SUPABASE_URL and ' +
-      'VITE_SUPABASE_ANON_KEY. Copy .env.example to .env.local and fill them in.',
+    `Missing Supabase environment variables. Expected ${expected}. ` +
+      'Copy .env.example to .env.local and fill them in.',
   );
 }
 
@@ -48,12 +57,12 @@ export const supabase = createClient<Database>(
       detectSessionInUrl: false,
       // Namespaced storage key so multiple FLC apps on the same origin
       // (admin, mobile, customer portal) don't clobber each other's session.
-      storageKey: 'flc.auth.session',
+      storageKey: isHrmsWebApp ? 'flc.hrms.auth.session' : 'flc.ubs.auth.session',
       storage: createSharedAuthStorage(),
     },
     global: {
       headers: {
-        'x-client-info': 'flc-bi-web',
+        'x-client-info': isHrmsWebApp ? 'flc-hrms-web' : 'flc-ubs-web',
       },
     },
   },

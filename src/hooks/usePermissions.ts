@@ -3,11 +3,24 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColumnPermissions, canViewField, canEditField } from './useColumnPermissions';
 import {
+  ALL_SECTIONS,
   DEFAULT_ROLE_SECTIONS,
   type SectionName,
 } from '@/config/rolePermissions';
 import { fetchRoleSections, type RoleSectionsMatrix } from '@flc/auth';
 import type { AppRole } from '@/types';
+
+const UBS_SECTION_SET = new Set<string>(ALL_SECTIONS);
+
+function toUbsRoleSectionMatrix(matrix?: RoleSectionsMatrix | null): RoleSectionsMatrix {
+  const merged: RoleSectionsMatrix = { ...DEFAULT_ROLE_SECTIONS, ...(matrix ?? {}) };
+  return Object.fromEntries(
+    Object.entries(merged).map(([role, sections]) => [
+      role,
+      (sections ?? []).filter((section) => UBS_SECTION_SET.has(section)),
+    ]),
+  ) as RoleSectionsMatrix;
+}
 
 /**
  * Unified permissions hook — the single surface every route/sidebar/component
@@ -54,7 +67,7 @@ export function useRoleSectionMatrix(): RoleSectionsMatrix {
     staleTime: 5 * 60 * 1000, // 5 min — permissions change rarely
   });
 
-  return data ?? { ...DEFAULT_ROLE_SECTIONS };
+  return toUbsRoleSectionMatrix(data);
 }
 
 export function usePermissions(): UnifiedPermissions {

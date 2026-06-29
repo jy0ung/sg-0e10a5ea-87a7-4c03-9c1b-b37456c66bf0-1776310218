@@ -25,6 +25,7 @@ vi.mock('@flc/supabase', () => {
     proxy.eq = (..._args: unknown[]) => proxy;
     proxy.or = (..._args: unknown[]) => proxy;
     proxy.order = (..._args: unknown[]) => proxy;
+    proxy.single = () => Promise.resolve(drainResolve());
     proxy.update = (values: unknown) => {
       updateCalls.push({ table, values });
       return proxy;
@@ -54,7 +55,7 @@ vi.mock('@flc/platform-services', () => ({
   logUserAction: vi.fn().mockResolvedValue({ error: null }),
 }));
 
-import { deactivateUser, deleteInvitedUser, inviteUser, listProfiles, reactivateUser, updateProfile } from './profileService';
+import { deactivateUser, deleteInvitedUser, inviteUser, listProfiles, reactivateUser, updateOwnProfileName, updateProfile } from './profileService';
 
 beforeEach(() => {
   queuedResults.length = 0;
@@ -87,6 +88,25 @@ describe('listProfiles', () => {
 });
 
 describe('updateProfile', () => {
+  it('passes portal roles through to the profiles update', async () => {
+    queueResolves({ data: { id: 'p1' }, error: null });
+
+    const result = await updateProfile({
+      id: 'p1',
+      role: 'portal_admin',
+      access_scope: 'company',
+    }, {
+      actorId: 'admin-1',
+      companyId: 'c1',
+    });
+
+    expect(result.error).toBeNull();
+    expect(updateCalls[0].values).toMatchObject({
+      role: 'portal_admin',
+      access_scope: 'company',
+    });
+  });
+
   it('surfaces an error when employee_id cannot be updated', async () => {
     queueResolves({ data: null, error: { message: 'column profiles.employee_id does not exist' } });
 
@@ -107,20 +127,41 @@ describe('updateProfile', () => {
 
 describe('inviteUser', () => {
   it('passes employee_id to the invite-user function when provided', async () => {
-    queueResolves({ data: { ok: true }, error: null });
+    queueResolves({ data: { invite_link: 'http://invite.test/link', email_delivery_status: 'link_generated' }, error: null });
 
     const result = await inviteUser({
       email: 'user@company.com',
       name: 'User',
       role: 'analyst',
       companyId: 'c1',
+      branchId: 'branch-1',
       employeeId: 'emp-1',
+    });
+
+    expect(result.error).toBeNull();
+    expect(result.inviteLink).toBe('http://invite.test/link');
+    expect(result.emailDeliveryStatus).toBe('link_generated');
+    expect(functionInvocations[0]).toMatchObject({
+      name: 'invite-user',
+      body: expect.objectContaining({ branch_id: 'branch-1', employee_id: 'emp-1' }),
+    });
+  });
+
+  it('allows global role invites without a branch assignment', async () => {
+    queueResolves({ data: { invite_link: 'http://invite.test/link', email_delivery_status: 'link_generated' }, error: null });
+
+    const result = await inviteUser({
+      email: 'admin@company.com',
+      name: 'Global Admin',
+      role: 'super_admin',
+      companyId: 'c1',
+      branchId: null,
     });
 
     expect(result.error).toBeNull();
     expect(functionInvocations[0]).toMatchObject({
       name: 'invite-user',
-      body: expect.objectContaining({ employee_id: 'emp-1' }),
+      body: expect.objectContaining({ branch_id: null }),
     });
   });
 });
@@ -171,8 +212,8 @@ describe('account status actions', () => {
 
     expect(result.error).toBeNull();
     expect(functionInvocations[0]).toMatchObject({
-      name: 'delete-user',
-      body: { action: 'update_status', user_id: 'user-1', status: 'inactive', reason: 'Left company' },
+      name: 'update-user-status',
+      body: { user_id: 'user-1', status: 'inactive', reason: 'Left company' },
     });
   });
 
@@ -183,8 +224,8 @@ describe('account status actions', () => {
 
     expect(result.error).toBeNull();
     expect(functionInvocations[0]).toMatchObject({
-      name: 'delete-user',
-      body: { action: 'update_status', user_id: 'user-1', status: 'active', reason: null },
+      name: 'update-user-status',
+      body: { user_id: 'user-1', status: 'active', reason: null },
     });
   });
 
@@ -202,5 +243,19 @@ describe('account status actions', () => {
     const result = await deactivateUser('user-1');
 
     expect(result.error).toBe('At least one active super admin account is required');
+  });
+});
+
+describe('updateOwnProfileName', () => {
+  it('activates a pending invited profile when requested', async () => {
+    queueResolves({ data: { id: 'user-1' }, error: null });
+
+    const result = await updateOwnProfileName('user-1', 'Invited User', { activateInvite: true });
+
+    expect(result.error).toBeNull();
+    expect(updateCalls[0]).toMatchObject({
+      table: 'profiles',
+      values: expect.objectContaining({ name: 'Invited User', status: 'active' }),
+    });
   });
 });

@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { Search, Plus, Users, UserCheck, UserMinus, Pencil, SlidersHorizontal, Trash2, Send, Eye } from 'lucide-react';
-import { AppRole, Employee, EmployeeStatus } from '@/types';
+import { APP_ROLES, AppRole, Employee, EmployeeStatus } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import { listDepartments, listJobTitles } from '@/services/hrmsAdminService';
 import {
@@ -33,10 +33,7 @@ import { createEmployeeSchema } from '@/lib/validations';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const ALL_ROLES: AppRole[] = [
-  'super_admin', 'company_admin', 'director', 'general_manager',
-  'manager', 'sales', 'accounts', 'analyst',
-];
+const ALL_ROLES: readonly AppRole[] = APP_ROLES;
 
 const ROLE_LABEL: Record<AppRole, string> = {
   super_admin:     'Super Admin',
@@ -391,7 +388,7 @@ export default function EmployeeDirectory() {
     if (!user) return;
     setReInviting(emp.id);
     const { error } = await reInviteEmployee(
-      { id: emp.id, email: emp.email, name: emp.name, role: emp.role },
+      { id: emp.id, email: emp.email, name: emp.name, role: emp.role, branchId: emp.branchId },
       user.companyId,
       user.id,
     );

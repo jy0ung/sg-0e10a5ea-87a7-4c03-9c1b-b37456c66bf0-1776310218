@@ -50,6 +50,7 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
       name:             input.name,
       role:             input.role,
       companyId:        input.companyId,
+      branchId:         input.branchId ?? '',
       employeeId:       input.id,
       portalAccessOnly: true,
     });
@@ -140,7 +141,7 @@ export async function deleteEmployee(
 }
 
 export async function reInviteEmployee(
-  employee: { id: string; email: string; name: string; role: AppRole },
+  employee: { id: string; email: string; name: string; role: AppRole; branchId?: string | null },
   companyId: string,
   actorId?: string,
 ): Promise<{ error: string | null }> {
@@ -166,6 +167,7 @@ export async function reInviteEmployee(
     name:             employee.name,
     role:             employee.role,
     companyId,
+    branchId:         employee.branchId ?? '',
     employeeId:       employee.id,
     portalAccessOnly: true,
   });

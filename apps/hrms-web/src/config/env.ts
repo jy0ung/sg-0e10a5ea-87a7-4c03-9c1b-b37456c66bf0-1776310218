@@ -12,11 +12,11 @@ import { z } from 'zod';
  * dashboard or CI secret store and must never be referenced from this file.
  */
 const envSchema = z.object({
-  VITE_SUPABASE_URL: z.string().url('VITE_SUPABASE_URL must be a valid URL'),
-  VITE_SUPABASE_ANON_KEY: z
+  VITE_HRMS_SUPABASE_URL: z.string().url('VITE_HRMS_SUPABASE_URL must be a valid URL'),
+  VITE_HRMS_SUPABASE_ANON_KEY: z
     .string()
-    .min(20, 'VITE_SUPABASE_ANON_KEY looks too short to be a real key'),
-  VITE_SUPABASE_PROJECT_ID: z.string().optional(),
+    .min(20, 'VITE_HRMS_SUPABASE_ANON_KEY looks too short to be a real key'),
+  VITE_HRMS_SUPABASE_PROJECT_ID: z.string().optional(),
   VITE_SENTRY_DSN: z.string().url().optional().or(z.literal('')),
   VITE_SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).optional(),
   VITE_APP_ENV: z
@@ -34,10 +34,10 @@ function resolveSupabaseUrl(raw: string | undefined): string | undefined {
   // Relative proxy path (e.g. "/__supabase") — resolve against the current origin
   // so the absolute URL is available for validation and for the Supabase client.
   if (raw.startsWith('/')) {
-    const origin =
-      typeof window !== 'undefined'
-        ? window.location.origin
-        : 'http://localhost:3000';
+      const origin =
+        typeof window !== 'undefined'
+          ? window.location.origin
+        : 'http://localhost:3001';
     return `${origin}${raw}`;
   }
   return raw;
@@ -45,15 +45,9 @@ function resolveSupabaseUrl(raw: string | undefined): string | undefined {
 
 function parseEnv(): AppEnv {
   const raw = {
-    VITE_SUPABASE_URL: resolveSupabaseUrl(
-      import.meta.env.VITE_SUPABASE_URL ??
-      import.meta.env.NEXT_PUBLIC_SUPABASE_URL
-    ),
-    VITE_SUPABASE_ANON_KEY:
-      import.meta.env.VITE_SUPABASE_ANON_KEY ??
-      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-      import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    VITE_SUPABASE_PROJECT_ID: import.meta.env.VITE_SUPABASE_PROJECT_ID,
+    VITE_HRMS_SUPABASE_URL: resolveSupabaseUrl(import.meta.env.VITE_HRMS_SUPABASE_URL),
+    VITE_HRMS_SUPABASE_ANON_KEY: import.meta.env.VITE_HRMS_SUPABASE_ANON_KEY,
+    VITE_HRMS_SUPABASE_PROJECT_ID: import.meta.env.VITE_HRMS_SUPABASE_PROJECT_ID,
     VITE_SENTRY_DSN: import.meta.env.VITE_SENTRY_DSN,
     VITE_SENTRY_TRACES_SAMPLE_RATE: import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE || undefined,
     VITE_APP_ENV: import.meta.env.VITE_APP_ENV,

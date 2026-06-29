@@ -37,6 +37,7 @@ export const inviteUserSchema = z.object({
   email: z.string().min(1, 'Email is required').email('Invalid email address'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
   role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater']),
+  branch_id: z.string().min(1, 'Branch is required'),
   employee_id: z.string().nullable().optional(),
   portal_access_only: z.boolean().optional(),
 });

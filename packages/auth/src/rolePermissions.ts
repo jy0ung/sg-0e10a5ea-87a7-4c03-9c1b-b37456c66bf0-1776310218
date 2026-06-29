@@ -13,6 +13,9 @@ export const ALL_SECTIONS = [
 ] as const;
 
 export type SectionName = typeof ALL_SECTIONS[number];
+export type UbsSectionName = Exclude<SectionName, 'HRMS'>;
+
+export const UBS_SECTIONS = ALL_SECTIONS.filter((section): section is UbsSectionName => section !== 'HRMS');
 
 /**
  * Default section-level permissions for each role.
@@ -28,6 +31,25 @@ export const DEFAULT_ROLE_SECTIONS: Record<AppRole, SectionName[]> = {
   accounts: ['Platform', 'Sales', 'Purchasing', 'Accounts', 'Reports', 'HRMS', 'Admin'],
   analyst: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Reports', 'HRMS', 'Admin'],
   creator_updater: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'HRMS', 'Admin'],
+  portal_admin: ['Admin'],
+  portal_manager: ['Admin'],
+  portal_staff: [],
+};
+
+/**
+ * UBS main-app section defaults. HRMS is intentionally absent because the
+ * dedicated HRMS app owns its own navigation and workflow permissions.
+ */
+export const UBS_DEFAULT_ROLE_SECTIONS: Record<AppRole, UbsSectionName[]> = {
+  super_admin: [...UBS_SECTIONS],
+  company_admin: [...UBS_SECTIONS],
+  director: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'Accounts', 'Reports', 'Admin'],
+  general_manager: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'Accounts', 'Reports', 'Admin'],
+  manager: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Reports', 'Admin'],
+  sales: ['Platform', 'Sales', 'Admin'],
+  accounts: ['Platform', 'Sales', 'Purchasing', 'Accounts', 'Reports', 'Admin'],
+  analyst: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Reports', 'Admin'],
+  creator_updater: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'Admin'],
   portal_admin: ['Admin'],
   portal_manager: ['Admin'],
   portal_staff: [],

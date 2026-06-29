@@ -61,7 +61,7 @@ Guardrails:
 ### Admin
 - `/admin/activity`, `/admin/kpi-studio`, `/admin/webhooks`, `/admin/dms-sync`
 - `/admin/reconciliation`, `/admin/reconciliation/:matchId`
-- `/admin/users`, `/admin/audit`, `/admin/settings`, `/admin/branches`, `/admin/master-data`, `/admin/suppliers`, `/admin/dealers`, `/admin/user-groups`, `/admin/role-permissions`, `/admin/health`
+- `/admin/users`, `/admin/audit`, `/admin/settings`, `/admin/branches`, `/admin/master-data`, `/admin/suppliers`, `/admin/dealers`, `/admin/user-groups`, `/admin/health`
 
 ### HRMS ingress
 - `/hrms` redirect/hand-off behavior in main app; production HRMS domain smoke separately if reachable.
@@ -259,4 +259,3 @@ Regression coverage:
    - New Request draft persists across route changes/tab visibility
 4. Complete role matrix once safe test credentials are available for requester/owner/manager/backup owner.
 5. Decide whether to configure Sentry/DSN and/or remove/allow Cloudflare Insights to eliminate production console noise.
-

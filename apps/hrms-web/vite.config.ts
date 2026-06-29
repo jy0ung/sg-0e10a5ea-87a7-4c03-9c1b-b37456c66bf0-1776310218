@@ -8,7 +8,7 @@ const buildSourceMaps = process.env.BUILD_SOURCEMAP === 'true';
 export default defineConfig(({ mode }) => {
   const viteEnv = loadEnv(mode, rootDir, ['VITE_']);
   const shouldProxySupabase = Boolean(
-    process.env.CODESPACES || viteEnv.VITE_SUPABASE_URL?.startsWith('/'),
+    process.env.CODESPACES || viteEnv.VITE_HRMS_SUPABASE_URL?.startsWith('/'),
   );
 
   return {
@@ -48,10 +48,10 @@ export default defineConfig(({ mode }) => {
       port: 3001,
       proxy: shouldProxySupabase
         ? {
-            '/__supabase': {
-              target: 'http://127.0.0.1:54321',
+            '/__hrms_supabase': {
+              target: 'http://127.0.0.1:55321',
               changeOrigin: true,
-              rewrite: (requestPath) => requestPath.replace(/^\/__supabase/, ''),
+              rewrite: (requestPath) => requestPath.replace(/^\/__hrms_supabase/, ''),
             },
           }
         : undefined,

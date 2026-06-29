@@ -143,15 +143,17 @@ export async function inviteUser(payload: {
   name: string;
   role: AppRole;
   companyId: string;
+  branchId?: string | null;
   employeeId?: string | null;
   portalAccessOnly?: boolean;
-}): Promise<{ error: string | null }> {
+}): Promise<{ error: string | null; inviteLink?: string | null; emailDeliveryStatus?: 'sent' | 'link_generated' }> {
   const { data, error } = await supabase.functions.invoke('invite-user', {
     body: {
       email: payload.email,
       name: payload.name,
       role: payload.role,
       company_id: payload.companyId,
+      branch_id: payload.branchId || null,
       employee_id: payload.employeeId ?? null,
       portal_access_only: payload.portalAccessOnly ?? false,
     },
@@ -160,7 +162,13 @@ export async function inviteUser(payload: {
   if (data && typeof data === 'object' && 'error' in data && data.error) {
     return { error: String(data.error) };
   }
-  return { error: null };
+  const response = data as { invite_link?: unknown; email_delivery_status?: unknown } | null;
+  const emailDeliveryStatus = response?.email_delivery_status === 'link_generated' ? 'link_generated' : 'sent';
+  return {
+    error: null,
+    inviteLink: typeof response?.invite_link === 'string' ? response.invite_link : null,
+    emailDeliveryStatus,
+  };
 }
 
 /** Delete an invited user that has never signed in so they can be re-invited. */
@@ -180,9 +188,8 @@ async function updateUserAccountStatus(
   status: 'active' | 'inactive',
   reason?: string,
 ): Promise<{ error: string | null }> {
-  const { data, error } = await supabase.functions.invoke('delete-user', {
+  const { data, error } = await supabase.functions.invoke('update-user-status', {
     body: {
-      action: 'update_status',
       user_id: userId,
       status,
       reason: reason?.trim() || null,
@@ -222,10 +229,17 @@ export async function changePassword(
 }
 
 /** Update the authenticated user's own profile name (used during invite sign-up). */
-export async function updateOwnProfileName(userId: string, name: string): Promise<{ error: string | null }> {
+export async function updateOwnProfileName(
+  userId: string,
+  name: string,
+  options: { activateInvite?: boolean } = {},
+): Promise<{ error: string | null }> {
+  const patch: Record<string, unknown> = { name, updated_at: new Date().toISOString() };
+  if (options.activateInvite) patch.status = 'active';
+
   const { error } = await supabase
     .from('profiles')
-    .update({ name, updated_at: new Date().toISOString() })
+    .update(patch as never)
     .eq('id', userId)
     .select('id')
     .single();

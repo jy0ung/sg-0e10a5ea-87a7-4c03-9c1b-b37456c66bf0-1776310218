@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { APP_ROLES } from '@flc/types';
 
 // Auth schemas
 export const loginSchema = z.object({
@@ -17,7 +18,7 @@ export const forgotPasswordSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string().min(1, 'Please confirm your password'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -26,7 +27,7 @@ export const resetPasswordSchema = z.object({
 
 export const inviteSignupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string().min(1, 'Please confirm your password'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -36,10 +37,19 @@ export const inviteSignupSchema = z.object({
 export const inviteUserSchema = z.object({
   email: z.string().min(1, 'Email is required').email('Invalid email address'),
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater', 'portal_admin', 'portal_manager', 'portal_staff']),
+  role: z.enum(APP_ROLES),
   company_id: z.string().nullable().optional(),
+  branch_id: z.string().nullable().optional().transform((value) => value ?? ''),
   employee_id: z.string().nullable().optional(),
   portal_access_only: z.boolean().optional(),
+}).superRefine((value, ctx) => {
+  if (value.role !== 'super_admin' && !value.branch_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['branch_id'],
+      message: 'Branch is required',
+    });
+  }
 });
 
 export type InviteSignupFormData = z.infer<typeof inviteSignupSchema>;
@@ -85,7 +95,7 @@ export const vehicleSchema = z.object({
 // User management schemas
 export const userUpdateSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater']),
+  role: z.enum(APP_ROLES),
   access_scope: z.enum(['self', 'branch', 'company', 'global']),
   branch_id: z.string().nullable().optional(),
   employee_id: z.string().nullable().optional(),
@@ -95,7 +105,7 @@ export const userUpdateSchema = z.object({
 // Settings schemas
 export const profileUpdateSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  role: z.enum(['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'sales', 'accounts', 'analyst', 'creator_updater']),
+  role: z.enum(APP_ROLES),
   branch_id: z.string().nullable().optional(),
 });
 

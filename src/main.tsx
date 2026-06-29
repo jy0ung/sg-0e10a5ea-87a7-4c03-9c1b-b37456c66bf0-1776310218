@@ -28,7 +28,7 @@ import { subscribeWebVitals } from "@/services/webVitalsService";
 import { env } from "@/config/env";
 import { createAppQueryClient } from "@/lib/queryClient";
 import { hasPortalSpecificRole, isPortalOnlyUser } from '@/lib/portalAccess';
-import { getDedicatedHrmsWorkspacePath, HRMS_PATHS } from '@/lib/hrmsWorkspace';
+import { getDedicatedHrmsWorkspacePath, HRMS_PATHS, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
 import {
   ADMIN_ONLY,
   ADMIN_AND_DIRECTOR,
@@ -140,7 +140,6 @@ const DealerInvoices = lazy(() => import("./pages/sales/DealerInvoices"));
 const VerifyOR = lazy(() => import("./pages/sales/VerifyOR"));
 const ReportsCenter = lazy(() => import("./pages/reports/ReportsCenter"));
 const ChassisFilter = lazy(() => import("./pages/inventory/ChassisFilter"));
-const RolePermissionsPage = lazy(() => import('./pages/admin/RolePermissions'));
 const HrmsWorkspaceRedirect = lazy(() => import('./pages/hrms/HrmsWorkspaceRedirect'));
 
 // Shorthand Suspense wrapper used on every route element
@@ -169,6 +168,19 @@ function ProtectedAppShell({ redirectTo = "/login" }: { redirectTo?: string | ((
       return <Navigate to="/portal" state={{ from: location }} replace />;
     }
     // HRMS-only users (portal_access_only flag) → redirect to HRMS workspace
+    if (isHrmsWorkspacePath(location.pathname)) {
+      return (
+        <ProtectedRoute redirectTo={redirectTo}>
+          <ModuleAccessProvider>
+            <DataProvider>
+              <SalesProvider>
+                <AppLayout />
+              </SalesProvider>
+            </DataProvider>
+          </ModuleAccessProvider>
+        </ProtectedRoute>
+      );
+    }
     const hrmsPath = getDedicatedHrmsWorkspacePath(HRMS_PATHS.root);
     if (!hrmsPath.startsWith('http')) {
       return <Navigate to={hrmsPath} state={{ from: location }} replace />;
@@ -301,7 +313,7 @@ const router = createBrowserRouter([
       { path: "admin/suppliers", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Suppliers"><S><Suppliers /></S></R></RequireRole> },
       { path: "admin/dealers", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Dealers"><S><Dealers /></S></R></RequireRole> },
       { path: "admin/user-groups", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="User Groups"><S><UserGroups /></S></R></RequireRole> },
-      { path: 'admin/role-permissions', element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Role Permissions"><S><RolePermissionsPage /></S></R></RequireRole> },
+      { path: 'admin/role-permissions', element: <Navigate to="/admin/users" replace /> },
       { path: "reports", element: withModuleAccess('reports', <R scope="Reports"><S><ReportsCenter /></S></R>) },
       { path: "inventory/chassis-filter", element: withModuleAccess('inventory', <R scope="Advanced Search"><S><ChassisFilter /></S></R>) },
       { path: "hrms", element: withModuleAccess('hrms', <R scope="HRMS Workspace"><S><HrmsWorkspaceRedirect /></S></R>) },

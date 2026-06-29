@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import SignUpPage from './SignUpPage';
 
@@ -11,6 +11,7 @@ const mockGetSession = vi.fn();
 const mockGetUser = vi.fn();
 const mockUpdateUser = vi.fn();
 const mockSignOut = vi.fn();
+const mockUpdateOwnProfileName = vi.fn();
 
 vi.mock('@flc/supabase/client', () => ({
   supabase: {
@@ -28,7 +29,7 @@ vi.mock('@flc/supabase/client', () => ({
 
 vi.mock('@flc/auth', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@flc/auth')>()),
-  updateOwnProfileName: vi.fn().mockResolvedValue({ error: null }),
+  updateOwnProfileName: (...args: unknown[]) => mockUpdateOwnProfileName(...args),
 }));
 
 function renderPage(path = '/signup') {
@@ -57,6 +58,7 @@ describe('SignUpPage', () => {
     });
     mockUpdateUser.mockResolvedValue({ error: null });
     mockSignOut.mockResolvedValue({ error: null });
+    mockUpdateOwnProfileName.mockResolvedValue({ error: null });
   });
 
   it('exchanges a bare PKCE invite code returned by GoTrue verify', async () => {
@@ -73,6 +75,41 @@ describe('SignUpPage', () => {
     expect(mockVerifyOtp).toHaveBeenCalledWith({
       type: 'invite',
       token_hash: 'invite-token',
+    });
+  });
+
+  it('activates the invited profile after password setup succeeds', async () => {
+    mockGetUser
+      .mockResolvedValueOnce({
+        data: {
+          user: {
+            email: 'invited@example.com',
+            user_metadata: { name: 'Invited User' },
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          user: {
+            id: 'user-1',
+            email: 'invited@example.com',
+            user_metadata: { name: 'Invited User' },
+          },
+        },
+      });
+
+    renderPage('/signup?code=invite-code');
+
+    await screen.findByText('Complete your account setup');
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Invited User' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'newpassword' } });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'newpassword' } });
+    const submit = screen.getByRole('button', { name: /complete sign up/i });
+    await waitFor(() => expect(submit).not.toBeDisabled());
+    fireEvent.click(submit);
+
+    await waitFor(() => {
+      expect(mockUpdateOwnProfileName).toHaveBeenCalledWith('user-1', 'Invited User', { activateInvite: true });
     });
   });
 });

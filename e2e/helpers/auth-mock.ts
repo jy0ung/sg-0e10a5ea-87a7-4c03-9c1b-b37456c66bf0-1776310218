@@ -17,10 +17,23 @@ import { fileURLToPath } from "url";
 const MODULE_DIR = fileURLToPath(new URL(".", import.meta.url));
 const PROJECT_ROOTS = [process.cwd(), resolve(MODULE_DIR, "../..")] as const;
 
+function isHrmsE2E(): boolean {
+  return process.env.E2E_APP === "hrms" || process.env.VITE_HRMS_WEB_APP === "true";
+}
+
 function resolveBrowserOrigin(): string {
+  if (isHrmsE2E()) {
+    return (
+      process.env.HRMS_WEB_E2E_BASE_URL ||
+      process.env.BASE_URL ||
+      process.env.E2E_BASE_URL ||
+      "http://localhost:3101"
+    ).replace(/\/$/, "");
+  }
+
   return (
+    process.env.E2E_BASE_URL ||
     process.env.BASE_URL ||
-    process.env.HRMS_WEB_E2E_BASE_URL ||
     "http://localhost:3001"
   ).replace(/\/$/, "");
 }
@@ -29,10 +42,20 @@ function resolveSupabaseUrl(value: string): string {
   return value.startsWith("/") ? `${resolveBrowserOrigin()}${value}` : value;
 }
 
+function readEnvValue(content: string, names: readonly string[]): string | null {
+  for (const name of names) {
+    const match = content.match(new RegExp(`^${name}\\s*=\\s*"?([^"\\n]+)"?`, "m"));
+    if (match) return match[1];
+  }
+  return null;
+}
+
 // Read VITE_SUPABASE_URL using Vite's env-file precedence so the mock targets
 // the same Supabase instance the app talks to at runtime.
 function readSupabaseUrl(): string {
-  const envValue = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const envValue = isHrmsE2E()
+    ? process.env.VITE_HRMS_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+    : process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (envValue) return resolveSupabaseUrl(envValue);
 
   const envFiles = [
@@ -52,8 +75,13 @@ function readSupabaseUrl(): string {
 
       try {
         const content = readFileSync(envPath, "utf-8");
-        const match = content.match(/(?:VITE_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL)\s*=\s*"?([^"\n]+)"?/);
-        if (match) return resolveSupabaseUrl(match[1]);
+        const value = readEnvValue(
+          content,
+          isHrmsE2E()
+            ? ["VITE_HRMS_SUPABASE_URL", "VITE_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"]
+            : ["VITE_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"],
+        );
+        if (value) return resolveSupabaseUrl(value);
       } catch {
         // Ignore missing env files and continue down the precedence chain.
       }
@@ -64,7 +92,7 @@ function readSupabaseUrl(): string {
 }
 
 export const SUPABASE_URL = readSupabaseUrl();
-const LS_KEY = 'flc.auth.session';
+const LS_KEY = isHrmsE2E() ? 'flc.hrms.auth.session' : 'flc.ubs.auth.session';
 
 export const MOCK_USER = {
   id: "00000000-0000-0000-0000-000000000001",
@@ -169,7 +197,7 @@ export async function setupSessionForUpdateUser(page: Page) {
 
 export async function setupRecoveryCallbackMocks(page: Page) {
   await page.context().addInitScript(() => {
-    localStorage.setItem('flc.auth.session-code-verifier', JSON.stringify('fake-code-verifier/recovery'));
+    localStorage.setItem('flc.ubs.auth.session-code-verifier', JSON.stringify('fake-code-verifier/recovery'));
   });
 
   await page.route(`${SUPABASE_URL}/auth/v1/verify*`, (route) => {

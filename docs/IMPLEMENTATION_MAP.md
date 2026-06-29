@@ -133,7 +133,7 @@ This is a **Turborepo monorepo** (`flc-bi`) housing a multi-module enterprise BI
 │   │   └── vehicles/                  # VehicleDetailPanel, VehicleEditDialog
 │   ├── pages/
 │   │   ├── accounts/                  # ChartOfAccounts, TrialBalance, JournalEntries, AccountingPeriods
-│   │   ├── admin/                     # UserManagement, AuditLog, SettingsPage, BranchManagement, MasterData, Suppliers, Dealers, UserGroups, RolePermissions, ActivityDashboard
+│   │   ├── admin/                     # UserManagement, AuditLog, SettingsPage, BranchManagement, MasterData, Suppliers, Dealers, UserGroups, ActivityDashboard
 │   │   ├── auto-aging/                # AutoAgingDashboard, VehicleExplorer, VehicleDetail, ImportCenter, ImportReviewQueue, ImportReviewDetail, DataQuality, SLAAdmin, MappingAdmin, ImportHistory, CommissionDashboard, ReportCenter
 │   │   ├── hrms/                      # HrmsWorkspaceRedirect (6 legacy pages exist but route to redirect)
 │   │   ├── inventory/                 # StockBalance, VehicleTransfer, ChassisMovement, ChassisFilter
@@ -270,7 +270,6 @@ All routes are defined in `src/main.tsx:175-303` inside a single `createBrowserR
 | `/admin/suppliers` | Suppliers | AppLayout | ADMIN_ONLY | — | — |
 | `/admin/dealers` | Dealers | AppLayout | ADMIN_ONLY | — | — |
 | `/admin/user-groups` | UserGroups | AppLayout | ADMIN_ONLY | — | — |
-| `/admin/role-permissions` | RolePermissionsPage | AppLayout | ADMIN_ONLY | — | `roleSectionService`, `permissionService` |
 | `/reports` | ReportsCenter | AppLayout | — | `reports` | `businessReportService` |
 | `/hrms` / `/hrms/*` | HrmsWorkspaceRedirect | AppLayout | — | `hrms` | — (redirects to HRMS app) |
 | `/portal` | PortalLanding | CustomerServiceLayout | ProtectedRoute | `support` | — |
@@ -434,7 +433,7 @@ Internet
 
 | Group | Roles | Usage |
 |-------|-------|-------|
-| `ADMIN_ONLY` | super_admin, company_admin | `/admin/users`, `/admin/branches`, `/admin/master-data`, `/admin/suppliers`, `/admin/dealers`, `/admin/user-groups`, `/admin/role-permissions` |
+| `ADMIN_ONLY` | super_admin, company_admin | `/admin/users`, `/admin/branches`, `/admin/master-data`, `/admin/suppliers`, `/admin/dealers`, `/admin/user-groups` |
 | `ADMIN_AND_DIRECTOR` | + director | `/admin/audit` |
 | `EXECUTIVE` | + general_manager | `/admin/activity`, `/auto-aging/sla`, `/auto-aging/mappings`, `/sales/margin` |
 | `MANAGER_AND_UP` | + manager | `/auto-aging/import`, `/auto-aging/review`, `/auto-aging/commissions`, `/sales/pipeline`, `/sales/invoices`, `/sales/performance`, `/sales/advisors`, `/sales/dealer-invoices`, `/sales/verify-or`, `/inventory/transfers`, `/purchasing/invoices` |

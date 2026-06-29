@@ -9,6 +9,7 @@ interface InvitePayload {
   name: string;
   role: string;
   company_id: string;
+  branch_id?: string | null;
   access_scope?: string;
   employee_id?: string | null;
   portal_access_only?: boolean;
@@ -17,6 +18,10 @@ interface InvitePayload {
 function isMissingEmployeeLinkColumnError(message: string | null | undefined): boolean {
   const text = (message ?? '').toLowerCase();
   return text.includes('column profiles.employee_id does not exist') || text.includes('employee_id');
+}
+
+function isEmailDeliveryError(message: string | null | undefined): boolean {
+  return /send(ing)? invite email|send(ing)? email|smtp|email/i.test(message ?? '');
 }
 
 // Durable rate limit: 10 invites per caller per hour. Backed by the
@@ -120,11 +125,42 @@ Deno.serve(withRequestLogging('invite-user', async ({ req }) => {
 
     // Parse request body
     const body: InvitePayload = await req.json();
-    const { email, name, role, company_id, access_scope, employee_id, portal_access_only } = body;
+    const { email, name, role, company_id, branch_id, access_scope, employee_id, portal_access_only } = body;
 
     if (!email || !name || !role || !company_id) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: email, name, role, company_id' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    const roleDefaultScopes: Record<string, string> = {
+      super_admin: 'global',
+      company_admin: 'company',
+      director: 'company',
+      general_manager: 'company',
+      manager: 'branch',
+      sales: 'self',
+      accounts: 'company',
+      analyst: 'company',
+      creator_updater: 'branch',
+      portal_admin: 'company',
+      portal_manager: 'company',
+      portal_staff: 'self',
+    };
+    if (!(role in roleDefaultScopes)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid role: ${role}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    const finalScope = access_scope || roleDefaultScopes[role] || 'company';
+    const requiresBranch = finalScope !== 'global';
+
+    if (requiresBranch && !branch_id) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: branch_id' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -145,10 +181,36 @@ Deno.serve(withRequestLogging('invite-user', async ({ req }) => {
       }
     }
 
+    if (branch_id) {
+      const { data: selectedBranch, error: branchError } = await adminClient
+        .from('branches')
+        .select('id, company_id')
+        .eq('id', branch_id)
+        .eq('company_id', company_id)
+        .maybeSingle();
+
+      if (branchError) {
+        return new Response(
+          JSON.stringify({ error: `Failed to validate branch assignment: ${branchError.message}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      if (!selectedBranch) {
+        return new Response(
+          JSON.stringify({ error: 'Selected branch is not valid for this company' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
     const redirectTo = `${siteUrl.replace(/\/$/, '')}/signup`;
 
-    // Invite the user via Supabase Admin API
-    const { data: inviteData, error: inviteError } = await inviteClient.auth.admin.inviteUserByEmail(
+    let emailDeliveryStatus: 'sent' | 'link_generated' = 'sent';
+    let inviteLink: string | null = null;
+
+    // Invite the user via Supabase Admin API.
+    let { data: inviteData, error: inviteError } = await inviteClient.auth.admin.inviteUserByEmail(
       email,
       {
         data: { name, role, company_id },
@@ -157,37 +219,47 @@ Deno.serve(withRequestLogging('invite-user', async ({ req }) => {
     );
 
     if (inviteError) {
-      return new Response(
-        JSON.stringify({ error: inviteError.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+      if (!isEmailDeliveryError(inviteError.message)) {
+        return new Response(
+          JSON.stringify({ error: inviteError.message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      const generated = await inviteClient.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: {
+          data: { name, role, company_id },
+          redirectTo,
+        },
+      });
+
+      if (generated.error) {
+        return new Response(
+          JSON.stringify({ error: generated.error.message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      inviteData = generated.data;
+      inviteError = null;
+      emailDeliveryStatus = 'link_generated';
+      inviteLink = generated.data.properties?.action_link ?? null;
     }
 
     // Update the profile with role, company_id, and access_scope
     // The handle_new_user trigger creates the profile row automatically
     if (inviteData.user) {
-      const roleDefaultScopes: Record<string, string> = {
-        super_admin: 'global',
-        company_admin: 'company',
-        director: 'company',
-        general_manager: 'company',
-        manager: 'branch',
-        sales: 'self',
-        accounts: 'company',
-        analyst: 'company',
-        creator_updater: 'branch',
-      };
-
-      const finalScope = access_scope || roleDefaultScopes[role] || 'company';
-
       const profilePatch = {
         id: inviteData.user.id,
         email,
         name,
         role,
         company_id,
+        branch_id: branch_id ?? null,
         access_scope: finalScope,
-        status: 'active',
+        status: 'pending',
         portal_access_only: portal_access_only ?? false,
         updated_at: new Date().toISOString(),
         ...(employee_id ? { employee_id } : {}),
@@ -211,12 +283,33 @@ Deno.serve(withRequestLogging('invite-user', async ({ req }) => {
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
+
+      await adminClient.from('audit_logs').insert({
+        user_id: caller.id,
+        action: 'create',
+        entity_type: 'profile',
+        entity_id: inviteData.user.id,
+        changes: {
+          component: 'invite-user edge function',
+          email,
+          role,
+          company_id,
+          branch_id,
+          access_scope: finalScope,
+          status: 'pending',
+          portal_access_only: portal_access_only ?? false,
+          email_delivery_status: emailDeliveryStatus,
+        },
+        table_name: 'user_actions',
+      });
     }
 
     return new Response(
       JSON.stringify({
-        message: `Invitation sent to ${email}`,
+        message: emailDeliveryStatus === 'sent' ? `Invitation sent to ${email}` : `Invitation link generated for ${email}`,
         user_id: inviteData.user?.id,
+        invite_link: inviteLink,
+        email_delivery_status: emailDeliveryStatus,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );

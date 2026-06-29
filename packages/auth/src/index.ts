@@ -26,9 +26,11 @@ export {
 export {
   ALL_SECTIONS,
   DEFAULT_ROLE_SECTIONS,
+  UBS_DEFAULT_ROLE_SECTIONS,
+  UBS_SECTIONS,
   ROLE_LABELS,
 } from './rolePermissions';
-export type { SectionName } from './rolePermissions';
+export type { SectionName, UbsSectionName } from './rolePermissions';
 export {
   HRMS_ACCESS_ROLES,
   HRMS_ADMIN_ROLES,

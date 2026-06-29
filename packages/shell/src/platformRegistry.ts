@@ -229,7 +229,6 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
   { id: 'admin-webhooks', label: 'Webhook Outbox', path: '/admin/webhooks', shell: 'main', section: 'Admin', icon: 'git-branch', group: 'Governance', moduleGate: 'admin', featureFlag: 'phase6.webhook-outbox', roles: ['super_admin', 'company_admin'] },
   { id: 'admin-users', label: 'Users & Roles', path: '/admin/users', shell: 'main', section: 'Admin', icon: 'shield', group: 'Access', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'admin-user-groups', label: 'User Groups', path: '/admin/user-groups', shell: 'main', section: 'Admin', icon: 'shield', group: 'Access', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'admin-role-permissions', label: 'Role Permissions', path: '/admin/role-permissions', shell: 'main', section: 'Admin', icon: 'shield', group: 'Access', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'admin-branches', label: 'Branch Management', path: '/admin/branches', shell: 'main', section: 'Admin', icon: 'git-branch', group: 'Master Data', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'admin-master-data', label: 'Master Data', path: '/admin/master-data', shell: 'main', section: 'Admin', icon: 'database', group: 'Master Data', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'admin-suppliers', label: 'Suppliers', path: '/admin/suppliers', shell: 'main', section: 'Admin', icon: 'truck', group: 'Master Data', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
@@ -255,7 +254,7 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
   { id: 'hrms-approval-flows-legacy', label: 'Approval Flows', path: '/approval-flows', shell: 'hrms', section: 'HRMS', icon: 'settings', smoke: { app: 'hrms' } },
 ] as const;
 
-export const MAIN_NAV_ROUTES = PLATFORM_ROUTES.filter((route) => route.navShell === 'main');
+export const MAIN_NAV_ROUTES = PLATFORM_ROUTES.filter((route) => route.navShell === 'main' && route.section !== 'HRMS');
 
 const HRMS_PROTECTED_ROUTE_IDS = [
   'hrms-dashboard',

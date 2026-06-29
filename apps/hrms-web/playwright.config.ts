@@ -5,6 +5,7 @@ const BASE_URL = process.env.HRMS_WEB_E2E_BASE_URL ?? `http://localhost:${PORT}`
 
 process.env.HRMS_WEB_E2E_BASE_URL = BASE_URL;
 process.env.BASE_URL = BASE_URL;
+process.env.E2E_APP = 'hrms';
 
 export default defineConfig({
   testDir: './e2e',
@@ -29,7 +30,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npm run dev -- --port ${PORT} --strictPort`,
+    command: `npm run dev --workspace @flc/hrms-web -- --port ${PORT} --strictPort`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

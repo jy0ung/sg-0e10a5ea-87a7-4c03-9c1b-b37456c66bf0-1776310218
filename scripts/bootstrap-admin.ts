@@ -26,12 +26,14 @@
  *   npx tsx scripts/bootstrap-admin.ts
  */
 import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const COMPANY_NAME = process.env.COMPANY_NAME ?? 'FLC';
+const ENABLE_MODULE_ID = process.env.ENABLE_MODULE_ID;
 
 function fail(msg: string): never {
   console.error(`[bootstrap-admin] ${msg}`);
@@ -64,6 +66,7 @@ try {
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
+  realtime: { transport: WebSocket },
 });
 
 function slugify(name: string): string {
@@ -139,10 +142,25 @@ async function upsertAdminProfile(userId: string, email: string, companyId: stri
   if (error) throw new Error(`profiles upsert failed: ${error.message}`);
 }
 
+async function enableModule(companyId: string, moduleId: string, userId: string): Promise<void> {
+  const { error } = await admin.from('module_settings').upsert(
+    {
+      company_id: companyId,
+      module_id: moduleId,
+      is_active: true,
+      updated_by: userId,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'company_id,module_id' },
+  );
+  if (error) throw new Error(`module_settings upsert failed: ${error.message}`);
+}
+
 async function main() {
   const companyId = await ensureCompany(COMPANY_NAME);
   const userId = await ensureAuthUser(ADMIN_EMAIL!, ADMIN_PASSWORD!);
   await upsertAdminProfile(userId, ADMIN_EMAIL!, companyId);
+  if (ENABLE_MODULE_ID) await enableModule(companyId, ENABLE_MODULE_ID, userId);
   console.info(
     JSON.stringify(
       {
@@ -152,6 +170,7 @@ async function main() {
         companyId,
         role: 'super_admin',
         status: 'active',
+        enabledModuleId: ENABLE_MODULE_ID || null,
       },
       null,
       2,

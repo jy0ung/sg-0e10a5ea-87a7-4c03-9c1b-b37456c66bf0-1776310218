@@ -1,17 +1,20 @@
 // ===== User & Auth =====
-export type AppRole =
-  | 'super_admin'
-  | 'company_admin'
-  | 'director'
-  | 'general_manager'
-  | 'manager'
-  | 'sales'
-  | 'accounts'
-  | 'analyst'
-  | 'creator_updater'
-  | 'portal_admin'
-  | 'portal_manager'
-  | 'portal_staff';
+export const APP_ROLES = [
+  'super_admin',
+  'company_admin',
+  'director',
+  'general_manager',
+  'manager',
+  'sales',
+  'accounts',
+  'analyst',
+  'creator_updater',
+  'portal_admin',
+  'portal_manager',
+  'portal_staff',
+] as const;
+
+export type AppRole = typeof APP_ROLES[number];
 export type AccessScope = 'self' | 'branch' | 'company' | 'global';
 
 export const DEFAULT_APP_ROLE: AppRole = 'creator_updater';

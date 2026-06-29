@@ -42,14 +42,14 @@ content_path = "./supabase/templates/recovery.html"
 # Keep this block commented in git so local development continues to use Mailpit.
 # Configure the live server with scripts/configure-supabase-auth-smtp.sh.
 # BEGIN managed auth SMTP relay
-[auth.email.smtp]
-enabled = true
-host = "smtp.resend.com"
-port = 587
-user = "resend"
-pass = "env(AUTH_SMTP_PASS)"
-admin_email = "flsys@protonfookloi.com"
-sender_name = "FOOK LOI SYSTEM"
+# [auth.email.smtp]
+# enabled = true
+# host = "smtp.resend.com"
+# port = 587
+# user = "resend"
+# pass = "env(AUTH_SMTP_PASS)"
+# admin_email = "flsys@protonfookloi.com"
+# sender_name = "FOOK LOI SYSTEM"
 # END managed auth SMTP relay
 
 # ── Edge Function registration ────────────────────────────────────────────────

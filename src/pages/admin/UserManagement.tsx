@@ -11,7 +11,6 @@ import {
   listCompanyOptions,
   listProfiles,
   reactivateUser,
-  setPortalAccess,
   updateProfile,
   type ProfileRow,
 } from '@flc/auth';
@@ -40,7 +39,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -61,34 +59,39 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AppRole, AccessScope, DEFAULT_APP_ROLE, ROLE_DEFAULT_SCOPE, type Employee } from '@/types';
+import { APP_ROLES, AppRole, AccessScope, DEFAULT_APP_ROLE, ROLE_DEFAULT_SCOPE, type BranchRecord } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import { PermissionEditor } from '@/components/admin/PermissionEditor';
+import { RoleManagementPanel } from '@/components/admin/RoleManagementPanel';
 import { userUpdateSchema, inviteUserSchema, type UserUpdateFormData, type InviteUserFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
-import { listEmployeeDirectory } from '@/services/hrmsService';
 import { authService } from '@/services/authService';
 import { cn } from '@/lib/utils';
+import { logPermissionChange } from '@flc/platform-services';
 
-const ROLES: { value: AppRole; label: string }[] = [
-  { value: 'super_admin', label: 'Super Admin' },
-  { value: 'company_admin', label: 'Company Admin' },
-  { value: 'director', label: 'Director' },
-  { value: 'general_manager', label: 'General Manager' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'sales', label: 'Sales' },
-  { value: 'accounts', label: 'Accounts' },
-  { value: 'analyst', label: 'Analyst (Legacy)' },
-  { value: 'creator_updater', label: 'Creator/Updater' },
-  // Portal-only roles
-  { value: 'portal_admin', label: 'Portal Admin' },
-  { value: 'portal_manager', label: 'Portal Manager' },
-  { value: 'portal_staff', label: 'Portal Staff' },
-];
+const ROLE_LABELS: Record<AppRole, string> = {
+  super_admin: 'Super Admin',
+  company_admin: 'Company Admin',
+  director: 'Director',
+  general_manager: 'General Manager',
+  manager: 'Manager',
+  sales: 'Sales',
+  accounts: 'Accounts',
+  analyst: 'Analyst (Legacy)',
+  creator_updater: 'Creator/Updater',
+  portal_admin: 'Portal Admin',
+  portal_manager: 'Portal Manager',
+  portal_staff: 'Portal Staff',
+};
+
+const ROLES: { value: AppRole; label: string }[] = APP_ROLES.map((role) => ({
+  value: role,
+  label: ROLE_LABELS[role],
+}));
 
 const SCOPES: { value: AccessScope; label: string }[] = [
   { value: 'self', label: 'Self - own records only' },
@@ -98,6 +101,8 @@ const SCOPES: { value: AccessScope; label: string }[] = [
 ];
 
 type AccountFilter = 'active' | 'pending' | 'inactive' | 'all';
+type RoleFilter = AppRole | 'all';
+type AdminUsersRoleTab = 'users' | 'roles';
 type AccountStatusAction = 'deactivate' | 'reactivate';
 const ARCHIVED_EMAIL_DOMAIN = '@archived.local';
 
@@ -107,6 +112,10 @@ function scopeLabel(scope: string): string {
 
 function roleLabel(role: AppRole): string {
   return ROLES.find(r => r.value === role)?.label ?? role.replace(/_/g, ' ');
+}
+
+function isBranchRequiredForRole(role: AppRole): boolean {
+  return (ROLE_DEFAULT_SCOPE[role] || 'company') !== 'global';
 }
 
 function getInitials(name: string, email: string): string {
@@ -137,16 +146,18 @@ export default function UserManagement() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [signupUrl, setSignupUrl] = useState('');
+  const [inviteDeliveryStatus, setInviteDeliveryStatus] = useState<'sent' | 'link_generated'>('sent');
   const [copied, setCopied] = useState(false);
   const [activating, setActivating] = useState<string>('');
-  const [grantingAccess, setGrantingAccess] = useState<string>('');
   const [resettingPassword, setResettingPassword] = useState<string>('');
   const [deletingUser, setDeletingUser] = useState<string>('');
   const [updatingAccountStatus, setUpdatingAccountStatus] = useState<string>('');
   const [pendingSelections, setPendingSelections] = useState<
-    Record<string, { role: AppRole; company_id: string; employee_id: string | null }>
+    Record<string, { role: AppRole; company_id: string; branch_id: string }>
   >({});
   const [accountFilter, setAccountFilter] = useState<AccountFilter>('active');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+  const [adminTab, setAdminTab] = useState<AdminUsersRoleTab>('users');
   const [search, setSearch] = useState('');
   const [statusActionUser, setStatusActionUser] = useState<ProfileRow | null>(null);
   const [statusAction, setStatusAction] = useState<AccountStatusAction>('deactivate');
@@ -160,8 +171,6 @@ export default function UserManagement() {
       role: DEFAULT_APP_ROLE,
       access_scope: 'company',
       branch_id: null,
-      employee_id: null,
-      portal_access_only: false,
     },
     mode: 'onChange',
   });
@@ -175,38 +184,9 @@ export default function UserManagement() {
     staleTime: STALE.reference,
   });
 
-  const { data: branches = [] } = useQuery({
-    queryKey: ['branches', user?.company_id],
-    queryFn: () => getBranches(user!.company_id || '').then(r => r.data),
-    enabled: !!user?.company_id,
-    staleTime: STALE.reference,
-  });
-
   const { data: companies = [] } = useQuery({
     queryKey: ['company-options'],
     queryFn: () => listCompanyOptions().then(r => r.data),
-    staleTime: STALE.reference,
-  });
-
-  const companyIdsForEmployees = useMemo(() => [
-    ...new Set(
-      profiles.map(p => p.company_id).concat(user?.company_id ?? null).filter((id): id is string => Boolean(id)),
-    ),
-  ], [profiles, user?.company_id]);
-
-  const { data: employeesByCompany = {} } = useQuery({
-    queryKey: ['employees-by-company', companyIdsForEmployees],
-    queryFn: async () => {
-      const results = await Promise.all(
-        companyIdsForEmployees.map(async (companyId) => ({ companyId, result: await listEmployeeDirectory(companyId) })),
-      );
-      const map: Record<string, Employee[]> = {};
-      for (const { companyId, result } of results) {
-        if (!result.error) map[companyId] = result.data;
-      }
-      return map;
-    },
-    enabled: companyIdsForEmployees.length > 0,
     staleTime: STALE.reference,
   });
 
@@ -217,23 +197,56 @@ export default function UserManagement() {
       name: '',
       role: DEFAULT_APP_ROLE,
       company_id: user?.company_id ?? null,
-      employee_id: null,
-      portal_access_only: true,
+      branch_id: '',
+      portal_access_only: false,
     },
     mode: 'onChange',
   });
+
   const selectedInviteCompanyId = isSuperAdmin
     ? (inviteForm.watch('company_id') ?? '')
     : (user?.company_id ?? '');
+  const selectedInviteRole = inviteForm.watch('role') as AppRole;
+  const isInviteBranchRequired = isBranchRequiredForRole(selectedInviteRole);
 
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches', user?.company_id],
+    queryFn: () => getBranches(user!.company_id || '').then(r => r.data),
+    enabled: !!user?.company_id,
+    staleTime: STALE.reference,
+  });
 
-  const linkedEmployeeProfileIdByEmployeeId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const profile of profiles) {
-      if (profile.employee_id) map.set(profile.employee_id, profile.id);
-    }
-    return map;
-  }, [profiles]);
+  const { data: inviteBranches = [] } = useQuery({
+    queryKey: ['invite-branches', selectedInviteCompanyId],
+    queryFn: () => getBranches(selectedInviteCompanyId).then(r => r.data),
+    enabled: !!selectedInviteCompanyId,
+    staleTime: STALE.reference,
+  });
+
+  const branchCompanyIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (user?.company_id) ids.add(user.company_id);
+    companies.forEach(company => ids.add(company.id));
+    profiles.forEach(profile => {
+      if (profile.company_id) ids.add(profile.company_id);
+    });
+    return Array.from(ids).sort();
+  }, [companies, profiles, user?.company_id]);
+
+  const { data: branchesByCompany = {} } = useQuery({
+    queryKey: ['branches-by-company', branchCompanyIds],
+    queryFn: async () => {
+      const entries = await Promise.all(
+        branchCompanyIds.map(async (companyId) => {
+          const result = await getBranches(companyId);
+          return [companyId, result.data] as const;
+        }),
+      );
+      return Object.fromEntries(entries) as Record<string, BranchRecord[]>;
+    },
+    enabled: branchCompanyIds.length > 0,
+    staleTime: STALE.reference,
+  });
 
   const visibleProfiles = useMemo(
     () => profiles.filter(profile => !isArchivedAccountProfile(profile)),
@@ -254,28 +267,14 @@ export default function UserManagement() {
     active: managedUsers.filter(p => p.status === 'active').length,
     pending: pendingUsers.length,
     inactive: managedUsers.filter(p => p.status === 'inactive' || p.status === 'resigned').length,
-    portalOnly: managedUsers.filter(p => p.portal_access_only).length,
+    managed: managedUsers.length,
     total: visibleProfiles.length,
   }), [managedUsers, pendingUsers.length, visibleProfiles.length]);
 
-  function getEmployeeOptions(companyId: string | null | undefined, currentProfileId?: string) {
-    if (!companyId) return [];
-    return (employeesByCompany[companyId] ?? []).filter(employee => {
-      const linkedProfileId = linkedEmployeeProfileIdByEmployeeId.get(employee.id);
-      return !linkedProfileId || linkedProfileId === currentProfileId;
-    });
-  }
-
-  function getEmployeeLabel(profile: ProfileRow) {
-    if (!profile.employee_id || !profile.company_id) return 'Unlinked';
-    const employee = (employeesByCompany[profile.company_id] ?? []).find(row => row.id === profile.employee_id);
-    if (!employee) return profile.employee_id;
-    return employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name;
-  }
-
   function getBranchLabel(profile: ProfileRow) {
     if (!profile.branch_id) return 'All branches';
-    const branch = branches.find(row => row.id === profile.branch_id || row.name === profile.branch_id);
+    const companyBranches = profile.company_id ? (branchesByCompany[profile.company_id] ?? []) : branches;
+    const branch = companyBranches.find(row => row.id === profile.branch_id || row.name === profile.branch_id);
     return branch?.name ?? profile.branch_id;
   }
 
@@ -289,16 +288,17 @@ export default function UserManagement() {
         return true;
       });
 
-    if (!query) return source;
+    const roleScoped = roleFilter === 'all' ? source : source.filter(profile => profile.role === roleFilter);
 
-    return source.filter(profile => {
+    if (!query) return roleScoped;
+
+    return roleScoped.filter(profile => {
       const haystack = [
         profile.name,
         profile.email,
         roleLabel(profile.role),
         scopeLabel(profile.access_scope),
         profile.status,
-        getEmployeeLabel(profile),
         getBranchLabel(profile),
       ].map(normalizeText).join(' ');
       return haystack.includes(query);
@@ -317,8 +317,6 @@ export default function UserManagement() {
       role: p.role as UserUpdateFormData['role'],
       access_scope: p.access_scope as UserUpdateFormData['access_scope'],
       branch_id: p.branch_id,
-      employee_id: p.employee_id ?? null,
-      portal_access_only: p.portal_access_only,
     });
   };
 
@@ -340,8 +338,6 @@ export default function UserManagement() {
       role: data.role,
       access_scope: data.access_scope,
       branch_id: data.branch_id,
-      employee_id: data.employee_id,
-      portal_access_only: data.portal_access_only ?? false,
     }, {
       actorId: user?.id,
       companyId: editUser.company_id ?? user?.company_id,
@@ -365,8 +361,6 @@ export default function UserManagement() {
           role: data.role,
           access_scope: data.access_scope,
           branch_id: data.branch_id,
-          employee_id: data.employee_id ?? null,
-          portal_access_only: data.portal_access_only ?? false,
         } as ProfileRow : p)
       );
       setEditUser(null);
@@ -436,27 +430,32 @@ export default function UserManagement() {
     }
 
     setInviting(true);
-    const { error } = await inviteUser({
+    const { error, inviteLink, emailDeliveryStatus } = await inviteUser({
       email: data.email,
       name: data.name,
       role: data.role,
       companyId,
-      employeeId: data.employee_id,
-      portalAccessOnly: data.portal_access_only ?? false,
+      branchId: data.branch_id || null,
+      portalAccessOnly: false,
     });
     setInviting(false);
     if (error) {
       toast.error('Failed to send invitation: ' + error);
       return;
     }
-    toast.success(`Invitation sent to ${data.email}`);
-    setSignupUrl(getSignupUrl());
+    if (emailDeliveryStatus === 'link_generated') {
+      toast.success(`Invite link generated for ${data.email}`);
+    } else {
+      toast.success(`Invitation sent to ${data.email}`);
+    }
+    setInviteDeliveryStatus(emailDeliveryStatus ?? 'sent');
+    setSignupUrl(inviteLink ?? getSignupUrl());
     inviteForm.reset({
       email: '',
       name: '',
       role: DEFAULT_APP_ROLE,
       company_id: isSuperAdmin ? null : (user?.company_id ?? null),
-      employee_id: null,
+      branch_id: '',
       portal_access_only: false,
     } as InviteUserFormData);
     await refreshProfiles();
@@ -469,7 +468,7 @@ export default function UserManagement() {
       company_id:
         current?.company_id
         ?? (p.company_id || (hasRole(['super_admin']) ? (companies[0]?.id ?? '') : (user?.company_id ?? ''))),
-      employee_id: current?.employee_id ?? (p.employee_id ?? null),
+      branch_id: current?.branch_id ?? (p.branch_id ?? ''),
     };
   };
 
@@ -477,10 +476,16 @@ export default function UserManagement() {
     setPendingSelections(prev => ({ ...prev, [profile.id]: { ...getPendingSelection(profile), ...prev[profile.id], role } }));
   };
   const setPendingCompany = (profile: ProfileRow, company_id: string) => {
-    setPendingSelections(prev => ({ ...prev, [profile.id]: { ...getPendingSelection(profile), ...prev[profile.id], company_id, employee_id: null } }));
+    setPendingSelections(prev => ({ ...prev, [profile.id]: { ...getPendingSelection(profile), ...prev[profile.id], company_id, branch_id: '' } }));
   };
-  const setPendingEmployee = (profile: ProfileRow, employee_id: string | null) => {
-    setPendingSelections(prev => ({ ...prev, [profile.id]: { ...getPendingSelection(profile), ...prev[profile.id], employee_id } }));
+  const setPendingBranch = (profile: ProfileRow, branch_id: string) => {
+    setPendingSelections(prev => ({ ...prev, [profile.id]: { ...getPendingSelection(profile), ...prev[profile.id], branch_id } }));
+  };
+  const getPendingBranchOptions = (companyId: string) => branchesByCompany[companyId] ?? [];
+  const canActivatePendingUser = (selection: { role: AppRole; company_id: string; branch_id: string }) => {
+    if (!selection.company_id) return false;
+    if (!isBranchRequiredForRole(selection.role)) return true;
+    return Boolean(selection.branch_id);
   };
 
   const handleActivate = async (p: ProfileRow) => {
@@ -489,13 +494,17 @@ export default function UserManagement() {
       toast.error('Select a company before activating.');
       return;
     }
+    if (isBranchRequiredForRole(sel.role) && !sel.branch_id) {
+      toast.error('Select a branch before activating this user.');
+      return;
+    }
     setActivating(p.id);
     const { error } = await updateProfile({
       id: p.id,
       role: sel.role,
       company_id: sel.company_id,
       access_scope: (ROLE_DEFAULT_SCOPE[sel.role] || 'company') as AccessScope,
-      employee_id: sel.employee_id,
+      branch_id: sel.branch_id || null,
       status: 'active',
     }, {
       actorId: user?.id,
@@ -514,18 +523,6 @@ export default function UserManagement() {
       const { [p.id]: _removed, ...rest } = prev;
       return rest;
     });
-  };
-
-  const handleGrantMainAppAccess = async (p: ProfileRow, grant: boolean) => {
-    setGrantingAccess(p.id);
-    const { error } = await setPortalAccess(p.id, !grant);
-    setGrantingAccess('');
-    if (error) {
-      toast.error((grant ? 'Failed to grant access: ' : 'Failed to revoke access: ') + error);
-      return;
-    }
-    toast.success(grant ? `Main app access granted to ${p.name || p.email}` : `Main app access revoked for ${p.name || p.email}`);
-    await refreshProfiles();
   };
 
   const handleSendPasswordReset = async (p: ProfileRow) => {
@@ -612,7 +609,6 @@ export default function UserManagement() {
   const renderAccountStatus = (p: ProfileRow) => (
     <div className="flex flex-wrap items-center gap-1.5">
       <StatusBadge status={p.status} />
-      {p.portal_access_only && <StatusBadge status="portal_only" />}
     </div>
   );
 
@@ -669,100 +665,121 @@ export default function UserManagement() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Users & Roles"
-        description="Manage account status, roles, employee links, and application access"
+        description="Manage UBS account status, roles, branch assignments, and permissions"
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Users & Roles' }]}
-        actions={
+        actions={adminTab === 'users' ? (
           <>
             <Button variant="outline" size="sm" onClick={handleCopySignupLink}>
               {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
               {copied ? 'Copied' : 'Copy Sign-Up Link'}
             </Button>
-            <Button size="sm" onClick={() => { setInviteOpen(true); setSignupUrl(''); }}>
+            <Button size="sm" onClick={() => { setInviteOpen(true); setSignupUrl(''); setInviteDeliveryStatus('sent'); }}>
               <UserPlus className="h-4 w-4 mr-1" />
               Invite User
             </Button>
           </>
-        }
+        ) : undefined}
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><UserCheck className="h-3.5 w-3.5" /> Active users</p>
-          <p className="text-2xl font-bold text-success">{summary.active}</p>
-        </div>
-        <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Pending activation</p>
-          <p className="text-2xl font-bold text-warning">{summary.pending}</p>
-        </div>
-        <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><UserMinus className="h-3.5 w-3.5" /> Inactive users</p>
-          <p className="text-2xl font-bold text-foreground">{summary.inactive}</p>
-        </div>
-        <div className="glass-panel p-4">
-          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Portal-only</p>
-          <p className="text-2xl font-bold text-primary">{summary.portalOnly}</p>
-        </div>
-      </div>
+      <Tabs value={adminTab} onValueChange={(value) => setAdminTab(value as AdminUsersRoleTab)} className="space-y-6">
+        <TabsList className="h-auto flex-wrap justify-start">
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="roles">Role management</TabsTrigger>
+        </TabsList>
 
-      <div className="glass-panel overflow-hidden">
-        <div className="p-4 border-b border-border space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:justify-between">
-            <Tabs value={accountFilter} onValueChange={(value) => setAccountFilter(value as AccountFilter)}>
-              <TabsList className="h-auto flex-wrap justify-start">
-                <TabsTrigger value="active">Active ({summary.active})</TabsTrigger>
-                <TabsTrigger value="pending">Pending ({summary.pending})</TabsTrigger>
-                <TabsTrigger value="inactive">Inactive ({summary.inactive})</TabsTrigger>
-                <TabsTrigger value="all">All ({summary.total})</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <div className="relative w-full lg:max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                className="pl-8 h-9"
-                placeholder="Search users, roles, employees..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
+        <TabsContent value="users" className="mt-0 space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="glass-panel p-4">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><UserCheck className="h-3.5 w-3.5" /> Active users</p>
+              <p className="text-2xl font-bold text-success">{summary.active}</p>
+            </div>
+            <div className="glass-panel p-4">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Pending activation</p>
+              <p className="text-2xl font-bold text-warning">{summary.pending}</p>
+            </div>
+            <div className="glass-panel p-4">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><UserMinus className="h-3.5 w-3.5" /> Inactive users</p>
+              <p className="text-2xl font-bold text-foreground">{summary.inactive}</p>
+            </div>
+            <div className="glass-panel p-4">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Managed users</p>
+              <p className="text-2xl font-bold text-primary">{summary.managed}</p>
             </div>
           </div>
-        </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-secondary/30 hover:bg-secondary/30">
-              <TableHead className="min-w-56">User</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Employee</TableHead>
-              <TableHead>Role & Scope</TableHead>
-              <TableHead>Branch</TableHead>
-              <TableHead className="w-10">
-                <input
-                  type="checkbox"
-                  checked={bulkSelected.size === displayedUsers.length && displayedUsers.length > 0}
-                  onChange={toggleAllBulk}
-                  className="h-3.5 w-3.5 accent-primary"
-                  aria-label="Select all users"
-                />
-              </TableHead>
-              <TableHead className="w-56 text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {bulkSelected.size > 0 && (
-              <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 mb-3">
-                <span className="text-xs font-medium text-primary">{bulkSelected.size} selected</span>
-                <Button size="sm" variant="outline" onClick={handleBulkDeactivate}>Deactivate</Button>
-                <Button size="sm" variant="outline" onClick={handleBulkReactivate}>Reactivate</Button>
-                <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setBulkSelected(new Set())}>Clear</Button>
+          <div className="glass-panel overflow-hidden">
+            <div className="p-4 border-b border-border space-y-4">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:justify-between">
+                <Tabs value={accountFilter} onValueChange={(value) => setAccountFilter(value as AccountFilter)}>
+                  <TabsList className="h-auto flex-wrap justify-start">
+                    <TabsTrigger value="active">Active ({summary.active})</TabsTrigger>
+                    <TabsTrigger value="pending">Pending ({summary.pending})</TabsTrigger>
+                    <TabsTrigger value="inactive">Inactive ({summary.inactive})</TabsTrigger>
+                    <TabsTrigger value="all">All ({summary.total})</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <div className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-xl">
+                  <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value as RoleFilter)}>
+                    <SelectTrigger className="h-9 sm:w-48">
+                      <SelectValue placeholder="Filter role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All roles</SelectItem>
+                      {ROLES.map(role => <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-8 h-9"
+                      placeholder="Search users, roles, branches..."
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
-            )}
-            {displayedUsers.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
-                  No users match the current view.
-                </TableCell>
-              </TableRow>
-            )}
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-secondary/30 hover:bg-secondary/30">
+                  <TableHead className="w-10">
+                    <input
+                      type="checkbox"
+                      checked={bulkSelected.size === displayedUsers.length && displayedUsers.length > 0}
+                      onChange={toggleAllBulk}
+                      className="h-3.5 w-3.5 accent-primary"
+                      aria-label="Select all users"
+                    />
+                  </TableHead>
+                  <TableHead className="min-w-56">User</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Role & Scope</TableHead>
+                  <TableHead>Branch</TableHead>
+                  <TableHead className="w-56 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bulkSelected.size > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="bg-primary/5">
+                      <div className="flex items-center gap-3 rounded-lg border border-primary/20 px-3 py-2">
+                        <span className="text-xs font-medium text-primary">{bulkSelected.size} selected</span>
+                        <Button size="sm" variant="outline" onClick={handleBulkDeactivate}>Deactivate</Button>
+                        <Button size="sm" variant="outline" onClick={handleBulkReactivate}>Reactivate</Button>
+                        <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setBulkSelected(new Set())}>Clear</Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {displayedUsers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                      No users match the current view.
+                    </TableCell>
+                  </TableRow>
+                )}
 
             {displayedUsers.map(p => {
               const isPending = !p.company_id || p.status === 'pending';
@@ -798,24 +815,6 @@ export default function UserManagement() {
 
                   <TableCell>
                     {isPending && pendingSelection ? (
-                      <Select value={pendingSelection.employee_id ?? 'none'} onValueChange={(value) => setPendingEmployee(p, value === 'none' ? null : value)}>
-                        <SelectTrigger className="h-8 min-w-44"><SelectValue placeholder="Link employee" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No employee link</SelectItem>
-                          {getEmployeeOptions(pendingSelection.company_id, p.id).map(employee => (
-                            <SelectItem key={employee.id} value={employee.id}>
-                              {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">{getEmployeeLabel(p)}</span>
-                    )}
-                  </TableCell>
-
-                  <TableCell>
-                    {isPending && pendingSelection ? (
                       <div className="grid gap-2 min-w-56">
                         <Select value={pendingSelection.role} onValueChange={(value) => setPendingRole(p, value as AppRole)}>
                           <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
@@ -827,6 +826,18 @@ export default function UserManagement() {
                           <SelectTrigger className="h-8"><SelectValue placeholder="Select company" /></SelectTrigger>
                           <SelectContent>
                             {companies.map(company => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={pendingSelection.branch_id || undefined}
+                          onValueChange={(value) => setPendingBranch(p, value)}
+                          disabled={!pendingSelection.company_id || !isBranchRequiredForRole(pendingSelection.role)}
+                        >
+                          <SelectTrigger className="h-8"><SelectValue placeholder={isBranchRequiredForRole(pendingSelection.role) ? 'Select branch' : 'No branch required'} /></SelectTrigger>
+                          <SelectContent>
+                            {getPendingBranchOptions(pendingSelection.company_id).map(branch => (
+                              <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -850,7 +861,7 @@ export default function UserManagement() {
                           <Button
                             size="sm"
                             onClick={() => handleActivate(p)}
-                            disabled={activating === p.id || !pendingSelection.company_id}
+                            disabled={activating === p.id || !canActivatePendingUser(pendingSelection)}
                           >
                             {activating === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
                             <span className="ml-1.5">Activate</span>
@@ -888,18 +899,6 @@ export default function UserManagement() {
                                 {resettingPassword === p.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <KeyRound className="h-4 w-4 mr-2" />}
                                 Reset password
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              {p.portal_access_only ? (
-                                <DropdownMenuItem onClick={() => handleGrantMainAppAccess(p, true)} disabled={grantingAccess === p.id || p.status !== 'active'}>
-                                  {grantingAccess === p.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserCheck className="h-4 w-4 mr-2" />}
-                                  Grant full access
-                                </DropdownMenuItem>
-                              ) : p.role !== 'super_admin' ? (
-                                <DropdownMenuItem onClick={() => handleGrantMainAppAccess(p, false)} disabled={grantingAccess === p.id || p.status !== 'active'}>
-                                  {grantingAccess === p.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserMinus className="h-4 w-4 mr-2" />}
-                                  Revoke full access
-                                </DropdownMenuItem>
-                              ) : null}
                               {p.status === 'inactive' && (
                                 <>
                                   <DropdownMenuSeparator />
@@ -922,9 +921,15 @@ export default function UserManagement() {
                 </TableRow>
               );
             })}
-          </TableBody>
-        </Table>
-      </div>
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="roles" className="mt-0">
+          <RoleManagementPanel embedded />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -984,40 +989,6 @@ export default function UserManagement() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Linked Employee</Label>
-              <Select
-                value={editForm.watch('employee_id') ?? 'none'}
-                onValueChange={(value) => editForm.setValue('employee_id', value === 'none' ? null : value, { shouldDirty: true, shouldValidate: true })}
-              >
-                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No employee link</SelectItem>
-                  {getEmployeeOptions(editUser?.company_id, editUser?.id).map(employee => (
-                    <SelectItem key={employee.id} value={employee.id}>
-                      {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="rounded-lg border border-border bg-secondary/30 p-3">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="portal-access-only">Internal Requests Only</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Restrict this user to the Internal Requests portal and block access to the main application shell.
-                  </p>
-                </div>
-                <Switch
-                  id="portal-access-only"
-                  checked={editForm.watch('portal_access_only') ?? false}
-                  onCheckedChange={(checked) => editForm.setValue('portal_access_only', checked, { shouldDirty: true, shouldValidate: true })}
-                />
-              </div>
-            </div>
-
             <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
               <p className="font-medium text-foreground">Access Summary</p>
               <p className="text-muted-foreground">
@@ -1026,11 +997,6 @@ export default function UserManagement() {
                 {editForm.watch('access_scope') === 'branch' && `Can see all data in branch ${editBranch === 'none' ? '(unassigned)' : editBranch} within company ${editUser?.company_id}.`}
                 {editForm.watch('access_scope') === 'self' && `Can only see records assigned to this user within company ${editUser?.company_id}.`}
               </p>
-              {editForm.watch('portal_access_only') && (
-                <p className="text-primary">
-                  Main app navigation will be hidden and protected routes will redirect this user to the Internal Requests portal.
-                </p>
-              )}
             </div>
 
             <Button onClick={editForm.handleSubmit(handleSave)} disabled={saving || !editForm.formState.isValid} className="w-full">
@@ -1058,7 +1024,7 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={inviteOpen} onOpenChange={(open) => { if (!open) { setInviteOpen(false); setSignupUrl(''); } }}>
+      <Dialog open={inviteOpen} onOpenChange={(open) => { if (!open) { setInviteOpen(false); setSignupUrl(''); setInviteDeliveryStatus('sent'); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Invite New User</DialogTitle>
@@ -1068,9 +1034,13 @@ export default function UserManagement() {
               <div className="space-y-4">
                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/20 text-center space-y-2">
                   <CheckCircle className="h-8 w-8 text-primary mx-auto" />
-                  <p className="text-sm font-medium text-foreground">Invitation sent!</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {inviteDeliveryStatus === 'link_generated' ? 'Invite link generated' : 'Invitation sent!'}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    The user will receive an email with a link to set up their account.
+                    {inviteDeliveryStatus === 'link_generated'
+                      ? 'Email delivery is unavailable. Share the invite link below so the user can set up their account.'
+                      : 'The user will receive an email with a link to set up their account.'}
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -1119,7 +1089,12 @@ export default function UserManagement() {
 
                 <div className="space-y-2">
                   <Label>Role</Label>
-                  <Select value={inviteForm.watch('role')} onValueChange={(value) => inviteForm.setValue('role', value as InviteUserFormData['role'])}>
+                  <Select value={inviteForm.watch('role')} onValueChange={(value) => {
+                    inviteForm.setValue('role', value as InviteUserFormData['role'], { shouldDirty: true, shouldValidate: true });
+                    if (!isBranchRequiredForRole(value as AppRole)) {
+                      inviteForm.setValue('branch_id', '', { shouldDirty: true, shouldValidate: true });
+                    }
+                  }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {ROLES.map(role => <SelectItem key={role.value} value={role.value}>{role.label}</SelectItem>)}
@@ -1134,7 +1109,7 @@ export default function UserManagement() {
                       value={selectedInviteCompanyId || undefined}
                       onValueChange={(value) => {
                         inviteForm.setValue('company_id', value, { shouldDirty: true, shouldValidate: true });
-                        inviteForm.setValue('employee_id', null, { shouldDirty: true, shouldValidate: true });
+                        inviteForm.setValue('branch_id', '', { shouldDirty: true, shouldValidate: true });
                       }}
                     >
                       <SelectTrigger>
@@ -1152,37 +1127,24 @@ export default function UserManagement() {
                 )}
 
                 <div className="space-y-2">
-                  <Label>Linked Employee</Label>
+                  <Label>Branch</Label>
                   <Select
-                    value={inviteForm.watch('employee_id') ?? 'none'}
-                    onValueChange={(value) => inviteForm.setValue('employee_id', value === 'none' ? null : value, { shouldDirty: true, shouldValidate: true })}
+                    value={inviteForm.watch('branch_id') || undefined}
+                    onValueChange={(value) => inviteForm.setValue('branch_id', value, { shouldDirty: true, shouldValidate: true })}
+                    disabled={!isInviteBranchRequired}
                   >
-                    <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                    <SelectTrigger className={inviteForm.formState.errors.branch_id ? 'border-destructive' : ''}>
+                      <SelectValue placeholder={isInviteBranchRequired ? 'Select branch' : 'No branch required'} />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">No employee link</SelectItem>
-                      {getEmployeeOptions(selectedInviteCompanyId).map(employee => (
-                        <SelectItem key={employee.id} value={employee.id}>
-                          {employee.staffCode ? `${employee.name} (${employee.staffCode})` : employee.name}
-                        </SelectItem>
+                      {inviteBranches.map(branch => (
+                        <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="rounded-lg border border-border bg-secondary/30 p-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <Label htmlFor="invite-portal-access-only">HRMS Only (no main app access)</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Limit this user to the HRMS app. Disable to grant full access to the main app.
-                      </p>
-                    </div>
-                    <Switch
-                      id="invite-portal-access-only"
-                      checked={inviteForm.watch('portal_access_only') ?? false}
-                      onCheckedChange={(checked) => inviteForm.setValue('portal_access_only', checked, { shouldDirty: true, shouldValidate: true })}
-                    />
-                  </div>
+                  {inviteForm.formState.errors.branch_id && (
+                    <p className="text-destructive text-xs">{inviteForm.formState.errors.branch_id.message}</p>
+                  )}
                 </div>
 
                 <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
@@ -1190,19 +1152,14 @@ export default function UserManagement() {
                   <p className="text-muted-foreground">
                     An invitation email will be sent to the user with a link to set up their account and password on the sign-up page.
                   </p>
-                  {inviteForm.watch('portal_access_only') && (
-                    <p className="text-primary">
-                      After sign-in, this user will land in the HRMS app. Enable full access to also grant main app permissions.
-                    </p>
-                  )}
-                  {!inviteForm.watch('portal_access_only') && (
-                    <p className="text-primary">
-                      This user will have full access to the main app and HRMS.
-                    </p>
-                  )}
+                  <p className="text-primary">
+                    {isInviteBranchRequired
+                      ? 'The user will be assigned to the selected UBS branch immediately.'
+                      : 'This global role is not tied to a branch.'}
+                  </p>
                 </div>
 
-                <Button type="submit" className="w-full" disabled={inviting || !inviteForm.formState.isValid || !selectedInviteCompanyId}>
+                <Button type="submit" className="w-full" disabled={inviting || !inviteForm.formState.isValid || !selectedInviteCompanyId || (isInviteBranchRequired && !inviteForm.watch('branch_id'))}>
                   {inviting ? (
                     <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending invitation...</>
                   ) : (
