@@ -64,7 +64,7 @@ jobs:
     outputs:
       env_name: ${{ steps.select.outputs.env_name }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Select target environment
         id: select
@@ -118,7 +118,7 @@ jobs:
       # rejects the workflow at parse time), so the deploy URL is omitted here.
       name: ${{ needs.plan.outputs.env_name }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v6
         with:
