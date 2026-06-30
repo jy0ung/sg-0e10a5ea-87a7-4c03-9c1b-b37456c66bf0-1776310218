@@ -92,9 +92,9 @@ export default function ManagerDashboard() {
   return (
     <div className="flex h-full w-full flex-col gap-4">
       <PageHeader
-        title="Manager Dashboard"
-        description="Live operating view for ownership, SLA exposure, workload, and closure quality."
-        breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'Manager Dashboard' }]}
+        title="Admin Command Center"
+        description="Live operating view for team capacity, SLA exposure, workload, and closure quality."
+        breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'Admin Command Center' }]}
       />
 
       <div className="flex items-center gap-3">

@@ -13,6 +13,7 @@ interface TicketChatPanelProps {
   saving: boolean;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  onReplyAndWait?: () => void;
   onAttachFiles?: (files: File[]) => void;
   readOnly?: boolean;
 }
@@ -26,6 +27,7 @@ export function TicketChatPanel({
   saving,
   onDraftChange,
   onSend,
+  onReplyAndWait,
   onAttachFiles,
   readOnly = false,
 }: TicketChatPanelProps) {
@@ -129,16 +131,18 @@ export function TicketChatPanel({
                 </label>
               )}
             </div>
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 gap-1.5 text-xs"
-              onClick={onSend}
-              disabled={saving || !draft.trim()}
-            >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              Send
-            </Button>
+            <div className="flex items-center gap-2">
+              {onReplyAndWait && (
+                <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onReplyAndWait} disabled={saving || !draft.trim()}>
+                  Reply & Wait
+                </Button>
+              )}
+              <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={onSend} disabled={saving || !draft.trim()}>
+                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Send message
+                <Send className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </>
       )}

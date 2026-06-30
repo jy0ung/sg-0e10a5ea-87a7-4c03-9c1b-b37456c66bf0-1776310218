@@ -33,18 +33,15 @@ describe('accessControl', () => {
     expect(isPortalOnlyUser({ role: 'portal_staff' })).toBe(true);
     expect(isPortalOnlyUser({ role: 'analyst', portal_access_only: true })).toBe(true);
     expect(isPortalOnlyUser({ role: 'company_admin' })).toBe(false);
-    expect(canAccessMainApp({ role: 'company_admin' })).toBe(true);
-    expect(canAccessMainApp({ role: 'portal_manager' })).toBe(false);
+    expect(canAccessMainApp({ role: 'portal_admin' })).toBe(false);
     expect(resolveAuthenticatedHomePath({ role: 'portal_admin' })).toBe('/portal');
   });
 
   it('separates queue and setup authorities for internal requests', () => {
     expect(canManagePortalQueue({ role: 'portal_admin' })).toBe(true);
-    expect(canManagePortalQueue({ role: 'portal_manager' })).toBe(true);
     expect(canManagePortalQueue({ role: 'portal_staff' })).toBe(false);
     expect(canManagePortalSetup({ role: 'portal_admin' })).toBe(true);
-    expect(canManagePortalSetup({ role: 'portal_manager' })).toBe(false);
-    expect(hasPortalSpecificRole({ role: 'portal_staff' })).toBe(true);
+    expect(canManagePortalSetup({ role: 'portal_staff' })).toBe(false);
     expect(hasPortalSpecificRole({ role: 'company_admin' })).toBe(false);
   });
 });

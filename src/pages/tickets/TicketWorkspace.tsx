@@ -4,14 +4,17 @@ import { formatDistanceToNow } from 'date-fns';
 import {
   AlertCircle,
   ArrowLeft,
+  Check,
   CheckCircle2,
   Clock3,
+  Edit2,
   FileText,
   Loader2,
   MessageSquare,
   MoreHorizontal,
   ShieldAlert,
   UserRound,
+  X,
 } from 'lucide-react';
 import { useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -40,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -80,6 +84,7 @@ import {
   reopenTicketByRequester,
   requestTicketMoreInformation,
   submitRequesterTicketUpdate,
+  ticketReplyAndWait,
   updateTicket,
 
 
@@ -138,8 +143,82 @@ function useTicketDraftField(
   return { value, setValue, clearValue, hasDraft };
 }
 
-export default function TicketWorkspace() {
-  const { ticketId = '' } = useParams();
+function EditableInfoRow({
+  label,
+  value,
+  onSave,
+  disabled
+}: {
+  label: string;
+  value: string | null;
+  onSave: (val: string) => Promise<boolean>;
+  disabled?: boolean;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentValue, setCurrentValue] = useState(value ?? '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setCurrentValue(value ?? '');
+  }, [value]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const ok = await onSave(currentValue);
+    setSaving(false);
+    if (ok) setIsEditing(false);
+  };
+
+  if (!isEditing) {
+    return (
+      <div className="group relative space-y-0.5 rounded-md -mx-2 px-2 py-1 hover:bg-muted/50 transition-colors">
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="text-sm font-medium text-foreground pr-6">{value || '—'}</p>
+        {!disabled && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => setIsEditing(true)}
+          >
+            <Edit2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1 -mx-2 px-2 py-1">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="flex items-center gap-1">
+        <Input 
+          value={currentValue}
+          onChange={(e) => setCurrentValue(e.target.value)}
+          className="h-7 text-sm"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void handleSave();
+            if (e.key === 'Escape') {
+              setIsEditing(false);
+              setCurrentValue(value ?? '');
+            }
+          }}
+          disabled={saving}
+        />
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 shrink-0" onClick={() => void handleSave()} disabled={saving}>
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive shrink-0" onClick={() => { setIsEditing(false); setCurrentValue(value ?? ''); }} disabled={saving}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default function TicketWorkspace({ ticketIdProp }: { ticketIdProp?: string } = {}) {
+  const params = useParams();
+  const ticketId = ticketIdProp || params.ticketId || '';
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -349,6 +428,17 @@ export default function TicketWorkspace() {
     const ok = await runWorkflow(
       () => addTicketComment(ticket.id, { message }, { userId: user.id, companyId: user.company_id }),
       'Message sent',
+    );
+    if (ok) chatDraft.clearValue();
+    return ok;
+  }, [chatDraft, runWorkflow, ticket, user]);
+
+  const handleReplyAndWait = useCallback(async () => {
+    const message = chatDraft.value.trim();
+    if (!ticket || !user || !message) return true;
+    const ok = await runWorkflow(
+      () => ticketReplyAndWait(ticket.id, message, { userId: user.id, companyId: user.company_id }),
+      'Replied and paused SLA',
     );
     if (ok) chatDraft.clearValue();
     return ok;
@@ -750,9 +840,42 @@ export default function TicketWorkspace() {
                     <InfoRow label="Category" value={getRequestCategoryLabel(ticket.category, categories)} />
                     <InfoRow label="Subcategory" value={ticket.subcategory ? getRequestSubcategoryLabel(ticket.subcategory, ticket.category, subcategories) : 'Not selected'} />
                     <InfoRow label="Requested due date" value={ticket.requested_due_date ? formatDueDate(ticket.requested_due_date) : 'Not provided'} />
-                    <InfoRow label="VSO" value={ticket.vso_number ?? 'Not provided'} />
-                    <InfoRow label="Desired outcome" value={ticket.desired_outcome ?? 'Not provided'} />
-                    <InfoRow label="Business impact" value={ticket.business_impact ?? 'Not provided'} />
+                    <EditableInfoRow 
+                      label="VSO" 
+                      value={ticket.vso_number ?? ''} 
+                      onSave={async (val) => {
+                        const { error } = await updateTicket(ticket.id, { vso_number: val }, { userId: user?.id ?? '', companyId: user?.company_id ?? '' });
+                        if (error) { toast.error('Failed to update VSO'); return false; }
+                        toast.success('VSO updated');
+                        void queryClient.invalidateQueries({ queryKey: workspaceQueryKey });
+                        return true;
+                      }}
+                      disabled={!data.permissions.canManageWorkflow}
+                    />
+                    <EditableInfoRow 
+                      label="Desired outcome" 
+                      value={ticket.desired_outcome ?? ''} 
+                      onSave={async (val) => {
+                        const { error } = await updateTicket(ticket.id, { desired_outcome: val }, { userId: user?.id ?? '', companyId: user?.company_id ?? '' });
+                        if (error) { toast.error('Failed to update desired outcome'); return false; }
+                        toast.success('Desired outcome updated');
+                        void queryClient.invalidateQueries({ queryKey: workspaceQueryKey });
+                        return true;
+                      }}
+                      disabled={!data.permissions.canManageWorkflow}
+                    />
+                    <EditableInfoRow 
+                      label="Business impact" 
+                      value={ticket.business_impact ?? ''} 
+                      onSave={async (val) => {
+                        const { error } = await updateTicket(ticket.id, { business_impact: val }, { userId: user?.id ?? '', companyId: user?.company_id ?? '' });
+                        if (error) { toast.error('Failed to update business impact'); return false; }
+                        toast.success('Business impact updated');
+                        void queryClient.invalidateQueries({ queryKey: workspaceQueryKey });
+                        return true;
+                      }}
+                      disabled={!data.permissions.canManageWorkflow}
+                    />
                   </div>
                 </Section>
                 {customFields.length > 0 && (
@@ -774,6 +897,7 @@ export default function TicketWorkspace() {
                   saving={saving}
                   onDraftChange={chatDraft.setValue}
                   onSend={() => void handleAddComment()}
+                  onReplyAndWait={data.permissions.canManageWorkflow ? () => void handleReplyAndWait() : undefined}
                   onAttachFiles={(files) => void handleChatFilesSelected(files)}
                 />
               </TabsContent>

@@ -130,6 +130,9 @@ export interface UpdateTicketInput {
   mark_opened?: boolean;
   admin_override_reason?: string | null;
   sla_breach_reason?: string | null;
+  vso_number?: string | null;
+  desired_outcome?: string | null;
+  business_impact?: string | null;
 }
 
 export interface AddTicketCommentInput {
@@ -168,7 +171,7 @@ const ARCHIVED_STATUSES: TicketStatus[] = ['closed', 'cancelled'];
  *   at_risk        – unresolved tickets within 4 hours of an SLA deadline
  *   breached       – unresolved tickets past an SLA deadline
  */
-export type TicketSlaFilter = 'all' | 'not_configured' | 'at_risk' | 'breached';
+export type TicketSlaFilter = 'all' | 'not_configured' | 'at_risk' | 'breached' | 'paused';
 
 /** AT_RISK_WINDOW matches the client-side constant in src/lib/ticketSla.ts */
 const AT_RISK_WINDOW_MS = 4 * 60 * 60 * 1000;
@@ -289,7 +292,7 @@ export interface DuplicateTicketCandidate {
 }
 
 type TicketRow = TicketRecord;
-type TicketUpdate = Database['public']['Tables']['tickets']['Update'] & Record<string, unknown>;
+type TicketUpdate = Database['public']['Tables']['tickets']['Update'];
 type TicketActivityDbInsert = Database['public']['Tables']['ticket_activity']['Insert'];
 
 interface ProfileLookupRow {
@@ -1537,6 +1540,9 @@ export async function updateTicket(
   if (input.resolution_note !== undefined) {
     patch.resolution_note = input.resolution_note?.trim() ? input.resolution_note.trim() : null;
   }
+  if (input.vso_number !== undefined) patch.vso_number = input.vso_number?.trim() || null;
+  if (input.desired_outcome !== undefined) patch.desired_outcome = input.desired_outcome?.trim() || null;
+  if (input.business_impact !== undefined) patch.business_impact = input.business_impact?.trim() || null;
   if (Object.keys(patch).length > 0) patch.last_action_by = context.userId;
 
   try {
@@ -2033,6 +2039,29 @@ export async function addTicketComment(
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to add request comment');
     loggingService.error('Failed to add request comment', { error: error.message, ticketId }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+export async function ticketReplyAndWait(
+  ticketId: string,
+  message: string,
+  context: { userId: string; companyId: string }
+): Promise<TicketServiceResult<TicketRecord>> {
+  try {
+    const { data, error } = await supabase.rpc('ticket_reply_and_wait', {
+      p_ticket_id: ticketId,
+      p_company_id: context.companyId,
+      p_message: message,
+    });
+
+    if (error) throw error;
+    if (!data) throw new Error('Failed to update ticket and add reply');
+
+    return { data: mapTicket(data as TicketRow), error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to reply and wait');
+    loggingService.error('Failed to reply and wait', { error: error.message, ticketId }, 'TicketService');
     return { data: null, error };
   }
 }

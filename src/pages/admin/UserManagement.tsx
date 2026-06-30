@@ -84,7 +84,6 @@ const ROLE_LABELS: Record<AppRole, string> = {
   analyst: 'Analyst (Legacy)',
   creator_updater: 'Creator/Updater',
   portal_admin: 'Portal Admin',
-  portal_manager: 'Portal Manager',
   portal_staff: 'Portal Staff',
 };
 

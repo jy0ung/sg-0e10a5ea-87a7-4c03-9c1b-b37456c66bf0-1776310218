@@ -6,8 +6,8 @@ export interface AccessSubject {
   portalAccessOnly?: boolean | null;
 }
 
-export const PORTAL_ONLY_ROLES = ['portal_admin', 'portal_manager', 'portal_staff'] as const;
-export const PORTAL_QUEUE_ROLES = ['super_admin', 'company_admin', 'portal_admin', 'portal_manager'] as const;
+export const PORTAL_ONLY_ROLES = ['portal_admin', 'portal_staff'] as const;
+export const PORTAL_QUEUE_ROLES = ['super_admin', 'company_admin', 'portal_admin'] as const;
 export const PORTAL_SETUP_ROLES = ['super_admin', 'company_admin', 'portal_admin'] as const;
 
 const PORTAL_ONLY_ROLE_SET = new Set<string>(PORTAL_ONLY_ROLES);

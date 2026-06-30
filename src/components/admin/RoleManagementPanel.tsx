@@ -30,8 +30,7 @@ const ROLE_DESCRIPTIONS: Partial<Record<AppRole, string>> = {
   analyst: 'Legacy reporting and analysis role retained for existing users.',
   creator_updater: 'Operational role for creating and maintaining day-to-day records.',
   portal_admin: 'Internal Requests portal administrator role.',
-  portal_manager: 'Internal Requests portal manager role.',
-  portal_staff: 'Internal Requests portal staff role.',
+  portal_staff: 'Internal Requests portal staff/resolver role.',
 };
 
 function scopeLabel(role: AppRole) {
@@ -71,7 +70,7 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
       if (data) {
         const merged: Record<AppRole, SectionName[]> = { ...DEFAULT_ROLE_SECTIONS };
         for (const role of Object.keys(data) as AppRole[]) {
-          merged[role] = data[role];
+          merged[role] = data[role] as SectionName[];
         }
         setPermissions(merged);
       }

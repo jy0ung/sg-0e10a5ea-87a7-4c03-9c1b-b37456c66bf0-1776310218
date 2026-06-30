@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
@@ -20,6 +20,7 @@ import {
   SlidersHorizontal,
   User,
   UserX,
+  X,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -86,7 +87,9 @@ import {
   formatTicketLabel,
   isOpenStatus,
 } from '@/lib/requestFormatters';
-import { openTicketWorkspace, type TicketWorkspaceReturnState } from '@/lib/ticketWorkspaceNavigation';
+import { type TicketWorkspaceReturnState } from '@/lib/ticketWorkspaceNavigation';
+import { cn } from '@/lib/utils';
+import TicketWorkspace from './TicketWorkspace';
 
 const statusOptions: Array<{ value: TicketStatus; label: string }> = [
   { value: 'open', label: 'Open' },
@@ -111,7 +114,6 @@ const REQUEST_QUEUE_PAGE_SIZE = 25;
 
 export default function RequestQueue() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
@@ -136,6 +138,8 @@ export default function RequestQueue() {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
   const [metricsExpanded, setMetricsExpanded] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.localStorage.getItem('requestQueue.metricsExpanded') !== 'false';
@@ -446,14 +450,7 @@ export default function RequestQueue() {
   };
 
   const handleOpenChat = (ticketId: string) => {
-    openTicketWorkspace(navigate, ticketId, {
-      source: 'queue',
-      path: `${location.pathname}${location.search}`,
-      page,
-      activeSavedView: activeSavedView ?? undefined,
-      filters: currentFilterPayload,
-      scrollTop: contentScrollRef.current?.scrollTop ?? 0,
-    }, 'chat');
+    setSelectedTicketId(ticketId);
   };
 
   const handleExportCsv = () => {
@@ -571,14 +568,7 @@ export default function RequestQueue() {
   }, [location.state]);
 
   const handleOpenTicketWorkspace = (ticketId: string) => {
-    openTicketWorkspace(navigate, ticketId, {
-      source: 'queue',
-      path: `${location.pathname}${location.search}`,
-      page,
-      activeSavedView: activeSavedView ?? undefined,
-      filters: currentFilterPayload,
-      scrollTop: contentScrollRef.current?.scrollTop ?? 0,
-    });
+    setSelectedTicketId(ticketId);
   };
 
   const applySavedFilter = (filter: RequestSavedFilterRecord) => {
@@ -631,7 +621,7 @@ export default function RequestQueue() {
     if (!user || selectedIds.size === 0) return;
     const count = selectedIds.size;
     const assignedTo = profileIdOrUnassigned === 'unassigned' ? null : profileIdOrUnassigned;
-    setBulkSaving(true);
+    setIsAssigning(true);
     try {
       await Promise.all(
         Array.from(selectedIds).map((ticketId) =>
@@ -644,7 +634,7 @@ export default function RequestQueue() {
     } catch {
       toast.error('Failed to assign some requests');
     } finally {
-      setBulkSaving(false);
+      setIsAssigning(false);
     }
   };
 
@@ -778,7 +768,8 @@ export default function RequestQueue() {
   ];
 
   return (
-    <div className="flex h-full w-full flex-col gap-4">
+    <div className="flex h-full w-full gap-4 overflow-hidden">
+      <div className={cn("flex h-full flex-col gap-4 overflow-hidden", selectedTicketId ? "hidden lg:flex lg:w-[45%]" : "w-full")}>
       <PageHeader
         title="Pending / Active Requests"
         description="Triage ownership, next action, SLA risk, and active request workflow."
@@ -960,7 +951,7 @@ export default function RequestQueue() {
             onSelectionChange={setSelectedIds}
             bulkActions={() => (
               <>
-                <Select value="" onValueChange={(value) => void handleBulkAssign(value)} disabled={bulk.bulkSaving}>
+                <Select value="" onValueChange={(value) => void handleBulkAssign(value)} disabled={bulk.bulkSaving || isAssigning}>
                   <SelectTrigger className="h-7 w-[150px] text-xs">
                     <SelectValue placeholder="Assign to..." />
                   </SelectTrigger>
@@ -971,12 +962,12 @@ export default function RequestQueue() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={handleBulkExportCsv} disabled={bulk.bulkSaving}>
-                  <Download className="h-3 w-3" />
-                  CSV
+                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={handleBulkExportCsv} disabled={bulk.bulkSaving || isAssigning}>
+                  <Download className="h-3.5 w-3.5" />
+                  Export
                 </Button>
-                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={bulk.openPriorityDialog} disabled={bulk.bulkSaving}>
-                  <SlidersHorizontal className="h-3 w-3" />
+                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={bulk.openPriorityDialog} disabled={bulk.bulkSaving || isAssigning}>
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
                   Priority
                 </Button>
                 <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={bulk.openNotifyDialog} disabled={bulk.bulkSaving}>
@@ -998,6 +989,19 @@ export default function RequestQueue() {
       </div>
 
       {bulk.dialogs}
+      </div>
+      {selectedTicketId && (
+        <div className="flex flex-1 flex-col overflow-hidden rounded-md border bg-background shadow-sm animate-in slide-in-from-right-4 duration-300">
+          <div className="flex shrink-0 items-center justify-end border-b bg-muted/10 p-1">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedTicketId(null)} className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" /> Close
+            </Button>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <TicketWorkspace ticketIdProp={selectedTicketId} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,27 +5,17 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertCircle,
-  CheckCircle2,
-  Inbox,
   MessageSquare,
   Plus,
   RefreshCcw,
   Search,
   Ticket,
-  XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { MetricCard } from '@/components/shared/MetricCard';
 import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
@@ -42,7 +32,7 @@ import {
   type TicketChatSummary,
 } from '@/services/ticketService';
 
-type MyStatusFilter = 'all' | 'in_progress' | 'attention' | 'cancelled';
+type MyStatusFilter = 'action_required' | 'open' | 'closed';
 
 export default function MyTickets() {
   const { user } = useAuth();
@@ -52,7 +42,7 @@ export default function MyTickets() {
   const { categories } = useRequestCategories(user?.company_id, true);
   const [chatSummariesByTicket, setChatSummariesByTicket] = useState<Record<string, TicketChatSummary>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<MyStatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<MyStatusFilter>('open');
 
   const myTicketsKey = ['my-tickets', user?.id, user?.company_id] as const;
 
@@ -116,24 +106,25 @@ export default function MyTickets() {
   // ── Derived state ─────────────────────────────────────────────────────────
 
   const counts = useMemo(() => {
-    const pendingTickets = tickets.filter((ticket) => ticket.status !== 'closed');
-    const c = { all: pendingTickets.length, in_progress: 0, attention: 0, cancelled: 0 };
-    for (const t of pendingTickets) {
-      if (t.status === 'in_progress' || t.status === 'pending_owner_review') c.in_progress++;
-      else if (t.status === 'pending_requester' || t.status === 'completed_by_owner') c.attention++;
-      else if (t.status === 'cancelled') c.cancelled++;
+    const c = { action_required: 0, open: 0, closed: 0 };
+    for (const t of tickets) {
+      if (t.status === 'pending_requester' || t.status === 'completed_by_owner') c.action_required++;
+      else if (t.status === 'closed' || t.status === 'cancelled') c.closed++;
+      else c.open++;
     }
+    // Auto-select 'action_required' on load if there are tickets needing attention and filter is still 'open'
     return c;
   }, [tickets]);
+
+  // If we wanted to auto-switch the tab, we'd do it in a useEffect. For now just let it default to 'open'.
 
   const filteredTickets = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
     return tickets.filter((ticket) => {
       // Status filter
-      if (ticket.status === 'closed') return false;
-      if (statusFilter === 'in_progress' && ticket.status !== 'in_progress' && ticket.status !== 'pending_owner_review') return false;
-      if (statusFilter === 'attention' && ticket.status !== 'pending_requester' && ticket.status !== 'completed_by_owner') return false;
-      if (statusFilter === 'cancelled' && ticket.status !== 'cancelled') return false;
+      if (statusFilter === 'action_required' && ticket.status !== 'pending_requester' && ticket.status !== 'completed_by_owner') return false;
+      if (statusFilter === 'closed' && ticket.status !== 'closed' && ticket.status !== 'cancelled') return false;
+      if (statusFilter === 'open' && (ticket.status === 'closed' || ticket.status === 'cancelled' || ticket.status === 'pending_requester' || ticket.status === 'completed_by_owner')) return false;
 
       // Search
       if (!search) return true;
@@ -238,21 +229,12 @@ export default function MyTickets() {
     },
   ], [categories, chatSummariesByTicket, handleOpenChat]);
 
-  const metrics: Array<{ key: MyStatusFilter; label: string; value: number; icon: React.ElementType; tone: 'slate' | 'blue' | 'emerald' | 'amber'; hint?: string }> = [
-    { key: 'all', label: 'Total', value: counts.all, icon: Ticket, tone: 'slate' },
-    { key: 'in_progress', label: 'In Progress', value: counts.in_progress, icon: Inbox, tone: 'blue' },
-    { key: 'attention', label: 'Need Your Attention', value: counts.attention, icon: CheckCircle2, tone: 'amber' },
-    { key: 'cancelled', label: 'Cancelled', value: counts.cancelled, icon: XCircle, tone: 'slate' },
-  ];
-
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
     <div className="flex h-full w-full flex-col gap-4">
       <PageHeader
-        title="Pending Requests"
-        description="Track active requests, requester actions, and owner follow-up."
-        breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'Pending Requests' }]}
+        title="My Requests Hub"
+        description="Track your requests, take action on updates, and view history."
+        breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'My Requests' }]}
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void refreshTickets()} disabled={loading}>
@@ -269,82 +251,74 @@ export default function MyTickets() {
         }
       />
 
-      {/* Metric strip — also acts as a status filter */}
-      {!loading && !displayError && tickets.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {metrics.map((metric) => (
-            <MetricCard
-              key={metric.key}
-              label={metric.label}
-              value={metric.value}
-              icon={metric.icon}
-              tone={metric.tone}
-              hint={metric.hint}
-              onClick={() => setStatusFilter(metric.key)}
-            />
-          ))}
-        </div>
-      )}
+      {!loading && !displayError && (
+        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as MyStatusFilter)} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <TabsList>
+              <TabsTrigger value="action_required" className="gap-2 relative">
+                Needs Action
+                {counts.action_required > 0 && (
+                  <span className="rounded-full bg-destructive px-2 py-0.5 text-xs text-destructive-foreground">
+                    {counts.action_required}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="open" className="gap-2">
+                Open <span className="text-muted-foreground">{counts.open}</span>
+              </TabsTrigger>
+              <TabsTrigger value="closed" className="gap-2">
+                Closed <span className="text-muted-foreground">{counts.closed}</span>
+              </TabsTrigger>
+            </TabsList>
 
-      {/* Filter bar */}
-      {!loading && !displayError && tickets.length > 0 && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search by subject, category, VSO..."
-              className="h-9 pl-9"
-            />
+            <div className="relative w-full sm:w-[300px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search by subject, category, VSO..."
+                className="h-9 pl-9"
+              />
+            </div>
           </div>
-          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as MyStatusFilter)}>
-            <SelectTrigger className="h-9 w-full sm:w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All ({counts.all})</SelectItem>
-              <SelectItem value="in_progress">In progress ({counts.in_progress})</SelectItem>
-              <SelectItem value="attention">Need your attention ({counts.attention})</SelectItem>
-              <SelectItem value="cancelled">Cancelled ({counts.cancelled})</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+
+          <TabsContent value={statusFilter} className="m-0 border-none p-0 outline-none">
+            {tickets.length === 0 ? (
+              <HrmsEmptyState
+                icon={Ticket}
+                title="No requests yet"
+                description="Submit a new internal request to get started."
+                action={{ label: 'New request', onClick: () => navigate('/portal/tickets/new') }}
+              />
+            ) : (
+              <StandardTable
+                data={filteredTickets}
+                columns={columns}
+                rowKey="id"
+                hideSearch
+                mobileLayout="table"
+                emptyMessage="No requests match your search or filter."
+                onRowClick={(ticket) => openTicketWorkspace(navigate, ticket.id, {
+                  source: 'pending',
+                  path: `${location.pathname}${location.search}`,
+                  filters: { searchTerm, statusFilter },
+                })}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
-      {/* Content */}
-      {loading ? (
-        <TableSkeleton rows={6} cols={5} />
-      ) : displayError ? (
+      {loading && <TableSkeleton rows={6} cols={5} />}
+      
+      {displayError && (
         <HrmsEmptyState
           icon={AlertCircle}
           title="Unable to load requests"
           description={displayError}
           action={{ label: 'Retry', onClick: () => void refreshTickets() }}
         />
-      ) : tickets.length === 0 ? (
-        <HrmsEmptyState
-          icon={Ticket}
-          title="No requests yet"
-          description="Submit a new internal request to get started."
-          action={{ label: 'New request', onClick: () => navigate('/portal/tickets/new') }}
-        />
-      ) : (
-        <StandardTable
-          data={filteredTickets}
-          columns={columns}
-          rowKey="id"
-          hideSearch
-          mobileLayout="table"
-          emptyMessage="No requests match your search or filter."
-          onRowClick={(ticket) => openTicketWorkspace(navigate, ticket.id, {
-            source: 'pending',
-            path: `${location.pathname}${location.search}`,
-            filters: { searchTerm, statusFilter },
-          })}
-        />
       )}
-
     </div>
   );
 }
