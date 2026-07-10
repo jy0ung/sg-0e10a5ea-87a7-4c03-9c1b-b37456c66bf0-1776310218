@@ -250,8 +250,8 @@ jobs:
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           CONTAINER_NAME: ${{ secrets.DEPLOY_CONTAINER_NAME }}
           HOST_PORT: ${{ secrets.DEPLOY_HOST_PORT }}
-          GHCR_USERNAME: ${{ secrets.GHCR_READ_USERNAME }}
-          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
           IMAGE: ${{ steps.mode.outputs.image_ref }}
         run: |
           set -euo pipefail
