@@ -15,9 +15,14 @@
  */
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 
 const shouldRun = process.env.RLS_E2E === '1';
 const describeIfLive = shouldRun ? describe : describe.skip;
+const clientOptions: Parameters<typeof createClient>[2] = {
+  auth: { persistSession: false },
+  realtime: { transport: WebSocket as never },
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -32,13 +37,13 @@ interface Session {
 function makeServiceClient(): SupabaseClient {
   const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? '';
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-  return createClient(url, key, { auth: { persistSession: false } });
+  return createClient(url, key, clientOptions);
 }
 
 async function signInAs(email: string, password: string): Promise<Session> {
   const url  = process.env.VITE_SUPABASE_URL ?? '';
   const anon = process.env.VITE_SUPABASE_ANON_KEY ?? '';
-  const client = createClient(url, anon, { auth: { persistSession: false } });
+  const client = createClient(url, anon, clientOptions);
   const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error || !data.user) throw new Error(`Sign-in failed for ${email}: ${error?.message}`);
   const { data: profile, error: profErr } = await client

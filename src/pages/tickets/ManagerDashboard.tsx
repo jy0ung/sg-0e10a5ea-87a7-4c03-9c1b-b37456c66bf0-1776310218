@@ -54,6 +54,51 @@ function BarRow({ label, value, max, tone = 'bg-primary' }: { label: string; val
   );
 }
 
+function CapacityCell({ owner }: { owner: { owner_id: string | null; owner_name: string; pending: number; breached: number; at_risk: number } }) {
+  const load = owner.pending;
+  let bgClass = 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800/40';
+  let textClass = 'text-emerald-700 dark:text-emerald-400';
+  let label = 'Available';
+  if (owner.breached > 0) {
+    bgClass = 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800/40';
+    textClass = 'text-red-700 dark:text-red-400';
+    label = 'Overloaded';
+  } else if (load >= 10) {
+    bgClass = 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-800/40';
+    textClass = 'text-orange-700 dark:text-orange-400';
+    label = 'Heavy';
+  } else if (load >= 5) {
+    bgClass = 'bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/40';
+    textClass = 'text-amber-700 dark:text-amber-400';
+    label = 'Moderate';
+  }
+
+  return (
+    <div className={`rounded-lg border px-3 py-2.5 ${bgClass} transition-colors`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-sm font-medium text-foreground">{owner.owner_name}</p>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${textClass}`}>
+          {label}
+        </span>
+      </div>
+      <div className="mt-2 flex items-end gap-3 text-xs text-muted-foreground">
+        <span className="tabular-nums font-semibold text-foreground text-lg leading-none">{load}</span>
+        <span>pending</span>
+        {owner.breached > 0 && (
+          <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+            {owner.breached} breached
+          </span>
+        )}
+        {owner.at_risk > 0 && (
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+            {owner.at_risk} at risk
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ManagerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -88,6 +133,16 @@ export default function ManagerDashboard() {
     () => Math.max(...(data?.workload_by_owner.map((item) => item.pending) ?? [0])),
     [data?.workload_by_owner],
   );
+
+  const staleCount = useMemo(() => {
+    if (!data?.indicators_by_ticket) return 0;
+    return Object.values(data.indicators_by_ticket).filter((ind) => ind.stale).length;
+  }, [data?.indicators_by_ticket]);
+
+  const stuckCount = useMemo(() => {
+    if (!data?.indicators_by_ticket) return 0;
+    return Object.values(data.indicators_by_ticket).filter((ind) => ind.stuck).length;
+  }, [data?.indicators_by_ticket]);
 
   return (
     <div className="flex h-full w-full flex-col gap-4">
@@ -140,6 +195,45 @@ export default function ManagerDashboard() {
             <MetricCard label="Reopened" value={data.reopened} icon={RotateCcw} tone={data.reopened > 0 ? 'amber' : 'slate'} />
             <MetricCard label="Satisfaction" value={data.requester_satisfaction_score ? data.requester_satisfaction_score.toFixed(1) : 'No data'} icon={Star} tone="emerald" />
           </div>
+
+          {(staleCount > 0 || stuckCount > 0) && (
+            <div className="flex flex-wrap gap-3">
+              {staleCount > 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm dark:border-amber-800/40 dark:bg-amber-950/20">
+                  <Clock3 className="h-4 w-4 text-amber-600" />
+                  <span className="text-amber-800 dark:text-amber-300">
+                    <strong>{staleCount}</strong> stale {staleCount === 1 ? 'ticket' : 'tickets'} — no updates for 3+ days
+                  </span>
+                </div>
+              )}
+              {stuckCount > 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm dark:border-red-800/40 dark:bg-red-950/20">
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                  <span className="text-red-800 dark:text-red-300">
+                    <strong>{stuckCount}</strong> stuck {stuckCount === 1 ? 'ticket' : 'tickets'} — same status for 5+ days
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {data.workload_by_owner.length > 0 && (
+            <Card>
+              <CardHeader className="border-b bg-muted/30">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <UserCheck className="h-4 w-4" />
+                  Team Capacity Heatmap
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {data.workload_by_owner.map((owner) => (
+                    <CapacityCell key={owner.owner_id ?? 'unassigned'} owner={owner} />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
             <Card className="overflow-hidden">

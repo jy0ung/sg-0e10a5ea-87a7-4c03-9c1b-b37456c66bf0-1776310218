@@ -32,6 +32,7 @@ export const DEFAULT_ROLE_SECTIONS: Record<AppRole, SectionName[]> = {
   analyst: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Reports', 'HRMS', 'Admin'],
   creator_updater: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'HRMS', 'Admin'],
   portal_admin: ['Admin'],
+  portal_manager: [],
   portal_staff: [],
 };
 
@@ -50,6 +51,7 @@ export const UBS_DEFAULT_ROLE_SECTIONS: Record<AppRole, UbsSectionName[]> = {
   analyst: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Reports', 'Admin'],
   creator_updater: ['Platform', 'Auto Aging', 'Sales', 'Inventory', 'Purchasing', 'Admin'],
   portal_admin: ['Admin'],
+  portal_manager: [],
   portal_staff: [],
 };
 
@@ -65,5 +67,6 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   analyst: 'Analyst (Legacy)',
   creator_updater: 'Creator / Updater',
   portal_admin: 'Portal Admin',
+  portal_manager: 'Portal Manager',
   portal_staff: 'Portal Staff',
 };

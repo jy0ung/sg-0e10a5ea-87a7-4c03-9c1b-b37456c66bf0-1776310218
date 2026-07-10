@@ -10,7 +10,6 @@ import {
   ChevronUp,
   Clock,
   Download,
-  Inbox,
   MessageSquare,
   Bell,
   Archive,
@@ -20,7 +19,6 @@ import {
   SlidersHorizontal,
   User,
   UserX,
-  X,
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,10 +29,9 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
 import { TableSkeleton } from '@/components/ui/TableSkeleton';
-import { RequestStatusBadge } from '@/components/tickets/RequestBadge';
+import { RequestStatusBadge, RequestPriorityBadge } from '@/components/tickets/RequestBadge';
 import { TicketApprovalSummary } from '@/components/tickets/TicketApprovalSummary';
 import { TicketOperationalBadges } from '@/components/tickets/TicketOperationalIndicators';
-import { TicketSlaSummary } from '@/components/tickets/TicketSlaSummary';
 import {
   RequestQueueFilters,
   type AssigneeFilter,
@@ -81,7 +78,7 @@ import { listProfiles } from '@flc/auth';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { getRequestSubcategoryLabel } from '@/lib/requestSubcategories';
 import { getRequestAssignees } from '@/lib/requestAssignees';
-import { formatSlaState, getTicketSlaSummary } from '@/lib/ticketSla';
+import { formatSlaCompactLabel, formatSlaState, getTicketSlaSummary } from '@/lib/ticketSla';
 import {
   downloadCsv,
   formatTicketLabel,
@@ -89,6 +86,7 @@ import {
 } from '@/lib/requestFormatters';
 import { type TicketWorkspaceReturnState } from '@/lib/ticketWorkspaceNavigation';
 import { cn } from '@/lib/utils';
+import { Avatar, AvatarFallback } from '@flc/ui';
 import TicketWorkspace from './TicketWorkspace';
 
 const statusOptions: Array<{ value: TicketStatus; label: string }> = [
@@ -157,12 +155,11 @@ export default function RequestQueue() {
   };
 
   const savedViews = useMemo<SavedViewDef[]>(() => [
-    { id: 'all_active',    label: 'Pending / Active',   Icon: Inbox,          status: 'active',              priority: 'all',  sla: 'all',      assignedTo: 'all' },
-    { id: 'my_queue',      label: 'My Queue',            Icon: User,           status: 'active',              priority: 'all',  sla: 'all',      assignedTo: user?.id ?? 'all' },
+    { id: 'my_queue',      label: 'Assigned to me',      Icon: User,           status: 'active',              priority: 'all',  sla: 'all',      assignedTo: user?.id ?? 'all' },
     { id: 'unassigned',    label: 'Unassigned',          Icon: UserX,          status: 'active',              priority: 'all',  sla: 'all',      assignedTo: 'unassigned' },
-    { id: 'high_priority', label: 'High Priority',       Icon: AlertCircle,    status: 'active',              priority: 'high', sla: 'all',      assignedTo: 'all' },
-    { id: 'awaiting',      label: 'Pending Requester',   Icon: Clock,          status: 'pending_requester',   priority: 'all',  sla: 'all',      assignedTo: 'all' },
-    { id: 'breached',      label: 'Breached SLA',        Icon: AlertTriangle,  status: 'active',              priority: 'all',  sla: 'breached', assignedTo: 'all' },
+    { id: 'at_risk',       label: 'At Risk',             Icon: Clock,          status: 'active',              priority: 'all',  sla: 'at_risk',  assignedTo: 'all' },
+    { id: 'awaiting',      label: 'Waiting on Requester',Icon: Clock,          status: 'pending_requester',   priority: 'all',  sla: 'all',      assignedTo: 'all' },
+    { id: 'breached',      label: 'Breached',            Icon: AlertTriangle,  status: 'active',              priority: 'all',  sla: 'breached', assignedTo: 'all' },
   ], [user?.id]);
 
   const activeSavedView = useMemo(() => {
@@ -693,12 +690,43 @@ export default function RequestQueue() {
       ),
     },
     {
+      key: 'priority',
+      label: 'Priority',
+      render: (ticket) => <RequestPriorityBadge priority={ticket.priority} />,
+    },
+    {
       key: 'assigned_to_name',
-      label: 'Owner',
-      render: (ticket) =>
-        ticket.assigned_to_name
-          ? <span className="text-sm text-foreground">{ticket.assigned_to_name}</span>
-          : <span className="text-sm text-muted-foreground">{ticket.responsible_queue}</span>,
+      label: 'Owner & Collaborators',
+      render: (ticket) => {
+        const collabs = (ticket.collaborator_ids || []).map((id) => profileRows?.find((p) => p.id === id)).filter(Boolean) as Array<{ id: string; name: string; email: string }>;
+        const visibleCollabs = collabs.slice(0, 3);
+        const extraCount = collabs.length - 3;
+        return (
+          <div className="flex flex-col gap-1.5">
+            {ticket.assigned_to_name ? (
+              <span className="text-sm text-foreground font-medium">{ticket.assigned_to_name}</span>
+            ) : (
+              <span className="text-sm text-muted-foreground">{ticket.responsible_queue}</span>
+            )}
+            {collabs.length > 0 && (
+              <div className="flex items-center" title={collabs.map(c => c.name || c.email).join(', ')}>
+                {visibleCollabs.map((collab, i) => (
+                  <Avatar key={collab.id} className={cn("h-6 w-6 border-2 border-background", i > 0 && "-ml-2")}>
+                    <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">
+                      {((collab.name && collab.name[0]) || collab.email[0]).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                ))}
+                {extraCount > 0 && (
+                  <div className="-ml-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-medium text-muted-foreground">
+                    +{extraCount}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'status',
@@ -743,7 +771,36 @@ export default function RequestQueue() {
       key: 'sla',
       label: 'SLA',
       sortable: false,
-      render: (ticket) => <TicketSlaSummary ticket={ticket} compact />,
+      render: (ticket) => {
+        const sla = getTicketSlaSummary(ticket);
+        let dotColor = 'bg-slate-300';
+        let textColor = 'text-slate-600';
+        if (ticket.status === 'pending_requester' || ticket.status === 'completed_by_owner') {
+          dotColor = 'bg-slate-300';
+          textColor = 'text-slate-500';
+        } else if (sla.overall === 'breached') {
+          dotColor = 'bg-red-500';
+          textColor = 'text-red-700 font-medium';
+        } else if (sla.overall === 'at_risk') {
+          dotColor = 'bg-amber-500';
+          textColor = 'text-amber-700 font-medium';
+        } else if (sla.overall === 'pending') {
+          dotColor = 'bg-blue-500';
+          textColor = 'text-blue-700';
+        } else if (sla.overall === 'met') {
+          dotColor = 'bg-emerald-500';
+          textColor = 'text-emerald-700';
+        }
+
+        return (
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${dotColor}`} />
+            <span className={`text-xs ${textColor}`}>
+              {ticket.status === 'pending_requester' ? 'Waiting' : formatSlaCompactLabel(sla)}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'updated_at',
@@ -768,8 +825,8 @@ export default function RequestQueue() {
   ];
 
   return (
-    <div className="flex h-full w-full gap-4 overflow-hidden">
-      <div className={cn("flex h-full flex-col gap-4 overflow-hidden", selectedTicketId ? "hidden lg:flex lg:w-[45%]" : "w-full")}>
+    <div className="relative flex h-full w-full gap-4 overflow-hidden">
+      <div className="flex h-full w-full flex-col gap-4 overflow-hidden">
       <PageHeader
         title="Pending / Active Requests"
         description="Triage ownership, next action, SLA risk, and active request workflow."
@@ -991,16 +1048,17 @@ export default function RequestQueue() {
       {bulk.dialogs}
       </div>
       {selectedTicketId && (
-        <div className="flex flex-1 flex-col overflow-hidden rounded-md border bg-background shadow-sm animate-in slide-in-from-right-4 duration-300">
-          <div className="flex shrink-0 items-center justify-end border-b bg-muted/10 p-1">
-            <Button variant="ghost" size="sm" onClick={() => setSelectedTicketId(null)} className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
-              <X className="h-3.5 w-3.5" /> Close
-            </Button>
+        <>
+          <button
+            type="button"
+            aria-label="Close request workspace"
+            className="absolute inset-0 z-40 cursor-default bg-slate-900/10 p-0 transition-opacity animate-in fade-in duration-300"
+            onClick={() => setSelectedTicketId(null)}
+          />
+          <div className="absolute right-0 top-0 bottom-0 z-50 flex h-full w-full md:w-[720px] lg:w-[840px] max-w-[860px] flex-col overflow-hidden border-l border-border bg-background shadow-2xl animate-in slide-in-from-right duration-300">
+            <TicketWorkspace ticketIdProp={selectedTicketId} onClose={() => setSelectedTicketId(null)} />
           </div>
-          <div className="flex-1 overflow-y-auto">
-            <TicketWorkspace ticketIdProp={selectedTicketId} />
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

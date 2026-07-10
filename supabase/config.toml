@@ -65,7 +65,8 @@ content_path = "./supabase/templates/recovery.html"
 #     {"name":"update-user-status","verify_jwt":true},
 #     {"name":"send-push-notification","verify_jwt":true},
 #     {"name":"rollover-leave-balances","verify_jwt":true},
-#     {"name":"dms-sync-worker","verify_jwt":true}
+#     {"name":"dms-sync-worker","verify_jwt":true},
+#     {"name":"auto-close-resolved-tickets","verify_jwt":true}
 #   ]'
 
 [functions.invite-user]
@@ -89,4 +90,10 @@ verify_jwt = true
 # UBS rows. Must NOT be invoked from browser code — always use service role
 # or a privileged server-side caller.
 [functions.dms-sync-worker]
+verify_jwt = true
+
+# Internal request lifecycle worker.
+# Cron should invoke this with the service-role bearer. Admin JWTs may dry-run
+# or run scoped to their company; all callers are still JWT-verified.
+[functions.auto-close-resolved-tickets]
 verify_jwt = true

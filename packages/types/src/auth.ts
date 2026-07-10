@@ -10,6 +10,7 @@ export const APP_ROLES = [
   'analyst',
   'creator_updater',
   'portal_admin',
+  'portal_manager',
   'portal_staff',
 ] as const;
 
@@ -29,6 +30,7 @@ export const ROLE_DEFAULT_SCOPE: Record<AppRole, AccessScope> = {
   analyst: 'company',
   creator_updater: 'branch',
   portal_admin: 'company',
+  portal_manager: 'company',
   portal_staff: 'self',
 };
 

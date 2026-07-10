@@ -19,3 +19,4 @@ export * from './StandardTable';
 export * from './StepperProgress';
 export * from './TableSkeleton';
 export * from './UnauthorizedAccess';
+export * from './avatar';

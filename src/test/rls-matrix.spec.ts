@@ -32,9 +32,18 @@
  */
 import { describe, it, beforeAll, afterAll, expect } from 'vitest';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 
 const shouldRun = process.env.RLS_E2E === '1';
 const describeIfLive = shouldRun ? describe : describe.skip;
+const RLS_USER_A_EMAIL = process.env.RLS_USER_A_EMAIL ?? 'a@rls.test';
+const RLS_USER_A_PASSWORD = process.env.RLS_USER_A_PASSWORD ?? 'Test1234!';
+const RLS_USER_B_EMAIL = process.env.RLS_USER_B_EMAIL ?? 'b@rls.test';
+const RLS_USER_B_PASSWORD = process.env.RLS_USER_B_PASSWORD ?? 'Test1234!';
+const clientOptions: Parameters<typeof createClient>[2] = {
+  auth: { persistSession: false },
+  realtime: { transport: WebSocket as never },
+};
 
 // Tables that must be strictly company-scoped. Extend as new tables land.
 const TENANT_SCOPED_TABLES = [
@@ -123,7 +132,7 @@ function crossTenantSelect(
 async function signInAs(email: string, password: string): Promise<TenantSession> {
   const url = process.env.VITE_SUPABASE_URL ?? '';
   const anon = process.env.VITE_SUPABASE_ANON_KEY ?? '';
-  const client = createClient(url, anon, { auth: { persistSession: false } });
+  const client = createClient(url, anon, clientOptions);
   const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error || !data.user) throw new Error(`Sign-in failed for ${email}: ${error?.message}`);
 
@@ -142,7 +151,7 @@ function maybeAdminClient(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? '';
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
   if (!url || !serviceKey) return null;
-  return createClient(url, serviceKey, { auth: { persistSession: false } });
+  return createClient(url, serviceKey, clientOptions);
 }
 
 async function cleanupStage2Rows() {
@@ -208,14 +217,8 @@ describeIfLive('RLS cross-tenant matrix', () => {
       throw new Error('SUPABASE_SERVICE_ROLE_KEY is required so live RLS tests can clean up temporary Sales Order and vehicle rows.');
     }
 
-    userA = await signInAs(
-      process.env.RLS_USER_A_EMAIL ?? '',
-      process.env.RLS_USER_A_PASSWORD ?? '',
-    );
-    userB = await signInAs(
-      process.env.RLS_USER_B_EMAIL ?? '',
-      process.env.RLS_USER_B_PASSWORD ?? '',
-    );
+    userA = await signInAs(RLS_USER_A_EMAIL, RLS_USER_A_PASSWORD);
+    userB = await signInAs(RLS_USER_B_EMAIL, RLS_USER_B_PASSWORD);
     expect(userA.companyId).not.toBe(userB.companyId);
   });
 
@@ -262,7 +265,7 @@ describeIfLive('RLS cross-tenant matrix', () => {
     it('rejects role/company/access_scope metadata on signup', async () => {
       const url = process.env.VITE_SUPABASE_URL ?? '';
       const anon = process.env.VITE_SUPABASE_ANON_KEY ?? '';
-      const client = createClient(url, anon, { auth: { persistSession: false } });
+      const client = createClient(url, anon, clientOptions);
       const email = `escal-${Date.now()}@rls.test`;
       const { data, error } = await client.auth.signUp({
         email,

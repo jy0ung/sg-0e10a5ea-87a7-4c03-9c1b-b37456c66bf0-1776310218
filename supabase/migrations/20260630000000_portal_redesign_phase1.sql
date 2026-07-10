@@ -1,11 +1,6 @@
 -- Migration for Portal Redesign Phase 1: Foundation & Data Model
 
--- 1. Map existing portal_managers to portal_admin
-UPDATE public.profiles
-SET role = 'portal_admin'
-WHERE role = 'portal_manager';
-
--- 2. Update the role check constraint on profiles to remove portal_manager
+-- 1. Keep the role check constraint aligned with canonical app roles.
 ALTER TABLE public.profiles
 DROP CONSTRAINT IF EXISTS profiles_role_check;
 
@@ -22,10 +17,11 @@ CHECK (role IN (
   'analyst',
   'creator_updater',
   'portal_admin',
+  'portal_manager',
   'portal_staff'
 ));
 
--- 3. Create ticket_collaborators mapping table
+-- 2. Create ticket_collaborators mapping table
 CREATE TABLE IF NOT EXISTS public.ticket_collaborators (
   ticket_id uuid NOT NULL REFERENCES public.tickets(id) ON DELETE CASCADE,
   company_id text NOT NULL,
@@ -41,10 +37,12 @@ CREATE INDEX IF NOT EXISTS ticket_collaborators_ticket_idx ON public.ticket_coll
 ALTER TABLE public.ticket_collaborators ENABLE ROW LEVEL SECURITY;
 
 -- Collaborators table policies
+DROP POLICY IF EXISTS "ticket_collaborators_select_scoped" ON public.ticket_collaborators;
 CREATE POLICY "ticket_collaborators_select_scoped" ON public.ticket_collaborators
   FOR SELECT TO authenticated
   USING (public.is_same_company(company_id));
 
+DROP POLICY IF EXISTS "ticket_collaborators_insert_scoped" ON public.ticket_collaborators;
 CREATE POLICY "ticket_collaborators_insert_scoped" ON public.ticket_collaborators
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -60,6 +58,7 @@ CREATE POLICY "ticket_collaborators_insert_scoped" ON public.ticket_collaborator
     )
   );
 
+DROP POLICY IF EXISTS "ticket_collaborators_delete_scoped" ON public.ticket_collaborators;
 CREATE POLICY "ticket_collaborators_delete_scoped" ON public.ticket_collaborators
   FOR DELETE TO authenticated
   USING (
@@ -77,26 +76,34 @@ CREATE POLICY "ticket_collaborators_delete_scoped" ON public.ticket_collaborator
   );
 
 -- 4. Update tickets policies to allow collaborators to read and update
+DROP POLICY IF EXISTS "tickets_select_collaborator" ON public.tickets;
 CREATE POLICY "tickets_select_collaborator" ON public.tickets
   FOR SELECT TO authenticated
   USING (
     EXISTS (
       SELECT 1 FROM public.ticket_collaborators tc
-      WHERE tc.ticket_id = id AND tc.user_id = auth.uid()
+      WHERE tc.ticket_id = tickets.id
+        AND tc.company_id = tickets.company_id
+        AND tc.user_id = auth.uid()
     )
   );
 
+DROP POLICY IF EXISTS "tickets_update_collaborator" ON public.tickets;
 CREATE POLICY "tickets_update_collaborator" ON public.tickets
   FOR UPDATE TO authenticated
   USING (
     EXISTS (
       SELECT 1 FROM public.ticket_collaborators tc
-      WHERE tc.ticket_id = id AND tc.user_id = auth.uid()
+      WHERE tc.ticket_id = tickets.id
+        AND tc.company_id = tickets.company_id
+        AND tc.user_id = auth.uid()
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.ticket_collaborators tc
-      WHERE tc.ticket_id = id AND tc.user_id = auth.uid()
+      WHERE tc.ticket_id = tickets.id
+        AND tc.company_id = tickets.company_id
+        AND tc.user_id = auth.uid()
     )
   );

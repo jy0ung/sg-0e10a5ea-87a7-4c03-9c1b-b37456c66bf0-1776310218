@@ -328,6 +328,108 @@ describe('ticketService', () => {
     });
   });
 
+  it('syncs collaborators through the ticket_collaborators table instead of tickets columns', async () => {
+    const ticketId = '11111111-1111-4111-8111-111111111111';
+    const actorId = '22222222-2222-4222-8222-222222222222';
+    const removedCollaboratorId = '33333333-3333-4333-8333-333333333333';
+    const retainedCollaboratorId = '44444444-4444-4444-8444-444444444444';
+    const addedCollaboratorId = '55555555-5555-4555-8555-555555555555';
+    const currentTicket = {
+      id: ticketId,
+      company_id: 'company-1',
+      subject: 'Need collaborator support',
+      category: 'operations_support',
+      subcategory: null,
+      priority: 'medium',
+      status: 'in_progress',
+      description: 'Please help me follow up on this order request.',
+      submitted_by: 'requester-1',
+      assigned_to: actorId,
+      assigned_at: '2026-04-30T10:00:00.000Z',
+      first_response_due_at: '2026-04-30T13:00:00.000Z',
+      resolution_due_at: '2026-05-02T09:00:00.000Z',
+      first_responded_at: '2026-04-30T10:00:00.000Z',
+      resolved_at: null,
+      resolution_note: null,
+      custom_fields: {},
+      created_at: '2026-04-30T09:00:00.000Z',
+      updated_at: '2026-04-30T10:00:00.000Z',
+    };
+    const currentSelect = mockTicketFetch(currentTicket);
+
+    const collaboratorIn = vi.fn().mockResolvedValue({
+      data: [
+        { ticket_id: ticketId, user_id: removedCollaboratorId },
+        { ticket_id: ticketId, user_id: retainedCollaboratorId },
+      ],
+      error: null,
+    });
+    const collaboratorCompanyEq = vi.fn(() => ({ in: collaboratorIn }));
+    const collaboratorSelect = vi.fn(() => ({ eq: collaboratorCompanyEq }));
+
+    const ticketUpdate = mockTicketUpdate({
+      ...currentTicket,
+      last_action_by: actorId,
+      updated_at: '2026-04-30T10:05:00.000Z',
+    });
+
+    const removeIn = vi.fn().mockResolvedValue({ error: null });
+    const removeTicketEq = vi.fn(() => ({ in: removeIn }));
+    const removeCompanyEq = vi.fn(() => ({ eq: removeTicketEq }));
+    const deleteCollaborator = vi.fn(() => ({ eq: removeCompanyEq }));
+
+    const upsertCollaborators = vi.fn().mockResolvedValue({ error: null });
+    const approvalMetadata = mockNoInternalRequestApprovalMetadata();
+    const activityInsert = mockActivityInsert();
+
+    vi.mocked(supabase.from)
+      .mockImplementationOnce(() => ({ select: currentSelect.select }) as never)
+      .mockImplementationOnce(() => ({ select: collaboratorSelect }) as never)
+      .mockImplementationOnce(() => ({ update: ticketUpdate.update }) as never)
+      .mockImplementationOnce(() => ({ delete: deleteCollaborator }) as never)
+      .mockImplementationOnce(() => ({ upsert: upsertCollaborators }) as never)
+      .mockImplementationOnce(() => ({ select: approvalMetadata.select }) as never)
+      .mockImplementationOnce(() => ({ insert: activityInsert.insert }) as never);
+
+    const result = await updateTicket(
+      ticketId,
+      { collaborator_ids: [retainedCollaboratorId, addedCollaboratorId] },
+      { userId: actorId, companyId: 'company-1' },
+    );
+
+    expect(result.error).toBeNull();
+    expect(ticketUpdate.update).toHaveBeenCalledWith({ last_action_by: actorId });
+    expect(removeIn).toHaveBeenCalledWith('user_id', [removedCollaboratorId]);
+    expect(upsertCollaborators).toHaveBeenCalledWith([
+      {
+        ticket_id: ticketId,
+        company_id: 'company-1',
+        user_id: addedCollaboratorId,
+        added_by: actorId,
+      },
+    ], { onConflict: 'ticket_id,user_id' });
+    expect(result.data?.collaborator_ids).toEqual([retainedCollaboratorId, addedCollaboratorId]);
+    expect(activityInsert.insert).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({
+        event_type: 'owner_changed',
+        message: 'Request collaborators updated.',
+        metadata: {
+          field: 'collaborators',
+          before: [removedCollaboratorId, retainedCollaboratorId],
+          after: [retainedCollaboratorId, addedCollaboratorId],
+        },
+      }),
+    ]));
+    expect(createNotifications).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ userId: addedCollaboratorId, title: 'Request shared with you' }),
+    ]));
+    expect(logUserAction).toHaveBeenCalledWith(actorId, 'update', 'ticket', ticketId, {
+      component: 'TicketService',
+      last_action_by: actorId,
+      collaborator_ids: [retainedCollaboratorId, addedCollaboratorId],
+    });
+  });
+
   it('scopes ticket activity queries to the current company to prevent cross-tenant data leaks', async () => {
     const order = vi.fn().mockResolvedValue({ data: [], error: null });
     const companyEq = vi.fn(() => ({ order }));
@@ -772,7 +874,6 @@ describe('ticketService', () => {
     };
     const currentForComment = mockTicketFetch(current);
     const commentInsert = mockCommentInsert(current.id, 'owner-1', 'Please provide the signed form.');
-    const currentForWorkflow = mockTicketFetch(current);
     const ticketUpdate = mockTicketUpdate(updated);
     const approvalMetadata = mockNoInternalRequestApprovalMetadata();
     const activityInsert = mockActivityInsert();
@@ -780,7 +881,6 @@ describe('ticketService', () => {
     vi.mocked(supabase.from)
       .mockImplementationOnce(() => ({ select: currentForComment.select }) as never)
       .mockImplementationOnce(() => ({ insert: commentInsert.insert }) as never)
-      .mockImplementationOnce(() => ({ select: currentForWorkflow.select }) as never)
       .mockImplementationOnce(() => ({ update: ticketUpdate.update }) as never)
       .mockImplementationOnce(() => ({ select: approvalMetadata.select }) as never)
       .mockImplementationOnce(() => ({ insert: activityInsert.insert }) as never);
@@ -814,7 +914,6 @@ describe('ticketService', () => {
     };
     const currentForComment = mockTicketFetch(current);
     const commentInsert = mockCommentInsert(current.id, 'requester-1', 'The signed form is attached.');
-    const currentForWorkflow = mockTicketFetch(current);
     const ticketUpdate = mockTicketUpdate(updated);
     const approvalMetadata = mockNoInternalRequestApprovalMetadata();
     const activityInsert = mockActivityInsert();
@@ -822,7 +921,6 @@ describe('ticketService', () => {
     vi.mocked(supabase.from)
       .mockImplementationOnce(() => ({ select: currentForComment.select }) as never)
       .mockImplementationOnce(() => ({ insert: commentInsert.insert }) as never)
-      .mockImplementationOnce(() => ({ select: currentForWorkflow.select }) as never)
       .mockImplementationOnce(() => ({ update: ticketUpdate.update }) as never)
       .mockImplementationOnce(() => ({ select: approvalMetadata.select }) as never)
       .mockImplementationOnce(() => ({ insert: activityInsert.insert }) as never);

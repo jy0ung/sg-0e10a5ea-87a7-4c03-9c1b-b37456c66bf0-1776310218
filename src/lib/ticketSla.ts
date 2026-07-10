@@ -69,7 +69,7 @@ function evaluateSlaTarget(
 }
 
 export function getTicketSlaSummary(ticket: TicketSlaInput): TicketSlaSummary {
-  if (ticket.sla_status === 'paused' || (ticket.status === 'pending_requester' && ticket.sla_paused_at)) {
+  if (ticket.sla_status === 'paused' || ticket.status === 'pending_requester') {
     const paused = { state: 'paused' as TicketSlaState, dueAt: null, completedAt: null };
     return {
       overall: 'paused',

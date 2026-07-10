@@ -4,3 +4,4 @@ export * from './requestRoutingService';
 export * from './requestApprovalService';
 export * from './requestCategoryService';
 export * from './requestSubcategoryService';
+export * from './ticketWorkflow';

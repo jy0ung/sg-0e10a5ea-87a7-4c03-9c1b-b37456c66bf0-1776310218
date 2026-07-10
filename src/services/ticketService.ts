@@ -11,7 +11,18 @@ import {
   getInternalRequestApprovalGate,
   getInternalRequestApprovalPlan,
   listInternalRequestApprovalMetadata,
+  canTransition,
+  getAvailableTicketActions,
+  getTicketWorkflowSideEffects,
+  normalizePersistedTicketStatus,
+  normalizeTicketCompletionCategory,
   type InternalRequestApprovalMetadata,
+  type PersistedTicketStatus,
+  type TicketActor,
+  type TicketCompletionCategory,
+  type TicketTransitionAction,
+  type TicketTransitionPayload,
+  type TicketWorkflowSubject,
 } from '@flc/internal-requests';
 
 /**
@@ -25,20 +36,12 @@ import {
  * generated types the next time `supabase gen types` runs.
  */
 
-export type TicketStatus =
-  | 'open'
-  | 'in_progress'
-  | 'pending_requester'
-  | 'pending_owner_review'
-  | 'completed_by_owner'
-  | 'closed'
-  | 'reopened'
-  | 'cancelled';
+export type TicketStatus = PersistedTicketStatus;
 export type TicketPriority = 'low' | 'medium' | 'high';
 export type TicketCategory = RequestCategoryValue;
 export type TicketResponsibleParty = 'Owner' | 'Requester' | 'Backup Owner' | 'Manager' | 'Escalation Owner' | 'Admin' | 'None';
 export type TicketSlaStatus = 'on_track' | 'at_risk' | 'breached' | 'paused';
-export type TicketCompletionCategory = 'resolved' | 'rejected' | 'duplicate' | 'cancelled' | 'not_applicable';
+export type { TicketCompletionCategory, TicketTransitionAction } from '@flc/internal-requests';
 
 export interface TicketRecord {
   id: string;
@@ -56,6 +59,7 @@ export interface TicketRecord {
   vso_number: string | null;
   submitted_by: string;
   assigned_to: string | null;
+  collaborator_ids: string[] | null;
   backup_owner_id: string | null;
   escalation_owner_id: string | null;
   responsible_queue: string;
@@ -124,6 +128,7 @@ export interface UpdateTicketInput {
   status?: TicketStatus;
   priority?: TicketPriority;
   assigned_to?: string | null;
+  collaborator_ids?: string[] | null;
   backup_owner_id?: string | null;
   escalation_owner_id?: string | null;
   resolution_note?: string | null;
@@ -133,6 +138,10 @@ export interface UpdateTicketInput {
   vso_number?: string | null;
   desired_outcome?: string | null;
   business_impact?: string | null;
+  category?: TicketCategory;
+  resolution_due_at?: string | null;
+  current_responsible_party?: TicketResponsibleParty;
+  next_action?: string;
 }
 
 export interface AddTicketCommentInput {
@@ -294,6 +303,7 @@ export interface DuplicateTicketCandidate {
 type TicketRow = TicketRecord;
 type TicketUpdate = Database['public']['Tables']['tickets']['Update'];
 type TicketActivityDbInsert = Database['public']['Tables']['ticket_activity']['Insert'];
+type TicketCollaboratorInsert = Database['public']['Tables']['ticket_collaborators']['Insert'];
 
 interface ProfileLookupRow {
   id: string;
@@ -335,23 +345,10 @@ interface TicketAuditRow {
 const TICKET_SELECT =
   'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, custom_fields, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, backup_owner_id, escalation_owner_id, responsible_queue, current_responsible_party, next_action, status_changed_at, last_action_by, sla_status, sla_paused_at, sla_pause_duration_ms, sla_breach_reason, assigned_at, first_response_due_at, resolution_due_at, first_responded_at, resolved_at, resolution_note, completion_category, completion_checklist_confirmed, completion_attachment_required, closure_confirmed, satisfaction_rating, closure_feedback, closed_at, reopen_count, reopened_at, last_reopen_reason, previous_owner_id';
 
-const TICKET_STATUSES = new Set<TicketStatus>([
-  'open',
-  'in_progress',
-  'pending_requester',
-  'pending_owner_review',
-  'completed_by_owner',
-  'closed',
-  'reopened',
-  'cancelled',
-]);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function normalizeStatus(status: unknown): TicketStatus {
-  if (status === 'awaiting_requester') return 'pending_requester';
-  if (status === 'resolved') return 'completed_by_owner';
-  return typeof status === 'string' && TICKET_STATUSES.has(status as TicketStatus)
-    ? status as TicketStatus
-    : 'open';
+  return normalizePersistedTicketStatus(status);
 }
 
 function normalizePriority(priority: unknown): TicketPriority {
@@ -414,6 +411,7 @@ function mapTicket(row: TicketRow): TicketRecord {
     vso_number: row.vso_number ?? null,
     submitted_by: row.submitted_by ?? '',
     assigned_to: row.assigned_to ?? null,
+    collaborator_ids: [],
     backup_owner_id: row.backup_owner_id ?? null,
     escalation_owner_id: row.escalation_owner_id ?? null,
     responsible_queue: row.responsible_queue ?? 'Unassigned',
@@ -436,7 +434,7 @@ function mapTicket(row: TicketRow): TicketRecord {
     current_approver_user_id: row.current_approver_user_id ?? null,
     resolved_at: row.resolved_at ?? null,
     resolution_note: row.resolution_note ?? null,
-    completion_category: row.completion_category ?? null,
+    completion_category: normalizeTicketCompletionCategory(row.completion_category),
     completion_checklist_confirmed: Boolean(row.completion_checklist_confirmed ?? false),
     completion_attachment_required: Boolean(row.completion_attachment_required ?? false),
     closure_confirmed: row.closure_confirmed ?? null,
@@ -482,12 +480,12 @@ function ticketsTable() {
   return supabase.from('tickets');
 }
 
-function ticketActivityTable() {
-  return supabase.from('ticket_activity');
+function ticketCollaboratorsTable() {
+  return supabase.from('ticket_collaborators');
 }
 
-function table(name: string) {
-  return (supabase as never as { from: (tableName: string) => ReturnType<typeof supabase.from> }).from(name);
+function ticketActivityTable() {
+  return supabase.from('ticket_activity');
 }
 
 function toJsonObject(value: Record<string, unknown> | null | undefined): Json {
@@ -496,6 +494,107 @@ function toJsonObject(value: Record<string, unknown> | null | undefined): Json {
 
 function formatTicketLabel(value: string) {
   return value.replace(/_/g, ' ');
+}
+
+function normalizeCollaboratorIds(ids: string[] | null | undefined): string[] {
+  return Array.from(new Set((ids ?? []).filter((id) => UUID_PATTERN.test(id))));
+}
+
+function sameStringSet(left: string[], right: string[]) {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((value) => rightSet.has(value));
+}
+
+async function fetchCollaboratorIdsByTicketIds(
+  ticketIds: string[],
+  companyId: string,
+): Promise<Map<string, string[]>> {
+  const uniqueTicketIds = Array.from(new Set(ticketIds.filter((id) => UUID_PATTERN.test(id))));
+  const grouped = new Map(uniqueTicketIds.map((ticketId) => [ticketId, [] as string[]]));
+  if (uniqueTicketIds.length === 0) return grouped;
+
+  const { data, error } = await ticketCollaboratorsTable()
+    .select('ticket_id, user_id')
+    .eq('company_id', companyId)
+    .in('ticket_id', uniqueTicketIds);
+
+  if (error) throw error;
+
+  for (const row of data ?? []) {
+    grouped.get(row.ticket_id)?.push(row.user_id);
+  }
+  return grouped;
+}
+
+async function attachTicketCollaborators<T extends TicketRecord>(
+  tickets: T[],
+  companyId: string,
+): Promise<T[]> {
+  if (tickets.length === 0) return tickets;
+  const collaboratorsByTicket = await fetchCollaboratorIdsByTicketIds(tickets.map((ticket) => ticket.id), companyId);
+  return tickets.map((ticket) => ({
+    ...ticket,
+    collaborator_ids: collaboratorsByTicket.get(ticket.id) ?? [],
+  }));
+}
+
+async function listCollaboratorTicketIds(companyId: string, userId: string): Promise<string[]> {
+  if (!UUID_PATTERN.test(userId)) return [];
+
+  const { data, error } = await ticketCollaboratorsTable()
+    .select('ticket_id')
+    .eq('company_id', companyId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+  return Array.from(new Set((data ?? []).map((row) => row.ticket_id)));
+}
+
+async function syncTicketCollaborators(
+  ticketId: string,
+  companyId: string,
+  nextIds: string[],
+  actorId: string,
+  currentIds?: string[],
+) {
+  const normalizedNextIds = normalizeCollaboratorIds(nextIds);
+  const normalizedCurrentIds = currentIds
+    ? normalizeCollaboratorIds(currentIds)
+    : (await fetchCollaboratorIdsByTicketIds([ticketId], companyId)).get(ticketId) ?? [];
+
+  if (sameStringSet(normalizedCurrentIds, normalizedNextIds)) {
+    return normalizedNextIds;
+  }
+
+  const nextSet = new Set(normalizedNextIds);
+  const currentSet = new Set(normalizedCurrentIds);
+  const removedIds = normalizedCurrentIds.filter((id) => !nextSet.has(id));
+  const addedRows: TicketCollaboratorInsert[] = normalizedNextIds
+    .filter((id) => !currentSet.has(id))
+    .map((userId) => ({
+      ticket_id: ticketId,
+      company_id: companyId,
+      user_id: userId,
+      added_by: actorId,
+    }));
+
+  if (removedIds.length > 0) {
+    const { error } = await ticketCollaboratorsTable()
+      .delete()
+      .eq('company_id', companyId)
+      .eq('ticket_id', ticketId)
+      .in('user_id', removedIds);
+    if (error) throw error;
+  }
+
+  if (addedRows.length > 0) {
+    const { error } = await ticketCollaboratorsTable()
+      .upsert(addedRows, { onConflict: 'ticket_id,user_id' });
+    if (error) throw error;
+  }
+
+  return normalizedNextIds;
 }
 
 function isResolvedTicketStatus(status: TicketStatus) {
@@ -523,6 +622,92 @@ function isSlaBreached(ticket: Pick<TicketRecord, 'first_response_due_at' | 'fir
   return responseBreached || resolutionBreached || ticket.status === 'closed' && false;
 }
 
+function toTicketWorkflowSubject(
+  ticket: TicketRecord,
+  options: { withinReopenWindow?: boolean } = {},
+): TicketWorkflowSubject {
+  return {
+    lifecycleState: ticket.status,
+    approvalStatus: ticket.approval_status ?? 'none',
+    submittedBy: ticket.submitted_by,
+    assignedTo: ticket.assigned_to,
+    hasWorkStarted: Boolean(
+      ticket.assigned_at
+      || ticket.first_responded_at
+      || ticket.status !== 'open'
+      || ticket.resolution_note,
+    ),
+    isSlaBreached: isSlaBreached(ticket),
+    withinReopenWindow: options.withinReopenWindow,
+  };
+}
+
+function toTicketWorkflowActor(
+  ticket: TicketRecord,
+  context: {
+    userId: string | null;
+    companyId: string;
+    userRole?: string | null;
+    canManagePortalQueue?: boolean;
+    canAdminOverride?: boolean;
+    isSystem?: boolean;
+    isAssignedApprover?: boolean;
+  },
+): TicketActor {
+  return {
+    userId: context.userId,
+    companyId: context.companyId,
+    role: context.userRole ?? null,
+    isRequester: Boolean(context.userId && ticket.submitted_by === context.userId),
+    canManageQueue: Boolean(context.canManagePortalQueue || ticket.assigned_to === context.userId),
+    canAdminOverride: Boolean(context.canAdminOverride),
+    isSystem: Boolean(context.isSystem),
+    isAssignedApprover: Boolean(context.isAssignedApprover),
+  };
+}
+
+function validateTicketWorkflowTransition(
+  ticket: TicketRecord,
+  action: TicketTransitionAction,
+  payload: TicketTransitionPayload,
+  context: {
+    userId: string | null;
+    companyId: string;
+    userRole?: string | null;
+    canManagePortalQueue?: boolean;
+    canAdminOverride?: boolean;
+    isSystem?: boolean;
+    isAssignedApprover?: boolean;
+  },
+  subjectOptions: { withinReopenWindow?: boolean } = {},
+): Error | null {
+  const result = canTransition({
+    action,
+    actor: toTicketWorkflowActor(ticket, context),
+    subject: toTicketWorkflowSubject(ticket, subjectOptions),
+    payload,
+  });
+  return result.ok ? null : new Error(result.reason);
+}
+
+export function getAvailableTicketWorkflowActions(
+  ticket: TicketRecord,
+  context: {
+    userId: string | null;
+    companyId: string;
+    userRole?: string | null;
+    canManagePortalQueue?: boolean;
+    canAdminOverride?: boolean;
+    isSystem?: boolean;
+    isAssignedApprover?: boolean;
+  },
+): TicketTransitionAction[] {
+  return getAvailableTicketActions(
+    toTicketWorkflowSubject(ticket),
+    toTicketWorkflowActor(ticket, context),
+  );
+}
+
 function withWorkflowPatch(status: TicketStatus, extra: TicketUpdate = {}): TicketUpdate {
   const workflow = getTicketNextAction(status);
   return {
@@ -534,14 +719,21 @@ function withWorkflowPatch(status: TicketStatus, extra: TicketUpdate = {}): Tick
   } as TicketUpdate;
 }
 
-async function fetchTicketForUpdate(ticketId: string, companyId: string) {
+async function fetchTicketForUpdate(
+  ticketId: string,
+  companyId: string,
+  options: { includeCollaborators?: boolean } = {},
+) {
   const { data, error } = await ticketsTable()
     .select(TICKET_SELECT)
     .eq('company_id', companyId)
     .eq('id', ticketId)
     .single();
   if (error) throw error;
-  return mapTicket(data as TicketRow);
+  const ticket = mapTicket(data as TicketRow);
+  if (!options.includeCollaborators) return ticket;
+  const [withCollaborators] = await attachTicketCollaborators([ticket], companyId);
+  return withCollaborators;
 }
 
 function buildTicketActivityEntries(before: TicketRecord, after: TicketRecord, actorId: string): TicketActivityInsert[] {
@@ -588,6 +780,19 @@ function buildTicketActivityEntries(before: TicketRecord, after: TicketRecord, a
       event_type: 'owner_changed',
       message: after.escalation_owner_id ? 'Escalation owner assigned.' : 'Escalation owner cleared.',
       metadata: { field: 'escalation_owner_id', before: before.escalation_owner_id, after: after.escalation_owner_id },
+    });
+  }
+
+  const beforeCollaborators = normalizeCollaboratorIds(before.collaborator_ids);
+  const afterCollaborators = normalizeCollaboratorIds(after.collaborator_ids);
+  if (!sameStringSet(beforeCollaborators, afterCollaborators)) {
+    entries.push({
+      ticket_id: after.id,
+      company_id: after.company_id,
+      actor_id: actorId,
+      event_type: 'owner_changed',
+      message: 'Request collaborators updated.',
+      metadata: { field: 'collaborators', before: beforeCollaborators, after: afterCollaborators },
     });
   }
 
@@ -685,6 +890,20 @@ function buildTicketNotifications(
     }
   }
 
+  const beforeCollaborators = new Set(normalizeCollaboratorIds(before.collaborator_ids));
+  const afterCollaborators = normalizeCollaboratorIds(after.collaborator_ids);
+  for (const collaboratorId of afterCollaborators) {
+    if (beforeCollaborators.has(collaboratorId) || collaboratorId === actorId || collaboratorId === after.submitted_by || collaboratorId === after.assigned_to) {
+      continue;
+    }
+    notifications.push({
+      userId: collaboratorId,
+      title: 'Request shared with you',
+      message: `You have been added as a collaborator on "${after.subject}".`,
+      type: 'info',
+    });
+  }
+
   return notifications;
 }
 
@@ -692,6 +911,9 @@ function buildCommentNotifications(ticket: TicketRecord, actorId: string, messag
   const recipientIds = new Set<string>();
   if (ticket.submitted_by !== actorId) recipientIds.add(ticket.submitted_by);
   if (ticket.assigned_to && ticket.assigned_to !== actorId) recipientIds.add(ticket.assigned_to);
+  for (const collaboratorId of normalizeCollaboratorIds(ticket.collaborator_ids)) {
+    if (collaboratorId !== actorId) recipientIds.add(collaboratorId);
+  }
 
   return [...recipientIds].map((userId) => ({
     userId,
@@ -702,7 +924,8 @@ function buildCommentNotifications(ticket: TicketRecord, actorId: string, messag
 }
 
 async function enrichCompanyTickets(rows: TicketRecord[], companyId: string): Promise<CompanyTicketRecord[]> {
-  const ticketsWithApproval = await applyApprovalMetadata(rows);
+  const ticketsWithCollaborators = await attachTicketCollaborators(rows, companyId);
+  const ticketsWithApproval = await applyApprovalMetadata(ticketsWithCollaborators);
   const profilesById = await fetchProfilesById(
     companyId,
     ticketsWithApproval.flatMap((ticket) => {
@@ -711,6 +934,7 @@ async function enrichCompanyTickets(rows: TicketRecord[], companyId: string): Pr
       if (ticket.backup_owner_id) people.push(ticket.backup_owner_id);
       if (ticket.escalation_owner_id) people.push(ticket.escalation_owner_id);
       if (ticket.last_action_by) people.push(ticket.last_action_by);
+      people.push(...normalizeCollaboratorIds(ticket.collaborator_ids));
       return people;
     }),
   );
@@ -869,7 +1093,12 @@ export async function listCompanyTicketsPage(
       if (normalized.assignedTo === 'unassigned') {
         query = query.is('assigned_to', null);
       } else {
-        query = query.eq('assigned_to', normalized.assignedTo);
+        const collaboratorTicketIds = await listCollaboratorTicketIds(companyId, normalized.assignedTo);
+        if (collaboratorTicketIds.length > 0) {
+          query = query.or(`assigned_to.eq.${normalized.assignedTo},id.in.(${collaboratorTicketIds.join(',')})`);
+        } else {
+          query = query.eq('assigned_to', normalized.assignedTo);
+        }
       }
     }
     if (normalized.category && normalized.category !== 'all') {
@@ -1129,7 +1358,7 @@ export async function listTicketChatSummaries(
         .eq('company_id', companyId)
         .eq('event_type', 'comment_added')
         .in('ticket_id', ticketIds),
-      table('ticket_chat_reads')
+      supabase.from('ticket_chat_reads')
         .select('ticket_id, read_at')
         .eq('company_id', companyId)
         .eq('user_id', userId)
@@ -1140,7 +1369,7 @@ export async function listTicketChatSummaries(
     if (readsError) throw readsError;
 
     const readByTicket = new Map(
-      ((reads ?? []) as Array<{ ticket_id: string; read_at: string | null }>)
+      ((reads ?? []) as unknown as Array<{ ticket_id: string; read_at: string | null }>)
         .map((row) => [row.ticket_id, row.read_at ? new Date(row.read_at).getTime() : 0]),
     );
     const summaries: Record<string, TicketChatSummary> = { ...empty };
@@ -1171,7 +1400,7 @@ export async function markTicketChatRead(
   context: { userId: string; companyId: string },
 ): Promise<TicketServiceResult<true>> {
   try {
-    const { error } = await table('ticket_chat_reads').upsert({
+    const { error } = await supabase.from('ticket_chat_reads').upsert({
       ticket_id: ticketId,
       company_id: context.companyId,
       user_id: context.userId,
@@ -1194,14 +1423,14 @@ export async function listTicketInternalNotes(
   if (ticketIds.length === 0) return { data: grouped, error: null };
 
   try {
-    const { data, error } = await table('ticket_internal_notes')
+    const { data, error } = await supabase.from('ticket_internal_notes')
       .select('id, ticket_id, author_id, note, mentions, created_at, updated_at')
       .eq('company_id', companyId)
       .in('ticket_id', ticketIds)
       .order('created_at', { ascending: false });
     if (error) throw error;
 
-    const rows = (data ?? []) as Array<{
+    const rows = (data ?? []) as unknown as Array<{
       id: string;
       ticket_id: string;
       author_id: string;
@@ -1238,7 +1467,7 @@ export async function listTicketAuditEntries(
   companyId: string,
 ): Promise<TicketServiceResult<TicketAuditEntryRecord[]>> {
   try {
-    const { data, error } = await table('audit_logs')
+    const { data, error } = await supabase.from('audit_logs')
       .select('id, user_id, action, entity_type, entity_id, table_name, changes, created_at')
       .eq('entity_id', ticketId)
       .or('entity_type.eq.ticket,entity_type.eq.internal_request,table_name.eq.tickets,table_name.eq.user_actions')
@@ -1246,7 +1475,7 @@ export async function listTicketAuditEntries(
       .limit(100);
     if (error) throw error;
 
-    const rows = (data ?? []) as TicketAuditRow[];
+    const rows = (data ?? []) as unknown as TicketAuditRow[];
     const profilesById = await fetchProfilesById(companyId, rows.map((row) => row.user_id));
     return {
       data: rows.map((row) => ({
@@ -1342,7 +1571,7 @@ export async function addTicketInternalNote(
 
   try {
     const mentions = input.mentions ?? Array.from(note.matchAll(/@([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|[A-Za-z][A-Za-z\s.'-]{1,80})/g)).map((match) => match[1].trim());
-    const { data, error } = await table('ticket_internal_notes')
+    const { data, error } = await supabase.from('ticket_internal_notes')
       .insert({
         ticket_id: ticketId,
         company_id: context.companyId,
@@ -1458,7 +1687,7 @@ export async function createTicket(
 
     if (input.duplicate_of_ticket_id) {
       void Promise.allSettled([
-        table('ticket_duplicate_links').insert({
+        supabase.from('ticket_duplicate_links').insert({
           company_id: context.companyId,
           ticket_id: ticketId,
           duplicate_of_ticket_id: input.duplicate_of_ticket_id,
@@ -1523,6 +1752,10 @@ export async function updateTicket(
   context: { userId: string; companyId: string },
 ): Promise<TicketServiceResult<TicketRecord>> {
   const patch: TicketUpdate = {};
+  const collaboratorUpdateProvided = input.collaborator_ids !== undefined;
+  const nextCollaboratorIds = collaboratorUpdateProvided
+    ? normalizeCollaboratorIds(input.collaborator_ids)
+    : null;
 
   if (input.status) {
     if (!input.admin_override_reason?.trim()) {
@@ -1536,6 +1769,10 @@ export async function updateTicket(
   if (input.assigned_to !== undefined) patch.assigned_to = input.assigned_to;
   if (input.backup_owner_id !== undefined) patch.backup_owner_id = input.backup_owner_id;
   if (input.escalation_owner_id !== undefined) patch.escalation_owner_id = input.escalation_owner_id;
+  if (input.category !== undefined) patch.category = input.category;
+  if (input.resolution_due_at !== undefined) patch.resolution_due_at = input.resolution_due_at;
+  if (input.current_responsible_party !== undefined) patch.current_responsible_party = input.current_responsible_party;
+  if (input.next_action !== undefined) patch.next_action = input.next_action;
   if (input.sla_breach_reason !== undefined) patch.sla_breach_reason = input.sla_breach_reason?.trim() ? input.sla_breach_reason.trim() : null;
   if (input.resolution_note !== undefined) {
     patch.resolution_note = input.resolution_note?.trim() ? input.resolution_note.trim() : null;
@@ -1544,9 +1781,14 @@ export async function updateTicket(
   if (input.desired_outcome !== undefined) patch.desired_outcome = input.desired_outcome?.trim() || null;
   if (input.business_impact !== undefined) patch.business_impact = input.business_impact?.trim() || null;
   if (Object.keys(patch).length > 0) patch.last_action_by = context.userId;
+  if (collaboratorUpdateProvided && Object.keys(patch).length === 0) {
+    patch.last_action_by = context.userId;
+  }
 
   try {
-    const current = await fetchTicketForUpdate(ticketId, context.companyId);
+    const current = await fetchTicketForUpdate(ticketId, context.companyId, {
+      includeCollaborators: collaboratorUpdateProvided,
+    });
 
     if (
       input.mark_opened
@@ -1562,7 +1804,7 @@ export async function updateTicket(
       }));
     }
 
-    if (Object.keys(patch).length === 0) {
+    if (Object.keys(patch).length === 0 && !collaboratorUpdateProvided) {
       if (input.mark_opened) {
         return { data: current, error: null };
       }
@@ -1615,7 +1857,22 @@ export async function updateTicket(
 
     if (error) throw error;
 
-    const [nextTicket] = await applyApprovalMetadata([mapTicket(data as unknown as TicketRow)]);
+    let mappedNextTicket = mapTicket(data as unknown as TicketRow);
+    if (collaboratorUpdateProvided && nextCollaboratorIds) {
+      const syncedCollaboratorIds = await syncTicketCollaborators(
+        ticketId,
+        context.companyId,
+        nextCollaboratorIds,
+        context.userId,
+        current.collaborator_ids ?? [],
+      );
+      mappedNextTicket = {
+        ...mappedNextTicket,
+        collaborator_ids: syncedCollaboratorIds,
+      };
+    }
+
+    const [nextTicket] = await applyApprovalMetadata([mappedNextTicket]);
     const activityEntries = buildTicketActivityEntries(current, nextTicket, context.userId);
     if (input.status && input.admin_override_reason?.trim()) {
       activityEntries.push({
@@ -1644,6 +1901,7 @@ export async function updateTicket(
     void logUserAction(context.userId, 'update', 'ticket', ticketId, {
       component: 'TicketService',
       ...patch,
+      ...(collaboratorUpdateProvided ? { collaborator_ids: nextCollaboratorIds } : {}),
     });
 
     return { data: nextTicket, error: null };
@@ -1656,19 +1914,24 @@ export async function updateTicket(
 
 async function applyTicketWorkflowAction(
   ticketId: string,
+  action: TicketTransitionAction,
   status: TicketStatus,
   context: { userId: string; companyId: string },
   options: {
     eventType: TicketActivityEventType;
     message: string;
+    payload: TicketTransitionPayload;
     resolutionNote?: string | null;
     slaBreachReason?: string | null;
     metadata?: Record<string, unknown>;
     patch?: TicketUpdate;
+    currentTicket?: TicketRecord;
   },
 ): Promise<TicketServiceResult<TicketRecord>> {
   try {
-    const current = await fetchTicketForUpdate(ticketId, context.companyId);
+    const current = options.currentTicket ?? await fetchTicketForUpdate(ticketId, context.companyId);
+    const transitionError = validateTicketWorkflowTransition(current, action, options.payload, context);
+    if (transitionError) return { data: null, error: transitionError };
 
     if ((status === 'completed_by_owner' || status === 'closed') && isSlaBreached(current) && !options.slaBreachReason?.trim() && !current.sla_breach_reason) {
       return { data: null, error: new Error('A breach reason is required before this SLA-breached request can be completed or closed.') };
@@ -1681,6 +1944,19 @@ async function applyTicketWorkflowAction(
       sla_breach_reason: options.slaBreachReason?.trim() ? options.slaBreachReason.trim() : current.sla_breach_reason,
       ...(options.patch ?? {}),
     });
+    const workflowSideEffects = getTicketWorkflowSideEffects(action, options.payload);
+    if (workflowSideEffects.includes('sla_pause')) {
+      patch.sla_status = 'paused';
+      patch.sla_paused_at = current.sla_paused_at ?? now;
+    }
+    if (workflowSideEffects.includes('sla_resume')) {
+      const pausedAt = current.sla_paused_at ? new Date(current.sla_paused_at).getTime() : null;
+      patch.sla_status = current.sla_status === 'paused' ? 'on_track' : current.sla_status;
+      patch.sla_paused_at = null;
+      patch.sla_pause_duration_ms = pausedAt && Number.isFinite(pausedAt)
+        ? current.sla_pause_duration_ms + Math.max(Date.now() - pausedAt, 0)
+        : current.sla_pause_duration_ms;
+    }
 
     if (!current.first_responded_at && status !== 'open') {
       patch.first_responded_at = now;
@@ -1739,11 +2015,28 @@ export async function requestTicketMoreInformation(
   input: AddTicketCommentInput,
   context: { userId: string; companyId: string },
 ): Promise<TicketServiceResult<TicketRecord>> {
-  const comment = await addTicketComment(ticketId, input, context);
+  if (!input.message.trim()) return { data: null, error: new Error('Message is required.') };
+  let current: TicketRecord;
+  try {
+    current = await fetchTicketForUpdate(ticketId, context.companyId, { includeCollaborators: true });
+    const transitionError = validateTicketWorkflowTransition(current, 'request_more_info', {
+      kind: 'request_more_info',
+      message: input.message,
+      pauseSla: true,
+    }, context);
+    if (transitionError) return { data: null, error: transitionError };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to validate request workflow');
+    loggingService.error('Failed to validate request-more-info transition', { error: error.message, ticketId }, 'TicketService');
+    return { data: null, error };
+  }
+  const comment = await addTicketComment(ticketId, input, context, { ticket: current });
   if (comment.error) return { data: null, error: comment.error };
-  return applyTicketWorkflowAction(ticketId, 'pending_requester', context, {
+  return applyTicketWorkflowAction(ticketId, 'request_more_info', 'pending_requester', context, {
     eventType: 'owner_requested_more_information',
     message: 'Owner requested more information from the requester.',
+    payload: { kind: 'request_more_info', message: input.message, pauseSla: true },
+    currentTicket: current,
   });
 }
 
@@ -1752,11 +2045,27 @@ export async function submitRequesterTicketUpdate(
   input: AddTicketCommentInput,
   context: { userId: string; companyId: string },
 ): Promise<TicketServiceResult<TicketRecord>> {
-  const comment = await addTicketComment(ticketId, input, context);
+  if (!input.message.trim()) return { data: null, error: new Error('Message is required.') };
+  let current: TicketRecord;
+  try {
+    current = await fetchTicketForUpdate(ticketId, context.companyId, { includeCollaborators: true });
+    const transitionError = validateTicketWorkflowTransition(current, 'requester_reply', {
+      kind: 'requester_reply',
+      message: input.message,
+    }, context);
+    if (transitionError) return { data: null, error: transitionError };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to validate request workflow');
+    loggingService.error('Failed to validate requester-reply transition', { error: error.message, ticketId }, 'TicketService');
+    return { data: null, error };
+  }
+  const comment = await addTicketComment(ticketId, input, context, { ticket: current });
   if (comment.error) return { data: null, error: comment.error };
-  return applyTicketWorkflowAction(ticketId, 'pending_owner_review', context, {
+  return applyTicketWorkflowAction(ticketId, 'requester_reply', 'pending_owner_review', context, {
     eventType: 'requester_update_submitted',
     message: 'Requester submitted an update for owner review.',
+    payload: { kind: 'requester_reply', message: input.message },
+    currentTicket: current,
   });
 }
 
@@ -1779,9 +2088,16 @@ export async function markTicketCompletedByOwner(
   if (!input.checklistConfirmed) {
     return { data: null, error: new Error('Confirm the completion checklist before marking this request completed.') };
   }
-  return applyTicketWorkflowAction(ticketId, 'completed_by_owner', context, {
+  return applyTicketWorkflowAction(ticketId, 'complete_by_owner', 'completed_by_owner', context, {
     eventType: 'owner_completed_request',
     message: 'Owner marked the request as completed.',
+    payload: {
+      kind: 'complete_by_owner',
+      resolutionNote: input.resolutionNote,
+      completionCategory: input.completionCategory,
+      checklistConfirmed: input.checklistConfirmed,
+      slaBreachReason: input.slaBreachReason,
+    },
     resolutionNote: input.resolutionNote,
     slaBreachReason: input.slaBreachReason,
     metadata: { completion_category: input.completionCategory },
@@ -1809,9 +2125,15 @@ export async function closeTicketByRequester(
   if (!Number.isFinite(input.satisfactionRating) || input.satisfactionRating < 1 || input.satisfactionRating > 5) {
     return { data: null, error: new Error('Satisfaction rating must be between 1 and 5.') };
   }
-  const result = await applyTicketWorkflowAction(ticketId, 'closed', context, {
+  const result = await applyTicketWorkflowAction(ticketId, 'close_by_requester', 'closed', context, {
     eventType: 'requester_closed_request',
     message: 'Requester closed the request.',
+    payload: {
+      kind: 'close_by_requester',
+      confirmedResolved: true,
+      satisfactionRating: input.satisfactionRating,
+      feedbackComment: input.feedbackComment,
+    },
     slaBreachReason: input.slaBreachReason,
     metadata: { satisfaction_rating: input.satisfactionRating },
     patch: {
@@ -1823,7 +2145,7 @@ export async function closeTicketByRequester(
   });
   if (result.data) {
     await Promise.allSettled([
-      table('ticket_closure_feedback').insert({
+      supabase.from('ticket_closure_feedback').insert({
         ticket_id: ticketId,
         company_id: context.companyId,
         requester_id: context.userId,
@@ -1844,6 +2166,79 @@ export async function closeTicketByRequester(
   return result;
 }
 
+export async function rejectTicketCompletion(
+  ticketId: string,
+  input: { reason: string },
+  context: { userId: string; companyId: string },
+): Promise<TicketServiceResult<TicketRecord>> {
+  const reason = input.reason.trim();
+  if (!reason) return { data: null, error: new Error('Rejection reason is required.') };
+
+  try {
+    const current = await fetchTicketForUpdate(ticketId, context.companyId);
+    const transitionError = validateTicketWorkflowTransition(current, 'reject_completion', {
+      kind: 'reject_completion',
+      reason,
+    }, context);
+    if (transitionError) return { data: null, error: transitionError };
+
+    const now = new Date().toISOString();
+    const owner = current.previous_owner_id ?? current.assigned_to;
+    const patch = withWorkflowPatch('reopened', {
+      assigned_to: owner,
+      responsible_queue: owner ? 'Owner' : current.responsible_queue || 'Unassigned',
+      current_responsible_party: owner ? 'Owner' : 'Admin',
+      next_action: owner ? 'Owner to review rejected completion' : 'Admin to assign rejected completion',
+      reopened_at: now,
+      last_reopen_reason: reason,
+      reopen_count: current.reopen_count + 1,
+      resolved_at: null,
+      closed_at: null,
+      closure_confirmed: null as unknown as boolean,
+      last_action_by: context.userId,
+    });
+
+    const { data, error } = await ticketsTable()
+      .update(patch)
+      .eq('company_id', context.companyId)
+      .eq('id', ticketId)
+      .select(TICKET_SELECT)
+      .single();
+    if (error) throw error;
+
+    const nextTicket = mapTicket(data as unknown as TicketRow);
+    await Promise.allSettled([
+      ticketActivityTable().insert([
+        ...buildTicketActivityEntries(current, nextTicket, context.userId),
+        {
+          ticket_id: ticketId,
+          company_id: context.companyId,
+          actor_id: context.userId,
+          event_type: 'request_reopened',
+          message: 'Requester rejected the completion and reopened the request.',
+          metadata: { reason, rejected_completion: true },
+        },
+      ]),
+      createNotifications(
+        [nextTicket.assigned_to, nextTicket.backup_owner_id, nextTicket.escalation_owner_id]
+          .filter((recipientId): recipientId is string => Boolean(recipientId && recipientId !== context.userId))
+          .map((userId) => ({
+            userId,
+            title: 'Request completion rejected',
+            message: `"${nextTicket.subject}" was reopened by the requester.`,
+            type: 'warning',
+          })),
+      ),
+    ]);
+
+    return { data: nextTicket, error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to reject completion');
+    loggingService.error('Failed to reject ticket completion', { error: error.message, ticketId }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
 export async function reopenTicketByRequester(
   ticketId: string,
   input: { reason: string },
@@ -1861,7 +2256,7 @@ export async function reopenTicketByRequester(
       return { data: null, error: new Error('Only closed requests can be reopened.') };
     }
 
-    const { data: settings } = await table('request_module_settings')
+    const { data: settings } = await supabase.from('request_module_settings')
       .select('reopen_window_days')
       .eq('company_id', context.companyId)
       .maybeSingle();
@@ -1886,7 +2281,7 @@ export async function reopenTicketByRequester(
       reopen_count: current.reopen_count + 1,
       resolved_at: null,
       closed_at: null,
-      closure_confirmed: null,
+      closure_confirmed: null as unknown as boolean,
       last_action_by: context.userId,
     });
 
@@ -1955,7 +2350,7 @@ export async function cancelMyTicket(
     if (error) throw error;
     if (!data) throw new Error('Request cancellation did not return a ticket');
 
-    const nextTicket = mapTicket(data as TicketRow);
+    const nextTicket = mapTicket(data as unknown as TicketRow);
     await Promise.allSettled([
       ticketActivityTable().insert({
         ticket_id: ticketId,
@@ -1986,6 +2381,7 @@ export async function addTicketComment(
   ticketId: string,
   input: AddTicketCommentInput,
   context: { userId: string; companyId: string },
+  options: { ticket?: TicketRecord } = {},
 ): Promise<TicketServiceResult<TicketActivityRecord>> {
   const message = input.message.trim();
   if (!message) {
@@ -1993,7 +2389,7 @@ export async function addTicketComment(
   }
 
   try {
-    const ticket = await fetchTicketForUpdate(ticketId, context.companyId);
+    const ticket = options.ticket ?? await fetchTicketForUpdate(ticketId, context.companyId, { includeCollaborators: true });
 
     const metadata: Record<string, unknown> = { comment: true };
     if (input.attachmentNames?.length) metadata.attachment_names = input.attachmentNames;
@@ -2006,7 +2402,7 @@ export async function addTicketComment(
         actor_id: context.userId,
         event_type: 'comment_added',
         message,
-        metadata,
+        metadata: metadata as Json,
       })
       .select('id, ticket_id, company_id, actor_id, event_type, message, metadata, created_at')
       .single();
@@ -2058,7 +2454,7 @@ export async function ticketReplyAndWait(
     if (error) throw error;
     if (!data) throw new Error('Failed to update ticket and add reply');
 
-    return { data: mapTicket(data as TicketRow), error: null };
+    return { data: mapTicket(data as unknown as TicketRow), error: null };
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to reply and wait');
     loggingService.error('Failed to reply and wait', { error: error.message, ticketId }, 'TicketService');

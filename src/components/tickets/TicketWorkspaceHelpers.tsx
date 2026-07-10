@@ -15,7 +15,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { TicketActivityList } from '@/components/tickets/TicketActivityList';
-import type { TicketAuditEntryRecord, TicketStatus, TicketWorkspaceData } from '@/services/ticketService';
+import type {
+  CompanyTicketRecord,
+  TicketAuditEntryRecord,
+  TicketStatus,
+  TicketTransitionAction,
+  TicketWorkspaceData,
+} from '@/services/ticketService';
 
 // ─── Shared layout primitives ────────────────────────────────────────────
 
@@ -60,16 +66,21 @@ export function EmptyPanel({ title, description }: { title: string; description:
 
 // ─── Workflow strip ──────────────────────────────────────────────────────
 
-export function primaryActionLabel(ticket: CompanyTicketRecord, permissions: TicketWorkspaceData["permissions"]) {
+export function primaryActionLabel(
+  ticket: CompanyTicketRecord,
+  permissions: TicketWorkspaceData["permissions"],
+  availableActions?: TicketTransitionAction[],
+) {
+  const can = (action: TicketTransitionAction) => !availableActions || availableActions.includes(action);
   if (permissions.canManageWorkflow) {
-    if (ticket.status === "open") return "Start Request";
-    if (ticket.status === "in_progress" || ticket.status === "pending_owner_review" || ticket.status === "reopened") return "Mark as Completed";
-    if (ticket.status === "pending_requester") return "Request More Info";
+    if (ticket.status === "open" && can('start_work')) return "Start Request";
+    if ((ticket.status === "in_progress" || ticket.status === "pending_owner_review" || ticket.status === "reopened") && can('complete_by_owner')) return "Mark as Completed";
+    if (ticket.status === "pending_requester" && can('request_more_info')) return "Request More Info";
   }
   if (permissions.canCloseAsRequester) {
-    if (ticket.status === "pending_requester") return "Submit Update";
-    if (ticket.status === "completed_by_owner") return "Close Request";
-    if (ticket.status === "closed") return "Reopen Request";
+    if (ticket.status === "pending_requester" && can('requester_reply')) return "Submit Update";
+    if (ticket.status === "completed_by_owner" && can('close_by_requester')) return "Close Request";
+    if (ticket.status === "closed" && can('reopen_by_requester')) return "Reopen Request";
   }
   return null;
 }

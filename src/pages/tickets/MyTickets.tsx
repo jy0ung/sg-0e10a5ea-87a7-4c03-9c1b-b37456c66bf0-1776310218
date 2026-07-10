@@ -10,20 +10,21 @@ import {
   RefreshCcw,
   Search,
   Ticket,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { HrmsEmptyState } from '@/components/shared/HrmsEmptyState';
-import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
-import { TableSkeleton } from '@/components/ui/TableSkeleton';
-import { RequestPriorityBadge, RequestStatusBadge } from '@/components/tickets/RequestBadge';
 import { useRequestCategories } from '@/hooks/useRequestCategories';
 import { useTicketsRealtime } from '@/hooks/useTicketsRealtime';
 import { getRequestCategoryLabel } from '@/lib/requestCategories';
 import { openTicketWorkspace } from '@/lib/ticketWorkspaceNavigation';
+import { getTicketSlaSummary, formatSlaCompactLabel } from '@/lib/ticketSla';
+import { cn } from '@/lib/utils';
 
 import {
   listTicketChatSummaries,
@@ -32,7 +33,17 @@ import {
   type TicketChatSummary,
 } from '@/services/ticketService';
 
-type MyStatusFilter = 'action_required' | 'open' | 'closed';
+const PIZZA_STEPS = ['Submitted', 'Assigned', 'In Progress', 'Waiting on You', 'Resolved', 'Closed'];
+const HUB_RETURN_FILTERS = { searchTerm: '', statusFilter: 'open' };
+
+function getTicketStepIndex(ticket: RequestTicketRecord) {
+  if (ticket.status === 'closed' || ticket.status === 'cancelled') return 5;
+  if (ticket.status === 'completed_by_owner') return 4;
+  if (ticket.status === 'pending_requester') return 3;
+  if (ticket.status === 'in_progress' || ticket.status === 'pending_owner_review' || ticket.status === 'reopened') return 2;
+  if (ticket.assigned_to) return 1;
+  return 0; // open and unassigned
+}
 
 export default function MyTickets() {
   const { user } = useAuth();
@@ -41,8 +52,7 @@ export default function MyTickets() {
   const queryClient = useQueryClient();
   const { categories } = useRequestCategories(user?.company_id, true);
   const [chatSummariesByTicket, setChatSummariesByTicket] = useState<Record<string, TicketChatSummary>>({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<MyStatusFilter>('open');
+  const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
 
   const myTicketsKey = ['my-tickets', user?.id, user?.company_id] as const;
 
@@ -94,147 +104,36 @@ export default function MyTickets() {
     onChange: refreshTickets,
   });
 
+  const handleOpenTicket = useCallback((ticketId: string) => {
+    openTicketWorkspace(navigate, ticketId, {
+      source: 'pending',
+      path: `${location.pathname}${location.search}`,
+      filters: HUB_RETURN_FILTERS,
+    });
+  }, [location.pathname, location.search, navigate]);
+
   const handleOpenChat = useCallback((ticketId: string) => {
     openTicketWorkspace(navigate, ticketId, {
       source: 'pending',
       path: `${location.pathname}${location.search}`,
-      filters: { searchTerm, statusFilter },
-    }, 'chat');
-  }, [location.pathname, location.search, navigate, searchTerm, statusFilter]);
+      filters: HUB_RETURN_FILTERS,
+    }, 'activity');
+  }, [location.pathname, location.search, navigate]);
 
+  const handleCardKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>, ticketId: string) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handleOpenTicket(ticketId);
+  }, [handleOpenTicket]);
 
-  // ── Derived state ─────────────────────────────────────────────────────────
-
-  const counts = useMemo(() => {
-    const c = { action_required: 0, open: 0, closed: 0 };
-    for (const t of tickets) {
-      if (t.status === 'pending_requester' || t.status === 'completed_by_owner') c.action_required++;
-      else if (t.status === 'closed' || t.status === 'cancelled') c.closed++;
-      else c.open++;
-    }
-    // Auto-select 'action_required' on load if there are tickets needing attention and filter is still 'open'
-    return c;
-  }, [tickets]);
-
-  // If we wanted to auto-switch the tab, we'd do it in a useEffect. For now just let it default to 'open'.
-
-  const filteredTickets = useMemo(() => {
-    const search = searchTerm.trim().toLowerCase();
-    return tickets.filter((ticket) => {
-      // Status filter
-      if (statusFilter === 'action_required' && ticket.status !== 'pending_requester' && ticket.status !== 'completed_by_owner') return false;
-      if (statusFilter === 'closed' && ticket.status !== 'closed' && ticket.status !== 'cancelled') return false;
-      if (statusFilter === 'open' && (ticket.status === 'closed' || ticket.status === 'cancelled' || ticket.status === 'pending_requester' || ticket.status === 'completed_by_owner')) return false;
-
-      // Search
-      if (!search) return true;
-      const haystack = [
-        ticket.subject,
-        ticket.description,
-        ticket.vso_number,
-        getRequestCategoryLabel(ticket.category, categories),
-      ].filter(Boolean).join(' ').toLowerCase();
-      return haystack.includes(search);
-    });
-  }, [tickets, searchTerm, statusFilter, categories]);
-
-
-  const columns = useMemo<StandardTableColumn<RequestTicketRecord>[]>(() => [
-    {
-      key: 'subject',
-      label: 'Request',
-      className: 'min-w-[240px] max-w-[420px]',
-      render: (ticket) => (
-        <div className="min-w-0">
-          <p className="truncate font-medium text-foreground">{ticket.subject}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {ticket.assigned_to_name ? `Owner: ${ticket.assigned_to_name}` : 'Awaiting assignment'}
-            {ticket.vso_number ? ` · VSO ${ticket.vso_number}` : ''}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: 'category',
-      label: 'Category',
-      render: (ticket) => (
-        <span className="text-sm text-foreground">{getRequestCategoryLabel(ticket.category, categories)}</span>
-      ),
-    },
-    {
-      key: 'priority',
-      label: 'Priority',
-      render: (ticket) => <RequestPriorityBadge priority={ticket.priority} />,
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (ticket) => <RequestStatusBadge status={ticket.status} />,
-    },
-    {
-      key: 'chat',
-      label: '',
-      sortable: false,
-      className: 'w-[56px] text-center',
-      render: (ticket) => {
-        const summary = chatSummariesByTicket[ticket.id];
-        return (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="relative h-8 w-8"
-            onClick={(event) => {
-              event.stopPropagation();
-              void handleOpenChat(ticket.id);
-            }}
-            aria-label={`Open discussion for ${ticket.subject}`}
-          >
-            <MessageSquare className="h-4 w-4" />
-            {(summary?.unread_count ?? 0) > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-destructive px-1 text-[10px] font-semibold leading-4 text-destructive-foreground">
-                {summary!.unread_count}
-              </span>
-            )}
-          </Button>
-        );
-      },
-    },
-    {
-      key: 'updated_at',
-      label: 'Last Updated',
-      className: 'text-right',
-      render: (ticket) => (
-        <span className="whitespace-nowrap text-xs text-muted-foreground">
-          {formatDistanceToNow(new Date(ticket.updated_at), { addSuffix: true })}
-        </span>
-      ),
-    },
-    {
-      key: 'created_at',
-      label: 'Submitted',
-      className: 'text-right',
-      render: (ticket) => (
-        <span className="whitespace-nowrap text-xs text-muted-foreground">
-          {formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}
-        </span>
-      ),
-    },
-    {
-      key: 'assigned_to_name',
-      label: 'Owner / PIC',
-      render: (ticket) => (
-        <span className="text-sm text-foreground">{ticket.assigned_to_name ?? ticket.responsible_queue}</span>
-      ),
-    },
-  ], [categories, chatSummariesByTicket, handleOpenChat]);
+  const activeTickets = useMemo(() => tickets.filter(t => t.status !== 'closed' && t.status !== 'cancelled'), [tickets]);
 
   return (
-    <div className="flex h-full w-full flex-col gap-4">
+    <div className="flex h-full w-full flex-col gap-8 pb-10">
       <PageHeader
-        title="My Requests Hub"
-        description="Track your requests, take action on updates, and view history."
-        breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'My Requests' }]}
+        title="Pending Requests"
+        description="Track your active requests and request new services."
+        breadcrumbs={[{ label: 'Internal Requests', path: '/portal' }, { label: 'Pending Requests' }]}
         actions={
           <>
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void refreshTickets()} disabled={loading}>
@@ -244,80 +143,180 @@ export default function MyTickets() {
             <Button asChild size="sm" className="gap-1.5">
               <Link to="/portal/tickets/new">
                 <Plus className="h-4 w-4" />
-                New request
+                Start new request
               </Link>
             </Button>
           </>
         }
       />
 
-      {!loading && !displayError && (
-        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as MyStatusFilter)} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <TabsList>
-              <TabsTrigger value="action_required" className="gap-2 relative">
-                Needs Action
-                {counts.action_required > 0 && (
-                  <span className="rounded-full bg-destructive px-2 py-0.5 text-xs text-destructive-foreground">
-                    {counts.action_required}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="open" className="gap-2">
-                Open <span className="text-muted-foreground">{counts.open}</span>
-              </TabsTrigger>
-              <TabsTrigger value="closed" className="gap-2">
-                Closed <span className="text-muted-foreground">{counts.closed}</span>
-              </TabsTrigger>
-            </TabsList>
-
-            <div className="relative w-full sm:w-[300px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search by subject, category, VSO..."
-                className="h-9 pl-9"
-              />
-            </div>
-          </div>
-
-          <TabsContent value={statusFilter} className="m-0 border-none p-0 outline-none">
-            {tickets.length === 0 ? (
-              <HrmsEmptyState
-                icon={Ticket}
-                title="No requests yet"
-                description="Submit a new internal request to get started."
-                action={{ label: 'New request', onClick: () => navigate('/portal/tickets/new') }}
-              />
-            ) : (
-              <StandardTable
-                data={filteredTickets}
-                columns={columns}
-                rowKey="id"
-                hideSearch
-                mobileLayout="table"
-                emptyMessage="No requests match your search or filter."
-                onRowClick={(ticket) => openTicketWorkspace(navigate, ticket.id, {
-                  source: 'pending',
-                  path: `${location.pathname}${location.search}`,
-                  filters: { searchTerm, statusFilter },
-                })}
-              />
-            )}
-          </TabsContent>
-        </Tabs>
-      )}
-
-      {loading && <TableSkeleton rows={6} cols={5} />}
-      
-      {displayError && (
+      {loading ? (
+        <div className="flex animate-pulse items-center justify-center p-10"><RefreshCcw className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : displayError ? (
         <HrmsEmptyState
           icon={AlertCircle}
           title="Unable to load requests"
           description={displayError}
           action={{ label: 'Retry', onClick: () => void refreshTickets() }}
         />
+      ) : (
+        <>
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold tracking-tight">Active Requests Overview</h2>
+            {activeTickets.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-8 text-center bg-muted/20">
+                <p className="text-muted-foreground">No requests yet.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {activeTickets.map(ticket => {
+                  const stepIndex = getTicketStepIndex(ticket);
+                  const isWaitingOnYou = ticket.status === 'pending_requester';
+                  const summary = chatSummariesByTicket[ticket.id];
+                  const sla = getTicketSlaSummary(ticket);
+
+                  return (
+                    <div
+                      key={ticket.id}
+                      role="button"
+                      tabIndex={0}
+                      className={cn(
+                        "rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md cursor-pointer",
+                        isWaitingOnYou && "border-amber-300 bg-amber-50/30 dark:border-amber-900/50 dark:bg-amber-950/20"
+                      )}
+                      onClick={() => handleOpenTicket(ticket.id)}
+                      onKeyDown={(event) => handleCardKeyDown(event, ticket.id)}
+                    >
+                      <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+                        <div>
+                          <h3 className="font-semibold text-lg text-foreground">{ticket.subject}</h3>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-muted-foreground">
+                            <span>{getRequestCategoryLabel(ticket.category, categories)}</span>
+                            <span>•</span>
+                            <span>{ticket.vso_number ? `VSO ${ticket.vso_number}` : formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true })}</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {formatSlaCompactLabel(sla) || 'No SLA'}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {isWaitingOnYou && (
+                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                              Waiting on You
+                            </span>
+                          )}
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="relative"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenChat(ticket.id);
+                            }}
+                          >
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Discussion
+                            {(summary?.unread_count ?? 0) > 0 && (
+                              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                                {summary!.unread_count}
+                              </span>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Pizza Tracker Stepper */}
+                      <div className="relative pt-2">
+                        <div className="absolute left-0 top-4 h-[2px] w-full bg-muted" />
+                        <div
+                          className="absolute left-0 top-4 h-[2px] bg-primary transition-all duration-500"
+                          style={{ width: `${(stepIndex / (PIZZA_STEPS.length - 1)) * 100}%` }}
+                        />
+
+                        <div className="relative flex justify-between">
+                          {PIZZA_STEPS.map((baseStep, i) => {
+                            const step = (ticket.status === 'reopened' && i === 2) ? 'Reopened' : baseStep;
+                            const completed = i <= stepIndex;
+                            const current = i === stepIndex;
+                            return (
+                              <div key={baseStep} className="flex flex-col items-center gap-2">
+                                <div className={cn(
+                                  "flex h-4 w-4 items-center justify-center rounded-full border-2 bg-background z-10 transition-colors",
+                                  completed ? "border-primary bg-primary text-primary-foreground" : "border-muted text-transparent",
+                                  current && isWaitingOnYou ? "border-amber-500 bg-amber-500 text-white" : "",
+                                  current && ticket.status === 'reopened' ? "border-amber-500 bg-amber-500 text-white" : ""
+                                )}>
+                                  {completed && <CheckCircle2 className="h-3 w-3" />}
+                                </div>
+                                <span className={cn(
+                                  "text-[10px] md:text-xs font-medium text-center max-w-[60px] md:max-w-none leading-tight",
+                                  current ? (isWaitingOnYou || ticket.status === 'reopened' ? "text-amber-700 dark:text-amber-400" : "text-foreground") : "text-muted-foreground"
+                                )}>
+                                  {step}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-4 pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="text-lg font-semibold tracking-tight">Service Catalog</h2>
+              {categories.length > 8 && (
+                <div className="relative max-w-sm">
+                  <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search services..."
+                    value={catalogSearchTerm}
+                    onChange={(e) => setCatalogSearchTerm(e.target.value)}
+                    className="pl-8 h-8 text-sm"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {categories
+                .filter(c => !catalogSearchTerm || c.label.toLowerCase().includes(catalogSearchTerm.toLowerCase()) || (c.description || '').toLowerCase().includes(catalogSearchTerm.toLowerCase()))
+                .map(service => (
+                <Link
+                  key={service.id}
+                  to={`/portal/tickets/new?category=${service.id}`}
+                  className="flex flex-col rounded-xl border bg-card p-5 shadow-sm transition-all hover:border-primary/50 hover:shadow-md"
+                >
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Ticket className="h-5 w-5" />
+                  </div>
+                  <h3 className="font-semibold">{service.label}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground flex-1">{service.description || 'Submit a new request in this category.'}</p>
+                  <div className="mt-4 flex items-center justify-between border-t pt-4">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                      <Clock className="h-3 w-3" /> SLA: {service.resolution_sla_hours ? `${service.resolution_sla_hours} hours` : 'Not configured'}
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </Link>
+              ))}
+              {categories.length === 0 && (
+                <div className="col-span-full rounded-xl border border-dashed p-8 text-center bg-muted/20">
+                  <p className="text-muted-foreground">No service categories available.</p>
+                </div>
+              )}
+              {categories.length > 0 && categories.filter(c => !catalogSearchTerm || c.label.toLowerCase().includes(catalogSearchTerm.toLowerCase()) || (c.description || '').toLowerCase().includes(catalogSearchTerm.toLowerCase())).length === 0 && (
+                <div className="col-span-full py-8 text-center">
+                  <p className="text-muted-foreground text-sm">No services match your search.</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+        </>
       )}
     </div>
   );

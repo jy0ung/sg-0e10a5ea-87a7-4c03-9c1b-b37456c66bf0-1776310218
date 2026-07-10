@@ -18,6 +18,7 @@
  *   npx tsx scripts/seed-rls-users.ts --cleanup
  */
 import { createClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -63,9 +64,18 @@ if (CLEANUP && CONFIRM_RLS_TEST_CLEANUP !== 'delete-rls-test-data') {
   process.exit(1);
 }
 
-const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+const clientOptions: Parameters<typeof createClient>[2] = {
   auth: { persistSession: false },
-});
+  realtime: { transport: WebSocket as never },
+};
+
+const admin = createClient(SUPABASE_URL, SERVICE_KEY, clientOptions);
+
+async function findAuthUserId(email: string): Promise<string | null> {
+  const { data, error } = await admin.auth.admin.listUsers();
+  if (error) throw new Error(`auth.admin.listUsers failed: ${error.message}`);
+  return data?.users.find((user) => user.email === email)?.id ?? null;
+}
 
 async function upsertCompany(id: string, name: string, code: string): Promise<string> {
   const { data: existing } = await admin

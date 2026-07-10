@@ -83,11 +83,14 @@ SUPABASE_INTERNAL_FUNCTIONS_CONFIG='[
   {"name":"update-user-status","verify_jwt":true},
   {"name":"send-push-notification","verify_jwt":true},
   {"name":"rollover-leave-balances","verify_jwt":true},
-  {"name":"dms-sync-worker","verify_jwt":true}
+  {"name":"dms-sync-worker","verify_jwt":true},
+  {"name":"auto-close-resolved-tickets","verify_jwt":true}
 ]'
 ```
 
 Add new function names to this list whenever a new Edge Function is deployed. The same list is documented as a comment in `supabase/config.toml`.
+
+`auto-close-resolved-tickets` is an operator cron function for the internal request lifecycle. Production cron should call it with the service-role bearer and an empty JSON body, or `{ "dry_run": true }` for verification. Admin JWT callers are company-scoped unless the caller is `super_admin`.
 
 ## Self-hosted auth SMTP relay
 
