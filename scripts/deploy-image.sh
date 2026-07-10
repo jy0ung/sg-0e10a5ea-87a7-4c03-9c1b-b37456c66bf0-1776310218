@@ -176,6 +176,14 @@ SQL
 
 command -v docker >/dev/null || die "docker not installed"
 
+log "Docker storage before cleanup"
+docker system df || true
+docker container prune -f --filter "until=24h" >/dev/null || warn "Docker container prune failed"
+docker image prune -f --filter "until=168h" >/dev/null || warn "Docker image prune failed"
+docker builder prune -f --filter "until=168h" >/dev/null || warn "Docker builder prune failed"
+log "Docker storage after cleanup"
+docker system df || true
+
 # Login only if creds are present. Public GHCR images can be pulled anonymously,
 # so a stale optional token should not block the deploy.
 if [[ -n "${GHCR_TOKEN:-}" && -n "${GHCR_USERNAME:-}" ]]; then
@@ -199,12 +207,17 @@ if docker ps -a --format '{{.Names}}' | grep -qx "$STAGING_NAME"; then
 fi
 
 log "Starting staging container on 127.0.0.1:$STAGING_PORT"
-docker run -d \
-  --name "$STAGING_NAME" \
-  --restart unless-stopped \
-  --add-host host.docker.internal:host-gateway \
-  -p "127.0.0.1:${STAGING_PORT}:8080" \
-  "$IMAGE" >/dev/null
+if ! docker run -d \
+    --name "$STAGING_NAME" \
+    --restart unless-stopped \
+    --add-host host.docker.internal:host-gateway \
+    -p "127.0.0.1:${STAGING_PORT}:8080" \
+    "$IMAGE" >/dev/null; then
+  warn "Docker failed to start the staging container"
+  docker system df >&2 || true
+  df -h /srv/docker /var/lib/docker >&2 || true
+  die "Unable to start staging container for $IMAGE; existing container untouched."
+fi
 
 # Health-check loop.
 log "Waiting up to ${HEALTH_TIMEOUT}s for /healthz"
