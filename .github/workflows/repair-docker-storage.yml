@@ -1,0 +1,209 @@
+name: Repair Docker Storage
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Host action to run"
+        required: true
+        default: diagnose
+        type: choice
+        options:
+          - diagnose
+          - restart-docker
+          - repair-docker-state
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-docker-storage-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    name: Repair Docker Storage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install cloudflared
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/cloudflared.deb \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i /tmp/cloudflared.deb
+          cloudflared --version
+
+      - name: Configure SSH (with Cloudflare Access ProxyCommand)
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+          cat > ~/.ssh/config <<EOF
+          Host deploy-target
+            HostName $SSH_HOST
+            Port $SSH_PORT
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+            ProxyCommand cloudflared access ssh --hostname %h
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Run host Docker storage repair
+        shell: bash
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          REPAIR_MODE: ${{ inputs.mode }}
+          CONTAINER_NAME: ${{ secrets.DEPLOY_CONTAINER_NAME }}
+          HOST_PORT: ${{ secrets.DEPLOY_HOST_PORT }}
+        run: |
+          set -euo pipefail
+          ssh deploy-target \
+            "REPAIR_MODE='${REPAIR_MODE}' CONTAINER_NAME='${CONTAINER_NAME}' HOST_PORT='${HOST_PORT}' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+
+          mode="${REPAIR_MODE:-diagnose}"
+          container_name="${CONTAINER_NAME:-}"
+          host_port="${HOST_PORT:-}"
+
+          log() { printf '\033[1;34m[repair]\033[0m %s\n' "$*"; }
+          warn() { printf '\033[1;33m[repair]\033[0m %s\n' "$*" >&2; }
+
+          run_soft() {
+            log "$*"
+            set +e
+            "$@"
+            local code=$?
+            set -e
+            if (( code != 0 )); then
+              warn "Command failed with exit ${code}: $*"
+            fi
+            return 0
+          }
+
+          run_shell_soft() {
+            log "$*"
+            set +e
+            bash -lc "$*"
+            local code=$?
+            set -e
+            if (( code != 0 )); then
+              warn "Command failed with exit ${code}: $*"
+            fi
+            return 0
+          }
+
+          sudo_available() {
+            sudo -n true >/dev/null 2>&1
+          }
+
+          run_sudo_shell_soft() {
+            if sudo_available; then
+              log "sudo $*"
+              set +e
+              sudo -n bash -lc "$*"
+              local code=$?
+              set -e
+              if (( code != 0 )); then
+                warn "sudo command failed with exit ${code}: $*"
+              fi
+            else
+              warn "Passwordless sudo is not available for this SSH user; skipping: $*"
+            fi
+            return 0
+          }
+
+          diagnose() {
+            log "Mode: ${mode}"
+            run_soft whoami
+            run_soft id
+            run_soft hostname
+            run_soft date -Is
+            run_soft docker version
+            run_soft docker info
+            run_soft docker ps -a --no-trunc
+            run_soft docker system df -v
+            run_soft df -h / /srv /srv/docker /var/lib/docker
+            run_shell_soft "findmnt /srv /srv/docker /var/lib/docker || true"
+            run_shell_soft "mount | grep -E ' /srv|/srv/docker|/var/lib/docker|overlay' || true"
+            run_soft ls -ld /srv /srv/docker /srv/docker/containers /srv/docker/buildkit /var/lib/docker
+            run_shell_soft "stat -f -c '%n type=%T blocks=%b free=%f files=%c free_files=%d' / /srv /srv/docker /var/lib/docker 2>/dev/null || true"
+            run_sudo_shell_soft "journalctl -u docker --since '2 hours ago' --no-pager -n 200"
+            run_sudo_shell_soft "dmesg -T | tail -200"
+          }
+
+          ensure_live_container() {
+            if [[ -n "$container_name" ]] && docker ps -a --format '{{.Names}}' | grep -qx "$container_name"; then
+              local running
+              running="$(docker inspect --format '{{.State.Running}}' "$container_name" 2>/dev/null || true)"
+              if [[ "$running" != "true" ]]; then
+                warn "Canonical container ${container_name} is not running; attempting docker start"
+                run_soft docker start "$container_name"
+              fi
+            fi
+
+            if [[ -n "$host_port" ]]; then
+              run_shell_soft "curl -fsS 'http://127.0.0.1:${host_port}/healthz' >/dev/null"
+            fi
+          }
+
+          restart_docker() {
+            diagnose
+            if sudo_available; then
+              warn "Restarting Docker. Containers with restart policies should return automatically, but this may briefly interrupt production."
+              run_sudo_shell_soft "systemctl restart docker"
+              sleep 10
+              run_sudo_shell_soft "systemctl is-active docker"
+            else
+              warn "Cannot restart Docker because passwordless sudo is not available."
+            fi
+            run_soft docker ps -a --no-trunc
+            ensure_live_container
+          }
+
+          repair_docker_state() {
+            restart_docker
+            run_soft docker container prune -f --filter "until=24h"
+            run_soft docker image prune -f --filter "until=168h"
+            run_soft docker builder prune -f --filter "until=168h"
+            run_soft docker system df -v
+            ensure_live_container
+          }
+
+          case "$mode" in
+            diagnose)
+              diagnose
+              ;;
+            restart-docker)
+              restart_docker
+              ;;
+            repair-docker-state)
+              repair_docker_state
+              ;;
+            *)
+              warn "Unknown REPAIR_MODE: ${mode}"
+              exit 2
+              ;;
+          esac
+          REMOTE
