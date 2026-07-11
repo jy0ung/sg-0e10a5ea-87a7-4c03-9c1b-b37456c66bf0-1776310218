@@ -12,6 +12,11 @@ on:
           - diagnose
           - restart-docker
           - repair-docker-state
+          - inspect-container
+          - remove-stopped-container
+      container_id:
+        description: "Container ID for inspect/remove modes"
+        required: false
 
 permissions:
   contents: read
@@ -75,15 +80,17 @@ jobs:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           REPAIR_MODE: ${{ inputs.mode }}
+          TARGET_CONTAINER_ID: ${{ inputs.container_id }}
           CONTAINER_NAME: ${{ secrets.DEPLOY_CONTAINER_NAME }}
           HOST_PORT: ${{ secrets.DEPLOY_HOST_PORT }}
         run: |
           set -euo pipefail
           ssh deploy-target \
-            "REPAIR_MODE='${REPAIR_MODE}' CONTAINER_NAME='${CONTAINER_NAME}' HOST_PORT='${HOST_PORT}' bash -s" <<'REMOTE'
+            "REPAIR_MODE='${REPAIR_MODE}' TARGET_CONTAINER_ID='${TARGET_CONTAINER_ID}' CONTAINER_NAME='${CONTAINER_NAME}' HOST_PORT='${HOST_PORT}' bash -s" <<'REMOTE'
           set -Eeuo pipefail
 
           mode="${REPAIR_MODE:-diagnose}"
+          target_container_id="${TARGET_CONTAINER_ID:-}"
           container_name="${CONTAINER_NAME:-}"
           host_port="${HOST_PORT:-}"
 
@@ -134,6 +141,51 @@ jobs:
             return 0
           }
 
+          list_containers() {
+            run_shell_soft "docker ps -a --format 'table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'"
+          }
+
+          require_target_container_id() {
+            if [[ -z "$target_container_id" ]]; then
+              warn "TARGET_CONTAINER_ID is required for mode ${mode}"
+              exit 2
+            fi
+          }
+
+          verify_docker_storage() {
+            local failed=0
+            docker system df >/dev/null 2>&1 || failed=1
+            df -h /srv/docker >/dev/null 2>&1 || failed=1
+            [[ -d /srv/docker/containers ]] || failed=1
+
+            if (( failed != 0 )); then
+              warn "Docker storage is still unhealthy."
+              return 1
+            fi
+
+            log "Docker storage verification passed."
+          }
+
+          inspect_target_container() {
+            require_target_container_id
+            run_shell_soft "docker inspect --format 'id={{.Id}} name={{.Name}} image={{.Config.Image}} status={{.State.Status}} running={{.State.Running}} restart={{.HostConfig.RestartPolicy.Name}}' '${target_container_id}'"
+          }
+
+          remove_stopped_container() {
+            require_target_container_id
+            inspect_target_container
+
+            local running
+            running="$(docker inspect --format '{{.State.Running}}' "$target_container_id" 2>/dev/null || true)"
+            if [[ "$running" == "true" ]]; then
+              warn "Refusing to remove running container ${target_container_id}."
+              exit 1
+            fi
+
+            run_soft docker rm -f "$target_container_id"
+            verify_docker_storage
+          }
+
           diagnose() {
             log "Mode: ${mode}"
             run_soft whoami
@@ -142,7 +194,7 @@ jobs:
             run_soft date -Is
             run_soft docker version
             run_soft docker info
-            run_soft docker ps -a --no-trunc
+            list_containers
             run_soft docker system df -v
             run_soft df -h / /srv /srv/docker /var/lib/docker
             run_shell_soft "findmnt /srv /srv/docker /var/lib/docker || true"
@@ -178,7 +230,7 @@ jobs:
             else
               warn "Cannot restart Docker because passwordless sudo is not available."
             fi
-            run_soft docker ps -a --no-trunc
+            list_containers
             ensure_live_container
           }
 
@@ -189,6 +241,7 @@ jobs:
             run_soft docker builder prune -f --filter "until=168h"
             run_soft docker system df -v
             ensure_live_container
+            verify_docker_storage
           }
 
           case "$mode" in
@@ -200,6 +253,12 @@ jobs:
               ;;
             repair-docker-state)
               repair_docker_state
+              ;;
+            inspect-container)
+              inspect_target_container
+              ;;
+            remove-stopped-container)
+              remove_stopped_container
               ;;
             *)
               warn "Unknown REPAIR_MODE: ${mode}"
