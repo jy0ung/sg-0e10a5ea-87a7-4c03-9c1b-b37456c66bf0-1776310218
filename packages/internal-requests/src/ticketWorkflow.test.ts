@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canTransition,
+  createTicketWorkflowUseCases,
   getAvailableTicketActions,
   getNextTicketLifecycleState,
   getTicketWorkflowSideEffects,
@@ -186,5 +187,109 @@ describe('ticketWorkflow', () => {
     expect(getAvailableTicketActions(subject({ lifecycleState: 'cancelled' }), admin)).toEqual([
       'admin_override_status',
     ]);
+  });
+
+  it('orchestrates validation, next state, and side-effect descriptors through one adapter', async () => {
+    const calls: unknown[] = [];
+    const workflow = createTicketWorkflowUseCases({
+      async load(command) {
+        calls.push(['load', command.action]);
+        return {
+          ticket: { id: command.ticketId },
+          subject: subject({ lifecycleState: 'in_progress' }),
+        };
+      },
+      async execute(context) {
+        calls.push(['execute', context.nextStatus, context.sideEffects]);
+        return {
+          ticket: { id: context.command.ticketId, status: context.nextStatus },
+          activities: ['owner_completed_request'],
+          notificationsQueued: true,
+        };
+      },
+    });
+
+    const result = await workflow.transition({
+      ticketId: 'ticket-1',
+      action: 'complete_by_owner',
+      actor: owner,
+      payload: {
+        kind: 'complete_by_owner',
+        resolutionNote: 'Completed',
+        completionCategory: 'resolved',
+        checklistConfirmed: true,
+      },
+    });
+
+    expect(result).toEqual({
+      ticket: { id: 'ticket-1', status: 'completed_by_owner' },
+      draftId: undefined,
+      previousStatus: 'in_progress',
+      nextStatus: 'completed_by_owner',
+      activities: ['owner_completed_request'],
+      notificationsQueued: true,
+    });
+    expect(calls).toEqual([
+      ['load', 'complete_by_owner'],
+      ['execute', 'completed_by_owner', ['activity', 'notification', 'auto_close']],
+    ]);
+  });
+
+  it('uses the requested target for audited admin overrides', async () => {
+    const workflow = createTicketWorkflowUseCases({
+      async load() {
+        return { ticket: { id: 'ticket-1' }, subject: subject({ lifecycleState: 'cancelled' }) };
+      },
+      async execute(context) {
+        return { ticket: { id: 'ticket-1', status: context.nextStatus } };
+      },
+    });
+
+    await expect(workflow.transition({
+      ticketId: 'ticket-1',
+      action: 'admin_override_status',
+      actor: admin,
+      payload: { kind: 'admin_override_status', targetStatus: 'reopened', reason: 'Correction' },
+    })).resolves.toMatchObject({ previousStatus: 'cancelled', nextStatus: 'reopened' });
+  });
+
+  it('does not execute adapters when command validation fails', async () => {
+    let executed = false;
+    const workflow = createTicketWorkflowUseCases({
+      async load() {
+        return { ticket: { id: 'ticket-1' }, subject: subject({ lifecycleState: 'open', approvalStatus: 'pending' }) };
+      },
+      async execute() {
+        executed = true;
+        return { ticket: null };
+      },
+    });
+
+    await expect(workflow.transition({
+      ticketId: 'ticket-1',
+      action: 'start_work',
+      actor: owner,
+      payload: { kind: 'start_work' },
+    })).rejects.toThrow('waiting for approval');
+    expect(executed).toBe(false);
+  });
+
+  it('allows a draft adapter to model discard as no next lifecycle state', async () => {
+    const workflow = createTicketWorkflowUseCases({
+      async load() {
+        return { ticket: null, subject: subject({ lifecycleState: 'draft' }) };
+      },
+      async execute(context) {
+        expect(context.nextStatus).toBeNull();
+        return { ticket: null, draftId: null };
+      },
+    });
+
+    await expect(workflow.transition({
+      draftId: 'draft-1',
+      action: 'discard_draft',
+      actor: requester,
+      payload: { kind: 'discard_draft' },
+    })).resolves.toMatchObject({ previousStatus: 'draft', nextStatus: null, ticket: null });
   });
 });

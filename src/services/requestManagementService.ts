@@ -6,6 +6,7 @@ import {
   listCompanyTickets,
   listTicketActivity,
   listTicketChatSummaries,
+  transitionTicketWorkflow,
   updateTicket,
   type CompanyTicketRecord,
   type TicketActivityRecord,
@@ -331,7 +332,18 @@ export async function bulkArchiveRequests(
   if (!reason.trim()) return { updated: 0, error: new Error('Reason is required for bulk archive.') };
   try {
     const results = await Promise.all(ticketIds.map((ticketId) =>
-      updateTicket(ticketId, { status: 'cancelled', admin_override_reason: reason }, context),
+      transitionTicketWorkflow({
+        ticketId,
+        action: 'admin_override_status',
+        actor: {
+          userId: context.userId,
+          companyId: context.companyId,
+          role: null,
+          canManageQueue: true,
+          canAdminOverride: true,
+        },
+        payload: { kind: 'admin_override_status', targetStatus: 'cancelled', reason },
+      }),
     ));
     const updatedIds = ticketIds.filter((_, index) => !results[index].error);
     await insertBulkActivity(context.companyId, context.userId, updatedIds, 'Bulk archive performed.', { reason: reason.trim() });

@@ -11,7 +11,9 @@ import {
   getInternalRequestApprovalGate,
   getInternalRequestApprovalPlan,
   listInternalRequestApprovalMetadata,
+  reviewInternalRequestApproval,
   canTransition,
+  createTicketWorkflowUseCases,
   getAvailableTicketActions,
   getTicketWorkflowSideEffects,
   normalizePersistedTicketStatus,
@@ -21,7 +23,9 @@ import {
   type TicketActor,
   type TicketCompletionCategory,
   type TicketTransitionAction,
+  type TicketTransitionCommand,
   type TicketTransitionPayload,
+  type TicketTransitionResult,
   type TicketWorkflowSubject,
 } from '@flc/internal-requests';
 
@@ -42,6 +46,16 @@ export type TicketCategory = RequestCategoryValue;
 export type TicketResponsibleParty = 'Owner' | 'Requester' | 'Backup Owner' | 'Manager' | 'Escalation Owner' | 'Admin' | 'None';
 export type TicketSlaStatus = 'on_track' | 'at_risk' | 'breached' | 'paused';
 export type { TicketCompletionCategory, TicketTransitionAction } from '@flc/internal-requests';
+
+type TicketWorkflowContext = {
+  userId: string;
+  companyId: string;
+  userRole?: string | null;
+  canManagePortalQueue?: boolean;
+  canAdminOverride?: boolean;
+  isSystem?: boolean;
+  isAssignedApprover?: boolean;
+};
 
 export interface TicketRecord {
   id: string;
@@ -2010,15 +2024,16 @@ async function applyTicketWorkflowAction(
   }
 }
 
-export async function requestTicketMoreInformation(
+async function executeRequestTicketMoreInformation(
   ticketId: string,
   input: AddTicketCommentInput,
   context: { userId: string; companyId: string },
+  currentTicket?: TicketRecord,
 ): Promise<TicketServiceResult<TicketRecord>> {
   if (!input.message.trim()) return { data: null, error: new Error('Message is required.') };
   let current: TicketRecord;
   try {
-    current = await fetchTicketForUpdate(ticketId, context.companyId, { includeCollaborators: true });
+    current = currentTicket ?? await fetchTicketForUpdate(ticketId, context.companyId, { includeCollaborators: true });
     const transitionError = validateTicketWorkflowTransition(current, 'request_more_info', {
       kind: 'request_more_info',
       message: input.message,
@@ -2040,15 +2055,16 @@ export async function requestTicketMoreInformation(
   });
 }
 
-export async function submitRequesterTicketUpdate(
+async function executeSubmitRequesterTicketUpdate(
   ticketId: string,
   input: AddTicketCommentInput,
   context: { userId: string; companyId: string },
+  currentTicket?: TicketRecord,
 ): Promise<TicketServiceResult<TicketRecord>> {
   if (!input.message.trim()) return { data: null, error: new Error('Message is required.') };
   let current: TicketRecord;
   try {
-    current = await fetchTicketForUpdate(ticketId, context.companyId, { includeCollaborators: true });
+    current = currentTicket ?? await fetchTicketForUpdate(ticketId, context.companyId, { includeCollaborators: true });
     const transitionError = validateTicketWorkflowTransition(current, 'requester_reply', {
       kind: 'requester_reply',
       message: input.message,
@@ -2069,7 +2085,7 @@ export async function submitRequesterTicketUpdate(
   });
 }
 
-export async function markTicketCompletedByOwner(
+async function executeMarkTicketCompletedByOwner(
   ticketId: string,
   input: {
     resolutionNote: string;
@@ -2078,6 +2094,7 @@ export async function markTicketCompletedByOwner(
     slaBreachReason?: string | null;
   },
   context: { userId: string; companyId: string },
+  currentTicket?: TicketRecord,
 ): Promise<TicketServiceResult<TicketRecord>> {
   if (!input.resolutionNote.trim()) {
     return { data: null, error: new Error('Resolution summary is required.') };
@@ -2106,10 +2123,11 @@ export async function markTicketCompletedByOwner(
       completion_checklist_confirmed: input.checklistConfirmed,
       previous_owner_id: context.userId,
     },
+    currentTicket,
   });
 }
 
-export async function closeTicketByRequester(
+async function executeCloseTicketByRequester(
   ticketId: string,
   input: {
     confirmedResolved: boolean;
@@ -2118,6 +2136,7 @@ export async function closeTicketByRequester(
     slaBreachReason?: string | null;
   },
   context: { userId: string; companyId: string },
+  currentTicket?: TicketRecord,
 ): Promise<TicketServiceResult<TicketRecord>> {
   if (!input.confirmedResolved) {
     return { data: null, error: new Error('Confirm the request is resolved before closing it.') };
@@ -2142,6 +2161,7 @@ export async function closeTicketByRequester(
       closure_feedback: input.feedbackComment?.trim() ? input.feedbackComment.trim() : null,
       closed_at: new Date().toISOString(),
     },
+    currentTicket,
   });
   if (result.data) {
     await Promise.allSettled([
@@ -2166,16 +2186,17 @@ export async function closeTicketByRequester(
   return result;
 }
 
-export async function rejectTicketCompletion(
+async function executeRejectTicketCompletion(
   ticketId: string,
   input: { reason: string },
   context: { userId: string; companyId: string },
+  currentTicket?: TicketRecord,
 ): Promise<TicketServiceResult<TicketRecord>> {
   const reason = input.reason.trim();
   if (!reason) return { data: null, error: new Error('Rejection reason is required.') };
 
   try {
-    const current = await fetchTicketForUpdate(ticketId, context.companyId);
+    const current = currentTicket ?? await fetchTicketForUpdate(ticketId, context.companyId);
     const transitionError = validateTicketWorkflowTransition(current, 'reject_completion', {
       kind: 'reject_completion',
       reason,
@@ -2239,16 +2260,17 @@ export async function rejectTicketCompletion(
   }
 }
 
-export async function reopenTicketByRequester(
+async function executeReopenTicketByRequester(
   ticketId: string,
   input: { reason: string },
   context: { userId: string; companyId: string },
+  currentTicket?: TicketRecord,
 ): Promise<TicketServiceResult<TicketRecord>> {
   const reason = input.reason.trim();
   if (!reason) return { data: null, error: new Error('Reopen reason is required.') };
 
   try {
-    const current = await fetchTicketForUpdate(ticketId, context.companyId);
+    const current = currentTicket ?? await fetchTicketForUpdate(ticketId, context.companyId);
     if (current.submitted_by !== context.userId) {
       return { data: null, error: new Error('Only the requester can reopen this request.') };
     }
@@ -2326,15 +2348,16 @@ export async function reopenTicketByRequester(
   }
 }
 
-export async function cancelMyTicket(
+async function executeCancelMyTicket(
   ticketId: string,
   input: CancelTicketInput,
   context: { userId: string; companyId: string },
+  currentTicket?: TicketRecord,
 ): Promise<TicketServiceResult<TicketRecord>> {
   const reason = input.reason?.trim() ? input.reason.trim() : null;
 
   try {
-    const current = await fetchTicketForUpdate(ticketId, context.companyId);
+    const current = currentTicket ?? await fetchTicketForUpdate(ticketId, context.companyId);
     if (current.submitted_by !== context.userId) {
       return { data: null, error: new Error('Only the requester can cancel this request') };
     }
@@ -2375,6 +2398,221 @@ export async function cancelMyTicket(
     loggingService.error('Failed to cancel request', { error: error.message, ticketId }, 'TicketService');
     return { data: null, error };
   }
+}
+
+function commandContext(command: TicketTransitionCommand): TicketWorkflowContext {
+  if (!command.actor.userId) throw new Error('A user actor is required for this workflow action.');
+  return {
+    userId: command.actor.userId,
+    companyId: command.actor.companyId,
+    userRole: command.actor.role,
+    canManagePortalQueue: command.actor.canManageQueue,
+    canAdminOverride: command.actor.canAdminOverride,
+    isSystem: command.actor.isSystem,
+    isAssignedApprover: command.actor.isAssignedApprover,
+  };
+}
+
+async function executeTicketTransitionCommand(
+  command: TicketTransitionCommand,
+  current: TicketRecord,
+): Promise<TicketRecord> {
+  const ticketId = command.ticketId;
+  if (!ticketId) throw new Error('Ticket ID is required for this workflow action.');
+  const context = commandContext(command);
+  let result: TicketServiceResult<TicketRecord>;
+
+  switch (command.payload.kind) {
+    case 'start_work':
+      result = await applyTicketWorkflowAction(ticketId, command.action, 'in_progress', context, {
+        eventType: 'status_changed',
+        message: 'Owner started work on the request.',
+        payload: command.payload,
+        currentTicket: current,
+        patch: {
+          assigned_to: current.assigned_to ?? context.userId,
+          assigned_at: current.assigned_at ?? new Date().toISOString(),
+        },
+      });
+      break;
+    case 'request_more_info':
+      result = await executeRequestTicketMoreInformation(ticketId, { message: command.payload.message }, context, current);
+      break;
+    case 'requester_reply':
+      result = await executeSubmitRequesterTicketUpdate(ticketId, { message: command.payload.message }, context, current);
+      break;
+    case 'complete_by_owner':
+      result = await executeMarkTicketCompletedByOwner(ticketId, {
+        resolutionNote: command.payload.resolutionNote,
+        completionCategory: command.payload.completionCategory,
+        checklistConfirmed: command.payload.checklistConfirmed,
+        slaBreachReason: command.payload.slaBreachReason,
+      }, context, current);
+      break;
+    case 'reject_completion':
+      result = await executeRejectTicketCompletion(ticketId, { reason: command.payload.reason }, context, current);
+      break;
+    case 'close_by_requester':
+      result = await executeCloseTicketByRequester(ticketId, {
+        confirmedResolved: command.payload.confirmedResolved,
+        satisfactionRating: command.payload.satisfactionRating,
+        feedbackComment: command.payload.feedbackComment,
+      }, context, current);
+      break;
+    case 'reopen_by_requester':
+      result = await executeReopenTicketByRequester(ticketId, { reason: command.payload.reason }, context, current);
+      break;
+    case 'cancel_by_requester':
+      result = await executeCancelMyTicket(ticketId, { reason: command.payload.reason }, context, current);
+      break;
+    case 'approve_step':
+    case 'reject_step': {
+      const review = await reviewInternalRequestApproval(
+        ticketId,
+        command.payload.kind === 'approve_step' ? 'approved' : 'rejected',
+        command.payload.note ?? undefined,
+        context,
+      );
+      if (review.error) throw new Error(review.error);
+      result = { data: await fetchTicketForUpdate(ticketId, context.companyId), error: null };
+      break;
+    }
+    case 'reassign_owner':
+      result = await updateTicket(ticketId, { assigned_to: command.payload.newOwnerId }, context);
+      if (result.data && !result.error) {
+        await ticketActivityTable().insert({
+          ticket_id: ticketId,
+          company_id: context.companyId,
+          actor_id: context.userId,
+          event_type: 'owner_changed',
+          message: command.payload.transitionNote.trim(),
+          metadata: {
+            workflow_action: 'reassign_owner',
+            before: current.assigned_to,
+            after: command.payload.newOwnerId,
+          },
+        });
+      }
+      break;
+    case 'escalate':
+      result = await updateTicket(ticketId, { escalation_owner_id: command.payload.escalationOwnerId ?? current.escalation_owner_id }, context);
+      if (result.data && !result.error) {
+        await ticketActivityTable().insert({
+          ticket_id: ticketId,
+          company_id: context.companyId,
+          actor_id: context.userId,
+          event_type: 'escalation_triggered',
+          message: command.payload.reason.trim(),
+          metadata: {
+            workflow_action: 'escalate',
+            status_unchanged: true,
+            escalation_owner_id: command.payload.escalationOwnerId ?? current.escalation_owner_id,
+          },
+        });
+      }
+      break;
+    case 'admin_override_status':
+      result = await updateTicket(ticketId, {
+        status: command.payload.targetStatus,
+        admin_override_reason: command.payload.reason,
+      }, context);
+      break;
+    case 'auto_close':
+      throw new Error('Auto-close is executed by the production edge-function worker.');
+    case 'save_draft':
+    case 'discard_draft':
+      throw new Error('Draft transitions are handled by the persisted draft adapter.');
+    case 'submit_request':
+      throw new Error('Request submission is handled by the create-ticket intake adapter.');
+  }
+
+  if (result.error) throw result.error;
+  if (!result.data) throw new Error(`Workflow action ${command.action} did not return a ticket.`);
+  return result.data;
+}
+
+export async function transitionTicketWorkflow(
+  command: TicketTransitionCommand,
+): Promise<TicketServiceResult<TicketTransitionResult<TicketRecord>>> {
+  try {
+    const workflow = createTicketWorkflowUseCases<TicketRecord>({
+      async load(nextCommand) {
+        if (!nextCommand.ticketId) throw new Error('Ticket ID is required for this workflow action.');
+        const ticket = await fetchTicketForUpdate(nextCommand.ticketId, nextCommand.actor.companyId, { includeCollaborators: true });
+        return { ticket, subject: toTicketWorkflowSubject(ticket) };
+      },
+      async execute({ command: nextCommand, ticket, sideEffects }) {
+        if (!ticket) throw new Error('Request not found.');
+        const updated = await executeTicketTransitionCommand(nextCommand, ticket);
+        return {
+          ticket: updated,
+          activities: sideEffects.includes('activity') ? [nextCommand.action] : [],
+          notificationsQueued: sideEffects.includes('notification'),
+        };
+      },
+    });
+    return { data: await workflow.transition(command), error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error('Failed to transition request workflow.');
+    loggingService.error('Failed to transition request workflow', {
+      error: error.message,
+      action: command.action,
+      ticketId: command.ticketId,
+    }, 'TicketService');
+    return { data: null, error };
+  }
+}
+
+function legacyActor(
+  context: { userId: string; companyId: string },
+  options: Pick<TicketActor, 'isRequester' | 'canManageQueue' | 'canAdminOverride'> = {},
+): TicketActor {
+  return { userId: context.userId, companyId: context.companyId, role: null, ...options };
+}
+
+async function legacyTransitionTicket(
+  command: TicketTransitionCommand,
+): Promise<TicketServiceResult<TicketRecord>> {
+  const result = await transitionTicketWorkflow(command);
+  return { data: result.data?.ticket ?? null, error: result.error };
+}
+
+export function requestTicketMoreInformation(ticketId: string, input: AddTicketCommentInput, context: { userId: string; companyId: string }) {
+  if (!input.message.trim()) return Promise.resolve({ data: null, error: new Error('Message is required.') });
+  return legacyTransitionTicket({ ticketId, action: 'request_more_info', actor: legacyActor(context), payload: { kind: 'request_more_info', message: input.message, pauseSla: true } });
+}
+
+export function submitRequesterTicketUpdate(ticketId: string, input: AddTicketCommentInput, context: { userId: string; companyId: string }) {
+  if (!input.message.trim()) return Promise.resolve({ data: null, error: new Error('Message is required.') });
+  return legacyTransitionTicket({ ticketId, action: 'requester_reply', actor: legacyActor(context, { isRequester: true }), payload: { kind: 'requester_reply', message: input.message } });
+}
+
+export function markTicketCompletedByOwner(ticketId: string, input: { resolutionNote: string; completionCategory: TicketCompletionCategory; checklistConfirmed: boolean; slaBreachReason?: string | null }, context: { userId: string; companyId: string }) {
+  if (!input.resolutionNote.trim()) return Promise.resolve({ data: null, error: new Error('Resolution summary is required.') });
+  if (!input.completionCategory) return Promise.resolve({ data: null, error: new Error('Completion category is required.') });
+  if (!input.checklistConfirmed) return Promise.resolve({ data: null, error: new Error('Confirm the completion checklist before marking this request completed.') });
+  return legacyTransitionTicket({ ticketId, action: 'complete_by_owner', actor: legacyActor(context), payload: { kind: 'complete_by_owner', ...input } });
+}
+
+export function closeTicketByRequester(ticketId: string, input: { confirmedResolved: boolean; satisfactionRating: number; feedbackComment?: string | null; slaBreachReason?: string | null }, context: { userId: string; companyId: string }) {
+  if (!input.confirmedResolved) return Promise.resolve({ data: null, error: new Error('Confirm the request is resolved before closing it.') });
+  if (!Number.isFinite(input.satisfactionRating) || input.satisfactionRating < 1 || input.satisfactionRating > 5) {
+    return Promise.resolve({ data: null, error: new Error('Satisfaction rating must be between 1 and 5.') });
+  }
+  return legacyTransitionTicket({ ticketId, action: 'close_by_requester', actor: legacyActor(context, { isRequester: true }), payload: { kind: 'close_by_requester', confirmedResolved: true, satisfactionRating: input.satisfactionRating, feedbackComment: input.feedbackComment } });
+}
+
+export function rejectTicketCompletion(ticketId: string, input: { reason: string }, context: { userId: string; companyId: string }) {
+  return legacyTransitionTicket({ ticketId, action: 'reject_completion', actor: legacyActor(context, { isRequester: true }), payload: { kind: 'reject_completion', reason: input.reason } });
+}
+
+export function reopenTicketByRequester(ticketId: string, input: { reason: string }, context: { userId: string; companyId: string }) {
+  if (!input.reason.trim()) return Promise.resolve({ data: null, error: new Error('Reopen reason is required.') });
+  return legacyTransitionTicket({ ticketId, action: 'reopen_by_requester', actor: legacyActor(context, { isRequester: true }), payload: { kind: 'reopen_by_requester', reason: input.reason } });
+}
+
+export function cancelMyTicket(ticketId: string, input: CancelTicketInput, context: { userId: string; companyId: string }) {
+  return legacyTransitionTicket({ ticketId, action: 'cancel_by_requester', actor: legacyActor(context, { isRequester: true }), payload: { kind: 'cancel_by_requester', reason: input.reason } });
 }
 
 export async function addTicketComment(

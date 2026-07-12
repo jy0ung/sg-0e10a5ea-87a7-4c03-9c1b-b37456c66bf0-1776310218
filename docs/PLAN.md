@@ -1,7 +1,15 @@
 # Core Ticket State Machine + Use-Case Interface
 
-Status: Approved with minor refinements.
+Status: Implemented and verified on 2026-07-12.
 Baseline: `docs/UBS_MODERNIZATION_REPORT.md` captured the modernization analysis; this plan is the post-stabilization implementation spec for the Internal Requests ticket workflow.
+
+## Implementation Record
+- Phase A is package-owned in `@flc/internal-requests`: transition table, normalization, guards, available actions, side-effect descriptors, and exhaustive focused tests.
+- Phase B uses `createTicketWorkflowUseCases()` plus the app-level `transitionTicketWorkflow()` command endpoint to load the authoritative subject, validate commands, resolve next state, and execute activity, notification, SLA, approval, owner, auto-close, and audit effects.
+- Phase C keeps `ticketService.ts` as the compatibility facade. Existing requester/owner lifecycle methods delegate to named workflow commands while the established RPCs remain available during migration.
+- Phase D routes active workspace and queue lifecycle controls through named commands, including start, approval review, reassignment, escalation, completion outcomes, requester reply/close/reopen, cancellation, and audited admin override.
+- Production migration history was reconciled by restoring `20260630000002_portal_redesign_phase3.sql`; `20260712000000_remove_legacy_ticket_collaborator_array.sql` removes its obsolete array/helper so `ticket_collaborators` remains canonical.
+- Production app deployment, host-local migrations, and the authenticated auto-close edge-function dry-run were verified before the orchestration rollout.
 
 ## Summary
 - Model `draft` as a separate request-draft lifecycle, not as `tickets.status`. Persisted ticket rows still start at `open`.

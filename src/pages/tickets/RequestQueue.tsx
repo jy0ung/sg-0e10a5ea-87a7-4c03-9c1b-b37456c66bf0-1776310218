@@ -64,6 +64,7 @@ import {
   type TicketResponsibleParty,
   type TicketStatus,
   type TicketStatusCounts,
+  transitionTicketWorkflow,
   updateTicket,
 } from '@/services/ticketService';
 import {
@@ -622,7 +623,21 @@ export default function RequestQueue() {
     try {
       await Promise.all(
         Array.from(selectedIds).map((ticketId) =>
-          updateTicket(ticketId, { assigned_to: assignedTo }, { userId: user.id, companyId: user.company_id }),
+          transitionTicketWorkflow({
+            ticketId,
+            action: 'reassign_owner',
+            actor: {
+              userId: user.id,
+              companyId: user.company_id,
+              role: user.role,
+              canManageQueue: true,
+            },
+            payload: {
+              kind: 'reassign_owner',
+              newOwnerId: assignedTo,
+              transitionNote: 'Owner changed through bulk queue assignment.',
+            },
+          }),
         ),
       );
       setSelectedIds(new Set());

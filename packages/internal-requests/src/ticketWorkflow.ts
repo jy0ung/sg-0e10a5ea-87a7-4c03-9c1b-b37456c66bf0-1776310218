@@ -109,6 +109,43 @@ export interface TicketTransitionCommand {
   payload: TicketTransitionPayload;
 }
 
+export interface TicketTransitionResult<TTicket = unknown> {
+  ticket: TTicket | null;
+  draftId?: string | null;
+  previousStatus: TicketLifecycleState | null;
+  nextStatus: TicketLifecycleState | null;
+  activities: string[];
+  notificationsQueued: boolean;
+}
+
+export interface TicketWorkflowExecutionContext<TTicket> {
+  command: TicketTransitionCommand;
+  ticket: TTicket | null;
+  subject: TicketWorkflowSubject;
+  previousStatus: TicketLifecycleState;
+  nextStatus: TicketLifecycleState | null;
+  sideEffects: TicketWorkflowSideEffect[];
+}
+
+export interface TicketWorkflowAdapter<TTicket> {
+  load(command: TicketTransitionCommand): Promise<{
+    ticket: TTicket | null;
+    subject: TicketWorkflowSubject;
+  }>;
+  execute(context: TicketWorkflowExecutionContext<TTicket>): Promise<{
+    ticket: TTicket | null;
+    draftId?: string | null;
+    activities?: string[];
+    notificationsQueued?: boolean;
+  }>;
+}
+
+export interface TicketWorkflowUseCases<TTicket = unknown> {
+  getAvailableActions(subject: TicketWorkflowSubject, actor: TicketActor): TicketTransitionAction[];
+  canTransition(command: TicketTransitionCommand): Promise<TicketTransitionCheck>;
+  transition(command: TicketTransitionCommand): Promise<TicketTransitionResult<TTicket>>;
+}
+
 export interface TicketWorkflowTransition {
   action: TicketTransitionAction;
   from: TicketLifecycleState[] | 'any' | 'none';
@@ -287,6 +324,60 @@ export function getNextTicketLifecycleState(action: TicketTransitionAction, curr
   if (transition.to === 'none') return null;
   if (transition.to === 'any') return current;
   return transition.to;
+}
+
+function resolveNextTicketLifecycleState(
+  command: TicketTransitionCommand,
+  current: TicketLifecycleState,
+): TicketLifecycleState | null {
+  if (command.payload.kind === 'admin_override_status') return command.payload.targetStatus;
+  return getNextTicketLifecycleState(command.action, current);
+}
+
+export function createTicketWorkflowUseCases<TTicket>(
+  adapter: TicketWorkflowAdapter<TTicket>,
+): TicketWorkflowUseCases<TTicket> {
+  const loadCommand = async (command: TicketTransitionCommand) => {
+    const loaded = await adapter.load(command);
+    return {
+      ...loaded,
+      command: { ...command, subject: loaded.subject },
+    };
+  };
+
+  return {
+    getAvailableActions: getAvailableTicketActions,
+    async canTransition(command) {
+      const loaded = await loadCommand(command);
+      return canTransition(loaded.command);
+    },
+    async transition(command) {
+      const loaded = await loadCommand(command);
+      const check = canTransition(loaded.command);
+      if (!check.ok) throw new Error(check.reason);
+
+      const previousStatus = loaded.subject.lifecycleState;
+      const nextStatus = resolveNextTicketLifecycleState(loaded.command, previousStatus);
+      const sideEffects = getTicketWorkflowSideEffects(command.action, command.payload);
+      const executed = await adapter.execute({
+        command: loaded.command,
+        ticket: loaded.ticket,
+        subject: loaded.subject,
+        previousStatus,
+        nextStatus,
+        sideEffects,
+      });
+
+      return {
+        ticket: executed.ticket,
+        draftId: executed.draftId,
+        previousStatus,
+        nextStatus,
+        activities: executed.activities ?? [],
+        notificationsQueued: executed.notificationsQueued ?? false,
+      };
+    },
+  };
 }
 
 export function canTransition(command: TicketTransitionCommand): TicketTransitionCheck {

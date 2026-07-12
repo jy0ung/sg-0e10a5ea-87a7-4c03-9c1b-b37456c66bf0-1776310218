@@ -71,7 +71,6 @@ import {
   type TicketWorkspaceTab,
 } from '@/lib/ticketWorkspaceNavigation';
 import { buildRequestOperationalIndicators } from '@/services/requestManagementService';
-import { reviewInternalRequestApproval } from '@flc/internal-requests';
 import { cn } from '@/lib/utils';
 import {
   addTicketComment,
@@ -86,6 +85,7 @@ import {
   requestTicketMoreInformation,
   submitRequesterTicketUpdate,
   ticketReplyAndWait,
+  transitionTicketWorkflow,
   updateTicket,
 
 
@@ -512,6 +512,15 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
     (action: TicketTransitionAction) => workflowActions.includes(action),
     [workflowActions],
   );
+  const workflowActor = user && data ? {
+    userId: user.id,
+    companyId: user.company_id,
+    role: user.role,
+    isRequester: ticket?.submitted_by === user.id,
+    canManageQueue: data.permissions.canManageWorkflow,
+    canAdminOverride: data.permissions.canManageWorkflow,
+    isAssignedApprover: data.permissions.canReviewApproval,
+  } : null;
 
   useEffect(() => {
     if (!ticket) return;
@@ -590,7 +599,12 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
     if (!ticket || !user || !data) return;
     if (canWorkflow('start_work')) {
       await runWorkflow(
-        () => updateTicket(ticket.id, { mark_opened: true }, { userId: user.id, companyId: user.company_id }),
+        () => transitionTicketWorkflow({
+          ticketId: ticket.id,
+          action: 'start_work',
+          actor: workflowActor!,
+          payload: { kind: 'start_work' },
+        }),
         'Request accepted and status set to In Progress',
       );
     } else if (canWorkflow('complete_by_owner')) {
@@ -1049,7 +1063,16 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
                     onSave={async (val) => {
                       if (!user) return false;
                       const res = await runWorkflow(
-                        () => updateTicket(ticket.id, { assigned_to: val === 'unassigned' ? null : val }, { userId: user.id, companyId: user.company_id }),
+                        () => transitionTicketWorkflow({
+                          ticketId: ticket.id,
+                          action: 'reassign_owner',
+                          actor: workflowActor!,
+                          payload: {
+                            kind: 'reassign_owner',
+                            newOwnerId: val === 'unassigned' ? null : val,
+                            transitionNote: 'Owner changed from request properties.',
+                          },
+                        }),
                         'Owner updated successfully'
                       );
                       return res;
@@ -1233,15 +1256,12 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
         onSubmit={async () => {
           if (!user || !overrideReason.value.trim()) return;
           const ok = await runWorkflow(
-            () => updateTicket(
-              ticket.id,
-              {
-                current_responsible_party: 'Escalation Owner',
-                next_action: 'Escalation owner to resolve request',
-                admin_override_reason: `Escalated: ${overrideReason.value.trim()}`
-              },
-              { userId: user.id, companyId: user.company_id }
-            ),
+            () => transitionTicketWorkflow({
+              ticketId: ticket.id,
+              action: 'escalate',
+              actor: workflowActor!,
+              payload: { kind: 'escalate', reason: overrideReason.value.trim(), escalationOwnerId: ticket.escalation_owner_id },
+            }),
             'Ticket escalated successfully',
           );
           if (ok) {
@@ -1455,7 +1475,16 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
               onClick={async () => {
                 if (!user) return;
                 const ok = await runWorkflow(
-                  () => updateTicket(ticket.id, { assigned_to: selectedAssignee === 'unassigned' ? null : selectedAssignee }, { userId: user.id, companyId: user.company_id }),
+                  () => transitionTicketWorkflow({
+                    ticketId: ticket.id,
+                    action: 'reassign_owner',
+                    actor: workflowActor!,
+                    payload: {
+                      kind: 'reassign_owner',
+                      newOwnerId: selectedAssignee === 'unassigned' ? null : selectedAssignee,
+                      transitionNote: 'Owner changed from the request workspace.',
+                    },
+                  }),
                   'Owner updated',
                 );
                 if (ok) setAssignOpen(false);
@@ -1522,7 +1551,12 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
               onClick={async () => {
                 if (!user) return;
                 const ok = await runWorkflow(
-                  () => updateTicket(ticket.id, { status: overrideStatus, admin_override_reason: overrideReason.value }, { userId: user.id, companyId: user.company_id }),
+                  () => transitionTicketWorkflow({
+                    ticketId: ticket.id,
+                    action: 'admin_override_status',
+                    actor: workflowActor!,
+                    payload: { kind: 'admin_override_status', targetStatus: overrideStatus, reason: overrideReason.value },
+                  }),
                   'Status overridden',
                 );
                 if (ok) {
@@ -1553,7 +1587,14 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
                 if (!user || !reviewDecision) return;
                 const decision = reviewDecision;
                 const ok = await runWorkflow(
-                  () => reviewInternalRequestApproval(ticket.id, decision, reviewNote.value, { userId: user.id, companyId: user.company_id })
+                  () => transitionTicketWorkflow({
+                    ticketId: ticket.id,
+                    action: decision === 'approved' ? 'approve_step' : 'reject_step',
+                    actor: workflowActor!,
+                    payload: decision === 'approved'
+                      ? { kind: 'approve_step', note: reviewNote.value }
+                      : { kind: 'reject_step', note: reviewNote.value },
+                  })
                     .then((result) => ({ error: result.error ? new Error(result.error) : null })),
                   decision === 'approved' ? 'Approval recorded' : 'Rejection recorded',
                 );
