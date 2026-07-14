@@ -107,7 +107,7 @@ jobs:
             --sse AES256
 
       - name: Upload encrypted dump artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.dump.outputs.artifact_name }}
           path: |
