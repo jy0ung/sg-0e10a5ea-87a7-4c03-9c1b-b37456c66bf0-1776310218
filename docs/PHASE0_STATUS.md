@@ -19,10 +19,15 @@
 - Multiple `npm run typecheck` runs were clean on the May 21 base.
 - Post-rebase: re-run typecheck on latest `main` + new packages.
 
+## Tooling (2026-07-25)
+- Supabase CLI: **installed** as devDependency `supabase@2.109.1` — use `npx supabase` or `./node_modules/.bin/supabase`.
+- Docker: **not installed on this Windows host** — `supabase start` / local full stack still blocked until Docker Desktop (or remote dev host) is available.
+- Branch: `dev-2` pushed to `origin/dev-2` (rebased on `main` @ tickets workflow).
+
 ## Blockers
-1. Supabase CLI may still be missing locally (blocks real v2 migrations / `supabase start`)
+1. Docker required for local Supabase stack (`supabase start`) — CLI alone is not enough
 2. `@flc/core-types` not yet adopted by app code (by design until Phase 1+)
-3. v2 migration path vs existing 100+ migrations needs an explicit cutover strategy
+3. v2 migration path vs existing 100+ migrations needs an explicit cutover strategy (see recommendations: evolutionary / strangler, not wipe-and-replace)
 
 ## Next (real v2 work on rebased tip)
 - Rebase `dev-2` onto latest `origin/main`
