@@ -1,8 +1,15 @@
 # FLC BI / UBS Webapp Rebuild Roadmap (v2 from Scratch)
 
 **Branch**: `dev-2`  
-**Date**: 2026-06-28  
-**Status**: Planning Complete — Ready for Implementation  
+**Date**: 2026-06-28 (rebase onto latest `main`: 2026-07-25)  
+**Status**: Planning complete — Phase 0 additive foundation; branch tip rebased onto production `main`
+
+**Phase 0 Progress** (Foundation):
+- Roadmap + data-model skeleton + `supabase/migrations/v2` stub + `@flc/core-types` (roles/scopes/Zod Profile helpers).
+- **Do not recreate `@flc/ui` on this branch** — `main` already ships a full `@flc/ui` (and `@flc/auth`, `@flc/shell`, platform/internal-request packages). Phase 0 local UI stub was discarded before rebase to avoid clobbering production UI.
+- Workspace: new packages auto-pick via `packages/*`; app adoption of `@flc/core-types` is deferred until Phase 1+ design.
+- Blockers: Supabase CLI for real v2 DDL; cutover strategy vs existing migrations; keep changes additive on top of `main`.
+- Next: real v2 work on rebased tip (schema design / Phase 1 Vehicle) without discarding July production features.
 **Objective**: Clean-slate rebuild of the Unified Business Suite (UBS) for Fook Loi Group car dealership operations. Prioritize correctness, maintainability, scalability, developer experience (DX), and production readiness while retaining proven patterns from the existing system.
 
 This document is the authoritative planning artifact. All future work on `dev-2` references this roadmap. Implementation begins only after explicit approval of next tasks.
