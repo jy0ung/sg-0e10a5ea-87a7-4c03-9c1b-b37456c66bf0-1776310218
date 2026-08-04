@@ -109,12 +109,30 @@ export function usePersistedDraft({
     }
   }, [key]);
 
-  // Clean up the timer on unmount.
+  // Flush pending draft and clean up the timer on unmount.
+  // Without this flush, navigating away within the debounce window loses the
+  // most recent keystrokes because the timer is cancelled but the data is
+  // never written to localStorage.
   useEffect(
     () => () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+        if (key && draftRef.current) {
+          try {
+            const envelope: PersistedDraftEnvelope = {
+              version,
+              updatedAt: new Date().toISOString(),
+              data: draftRef.current,
+            };
+            window.localStorage.setItem(key, JSON.stringify(envelope));
+          } catch {
+            // Ignore quota / private-mode errors.
+          }
+        }
+      }
     },
-    [],
+    [key, version],
   );
 
   return { draft, saveDraft, clearDraft, draftSavedAt };

@@ -56,29 +56,46 @@ export function usePersistedDraftMap(
   });
 
   const debounceRef = useRef<number | null>(null);
+  // Keep a ref to the latest drafts so the unmount flush can access the most
+  // recent state without re-triggering the debounce effect.
+  const draftsRef = useRef(drafts);
+  useEffect(() => { draftsRef.current = drafts; }, [drafts]);
+
+  const flushToStorage = useCallback(() => {
+    if (!storageKey || typeof window === 'undefined') return;
+    try {
+      const cleaned: Record<string, string> = {};
+      for (const [id, value] of Object.entries(draftsRef.current)) {
+        if (value && value.trim().length > 0) cleaned[id] = value;
+      }
+      if (Object.keys(cleaned).length === 0) {
+        window.localStorage.removeItem(storageKey);
+      } else {
+        window.localStorage.setItem(storageKey, JSON.stringify(cleaned));
+      }
+    } catch {
+      // localStorage may be full, disabled, or running in private mode.
+      // The in-memory state still works; we just lose the persistence.
+    }
+  }, [storageKey]);
+
   useEffect(() => {
     if (!storageKey || typeof window === 'undefined') return undefined;
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(() => {
-      try {
-        const cleaned: Record<string, string> = {};
-        for (const [id, value] of Object.entries(drafts)) {
-          if (value && value.trim().length > 0) cleaned[id] = value;
-        }
-        if (Object.keys(cleaned).length === 0) {
-          window.localStorage.removeItem(storageKey);
-        } else {
-          window.localStorage.setItem(storageKey, JSON.stringify(cleaned));
-        }
-      } catch {
-        // localStorage may be full, disabled, or running in private mode.
-        // The in-memory state still works; we just lose the persistence.
-      }
+      flushToStorage();
+      debounceRef.current = null;
     }, 300);
     return () => {
-      if (debounceRef.current) window.clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+        // Flush the pending draft on unmount so navigating away within the
+        // debounce window doesn't lose the most recent keystrokes.
+        flushToStorage();
+      }
     };
-  }, [drafts, storageKey]);
+  }, [drafts, storageKey, flushToStorage]);
 
   const setDrafts = useCallback(
     (updater: React.SetStateAction<Record<string, string>>) => setDraftsState(updater),
