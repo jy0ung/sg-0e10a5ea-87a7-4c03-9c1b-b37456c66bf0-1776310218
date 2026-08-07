@@ -1270,39 +1270,41 @@ export async function getCompanyTicketStatusCounts(
   options: Pick<CompanyTicketListOptions, 'priority' | 'search'> = {},
 ): Promise<TicketServiceResult<TicketStatusCounts>> {
   const search = sanitizeTicketSearchTerm(options.search ?? '');
-  const statuses: TicketStatus[] = ['open', 'in_progress', 'pending_requester', 'pending_owner_review', 'completed_by_owner', 'closed', 'reopened', 'cancelled'];
 
   try {
     const profileIds = search ? await findMatchingProfileIds(companyId, search) : [];
 
-    const perStatus = await Promise.all(
-      statuses.map(async (status) => {
-        let query = ticketsTable()
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', companyId)
-          .eq('status', status);
+    // Single query: fetch only the status column for all matching tickets,
+    // then count by status on the client. This replaces the previous
+    // implementation that fired 8 separate HTTP requests (one per status)
+    // via Promise.all, which caused race-condition failures during navigation
+    // and poor performance.
+    let query = ticketsTable()
+      .select('status')
+      .eq('company_id', companyId);
 
-        if (options.priority && options.priority !== 'all') {
-          query = query.eq('priority', options.priority);
-        }
-        if (search) {
-          query = query.or(buildTicketSearchOrFilter(search, profileIds));
-        }
+    if (options.priority && options.priority !== 'all') {
+      query = query.eq('priority', options.priority);
+    }
+    if (search) {
+      query = query.or(buildTicketSearchOrFilter(search, profileIds));
+    }
 
-        const { count, error } = await query;
-        if (error) throw error;
-        return { status, count: count ?? 0 };
-      }),
-    );
+    const { data, error } = await query;
+    if (error) throw error;
 
     const result: TicketStatusCounts = {
       all: 0, open: 0, in_progress: 0, pending_requester: 0, pending_owner_review: 0,
       completed_by_owner: 0, closed: 0, reopened: 0, cancelled: 0,
     };
-    for (const { status, count } of perStatus) {
-      result[status] = count;
-      result.all += count;
+
+    for (const row of (data ?? []) as { status: string }[]) {
+      if (row.status in result) {
+        (result as Record<string, number>)[row.status]++;
+      }
+      result.all++;
     }
+
     return { data: result, error: null };
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to get ticket status counts');
