@@ -71,16 +71,16 @@ export class ErrorTrackingService {
           ],
         });
         this.hasSentry = true;
-        loggingService.info("Error tracking initialized with Sentry", {}, "ErrorTracking");
+        loggingService.info("Observability initialized with Sentry", {}, "Observability");
       } catch (err) {
         loggingService.error(
           "Failed to initialize Sentry - falling back to local-only tracking",
           { error: (err as Error).message },
-          "ErrorTracking",
+          "Observability",
         );
       }
     } else {
-      loggingService.info("Error tracking running in local-only mode (no DSN)", {}, "ErrorTracking");
+      loggingService.info("Observability running in local-only mode (no DSN)", {}, "Observability");
     }
   }
 
@@ -114,7 +114,7 @@ export class ErrorTrackingService {
     }) ?? {};
     const logLevel = level === "warning" ? "warn" : level;
 
-    loggingService[logLevel](message, enrichedContext, context?.component || "ErrorTracking");
+    loggingService[logLevel](message, enrichedContext, context?.component || "Observability");
 
     if (this.hasSentry) {
       Sentry.captureMessage(redactString(message), {
