@@ -30,7 +30,7 @@ export async function getVehicleById(companyId: string, id: string): Promise<{
     loggingService.error("Failed to get vehicle", { companyId, id, error }, "VehicleService");
   }
 
-  return { data: data as unknown as VehicleCanonical | null, error: error || null };
+  return { data: data as VehicleCanonical | null, error: error || null };
 }
 
 export async function getVehicleByChassis(companyId: string, chassisNo: string): Promise<{
@@ -54,7 +54,7 @@ export async function getVehicleByChassis(companyId: string, chassisNo: string):
     loggingService.error("Failed to get vehicle by chassis", { companyId, chassisNo, error }, "VehicleService");
   }
 
-  return { data: data as unknown as VehicleCanonical | null, error: error || null };
+  return { data: data as VehicleCanonical | null, error: error || null };
 }
 
 export async function getVehicles(filters?: {
@@ -102,7 +102,7 @@ export async function getVehicles(filters?: {
     loggingService.error("Failed to get vehicles", { filters, error }, "VehicleService");
   }
 
-  return { data: data as unknown as VehicleCanonical[] | null, error: error || null, count: count ?? undefined };
+  return { data: data as VehicleCanonical[] | null, error: error || null, count: count ?? undefined };
 }
 
 export async function updateVehicleWithAudit(
@@ -123,10 +123,10 @@ export async function updateVehicleWithAudit(
   if (error) return { data: null, error: new Error(error.message) };
   const changes: Record<string, unknown> = {};
   for (const key of Object.keys(updates)) {
-    changes[key] = { before: (before as unknown as Record<string, unknown> | null)?.[key], after: updates[key] };
+    changes[key] = { before: (before as Record<string, unknown> | null)?.[key], after: updates[key] };
   }
   await logVehicleEdit(userId, id, changes as Record<string, { before: unknown; after: unknown }>);
-  return { data: data as unknown as VehicleCanonical, error: null };
+  return { data: data as VehicleCanonical, error: null };
 }
 
 /**
@@ -545,14 +545,14 @@ export async function searchVehicles(
   }
 
   const { data, error } = await supabase.rpc('search_vehicles', {
-    p_branch: (params.branch ?? null) as unknown as string | undefined,
-    p_model: (params.model ?? null) as unknown as string | undefined,
-    p_payment: (params.payment ?? null) as unknown as string | undefined,
-    p_stage: (params.stage ?? null) as unknown as string | undefined,
-    p_search: (params.search ?? null) as unknown as string | undefined,
-    p_bg_date_from: (params.bgDateFrom ?? null) as unknown as string | undefined,
-    p_bg_date_to: (params.bgDateTo ?? null) as unknown as string | undefined,
-    p_has_delivery_date: (params.hasDeliveryDate ?? null) as unknown as boolean | undefined,
+    p_branch: params.branch ?? undefined,
+    p_model: params.model ?? undefined,
+    p_payment: params.payment ?? undefined,
+    p_stage: params.stage ?? undefined,
+    p_search: params.search ?? undefined,
+    p_bg_date_from: params.bgDateFrom ?? undefined,
+    p_bg_date_to: params.bgDateTo ?? undefined,
+    p_has_delivery_date: params.hasDeliveryDate ?? undefined,
     p_limit: params.limit ?? 50,
     p_offset: params.offset ?? 0,
     p_sort_column: params.sortColumn ?? 'created_at',
@@ -591,7 +591,7 @@ export async function getVehicleKpiSummary(
   }
 
   const { data, error } = await supabase.rpc('vehicle_kpi_summary', {
-    p_branch: (branch ?? null) as unknown as string | undefined,
+    p_branch: branch ?? undefined,
   });
 
   performanceService.endQueryTimer(queryId, 'vehicle_kpi_summary');

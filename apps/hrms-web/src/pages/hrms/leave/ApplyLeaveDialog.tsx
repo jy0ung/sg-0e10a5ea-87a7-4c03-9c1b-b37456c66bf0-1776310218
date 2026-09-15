@@ -143,9 +143,9 @@ export function ApplyLeaveDialog({
     queryFn: () => checkLeaveQuotaAvailability(
       user!.companyId,
       selfServiceEmployeeId!,
-      form.leaveTypeId,
-      form.startDate,
-      effectiveEnd,
+      form.leaveTypeId!,
+      form.startDate!,
+      effectiveEnd!,
       form.dayPart as 'full_day' | 'half_day_morning' | 'half_day_afternoon',
     ),
     enabled: quotaCheckEnabled,

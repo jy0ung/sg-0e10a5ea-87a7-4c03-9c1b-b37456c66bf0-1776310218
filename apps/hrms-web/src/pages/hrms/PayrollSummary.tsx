@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PageSpinner } from '@/components/shared/PageSpinner';
 import { StandardTable, type StandardTableColumn } from '@/components/shared/StandardTable';
-import { StatusBadge } from '@/components/shared/StatusBadge';
+import { StatusBadge } from '@hrms-web/components/shared/StatusBadge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

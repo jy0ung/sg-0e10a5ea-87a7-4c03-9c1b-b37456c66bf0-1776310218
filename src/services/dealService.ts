@@ -1,3 +1,5 @@
+import type { Database, Json } from '@flc/supabase';
+import { createNotifications } from './notificationService';
 import { supabase } from '@/integrations/supabase/client';
 import { loggingService } from './loggingService';
 
@@ -37,8 +39,8 @@ export interface Deal {
   selling_price: number | null;
   deposit_amount: number | null;
   deposit_date: string | null;
-  discount_amount: number;
-  accessories_amount: number;
+  discount_amount: number | null;
+  accessories_amount: number | null;
   total_amount: number | null;
   sales_advisor_id: string | null;
   sales_advisor_name: string | null;
@@ -129,7 +131,7 @@ export interface DealActivity {
   company_id: string;
   actor_id: string | null;
   action: string;
-  metadata: Record<string, unknown> | null;
+  metadata: Json;
   created_at: string;
 }
 
@@ -145,35 +147,14 @@ export interface DealDocument {
   created_at: string;
 }
 
-export interface CreateDealInput {
-  company_id: string;
-  branch_id?: string;
-  customer_name: string;
-  customer_ic?: string;
-  customer_phone?: string;
-  customer_email?: string;
-  customer_id?: string;
-  model_id?: string;
-  model_name?: string;
-  variant?: string;
-  colour?: string;
-  selling_price?: number;
-  deposit_amount?: number;
-  deposit_date?: string;
-  discount_amount?: number;
-  accessories_amount?: number;
-  total_amount?: number;
-  sales_advisor_id?: string;
-  sales_advisor_name?: string;
-  lead_source?: string;
-  lead_source_detail?: string;
-  notes?: string;
-  vso_no?: string;
-}
+export type CreateDealInput = Pick<Database['public']['Tables']['deals']['Insert'],
+  'company_id' | 'branch_id' | 'customer_name' | 'customer_ic' | 'customer_phone' |
+  'customer_email' | 'customer_id' | 'model_id' | 'model_name' | 'variant' | 'colour' |
+  'chassis_no' | 'vehicle_id' | 'selling_price' | 'deposit_amount' | 'deposit_date' |
+  'discount_amount' | 'accessories_amount' | 'total_amount' | 'sales_advisor_id' |
+  'sales_advisor_name' | 'lead_source' | 'lead_source_detail' | 'notes' | 'vso_no'>;
 
-export interface UpdateDealInput extends Partial<CreateDealInput> {
-  stage?: DealStage;
-}
+export type UpdateDealInput = Partial<CreateDealInput> & { stage?: DealStage };
 
 export interface DealFilters {
   company_id: string;
@@ -437,7 +418,7 @@ export async function updateDeal(id: string, input: UpdateDealInput, userId: str
     }
 
     // Calculate total_amount if pricing fields changed
-    const updates: Record<string, unknown> = { ...input };
+    const updates: Database['public']['Tables']['deals']['Update'] = { ...input };
     if (input.selling_price !== undefined || input.discount_amount !== undefined || input.accessories_amount !== undefined) {
       const sp = input.selling_price ?? current.selling_price ?? 0;
       const disc = input.discount_amount ?? current.discount_amount ?? 0;
@@ -558,7 +539,7 @@ export async function setupLoan(dealId: string, companyId: string, input: Partia
 
 export async function updateLoanStatus(dealId: string, companyId: string, status: LoanStatus, userId: string, metadata?: Record<string, unknown>): Promise<{ error: Error | null }> {
   try {
-    const updates: Record<string, unknown> = { status };
+    const updates: Database['public']['Tables']['deal_loan']['Update'] = { status };
     
     // Set timestamp based on status
     switch (status) {
@@ -611,7 +592,7 @@ export async function setupInsurance(dealId: string, companyId: string, input: P
 
 export async function updateInsuranceStatus(dealId: string, companyId: string, status: InsuranceStatus, userId: string): Promise<{ error: Error | null }> {
   try {
-    const updates: Record<string, unknown> = { status };
+    const updates: Database['public']['Tables']['deal_insurance']['Update'] = { status };
     switch (status) {
       case "cover_note_issued": updates.cover_note_issued_at = new Date().toISOString(); break;
       case "policy_active": updates.policy_issued_at = new Date().toISOString(); break;
@@ -627,7 +608,7 @@ export async function updateInsuranceStatus(dealId: string, companyId: string, s
 
 export async function updateRegistrationStatus(dealId: string, companyId: string, status: RegistrationStatus, userId: string): Promise<{ error: Error | null }> {
   try {
-    const updates: Record<string, unknown> = { status };
+    const updates: Database['public']['Tables']['deal_registration']['Update'] = { status };
     switch (status) {
       case "submitted": updates.submitted_at = new Date().toISOString(); break;
       case "registered": updates.registered_at = new Date().toISOString(); break;
@@ -723,7 +704,7 @@ async function logActivity(dealId: string, companyId: string, actorId: string, a
         company_id: companyId,
         actor_id: actorId,
         action,
-        metadata,
+        metadata: JSON.parse(JSON.stringify(metadata)) as Json,
       });
   } catch (err) {
     loggingService.error('Failed to log activity', { error: err, dealId, action });

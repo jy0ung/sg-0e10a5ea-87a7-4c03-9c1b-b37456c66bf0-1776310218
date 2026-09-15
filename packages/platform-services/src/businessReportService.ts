@@ -248,8 +248,8 @@ export const REPORTS: ReportConfig[] = [
       if (to) q = q.lte('bg_date', to);
       const { data, count } = await q;
       const now = Date.now();
-      const rows: ReportRow[] = (data ?? []).map((v: Record<string, unknown>) => {
-        const deal = Array.isArray(v.deals) && v.deals.length > 0 ? v.deals[0] as Record<string, unknown> : null;
+      const rows: ReportRow[] = (data ?? []).map((v) => {
+        const deal = Array.isArray(v.deals) && v.deals.length > 0 ? v.deals[0] : null;
         const bg = v.bg_date ? new Date(v.bg_date as string).getTime() : null;
         return {
           chassis_no: v.chassis_no,
@@ -286,8 +286,8 @@ export const REPORTS: ReportConfig[] = [
         if (to) q = q.lte('bg_date', to);
         const { data, count } = await q;
         if (page === 0) totalCount = count ?? 0;
-        const mapped = (data ?? []).map((v: Record<string, unknown>) => {
-          const deal = Array.isArray(v.deals) && v.deals.length > 0 ? v.deals[0] as Record<string, unknown> : null;
+        const mapped = (data ?? []).map((v) => {
+          const deal = Array.isArray(v.deals) && v.deals.length > 0 ? v.deals[0] : null;
           const bg = v.bg_date ? new Date(v.bg_date as string).getTime() : null;
           return {
             chassis_no: v.chassis_no, model: v.model, branch_code: v.branch_code,

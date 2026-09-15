@@ -4,5 +4,5 @@ import { useHrmsShellConfig } from './hrmsShellConfig';
 export default function HrmsLayout() {
   const shellConfig = useHrmsShellConfig();
 
-  return <AppShell {...shellConfig} mobileSheetTitle="HRMS navigation" />;
+  return <AppShell {...shellConfig} routeChrome={[...shellConfig.routeChrome]} mobileSheetTitle="HRMS navigation" />;
 }

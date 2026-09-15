@@ -1,5 +1,7 @@
 import {
   AlertTriangle,
+  Archive,
+  Plus,
   ArrowLeft,
   ArrowLeftRight,
   BarChart3,
@@ -75,6 +77,8 @@ interface MainSectionDef {
 }
 
 const ICONS: Record<PlatformIconKey, typeof Car> = {
+  archive: Archive,
+  plus: Plus,
   'alert-triangle': AlertTriangle,
   'arrow-left-right': ArrowLeftRight,
   'bar-chart': BarChart3,

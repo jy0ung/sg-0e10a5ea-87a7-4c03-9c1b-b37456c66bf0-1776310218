@@ -1,7 +1,7 @@
 # Security Release Sign-Off
 
-Status: Draft - static guardrails and local RLS matrix passed; live release evidence pending
-Last updated: 2026-04-28
+Status: Local production-readiness gate passed; UAT unavailable and staging/operational sign-off blocked
+Last updated: 2026-09-15
 
 Use this document for the production release security review. Keep customer-identifying evidence, credentials, and raw logs out of the repository; link to private tickets or internal evidence stores where needed.
 
@@ -10,10 +10,10 @@ Use this document for the production release security review. Keep customer-iden
 ```bash
 npm run security:edge-functions
 bash scripts/security-check.sh
-npm run test:rls
+npm run test:integration
 ```
 
-`npm run test:rls` requires a reachable Supabase stack with dedicated RLS test users and `RLS_E2E=1`. Use a local or isolated staging environment for those synthetic tenants; do not seed them into the live production database. If the required non-production environment is unavailable, mark the gate blocked rather than waived.
+`npm run test:integration` creates and destroys an isolated local Supabase stack and synthetic tenants. The staging RLS job remains required before cutover; do not seed synthetic users into production.
 
 ## Edge Function Review
 
@@ -29,7 +29,9 @@ npm run test:rls
 | ---- | ------ | -------- | -------- | ---- |
 | Edge function static guardrail | Passed | `npm run security:edge-functions` | | 2026-04-27 |
 | Full security script | Passed | `bash scripts/security-check.sh` | | 2026-04-28 |
-| RLS cross-company integration suite | Passed locally; isolated staging evidence pending | Local seeded Supabase: `npm run test:rls`, `84 passed`. Rerun against an isolated staging Supabase target with `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `RLS_USER_A_EMAIL`, `RLS_USER_A_PASSWORD`, `RLS_USER_B_EMAIL`, and `RLS_USER_B_PASSWORD` before cutover | | 2026-04-28 |
+| RLS/auth/RPC persistence suite | 149 tests passed locally; isolated staging evidence blocked | Disposable Supabase: `npm run test:integration`; database lint, dual approval engines, HRMS leave workflow, and privilege audits passed | | 2026-09-15 |
+| Migration reconstruction | Passed locally | Full clean-stack migration application inside `npm run test:integration` | | 2026-09-15 |
+| Definer/search-path and anonymous RPC audit | Passed locally | Automated catalog assertions inside `npm run test:integration` | | 2026-09-15 |
 | Sentry redaction/user-context review | Passed in Phase 2 slice 1 | `src/services/errorTrackingService.test.ts` | | 2026-04-27 |
 | Backup/incident/on-call runbook review | Passed in Phase 2 slice 2 | `docs/BACKUP_DR.md`, `docs/INCIDENT_RESPONSE.md`, `docs/ONCALL.md` | | 2026-04-27 |
 

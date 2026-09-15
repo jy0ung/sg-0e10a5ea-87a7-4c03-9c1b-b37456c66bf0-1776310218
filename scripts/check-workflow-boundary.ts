@@ -18,6 +18,8 @@ const sourceRoots = [
 const allowedLegacyFiles = new Set([
   'src/services/approvalEngineService.ts',
   'apps/hrms-web/src/services/approvalEngineService.ts',
+  // Direct compatibility coverage for the dual-target decision migration.
+  'src/test/release-workflows.spec.ts',
 ]);
 
 const ignoredDirs = new Set([

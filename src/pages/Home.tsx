@@ -1,3 +1,4 @@
+import { Badge } from '@/components/ui/badge';
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -23,6 +24,7 @@ import {
   Bell,
   Brain,
   Briefcase,
+  AlertTriangle,
   ChevronRight,
   ClipboardList,
   Clock,

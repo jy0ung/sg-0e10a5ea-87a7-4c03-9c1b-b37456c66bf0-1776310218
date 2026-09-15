@@ -148,7 +148,7 @@ describe('importReviewService', () => {
     });
 
     it('orders results by row number ascending', async () => {
-      const mockRowData = [];
+      const mockRowData: never[] = [];
       const select = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({

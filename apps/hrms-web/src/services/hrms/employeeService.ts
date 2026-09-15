@@ -28,6 +28,9 @@ export interface CreateEmployeeInput {
 }
 
 export async function createEmployee(input: CreateEmployeeInput, actorId?: string): Promise<{ error: string | null }> {
+  if (input.role === 'portal_admin' || input.role === 'portal_manager' || input.role === 'portal_staff') {
+    return { error: 'Select a workforce role when creating an employee.' };
+  }
   const { error } = await supabase.from('employees').insert({
     id:                  input.id,
     company_id:          input.companyId,
@@ -83,7 +86,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   try {
     await pkg.updateEmployee(id, input, companyId);
     if (actorId) {
-      void logUserAction(actorId, 'update', 'employee', id, { changes: input as unknown as import('@/integrations/supabase/types').Json });
+      void logUserAction(actorId, 'update', 'employee', id, { changes: { ...input } });
     }
     return { error: null };
   } catch (e) {
@@ -173,8 +176,8 @@ export async function reInviteEmployee(
   });
 
   if (!result.error && actorId) {
-    void logUserAction(actorId, 're_invite', 'employee', employee.id,
-      { email: employee.email } as unknown as import('@/integrations/supabase/types').Json);
+    void logUserAction(actorId, 'update', 'employee', employee.id,
+      { email: employee.email });
   }
   return result;
 }

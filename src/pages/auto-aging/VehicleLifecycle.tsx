@@ -25,18 +25,18 @@ interface LifecycleStage {
 export default function VehicleLifecycle() {
   const { chassisNo } = useParams<{ chassisNo: string }>();
   const navigate = useNavigate();
-  const { user: _user } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [vehicle, setVehicle] = useState<VehicleCanonical | null>(null);
   const [deal, setDeal] = useState<Deal | null>(null);
   const [stages, setStages] = useState<LifecycleStage[]>([]);
 
   const loadData = useCallback(async () => {
-    if (!chassisNo) return;
+    if (!chassisNo || !user?.company_id) return;
     setLoading(true);
     try {
       // Load vehicle
-      const { data: v, error: ve } = await getVehicleByChassis(chassisNo);
+      const { data: v, error: ve } = await getVehicleByChassis(user.company_id, chassisNo);
       if (ve) {
         toast.error('Vehicle not found');
         navigate('/auto-aging');
@@ -45,10 +45,8 @@ export default function VehicleLifecycle() {
       setVehicle(v);
 
       // Load deal linked to this vehicle
-      if (v?.id) {
-        const { data: d } = await getDealByVehicleId(v.id);
-        setDeal(d);
-      }
+      const d = v?.id ? (await getDealByVehicleId(v.id)).data : null;
+      setDeal(d);
 
       // Build lifecycle stages
       const lifecycleStages: LifecycleStage[] = [];
@@ -90,7 +88,7 @@ export default function VehicleLifecycle() {
         label: 'Sale',
         icon: TrendingUp,
         status: d ? (d.stage === 'lead' || d.stage === 'prospect' ? 'active' : 'completed') : 'pending',
-        date: d?.created_at,
+        date: d?.created_at ?? undefined,
         detail: d ? `${d.customer_name} — ${getStageLabel(d.stage)}` : undefined,
         link: d ? `/sales/deals/${d.id}` : undefined,
       });
@@ -125,7 +123,7 @@ export default function VehicleLifecycle() {
         label: 'Delivery',
         icon: MapPin,
         status: d?.stage === 'completed' ? 'completed' : (d?.stage === 'delivery' ? 'active' : 'pending'),
-        date: d?.completed_at,
+        date: d?.completed_at ?? undefined,
         link: d ? `/sales/deals/${d.id}` : undefined,
       });
 
@@ -135,7 +133,7 @@ export default function VehicleLifecycle() {
     } finally {
       setLoading(false);
     }
-  }, [chassisNo, navigate]);
+  }, [chassisNo, navigate, user?.company_id]);
 
   useEffect(() => {
     loadData();
@@ -171,7 +169,7 @@ export default function VehicleLifecycle() {
         </Button>
         <PageHeader
           title={`Vehicle: ${vehicle.chassis_no || '—'}`}
-          subtitle={`${vehicle.model || '—'} · ${vehicle.branch_code || '—'} · ${stockDays} days in stock`}
+          description={`${vehicle.model || '—'} · ${vehicle.branch_code || '—'} · ${stockDays} days in stock`}
         />
       </div>
 
@@ -198,7 +196,7 @@ export default function VehicleLifecycle() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Owner</p>
-            <p className="font-medium">{vehicle.owner_name || vehicle.customer_name || '—'}</p>
+            <p className="font-medium">{vehicle.customer_name || '—'}</p>
           </CardContent>
         </Card>
       </div>
@@ -343,7 +341,7 @@ export default function VehicleLifecycle() {
           <CardContent className="p-6 text-center">
             <Car className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
             <p className="text-muted-foreground mb-2">No deal linked to this vehicle</p>
-            <Button onClick={() => navigate(`/sales/deals/new?chassis=${encodeURIComponent(vehicle.chassis_no || '')}&model=${encodeURIComponent(vehicle.model || '')}&colour=${encodeURIComponent(vehicle.colour || '')}`)}>
+            <Button onClick={() => navigate(`/sales/deals/new?chassis=${encodeURIComponent(vehicle.chassis_no || '')}&model=${encodeURIComponent(vehicle.model || '')}&colour=${encodeURIComponent(vehicle.color || '')}`)}>
               Create Deal for this Vehicle
             </Button>
           </CardContent>

@@ -89,7 +89,6 @@ function renderLayout(role: AppRole, initialPath = '/leave') {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter
         initialEntries={[initialPath]}
-        future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
       >
         <Routes>
           <Route element={<HrmsLayout />}>

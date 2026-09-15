@@ -61,7 +61,7 @@ export default function ActivityDashboard() {
       const result = await getAllAuditLogs(200, 0, { fromDate });
       if (result.error) {
         loggingService.error('Error loading activity logs', { error: result.error }, 'ActivityDashboard');
-        throw new Error(result.error);
+        throw result.error;
       }
       return result.data ?? [];
     },

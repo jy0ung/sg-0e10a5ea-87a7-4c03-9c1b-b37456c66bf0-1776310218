@@ -21,10 +21,12 @@ import WebSocket from 'ws';
 
 const shouldRun = process.env.RLS_E2E === '1';
 const describeIfLive = shouldRun ? describe : describe.skip;
-const clientOptions: Parameters<typeof createClient>[2] = {
-  auth: { persistSession: false },
-  realtime: { transport: WebSocket as never },
-};
+function clientOptions(storageKey: string): Parameters<typeof createClient>[2] {
+  return {
+    auth: { persistSession: false, storageKey },
+    realtime: { transport: WebSocket as never },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,13 +41,13 @@ interface Session {
 function makeServiceClient(): SupabaseClient {
   const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? '';
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-  return createClient(url, key, clientOptions);
+  return createClient(url, key, clientOptions('ap-foundation-service'));
 }
 
 async function signInAs(email: string, password: string): Promise<Session> {
   const url  = process.env.VITE_SUPABASE_URL ?? '';
   const anon = process.env.VITE_SUPABASE_ANON_KEY ?? '';
-  const client = createClient(url, anon, clientOptions);
+  const client = createClient(url, anon, clientOptions(`ap-foundation-${email}`));
   const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error || !data.user) throw new Error(`Sign-in failed for ${email}: ${error?.message}`);
   const { data: profile, error: profErr } = await client
@@ -278,7 +280,7 @@ describeIfLive('AP Foundation RPCs', () => {
       p_actor_id:      userA.userId,
     });
     expect(error).not.toBeNull();
-    expect(error?.message).toMatch(/invalid transition|cannot transition/i);
+    expect(error?.message).toMatch(/invalid (?:lifecycle )?transition|cannot transition/i);
   });
 
   // 8. Cross-tenant isolation ─────────────────────────────────────────────────

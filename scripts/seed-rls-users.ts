@@ -27,13 +27,29 @@ const ALLOW_REMOTE_RLS_SEED = process.env.ALLOW_REMOTE_RLS_SEED === '1';
 const CONFIRM_RLS_TEST_CLEANUP = process.env.CONFIRM_RLS_TEST_CLEANUP;
 
 const TEST_COMPANIES = [
-  { id: 'rls-a', name: 'RLS Company A', code: 'RLS-A' },
-  { id: 'rls-b', name: 'RLS Company B', code: 'RLS-B' },
+  {
+    id: process.env.RLS_COMPANY_A_ID ?? 'rls-a',
+    name: process.env.RLS_COMPANY_A_NAME ?? 'RLS Company A',
+    code: process.env.RLS_COMPANY_A_CODE ?? 'RLS-A',
+  },
+  {
+    id: process.env.RLS_COMPANY_B_ID ?? 'rls-b',
+    name: process.env.RLS_COMPANY_B_NAME ?? 'RLS Company B',
+    code: process.env.RLS_COMPANY_B_CODE ?? 'RLS-B',
+  },
 ] as const;
 
 const TEST_USERS = [
-  { email: 'a@rls.test', password: 'Test1234!', companyId: 'rls-a' },
-  { email: 'b@rls.test', password: 'Test1234!', companyId: 'rls-b' },
+  {
+    email: process.env.RLS_USER_A_EMAIL ?? 'a@rls.test',
+    password: process.env.RLS_USER_A_PASSWORD ?? 'Test1234!',
+    companyId: TEST_COMPANIES[0].id,
+  },
+  {
+    email: process.env.RLS_USER_B_EMAIL ?? 'b@rls.test',
+    password: process.env.RLS_USER_B_PASSWORD ?? 'Test1234!',
+    companyId: TEST_COMPANIES[1].id,
+  },
 ] as const;
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
@@ -180,12 +196,7 @@ async function main() {
         companyBId,
         userAId,
         userBId,
-        credentials: {
-          RLS_USER_A_EMAIL: TEST_USERS[0].email,
-          RLS_USER_A_PASSWORD: TEST_USERS[0].password,
-          RLS_USER_B_EMAIL: TEST_USERS[1].email,
-          RLS_USER_B_PASSWORD: TEST_USERS[1].password,
-        },
+        configuredUsers: TEST_USERS.map((user) => user.email),
       },
       null,
       2,

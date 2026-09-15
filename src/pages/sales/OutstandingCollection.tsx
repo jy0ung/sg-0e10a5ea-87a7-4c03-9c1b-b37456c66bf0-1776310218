@@ -74,12 +74,12 @@ export default function OutstandingCollection() {
   const columns = [
     {
       key: 'deal_no',
-      header: 'Deal No',
+      label: 'Deal No',
       render: (deal: Deal) => <span className="font-medium">{deal.deal_no}</span>,
     },
     {
       key: 'customer',
-      header: 'Customer',
+      label: 'Customer',
       render: (deal: Deal) => (
         <div>
           <p className="font-medium">{deal.customer_name}</p>
@@ -89,7 +89,7 @@ export default function OutstandingCollection() {
     },
     {
       key: 'vehicle',
-      header: 'Vehicle',
+      label: 'Vehicle',
       render: (deal: Deal) => (
         <div>
           <p>{deal.model_name}</p>
@@ -99,12 +99,12 @@ export default function OutstandingCollection() {
     },
     {
       key: 'amount',
-      header: 'Amount',
+      label: 'Amount',
       render: (deal: Deal) => deal.total_amount ? `RM ${deal.total_amount.toLocaleString()}` : '—',
     },
     {
       key: 'days',
-      header: 'Days in Stage',
+      label: 'Days in Stage',
       render: (deal: Deal) => {
         const days = Math.floor((Date.now() - new Date(deal.stage_entered_at).getTime()) / (1000 * 60 * 60 * 24));
         return <span className={days > 14 ? 'text-destructive font-medium' : ''}>{days} days</span>;
@@ -112,7 +112,7 @@ export default function OutstandingCollection() {
     },
     {
       key: 'stage',
-      header: 'Stage',
+      label: 'Stage',
       render: (deal: Deal) => <Badge variant="outline">{getStageLabel(deal.stage)}</Badge>,
     },
   ];
@@ -121,7 +121,7 @@ export default function OutstandingCollection() {
     <div className="space-y-4 animate-fade-in">
       <PageHeader
         title="Outstanding Collection"
-        subtitle={`${filteredDeals.length} deals · RM ${totalOutstanding.toLocaleString()} pending`}
+        description={`${filteredDeals.length} deals · RM ${totalOutstanding.toLocaleString()} pending`}
       />
 
       {/* Summary */}

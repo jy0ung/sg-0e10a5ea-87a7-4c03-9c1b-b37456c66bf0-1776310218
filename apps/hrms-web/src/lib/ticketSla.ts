@@ -28,7 +28,7 @@ export interface TicketSlaSummary {
 const AT_RISK_WINDOW_MS = 4 * 60 * 60 * 1000;
 
 function isTerminalStatus(status: TicketStatus) {
-  return status === 'resolved' || status === 'closed' || status === 'cancelled';
+  return status === 'completed_by_owner' || status === 'closed' || status === 'cancelled';
 }
 
 function evaluateSlaTarget(

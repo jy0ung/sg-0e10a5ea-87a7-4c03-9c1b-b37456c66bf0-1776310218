@@ -46,7 +46,7 @@ export type Database = {
           period_month: number
           period_year: number
           start_date: string
-          status: string
+          status: Database["public"]["Enums"]["accounting_period_status"]
           updated_at: string
         }
         Insert: {
@@ -60,7 +60,7 @@ export type Database = {
           period_month: number
           period_year: number
           start_date: string
-          status?: string
+          status?: Database["public"]["Enums"]["accounting_period_status"]
           updated_at?: string
         }
         Update: {
@@ -74,7 +74,7 @@ export type Database = {
           period_month?: number
           period_year?: number
           start_date?: string
-          status?: string
+          status?: Database["public"]["Enums"]["accounting_period_status"]
           updated_at?: string
         }
         Relationships: [
@@ -97,7 +97,7 @@ export type Database = {
           is_active: boolean
           is_system: boolean
           name: string
-          type: string
+          type: Database["public"]["Enums"]["account_type"]
           updated_at: string
         }
         Insert: {
@@ -109,7 +109,7 @@ export type Database = {
           is_active?: boolean
           is_system?: boolean
           name: string
-          type: string
+          type: Database["public"]["Enums"]["account_type"]
           updated_at?: string
         }
         Update: {
@@ -121,7 +121,7 @@ export type Database = {
           is_active?: boolean
           is_system?: boolean
           name?: string
-          type?: string
+          type?: Database["public"]["Enums"]["account_type"]
           updated_at?: string
         }
         Relationships: [
@@ -171,13 +171,13 @@ export type Database = {
         Row: {
           author_id: string | null
           body: string
-          category: string
+          category: Database["public"]["Enums"]["announcement_category"]
           company_id: string
           created_at: string
           expires_at: string | null
           id: string
           pinned: boolean
-          priority: string
+          priority: Database["public"]["Enums"]["announcement_priority"]
           published_at: string | null
           title: string
           updated_at: string
@@ -185,13 +185,13 @@ export type Database = {
         Insert: {
           author_id?: string | null
           body: string
-          category?: string
+          category?: Database["public"]["Enums"]["announcement_category"]
           company_id: string
           created_at?: string
           expires_at?: string | null
           id?: string
           pinned?: boolean
-          priority?: string
+          priority?: Database["public"]["Enums"]["announcement_priority"]
           published_at?: string | null
           title: string
           updated_at?: string
@@ -199,13 +199,13 @@ export type Database = {
         Update: {
           author_id?: string | null
           body?: string
-          category?: string
+          category?: Database["public"]["Enums"]["announcement_category"]
           company_id?: string
           created_at?: string
           expires_at?: string | null
           id?: string
           pinned?: boolean
-          priority?: string
+          priority?: Database["public"]["Enums"]["announcement_priority"]
           published_at?: string | null
           title?: string
           updated_at?: string
@@ -264,7 +264,7 @@ export type Database = {
           reviewed_at: string | null
           reviewer_comments: string | null
           reviewer_id: string | null
-          status: string
+          status: Database["public"]["Enums"]["appraisal_item_status"]
           updated_at: string
         }
         Insert: {
@@ -280,7 +280,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewer_comments?: string | null
           reviewer_id?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["appraisal_item_status"]
           updated_at?: string
         }
         Update: {
@@ -296,7 +296,7 @@ export type Database = {
           reviewed_at?: string | null
           reviewer_comments?: string | null
           reviewer_id?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["appraisal_item_status"]
           updated_at?: string
         }
         Relationships: [
@@ -328,11 +328,11 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
-          cycle: string
+          cycle: Database["public"]["Enums"]["appraisal_cycle"]
           id: string
           period_end: string
           period_start: string
-          status: string
+          status: Database["public"]["Enums"]["appraisal_status"]
           title: string
           updated_at: string
         }
@@ -340,11 +340,11 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
-          cycle?: string
+          cycle?: Database["public"]["Enums"]["appraisal_cycle"]
           id?: string
           period_end: string
           period_start: string
-          status?: string
+          status?: Database["public"]["Enums"]["appraisal_status"]
           title: string
           updated_at?: string
         }
@@ -352,11 +352,11 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
-          cycle?: string
+          cycle?: Database["public"]["Enums"]["appraisal_cycle"]
           id?: string
           period_end?: string
           period_start?: string
-          status?: string
+          status?: Database["public"]["Enums"]["appraisal_status"]
           title?: string
           updated_at?: string
         }
@@ -372,11 +372,11 @@ export type Database = {
       }
       approval_decisions: {
         Row: {
-          approval_request_id: string
+          approval_request_id: string | null
           approver_id: string
           created_at: string
           decided_at: string
-          decision: string
+          decision: Database["public"]["Enums"]["approval_decision"]
           id: string
           instance_id: string | null
           note: string | null
@@ -384,11 +384,11 @@ export type Database = {
           step_order: number | null
         }
         Insert: {
-          approval_request_id: string
+          approval_request_id?: string | null
           approver_id: string
           created_at?: string
           decided_at?: string
-          decision: string
+          decision: Database["public"]["Enums"]["approval_decision"]
           id?: string
           instance_id?: string | null
           note?: string | null
@@ -396,11 +396,11 @@ export type Database = {
           step_order?: number | null
         }
         Update: {
-          approval_request_id?: string
+          approval_request_id?: string | null
           approver_id?: string
           created_at?: string
           decided_at?: string
-          decision?: string
+          decision?: Database["public"]["Enums"]["approval_decision"]
           id?: string
           instance_id?: string | null
           note?: string | null
@@ -446,7 +446,7 @@ export type Database = {
           created_by: string | null
           department_id: string | null
           description: string | null
-          entity_type: string
+          entity_type: Database["public"]["Enums"]["approval_flow_entity_type"]
           id: string
           is_active: boolean
           is_default: boolean
@@ -462,7 +462,7 @@ export type Database = {
           created_by?: string | null
           department_id?: string | null
           description?: string | null
-          entity_type?: string
+          entity_type?: Database["public"]["Enums"]["approval_flow_entity_type"]
           id?: string
           is_active?: boolean
           is_default?: boolean
@@ -478,7 +478,7 @@ export type Database = {
           created_by?: string | null
           department_id?: string | null
           description?: string | null
-          entity_type?: string
+          entity_type?: Database["public"]["Enums"]["approval_flow_entity_type"]
           id?: string
           is_active?: boolean
           is_default?: boolean
@@ -521,11 +521,11 @@ export type Database = {
           current_step_name: string | null
           current_step_order: number | null
           entity_id: string
-          entity_type: string
+          entity_type: Database["public"]["Enums"]["approval_instance_entity_type"]
           flow_id: string
           id: string
           requester_id: string
-          status: string
+          status: Database["public"]["Enums"]["approval_instance_status"]
           updated_at: string
         }
         Insert: {
@@ -537,11 +537,11 @@ export type Database = {
           current_step_name?: string | null
           current_step_order?: number | null
           entity_id: string
-          entity_type: string
+          entity_type: Database["public"]["Enums"]["approval_instance_entity_type"]
           flow_id: string
           id?: string
           requester_id: string
-          status?: string
+          status?: Database["public"]["Enums"]["approval_instance_status"]
           updated_at?: string
         }
         Update: {
@@ -553,11 +553,11 @@ export type Database = {
           current_step_name?: string | null
           current_step_order?: number | null
           entity_id?: string
-          entity_type?: string
+          entity_type?: Database["public"]["Enums"]["approval_instance_entity_type"]
           flow_id?: string
           id?: string
           requester_id?: string
-          status?: string
+          status?: Database["public"]["Enums"]["approval_instance_status"]
           updated_at?: string
         }
         Relationships: [
@@ -597,11 +597,11 @@ export type Database = {
           created_at: string
           current_step_order: number
           entity_id: string
-          entity_type: string
+          entity_type: Database["public"]["Enums"]["approval_request_entity_type"]
           flow_id: string
           id: string
           requester_id: string
-          status: string
+          status: Database["public"]["Enums"]["approval_request_status"]
           updated_at: string
         }
         Insert: {
@@ -609,11 +609,11 @@ export type Database = {
           created_at?: string
           current_step_order?: number
           entity_id: string
-          entity_type: string
+          entity_type: Database["public"]["Enums"]["approval_request_entity_type"]
           flow_id: string
           id?: string
           requester_id: string
-          status?: string
+          status?: Database["public"]["Enums"]["approval_request_status"]
           updated_at?: string
         }
         Update: {
@@ -621,11 +621,11 @@ export type Database = {
           created_at?: string
           current_step_order?: number
           entity_id?: string
-          entity_type?: string
+          entity_type?: Database["public"]["Enums"]["approval_request_entity_type"]
           flow_id?: string
           id?: string
           requester_id?: string
-          status?: string
+          status?: Database["public"]["Enums"]["approval_request_status"]
           updated_at?: string
         }
         Relationships: [
@@ -649,7 +649,7 @@ export type Database = {
         Row: {
           allow_self_approval: boolean
           approver_role: string | null
-          approver_type: string
+          approver_type: Database["public"]["Enums"]["approval_step_approver_type"]
           approver_user_id: string | null
           condition_rule: string | null
           created_at: string
@@ -665,7 +665,7 @@ export type Database = {
         Insert: {
           allow_self_approval?: boolean
           approver_role?: string | null
-          approver_type: string
+          approver_type: Database["public"]["Enums"]["approval_step_approver_type"]
           approver_user_id?: string | null
           condition_rule?: string | null
           created_at?: string
@@ -681,7 +681,7 @@ export type Database = {
         Update: {
           allow_self_approval?: boolean
           approver_role?: string | null
-          approver_type?: string
+          approver_type?: Database["public"]["Enums"]["approval_step_approver_type"]
           approver_user_id?: string | null
           condition_rule?: string | null
           created_at?: string
@@ -729,7 +729,7 @@ export type Database = {
           hours_worked: number | null
           id: string
           notes: string | null
-          status: string
+          status: Database["public"]["Enums"]["attendance_record_status"]
           updated_at: string
         }
         Insert: {
@@ -742,7 +742,7 @@ export type Database = {
           hours_worked?: number | null
           id?: string
           notes?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["attendance_record_status"]
           updated_at?: string
         }
         Update: {
@@ -755,7 +755,7 @@ export type Database = {
           hours_worked?: number | null
           id?: string
           notes?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["attendance_record_status"]
           updated_at?: string
         }
         Relationships: [
@@ -932,7 +932,7 @@ export type Database = {
           column_name: string
           created_at: string | null
           id: string
-          permission_level: string
+          permission_level: Database["public"]["Enums"]["column_permission_permission_level"]
           table_name: string
           updated_at: string | null
           user_id: string
@@ -941,7 +941,7 @@ export type Database = {
           column_name: string
           created_at?: string | null
           id?: string
-          permission_level: string
+          permission_level: Database["public"]["Enums"]["column_permission_permission_level"]
           table_name?: string
           updated_at?: string | null
           user_id: string
@@ -950,7 +950,7 @@ export type Database = {
           column_name?: string
           created_at?: string | null
           id?: string
-          permission_level?: string
+          permission_level?: Database["public"]["Enums"]["column_permission_permission_level"]
           table_name?: string
           updated_at?: string | null
           user_id?: string
@@ -975,7 +975,7 @@ export type Database = {
           period: string
           rule_id: string | null
           salesman_name: string
-          status: string
+          status: Database["public"]["Enums"]["commission_record_status"]
           updated_at: string
           vehicle_id: string | null
         }
@@ -988,7 +988,7 @@ export type Database = {
           period: string
           rule_id?: string | null
           salesman_name: string
-          status?: string
+          status?: Database["public"]["Enums"]["commission_record_status"]
           updated_at?: string
           vehicle_id?: string | null
         }
@@ -1001,7 +1001,7 @@ export type Database = {
           period?: string
           rule_id?: string | null
           salesman_name?: string
-          status?: string
+          status?: Database["public"]["Enums"]["commission_record_status"]
           updated_at?: string
           vehicle_id?: string | null
         }
@@ -1195,7 +1195,7 @@ export type Database = {
           customer_id: string
           id: string
           subject: string | null
-          type: string
+          type: Database["public"]["Enums"]["customer_communication_type"]
           updated_at: string
         }
         Insert: {
@@ -1208,7 +1208,7 @@ export type Database = {
           customer_id: string
           id?: string
           subject?: string | null
-          type: string
+          type: Database["public"]["Enums"]["customer_communication_type"]
           updated_at?: string
         }
         Update: {
@@ -1221,7 +1221,7 @@ export type Database = {
           customer_id?: string
           id?: string
           subject?: string | null
-          type?: string
+          type?: Database["public"]["Enums"]["customer_communication_type"]
           updated_at?: string
         }
         Relationships: [
@@ -1469,7 +1469,7 @@ export type Database = {
           policy_url: string | null
           premium: number | null
           start_date: string | null
-          status: string
+          status: Database["public"]["Enums"]["deal_insurance_status"]
           updated_at: string
         }
         Insert: {
@@ -1490,7 +1490,7 @@ export type Database = {
           policy_url?: string | null
           premium?: number | null
           start_date?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["deal_insurance_status"]
           updated_at?: string
         }
         Update: {
@@ -1511,7 +1511,7 @@ export type Database = {
           policy_url?: string | null
           premium?: number | null
           start_date?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["deal_insurance_status"]
           updated_at?: string
         }
         Relationships: [
@@ -1561,7 +1561,7 @@ export type Database = {
           notes: string | null
           rejected_at: string | null
           rejection_reason: string | null
-          status: string
+          status: Database["public"]["Enums"]["deal_loan_status"]
           submitted_at: string | null
           updated_at: string
         }
@@ -1587,7 +1587,7 @@ export type Database = {
           notes?: string | null
           rejected_at?: string | null
           rejection_reason?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["deal_loan_status"]
           submitted_at?: string | null
           updated_at?: string
         }
@@ -1613,7 +1613,7 @@ export type Database = {
           notes?: string | null
           rejected_at?: string | null
           rejection_reason?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["deal_loan_status"]
           submitted_at?: string | null
           updated_at?: string
         }
@@ -1656,7 +1656,7 @@ export type Database = {
           registration_doc_url: string | null
           road_tax_expiry: string | null
           road_tax_url: string | null
-          status: string
+          status: Database["public"]["Enums"]["deal_registration_status"]
           submitted_at: string | null
           updated_at: string
         }
@@ -1674,7 +1674,7 @@ export type Database = {
           registration_doc_url?: string | null
           road_tax_expiry?: string | null
           road_tax_url?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["deal_registration_status"]
           submitted_at?: string | null
           updated_at?: string
         }
@@ -1692,7 +1692,7 @@ export type Database = {
           registration_doc_url?: string | null
           road_tax_expiry?: string | null
           road_tax_url?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["deal_registration_status"]
           submitted_at?: string | null
           updated_at?: string
         }
@@ -1872,7 +1872,7 @@ export type Database = {
           sales_advisor_id: string | null
           sales_advisor_name: string | null
           selling_price: number | null
-          stage: string
+          stage: Database["public"]["Enums"]["deal_stage"]
           stage_entered_at: string
           stage_updated_at: string
           stage_updated_by: string | null
@@ -1909,7 +1909,7 @@ export type Database = {
           sales_advisor_id?: string | null
           sales_advisor_name?: string | null
           selling_price?: number | null
-          stage?: string
+          stage?: Database["public"]["Enums"]["deal_stage"]
           stage_entered_at?: string
           stage_updated_at?: string
           stage_updated_by?: string | null
@@ -1946,7 +1946,7 @@ export type Database = {
           sales_advisor_id?: string | null
           sales_advisor_name?: string | null
           selling_price?: number | null
-          stage?: string
+          stage?: Database["public"]["Enums"]["deal_stage"]
           stage_entered_at?: string
           stage_updated_at?: string
           stage_updated_by?: string | null
@@ -2880,7 +2880,7 @@ export type Database = {
           id: string
           is_primary: boolean
           module_key: string
-          source: string
+          source: Database["public"]["Enums"]["employee_module_assignment_source"]
           updated_at: string
         }
         Insert: {
@@ -2894,7 +2894,7 @@ export type Database = {
           id?: string
           is_primary?: boolean
           module_key: string
-          source?: string
+          source?: Database["public"]["Enums"]["employee_module_assignment_source"]
           updated_at?: string
         }
         Update: {
@@ -2908,7 +2908,7 @@ export type Database = {
           id?: string
           is_primary?: boolean
           module_key?: string
-          source?: string
+          source?: Database["public"]["Enums"]["employee_module_assignment_source"]
           updated_at?: string
         }
         Relationships: [
@@ -2937,10 +2937,10 @@ export type Database = {
           manager_employee_id: string | null
           name: string
           personal_email: string | null
-          primary_role: string
+          primary_role: Database["public"]["Enums"]["employee_primary_role"]
           resign_date: string | null
           staff_code: string | null
-          status: string
+          status: Database["public"]["Enums"]["employee_status"]
           updated_at: string
           work_email: string | null
         }
@@ -2959,10 +2959,10 @@ export type Database = {
           manager_employee_id?: string | null
           name: string
           personal_email?: string | null
-          primary_role?: string
+          primary_role?: Database["public"]["Enums"]["employee_primary_role"]
           resign_date?: string | null
           staff_code?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["employee_status"]
           updated_at?: string
           work_email?: string | null
         }
@@ -2981,10 +2981,10 @@ export type Database = {
           manager_employee_id?: string | null
           name?: string
           personal_email?: string | null
-          primary_role?: string
+          primary_role?: Database["public"]["Enums"]["employee_primary_role"]
           resign_date?: string | null
           staff_code?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["employee_status"]
           updated_at?: string
           work_email?: string | null
         }
@@ -3235,7 +3235,7 @@ export type Database = {
           can_approve_requests: boolean
           can_manage_employee_records: boolean
           can_view_hrms_reports: boolean
-          category: string
+          category: Database["public"]["Enums"]["hrms_role_category"]
           code: string
           company_id: string
           created_at: string
@@ -3245,7 +3245,7 @@ export type Database = {
           is_active: boolean
           is_system_default: boolean
           name: string
-          scope: string
+          scope: Database["public"]["Enums"]["hrms_role_scope"]
           updated_at: string
           updated_by: string | null
         }
@@ -3254,7 +3254,7 @@ export type Database = {
           can_approve_requests?: boolean
           can_manage_employee_records?: boolean
           can_view_hrms_reports?: boolean
-          category?: string
+          category?: Database["public"]["Enums"]["hrms_role_category"]
           code: string
           company_id: string
           created_at?: string
@@ -3264,7 +3264,7 @@ export type Database = {
           is_active?: boolean
           is_system_default?: boolean
           name: string
-          scope?: string
+          scope?: Database["public"]["Enums"]["hrms_role_scope"]
           updated_at?: string
           updated_by?: string | null
         }
@@ -3273,7 +3273,7 @@ export type Database = {
           can_approve_requests?: boolean
           can_manage_employee_records?: boolean
           can_view_hrms_reports?: boolean
-          category?: string
+          category?: Database["public"]["Enums"]["hrms_role_category"]
           code?: string
           company_id?: string
           created_at?: string
@@ -3283,7 +3283,7 @@ export type Database = {
           is_active?: boolean
           is_system_default?: boolean
           name?: string
-          scope?: string
+          scope?: Database["public"]["Enums"]["hrms_role_scope"]
           updated_at?: string
           updated_by?: string | null
         }
@@ -3374,8 +3374,8 @@ export type Database = {
           raw_payload: Json
           resolved_at: string | null
           resolved_vehicle_id: string | null
-          review_reason: string
-          review_status: string
+          review_reason: Database["public"]["Enums"]["import_review_row_review_reason"]
+          review_status: Database["public"]["Enums"]["import_review_row_review_status"]
           row_number: number
           source_row_id: string | null
           updated_at: string
@@ -3393,8 +3393,8 @@ export type Database = {
           raw_payload?: Json
           resolved_at?: string | null
           resolved_vehicle_id?: string | null
-          review_reason: string
-          review_status?: string
+          review_reason: Database["public"]["Enums"]["import_review_row_review_reason"]
+          review_status?: Database["public"]["Enums"]["import_review_row_review_status"]
           row_number: number
           source_row_id?: string | null
           updated_at?: string
@@ -3412,8 +3412,8 @@ export type Database = {
           raw_payload?: Json
           resolved_at?: string | null
           resolved_vehicle_id?: string | null
-          review_reason?: string
-          review_status?: string
+          review_reason?: Database["public"]["Enums"]["import_review_row_review_reason"]
+          review_status?: Database["public"]["Enums"]["import_review_row_review_status"]
           row_number?: number
           source_row_id?: string | null
           updated_at?: string
@@ -3579,13 +3579,13 @@ export type Database = {
           id: string
           invoice_date: string
           invoice_no: string
-          invoice_type: string
+          invoice_type: Database["public"]["Enums"]["invoice_invoice_type"]
           notes: string | null
           paid_amount: number
-          payment_status: string
-          reconciliation_status: string
+          payment_status: Database["public"]["Enums"]["invoice_payment_status"]
+          reconciliation_status: Database["public"]["Enums"]["invoice_reconciliation_status"]
           sales_order_id: string
-          source_type: string
+          source_type: Database["public"]["Enums"]["invoice_source_type"]
           tax_amount: number
           total_amount: number
           updated_at: string
@@ -3601,13 +3601,13 @@ export type Database = {
           id?: string
           invoice_date: string
           invoice_no: string
-          invoice_type?: string
+          invoice_type?: Database["public"]["Enums"]["invoice_invoice_type"]
           notes?: string | null
           paid_amount?: number
-          payment_status?: string
-          reconciliation_status?: string
+          payment_status?: Database["public"]["Enums"]["invoice_payment_status"]
+          reconciliation_status?: Database["public"]["Enums"]["invoice_reconciliation_status"]
           sales_order_id: string
-          source_type?: string
+          source_type?: Database["public"]["Enums"]["invoice_source_type"]
           tax_amount?: number
           total_amount?: number
           updated_at?: string
@@ -3623,13 +3623,13 @@ export type Database = {
           id?: string
           invoice_date?: string
           invoice_no?: string
-          invoice_type?: string
+          invoice_type?: Database["public"]["Enums"]["invoice_invoice_type"]
           notes?: string | null
           paid_amount?: number
-          payment_status?: string
-          reconciliation_status?: string
+          payment_status?: Database["public"]["Enums"]["invoice_payment_status"]
+          reconciliation_status?: Database["public"]["Enums"]["invoice_reconciliation_status"]
           sales_order_id?: string
-          source_type?: string
+          source_type?: Database["public"]["Enums"]["invoice_source_type"]
           tax_amount?: number
           total_amount?: number
           updated_at?: string
@@ -3666,7 +3666,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
-          level: string | null
+          level: Database["public"]["Enums"]["job_title_level"] | null
           name: string
           updated_at: string
         }
@@ -3677,7 +3677,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
-          level?: string | null
+          level?: Database["public"]["Enums"]["job_title_level"] | null
           name: string
           updated_at?: string
         }
@@ -3688,7 +3688,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
-          level?: string | null
+          level?: Database["public"]["Enums"]["job_title_level"] | null
           name?: string
           updated_at?: string
         }
@@ -3714,7 +3714,7 @@ export type Database = {
           posted_by: string | null
           reference_no: string | null
           source_id: string | null
-          source_type: string
+          source_type: Database["public"]["Enums"]["journal_entry_source_type"]
         }
         Insert: {
           company_id: string
@@ -3727,7 +3727,7 @@ export type Database = {
           posted_by?: string | null
           reference_no?: string | null
           source_id?: string | null
-          source_type: string
+          source_type: Database["public"]["Enums"]["journal_entry_source_type"]
         }
         Update: {
           company_id?: string
@@ -3740,7 +3740,7 @@ export type Database = {
           posted_by?: string | null
           reference_no?: string | null
           source_id?: string | null
-          source_type?: string
+          source_type?: Database["public"]["Enums"]["journal_entry_source_type"]
         }
         Relationships: [
           {
@@ -3917,8 +3917,8 @@ export type Database = {
           id: string
           next_action_date: string | null
           notes: string
-          outcome: string | null
-          source_kind: string
+          outcome: Database["public"]["Enums"]["lead_followup_outcome"] | null
+          source_kind: Database["public"]["Enums"]["lead_followup_source_kind"]
           source_raw_id: string
           updated_at: string
         }
@@ -3929,8 +3929,8 @@ export type Database = {
           id?: string
           next_action_date?: string | null
           notes: string
-          outcome?: string | null
-          source_kind: string
+          outcome?: Database["public"]["Enums"]["lead_followup_outcome"] | null
+          source_kind: Database["public"]["Enums"]["lead_followup_source_kind"]
           source_raw_id: string
           updated_at?: string
         }
@@ -3941,8 +3941,8 @@ export type Database = {
           id?: string
           next_action_date?: string | null
           notes?: string
-          outcome?: string | null
-          source_kind?: string
+          outcome?: Database["public"]["Enums"]["lead_followup_outcome"] | null
+          source_kind?: Database["public"]["Enums"]["lead_followup_source_kind"]
           source_raw_id?: string
           updated_at?: string
         }
@@ -4026,7 +4026,7 @@ export type Database = {
           is_active: boolean
           leave_type_id: string
           max_requests: number
-          period_type: string
+          period_type: Database["public"]["Enums"]["leave_quota_rule_period_type"]
           remarks: string | null
           rule_name: string
           updated_at: string
@@ -4046,7 +4046,7 @@ export type Database = {
           is_active?: boolean
           leave_type_id: string
           max_requests?: number
-          period_type?: string
+          period_type?: Database["public"]["Enums"]["leave_quota_rule_period_type"]
           remarks?: string | null
           rule_name: string
           updated_at?: string
@@ -4066,7 +4066,7 @@ export type Database = {
           is_active?: boolean
           leave_type_id?: string
           max_requests?: number
-          period_type?: string
+          period_type?: Database["public"]["Enums"]["leave_quota_rule_period_type"]
           remarks?: string | null
           rule_name?: string
           updated_at?: string
@@ -4111,7 +4111,7 @@ export type Database = {
           attachment_mime_type: string | null
           company_id: string
           created_at: string
-          day_part: string
+          day_part: Database["public"]["Enums"]["leave_request_day_part"]
           days: number
           employee_id: string
           end_date: string
@@ -4122,7 +4122,7 @@ export type Database = {
           reviewed_by: string | null
           reviewer_note: string | null
           start_date: string
-          status: string
+          status: Database["public"]["Enums"]["leave_request_status"]
           updated_at: string
         }
         Insert: {
@@ -4132,7 +4132,7 @@ export type Database = {
           attachment_mime_type?: string | null
           company_id: string
           created_at?: string
-          day_part?: string
+          day_part?: Database["public"]["Enums"]["leave_request_day_part"]
           days: number
           employee_id: string
           end_date: string
@@ -4143,7 +4143,7 @@ export type Database = {
           reviewed_by?: string | null
           reviewer_note?: string | null
           start_date: string
-          status?: string
+          status?: Database["public"]["Enums"]["leave_request_status"]
           updated_at?: string
         }
         Update: {
@@ -4153,7 +4153,7 @@ export type Database = {
           attachment_mime_type?: string | null
           company_id?: string
           created_at?: string
-          day_part?: string
+          day_part?: Database["public"]["Enums"]["leave_request_day_part"]
           days?: number
           employee_id?: string
           end_date?: string
@@ -4164,7 +4164,7 @@ export type Database = {
           reviewed_by?: string | null
           reviewer_note?: string | null
           start_date?: string
-          status?: string
+          status?: Database["public"]["Enums"]["leave_request_status"]
           updated_at?: string
         }
         Relationships: [
@@ -4340,7 +4340,7 @@ export type Database = {
           normalized_payload: Json | null
           payload_hash: string
           raw_payload: Json
-          record_type: string
+          record_type: Database["public"]["Enums"]["legacy_staging_record_record_type"]
           reference_code: string | null
           reference_label: string | null
           sync_run_id: string | null
@@ -4358,7 +4358,7 @@ export type Database = {
           normalized_payload?: Json | null
           payload_hash: string
           raw_payload: Json
-          record_type: string
+          record_type: Database["public"]["Enums"]["legacy_staging_record_record_type"]
           reference_code?: string | null
           reference_label?: string | null
           sync_run_id?: string | null
@@ -4376,7 +4376,7 @@ export type Database = {
           normalized_payload?: Json | null
           payload_hash?: string
           raw_payload?: Json
-          record_type?: string
+          record_type?: Database["public"]["Enums"]["legacy_staging_record_record_type"]
           reference_code?: string | null
           reference_label?: string | null
           sync_run_id?: string | null
@@ -4512,7 +4512,7 @@ export type Database = {
           lender: string
           notes: string | null
           order_id: string
-          status: string
+          status: Database["public"]["Enums"]["loan_application_status"]
           updated_at: string
         }
         Insert: {
@@ -4527,7 +4527,7 @@ export type Database = {
           lender: string
           notes?: string | null
           order_id: string
-          status?: string
+          status?: Database["public"]["Enums"]["loan_application_status"]
           updated_at?: string
         }
         Update: {
@@ -4542,7 +4542,7 @@ export type Database = {
           lender?: string
           notes?: string | null
           order_id?: string
-          status?: string
+          status?: Database["public"]["Enums"]["loan_application_status"]
           updated_at?: string
         }
         Relationships: [
@@ -4606,31 +4606,31 @@ export type Database = {
       }
       normalizer_column_authority: {
         Row: {
-          authority: string
+          authority: Database["public"]["Enums"]["normalizer_column_authority_authority"]
           canonical_table: string
           column_name: string
           created_at: string
           id: string
           notes: string | null
-          overwrite_rule: string
+          overwrite_rule: Database["public"]["Enums"]["normalizer_column_authority_overwrite_rule"]
         }
         Insert: {
-          authority: string
+          authority: Database["public"]["Enums"]["normalizer_column_authority_authority"]
           canonical_table: string
           column_name: string
           created_at?: string
           id?: string
           notes?: string | null
-          overwrite_rule: string
+          overwrite_rule: Database["public"]["Enums"]["normalizer_column_authority_overwrite_rule"]
         }
         Update: {
-          authority?: string
+          authority?: Database["public"]["Enums"]["normalizer_column_authority_authority"]
           canonical_table?: string
           column_name?: string
           created_at?: string
           id?: string
           notes?: string | null
-          overwrite_rule?: string
+          overwrite_rule?: Database["public"]["Enums"]["normalizer_column_authority_overwrite_rule"]
         }
         Relationships: []
       }
@@ -4642,7 +4642,7 @@ export type Database = {
           message: string
           read: boolean
           title: string
-          type: string
+          type: Database["public"]["Enums"]["notification_type"]
           user_id: string
         }
         Insert: {
@@ -4652,7 +4652,7 @@ export type Database = {
           message: string
           read?: boolean
           title: string
-          type?: string
+          type?: Database["public"]["Enums"]["notification_type"]
           user_id: string
         }
         Update: {
@@ -4662,7 +4662,7 @@ export type Database = {
           message?: string
           read?: boolean
           title?: string
-          type?: string
+          type?: Database["public"]["Enums"]["notification_type"]
           user_id?: string
         }
         Relationships: [
@@ -4723,7 +4723,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
-          event_type: string
+          event_type: Database["public"]["Enums"]["payment_event_event_type"]
           id: string
           invoice_id: string
           notes: string | null
@@ -4738,7 +4738,7 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
-          event_type: string
+          event_type: Database["public"]["Enums"]["payment_event_event_type"]
           id?: string
           invoice_id: string
           notes?: string | null
@@ -4753,7 +4753,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
-          event_type?: string
+          event_type?: Database["public"]["Enums"]["payment_event_event_type"]
           id?: string
           invoice_id?: string
           notes?: string | null
@@ -4949,7 +4949,7 @@ export type Database = {
           notes: string | null
           period_month: number
           period_year: number
-          status: string
+          status: Database["public"]["Enums"]["payroll_run_status"]
           total_gross: number
           total_headcount: number
           total_net: number
@@ -4963,7 +4963,7 @@ export type Database = {
           notes?: string | null
           period_month: number
           period_year: number
-          status?: string
+          status?: Database["public"]["Enums"]["payroll_run_status"]
           total_gross?: number
           total_headcount?: number
           total_net?: number
@@ -4977,7 +4977,7 @@ export type Database = {
           notes?: string | null
           period_month?: number
           period_year?: number
-          status?: string
+          status?: Database["public"]["Enums"]["payroll_run_status"]
           total_gross?: number
           total_headcount?: number
           total_net?: number
@@ -4995,9 +4995,9 @@ export type Database = {
       }
       portal_announcements: {
         Row: {
-          announcement_type: string
+          announcement_type: Database["public"]["Enums"]["portal_announcement_announcement_type"]
           archived_at: string | null
-          audience_scope: string
+          audience_scope: Database["public"]["Enums"]["portal_announcement_audience_scope"]
           body: string
           company_id: string
           created_at: string
@@ -5005,17 +5005,17 @@ export type Database = {
           expires_at: string | null
           id: string
           is_pinned: boolean
-          priority: string
+          priority: Database["public"]["Enums"]["portal_announcement_priority"]
           publish_at: string | null
-          status: string
+          status: Database["public"]["Enums"]["portal_announcement_status"]
           title: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
-          announcement_type?: string
+          announcement_type?: Database["public"]["Enums"]["portal_announcement_announcement_type"]
           archived_at?: string | null
-          audience_scope?: string
+          audience_scope?: Database["public"]["Enums"]["portal_announcement_audience_scope"]
           body: string
           company_id: string
           created_at?: string
@@ -5023,17 +5023,17 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_pinned?: boolean
-          priority?: string
+          priority?: Database["public"]["Enums"]["portal_announcement_priority"]
           publish_at?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["portal_announcement_status"]
           title: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
-          announcement_type?: string
+          announcement_type?: Database["public"]["Enums"]["portal_announcement_announcement_type"]
           archived_at?: string | null
-          audience_scope?: string
+          audience_scope?: Database["public"]["Enums"]["portal_announcement_audience_scope"]
           body?: string
           company_id?: string
           created_at?: string
@@ -5041,9 +5041,9 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_pinned?: boolean
-          priority?: string
+          priority?: Database["public"]["Enums"]["portal_announcement_priority"]
           publish_at?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["portal_announcement_status"]
           title?: string
           updated_at?: string
           updated_by?: string | null
@@ -5075,7 +5075,7 @@ export type Database = {
       portal_documents: {
         Row: {
           archived_at: string | null
-          category: string
+          category: Database["public"]["Enums"]["portal_document_category"]
           company_id: string
           created_at: string
           description: string | null
@@ -5087,17 +5087,17 @@ export type Database = {
           file_type: string | null
           id: string
           is_pinned: boolean
-          status: string
+          status: Database["public"]["Enums"]["portal_document_status"]
           title: string
           updated_at: string
           updated_by: string | null
           uploaded_by: string | null
           version: string
-          visibility_scope: string
+          visibility_scope: Database["public"]["Enums"]["portal_document_visibility_scope"]
         }
         Insert: {
           archived_at?: string | null
-          category?: string
+          category?: Database["public"]["Enums"]["portal_document_category"]
           company_id: string
           created_at?: string
           description?: string | null
@@ -5109,17 +5109,17 @@ export type Database = {
           file_type?: string | null
           id?: string
           is_pinned?: boolean
-          status?: string
+          status?: Database["public"]["Enums"]["portal_document_status"]
           title: string
           updated_at?: string
           updated_by?: string | null
           uploaded_by?: string | null
           version?: string
-          visibility_scope?: string
+          visibility_scope?: Database["public"]["Enums"]["portal_document_visibility_scope"]
         }
         Update: {
           archived_at?: string | null
-          category?: string
+          category?: Database["public"]["Enums"]["portal_document_category"]
           company_id?: string
           created_at?: string
           description?: string | null
@@ -5131,13 +5131,13 @@ export type Database = {
           file_type?: string | null
           id?: string
           is_pinned?: boolean
-          status?: string
+          status?: Database["public"]["Enums"]["portal_document_status"]
           title?: string
           updated_at?: string
           updated_by?: string | null
           uploaded_by?: string | null
           version?: string
-          visibility_scope?: string
+          visibility_scope?: Database["public"]["Enums"]["portal_document_visibility_scope"]
         }
         Relationships: [
           {
@@ -5185,9 +5185,9 @@ export type Database = {
           name: string
           portal_access_only: boolean
           resign_date: string | null
-          role: string
+          role: Database["public"]["Enums"]["profile_role"]
           staff_code: string | null
-          status: string
+          status: Database["public"]["Enums"]["profile_status"]
           updated_at: string
         }
         Insert: {
@@ -5211,9 +5211,9 @@ export type Database = {
           name?: string
           portal_access_only?: boolean
           resign_date?: string | null
-          role?: string
+          role?: Database["public"]["Enums"]["profile_role"]
           staff_code?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["profile_status"]
           updated_at?: string
         }
         Update: {
@@ -5237,9 +5237,9 @@ export type Database = {
           name?: string
           portal_access_only?: boolean
           resign_date?: string | null
-          role?: string
+          role?: Database["public"]["Enums"]["profile_role"]
           staff_code?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["profile_status"]
           updated_at?: string
         }
         Relationships: [
@@ -5278,7 +5278,7 @@ export type Database = {
           company_id: string
           created_at: string
           date: string
-          holiday_type: string
+          holiday_type: Database["public"]["Enums"]["public_holiday_holiday_type"]
           id: string
           is_recurring: boolean
           name: string
@@ -5288,7 +5288,7 @@ export type Database = {
           company_id: string
           created_at?: string
           date: string
-          holiday_type?: string
+          holiday_type?: Database["public"]["Enums"]["public_holiday_holiday_type"]
           id?: string
           is_recurring?: boolean
           name: string
@@ -5298,7 +5298,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           date?: string
-          holiday_type?: string
+          holiday_type?: Database["public"]["Enums"]["public_holiday_holiday_type"]
           id?: string
           is_recurring?: boolean
           name?: string
@@ -5320,15 +5320,15 @@ export type Database = {
           invoice_date: string
           invoice_no: string
           is_deleted: boolean
-          lifecycle_status: string
+          lifecycle_status: Database["public"]["Enums"]["purchase_invoice_lifecycle_status"]
           model: string
           notes: string | null
           paid_amount: number
-          payment_status: string
+          payment_status: Database["public"]["Enums"]["purchase_invoice_payment_status"]
           po_line_id: string | null
           received_date: string | null
           remark: string | null
-          status: string
+          status: Database["public"]["Enums"]["purchase_invoice_status"]
           supplier: string
           verified_at: string | null
           verified_by: string | null
@@ -5346,15 +5346,15 @@ export type Database = {
           invoice_date: string
           invoice_no: string
           is_deleted?: boolean
-          lifecycle_status?: string
+          lifecycle_status?: Database["public"]["Enums"]["purchase_invoice_lifecycle_status"]
           model: string
           notes?: string | null
           paid_amount?: number
-          payment_status?: string
+          payment_status?: Database["public"]["Enums"]["purchase_invoice_payment_status"]
           po_line_id?: string | null
           received_date?: string | null
           remark?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["purchase_invoice_status"]
           supplier: string
           verified_at?: string | null
           verified_by?: string | null
@@ -5372,15 +5372,15 @@ export type Database = {
           invoice_date?: string
           invoice_no?: string
           is_deleted?: boolean
-          lifecycle_status?: string
+          lifecycle_status?: Database["public"]["Enums"]["purchase_invoice_lifecycle_status"]
           model?: string
           notes?: string | null
           paid_amount?: number
-          payment_status?: string
+          payment_status?: Database["public"]["Enums"]["purchase_invoice_payment_status"]
           po_line_id?: string | null
           received_date?: string | null
           remark?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["purchase_invoice_status"]
           supplier?: string
           verified_at?: string | null
           verified_by?: string | null
@@ -5471,7 +5471,7 @@ export type Database = {
           created_by: string | null
           expected_delivery_date: string | null
           id: string
-          lifecycle_status: string
+          lifecycle_status: Database["public"]["Enums"]["purchase_order_lifecycle_status"]
           notes: string | null
           order_date: string
           po_no: string
@@ -5487,7 +5487,7 @@ export type Database = {
           created_by?: string | null
           expected_delivery_date?: string | null
           id?: string
-          lifecycle_status?: string
+          lifecycle_status?: Database["public"]["Enums"]["purchase_order_lifecycle_status"]
           notes?: string | null
           order_date: string
           po_no: string
@@ -5503,7 +5503,7 @@ export type Database = {
           created_by?: string | null
           expected_delivery_date?: string | null
           id?: string
-          lifecycle_status?: string
+          lifecycle_status?: Database["public"]["Enums"]["purchase_order_lifecycle_status"]
           notes?: string | null
           order_date?: string
           po_no?: string
@@ -5589,21 +5589,21 @@ export type Database = {
       push_tokens: {
         Row: {
           id: string
-          platform: string
+          platform: Database["public"]["Enums"]["push_token_platform"]
           token: string
           updated_at: string
           user_id: string
         }
         Insert: {
           id?: string
-          platform: string
+          platform: Database["public"]["Enums"]["push_token_platform"]
           token: string
           updated_at?: string
           user_id: string
         }
         Update: {
           id?: string
-          platform?: string
+          platform?: Database["public"]["Enums"]["push_token_platform"]
           token?: string
           updated_at?: string
           user_id?: string
@@ -5884,10 +5884,10 @@ export type Database = {
           conditional_logic: Json
           created_at: string
           created_by: string | null
-          data_source: string | null
+          data_source: Database["public"]["Enums"]["request_form_field_data_source"] | null
           default_value: string
           field_key: string
-          field_type: string
+          field_type: Database["public"]["Enums"]["request_form_field_field_type"]
           help_text: string
           id: string
           is_active: boolean
@@ -5906,10 +5906,10 @@ export type Database = {
           conditional_logic?: Json
           created_at?: string
           created_by?: string | null
-          data_source?: string | null
+          data_source?: Database["public"]["Enums"]["request_form_field_data_source"] | null
           default_value?: string
           field_key: string
-          field_type?: string
+          field_type?: Database["public"]["Enums"]["request_form_field_field_type"]
           help_text?: string
           id?: string
           is_active?: boolean
@@ -5928,10 +5928,10 @@ export type Database = {
           conditional_logic?: Json
           created_at?: string
           created_by?: string | null
-          data_source?: string | null
+          data_source?: Database["public"]["Enums"]["request_form_field_data_source"] | null
           default_value?: string
           field_key?: string
-          field_type?: string
+          field_type?: Database["public"]["Enums"]["request_form_field_field_type"]
           help_text?: string
           id?: string
           is_active?: boolean
@@ -5977,7 +5977,7 @@ export type Database = {
           request_title_placeholder: string
           role_permissions: Json
           sla_at_risk_threshold_hours: number
-          sla_start_event: string
+          sla_start_event: Database["public"]["Enums"]["request_module_setting_sla_start_event"]
           status_labels: Json
           updated_at: string
           updated_by: string | null
@@ -5997,7 +5997,7 @@ export type Database = {
           request_title_placeholder?: string
           role_permissions?: Json
           sla_at_risk_threshold_hours?: number
-          sla_start_event?: string
+          sla_start_event?: Database["public"]["Enums"]["request_module_setting_sla_start_event"]
           status_labels?: Json
           updated_at?: string
           updated_by?: string | null
@@ -6017,7 +6017,7 @@ export type Database = {
           request_title_placeholder?: string
           role_permissions?: Json
           sla_at_risk_threshold_hours?: number
-          sla_start_event?: string
+          sla_start_event?: Database["public"]["Enums"]["request_module_setting_sla_start_event"]
           status_labels?: Json
           updated_at?: string
           updated_by?: string | null
@@ -6087,7 +6087,7 @@ export type Database = {
           filters: Json
           id: string
           name: string
-          scope: string
+          scope: Database["public"]["Enums"]["request_saved_filter_scope"]
           updated_at: string
           user_id: string
         }
@@ -6097,7 +6097,7 @@ export type Database = {
           filters?: Json
           id?: string
           name: string
-          scope?: string
+          scope?: Database["public"]["Enums"]["request_saved_filter_scope"]
           updated_at?: string
           user_id: string
         }
@@ -6107,7 +6107,7 @@ export type Database = {
           filters?: Json
           id?: string
           name?: string
-          scope?: string
+          scope?: Database["public"]["Enums"]["request_saved_filter_scope"]
           updated_at?: string
           user_id?: string
         }
@@ -6316,7 +6316,7 @@ export type Database = {
       }
       sales_activities: {
         Row: {
-          activity_type: string
+          activity_type: Database["public"]["Enums"]["sales_activity_activity_type"]
           company_id: string
           completed_at: string | null
           created_at: string
@@ -6330,7 +6330,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          activity_type: string
+          activity_type: Database["public"]["Enums"]["sales_activity_activity_type"]
           company_id: string
           completed_at?: string | null
           created_at?: string
@@ -6344,7 +6344,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          activity_type?: string
+          activity_type?: Database["public"]["Enums"]["sales_activity_activity_type"]
           company_id?: string
           completed_at?: string | null
           created_at?: string
@@ -6854,10 +6854,10 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
-          date_range: string
+          date_range: Database["public"]["Enums"]["scheduled_report_date_range"]
           day_of_month: number | null
           day_of_week: number | null
-          frequency: string
+          frequency: Database["public"]["Enums"]["scheduled_report_frequency"]
           id: string
           is_active: boolean
           last_run_at: string | null
@@ -6872,10 +6872,10 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
-          date_range?: string
+          date_range?: Database["public"]["Enums"]["scheduled_report_date_range"]
           day_of_month?: number | null
           day_of_week?: number | null
-          frequency: string
+          frequency: Database["public"]["Enums"]["scheduled_report_frequency"]
           id?: string
           is_active?: boolean
           last_run_at?: string | null
@@ -6890,10 +6890,10 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
-          date_range?: string
+          date_range?: Database["public"]["Enums"]["scheduled_report_date_range"]
           day_of_month?: number | null
           day_of_week?: number | null
-          frequency?: string
+          frequency?: Database["public"]["Enums"]["scheduled_report_frequency"]
           id?: string
           is_active?: boolean
           last_run_at?: string | null
@@ -7014,14 +7014,14 @@ export type Database = {
           id: string
           match_basis: Json
           match_rule: string | null
-          match_status: string
-          object_type: string
+          match_status: Database["public"]["Enums"]["source_reconciliation_match_match_status"]
+          object_type: Database["public"]["Enums"]["source_reconciliation_match_object_type"]
           review_notes: string | null
           review_owner: string | null
           reviewed_at: string | null
           source_priority: number
           source_record_id: string
-          source_system: string
+          source_system: Database["public"]["Enums"]["source_reconciliation_match_source_system"]
           source_table: string
           updated_at: string
         }
@@ -7035,14 +7035,14 @@ export type Database = {
           id?: string
           match_basis?: Json
           match_rule?: string | null
-          match_status?: string
-          object_type: string
+          match_status?: Database["public"]["Enums"]["source_reconciliation_match_match_status"]
+          object_type: Database["public"]["Enums"]["source_reconciliation_match_object_type"]
           review_notes?: string | null
           review_owner?: string | null
           reviewed_at?: string | null
           source_priority?: number
           source_record_id: string
-          source_system: string
+          source_system: Database["public"]["Enums"]["source_reconciliation_match_source_system"]
           source_table: string
           updated_at?: string
         }
@@ -7056,14 +7056,14 @@ export type Database = {
           id?: string
           match_basis?: Json
           match_rule?: string | null
-          match_status?: string
-          object_type?: string
+          match_status?: Database["public"]["Enums"]["source_reconciliation_match_match_status"]
+          object_type?: Database["public"]["Enums"]["source_reconciliation_match_object_type"]
           review_notes?: string | null
           review_owner?: string | null
           reviewed_at?: string | null
           source_priority?: number
           source_record_id?: string
-          source_system?: string
+          source_system?: Database["public"]["Enums"]["source_reconciliation_match_source_system"]
           source_table?: string
           updated_at?: string
         }
@@ -7090,7 +7090,7 @@ export type Database = {
           company_id: string
           created_at: string
           created_by: string | null
-          event_type: string
+          event_type: Database["public"]["Enums"]["supplier_payment_event_event_type"]
           id: string
           notes: string | null
           payment_date: string
@@ -7104,7 +7104,7 @@ export type Database = {
           company_id: string
           created_at?: string
           created_by?: string | null
-          event_type: string
+          event_type: Database["public"]["Enums"]["supplier_payment_event_event_type"]
           id?: string
           notes?: string | null
           payment_date: string
@@ -7118,7 +7118,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           created_by?: string | null
-          event_type?: string
+          event_type?: Database["public"]["Enums"]["supplier_payment_event_event_type"]
           id?: string
           notes?: string | null
           payment_date?: string
@@ -7213,9 +7213,9 @@ export type Database = {
           record_count: number
           request_filters: Json
           source_endpoint: string | null
-          source_system: string
+          source_system: Database["public"]["Enums"]["sync_run_source_system"]
           started_at: string
-          status: string
+          status: Database["public"]["Enums"]["sync_run_status"]
           sync_type: string
           updated_at: string
         }
@@ -7232,9 +7232,9 @@ export type Database = {
           record_count?: number
           request_filters?: Json
           source_endpoint?: string | null
-          source_system: string
+          source_system: Database["public"]["Enums"]["sync_run_source_system"]
           started_at?: string
-          status?: string
+          status?: Database["public"]["Enums"]["sync_run_status"]
           sync_type: string
           updated_at?: string
         }
@@ -7251,9 +7251,9 @@ export type Database = {
           record_count?: number
           request_filters?: Json
           source_endpoint?: string | null
-          source_system?: string
+          source_system?: Database["public"]["Enums"]["sync_run_source_system"]
           started_at?: string
-          status?: string
+          status?: Database["public"]["Enums"]["sync_run_status"]
           sync_type?: string
           updated_at?: string
         }
@@ -7279,7 +7279,7 @@ export type Database = {
           actor_id: string
           company_id: string
           created_at: string
-          event_type: string
+          event_type: Database["public"]["Enums"]["ticket_activity_event_type"]
           id: string
           message: string
           metadata: Json
@@ -7289,7 +7289,7 @@ export type Database = {
           actor_id: string
           company_id: string
           created_at?: string
-          event_type: string
+          event_type: Database["public"]["Enums"]["ticket_activity_event_type"]
           id?: string
           message: string
           metadata?: Json
@@ -7299,7 +7299,7 @@ export type Database = {
           actor_id?: string
           company_id?: string
           created_at?: string
-          event_type?: string
+          event_type?: Database["public"]["Enums"]["ticket_activity_event_type"]
           id?: string
           message?: string
           metadata?: Json
@@ -7578,7 +7578,7 @@ export type Database = {
           closure_feedback: string | null
           company_id: string
           completion_attachment_required: boolean
-          completion_category: string | null
+          completion_category: Database["public"]["Enums"]["ticket_completion_category"] | null
           completion_checklist_confirmed: boolean
           created_at: string
           current_responsible_party: string
@@ -7594,7 +7594,7 @@ export type Database = {
           last_reopen_reason: string | null
           next_action: string
           previous_owner_id: string | null
-          priority: string
+          priority: Database["public"]["Enums"]["ticket_priority"]
           reopen_count: number
           reopened_at: string | null
           requested_due_date: string | null
@@ -7606,8 +7606,8 @@ export type Database = {
           sla_breach_reason: string | null
           sla_pause_duration_ms: number
           sla_paused_at: string | null
-          sla_status: string
-          status: string
+          sla_status: Database["public"]["Enums"]["ticket_sla_status"]
+          status: Database["public"]["Enums"]["ticket_status"]
           status_changed_at: string
           subcategory: string | null
           subject: string
@@ -7627,7 +7627,7 @@ export type Database = {
           closure_feedback?: string | null
           company_id: string
           completion_attachment_required?: boolean
-          completion_category?: string | null
+          completion_category?: Database["public"]["Enums"]["ticket_completion_category"] | null
           completion_checklist_confirmed?: boolean
           created_at?: string
           current_responsible_party?: string
@@ -7643,7 +7643,7 @@ export type Database = {
           last_reopen_reason?: string | null
           next_action?: string
           previous_owner_id?: string | null
-          priority?: string
+          priority?: Database["public"]["Enums"]["ticket_priority"]
           reopen_count?: number
           reopened_at?: string | null
           requested_due_date?: string | null
@@ -7655,8 +7655,8 @@ export type Database = {
           sla_breach_reason?: string | null
           sla_pause_duration_ms?: number
           sla_paused_at?: string | null
-          sla_status?: string
-          status?: string
+          sla_status?: Database["public"]["Enums"]["ticket_sla_status"]
+          status?: Database["public"]["Enums"]["ticket_status"]
           status_changed_at?: string
           subcategory?: string | null
           subject: string
@@ -7676,7 +7676,7 @@ export type Database = {
           closure_feedback?: string | null
           company_id?: string
           completion_attachment_required?: boolean
-          completion_category?: string | null
+          completion_category?: Database["public"]["Enums"]["ticket_completion_category"] | null
           completion_checklist_confirmed?: boolean
           created_at?: string
           current_responsible_party?: string
@@ -7692,7 +7692,7 @@ export type Database = {
           last_reopen_reason?: string | null
           next_action?: string
           previous_owner_id?: string | null
-          priority?: string
+          priority?: Database["public"]["Enums"]["ticket_priority"]
           reopen_count?: number
           reopened_at?: string | null
           requested_due_date?: string | null
@@ -7704,8 +7704,8 @@ export type Database = {
           sla_breach_reason?: string | null
           sla_pause_duration_ms?: number
           sla_paused_at?: string | null
-          sla_status?: string
-          status?: string
+          sla_status?: Database["public"]["Enums"]["ticket_sla_status"]
+          status?: Database["public"]["Enums"]["ticket_status"]
           status_changed_at?: string
           subcategory?: string | null
           subject?: string
@@ -7881,7 +7881,7 @@ export type Database = {
           model: string
           remark: string | null
           running_no: string
-          status: string
+          status: Database["public"]["Enums"]["vehicle_transfer_status"]
           to_branch: string
         }
         Insert: {
@@ -7895,7 +7895,7 @@ export type Database = {
           model: string
           remark?: string | null
           running_no: string
-          status?: string
+          status?: Database["public"]["Enums"]["vehicle_transfer_status"]
           to_branch: string
         }
         Update: {
@@ -7909,7 +7909,7 @@ export type Database = {
           model?: string
           remark?: string | null
           running_no?: string
-          status?: string
+          status?: Database["public"]["Enums"]["vehicle_transfer_status"]
           to_branch?: string
         }
         Relationships: [
@@ -7977,8 +7977,8 @@ export type Database = {
           shipment_etd_pkg: string | null
           shipment_name: string | null
           source_row_id: string | null
-          stage: string | null
-          stage_override: string | null
+          stage: Database["public"]["Enums"]["vehicle_stage"] | null
+          stage_override: Database["public"]["Enums"]["vehicle_stage_override"] | null
           status: string | null
           updated_at: string
           vaa_date: string | null
@@ -8039,8 +8039,8 @@ export type Database = {
           shipment_etd_pkg?: string | null
           shipment_name?: string | null
           source_row_id?: string | null
-          stage?: string | null
-          stage_override?: string | null
+          stage?: Database["public"]["Enums"]["vehicle_stage"] | null
+          stage_override?: Database["public"]["Enums"]["vehicle_stage_override"] | null
           status?: string | null
           updated_at?: string
           vaa_date?: string | null
@@ -8101,8 +8101,8 @@ export type Database = {
           shipment_etd_pkg?: string | null
           shipment_name?: string | null
           source_row_id?: string | null
-          stage?: string | null
-          stage_override?: string | null
+          stage?: Database["public"]["Enums"]["vehicle_stage"] | null
+          stage_override?: Database["public"]["Enums"]["vehicle_stage_override"] | null
           status?: string | null
           updated_at?: string
           vaa_date?: string | null
@@ -8311,9 +8311,9 @@ export type Database = {
       add_lead_followup: {
         Args: {
           p_company_id: string
-          p_next_action_date?: string
+          p_next_action_date?: string | null
           p_notes: string
-          p_outcome?: string
+          p_outcome?: string | null
           p_source_kind: string
           p_source_raw_id: string
         }
@@ -8379,7 +8379,7 @@ export type Database = {
         Returns: boolean
       }
       cancel_own_ticket: {
-        Args: { p_cancellation_note?: string; p_ticket_id: string }
+        Args: { p_cancellation_note?: string | null; p_ticket_id: string }
         Returns: {
           assigned_at: string | null
           assigned_to: string | null
@@ -8451,19 +8451,19 @@ export type Database = {
           p_company_id: string
           p_grn_no: string
           p_lines: Json
-          p_notes: string
+          p_notes: string | null
           p_po_id: string
           p_received_date: string
-          p_supplier_dn_no: string
+          p_supplier_dn_no: string | null
         }
         Returns: string
       }
       create_purchase_order: {
         Args: {
           p_company_id: string
-          p_expected_delivery_date: string
+          p_expected_delivery_date: string | null
           p_lines: Json
-          p_notes: string
+          p_notes: string | null
           p_order_date: string
           p_po_no: string
           p_supplier: string
@@ -8478,7 +8478,7 @@ export type Database = {
           p_company_id: string
           p_decision: string
           p_match_id: string
-          p_notes?: string
+          p_notes?: string | null
         }
         Returns: string
       }
@@ -8488,11 +8488,11 @@ export type Database = {
       }
       generate_deal_no:
         | {
-            Args: { p_branch_id: string; p_company_id: string }
+            Args: { p_branch_id: string | null; p_company_id: string }
             Returns: string
           }
         | {
-            Args: { p_branch_id: string; p_company_id: string }
+            Args: { p_branch_id: string | null; p_company_id: string }
             Returns: string
           }
       get_ap_aging_by_branch: {
@@ -8595,11 +8595,11 @@ export type Database = {
       }
       get_leads_feed: {
         Args: {
-          p_branch_code?: string
+          p_branch_code?: string | null
           p_company_id: string
-          p_kind?: string
+          p_kind?: string | null
           p_limit?: number
-          p_status?: string
+          p_status?: string | null
         }
         Returns: {
           branch_code: string
@@ -8724,8 +8724,8 @@ export type Database = {
         Args: {
           p_company_id: string
           p_limit?: number
-          p_match_status?: string
-          p_object_type?: string
+          p_match_status?: string | null
+          p_object_type?: string | null
         }
         Returns: {
           canonical_record_id: string
@@ -8764,15 +8764,15 @@ export type Database = {
         }[]
       }
       get_sales_dashboard_summary: {
-        Args: { p_branch_code?: string; p_company_id: string }
+        Args: { p_branch_code?: string | null; p_company_id: string }
         Returns: Json
       }
       get_sales_pipeline_summary: {
         Args: {
-          p_branch_code?: string
+          p_branch_code?: string | null
           p_company_id: string
-          p_from_date?: string
-          p_to_date?: string
+          p_from_date?: string | null
+          p_to_date?: string | null
         }
         Returns: Json
       }
@@ -8796,7 +8796,7 @@ export type Database = {
         Args: {
           p_company_id: string
           p_limit?: number
-          p_match_status?: string
+          p_match_status?: string | null
         }
         Returns: {
           amount_variance: number
@@ -8842,7 +8842,7 @@ export type Database = {
         }[]
       }
       get_trial_balance: {
-        Args: { p_company_id: string; p_period_id: string }
+        Args: { p_company_id: string; p_period_id: string | null }
         Returns: {
           account_code: string
           account_id: string
@@ -8958,48 +8958,48 @@ export type Database = {
         Args: {
           p_amount: number
           p_invoice_id: string
-          p_notes?: string
-          p_official_receipt_id?: string
+          p_notes?: string | null
+          p_official_receipt_id?: string | null
           p_payment_date: string
-          p_payment_method?: string
-          p_receipt_reference?: string
+          p_payment_method?: string | null
+          p_receipt_reference?: string | null
         }
         Returns: string
       }
       record_supplier_payment_event: {
         Args: {
           p_amount: number
-          p_notes?: string
+          p_notes?: string | null
           p_payment_date: string
-          p_payment_method?: string
+          p_payment_method?: string | null
           p_purchase_invoice_id: string
-          p_reference_no?: string
+          p_reference_no?: string | null
         }
         Returns: string
       }
       requeue_webhook_delivery: { Args: { p_id: string }; Returns: boolean }
       reverse_payment_event: {
-        Args: { p_event_id: string; p_reason?: string }
+        Args: { p_event_id: string; p_reason?: string | null }
         Returns: string
       }
       reverse_supplier_payment_event: {
-        Args: { p_event_id: string; p_reason?: string }
+        Args: { p_event_id: string; p_reason?: string | null }
         Returns: string
       }
       search_vehicles: {
         Args: {
-          p_bg_date_from?: string
-          p_bg_date_to?: string
-          p_branch?: string
-          p_has_delivery_date?: boolean
+          p_bg_date_from?: string | null
+          p_bg_date_to?: string | null
+          p_branch?: string | null
+          p_has_delivery_date?: boolean | null
           p_limit?: number
-          p_model?: string
+          p_model?: string | null
           p_offset?: number
-          p_payment?: string
-          p_search?: string
+          p_payment?: string | null
+          p_search?: string | null
           p_sort_column?: string
           p_sort_direction?: string
-          p_stage?: string
+          p_stage?: string | null
         }
         Returns: {
           rows: Json
@@ -9071,7 +9071,7 @@ export type Database = {
         }
       }
       transition_pi_lifecycle: {
-        Args: { p_actor_id?: string; p_id: string; p_target_status: string }
+        Args: { p_actor_id?: string | null; p_id: string; p_target_status: string }
         Returns: string
       }
       transition_po_status: {
@@ -9080,10 +9080,10 @@ export type Database = {
       }
       transition_sales_order_stage: {
         Args: {
-          p_actor_id?: string
+          p_actor_id?: string | null
           p_company_id: string
           p_order_id: string
-          p_stage_id: string
+          p_stage_id: string | null
         }
         Returns: Json
       }
@@ -9100,22 +9100,508 @@ export type Database = {
           p_active: boolean
           p_company_id: string
           p_event_types: string[]
-          p_id: string
+          p_id: string | null
           p_name: string
           p_secret: string
           p_url: string
         }
         Returns: string
       }
-      vehicle_kpi_summary: { Args: { p_branch?: string }; Returns: Json }
+      vehicle_kpi_summary: { Args: { p_branch?: string | null }; Returns: Json }
     }
     Enums: {
-      webhook_delivery_status:
-        | "pending"
-        | "delivering"
-        | "delivered"
-        | "failed"
-        | "dead"
+    webhook_delivery_status:
+      | "pending"
+      | "delivering"
+      | "delivered"
+      | "failed"
+      | "dead",
+    accounting_period_status:
+      | "open"
+      | "closed"
+      | "locked",
+    account_type:
+      | "asset"
+      | "liability"
+      | "equity"
+      | "revenue"
+      | "expense",
+    announcement_category:
+      | "general"
+      | "policy"
+      | "event"
+      | "emergency"
+      | "holiday",
+    announcement_priority:
+      | "low"
+      | "normal"
+      | "high"
+      | "urgent",
+    appraisal_item_status:
+      | "pending"
+      | "self_reviewed"
+      | "reviewed"
+      | "acknowledged",
+    appraisal_cycle:
+      | "annual"
+      | "mid_year"
+      | "quarterly"
+      | "probation",
+    appraisal_status:
+      | "open"
+      | "in_progress"
+      | "completed"
+      | "archived",
+    approval_decision:
+      | "approved"
+      | "rejected",
+    approval_flow_entity_type:
+      | "leave_request"
+      | "payroll_run"
+      | "appraisal"
+      | "internal_request"
+      | "general",
+    approval_instance_entity_type:
+      | "leave_request"
+      | "payroll_run"
+      | "appraisal"
+      | "internal_request"
+      | "general",
+    approval_instance_status:
+      | "pending"
+      | "approved"
+      | "rejected"
+      | "cancelled",
+    approval_request_entity_type:
+      | "leave_request"
+      | "payroll_run"
+      | "appraisal"
+      | "internal_request"
+      | "general",
+    approval_request_status:
+      | "pending"
+      | "approved"
+      | "rejected"
+      | "cancelled",
+    approval_step_approver_type:
+      | "role"
+      | "specific_user"
+      | "direct_manager",
+    attendance_record_status:
+      | "present"
+      | "absent"
+      | "half_day"
+      | "on_leave"
+      | "public_holiday",
+    column_permission_permission_level:
+      | "none"
+      | "view"
+      | "edit",
+    commission_record_status:
+      | "pending"
+      | "approved"
+      | "paid",
+    customer_communication_type:
+      | "call"
+      | "email"
+      | "visit"
+      | "message"
+      | "meeting"
+      | "note",
+    deal_insurance_status:
+      | "pending"
+      | "cover_note_issued"
+      | "policy_active"
+      | "expired",
+    deal_loan_status:
+      | "pending"
+      | "submitted"
+      | "approved"
+      | "rejected"
+      | "lou_issued"
+      | "lou_verified"
+      | "disbursed",
+    deal_registration_status:
+      | "pending"
+      | "submitted"
+      | "registered"
+      | "plate_received",
+    deal_stage:
+      | "lead"
+      | "prospect"
+      | "booking"
+      | "loan_submission"
+      | "lou"
+      | "shipment"
+      | "receive"
+      | "registration"
+      | "delivery"
+      | "disbursement"
+      | "completed",
+    employee_module_assignment_source:
+      | "manual"
+      | "migration"
+      | "sync",
+    employee_primary_role:
+      | "super_admin"
+      | "company_admin"
+      | "director"
+      | "general_manager"
+      | "manager"
+      | "sales"
+      | "accounts"
+      | "analyst"
+      | "creator_updater",
+    employee_status:
+      | "active"
+      | "inactive"
+      | "resigned"
+      | "pending",
+    hrms_role_category:
+      | "executive"
+      | "hr"
+      | "department"
+      | "line_management"
+      | "staff"
+      | "employee"
+      | "payroll"
+      | "attendance"
+      | "custom",
+    hrms_role_scope:
+      | "company"
+      | "branch"
+      | "department"
+      | "self",
+    import_review_row_review_reason:
+      | "incomplete"
+      | "blocking"
+      | "mixed",
+    import_review_row_review_status:
+      | "pending"
+      | "in_review"
+      | "resolved"
+      | "discarded",
+    invoice_invoice_type:
+      | "customer_sales"
+      | "dealer_sales"
+      | "purchase",
+    invoice_payment_status:
+      | "unpaid"
+      | "partial"
+      | "paid",
+    invoice_reconciliation_status:
+      | "pending"
+      | "reconciled"
+      | "disputed"
+      | "override",
+    invoice_source_type:
+      | "ubs_local"
+      | "dms_snapshot"
+      | "legacy_backfill",
+    job_title_level:
+      | "junior"
+      | "mid"
+      | "senior"
+      | "lead"
+      | "executive",
+    journal_entry_source_type:
+      | "ar_payment"
+      | "ap_payment"
+      | "manual"
+      | "adjustment",
+    lead_followup_outcome:
+      | "contacted"
+      | "no_answer"
+      | "callback_scheduled"
+      | "not_interested"
+      | "qualified"
+      | "converted"
+      | "lost",
+    lead_followup_source_kind:
+      | "lead"
+      | "prospect",
+    leave_quota_rule_period_type:
+      | "daily"
+      | "weekly"
+      | "monthly"
+      | "date_range",
+    leave_request_day_part:
+      | "full_day"
+      | "half_day_morning"
+      | "half_day_afternoon",
+    leave_request_status:
+      | "pending"
+      | "approved"
+      | "rejected"
+      | "cancelled",
+    legacy_staging_record_record_type:
+      | "purchase_invoice"
+      | "dealer_invoice"
+      | "staff"
+      | "branch"
+      | "advisor"
+      | "bank"
+      | "supplier"
+      | "dealer"
+      | "model"
+      | "color"
+      | "finance_company"
+      | "payment_type",
+    loan_application_status:
+      | "pending"
+      | "approved"
+      | "rejected"
+      | "disbursed",
+    normalizer_column_authority_authority:
+      | "dms"
+      | "legacy_fookloi"
+      | "ubs_local"
+      | "ubs_plus_dms",
+    normalizer_column_authority_overwrite_rule:
+      | "always"
+      | "if_null"
+      | "if_null_or_older"
+      | "never"
+      | "conflict_review",
+    notification_type:
+      | "info"
+      | "warning"
+      | "success"
+      | "error",
+    payment_event_event_type:
+      | "payment"
+      | "reversal"
+      | "write_off"
+      | "adjustment",
+    payroll_run_status:
+      | "draft"
+      | "finalised"
+      | "paid",
+    portal_announcement_announcement_type:
+      | "general"
+      | "process_update"
+      | "reminder"
+      | "policy_note"
+      | "maintenance"
+      | "deadline",
+    portal_announcement_audience_scope:
+      | "all"
+      | "admin_approver"
+      | "requester_staff",
+    portal_announcement_priority:
+      | "low"
+      | "normal"
+      | "high"
+      | "urgent",
+    portal_announcement_status:
+      | "draft"
+      | "published"
+      | "archived",
+    portal_document_category:
+      | "form"
+      | "template"
+      | "sop"
+      | "guideline"
+      | "checklist"
+      | "policy"
+      | "general",
+    portal_document_status:
+      | "active"
+      | "inactive"
+      | "archived",
+    portal_document_visibility_scope:
+      | "all"
+      | "admin_approver"
+      | "requester_staff",
+    profile_role:
+      | "super_admin"
+      | "company_admin"
+      | "director"
+      | "general_manager"
+      | "manager"
+      | "sales"
+      | "accounts"
+      | "analyst"
+      | "creator_updater"
+      | "portal_admin"
+      | "portal_manager"
+      | "portal_staff",
+    profile_status:
+      | "active"
+      | "inactive"
+      | "resigned"
+      | "pending",
+    public_holiday_holiday_type:
+      | "public"
+      | "company",
+    purchase_invoice_lifecycle_status:
+      | "received"
+      | "verified"
+      | "approved"
+      | "scheduled"
+      | "paid"
+      | "cancelled",
+    purchase_invoice_payment_status:
+      | "unpaid"
+      | "partial"
+      | "paid",
+    purchase_invoice_status:
+      | "pending"
+      | "received"
+      | "cancelled",
+    purchase_order_lifecycle_status:
+      | "draft"
+      | "submitted"
+      | "approved"
+      | "fulfilled"
+      | "closed"
+      | "cancelled",
+    push_token_platform:
+      | "ios"
+      | "android"
+      | "web",
+    request_form_field_data_source:
+      | "branches"
+      | "employees"
+      | "vehicles"
+      | null,
+    request_form_field_field_type:
+      | "text"
+      | "textarea"
+      | "number"
+      | "date"
+      | "database_select"
+      | "select"
+      | "multiselect"
+      | "checkbox"
+      | "radio"
+      | "file",
+    request_module_setting_sla_start_event:
+      | "submitted"
+      | "assigned",
+    request_saved_filter_scope:
+      | "queue"
+      | "reports",
+    sales_activity_activity_type:
+      | "call"
+      | "email"
+      | "meeting"
+      | "task"
+      | "note",
+    scheduled_report_date_range:
+      | "last_7_days"
+      | "last_30_days"
+      | "last_month"
+      | "current_month",
+    scheduled_report_frequency:
+      | "daily"
+      | "weekly"
+      | "monthly",
+    source_reconciliation_match_match_status:
+      | "candidate"
+      | "auto_matched"
+      | "accepted"
+      | "conflict"
+      | "ignored"
+      | "rejected",
+    source_reconciliation_match_object_type:
+      | "sales_order"
+      | "vehicle"
+      | "customer"
+      | "invoice_payment_evidence",
+    source_reconciliation_match_source_system:
+      | "dms"
+      | "legacy_fookloi"
+      | "google_sheets"
+      | "ubs",
+    supplier_payment_event_event_type:
+      | "payment"
+      | "reversal"
+      | "write_off"
+      | "adjustment",
+    sync_run_source_system:
+      | "dms"
+      | "legacy_fookloi"
+      | "google_sheets"
+      | "manual",
+    sync_run_status:
+      | "pending"
+      | "running"
+      | "succeeded"
+      | "failed"
+      | "cancelled",
+    ticket_activity_event_type:
+      | "status_changed"
+      | "owner_changed"
+      | "resolution_note_updated"
+      | "priority_changed"
+      | "comment_added"
+      | "request_created"
+      | "category_changed"
+      | "subcategory_changed"
+      | "sla_paused"
+      | "sla_resumed"
+      | "sla_breached"
+      | "requester_update_submitted"
+      | "owner_requested_more_information"
+      | "owner_completed_request"
+      | "requester_closed_request"
+      | "attachment_added"
+      | "escalation_triggered"
+      | "admin_manual_override"
+      | "internal_note_added"
+      | "duplicate_linked"
+      | "request_reopened"
+      | "closure_feedback_submitted"
+      | "bulk_action_performed"
+      | "report_exported"
+      | "saved_filter_changed"
+      | "configuration_changed",
+    ticket_completion_category:
+      | "resolved"
+      | "partially_resolved"
+      | "escalated"
+      | "transferred"
+      | "no_action_needed"
+      | "other"
+      | "rejected"
+      | "duplicate"
+      | "cancelled"
+      | "not_applicable"
+      | null,
+    ticket_priority:
+      | "low"
+      | "medium"
+      | "high",
+    ticket_sla_status:
+      | "on_track"
+      | "at_risk"
+      | "breached"
+      | "paused",
+    ticket_status:
+      | "open"
+      | "in_progress"
+      | "pending_requester"
+      | "pending_owner_review"
+      | "completed_by_owner"
+      | "closed"
+      | "reopened"
+      | "cancelled",
+    vehicle_transfer_status:
+      | "pending"
+      | "in_transit"
+      | "arrived"
+      | "cancelled",
+    vehicle_stage:
+      | "pending_register_free_stock"
+      | "pending_deliver_loan_disburse"
+      | "complete"
+      | null,
+    vehicle_stage_override:
+      | "pending_register_free_stock"
+      | "pending_deliver_loan_disburse"
+      | "complete"
+      | null
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9246,13 +9732,90 @@ export const Constants = {
   },
   public: {
     Enums: {
-      webhook_delivery_status: [
-        "pending",
-        "delivering",
-        "delivered",
-        "failed",
-        "dead",
-      ],
+      webhook_delivery_status: ["pending", "delivering", "delivered", "failed", "dead"],
+      accounting_period_status: ["open", "closed", "locked"],
+      account_type: ["asset", "liability", "equity", "revenue", "expense"],
+      announcement_category: ["general", "policy", "event", "emergency", "holiday"],
+      announcement_priority: ["low", "normal", "high", "urgent"],
+      appraisal_item_status: ["pending", "self_reviewed", "reviewed", "acknowledged"],
+      appraisal_cycle: ["annual", "mid_year", "quarterly", "probation"],
+      appraisal_status: ["open", "in_progress", "completed", "archived"],
+      approval_decision: ["approved", "rejected"],
+      approval_flow_entity_type: ["leave_request", "payroll_run", "appraisal", "internal_request", "general"],
+      approval_instance_entity_type: ["leave_request", "payroll_run", "appraisal", "internal_request", "general"],
+      approval_instance_status: ["pending", "approved", "rejected", "cancelled"],
+      approval_request_entity_type: ["leave_request", "payroll_run", "appraisal", "internal_request", "general"],
+      approval_request_status: ["pending", "approved", "rejected", "cancelled"],
+      approval_step_approver_type: ["role", "specific_user", "direct_manager"],
+      attendance_record_status: ["present", "absent", "half_day", "on_leave", "public_holiday"],
+      column_permission_permission_level: ["none", "view", "edit"],
+      commission_record_status: ["pending", "approved", "paid"],
+      customer_communication_type: ["call", "email", "visit", "message", "meeting", "note"],
+      deal_insurance_status: ["pending", "cover_note_issued", "policy_active", "expired"],
+      deal_loan_status: ["pending", "submitted", "approved", "rejected", "lou_issued", "lou_verified", "disbursed"],
+      deal_registration_status: ["pending", "submitted", "registered", "plate_received"],
+      deal_stage: ["lead", "prospect", "booking", "loan_submission", "lou", "shipment", "receive", "registration", "delivery", "disbursement", "completed"],
+      employee_module_assignment_source: ["manual", "migration", "sync"],
+      employee_primary_role: ["super_admin", "company_admin", "director", "general_manager", "manager", "sales", "accounts", "analyst", "creator_updater"],
+      employee_status: ["active", "inactive", "resigned", "pending"],
+      hrms_role_category: ["executive", "hr", "department", "line_management", "staff", "employee", "payroll", "attendance", "custom"],
+      hrms_role_scope: ["company", "branch", "department", "self"],
+      import_review_row_review_reason: ["incomplete", "blocking", "mixed"],
+      import_review_row_review_status: ["pending", "in_review", "resolved", "discarded"],
+      invoice_invoice_type: ["customer_sales", "dealer_sales", "purchase"],
+      invoice_payment_status: ["unpaid", "partial", "paid"],
+      invoice_reconciliation_status: ["pending", "reconciled", "disputed", "override"],
+      invoice_source_type: ["ubs_local", "dms_snapshot", "legacy_backfill"],
+      job_title_level: ["junior", "mid", "senior", "lead", "executive"],
+      journal_entry_source_type: ["ar_payment", "ap_payment", "manual", "adjustment"],
+      lead_followup_outcome: ["contacted", "no_answer", "callback_scheduled", "not_interested", "qualified", "converted", "lost"],
+      lead_followup_source_kind: ["lead", "prospect"],
+      leave_quota_rule_period_type: ["daily", "weekly", "monthly", "date_range"],
+      leave_request_day_part: ["full_day", "half_day_morning", "half_day_afternoon"],
+      leave_request_status: ["pending", "approved", "rejected", "cancelled"],
+      legacy_staging_record_record_type: ["purchase_invoice", "dealer_invoice", "staff", "branch", "advisor", "bank", "supplier", "dealer", "model", "color", "finance_company", "payment_type"],
+      loan_application_status: ["pending", "approved", "rejected", "disbursed"],
+      normalizer_column_authority_authority: ["dms", "legacy_fookloi", "ubs_local", "ubs_plus_dms"],
+      normalizer_column_authority_overwrite_rule: ["always", "if_null", "if_null_or_older", "never", "conflict_review"],
+      notification_type: ["info", "warning", "success", "error"],
+      payment_event_event_type: ["payment", "reversal", "write_off", "adjustment"],
+      payroll_run_status: ["draft", "finalised", "paid"],
+      portal_announcement_announcement_type: ["general", "process_update", "reminder", "policy_note", "maintenance", "deadline"],
+      portal_announcement_audience_scope: ["all", "admin_approver", "requester_staff"],
+      portal_announcement_priority: ["low", "normal", "high", "urgent"],
+      portal_announcement_status: ["draft", "published", "archived"],
+      portal_document_category: ["form", "template", "sop", "guideline", "checklist", "policy", "general"],
+      portal_document_status: ["active", "inactive", "archived"],
+      portal_document_visibility_scope: ["all", "admin_approver", "requester_staff"],
+      profile_role: ["super_admin", "company_admin", "director", "general_manager", "manager", "sales", "accounts", "analyst", "creator_updater", "portal_admin", "portal_manager", "portal_staff"],
+      profile_status: ["active", "inactive", "resigned", "pending"],
+      public_holiday_holiday_type: ["public", "company"],
+      purchase_invoice_lifecycle_status: ["received", "verified", "approved", "scheduled", "paid", "cancelled"],
+      purchase_invoice_payment_status: ["unpaid", "partial", "paid"],
+      purchase_invoice_status: ["pending", "received", "cancelled"],
+      purchase_order_lifecycle_status: ["draft", "submitted", "approved", "fulfilled", "closed", "cancelled"],
+      push_token_platform: ["ios", "android", "web"],
+      request_form_field_data_source: ["branches", "employees", "vehicles"],
+      request_form_field_field_type: ["text", "textarea", "number", "date", "database_select", "select", "multiselect", "checkbox", "radio", "file"],
+      request_module_setting_sla_start_event: ["submitted", "assigned"],
+      request_saved_filter_scope: ["queue", "reports"],
+      sales_activity_activity_type: ["call", "email", "meeting", "task", "note"],
+      scheduled_report_date_range: ["last_7_days", "last_30_days", "last_month", "current_month"],
+      scheduled_report_frequency: ["daily", "weekly", "monthly"],
+      source_reconciliation_match_match_status: ["candidate", "auto_matched", "accepted", "conflict", "ignored", "rejected"],
+      source_reconciliation_match_object_type: ["sales_order", "vehicle", "customer", "invoice_payment_evidence"],
+      source_reconciliation_match_source_system: ["dms", "legacy_fookloi", "google_sheets", "ubs"],
+      supplier_payment_event_event_type: ["payment", "reversal", "write_off", "adjustment"],
+      sync_run_source_system: ["dms", "legacy_fookloi", "google_sheets", "manual"],
+      sync_run_status: ["pending", "running", "succeeded", "failed", "cancelled"],
+      ticket_activity_event_type: ["status_changed", "owner_changed", "resolution_note_updated", "priority_changed", "comment_added", "request_created", "category_changed", "subcategory_changed", "sla_paused", "sla_resumed", "sla_breached", "requester_update_submitted", "owner_requested_more_information", "owner_completed_request", "requester_closed_request", "attachment_added", "escalation_triggered", "admin_manual_override", "internal_note_added", "duplicate_linked", "request_reopened", "closure_feedback_submitted", "bulk_action_performed", "report_exported", "saved_filter_changed", "configuration_changed"],
+      ticket_completion_category: ["resolved", "partially_resolved", "escalated", "transferred", "no_action_needed", "other", "rejected", "duplicate", "cancelled", "not_applicable"],
+      ticket_priority: ["low", "medium", "high"],
+      ticket_sla_status: ["on_track", "at_risk", "breached", "paused"],
+      ticket_status: ["open", "in_progress", "pending_requester", "pending_owner_review", "completed_by_owner", "closed", "reopened", "cancelled"],
+      vehicle_transfer_status: ["pending", "in_transit", "arrived", "cancelled"],
+      vehicle_stage: ["pending_register_free_stock", "pending_deliver_loan_disburse", "complete"],
+      vehicle_stage_override: ["pending_register_free_stock", "pending_deliver_loan_disburse", "complete"],
     },
   },
 } as const

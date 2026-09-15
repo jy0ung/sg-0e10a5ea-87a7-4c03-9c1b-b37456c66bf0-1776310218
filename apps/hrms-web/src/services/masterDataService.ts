@@ -171,7 +171,7 @@ export const getTinTypes = async (cid: string): Promise<{ data: TinType[]; error
 };
 export const upsertTinType = (cid: string, f: Partial<TinType> & { id?: string }) =>
   f.id ? supabase.from('tin_types').update({ code: f.code, name: f.name, status: f.status, updated_at: new Date().toISOString() }).eq('company_id', cid).eq('id', f.id).then(({ error }) => ({ error: error ? new Error(error.message) : null }))
-       : supabase.from('tin_types').insert({ id: crypto.randomUUID(), company_id: cid, code: f.code, name: f.name, status: f.status ?? 'Active' }).then(({ error }) => ({ error: error ? new Error(error.message) : null }));
+       : supabase.from('tin_types').insert({ id: crypto.randomUUID(), company_id: cid, code: f.code ?? '', name: f.name ?? '', status: f.status ?? 'Active' }).then(({ error }) => ({ error: error ? new Error(error.message) : null }));
 export const deleteTinType = async (cid: string, id: string): Promise<{ error: Error|null }> => {
   const { error } = await supabase.from('tin_types').delete().eq('company_id', cid).eq('id', id);
   return { error: error ? new Error(error.message) : null };
@@ -184,8 +184,9 @@ export const getRegistrationFees = async (cid: string): Promise<{ data: Registra
   return { data: (data ?? []).map(r => ({ id: r.id as string, description: r.description as string, price: Number(r.price), status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertRegistrationFee = async (cid: string, f: Partial<RegistrationFee> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.description?.trim()) return { error: new Error('Description is required') };
   const row = { company_id: cid, description: f.description, price: f.price ?? 0, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('registration_fees').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('registration_fees').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('registration_fees').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('registration_fees').insert({ ...row, id: crypto.randomUUID(), description: f.description! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteRegistrationFee = async (cid: string, id: string) => { const { error } = await supabase.from('registration_fees').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -197,8 +198,9 @@ export const getRoadTaxFees = async (cid: string): Promise<{ data: RoadTaxFee[];
   return { data: (data ?? []).map(r => ({ id: r.id as string, description: r.description as string, price: Number(r.price), status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertRoadTaxFee = async (cid: string, f: Partial<RoadTaxFee> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.description?.trim()) return { error: new Error('Description is required') };
   const row = { company_id: cid, description: f.description, price: f.price ?? 0, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('road_tax_fees').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('road_tax_fees').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('road_tax_fees').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('road_tax_fees').insert({ ...row, id: crypto.randomUUID(), description: f.description! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteRoadTaxFee = async (cid: string, id: string) => { const { error } = await supabase.from('road_tax_fees').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -210,8 +212,9 @@ export const getInspectionFees = async (cid: string): Promise<{ data: Inspection
   return { data: (data ?? []).map(r => ({ id: r.id as string, itemCode: r.item_code as string|undefined, description: r.description as string, price: Number(r.price), status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertInspectionFee = async (cid: string, f: Partial<InspectionFee> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.description?.trim()) return { error: new Error('Description is required') };
   const row = { company_id: cid, item_code: f.itemCode ?? null, description: f.description, price: f.price ?? 0, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('inspection_fees').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('inspection_fees').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('inspection_fees').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('inspection_fees').insert({ ...row, id: crypto.randomUUID(), description: f.description! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteInspectionFee = async (cid: string, id: string) => { const { error } = await supabase.from('inspection_fees').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -223,8 +226,9 @@ export const getHandlingFees = async (cid: string): Promise<{ data: HandlingFee[
   return { data: (data ?? []).map(r => ({ id: r.id as string, itemCode: r.item_code as string|undefined, description: r.description as string, price: Number(r.price), billing: r.billing as string|undefined, status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertHandlingFee = async (cid: string, f: Partial<HandlingFee> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.description?.trim()) return { error: new Error('Description is required') };
   const row = { company_id: cid, item_code: f.itemCode ?? null, description: f.description, price: f.price ?? 0, billing: f.billing ?? null, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('handling_fees').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('handling_fees').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('handling_fees').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('handling_fees').insert({ ...row, id: crypto.randomUUID(), description: f.description! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteHandlingFee = async (cid: string, id: string) => { const { error } = await supabase.from('handling_fees').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -236,8 +240,9 @@ export const getAdditionalItems = async (cid: string): Promise<{ data: Additiona
   return { data: (data ?? []).map(r => ({ id: r.id as string, itemCode: r.item_code as string|undefined, description: r.description as string, unitPrice: Number(r.unit_price), status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertAdditionalItem = async (cid: string, f: Partial<AdditionalItem> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.description?.trim()) return { error: new Error('Description is required') };
   const row = { company_id: cid, item_code: f.itemCode ?? null, description: f.description, unit_price: f.unitPrice ?? 0, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('additional_items').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('additional_items').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('additional_items').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('additional_items').insert({ ...row, id: crypto.randomUUID(), description: f.description! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteAdditionalItem = async (cid: string, id: string) => { const { error } = await supabase.from('additional_items').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -249,8 +254,9 @@ export const getPaymentTypes = async (cid: string): Promise<{ data: PaymentType[
   return { data: (data ?? []).map(r => ({ id: r.id as string, name: r.name as string, billing: r.billing as string|undefined, status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertPaymentType = async (cid: string, f: Partial<PaymentType> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.name?.trim()) return { error: new Error('Name is required') };
   const row = { company_id: cid, name: f.name, billing: f.billing ?? null, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('payment_types').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('payment_types').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('payment_types').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('payment_types').insert({ ...row, id: crypto.randomUUID(), name: f.name! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deletePaymentType = async (cid: string, id: string) => { const { error } = await supabase.from('payment_types').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -262,8 +268,9 @@ export const getBanks = async (cid: string): Promise<{ data: BankRecord[]; error
   return { data: (data ?? []).map(r => ({ id: r.id as string, name: r.name as string, accountNo: r.account_no as string|undefined, status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertBank = async (cid: string, f: Partial<BankRecord> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.name?.trim()) return { error: new Error('Name is required') };
   const row = { company_id: cid, name: f.name, account_no: f.accountNo ?? null, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('banks').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('banks').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('banks').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('banks').insert({ ...row, id: crypto.randomUUID(), name: f.name! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteBank = async (cid: string, id: string) => { const { error } = await supabase.from('banks').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -275,8 +282,9 @@ export const getSuppliers = async (cid: string): Promise<{ data: Supplier[]; err
   return { data: (data ?? []).map(r => ({ id: r.id as string, name: r.name as string, code: r.code as string|undefined, companyRegNo: r.company_reg_no as string|undefined, companyAddress: r.company_address as string|undefined, mailingAddress: r.mailing_address as string|undefined, attn: r.attn as string|undefined, contactNo: r.contact_no as string|undefined, email: r.email as string|undefined, status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertSupplier = async (cid: string, f: Partial<Supplier> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.name?.trim()) return { error: new Error('Name is required') };
   const row = { company_id: cid, name: f.name, code: f.code ?? null, company_reg_no: f.companyRegNo ?? null, company_address: f.companyAddress ?? null, mailing_address: f.mailingAddress ?? null, attn: f.attn ?? null, contact_no: f.contactNo ?? null, email: f.email ?? null, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('suppliers').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('suppliers').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('suppliers').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('suppliers').insert({ ...row, id: crypto.randomUUID(), name: f.name! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteSupplier = async (cid: string, id: string) => { const { error } = await supabase.from('suppliers').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -288,8 +296,9 @@ export const getDealers = async (cid: string): Promise<{ data: Dealer[]; error: 
   return { data: (data ?? []).map(r => ({ id: r.id as string, name: r.name as string, accCode: r.acc_code as string|undefined, companyRegNo: r.company_reg_no as string|undefined, companyAddress: r.company_address as string|undefined, mailingAddress: r.mailing_address as string|undefined, attn: r.attn as string|undefined, contactNo: r.contact_no as string|undefined, email: r.email as string|undefined, status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertDealer = async (cid: string, f: Partial<Dealer> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.name?.trim()) return { error: new Error('Name is required') };
   const row = { company_id: cid, name: f.name, acc_code: f.accCode ?? null, company_reg_no: f.companyRegNo ?? null, company_address: f.companyAddress ?? null, mailing_address: f.mailingAddress ?? null, attn: f.attn ?? null, contact_no: f.contactNo ?? null, email: f.email ?? null, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('dealers').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('dealers').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('dealers').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('dealers').insert({ ...row, id: crypto.randomUUID(), name: f.name! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteDealer = async (cid: string, id: string) => { const { error } = await supabase.from('dealers').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -301,8 +310,9 @@ export const getUserGroups = async (cid: string): Promise<{ data: UserGroup[]; e
   return { data: (data ?? []).map(r => ({ id: r.id as string, name: r.name as string, status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertUserGroup = async (cid: string, f: Partial<UserGroup> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.name?.trim()) return { error: new Error('Name is required') };
   const row = { company_id: cid, name: f.name, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('user_groups').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('user_groups').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('user_groups').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('user_groups').insert({ ...row, id: crypto.randomUUID(), name: f.name! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteUserGroup = async (cid: string, id: string) => { const { error } = await supabase.from('user_groups').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -314,8 +324,9 @@ export const getDealerInvoices = async (cid: string): Promise<{ data: DealerInvo
   return { data: (data ?? []).map(r => ({ id: r.id as string, invoiceNo: r.invoice_no as string, branch: r.branch as string|undefined, dealerName: r.dealer_name as string|undefined, carModel: r.car_model as string|undefined, carColour: r.car_colour as string|undefined, chassisNo: r.chassis_no as string|undefined, salesPrice: r.sales_price ? Number(r.sales_price) : undefined, invoiceDate: r.invoice_date as string|undefined, status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertDealerInvoice = async (cid: string, f: Partial<DealerInvoice> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.invoiceNo?.trim()) return { error: new Error('Invoice no is required') };
   const row = { company_id: cid, invoice_no: f.invoiceNo, branch: f.branch ?? null, dealer_name: f.dealerName ?? null, car_model: f.carModel ?? null, car_colour: f.carColour ?? null, chassis_no: f.chassisNo ?? null, sales_price: f.salesPrice ?? null, invoice_date: f.invoiceDate ?? null, status: f.status ?? 'Active', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('dealer_invoices').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('dealer_invoices').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('dealer_invoices').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('dealer_invoices').insert({ ...row, id: crypto.randomUUID(), invoice_no: f.invoiceNo! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteDealerInvoice = async (cid: string, id: string) => { const { error } = await supabase.from('dealer_invoices').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };
@@ -327,8 +338,9 @@ export const getOfficialReceipts = async (cid: string): Promise<{ data: Official
   return { data: (data ?? []).map(r => ({ id: r.id as string, receiptDate: r.receipt_date as string|undefined, branch: r.branch as string|undefined, receiptNo: r.receipt_no as string, amount: r.amount ? Number(r.amount) : undefined, attachmentUrl: r.attachment_url as string|undefined, verifiedBy: r.verified_by as string|undefined, status: r.status as string, companyId: r.company_id as string, createdAt: r.created_at as string })), error: null };
 };
 export const upsertOfficialReceipt = async (cid: string, f: Partial<OfficialReceipt> & { id?: string }): Promise<{ error: Error|null }> => {
+  if (!f.id && !f.receiptNo?.trim()) return { error: new Error('Receipt no is required') };
   const row = { company_id: cid, receipt_no: f.receiptNo, receipt_date: f.receiptDate ?? null, branch: f.branch ?? null, amount: f.amount ?? null, attachment_url: f.attachmentUrl ?? null, verified_by: f.verifiedBy ?? null, status: f.status ?? 'Pending', updated_at: new Date().toISOString() };
-  const { error } = f.id ? await supabase.from('official_receipts').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('official_receipts').insert({ ...row, id: crypto.randomUUID() });
+  const { error } = f.id ? await supabase.from('official_receipts').update(row).eq('company_id', cid).eq('id', f.id) : await supabase.from('official_receipts').insert({ ...row, id: crypto.randomUUID(), receipt_no: f.receiptNo! });
   return { error: error ? new Error(error.message) : null };
 };
 export const deleteOfficialReceipt = async (cid: string, id: string) => { const { error } = await supabase.from('official_receipts').delete().eq('company_id', cid).eq('id', id); return { error: error ? new Error(error.message) : null }; };

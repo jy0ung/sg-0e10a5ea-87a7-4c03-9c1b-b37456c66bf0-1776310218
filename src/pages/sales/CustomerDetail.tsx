@@ -122,12 +122,12 @@ export default function CustomerDetail() {
   const dealColumns = [
     {
       key: 'deal_no',
-      header: 'Deal No',
+      label: 'Deal No',
       render: (deal: Deal) => <span className="font-medium">{deal.deal_no}</span>,
     },
     {
       key: 'model',
-      header: 'Vehicle',
+      label: 'Vehicle',
       render: (deal: Deal) => (
         <div>
           <p>{deal.model_name || '\u2014'}</p>
@@ -138,22 +138,22 @@ export default function CustomerDetail() {
     },
     {
       key: 'stage',
-      header: 'Stage',
+      label: 'Stage',
       render: (deal: Deal) => <Badge variant="outline">{getStageLabel(deal.stage)}</Badge>,
     },
     {
       key: 'amount',
-      header: 'Amount',
+      label: 'Amount',
       render: (deal: Deal) => deal.total_amount ? `RM ${deal.total_amount.toLocaleString()}` : '\u2014',
     },
     {
       key: 'deposit',
-      header: 'Deposit',
+      label: 'Deposit',
       render: (deal: Deal) => deal.deposit_amount ? `RM ${deal.deposit_amount.toLocaleString()}` : '\u2014',
     },
     {
       key: 'created',
-      header: 'Created',
+      label: 'Created',
       render: (deal: Deal) => new Date(deal.created_at).toLocaleDateString(),
     },
   ];
@@ -173,7 +173,7 @@ export default function CustomerDetail() {
         <Button variant="ghost" size="sm" onClick={() => navigate('/sales/customers')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <PageHeader title={customerName || 'Customer'} subtitle={`${deals.length} deals`} />
+        <PageHeader title={customerName || 'Customer'} description={`${deals.length} deals`} />
       </div>
 
       {/* Summary Cards */}
@@ -314,7 +314,7 @@ export default function CustomerDetail() {
                         <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm font-medium">{formatAction(activity.action)}</span>
-                          {activity.metadata && (
+                          {activity.metadata && typeof activity.metadata === 'object' && !Array.isArray(activity.metadata) && (
                             <span className="text-sm text-muted-foreground ml-2">
                               {formatMetadata(activity.metadata)}
                             </span>

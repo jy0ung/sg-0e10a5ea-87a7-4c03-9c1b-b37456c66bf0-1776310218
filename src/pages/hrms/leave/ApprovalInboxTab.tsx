@@ -6,11 +6,13 @@ import {
 } from 'lucide-react';
 import type { PendingApproval } from '@/types';
 
+export type LeaveApprovalItem = Pick<PendingApproval, 'id' | 'entityId' | 'requesterId' | 'requesterName' | 'leaveRequest' | 'currentStepName'> & { flowName?: string };
+
 interface ApprovalInboxTabProps {
-  approvals: PendingApproval[];
-  onApprove: (approval: PendingApproval) => void;
-  onReject: (approval: PendingApproval) => void;
-  onViewDetails: (approval: PendingApproval) => void;
+  approvals: LeaveApprovalItem[];
+  onApprove: (approval: LeaveApprovalItem) => void;
+  onReject: (approval: LeaveApprovalItem) => void;
+  onViewDetails: (approval: LeaveApprovalItem) => void;
 }
 
 function formatDateShort(d: string): string {
@@ -92,8 +94,7 @@ export default function ApprovalInboxTab({
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
                     <Clock className="h-3 w-3" />
                     <span>Step: {pa.currentStepName}</span>
-                    <span className="text-muted-foreground/30">·</span>
-                    <span>{pa.flowName}</span>
+                    {pa.flowName && <><span className="text-muted-foreground/30">·</span><span>{pa.flowName}</span></>}
                   </div>
                 </div>
               </div>

@@ -1,3 +1,5 @@
+import type { Json } from '@flc/supabase';
+
 /**
  * Shared mutation helpers for the internal-request admin config services.
  *
@@ -46,13 +48,13 @@ export function buildAuditDiff(
   before: Record<string, unknown> | null | undefined,
   patch: Record<string, unknown>,
   ignoreKeys: string[] = ['updated_by', 'updated_at'],
-): { changedFields: string[]; before: Record<string, unknown>; after: Record<string, unknown> } {
+): { changedFields: string[]; before: Record<string, Json | undefined>; after: Record<string, Json | undefined> } {
   const changedFields = Object.keys(patch).filter((key) => !ignoreKeys.includes(key));
-  const beforeValues: Record<string, unknown> = {};
-  const afterValues: Record<string, unknown> = {};
+  const beforeValues: Record<string, Json | undefined> = {};
+  const afterValues: Record<string, Json | undefined> = {};
   for (const key of changedFields) {
-    beforeValues[key] = before ? before[key] : undefined;
-    afterValues[key] = patch[key];
+    beforeValues[key] = before?.[key] === undefined ? undefined : JSON.parse(JSON.stringify(before[key])) as Json;
+    afterValues[key] = patch[key] === undefined ? undefined : JSON.parse(JSON.stringify(patch[key])) as Json;
   }
   return { changedFields, before: beforeValues, after: afterValues };
 }

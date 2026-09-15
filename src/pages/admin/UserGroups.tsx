@@ -62,7 +62,7 @@ export default function UserGroups() {
 
   const openEdit = (g: UserGroup) => {
     setEditId(g.id);
-    form.reset({ name: g.name, status: g.status });
+    form.reset({ name: g.name, status: g.status === 'Active' ? 'Active' : 'Inactive' });
     setDialogOpen(true);
   };
 

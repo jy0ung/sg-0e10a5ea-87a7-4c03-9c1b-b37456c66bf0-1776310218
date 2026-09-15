@@ -25,7 +25,7 @@ import {
  * generated types the next time `supabase gen types` runs.
  */
 
-export type TicketStatus = 'open' | 'in_progress' | 'awaiting_requester' | 'resolved' | 'closed' | 'cancelled';
+export type TicketStatus = Database['public']['Tables']['tickets']['Row']['status'];
 export type TicketPriority = 'low' | 'medium' | 'high';
 export type TicketCategory = RequestCategoryValue;
 
@@ -111,11 +111,11 @@ export interface PaginatedTicketResult<T> {
   pageSize: number;
 }
 
-/** 'active' = open|in_progress|awaiting_requester; 'archived' = resolved|closed|cancelled */
+/** 'active' = open|in_progress|pending_requester; 'archived' = resolved|closed|cancelled */
 export type TicketStatusFilter = TicketStatus | 'all' | 'active' | 'archived';
 
-const ACTIVE_STATUSES: TicketStatus[] = ['open', 'in_progress', 'awaiting_requester'];
-const ARCHIVED_STATUSES: TicketStatus[] = ['resolved', 'closed', 'cancelled'];
+const ACTIVE_STATUSES: TicketStatus[] = ['open', 'in_progress', 'pending_requester', 'pending_owner_review', 'reopened'];
+const ARCHIVED_STATUSES: TicketStatus[] = ['completed_by_owner', 'closed', 'cancelled'];
 
 export interface CompanyTicketListOptions {
   page?: number;
@@ -170,16 +170,16 @@ interface TicketActivityInsert extends TicketActivityDbInsert {
   metadata: Json;
 }
 
-const LEGACY_TICKET_SELECT =
+const LEGACY_TICKET_SELECT: string =
   'id, subject, category, subcategory, priority, status, description, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
 
-const OPERATIONAL_TICKET_SELECT =
+const OPERATIONAL_TICKET_SELECT: string =
   'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
 
-const MODERN_TICKET_SELECT =
+const MODERN_TICKET_SELECT: string =
   'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, custom_fields, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, resolved_at, resolution_note';
 
-const TICKET_SELECT =
+const TICKET_SELECT: string =
   'id, subject, category, subcategory, priority, status, description, requested_due_date, business_impact, desired_outcome, custom_fields, vso_number, created_at, updated_at, company_id, submitted_by, assigned_to, assigned_at, first_response_due_at, resolution_due_at, first_responded_at, resolved_at, resolution_note';
 
 const operationalTicketFields = [
@@ -307,11 +307,11 @@ function formatTicketLabel(value: string) {
 }
 
 function isResolvedTicketStatus(status: TicketStatus) {
-  return status === 'resolved' || status === 'closed' || status === 'cancelled';
+  return status === 'completed_by_owner' || status === 'closed' || status === 'cancelled';
 }
 
 function isFirstResponseTicketStatus(status: TicketStatus) {
-  return status === 'in_progress' || status === 'awaiting_requester' || status === 'resolved' || status === 'closed';
+  return status === 'in_progress' || status === 'pending_requester' || status === 'completed_by_owner' || status === 'closed';
 }
 
 async function fetchTicketForUpdate(ticketId: string, companyId: string) {
@@ -335,7 +335,7 @@ async function fetchTicketForUpdate(ticketId: string, companyId: string) {
 
   if (error) throw error;
   return {
-    ticket: mapTicket(data as TicketRow),
+    ticket: mapTicket(data as unknown as TicketRow),
     select: useLegacyTicketSelect ? fallbackSelect : TICKET_SELECT,
   };
 }
@@ -562,7 +562,7 @@ export async function listMyTickets(userId: string, companyId: string): Promise<
 
     if (error) throw error;
 
-    const rows = await applyApprovalMetadata(((data ?? []) as TicketRow[]).map(mapTicket));
+    const rows = await applyApprovalMetadata(((data ?? []) as unknown as TicketRow[]).map(mapTicket));
     const profilesById = await fetchProfilesById(
       companyId,
       rows.map((ticket) => ticket.assigned_to).filter((ticketId): ticketId is string => Boolean(ticketId)),
@@ -594,7 +594,7 @@ export async function listCompanyTickets(companyId: string): Promise<TicketServi
 
     if (error) throw error;
 
-    return { data: await enrichCompanyTickets(((data ?? []) as TicketRow[]).map(mapTicket), companyId), error: null };
+    return { data: await enrichCompanyTickets(((data ?? []) as unknown as TicketRow[]).map(mapTicket), companyId), error: null };
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to load company tickets');
     loggingService.error('Failed to list company tickets', { error: error.message }, 'TicketService');
@@ -681,7 +681,7 @@ export async function listCompanyTicketsPage(
 
     if (error) throw error;
 
-    const rows = await enrichCompanyTickets(((data ?? []) as TicketRow[]).map(mapTicket), companyId);
+    const rows = await enrichCompanyTickets(((data ?? []) as unknown as TicketRow[]).map(mapTicket), companyId);
     return {
       data: {
         rows,
@@ -702,8 +702,10 @@ export interface TicketStatusCounts {
   all: number;
   open: number;
   in_progress: number;
-  awaiting_requester: number;
-  resolved: number;
+  pending_requester: number;
+  completed_by_owner: number;
+  pending_owner_review: number;
+  reopened: number;
   closed: number;
   cancelled: number;
 }
@@ -718,7 +720,7 @@ export async function getCompanyTicketStatusCounts(
   options: Pick<CompanyTicketListOptions, 'priority' | 'search'> = {},
 ): Promise<TicketServiceResult<TicketStatusCounts>> {
   const search = sanitizeTicketSearchTerm(options.search ?? '');
-  const statuses: TicketStatus[] = ['open', 'in_progress', 'awaiting_requester', 'resolved', 'closed', 'cancelled'];
+  const statuses: TicketStatus[] = ['open', 'in_progress', 'pending_requester', 'pending_owner_review', 'completed_by_owner', 'closed', 'reopened', 'cancelled'];
 
   try {
     const profileIds = search ? await findMatchingProfileIds(companyId, search) : [];
@@ -744,8 +746,8 @@ export async function getCompanyTicketStatusCounts(
     );
 
     const result: TicketStatusCounts = {
-      all: 0, open: 0, in_progress: 0, awaiting_requester: 0,
-      resolved: 0, closed: 0, cancelled: 0,
+      all: 0, open: 0, in_progress: 0, pending_requester: 0,
+      completed_by_owner: 0, closed: 0, cancelled: 0, pending_owner_review: 0, reopened: 0,
     };
     for (const { status, count } of perStatus) {
       result[status] = count;
@@ -822,7 +824,7 @@ export async function createTicket(
       submitterRole: context.submitterRole ?? null,
     });
 
-    const insertPayload = {
+    const insertPayload: Database['public']['Tables']['tickets']['Insert'] = {
       subject: input.subject.trim(),
       category: input.category,
       subcategory: input.subcategory?.trim() ? input.subcategory.trim() : null,
@@ -949,7 +951,7 @@ export async function updateTicket(
       return { data: null, error: new Error('No request updates were provided') };
     }
 
-    if (input.status && (input.status === 'resolved' || input.status === 'closed')) {
+    if (input.status && (input.status === 'completed_by_owner' || input.status === 'closed')) {
       const approvalGate = await getInternalRequestApprovalGate(ticketId);
       if (approvalGate.error) throw new Error(approvalGate.error);
       if (approvalGate.data?.status === 'pending') {
@@ -999,7 +1001,7 @@ export async function updateTicket(
     const activityEntries = buildTicketActivityEntries(current, nextTicket, context.userId);
     const notifications = buildTicketNotifications(current, nextTicket, context.userId);
 
-    const sideEffects: Promise<unknown>[] = [];
+    const sideEffects: PromiseLike<unknown>[] = [];
     if (activityEntries.length > 0) {
       sideEffects.push(ticketActivityTable().insert(activityEntries).then(res => res));
     }
@@ -1048,7 +1050,7 @@ export async function cancelMyTicket(
     if (error) throw error;
     if (!data) throw new Error('Request cancellation did not return a ticket');
 
-    const nextTicket = mapTicket(data as TicketRow);
+    const nextTicket = mapTicket(data as unknown as TicketRow);
     await Promise.allSettled([
       ticketActivityTable().insert({
         ticket_id: ticketId,
@@ -1105,7 +1107,7 @@ export async function addTicketComment(
     }
 
     if (ticketError) throw ticketError;
-    const ticket = mapTicket(ticketData as TicketRow);
+    const ticket = mapTicket(ticketData as unknown as TicketRow);
 
     const { data, error } = await ticketActivityTable()
       .insert({

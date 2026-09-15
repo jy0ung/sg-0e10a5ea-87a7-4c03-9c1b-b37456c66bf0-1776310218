@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { StatusBadge } from '@/components/shared/StatusBadge';
+import { StatusBadge } from '@hrms-web/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -1249,9 +1249,9 @@ function RoleManagementPanel({ companyId, actorId, canWrite }: SecurityPanelProp
 
     setSaving(true);
     const result = editingRole
-      ? await updateHrmsRole(companyId, editingRole.id, actorId, parsed.data)
+      ? { ...await updateHrmsRole(companyId, editingRole.id, actorId, parsed.data), data: editingRole }
       : await createHrmsRole(companyId, actorId, parsed.data);
-    const roleId = editingRole?.id ?? result.data?.id;
+    const roleId = result.data?.id;
     const assignmentResult = roleId
       ? await replaceHrmsRoleEmployeeAssignments(companyId, roleId, actorId, assignedEmployeeIds)
       : { error: result.error };
@@ -1704,6 +1704,7 @@ export default function HrmsAdmin() {
   }
 
   function renderModuleContent(module: Category) {
+    if (!user) return null;
     if (module === 'roles') return <RoleManagementPanel companyId={companyId} actorId={user.id} canWrite={canManageSecurity} />;
     if (module === 'approval-flows') {
       return (

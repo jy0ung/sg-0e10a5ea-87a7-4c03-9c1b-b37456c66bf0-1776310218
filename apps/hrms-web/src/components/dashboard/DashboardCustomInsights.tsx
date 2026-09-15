@@ -5,9 +5,9 @@ import {
   type PersonalDashboardCustomFormula,
   type PersonalDashboardCustomMetric,
   type DashboardMetricResult,
-} from '@/lib/personalDashboard';
-import { CustomKpiCard } from '@/components/CustomKpiCard';
-import type { CustomKpiEvaluation } from '@/lib/customKpiFormula';
+} from '@hrms-web/lib/personalDashboard';
+import { CustomKpiCard } from '@hrms-web/components/CustomKpiCard';
+import type { CustomKpiEvaluation } from '@hrms-web/lib/customKpiFormula';
 
 export type DashboardCustomWidget = PersonalDashboardCustomMetric | PersonalDashboardCustomFormula;
 

@@ -83,12 +83,13 @@ export function subscribeToSalesOrderChanges(companyId: string, onChange: () => 
 
 export async function createSalesOrder(companyId: string, fields: SalesOrderEditableFields, actorId?: string): Promise<{ data: SalesOrder | null; error: Error | null }> {
   if (!companyId) return { data: null, error: missingCompanyError() };
+  if (!fields.branchCode || !fields.salesmanName) return { data: null, error: new Error('Branch and sales advisor are required') };
   const { data, error } = await supabase
     .from('sales_orders')
     .insert({
       company_id: companyId,
       order_no: fields.orderNo,
-      customer_id: fields.customerId,
+      customer_id: fields.customerId ?? null,
       branch_code: fields.branchCode,
       salesman_name: fields.salesmanName,
       model: fields.model,

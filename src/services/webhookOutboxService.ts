@@ -1,3 +1,4 @@
+import type { Json } from '@flc/supabase';
 import { supabase } from '@/integrations/supabase/client';
 import { loggingService } from './loggingService';
 
@@ -159,7 +160,7 @@ export async function emitWebhookEvent(
   const { data, error } = await supabase.rpc('emit_webhook_event', {
     p_company_id: companyId,
     p_event_type: eventType,
-    p_payload:    payload,
+    p_payload:    JSON.parse(JSON.stringify(payload)) as Json,
   });
   if (error) {
     loggingService.error('emitWebhookEvent failed', { companyId, eventType, error }, 'webhookOutboxService');

@@ -9,18 +9,20 @@ import { useLeaveData } from '@/hooks/useLeaveData';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
-import { reviewLeaveRequest } from '@/services/hrmsService';
+import { useHrmsAccess } from '@/hooks/useHrmsAccess';
+import { buildApprovalInboxItems } from '@/lib/hrms/approvalInbox';
+import { cancelLeaveRequest } from '@flc/hrms-services';
 
 import { Loader2, CalendarPlus, Settings } from 'lucide-react';
 
-import type { LeaveRequest, PendingApproval } from '@/types';
+import type { LeaveRequest } from '@/types';
 
 // Sub-components
 import SnapshotStrip from './leave/SnapshotStrip';
 import ContextPanel from './leave/ContextPanel';
 import MyLeaveTab from './leave/MyLeaveTab';
 import TeamLeaveTab from './leave/TeamLeaveTab';
-import ApprovalInboxTab from './leave/ApprovalInboxTab';
+import ApprovalInboxTab, { type LeaveApprovalItem } from './leave/ApprovalInboxTab';
 import LeaveCalendarTab from './leave/LeaveCalendarTab';
 import LeaveBalanceCards from './leave/LeaveBalanceCards';
 import LeaveRequestDrawer from './leave/LeaveRequestDrawer';
@@ -42,18 +44,32 @@ export default function LeaveManagement() {
     requests,
     leaveTypes,
     leaveBalances,
-    pendingApprovals,
     myRequests,
-    myPendingRequests,
-    myUpcomingLeave,
+    myActivePending: myPendingRequests,
+    myUpcoming,
     teamOnLeaveToday,
-    myQueueCount,
-    isManager,
-    isApprover,
-    isAdmin,
-    canAccessApprovalInbox,
+    pendingForMeCount: myQueueCount,
     isLoading,
   } = useLeaveData();
+  const myUpcomingLeave = myUpcoming[0] ?? null;
+  const access = useHrmsAccess();
+  const isManager = access.canAccessEmployees;
+  const isApprover = access.canApproveRequests;
+  const isAdmin = access.canAccessSettings;
+  const canAccessApprovalInbox = isApprover;
+  const pendingApprovals = useMemo<LeaveApprovalItem[]>(() =>
+    buildApprovalInboxItems(requests, [], [], {
+      id: user?.id,
+      hrmsRoleIds: access.roleIds,
+      hrmsRoleCodes: access.roleCodes,
+    }).flatMap(item => item.entityType === 'leave_request' ? [{
+      id: item.entity.approvalInstanceId ?? item.entityId,
+      entityId: item.entityId,
+      requesterId: item.entity.employeeId,
+      requesterName: item.entity.employeeName,
+      currentStepName: item.currentApprovalStepName ?? 'Approval',
+      leaveRequest: item.entity,
+    }] : []), [requests, user?.id, access.roleIds, access.roleCodes]);
 
   // ─── State ─────────────────────────────────────────────────────────
 
@@ -81,14 +97,15 @@ export default function LeaveManagement() {
 
   const handleCancelRequest = useCallback(async () => {
     if (!selectedRequest || !user) return;
-    const { error } = await reviewLeaveRequest(selectedRequest.id, user.id, 'cancelled');
-    if (error) {
-      toast({ title: 'Error', description: error, variant: 'destructive' });
+    try {
+      await cancelLeaveRequest(selectedRequest.id);
+    } catch (error) {
+      toast({ title: 'Error', description: error instanceof Error ? error.message : String(error), variant: 'destructive' });
       return;
     }
     toast({ title: 'Request cancelled' });
     setDrawerOpen(false);
-    void queryClient.invalidateQueries({ queryKey: ['leave-control-center'] });
+    void queryClient.invalidateQueries({ queryKey: ['leave-management'] });
   }, [selectedRequest, user, toast, queryClient]);
 
   // Determine if current user can review the selected request
@@ -100,15 +117,15 @@ export default function LeaveManagement() {
   }, [selectedRequest, user, isApprover, isManager]);
 
   // Handle approval inbox actions
-  const handleInboxApprove = useCallback((pa: PendingApproval) => {
+  const handleInboxApprove = useCallback((pa: LeaveApprovalItem) => {
     startReview('approved', pa.entityId);
   }, [startReview]);
 
-  const handleInboxReject = useCallback((pa: PendingApproval) => {
+  const handleInboxReject = useCallback((pa: LeaveApprovalItem) => {
     startReview('rejected', pa.entityId);
   }, [startReview]);
 
-  const handleInboxViewDetails = useCallback((pa: PendingApproval) => {
+  const handleInboxViewDetails = useCallback((pa: LeaveApprovalItem) => {
     // Find the matching leave request for full detail view
     const req = requests.find(r => r.id === pa.entityId);
     if (req) openDrawer(req);

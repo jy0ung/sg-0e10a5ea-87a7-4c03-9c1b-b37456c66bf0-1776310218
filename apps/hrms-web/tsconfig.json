@@ -3,7 +3,11 @@
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleDetection": "force",
     "moduleResolution": "bundler",
@@ -12,31 +16,73 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {
-      "@/components/ui/*": ["../../packages/ui/src/*"],
-      "@/hooks/use-toast": ["../../packages/ui/src/hooks/use-toast.ts"],
-      "@/hooks/use-mobile": ["../../packages/ui/src/hooks/use-mobile.tsx"],
-      "@/*": ["../../src/*"],
-      "@hrms-web/*": ["./src/*"],
-      "@flc/auth": ["../../packages/auth/src/index.ts"],
-      "@flc/types": ["../../packages/types/src/index.ts"],
-      "@flc/supabase/client": ["../../packages/supabase/src/client.ts"],
-      "@flc/supabase/types": ["../../packages/supabase/src/types.ts"],
-      "@flc/supabase/useSupabaseChannel": ["../../packages/supabase/src/useSupabaseChannel.ts"],
-      "@flc/supabase": ["../../packages/supabase/src/index.ts"],
-      "@flc/shell": ["../../packages/shell/src/index.ts"],
-      "@flc/hrms-schemas": ["../../packages/hrms-schemas/src/index.ts"],
-      "@flc/hrms-services/access": ["../../packages/hrms-services/src/access/access.ts"],
-      "@flc/hrms-services": ["../../packages/hrms-services/src/index.ts"],
-      "@flc/internal-requests": ["../../packages/internal-requests/src/index.ts"],
-      "@flc/platform-services": ["../../packages/platform-services/src/index.ts"],
-      "@flc/ui/*": ["../../packages/ui/src/*"]
+      "@/components/ui/*": [
+        "../../packages/ui/src/*"
+      ],
+      "@/hooks/use-toast": [
+        "../../packages/ui/src/hooks/use-toast.ts"
+      ],
+      "@/hooks/use-mobile": [
+        "../../packages/ui/src/hooks/use-mobile.tsx"
+      ],
+      "@/*": [
+        "./src/*"
+      ],
+      "@hrms-web/*": [
+        "./src/*"
+      ],
+      "@flc/auth": [
+        "../../packages/auth/src/index.ts"
+      ],
+      "@flc/types": [
+        "../../packages/types/src/index.ts"
+      ],
+      "@flc/supabase/client": [
+        "../../packages/supabase/src/client.ts"
+      ],
+      "@flc/supabase/types": [
+        "../../packages/supabase/src/types.ts"
+      ],
+      "@flc/supabase/useSupabaseChannel": [
+        "../../packages/supabase/src/useSupabaseChannel.ts"
+      ],
+      "@flc/supabase": [
+        "../../packages/supabase/src/index.ts"
+      ],
+      "@flc/shell": [
+        "../../packages/shell/src/index.ts"
+      ],
+      "@flc/hrms-schemas": [
+        "../../packages/hrms-schemas/src/index.ts"
+      ],
+      "@flc/hrms-services/access": [
+        "../../packages/hrms-services/src/access/access.ts"
+      ],
+      "@flc/hrms-services": [
+        "../../packages/hrms-services/src/index.ts"
+      ],
+      "@flc/internal-requests": [
+        "../../packages/internal-requests/src/index.ts"
+      ],
+      "@flc/platform-services": [
+        "../../packages/platform-services/src/index.ts"
+      ],
+      "@flc/ui/*": [
+        "../../packages/ui/src/*"
+      ]
     },
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": false,
     "target": "ES2020",
-    "types": ["vite/client", "@testing-library/jest-dom"],
-    "useDefineForClassFields": true
+    "types": [
+      "vite/client",
+      "@testing-library/jest-dom"
+    ],
+    "useDefineForClassFields": true,
+    "strictNullChecks": true
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

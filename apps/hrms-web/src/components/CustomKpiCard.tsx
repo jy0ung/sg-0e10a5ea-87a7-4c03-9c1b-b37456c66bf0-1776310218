@@ -2,8 +2,8 @@ import React from 'react';
 import { Sparkles, Target, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import type { CustomKpiEvaluation, CustomKpiFormula } from '@/lib/customKpiFormula';
-import { CUSTOM_KPI_AGGREGATION_LABELS, CUSTOM_KPI_SOURCE_LABELS } from '@/lib/customKpiFormula';
+import type { CustomKpiEvaluation, CustomKpiFormula } from '@hrms-web/lib/customKpiFormula';
+import { CUSTOM_KPI_AGGREGATION_LABELS, CUSTOM_KPI_SOURCE_LABELS } from '@hrms-web/lib/customKpiFormula';
 
 export interface CustomKpiCardProps {
   title: string;

@@ -335,7 +335,7 @@ export async function getPendingApprovalsForUser(
       isEligible = true;
     } else if (step.approver_type === 'role' && step.approver_role) {
       const assigned = await userHasAssignedHrmsRole(companyId, approverId, String(step.approver_role));
-      isEligible = !assigned.error && assigned.data;
+      isEligible = assigned;
     } else if (step.approver_type === 'direct_manager') {
       const requesterRow = req.requester as Record<string, unknown> | null;
       if (requesterRow?.manager_id === approverId) isEligible = true;

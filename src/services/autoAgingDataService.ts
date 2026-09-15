@@ -23,7 +23,12 @@ export interface AutoAgingContextData {
   hasAuthError: boolean;
 }
 
-function mapDbVehicle(row: Record<string, unknown>): VehicleCanonical {
+type VehicleRow = Database['public']['Tables']['vehicles']['Row'];
+type ImportBatchRow = Database['public']['Tables']['import_batches']['Row'];
+type QualityIssueRow = Database['public']['Tables']['quality_issues']['Row'];
+type SlaPolicyRow = Database['public']['Tables']['sla_policies']['Row'];
+
+function mapDbVehicle(row: VehicleRow): VehicleCanonical {
   return {
     id: String(row.id || ''),
     chassis_no: String(row.chassis_no || ''),
@@ -71,7 +76,7 @@ function mapDbVehicle(row: Record<string, unknown>): VehicleCanonical {
   };
 }
 
-function mapDbBatch(row: Record<string, unknown>): ImportBatch {
+function mapDbBatch(row: ImportBatchRow): ImportBatch {
   return {
     id: String(row.id || ''),
     fileName: String(row.file_name || 'Unknown'),
@@ -89,7 +94,7 @@ function mapDbBatch(row: Record<string, unknown>): ImportBatch {
   };
 }
 
-function mapDbIssue(row: Record<string, unknown>): DataQualityIssue {
+function mapDbIssue(row: QualityIssueRow): DataQualityIssue {
   return {
     id: String(row.id || ''),
     chassisNo: String(row.chassis_no || ''),
@@ -101,7 +106,7 @@ function mapDbIssue(row: Record<string, unknown>): DataQualityIssue {
   };
 }
 
-function mapDbSla(row: Record<string, unknown>): SlaPolicy {
+function mapDbSla(row: SlaPolicyRow): SlaPolicy {
   return {
     id: String(row.id || ''),
     kpiId: String(row.kpi_id || ''),
@@ -167,7 +172,7 @@ export async function fetchAutoAgingImportBatches(companyId: string): Promise<{ 
     .order('created_at', { ascending: false });
   if (error) loggingService.error('Failed to load import batches', { error }, 'AutoAgingDataService');
   return {
-    data: (data ?? []).map(row => mapDbBatch(row as unknown as Record<string, unknown>)),
+    data: (data ?? []).map(row => mapDbBatch(row)),
     error,
     hasAuthError: isAuthLikeError(error),
   };
@@ -181,7 +186,7 @@ export async function fetchAutoAgingQualityIssues(companyId: string): Promise<{ 
     .order('created_at', { ascending: false });
   if (error) loggingService.error('Failed to load quality issues', { error }, 'AutoAgingDataService');
   return {
-    data: (data ?? []).map(row => mapDbIssue(row as unknown as Record<string, unknown>)),
+    data: (data ?? []).map(row => mapDbIssue(row)),
     error,
     hasAuthError: isAuthLikeError(error),
   };
@@ -194,7 +199,7 @@ export async function fetchAutoAgingSlaPolicies(companyId: string): Promise<{ da
     .eq('company_id', companyId);
   if (error) loggingService.error('Failed to load SLA policies', { error }, 'AutoAgingDataService');
   return {
-    data: (data ?? []).map(row => mapDbSla(row as unknown as Record<string, unknown>)),
+    data: (data ?? []).map(row => mapDbSla(row)),
     error,
     hasAuthError: isAuthLikeError(error),
   };
@@ -224,7 +229,7 @@ async function fetchAllVehicles(
     }
 
     let duplicateCount = 0;
-    const rows = (data ?? []).map(row => mapDbVehicle(row as unknown as Record<string, unknown>));
+    const rows = (data ?? []).map(row => mapDbVehicle(row));
     for (const row of rows) {
       if (!row.id || seenRowIds.has(row.id)) {
         duplicateCount += 1;
@@ -284,9 +289,9 @@ export async function fetchAutoAgingContextData(
     .some(error => isAuthLikeError(error));
 
   const dbVehicles = vehiclesRes.data ?? [];
-  const dbBatches = (batchesRes.data || []).map(row => mapDbBatch(row as unknown as Record<string, unknown>));
-  const dbIssues = (issuesRes.data || []).map(row => mapDbIssue(row as unknown as Record<string, unknown>));
-  const dbSlas = (slasRes.data || []).map(row => mapDbSla(row as unknown as Record<string, unknown>));
+  const dbBatches = (batchesRes.data || []).map(row => mapDbBatch(row));
+  const dbIssues = (issuesRes.data || []).map(row => mapDbIssue(row));
+  const dbSlas = (slasRes.data || []).map(row => mapDbSla(row));
 
   performanceService.endQueryTimer(queryId, 'data_reload');
   if (errors.length > 0) {
@@ -473,5 +478,5 @@ export async function getQualityIssuesByChassis(
     return [];
   }
 
-  return (data ?? []).map(row => mapDbIssue(row as unknown as Record<string, unknown>));
+  return (data ?? []).map(row => mapDbIssue(row));
 }

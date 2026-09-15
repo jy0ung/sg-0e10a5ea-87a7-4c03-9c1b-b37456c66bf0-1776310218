@@ -196,6 +196,7 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
   // ── Save ────────────────────────────────────────────────────────────────────
 
   async function handleSave() {
+    if (!user) return;
     const payload: ApprovalFlowFormData = { ...form, steps: steps as ApprovalFlowFormData['steps'] };
     const parsed = approvalFlowWithStepsSchema.safeParse(payload);
     if (!parsed.success) {
@@ -256,13 +257,14 @@ export default function ApprovalFlows({ embedded = false }: ApprovalFlowsProps =
   }
 
   async function handleToggleActive(flow: ApprovalFlow) {
+    if (!user) return;
     const { error } = await toggleApprovalFlowActive(companyId, flow.id, !flow.isActive, user.id);
     if (error) { toast({ title: 'Error', description: error, variant: 'destructive' }); }
     void queryClient.invalidateQueries({ queryKey: ['approval-flows', companyId] });
   }
 
   async function handleDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !user) return;
     const { error } = await deleteApprovalFlow(companyId, deleteTarget.id, user.id);
     if (error) toast({ title: 'Error', description: error, variant: 'destructive' });
     else toast({ title: 'Flow deleted' });

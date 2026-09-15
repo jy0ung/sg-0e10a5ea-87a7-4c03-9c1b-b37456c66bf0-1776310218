@@ -90,14 +90,14 @@ export default function DealList() {
   const columns = [
     {
       key: 'deal_no',
-      header: 'Deal No',
+      label: 'Deal No',
       render: (deal: Deal) => (
         <span className="font-medium">{deal.deal_no}</span>
       ),
     },
     {
       key: 'customer_name',
-      header: 'Customer',
+      label: 'Customer',
       render: (deal: Deal) => (
         <div>
           <p className="font-medium">{deal.customer_name}</p>
@@ -109,7 +109,7 @@ export default function DealList() {
     },
     {
       key: 'model',
-      header: 'Vehicle',
+      label: 'Vehicle',
       render: (deal: Deal) => (
         <div>
           <p>{deal.model_name}</p>
@@ -121,29 +121,29 @@ export default function DealList() {
     },
     {
       key: 'stage',
-      header: 'Stage',
+      label: 'Stage',
       render: (deal: Deal) => (
         <Badge variant="outline">{getStageLabel(deal.stage)}</Badge>
       ),
     },
     {
       key: 'responsible',
-      header: 'Responsible',
+      label: 'Responsible',
       render: (deal: Deal) => getResponsibleParty(deal.stage),
     },
     {
       key: 'advisor',
-      header: 'Advisor',
+      label: 'Advisor',
       render: (deal: Deal) => deal.sales_advisor_name || '—',
     },
     {
       key: 'amount',
-      header: 'Amount',
+      label: 'Amount',
       render: (deal: Deal) => deal.total_amount ? `RM ${deal.total_amount.toLocaleString()}` : '—',
     },
     {
       key: 'created',
-      header: 'Created',
+      label: 'Created',
       render: (deal: Deal) => new Date(deal.created_at).toLocaleDateString(),
     },
   ];
@@ -152,7 +152,7 @@ export default function DealList() {
     <div className="space-y-4 animate-fade-in">
       <PageHeader
         title="Deals"
-        subtitle={`${total} deals`}
+        description={`${total} deals`}
       />
 
       {/* Filters */}

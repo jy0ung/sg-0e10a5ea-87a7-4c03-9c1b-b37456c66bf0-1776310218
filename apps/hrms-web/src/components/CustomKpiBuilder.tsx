@@ -19,7 +19,7 @@ import {
   type CustomKpiOperator,
   type CustomKpiSource,
   type CustomKpiTarget,
-} from '@/lib/customKpiFormula';
+} from '@hrms-web/lib/customKpiFormula';
 
 const AGGREGATIONS: CustomKpiAggregation[] = ['count', 'sum', 'avg', 'min', 'max', 'median'];
 const OPERATORS: CustomKpiOperator[] = [

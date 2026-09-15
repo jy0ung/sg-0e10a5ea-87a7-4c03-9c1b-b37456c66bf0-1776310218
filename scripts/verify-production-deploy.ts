@@ -6,6 +6,9 @@ const DEFAULT_FORBIDDEN_PATTERNS = [
   'http://127.0.0.1:54321',
   'http://localhost:54321',
   'http://192.168.',
+  'sb_secret_',
+  'c2VydmljZV9yb2xl',
+  '-----BEGIN PRIVATE KEY-----',
 ];
 
 type CheckResult = {
@@ -131,15 +134,19 @@ function buildFakeSession() {
 }
 
 async function fetchText(url: URL): Promise<string> {
+  return (await fetchResponse(url)).text();
+}
+
+async function fetchResponse(url: URL, init?: RequestInit): Promise<Response> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxFetchAttempts; attempt += 1) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, init);
       if (!response.ok) {
         throw new Error(`${url.toString()} returned HTTP ${response.status}`);
       }
-      return response.text();
+      return response;
     } catch (error) {
       lastError = error;
       if (attempt < maxFetchAttempts) {
@@ -149,6 +156,61 @@ async function fetchText(url: URL): Promise<string> {
   }
 
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+async function checkTransportAndHeaders() {
+  const name = 'HTTPS and security headers';
+  try {
+    if (targetUrl.protocol !== 'https:' || healthUrl.protocol !== 'https:') {
+      addResult(name, false, 'application and health URLs must use HTTPS');
+      return;
+    }
+
+    const response = await fetchResponse(targetUrl);
+    const requiredHeaders: Array<[string, RegExp]> = [
+      ['content-security-policy', /.+/],
+      ['strict-transport-security', /max-age=/i],
+      ['x-content-type-options', /^nosniff$/i],
+      ['x-frame-options', /^(deny|sameorigin)$/i],
+      ['cache-control', /no-store/i],
+    ];
+    const missing = requiredHeaders
+      .filter(([header, expected]) => !expected.test(response.headers.get(header) ?? ''))
+      .map(([header]) => header);
+    addResult(name, missing.length === 0, missing.length ? `missing or invalid: ${missing.join(', ')}` : targetUrl.origin);
+  } catch (error) {
+    fail(name, error);
+  }
+}
+
+async function checkAnonymousRouteAndMixedContent() {
+  const name = 'anonymous route and mixed-content boundary';
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  const insecureRequests: string[] = [];
+  page.on('request', (request) => {
+    if (targetUrl.protocol === 'https:' && request.url().startsWith('http://')) {
+      insecureRequests.push(request.url());
+    }
+  });
+
+  try {
+    const protectedPath = appMode === 'hrms-web' ? '/leave' : '/home';
+    await page.goto(new URL(protectedPath, targetUrl).toString(), {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    });
+    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: 20_000 });
+    addResult(
+      name,
+      insecureRequests.length === 0,
+      insecureRequests.length ? `insecure request: ${insecureRequests[0]}` : `redirected to ${new URL(page.url()).pathname}`,
+    );
+  } catch (error) {
+    fail(name, error);
+  } finally {
+    await browser.close();
+  }
 }
 
 function addResult(name: string, ok: boolean, detail?: string) {
@@ -242,7 +304,30 @@ async function checkLoginFlow() {
     const errorVisible = await page
       .locator('text=/incorrect email or password|invalid login credentials|unable to connect/i')
       .count();
-    addResult(name, sessionStored && errorVisible === 0, `redirected to ${new URL(page.url()).pathname}`);
+    if (!sessionStored || errorVisible > 0) {
+      addResult(name, false, `redirected to ${new URL(page.url()).pathname}`);
+      return;
+    }
+
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 20_000 });
+    const sessionAfterReload = await page.evaluate(
+      (storageKey) => Boolean(window.localStorage.getItem(storageKey)),
+      authStorageKey,
+    );
+    if (!sessionAfterReload) {
+      addResult(name, false, 'session did not survive a full page reload');
+      return;
+    }
+
+    const signOutButton = page.getByRole('button', { name: /sign out/i }).first();
+    await signOutButton.click({ timeout: 15_000 });
+    await page.waitForURL((url) => url.pathname.includes('/login'), { timeout: 20_000 });
+    const sessionAfterLogout = await page.evaluate(
+      (storageKey) => Boolean(window.localStorage.getItem(storageKey)),
+      authStorageKey,
+    );
+    addResult(name, !sessionAfterLogout, 'login, reload persistence, and logout passed');
   } catch (error) {
     fail(name, error);
   } finally {
@@ -371,9 +456,11 @@ async function checkHrmsWebShell() {
   }
 }
 
+await checkTransportAndHeaders();
 await checkHealth();
 await checkBundleSupabaseConfig();
 await checkBundleHrmsAppUrl();
+await checkAnonymousRouteAndMixedContent();
 await checkLoginFlow();
 await checkHrmsWebShell();
 

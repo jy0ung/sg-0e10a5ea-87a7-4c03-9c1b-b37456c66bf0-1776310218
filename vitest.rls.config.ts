@@ -5,8 +5,16 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    fileParallelism: false,
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/test/rls-matrix.spec.ts', 'src/test/dms-normalizer.spec.ts', 'src/test/sales-pipeline.spec.ts'],
+    include: [
+      'src/test/rls-matrix.spec.ts',
+      'src/test/dms-normalizer.spec.ts',
+      'src/test/sales-pipeline.spec.ts',
+      'src/test/ap-foundation.spec.ts',
+      'src/test/production-readiness.spec.ts',
+      'src/test/release-workflows.spec.ts',
+    ],
     exclude: ['**/node_modules/**', '**/dist/**'],
   },
   resolve: {

@@ -34,7 +34,7 @@ function resolveBrowserOrigin(): string {
   return (
     process.env.E2E_BASE_URL ||
     process.env.BASE_URL ||
-    "http://localhost:3001"
+    `http://localhost:${process.env.E2E_PORT ?? 3001}`
   ).replace(/\/$/, "");
 }
 

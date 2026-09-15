@@ -15,6 +15,8 @@ export type PlatformSectionName =
   | 'Internal Requests';
 
 export type PlatformIconKey =
+  | 'archive'
+  | 'plus'
   | 'alert-triangle'
   | 'arrow-left-right'
   | 'bar-chart'

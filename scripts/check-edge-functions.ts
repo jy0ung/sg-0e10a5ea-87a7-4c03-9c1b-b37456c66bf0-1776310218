@@ -65,6 +65,11 @@ for (const filePath of getFunctionEntryFiles()) {
   }
 }
 
+const rateLimitSource = readFileSync(join(sharedDir, 'rateLimit.ts'), 'utf8');
+if (/function\s+failOpen\b/.test(rateLimitSource) || /allowed:\s*true[\s\S]{0,240}X-RateLimit-Failover/.test(rateLimitSource)) {
+  addFinding(join(sharedDir, 'rateLimit.ts'), 'privileged edge-function rate limiting must fail closed when its backing RPC is unavailable');
+}
+
 if (findings.length > 0) {
   console.error('Edge function security check failed:');
   for (const finding of findings) {

@@ -30,6 +30,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
   getDeal,
+  getDocuments,
+  uploadDocument,
+  type DealDocument,
   updateDeal,
   advanceStage,
   setupLoan,
@@ -105,12 +108,12 @@ export default function DealDetail() {
     try {
       const { data, error } = await searchVehicles({ search: vehicleSearch.trim(), limit: 10 });
       if (!error && data?.rows) {
-        setVehicleResults(data.rows.map((v: Record<string, unknown>) => ({
+        setVehicleResults(data.rows.map((v) => ({
           id: String(v.id || v.chassis_no || ''),
-          chassis_no: String(v.chassis_no || v.chassisNo || ''),
-          model: String(v.model || v.model_name || ''),
-          colour: String(v.colour || ''),
-          branch_code: String(v.branch_code || v.branchCode || ''),
+          chassis_no: String(v.chassis_no || ''),
+          model: String(v.model || ''),
+          colour: String(v.color || ''),
+          branch_code: String(v.branch_code || ''),
         })));
       }
     } catch {

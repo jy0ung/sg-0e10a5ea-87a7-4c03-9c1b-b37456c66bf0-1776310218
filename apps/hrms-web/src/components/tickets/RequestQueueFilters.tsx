@@ -59,7 +59,7 @@ export function RequestQueueFilters({
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="active">Active ({(counts.open ?? 0) + (counts.in_progress ?? 0) + (counts.awaiting_requester ?? 0)})</SelectItem>
+            <SelectItem value="active">Active ({(counts.open ?? 0) + (counts.in_progress ?? 0) + (counts.pending_requester ?? 0)})</SelectItem>
             <SelectItem value="all">All statuses ({counts.all})</SelectItem>
             {statusOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>

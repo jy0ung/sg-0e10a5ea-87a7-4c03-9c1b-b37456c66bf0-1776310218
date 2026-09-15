@@ -117,17 +117,17 @@ describe('authFlows', () => {
   });
 
   it('subscribes only to password recovery auth events', () => {
-    let authCallback: ((event: string) => void) | null = null;
+    const callbacks: Parameters<typeof supabase.auth.onAuthStateChange>[0][] = [];
     const unsubscribe = vi.fn();
     vi.mocked(supabase.auth.onAuthStateChange).mockImplementation((callback) => {
-      authCallback = callback as (event: string) => void;
+      callbacks.push(callback);
       return { data: { subscription: { unsubscribe } } } as never;
     });
     const onRecovery = vi.fn();
 
     const subscription = subscribeToPasswordRecovery(onRecovery);
-    authCallback?.('SIGNED_IN');
-    authCallback?.('PASSWORD_RECOVERY');
+    callbacks[0]('SIGNED_IN', null);
+    callbacks[0]('PASSWORD_RECOVERY', null);
 
     expect(onRecovery).toHaveBeenCalledTimes(1);
     subscription.unsubscribe();

@@ -23,6 +23,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
+      - name: Repository hygiene
+        run: npm run check:repo-hygiene
       - name: ESLint
         run: npm run lint
 
@@ -58,6 +60,9 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Build HRMS web
+        run: npm run build --workspace=@flc/hrms-web
+
       - name: Bundle budget
         run: npm run bundle:budget
 
@@ -83,11 +88,10 @@ jobs:
         run: npm run build
         working-directory: apps/hrms-mobile
 
-  # ── Dependency audit (non-blocking until baseline is clean) ─────────────────
+  # ── Dependency audit ─────────────────
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -95,8 +99,25 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - name: npm audit (high+ severity)
-        run: npm audit --audit-level=high
+      - name: npm audit (all severities)
+        run: npm audit --audit-level=low
+
+  production-readiness:
+    name: Production Readiness (local Supabase)
+    runs-on: ubuntu-latest
+    needs: [web]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.98.2
+      - run: npm ci
+      - name: Rebuild migrations and run live authorization tests
+        run: npm run test:integration
 
   # ── End-to-end (Playwright manages its own dev server) ──────────────────────
   e2e:

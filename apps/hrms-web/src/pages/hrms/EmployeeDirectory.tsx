@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { StatusBadge } from '@/components/shared/StatusBadge';
+import { StatusBadge } from '@hrms-web/components/shared/StatusBadge';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -330,7 +330,7 @@ export default function EmployeeDirectory() {
 
   // ── Save edit ──
   const handleEdit = async () => {
-    if (!editTarget || !editForm) return;
+    if (!editTarget || !editForm || !user) return;
     setEditSaving(true);
     const input: UpdateEmployeeInput = {
       name:         editForm.name,
@@ -360,6 +360,7 @@ export default function EmployeeDirectory() {
 
   // ── Quick status toggle ──
   const toggleStatus = async (emp: Employee) => {
+    if (!user) return;
     const next: EmployeeStatus = emp.status === 'active' ? 'inactive' : 'active';
     const { error } = await updateEmployee(emp.id, { status: next }, user?.id, user.companyId);
     if (error) {

@@ -119,7 +119,7 @@ async function seedAppraisalItemsForCycle(
     reviewer_id:  e.managerId
       ? (reviewerProfileIds.get(e.managerId) ?? fallbackReviewerId)
       : fallbackReviewerId,
-    status: 'pending',
+    status: 'pending' as const,
   }));
 
   const { error: itemError } = await supabase.from('appraisal_items').insert(items);

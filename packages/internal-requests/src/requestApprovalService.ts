@@ -122,57 +122,60 @@ export async function getInternalRequestApprovalPlan(
   requesterId: string,
   options: InternalRequestApprovalPlanOptions = {},
 ): Promise<{ data: InternalRequestApprovalPlan | null; error: string | null }> {
-  // Look up requester's department for department-scoped flow resolution
-  const { data: requesterProfile } = await supabase.from('profiles')
-    .select('department_id')
-    .eq('id', requesterId)
-    .maybeSingle();
-  const departmentId = requesterProfile?.department_id ?? null;
+  try {
+    // Look up requester's department for department-scoped flow resolution
+    const { data: requesterProfile } = await supabase.from('profiles')
+      .select('department_id')
+      .eq('id', requesterId)
+      .maybeSingle();
+    const departmentId = requesterProfile?.department_id ?? null;
 
-  // Resolution order (most specific wins):
-  //   1. subcategory pin — migration 20260527020000_request_subcategories_approval_flow_fk
-  //   2. category pin    — migration 20260518030000_request_categories_approval_flow_fk
-  //   3. department-scoped / company-default scorer in approvalFlowService
-  // Lookups are sequenced rather than parallel because the more specific pin
-  // short-circuits the rest; if subcategoryKey is unset, the call is a no-op
-  // round-trip back to the caller.
-  const subcategoryPinnedFlowId = await getSubcategoryPinnedFlowId(
-    companyId,
-    options.categoryKey,
-    options.subcategoryKey,
-  );
-  const categoryPinnedFlowId = subcategoryPinnedFlowId
-    ?? await getCategoryPinnedFlowId(companyId, options.categoryKey);
-  const flowId = categoryPinnedFlowId
-    ?? await resolveApprovalFlowId(companyId, 'internal_request', departmentId);
-  if (!flowId) return { data: null, error: null };
+    // Resolution order (most specific wins):
+    //   1. subcategory pin — migration 20260527020000_request_subcategories_approval_flow_fk
+    //   2. category pin    — migration 20260518030000_request_categories_approval_flow_fk
+    //   3. department-scoped / company-default scorer in approvalFlowService
+    // Lookups are sequenced rather than parallel because the more specific pin
+    // short-circuits the rest; if subcategoryKey is unset, the call is a no-op
+    // round-trip back to the caller.
+    const subcategoryPinnedFlowId = await getSubcategoryPinnedFlowId(
+      companyId,
+      options.categoryKey,
+      options.subcategoryKey,
+    );
+    const categoryPinnedFlowId = subcategoryPinnedFlowId
+      ?? await getCategoryPinnedFlowId(companyId, options.categoryKey);
+    const flowId = categoryPinnedFlowId
+      ?? await resolveApprovalFlowId(companyId, 'internal_request', departmentId);
+    if (!flowId) return { data: null, error: null };
 
-  const { data: steps, error: stepsError } = await supabase.from('approval_steps')
-    .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
-    .eq('flow_id', flowId)
-    .order('step_order');
+    const { data: steps, error: stepsError } = await supabase.from('approval_steps')
+      .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
+      .eq('flow_id', flowId)
+      .order('step_order');
 
-  if (stepsError) return { data: null, error: stepsError.message };
-  if (!steps?.length) return { data: null, error: 'The configured approval flow has no steps. Please contact HR/Admin.' };
+    if (stepsError) return { data: null, error: stepsError.message };
+    if (!steps?.length) return { data: null, error: 'The configured approval flow has no steps. Please contact HR/Admin.' };
 
-  const firstStep = (steps as Record<string, unknown>[])
-    .map((row) => rowToApprovalStep(row))
-    .find((step: ApprovalStepRecord) => step.isActive);
-  if (!firstStep) return { data: null, error: 'The configured approval flow has no active steps. Please contact HR/Admin.' };
-  const routing = await resolveStepRouting(firstStep, requesterId, companyId);
-  if (routing.error) return { data: null, error: routing.error };
+    const firstStep = (steps as Record<string, unknown>[])
+      .map((row) => rowToApprovalStep(row))
+      .find((step: ApprovalStepRecord) => step.isActive);
+    if (!firstStep) return { data: null, error: 'The configured approval flow has no active steps. Please contact HR/Admin.' };
+    const routing = await resolveStepRouting(firstStep, requesterId, companyId);
 
-  return {
-    data: {
-      flowId,
-      firstStepId: firstStep.id,
-      firstStepOrder: firstStep.stepOrder,
-      firstStepName: firstStep.name,
-      approverRole: routing.approverRole,
-      approverUserId: routing.approverUserId,
-    },
-    error: null,
-  };
+    return {
+      data: {
+        flowId,
+        firstStepId: firstStep.id,
+        firstStepOrder: firstStep.stepOrder,
+        firstStepName: firstStep.name,
+        approverRole: routing.approverRole,
+        approverUserId: routing.approverUserId,
+      },
+      error: null,
+    };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function createInternalRequestApprovalInstance(
@@ -255,168 +258,166 @@ export async function reviewInternalRequestApproval(
   note: string | undefined,
   context: { userId: string; companyId: string },
 ): Promise<{ error: string | null }> {
-  const { data: ticket, error: ticketError } = await supabase.from('tickets')
-    .select('id, company_id, submitted_by, subject, status')
-    .eq('company_id', context.companyId)
-    .eq('id', ticketId)
-    .single();
-  if (ticketError) return { error: ticketError.message };
-  if (!ticket) return { error: 'Request not found.' };
+  try {
+    const { data: ticket, error: ticketError } = await supabase.from('tickets')
+      .select('id, company_id, submitted_by, subject, status')
+      .eq('company_id', context.companyId)
+      .eq('id', ticketId)
+      .single();
+    if (ticketError) return { error: ticketError.message };
+    if (!ticket) return { error: 'Request not found.' };
 
-  const { data: approvalRow, error: approvalError } = await supabase.from('approval_instances')
-    .select('id, flow_id, requester_id, status, current_step_id, current_step_order, current_step_name, current_approver_role, current_approver_user_id')
-    .eq('company_id', context.companyId)
-    .eq('entity_type', 'internal_request')
-    .eq('entity_id', ticketId)
-    .maybeSingle();
-  if (approvalError) return { error: approvalError.message };
-  if (!approvalRow) return { error: 'This request does not have an approval workflow.' };
+    const { data: approvalRow, error: approvalError } = await supabase.from('approval_instances')
+      .select('id, flow_id, requester_id, status, current_step_id, current_step_order, current_step_name, current_approver_role, current_approver_user_id')
+      .eq('company_id', context.companyId)
+      .eq('entity_type', 'internal_request')
+      .eq('entity_id', ticketId)
+      .maybeSingle();
+    if (approvalError) return { error: approvalError.message };
+    if (!approvalRow) return { error: 'This request does not have an approval workflow.' };
 
-  const approval = approvalRow as Record<string, unknown>;
-  if (approval.status !== 'pending') return { error: `This request approval is already ${approval.status}.` };
+    const approval = approvalRow as Record<string, unknown>;
+    if (approval.status !== 'pending') return { error: `This request approval is already ${approval.status}.` };
 
-  const { data: stepRows, error: stepsError } = await supabase.from('approval_steps')
-    .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
-    .eq('flow_id', String(approval.flow_id))
-    .order('step_order');
-  if (stepsError) return { error: stepsError.message };
+    const { data: stepRows, error: stepsError } = await supabase.from('approval_steps')
+      .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
+      .eq('flow_id', String(approval.flow_id))
+      .order('step_order');
+    if (stepsError) return { error: stepsError.message };
 
-  const steps: ApprovalStepRecord[] = (stepRows as Record<string, unknown>[] ?? [])
-    .map((row) => rowToApprovalStep(row))
-    .filter((step: ApprovalStepRecord) => step.isActive);
-  const currentStep = steps.find((step: ApprovalStepRecord) => step.id === approval.current_step_id)
-    ?? steps.find((step: ApprovalStepRecord) => step.stepOrder === Number(approval.current_step_order));
-  if (!currentStep) return { error: 'The current approval step could not be resolved.' };
+    const steps: ApprovalStepRecord[] = (stepRows as Record<string, unknown>[] ?? [])
+      .map((row) => rowToApprovalStep(row))
+      .filter((step: ApprovalStepRecord) => step.isActive);
+    const currentStep = steps.find((step: ApprovalStepRecord) => step.id === approval.current_step_id)
+      ?? steps.find((step: ApprovalStepRecord) => step.stepOrder === Number(approval.current_step_order));
+    if (!currentStep) return { error: 'The current approval step could not be resolved.' };
 
-  const requesterId = String(approval.requester_id ?? ticket.submitted_by ?? '');
-  if (requesterId === context.userId && !currentStep.allowSelfApproval) {
-    return { error: 'You cannot approve or reject your own request.' };
-  }
+    const requesterId = String(approval.requester_id ?? ticket.submitted_by ?? '');
+    if (requesterId === context.userId && !currentStep.allowSelfApproval) {
+      return { error: 'You cannot approve or reject your own request.' };
+    }
 
-  let isAssignedApprover = Boolean(approval.current_approver_user_id) && approval.current_approver_user_id === context.userId;
-  if (currentStep.approverType === 'role' && approval.current_approver_role) {
-    const assigned = await userHasAssignedHrmsRole(context.companyId, context.userId, String(approval.current_approver_role));
-    if (assigned.error) return { error: assigned.error };
-    isAssignedApprover = assigned.data;
-  }
-  if (!isAssignedApprover) return { error: 'You are not the assigned approver for the current step.' };
+    let isAssignedApprover = Boolean(approval.current_approver_user_id) && approval.current_approver_user_id === context.userId;
+    if (currentStep.approverType === 'role' && approval.current_approver_role) {
+      const assigned = await userHasAssignedHrmsRole(context.companyId, context.userId, String(approval.current_approver_role));
+      isAssignedApprover = assigned;
+    }
+    if (!isAssignedApprover) return { error: 'You are not the assigned approver for the current step.' };
 
-  const nextStep = decision === 'approved'
-    ? steps.find((step: ApprovalStepRecord) => step.stepOrder > currentStep.stepOrder)
-    : undefined;
-  const nextRouting = nextStep
-    ? await resolveStepRouting(nextStep, requesterId, context.companyId)
-    : { approverRole: null, approverUserId: null, error: null };
-  if (nextRouting.error) return { error: nextRouting.error };
+    const nextStep = decision === 'approved'
+      ? steps.find((step: ApprovalStepRecord) => step.stepOrder > currentStep.stepOrder)
+      : undefined;
+    const nextRouting = nextStep
+      ? await resolveStepRouting(nextStep, requesterId, context.companyId)
+      : { approverRole: null, approverUserId: null, error: null };
 
-  const decidedAt = new Date().toISOString();
-  const normalizedNote = note?.trim() ? note.trim() : null;
-  // The generated types still mark approval_request_id as required on this
-  // insert, but a later migration made it nullable for entity-driven decisions.
-  // Until types are regenerated, narrow the insert payload here.
-  const { error: decisionError } = await supabase
-    .from('approval_decisions')
-    .insert({
-      instance_id: String(approval.id),
-      step_id: currentStep.id,
-      step_order: currentStep.stepOrder,
-      approver_id: context.userId,
+    const decidedAt = new Date().toISOString();
+    const normalizedNote = note?.trim() ? note.trim() : null;
+    const { error: decisionError } = await supabase
+      .from('approval_decisions')
+      .insert({
+        instance_id: String(approval.id),
+        step_id: currentStep.id,
+        step_order: currentStep.stepOrder,
+        approver_id: context.userId,
+        decision,
+        note: normalizedNote,
+        decided_at: decidedAt,
+      });
+    if (decisionError) return { error: decisionError.message };
+
+    if (decision === 'rejected') {
+      const [{ error: workflowError }, { error: requestError }, { error: activityError }] = await Promise.all([
+        supabase.from('approval_instances')
+          .update({
+            status: 'rejected',
+            current_step_id: null,
+            current_step_order: null,
+            current_step_name: null,
+            current_approver_role: null,
+            current_approver_user_id: null,
+            updated_at: decidedAt,
+          })
+          .eq('id', String(approval.id)),
+        supabase.from('tickets')
+          .update({
+            status: 'cancelled',
+            resolved_at: decidedAt,
+            resolution_note: normalizedNote ?? 'Request rejected during approval.',
+          })
+          .eq('company_id', context.companyId)
+          .eq('id', ticketId),
+        supabase.from('ticket_activity').insert({
+          ticket_id: ticketId,
+          company_id: context.companyId,
+          actor_id: context.userId,
+          event_type: 'status_changed',
+          message: 'Request rejected during approval.',
+          metadata: { before: ticket.status, after: 'cancelled', approvalStep: currentStep.name, note: normalizedNote },
+        }),
+      ]);
+      if (workflowError) return { error: workflowError.message };
+      if (requestError) return { error: requestError.message };
+      if (activityError) return { error: activityError.message };
+    } else if (nextStep) {
+      const { error: workflowError } = await supabase.from('approval_instances')
+        .update({
+          current_step_id: nextStep.id,
+          current_step_order: nextStep.stepOrder,
+          current_step_name: nextStep.name,
+          current_approver_role: nextRouting.approverRole,
+          current_approver_user_id: nextRouting.approverUserId,
+          updated_at: decidedAt,
+        })
+        .eq('id', String(approval.id));
+      if (workflowError) return { error: workflowError.message };
+    } else {
+      const [{ error: workflowError }, { error: activityError }] = await Promise.all([
+        supabase.from('approval_instances')
+          .update({
+            status: 'approved',
+            current_step_id: null,
+            current_step_order: null,
+            current_step_name: null,
+            current_approver_role: null,
+            current_approver_user_id: null,
+            updated_at: decidedAt,
+          })
+          .eq('id', String(approval.id)),
+        supabase.from('ticket_activity').insert({
+          ticket_id: ticketId,
+          company_id: context.companyId,
+          actor_id: context.userId,
+          event_type: 'comment_added',
+          message: 'Request approval completed.',
+          metadata: { approvalStep: currentStep.name, note: normalizedNote },
+        }),
+      ]);
+      if (workflowError) return { error: workflowError.message };
+      if (activityError) return { error: activityError.message };
+    }
+
+    if (ticket.submitted_by && ticket.submitted_by !== context.userId) {
+      void createNotifications([{
+        userId: String(ticket.submitted_by),
+        title: decision === 'approved' && !nextStep ? 'Request approved' : decision === 'rejected' ? 'Request rejected' : 'Request approval advanced',
+        message: `"${String(ticket.subject)}" ${decision === 'approved' && nextStep ? `advanced to ${nextStep.name}.` : `was ${decision}.`}`,
+        type: decision === 'rejected' ? 'warning' : 'success',
+      }]);
+    }
+
+    void logUserAction(context.userId, 'update', 'internal_request_approval', String(approval.id), {
+      ticketId,
       decision,
-      note: normalizedNote,
-      decided_at: decidedAt,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
-  if (decisionError) return { error: decisionError.message };
+      approvalStep: currentStep.name,
+      finalDecision: decision === 'rejected' || !nextStep,
+      nextApprovalStep: nextStep?.name ?? null,
+    });
 
-  if (decision === 'rejected') {
-    const [{ error: workflowError }, { error: requestError }, { error: activityError }] = await Promise.all([
-      supabase.from('approval_instances')
-        .update({
-          status: 'rejected',
-          current_step_id: null,
-          current_step_order: null,
-          current_step_name: null,
-          current_approver_role: null,
-          current_approver_user_id: null,
-          updated_at: decidedAt,
-        })
-        .eq('id', String(approval.id)),
-      supabase.from('tickets')
-        .update({
-          status: 'cancelled',
-          resolved_at: decidedAt,
-          resolution_note: normalizedNote ?? 'Request rejected during approval.',
-        })
-        .eq('company_id', context.companyId)
-        .eq('id', ticketId),
-      supabase.from('ticket_activity').insert({
-        ticket_id: ticketId,
-        company_id: context.companyId,
-        actor_id: context.userId,
-        event_type: 'status_changed',
-        message: 'Request rejected during approval.',
-        metadata: { before: ticket.status, after: 'cancelled', approvalStep: currentStep.name, note: normalizedNote },
-      }),
-    ]);
-    if (workflowError) return { error: workflowError.message };
-    if (requestError) return { error: requestError.message };
-    if (activityError) return { error: activityError.message };
-  } else if (nextStep) {
-    const { error: workflowError } = await supabase.from('approval_instances')
-      .update({
-        current_step_id: nextStep.id,
-        current_step_order: nextStep.stepOrder,
-        current_step_name: nextStep.name,
-        current_approver_role: nextRouting.approverRole,
-        current_approver_user_id: nextRouting.approverUserId,
-        updated_at: decidedAt,
-      })
-      .eq('id', String(approval.id));
-    if (workflowError) return { error: workflowError.message };
-  } else {
-    const [{ error: workflowError }, { error: activityError }] = await Promise.all([
-      supabase.from('approval_instances')
-        .update({
-          status: 'approved',
-          current_step_id: null,
-          current_step_order: null,
-          current_step_name: null,
-          current_approver_role: null,
-          current_approver_user_id: null,
-          updated_at: decidedAt,
-        })
-        .eq('id', String(approval.id)),
-      supabase.from('ticket_activity').insert({
-        ticket_id: ticketId,
-        company_id: context.companyId,
-        actor_id: context.userId,
-        event_type: 'comment_added',
-        message: 'Request approval completed.',
-        metadata: { approvalStep: currentStep.name, note: normalizedNote },
-      }),
-    ]);
-    if (workflowError) return { error: workflowError.message };
-    if (activityError) return { error: activityError.message };
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
   }
-
-  if (ticket.submitted_by && ticket.submitted_by !== context.userId) {
-    void createNotifications([{
-      userId: String(ticket.submitted_by),
-      title: decision === 'approved' && !nextStep ? 'Request approved' : decision === 'rejected' ? 'Request rejected' : 'Request approval advanced',
-      message: `"${String(ticket.subject)}" ${decision === 'approved' && nextStep ? `advanced to ${nextStep.name}.` : `was ${decision}.`}`,
-      type: decision === 'rejected' ? 'warning' : 'success',
-    }]);
-  }
-
-  void logUserAction(context.userId, 'update', 'internal_request_approval', String(approval.id), {
-    ticketId,
-    decision,
-    approvalStep: currentStep.name,
-    finalDecision: decision === 'rejected' || !nextStep,
-    nextApprovalStep: nextStep?.name ?? null,
-  });
-
-  return { error: null };
 }
 
 /**

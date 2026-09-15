@@ -688,6 +688,7 @@ export interface VehicleRaw {
 
 export interface VehicleCanonical {
   id: string;
+  created_at?: string;
   chassis_no: string;
   is_deleted?: boolean;
   deleted_at?: string;

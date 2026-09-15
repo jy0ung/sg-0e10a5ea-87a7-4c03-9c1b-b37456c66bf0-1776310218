@@ -2,6 +2,8 @@
 
 This document tracks row-level-security posture per table. Every tenant-scoped table must be `company_id`-scoped. Global master data is read-only to all authenticated users in the same company and write-restricted to admins.
 
+Migration `20260915090000_production_readiness_security.sql` adds restrictive policies to every RLS table and every `company_id` table. These policies are ANDed with older permissive policies, so enabled-account and tenant checks cannot be bypassed by a legacy policy. PostgREST also rejects data and RPC requests from inactive/resigned profiles before executing a query.
+
 ## Scope legend
 
 - **Company** — `company_id = (select company_id from profiles where id = auth.uid())`

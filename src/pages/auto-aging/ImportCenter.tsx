@@ -911,7 +911,8 @@ export default function ImportCenter() {
         }
       } else if (!canUseReviewQueue && reviewRows.length > 0) {
         // Feature disabled: merge review rows into clean rows for immediate publish
-        cleanRows.push(...reviewRows);
+        const reviewIds = new Set(reviewRows.map(row => row.sourceRowId));
+        cleanRows.push(...mergedRawRows.filter(row => reviewIds.has(row.id)));
         reviewRows.length = 0;
       }
 

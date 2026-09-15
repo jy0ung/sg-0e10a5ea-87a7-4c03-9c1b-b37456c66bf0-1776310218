@@ -386,9 +386,9 @@ interface OrganizationBrandingSettingsProps {
   brandingFields: BrandingFields;
   savingBranding: boolean;
   uploadingSlot: string | null;
-  logoInputRef: React.RefObject<HTMLInputElement | null>;
-  loginLogoInputRef: React.RefObject<HTMLInputElement | null>;
-  faviconInputRef: React.RefObject<HTMLInputElement | null>;
+  logoInputRef: React.RefObject<HTMLInputElement>;
+  loginLogoInputRef: React.RefObject<HTMLInputElement>;
+  faviconInputRef: React.RefObject<HTMLInputElement>;
   setBrandingFields: React.Dispatch<React.SetStateAction<BrandingFields>>;
   onSaveBranding: () => void | Promise<void>;
   onAssetUpload: (slot: 'logo' | 'login_logo' | 'favicon', file: File) => void | Promise<void>;

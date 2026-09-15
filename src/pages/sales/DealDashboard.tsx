@@ -4,11 +4,10 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { KpiCard } from '@/components/shared/KpiCard';
+import { MetricCard } from '@/components/shared/MetricCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw, AlertTriangle, TrendingUp, Users, Clock, DollarSign, Timer, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { HelpTip } from '@/components/shared/HelpTip';
 import { GLOSSARY } from '@/lib/glossary';
 import { toast } from 'sonner';
 import { getDashboard, type DashboardData, getAgedVehicles, type AgedVehicle } from '@/services/dealService';
@@ -68,44 +67,45 @@ export default function DealDashboard() {
     <div className="space-y-4 animate-fade-in">
       <PageHeader
         title="Deal Dashboard"
-        subtitle="Pipeline overview and metrics"
+        description="Pipeline overview and metrics"
       />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
-        <KpiCard
-          title="Active Deals"
+        <MetricCard
+          label="Active Deals"
           value={data.active_deals}
-          icon={<TrendingUp className="h-4 w-4" />}
+          icon={TrendingUp}
           onClick={() => navigate('/sales/deals')}
         />
-        <KpiCard
-          title="New Today"
+        <MetricCard
+          label="New Today"
           value={data.new_today}
-          icon={<TrendingUp className="h-4 w-4" />}
+          icon={TrendingUp}
         />
-        <KpiCard
-          title={<HelpTip tip={GLOSSARY.days_in_stage} size={12}>Stuck (&gt;7d)</HelpTip>}
+        <MetricCard
+          label="Stuck (>7d)"
+          hint={GLOSSARY.days_in_stage}
           value={data.stalled}
-          icon={<AlertTriangle className="h-4 w-4" />}
+          icon={AlertTriangle}
           className={data.stalled > 0 ? 'border-destructive' : ''}
         />
-        <KpiCard
-          title={<HelpTip tip="Average calendar days from deal creation to completion, for deals closed this month." size={12}>Avg Days</HelpTip>}
+        <MetricCard
+          label="Avg Days"
           value={data.avg_days_to_close}
-          icon={<Clock className="h-4 w-4" />}
-          suffix="days"
+          icon={Clock}
+          hint="days"
         />
-        <KpiCard
-          title="Completed"
+        <MetricCard
+          label="Completed"
           value={data.completed_this_month}
-          icon={<TrendingUp className="h-4 w-4" />}
+          icon={TrendingUp}
           onClick={() => navigate("/sales/deals?stage=completed")}
         />
-        <KpiCard
-          title="Revenue"
+        <MetricCard
+          label="Revenue"
           value={`RM ${(data.revenue_this_month / 1000).toFixed(0)}k`}
-          icon={<DollarSign className="h-4 w-4" />}
+          icon={DollarSign}
         />
       </div>
 

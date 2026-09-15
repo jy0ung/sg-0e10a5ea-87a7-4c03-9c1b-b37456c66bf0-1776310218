@@ -34,10 +34,6 @@ import {
  * Pages and components consume these functions rather than importing the
  * Supabase client directly (enforced by the `no-restricted-syntax` ESLint rule
  * on `src/pages/**` and `src/components/**`).
- *
- * The generated `Database` type does not yet include the `tickets` table, so
- * we declare a local row/insert shape here. This shim is replaced by the
- * generated types the next time `supabase gen types` runs.
  */
 
 export type TicketStatus = PersistedTicketStatus;
@@ -125,6 +121,7 @@ export interface CompanyTicketRecord extends RequestTicketRecord {
 }
 
 export interface CreateTicketInput {
+  deal_id?: string | null;
   subject: string;
   category: TicketCategory;
   subcategory?: string | null;
@@ -314,7 +311,14 @@ export interface DuplicateTicketCandidate {
   score: number;
 }
 
-type TicketRow = TicketRecord;
+type TicketRow = TicketDbRow;
+type TicketDbRow = Database['public']['Tables']['tickets']['Row'] & {
+  approval_instance_id?: string | null;
+  approval_status?: InternalRequestApprovalMetadata['status'] | null;
+  current_approval_step_name?: string | null;
+  current_approver_role?: string | null;
+  current_approver_user_id?: string | null;
+};
 type TicketUpdate = Database['public']['Tables']['tickets']['Update'];
 type TicketActivityDbInsert = Database['public']['Tables']['ticket_activity']['Insert'];
 type TicketCollaboratorInsert = Database['public']['Tables']['ticket_collaborators']['Insert'];
@@ -400,7 +404,7 @@ export function getTicketNextAction(status: TicketStatus): { responsibleParty: T
   }
 }
 
-function mapTicket(row: TicketRow): TicketRecord {
+function mapTicket(row: TicketDbRow): TicketRecord {
   const now = new Date().toISOString();
   const status = normalizeStatus(row.status);
   const workflow = getTicketNextAction(status);
@@ -420,7 +424,7 @@ function mapTicket(row: TicketRow): TicketRecord {
     business_impact: row.business_impact ?? null,
     desired_outcome: row.desired_outcome ?? null,
     custom_fields: row.custom_fields && typeof row.custom_fields === 'object' && !Array.isArray(row.custom_fields)
-      ? row.custom_fields
+      ? row.custom_fields as Record<string, unknown>
       : {},
     vso_number: row.vso_number ?? null,
     submitted_by: row.submitted_by ?? '',
@@ -1173,7 +1177,7 @@ async function getCompanyTicketById(ticketId: string, companyId: string): Promis
     .eq('id', ticketId)
     .single();
   if (error) throw error;
-  const [ticket] = await enrichCompanyTickets([mapTicket(data as unknown as TicketRow)], companyId);
+  const [ticket] = await enrichCompanyTickets([mapTicket(data as TicketDbRow)], companyId);
   return ticket ?? null;
 }
 
@@ -1300,7 +1304,7 @@ export async function getCompanyTicketStatusCounts(
 
     for (const row of (data ?? []) as { status: string }[]) {
       if (row.status in result) {
-        (result as Record<string, number>)[row.status]++;
+        result[row.status as keyof TicketStatusCounts]++;
       }
       result.all++;
     }
@@ -1385,7 +1389,7 @@ export async function listTicketChatSummaries(
     if (readsError) throw readsError;
 
     const readByTicket = new Map(
-      ((reads ?? []) as unknown as Array<{ ticket_id: string; read_at: string | null }>)
+      ((reads ?? []) as Array<{ ticket_id: string; read_at: string | null }>)
         .map((row) => [row.ticket_id, row.read_at ? new Date(row.read_at).getTime() : 0]),
     );
     const summaries: Record<string, TicketChatSummary> = { ...empty };
@@ -1446,7 +1450,7 @@ export async function listTicketInternalNotes(
       .order('created_at', { ascending: false });
     if (error) throw error;
 
-    const rows = (data ?? []) as unknown as Array<{
+    const rows = (data ?? []) as Array<{
       id: string;
       ticket_id: string;
       author_id: string;
@@ -1491,7 +1495,7 @@ export async function listTicketAuditEntries(
       .limit(100);
     if (error) throw error;
 
-    const rows = (data ?? []) as unknown as TicketAuditRow[];
+    const rows = (data ?? []) as TicketAuditRow[];
     const profilesById = await fetchProfilesById(companyId, rows.map((row) => row.user_id));
     return {
       data: rows.map((row) => ({
@@ -1608,7 +1612,7 @@ export async function addTicketInternalNote(
       metadata: { mentions },
     });
 
-    const row = data as unknown as {
+    const row = data as {
       id: string;
       ticket_id: string;
       author_id: string;
@@ -1658,7 +1662,8 @@ export async function createTicket(
       submitterRole: context.submitterRole ?? null,
     });
 
-    const insertPayload = {
+    const insertPayload: Database['public']['Tables']['tickets']['Insert'] = {
+      deal_id: input.deal_id ?? null,
       subject: input.subject.trim(),
       category: input.category,
       subcategory: input.subcategory?.trim() ? input.subcategory.trim() : null,
@@ -1873,7 +1878,7 @@ export async function updateTicket(
 
     if (error) throw error;
 
-    let mappedNextTicket = mapTicket(data as unknown as TicketRow);
+    let mappedNextTicket = mapTicket(data as TicketDbRow);
     if (collaboratorUpdateProvided && nextCollaboratorIds) {
       const syncedCollaboratorIds = await syncTicketCollaborators(
         ticketId,
@@ -1990,7 +1995,7 @@ async function applyTicketWorkflowAction(
 
     if (error) throw error;
 
-    const [nextTicket] = await applyApprovalMetadata([mapTicket(data as unknown as TicketRow)]);
+    const [nextTicket] = await applyApprovalMetadata([mapTicket(data as TicketDbRow)]);
     const activityEntries = buildTicketActivityEntries(current, nextTicket, context.userId);
     activityEntries.push({
       ticket_id: nextTicket.id,
@@ -2229,7 +2234,7 @@ async function executeRejectTicketCompletion(
       .single();
     if (error) throw error;
 
-    const nextTicket = mapTicket(data as unknown as TicketRow);
+    const nextTicket = mapTicket(data as TicketDbRow);
     await Promise.allSettled([
       ticketActivityTable().insert([
         ...buildTicketActivityEntries(current, nextTicket, context.userId),
@@ -2317,7 +2322,7 @@ async function executeReopenTicketByRequester(
       .single();
     if (error) throw error;
 
-    const nextTicket = mapTicket(data as unknown as TicketRow);
+    const nextTicket = mapTicket(data as TicketDbRow);
     await Promise.allSettled([
       ticketActivityTable().insert([
         ...buildTicketActivityEntries(current, nextTicket, context.userId),
@@ -2369,13 +2374,13 @@ async function executeCancelMyTicket(
 
     const { data, error } = await supabase.rpc('cancel_own_ticket', {
       p_ticket_id: ticketId,
-      p_cancellation_note: reason ?? null as unknown as string | undefined,
+      p_cancellation_note: reason,
     });
 
     if (error) throw error;
     if (!data) throw new Error('Request cancellation did not return a ticket');
 
-    const nextTicket = mapTicket(data as unknown as TicketRow);
+    const nextTicket = mapTicket(data as TicketDbRow);
     await Promise.allSettled([
       ticketActivityTable().insert({
         ticket_id: ticketId,
@@ -2694,7 +2699,7 @@ export async function ticketReplyAndWait(
     if (error) throw error;
     if (!data) throw new Error('Failed to update ticket and add reply');
 
-    return { data: mapTicket(data as unknown as TicketRow), error: null };
+    return { data: mapTicket(data as TicketDbRow), error: null };
   } catch (err) {
     const error = err instanceof Error ? err : new Error('Failed to reply and wait');
     loggingService.error('Failed to reply and wait', { error: error.message, ticketId }, 'TicketService');

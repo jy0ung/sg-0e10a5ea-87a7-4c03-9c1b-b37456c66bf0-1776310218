@@ -52,7 +52,7 @@ describe('authService', () => {
     it('returns null when not authenticated', async () => {
       vi.mocked(supabase.auth.getUser).mockResolvedValue({
         data: { user: null },
-        error: null
+        error: new Error('Not authenticated') as never
       });
 
       const user = await authService.getCurrentUser();
@@ -64,7 +64,7 @@ describe('authService', () => {
     it('returns user on successful sign in', async () => {
       const mockUser = { id: '123', email: 'test@test.com' };
       vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-        data: { user: mockUser as any, session: null },
+        data: { user: mockUser as any, session: { access_token: 'test' } as any },
         error: null
       });
 

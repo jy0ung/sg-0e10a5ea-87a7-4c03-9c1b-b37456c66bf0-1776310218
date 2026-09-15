@@ -266,7 +266,7 @@ export function RequestDetailPanel({
         )}
 
         {/* Resolution note */}
-        {(ticket.status === 'resolved' || ticket.status === 'closed' || ticket.resolution_note) && (
+        {(ticket.status === 'completed_by_owner' || ticket.status === 'closed' || ticket.resolution_note) && (
           <div className="space-y-2 rounded-md border border-border bg-secondary/20 px-3 py-2.5">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Resolution note</p>

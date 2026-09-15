@@ -37,12 +37,14 @@ interface MasterTableProps<T extends { id: string }> {
   rows: T[];
   columns: StandardTableColumn<T>[];
   onAdd: () => void;
+  onEdit: (row: T) => void;
+  onDelete: (row: T) => void;
   addLabel: string;
   searchPlaceholder: string;
   emptyMessage: string;
 }
 
-function MasterTable<T extends { id: string }>({ rows, columns, onAdd, addLabel, searchPlaceholder, emptyMessage }: MasterTableProps<T>) {
+function MasterTable<T extends { id: string }>({ rows, columns, onAdd, onEdit, onDelete, addLabel, searchPlaceholder, emptyMessage }: MasterTableProps<T>) {
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
@@ -50,7 +52,12 @@ function MasterTable<T extends { id: string }>({ rows, columns, onAdd, addLabel,
       </div>
       <StandardTable
         data={rows}
-        columns={columns}
+        columns={[...columns, { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
+          <div className="flex justify-end gap-1">
+            <Button variant="ghost" size="icon" onClick={() => onEdit(row)} aria-label="Edit record"><Pencil className="h-3.5 w-3.5" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => onDelete(row)} aria-label="Delete record"><Trash2 className="h-3.5 w-3.5" /></Button>
+          </div>
+        ) }]}
         searchPlaceholder={searchPlaceholder}
         emptyMessage={emptyMessage}
       />
@@ -493,12 +500,6 @@ export default function MasterData() {
             columns={[
               { key: 'code', label: 'Code', render: row => <span className="font-mono font-semibold">{row.code}</span> },
               { key: 'name', label: 'Name' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.code}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.code}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<FinanceCompany>[]}
             onAdd={() => setFcDialog({ open: true, values: {} })}
             onEdit={r => setFcDialog({ open: true, id: r.id, values: { code: r.code, name: r.name } })}
@@ -519,12 +520,6 @@ export default function MasterData() {
             columns={[
               { key: 'code', label: 'Code', render: row => <span className="font-mono font-semibold">{row.code}</span> },
               { key: 'name', label: 'Name' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.code}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.code}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<InsuranceCompany>[]}
             onAdd={() => setIcDialog({ open: true, values: {} })}
             onEdit={r => setIcDialog({ open: true, id: r.id, values: { code: r.code, name: r.name } })}
@@ -546,12 +541,6 @@ export default function MasterData() {
               { key: 'code', label: 'Code', render: row => <span className="font-mono font-semibold">{row.code}</span> },
               { key: 'name', label: 'Name' },
               { key: 'basePrice', label: 'Base Price (RM)' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.code}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.code}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<VehicleModel>[]}
             onAdd={() => setMdDialog({ open: true, values: {} })}
             onEdit={r => setMdDialog({ open: true, id: r.id, values: { code: r.code, name: r.name, basePrice: String(r.basePrice ?? '') } })}
@@ -573,12 +562,6 @@ export default function MasterData() {
               { key: 'code', label: 'Code', render: row => <span className="font-mono font-semibold">{row.code}</span> },
               { key: 'name', label: 'Name' },
               { key: 'hex', label: 'Hex Color' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.code}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.code}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<VehicleColour>[]}
             onAdd={() => setClDialog({ open: true, values: {} })}
             onEdit={r => setClDialog({ open: true, id: r.id, values: { code: r.code, name: r.name, hex: r.hex ?? '' } })}
@@ -600,12 +583,6 @@ export default function MasterData() {
               { key: 'code', label: 'Code', render: row => <span className="font-mono font-semibold">{row.code}</span> },
               { key: 'name', label: 'Name' },
               { key: 'status', label: 'Status' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.code}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.code}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<TinType>[]}
             onAdd={() => setTtDialog({ open: true, values: { status: 'Active' } })}
             onEdit={r => setTtDialog({ open: true, id: r.id, values: { code: r.code, name: r.name, status: r.status } })}
@@ -627,12 +604,6 @@ export default function MasterData() {
               { key: 'description', label: 'Description' },
               { key: 'price', label: 'Price (RM)' },
               { key: 'status', label: 'Status' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.description}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.description}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<RegistrationFee>[]}
             onAdd={() => setRfDialog({ open: true, values: { status: 'Active' } })}
             onEdit={r => setRfDialog({ open: true, id: r.id, values: { description: r.description, price: String(r.price), status: r.status } })}
@@ -654,12 +625,6 @@ export default function MasterData() {
               { key: 'description', label: 'Description' },
               { key: 'price', label: 'Price (RM)' },
               { key: 'status', label: 'Status' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.description}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.description}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<RoadTaxFee>[]}
             onAdd={() => setRtDialog({ open: true, values: { status: 'Active' } })}
             onEdit={r => setRtDialog({ open: true, id: r.id, values: { description: r.description, price: String(r.price), status: r.status } })}
@@ -682,12 +647,6 @@ export default function MasterData() {
               { key: 'description', label: 'Description' },
               { key: 'price', label: 'Price (RM)' },
               { key: 'status', label: 'Status' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.description}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.description}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<InspectionFee>[]}
             onAdd={() => setIfDialog({ open: true, values: { status: 'Active' } })}
             onEdit={r => setIfDialog({ open: true, id: r.id, values: { itemCode: r.itemCode ?? '', description: r.description, price: String(r.price), status: r.status } })}
@@ -711,12 +670,6 @@ export default function MasterData() {
               { key: 'price', label: 'Price (RM)' },
               { key: 'billing', label: 'Billing' },
               { key: 'status', label: 'Status' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.description}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.description}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<HandlingFee>[]}
             onAdd={() => setHfDialog({ open: true, values: { status: 'Active' } })}
             onEdit={r => setHfDialog({ open: true, id: r.id, values: { itemCode: r.itemCode ?? '', description: r.description, price: String(r.price), billing: r.billing ?? '', status: r.status } })}
@@ -739,12 +692,6 @@ export default function MasterData() {
               { key: 'description', label: 'Description' },
               { key: 'unitPrice', label: 'Unit Price (RM)' },
               { key: 'status', label: 'Status' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.description}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.description}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<AdditionalItem>[]}
             onAdd={() => setAiDialog({ open: true, values: { status: 'Active' } })}
             onEdit={r => setAiDialog({ open: true, id: r.id, values: { itemCode: r.itemCode ?? '', description: r.description, unitPrice: String(r.unitPrice), status: r.status } })}
@@ -766,12 +713,6 @@ export default function MasterData() {
               { key: 'name', label: 'Payment Type' },
               { key: 'billing', label: 'Billing' },
               { key: 'status', label: 'Status' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.name}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.name}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<PaymentType>[]}
             onAdd={() => setPtDialog({ open: true, values: { status: 'Active' } })}
             onEdit={r => setPtDialog({ open: true, id: r.id, values: { name: r.name, billing: r.billing ?? '', status: r.status } })}
@@ -793,12 +734,6 @@ export default function MasterData() {
               { key: 'name', label: 'Bank Name' },
               { key: 'accountNo', label: 'Account No.' },
               { key: 'status', label: 'Status' },
-              { key: 'actions', label: 'Actions', sortable: false, className: 'text-right', render: row => (
-                <div className="flex justify-end gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(row)} aria-label={`Edit ${row.name}`}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(row)} aria-label={`Delete ${row.name}`}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              )},
             ] as StandardTableColumn<BankRecord>[]}
             onAdd={() => setBkDialog({ open: true, values: { status: 'Active' } })}
             onEdit={r => setBkDialog({ open: true, id: r.id, values: { name: r.name, accountNo: r.accountNo ?? '', status: r.status } })}

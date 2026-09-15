@@ -133,7 +133,7 @@ describe('vehicleService', () => {
         p_search: 'CH001',
         p_bg_date_from: '2026-04-01',
         p_bg_date_to: '2026-04-30',
-        p_has_delivery_date: null,
+        p_has_delivery_date: undefined,
         p_limit: 25,
         p_offset: 50,
         p_sort_column: 'chassis_no',

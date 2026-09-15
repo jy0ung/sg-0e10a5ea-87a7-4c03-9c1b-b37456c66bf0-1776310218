@@ -80,10 +80,14 @@ export default function SalesOrders() {
 
   const handleCreate = async (data: SalesOrderFormData) => {
     const customer = customers.find(c => c.id === data.customerId);
+    if (!customer || !data.branchCode) {
+      toast({ title: 'Select a valid customer and branch', variant: 'destructive' });
+      return;
+    }
     const { error } = await createSalesOrder(companyId, {
       orderNo: data.orderNo,
       customerId: data.customerId,
-      customerName: customer?.name,
+      customerName: customer.name,
       branchCode: data.branchCode,
       salesmanName: data.salesmanName || undefined,
       model: data.model,

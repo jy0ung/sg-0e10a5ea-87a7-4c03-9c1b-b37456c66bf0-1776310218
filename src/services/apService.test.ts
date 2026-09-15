@@ -37,9 +37,9 @@ describe('recordSupplierPaymentEvent', () => {
       p_purchase_invoice_id: 'pi-1',
       p_amount: 60_000,
       p_payment_date: '2026-06-01',
-      p_payment_method: null,
-      p_reference_no: null,
-      p_notes: null,
+      p_payment_method: undefined,
+      p_reference_no: undefined,
+      p_notes: undefined,
     });
     expect(result.data).toBe('event-uuid-1');
     expect(result.error).toBeNull();
@@ -88,14 +88,14 @@ describe('reverseSupplierPaymentEvent', () => {
     expect(result.error).toBeNull();
   });
 
-  it('passes null reason when omitted', async () => {
+  it('uses the database default reason when omitted', async () => {
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 'reversal-uuid-2', error: null } as never);
 
     await reverseSupplierPaymentEvent('event-2');
 
     expect(supabase.rpc).toHaveBeenCalledWith('reverse_supplier_payment_event', {
       p_event_id: 'event-2',
-      p_reason: null,
+      p_reason: undefined,
     });
   });
 });
@@ -247,13 +247,13 @@ describe('transitionPiLifecycle', () => {
     expect(result.error).toBeNull();
   });
 
-  it('passes null actor_id when omitted', async () => {
+  it('uses the database default actor_id when omitted', async () => {
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 'pi-1', error: null } as never);
 
     await transitionPiLifecycle('pi-1', 'approved');
 
     expect(supabase.rpc).toHaveBeenCalledWith('transition_pi_lifecycle', expect.objectContaining({
-      p_actor_id: null,
+      p_actor_id: undefined,
     }));
   });
 

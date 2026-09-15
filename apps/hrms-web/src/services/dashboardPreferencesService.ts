@@ -7,7 +7,7 @@
  * preference updates.
  */
 import { supabase } from '@/integrations/supabase/client';
-import type { PersonalDashboardPreferences } from '@/lib/personalDashboard';
+import type { PersonalDashboardPreferences } from '@hrms-web/lib/personalDashboard';
 
 export interface DashboardPreferencesRow {
   user_id: string;

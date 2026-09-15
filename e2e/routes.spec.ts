@@ -20,7 +20,7 @@ async function assertPageLoaded(page: import("@playwright/test").Page, path: str
   await page.goto(path, { waitUntil: "domcontentloaded" });
 
   // Should NOT have crashed into the route error fallback
-  await expect(page.locator("text=Route Error")).not.toBeVisible({ timeout: 500 }).catch(() => {});
+  await expect(page.locator("text=Route Error")).not.toBeVisible();
 
   // App layout sidebar should exist
   await expect(page.locator("nav, aside, [data-sidebar]").first()).toBeVisible({ timeout: 8000 });

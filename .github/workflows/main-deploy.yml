@@ -274,7 +274,7 @@ jobs:
           PROD_HEALTH_URL: ${{ format('{0}/healthz', env.UBS_PRODUCTION_URL) }}
           PROD_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
           PROD_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
-          PROD_LOGIN_REQUIRED: '0'
+          PROD_LOGIN_REQUIRED: '1'
           PROD_VERIFY_FETCH_ATTEMPTS: '3'
         run: npm run verify:production
 

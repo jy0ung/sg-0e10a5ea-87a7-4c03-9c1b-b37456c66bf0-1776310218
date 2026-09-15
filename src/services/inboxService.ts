@@ -91,7 +91,7 @@ export function reconciliationToInbox(row: ReconciliationMatch): InboxItem {
 export function ticketToInbox(row: RequestTicketRecord): InboxItem {
   const tone: InboxTone =
     row.status === 'pending_requester' || row.status === 'completed_by_owner' ? 'amber'
-    : row.priority === 'critical' || row.priority === 'high' ? 'red'
+    : row.priority === 'high' ? 'red'
     : 'blue';
   return {
     id:        `ticket:${row.id}`,
@@ -151,8 +151,8 @@ export async function loadInbox(
       ? getReconciliationQueue(companyId, { limit }).catch(e => ({ data: [] as ReconciliationMatch[], error: e as Error }))
       : Promise.resolve({ data: [] as ReconciliationMatch[], error: null }),
     opts.includeReconciliation
-      ? getReconciliationStatusCounts(companyId).catch(e => ({ data: [], error: e as Error }))
-      : Promise.resolve({ data: [], error: null }),
+      ? getReconciliationStatusCounts(companyId).catch(e => ({ data: [] as Awaited<ReturnType<typeof getReconciliationStatusCounts>>['data'], error: e as Error }))
+      : Promise.resolve({ data: [] as Awaited<ReturnType<typeof getReconciliationStatusCounts>>['data'], error: null }),
   ]);
 
   if (leaveR.error)    errors.push(`Approvals (leave): ${leaveR.error}`);

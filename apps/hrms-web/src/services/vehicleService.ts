@@ -102,7 +102,7 @@ export async function getVehicles(filters?: {
     loggingService.error("Failed to get vehicles", { filters, error }, "VehicleService");
   }
 
-  return { data: data as unknown as VehicleCanonical[] | null, error: error || null, count };
+  return { data: data as unknown as VehicleCanonical[] | null, error: error || null, count: count ?? undefined };
 }
 
 export async function updateVehicleWithAudit(

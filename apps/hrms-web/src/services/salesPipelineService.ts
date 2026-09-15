@@ -271,7 +271,7 @@ export async function createVehicleFromSalesOrder(
 
   const { error: linkErr } = await supabase
     .from('sales_orders')
-    .update({ vehicle_id: vehicleId, chassis_no: chassisNo, status: 'confirmed', updated_at: new Date().toISOString() })
+    .update({ vehicle_id: vehicleId, chassis_no: chassisNo, updated_at: new Date().toISOString() })
     .eq('company_id', companyId)
     .eq('id', orderId);
   if (linkErr) return { vehicleId: null, error: new Error(linkErr.message) };

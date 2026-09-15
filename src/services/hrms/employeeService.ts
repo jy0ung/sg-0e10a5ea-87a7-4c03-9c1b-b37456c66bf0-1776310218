@@ -28,6 +28,9 @@ export interface CreateEmployeeInput {
 }
 
 export async function createEmployee(input: CreateEmployeeInput, actorId?: string): Promise<{ error: string | null }> {
+  if (input.role === 'portal_admin' || input.role === 'portal_manager' || input.role === 'portal_staff') {
+    return { error: 'Select a workforce role when creating an employee.' };
+  }
   const { error } = await supabase.from('employees').insert({
     id:                  input.id,
     company_id:          input.companyId,

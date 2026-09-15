@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 import { toneClass } from '@/lib/statusTones';
-import { statusMeta, type StatusDomain } from '@/lib/hrmsStatus';
+import { statusMeta, type StatusDomain } from '@hrms-web/lib/hrmsStatus';
 
 interface StatusBadgeProps {
   status: string;

@@ -261,7 +261,7 @@ export async function searchChassisFilter(
 ): Promise<{ rows: ChassisFilterRow[]; total: number; error: Error | null }> {
   let q = supabase
     .from('vehicles')
-    .select('id,chassis_no,plate_no,model,engine_no,colour,status,branch_id,branch_code,owner_name', { count: 'exact' })
+    .select('id,chassis_no,plate_no:reg_no,model,colour:color,status:stage,branch_code,owner_name:customer_name', { count: 'exact' })
     .eq('company_id', params.companyId);
 
   const ilike = (col: string, value?: string) => {
@@ -269,11 +269,11 @@ export async function searchChassisFilter(
     if (v) q = q.ilike(col, `%${v}%`);
   };
   ilike('chassis_no', params.chassisNo);
-  ilike('plate_no', params.plateNo);
+  ilike('reg_no', params.plateNo);
   ilike('model', params.model);
-  ilike('engine_no', params.engineNo);
-  ilike('colour', params.colour);
-  ilike('owner_name', params.ownerName);
+  if (params.engineNo?.trim()) return { rows: [], total: 0, error: new Error('Engine number filtering is not available for vehicle records.') };
+  ilike('color', params.colour);
+  ilike('customer_name', params.ownerName);
 
   const { data, count, error } = await q
     .order('chassis_no')
@@ -284,5 +284,5 @@ export async function searchChassisFilter(
     return { rows: [], total: 0, error: new Error(error.message) };
   }
 
-  return { rows: (data ?? []) as ChassisFilterRow[], total: count ?? 0, error: null };
+  return { rows: (data ?? []).map(row => ({ ...row, engine_no: null, branch_id: null })), total: count ?? 0, error: null };
 }

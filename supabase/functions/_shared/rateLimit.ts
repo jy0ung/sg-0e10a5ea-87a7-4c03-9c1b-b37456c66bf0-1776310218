@@ -65,10 +65,9 @@ interface RateLimitRpcClient {
 }
 
 /**
- * Calls bump_rate_limit() with service-role credentials. Fails open (returns
- * allowed=true) if the RPC errors — we prefer a brief budget overshoot to
- * blocking real requests on infrastructure hiccups. The error is logged via
- * console.warn for ops follow-up.
+ * Calls bump_rate_limit() with service-role credentials. Privileged operations
+ * fail closed if the durable limiter is unavailable; callers can retry after
+ * the short fallback window instead of bypassing abuse protection.
  */
 export async function checkRateLimit(input: RateLimitInput): Promise<RateLimitDecision> {
   const {
@@ -93,7 +92,7 @@ export async function checkRateLimit(input: RateLimitInput): Promise<RateLimitDe
 
   if (error) {
     console.warn(`[rateLimit] bump_rate_limit failed for action="${action}": ${error.message}`);
-    return failOpen(action, maxCalls, windowSeconds);
+    return failClosed(action, maxCalls, windowSeconds);
   }
 
   // RPC returns a single-row set; data is either an array or a single row
@@ -101,7 +100,7 @@ export async function checkRateLimit(input: RateLimitInput): Promise<RateLimitDe
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) {
     console.warn(`[rateLimit] bump_rate_limit returned no rows for action="${action}"`);
-    return failOpen(action, maxCalls, windowSeconds);
+    return failClosed(action, maxCalls, windowSeconds);
   }
 
   const allowed: boolean = Boolean(row.allowed);
@@ -135,19 +134,20 @@ export async function checkRateLimit(input: RateLimitInput): Promise<RateLimitDe
   };
 }
 
-function failOpen(action: string, maxCalls: number, windowSeconds: number): RateLimitDecision {
+function failClosed(action: string, maxCalls: number, windowSeconds: number): RateLimitDecision {
   const resetAt = new Date(Date.now() + windowSeconds * 1000).toISOString();
   return {
-    allowed: true,
-    remaining: maxCalls,
+    allowed: false,
+    remaining: 0,
     resetAt,
     headers: {
       'Content-Type': 'application/json',
       'X-RateLimit-Limit': String(maxCalls),
-      'X-RateLimit-Remaining': String(maxCalls),
+      'X-RateLimit-Remaining': '0',
       'X-RateLimit-Reset': resetAt,
       'X-RateLimit-Failover': 'bump_rate_limit_unavailable',
+      'Retry-After': String(windowSeconds),
     },
-    message: '',
+    message: `Rate-limit service unavailable for ${action}. Retry after ${resetAt}.`,
   };
 }

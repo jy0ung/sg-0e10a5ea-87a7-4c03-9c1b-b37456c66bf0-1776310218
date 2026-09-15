@@ -11,7 +11,7 @@ export type Enums<T extends keyof Database['public']['Enums']> = Database['publi
 export type Functions<T extends keyof Database['public']['Functions']> = Database['public']['Functions'][T];
 
 // Project reference: nrlzptrtukdeaugphayd
-// Last updated: 2026-04-16T05:01:09.193201
+// Last updated: 2026-09-15T06:27:14.694Z
 
 // ─── Named row type aliases ────────────────────────────────────────────────────
 // Convenience aliases for the most-used HRMS tables. Import these instead of

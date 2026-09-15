@@ -112,7 +112,7 @@ export default function VehicleDetail() {
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="h-3.5 w-3.5 mr-1" />Edit
             </Button>
-            <Button size="sm" onClick={() => navigate('/sales/deals/new?chassis=' + encodeURIComponent(vehicle.chassis_no || '') + '&model=' + encodeURIComponent(vehicle.model || '') + '&colour=' + encodeURIComponent(vehicle.colour || ''))}>
+            <Button size="sm" onClick={() => navigate('/sales/deals/new?chassis=' + encodeURIComponent(vehicle.chassis_no || '') + '&model=' + encodeURIComponent(vehicle.model || '') + '&colour=' + encodeURIComponent(vehicle.color || ''))}>
               <Plus className="h-3.5 w-3.5 mr-1" />Create Deal
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate(-1)}>

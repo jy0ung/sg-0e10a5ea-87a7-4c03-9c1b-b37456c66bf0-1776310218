@@ -4,6 +4,9 @@ This project is a Vite React application backed by a local Supabase stack for de
 
 ## Documentation
 
+- [Repository baseline audit](docs/REPO_BASELINE_AUDIT.md) — cleanup results and repeatable checks
+- [Production-readiness validation](docs/PRODUCTION_READINESS.md) — live local security evidence and staging release gates
+- [Staging qualification](docs/STAGING_QUALIFICATION.md) — current UAT status, release blockers, and exact qualification command
 - [Architecture](docs/ARCHITECTURE.md) — monorepo layout, layering rules, data fetching
 - [Security model](docs/SECURITY.md) — authn/z, edge functions, threat model
 - [Environment contract](docs/ENV.md) — required + optional env vars
@@ -32,10 +35,10 @@ supabase --version
 
 ## Local Development
 
-Install dependencies:
+Install the versions recorded in the npm lockfile:
 
 ```bash
-npm install
+npm ci
 ```
 
 Start the local Supabase stack:
@@ -59,7 +62,7 @@ Expected local URLs:
 - Supabase Studio: `http://127.0.0.1:54323`
 - Mailpit: `http://127.0.0.1:54324`
 
-The checked-in `.env` is already configured for native local development against the local Supabase stack.
+Create your local `.env` from `.env.example` and set the Supabase URL and anon key reported by `supabase status`. Environment files are ignored by Git; existing local configuration is preserved.
 
 ## Login And Auth Setup
 
@@ -216,3 +219,21 @@ npm test
 ## Data Migration
 
 Legacy data extraction and seeding instructions live in `migration/RUNBOOK.md`.
+
+## Repository validation
+
+After `npm ci`, run the complete baseline gate:
+
+```bash
+npm run check:baseline
+```
+
+This checks repository hygiene, lint, all app TypeScript configurations, architecture boundaries, unit tests, security rules, dependency advisories, and all three app builds. Browser smoke commands and validation limits are recorded in the [baseline audit](docs/REPO_BASELINE_AUDIT.md).
+
+Run the disposable Supabase integration gate to rebuild every migration and verify live authentication, RLS, RPC, edge-function, and persistence boundaries:
+
+```bash
+npm run test:integration
+```
+
+`npm run check:production-readiness` composes the baseline and integration gates. See the [production-readiness validation](docs/PRODUCTION_READINESS.md) for staging and device release gates.

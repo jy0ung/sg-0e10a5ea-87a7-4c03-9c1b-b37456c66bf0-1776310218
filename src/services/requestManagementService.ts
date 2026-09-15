@@ -1,3 +1,4 @@
+import type { Database, Json } from '@flc/supabase';
 import { supabase } from '@/integrations/supabase/client';
 import { loggingService } from './loggingService';
 import { logUserAction } from './auditService';
@@ -61,8 +62,8 @@ export interface RequestManagementDashboard {
   indicators_by_ticket: Record<string, RequestOperationalIndicator>;
 }
 
-function table(name: string) {
-  return (supabase as never as { from: (tableName: string) => ReturnType<typeof supabase.from> }).from(name);
+function table<T extends keyof Database['public']['Tables']>(name: T) {
+  return supabase.from(name);
 }
 
 function average(values: number[]) {
@@ -249,7 +250,7 @@ export async function saveRequestFilter(
       user_id: userId,
       name: input.name.trim(),
       scope: input.scope ?? 'queue',
-      filters: input.filters,
+      filters: JSON.parse(JSON.stringify(input.filters)) as Json,
     };
     const query = input.id
       ? table('request_saved_filters').update(payload).eq('id', input.id).eq('company_id', companyId).eq('user_id', userId)
@@ -297,7 +298,7 @@ async function insertBulkActivity(companyId: string, actorId: string, ticketIds:
     actor_id: actorId,
     event_type: 'bulk_action_performed',
     message,
-    metadata,
+    metadata: JSON.parse(JSON.stringify(metadata)) as Json,
   })));
 }
 

@@ -241,7 +241,7 @@ export default function DealPipeline() {
     <div className="space-y-4 animate-fade-in">
       <PageHeader
         title="Deal Pipeline"
-        subtitle={`${totalActive} active deals · RM ${totalValue.toLocaleString()}`}
+        description={`${totalActive} active deals · RM ${totalValue.toLocaleString()}`}
       />
 
       {/* Filters */}

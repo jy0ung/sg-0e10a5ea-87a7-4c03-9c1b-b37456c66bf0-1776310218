@@ -293,6 +293,7 @@ export async function createRequestFormField(
   }
 
   if (error) return { data: null, error: (error as { message: string }).message };
+  if (!data) return { data: null, error: 'The created field was not returned.' };
   const field = mapField(data as RequestFormFieldRow);
   void logUserAction(context.actorId, 'create', 'request_form_field', field.id, {
     component: 'RequestFormFieldService',

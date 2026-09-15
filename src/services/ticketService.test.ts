@@ -131,7 +131,7 @@ describe('ticketService', () => {
     };
   }
 
-  function mockTicketFetch(ticket: ReturnType<typeof workflowTicket>) {
+  function mockTicketFetch(ticket: Record<string, unknown>) {
     const single = vi.fn().mockResolvedValue({ data: ticket, error: null });
     const idEq = vi.fn(() => ({ single }));
     const companyEq = vi.fn(() => ({ eq: idEq }));
@@ -139,7 +139,7 @@ describe('ticketService', () => {
     return { select };
   }
 
-  function mockTicketUpdate(ticket: ReturnType<typeof workflowTicket>) {
+  function mockTicketUpdate(ticket: Record<string, unknown>) {
     const single = vi.fn().mockResolvedValue({ data: ticket, error: null });
     const select = vi.fn(() => ({ single }));
     const idEq = vi.fn(() => ({ select }));

@@ -49,6 +49,13 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_HRMS_APP_URL=$VITE_HRMS_APP_URL \
     VITE_APP_VERSION=$VITE_APP_VERSION
 
+RUN if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ] || [ -z "$VITE_APP_URL" ]; then \
+      echo "ERROR: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, and VITE_APP_URL are required." >&2; \
+      exit 1; \
+    fi \
+    && case "$VITE_SUPABASE_URL" in https://*) ;; *) echo "ERROR: production Supabase URL must use HTTPS." >&2; exit 1 ;; esac \
+    && case "$VITE_APP_URL" in https://*) ;; *) echo "ERROR: production app URL must use HTTPS." >&2; exit 1 ;; esac
+
 # Guard: dual UBS+HRMS production/staging builds require the dedicated HRMS URL.
 # UBS-only builds intentionally leave VITE_HRMS_APP_URL empty while the HRMS
 # standalone deployment is disabled.
@@ -79,7 +86,12 @@ RUN if [ -n "$BUILD_WORKSPACE" ]; then npm run build --workspace "$BUILD_WORKSPA
 # ---------------------------------------------------------------------------
 FROM nginx:1.27-alpine AS runtime
 
-ARG SUPABASE_INTERNAL_URL=http://192.168.1.241:54321
+ARG SUPABASE_INTERNAL_URL
+
+RUN if [ -z "$SUPABASE_INTERNAL_URL" ]; then \
+      echo "ERROR: SUPABASE_INTERNAL_URL is required for the runtime API proxy." >&2; \
+      exit 1; \
+    fi
 
 # Drop the stock default.conf and ship a hardened SPA config.
 RUN rm /etc/nginx/conf.d/default.conf

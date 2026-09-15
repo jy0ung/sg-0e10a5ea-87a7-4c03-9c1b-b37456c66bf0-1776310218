@@ -9,6 +9,7 @@ export interface NotificationRow {
   type: 'info' | 'warning' | 'success' | 'error';
   read: boolean;
   created_at: string | null;
+  action_url?: string | null;
 }
 
 export interface CreateNotificationInput {
@@ -17,6 +18,7 @@ export interface CreateNotificationInput {
   message: string;
   type?: NotificationRow['type'];
   read?: boolean;
+  actionUrl?: string;
 }
 
 export async function createNotifications(
@@ -33,6 +35,7 @@ export async function createNotifications(
         message: notification.message,
         type: notification.type ?? 'info',
         read: notification.read ?? false,
+        ...(notification.actionUrl ? { action_url: notification.actionUrl } : {}),
       })),
     );
 

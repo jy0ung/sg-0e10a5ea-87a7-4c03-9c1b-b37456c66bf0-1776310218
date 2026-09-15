@@ -969,9 +969,9 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
                                 {mine && <span className="rounded bg-primary-foreground/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary-foreground">You</span>}
                               </div>
                               <p className="whitespace-pre-line leading-relaxed">{message.message}</p>
-                              {message.metadata?.attachment_names?.length > 0 && (
+                              {Array.isArray(message.metadata?.attachment_names) && message.metadata.attachment_names.length > 0 && (
                                 <div className="mt-2 space-y-1">
-                                  {message.metadata.attachment_names.map((name: string) => (
+                                  {message.metadata.attachment_names.filter((name): name is string => typeof name === 'string').map((name) => (
                                     <span key={name} className="flex items-center gap-1.5 text-[11px] opacity-80">
                                       <Paperclip className="h-3 w-3" />
                                       {name}
@@ -1595,7 +1595,7 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
                       ? { kind: 'approve_step', note: reviewNote.value }
                       : { kind: 'reject_step', note: reviewNote.value },
                   })
-                    .then((result) => ({ error: result.error ? new Error(result.error) : null })),
+                    .then((result) => ({ error: result.error })),
                   decision === 'approved' ? 'Approval recorded' : 'Rejection recorded',
                 );
                 if (ok) {

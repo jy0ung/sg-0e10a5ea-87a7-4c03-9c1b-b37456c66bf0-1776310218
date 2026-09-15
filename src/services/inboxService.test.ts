@@ -101,16 +101,15 @@ describe('ticketToInbox', () => {
     resolved_at: null, resolution_note: null,
     created_at: '2026-05-26T00:00:00Z', updated_at: '2026-05-26T01:00:00Z',
     assigned_to_name: null, assigned_to_email: null,
-  } as never;
+  } as unknown as Parameters<typeof ticketToInbox>[0];
 
-  it('marks high/critical priority as red', () => {
+  it('marks high priority as red', () => {
     expect(ticketToInbox({ ...baseTicket, priority: 'high' }).badgeTone).toBe('red');
-    expect(ticketToInbox({ ...baseTicket, priority: 'critical' }).badgeTone).toBe('red');
   });
 
   it('marks requester-action ticket statuses as amber regardless of priority', () => {
     expect(ticketToInbox({ ...baseTicket, priority: 'low', status: 'pending_requester' }).badgeTone).toBe('amber');
-    expect(ticketToInbox({ ...baseTicket, priority: 'critical', status: 'completed_by_owner' }).badgeTone).toBe('amber');
+    expect(ticketToInbox({ ...baseTicket, priority: 'high', status: 'completed_by_owner' }).badgeTone).toBe('amber');
   });
 });
 

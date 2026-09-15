@@ -29,7 +29,7 @@ import { listAnnouncements, listAttendanceRecords } from '@/services/hrmsService
 import { cn } from '@/lib/utils';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { SectionCard } from '@/components/shared/SectionCard';
-import { StatusBadge } from '@/components/shared/StatusBadge';
+import { StatusBadge } from '@hrms-web/components/shared/StatusBadge';
 import { toneClass, type Tone } from '@/lib/statusTones';
 import type { Announcement, LeaveBalance, LeaveRequest } from '@/types';
 

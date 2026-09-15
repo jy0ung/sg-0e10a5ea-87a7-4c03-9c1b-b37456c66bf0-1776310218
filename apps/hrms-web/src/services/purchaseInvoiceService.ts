@@ -1,3 +1,4 @@
+import type { Database } from '@flc/supabase';
 import { supabase } from "@/integrations/supabase/client";
 import { logUserAction } from './auditService';
 import { loggingService } from "./loggingService";
@@ -200,7 +201,7 @@ export async function updatePurchaseInvoice(
   id: string,
   fields: UpdatePurchaseInvoiceInput,
 ): Promise<{ error: Error | null }> {
-  const patch: Record<string, unknown> = {};
+  const patch: Database['public']['Tables']['purchase_invoices']['Update'] = {};
   if (fields.invoiceNo   !== undefined) patch['invoice_no']   = fields.invoiceNo;
   if (fields.supplier    !== undefined) patch['supplier']     = fields.supplier;
   if (fields.chassisNo   !== undefined) patch['chassis_no']   = fields.chassisNo.toUpperCase();

@@ -76,7 +76,7 @@ export default function NewDeal() {
         <Button variant="ghost" size="sm" onClick={() => navigate('/sales/deals')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <PageHeader title="New Deal" subtitle="Create a new deal" />
+        <PageHeader title="New Deal" description="Create a new deal" />
       </div>
 
       <form onSubmit={handleSubmit}>

@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable, { type Styles } from 'jspdf-autotable';
 
 interface PdfColumn {
   key: string;
@@ -85,7 +85,7 @@ export function exportReportPdf(opts: PdfExportOptions): void {
     columnStyles: columns.reduce((acc, c, i) => {
       if (c.numeric) acc[i] = { halign: 'right' };
       return acc;
-    }, {} as Record<number, { halign: string }>),
+    }, {} as Record<number, Partial<Styles>>),
     didDrawPage: (data) => {
       // Footer with page number
       const pageCount = doc.getNumberOfPages();

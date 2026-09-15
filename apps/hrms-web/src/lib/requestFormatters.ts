@@ -27,7 +27,7 @@ export function formatDueDate(value: string): string {
 
 /** Returns true for statuses that represent active/open work. */
 export function isOpenStatus(status: TicketStatus): boolean {
-  return status === 'open' || status === 'in_progress' || status === 'awaiting_requester';
+  return status === 'pending_owner_review' || status === 'reopened' || status === 'open' || status === 'in_progress' || status === 'pending_requester';
 }
 
 /** Returns true when a ticket's requested due date has passed while still open. */
@@ -82,19 +82,23 @@ export function downloadCsv(filename: string, rows: string[][]): void {
 type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
 
 export const statusVariantMap: Record<TicketStatus, BadgeVariant> = {
+  pending_owner_review: 'secondary',
+  reopened: 'default',
   open: 'default',
   in_progress: 'secondary',
-  awaiting_requester: 'outline',
-  resolved: 'outline',
+  pending_requester: 'outline',
+  completed_by_owner: 'outline',
   closed: 'outline',
   cancelled: 'outline',
 };
 
 export const statusColorMap: Record<TicketStatus, string> = {
+  pending_owner_review: 'bg-amber-50 text-amber-700',
+  reopened: 'bg-blue-50 text-blue-700',
   open: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800',
   in_progress: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800',
-  awaiting_requester: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800',
-  resolved: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800',
+  pending_requester: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-300 dark:border-purple-800',
+  completed_by_owner: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800',
   closed: 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700',
   cancelled: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800',
 };

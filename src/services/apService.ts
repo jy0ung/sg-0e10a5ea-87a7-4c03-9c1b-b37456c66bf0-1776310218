@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { loggingService } from './loggingService';
 import type {
   SupplierPaymentEvent,
@@ -12,30 +13,49 @@ import type {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function mapEvent(row: Record<string, unknown>): SupplierPaymentEvent {
+type SupplierPaymentEventRpcRow = Database['public']['Functions']['get_supplier_payment_events']['Returns'][number] & {
+  company_id?: string;
+  purchase_invoice_id?: string;
+};
+
+function mapEvent(row: SupplierPaymentEventRpcRow): SupplierPaymentEvent {
   return {
-    id: String(row.id ?? ''),
+    id: row.id,
     companyId: String(row.company_id ?? ''),
     purchaseInvoiceId: String(row.purchase_invoice_id ?? ''),
     eventType: (row.event_type as SupplierPaymentEventType) ?? 'payment',
-    amount: Number(row.amount ?? 0),
-    paymentDate: String(row.payment_date ?? ''),
-    paymentMethod: row.payment_method ? String(row.payment_method) : undefined,
-    referenceNo: row.reference_no ? String(row.reference_no) : undefined,
-    notes: row.notes ? String(row.notes) : undefined,
-    reversalOfEventId: row.reversal_of_event_id ? String(row.reversal_of_event_id) : undefined,
-    isReversed: Boolean(row.is_reversed ?? false),
-    createdBy: row.created_by ? String(row.created_by) : undefined,
-    createdAt: String(row.created_at ?? ''),
+    amount: row.amount,
+    paymentDate: row.payment_date,
+    paymentMethod: row.payment_method || undefined,
+    referenceNo: row.reference_no || undefined,
+    notes: row.notes || undefined,
+    reversalOfEventId: row.reversal_of_event_id || undefined,
+    isReversed: row.is_reversed,
+    createdBy: row.created_by || undefined,
+    createdAt: row.created_at,
   };
 }
 
-function mapAgingRow(row: Record<string, unknown>): ApAgingSummary {
+type ApAgingSummaryRpcRow = Database['public']['Functions']['get_ap_aging_summary']['Returns'][number];
+
+function mapAgingRow(row: ApAgingSummaryRpcRow): ApAgingSummary {
   return {
     bucket: (row.bucket as ApAgingBucket) ?? 'no_due_date',
-    invoiceCount: Number(row.invoice_count ?? 0),
-    totalOutstanding: Number(row.total_outstanding ?? 0),
-    overdueAmount: Number(row.overdue_amount ?? 0),
+    invoiceCount: row.invoice_count,
+    totalOutstanding: row.total_outstanding,
+    overdueAmount: row.overdue_amount,
+  };
+}
+
+type ApAgingByBranchRpcRow = Database['public']['Functions']['get_ap_aging_by_branch']['Returns'][number];
+
+function mapAgingByBranchRow(row: ApAgingByBranchRpcRow): AgingByBranchRow {
+  return {
+    branchCode: row.branch_code || 'unassigned',
+    bucket: row.bucket as AgingBucket,
+    invoiceCount: row.invoice_count,
+    totalOutstanding: row.total_outstanding,
+    overdueAmount: row.overdue_amount,
   };
 }
 
@@ -62,9 +82,9 @@ export async function recordSupplierPaymentEvent(
     p_purchase_invoice_id: purchaseInvoiceId,
     p_amount: amount,
     p_payment_date: paymentDate,
-    p_payment_method: opts.paymentMethod ?? null as unknown as string | undefined,
-    p_reference_no: opts.referenceNo ?? null as unknown as string | undefined,
-    p_notes: opts.notes ?? null as unknown as string | undefined,
+    p_payment_method: opts.paymentMethod,
+    p_reference_no: opts.referenceNo,
+    p_notes: opts.notes,
   });
   if (error) {
     loggingService.error('recordSupplierPaymentEvent failed', { purchaseInvoiceId, error }, 'apService');
@@ -84,7 +104,7 @@ export async function reverseSupplierPaymentEvent(
 ): Promise<{ data: string | null; error: Error | null }> {
   const { data, error } = await supabase.rpc('reverse_supplier_payment_event', {
     p_event_id: eventId,
-    p_reason: reason ?? null as unknown as string | undefined,
+    p_reason: reason,
   });
   if (error) {
     loggingService.error('reverseSupplierPaymentEvent failed', { eventId, error }, 'apService');
@@ -105,7 +125,7 @@ export async function getSupplierPaymentEvents(
     return { data: [], error: new Error(error.message) };
   }
   return {
-    data: ((data as unknown[]) ?? []).map(r => mapEvent(r as Record<string, unknown>)),
+    data: (data ?? []).map(r => mapEvent(r)),
     error: null,
   };
 }
@@ -124,7 +144,7 @@ export async function getApAgingSummary(
     return { data: [], error: new Error(error.message) };
   }
   return {
-    data: ((data as unknown[]) ?? []).map(r => mapAgingRow(r as Record<string, unknown>)),
+    data: (data ?? []).map(r => mapAgingRow(r)),
     error: null,
   };
 }
@@ -141,16 +161,7 @@ export async function getApAgingByBranch(
     return { data: [], error: new Error(error.message) };
   }
   return {
-    data: ((data as unknown[]) ?? []).map(r => {
-      const row = r as Record<string, unknown>;
-      return {
-        branchCode:       String(row.branch_code ?? 'unassigned'),
-        bucket:           row.bucket as AgingBucket,
-        invoiceCount:     Number(row.invoice_count ?? 0),
-        totalOutstanding: Number(row.total_outstanding ?? 0),
-        overdueAmount:    Number(row.overdue_amount ?? 0),
-      };
-    }),
+    data: (data ?? []).map(r => mapAgingByBranchRow(r)),
     error: null,
   };
 }
@@ -170,7 +181,7 @@ export async function transitionPiLifecycle(
   const { data, error } = await supabase.rpc('transition_pi_lifecycle', {
     p_id: id,
     p_target_status: targetStatus,
-    p_actor_id: actorId ?? null as unknown as string | undefined,
+    p_actor_id: actorId,
   });
   if (error) {
     loggingService.error('transitionPiLifecycle failed', { id, targetStatus, error }, 'apService');
