@@ -246,14 +246,12 @@ jobs:
             echo "smoke_result=pass"
             echo "scope=logical_dump_full_restore_to_isolated_scratch_database"
           } > "$evidence"
-          echo "evidence_file=$evidence" >> "$GITHUB_ENV"
-
       - name: Upload restore evidence
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: restore-drill-evidence-${{ github.run_id }}
-          path: ${{ env.evidence_file }}
+          path: restore-evidence/*.txt
           retention-days: 30
 
       - name: Cleanup scratch database
