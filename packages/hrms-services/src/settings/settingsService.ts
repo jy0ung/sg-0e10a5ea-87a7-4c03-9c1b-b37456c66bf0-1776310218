@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Admin settings service — departments, job titles, leave-type config,
- * holiday config, and approval flows.
+ * and holiday config.
  *
  * All functions throw on error (consistent with the rest of @flc/hrms-services).
  */
@@ -17,9 +17,6 @@ import type {
   UpdateLeaveTypeInput,
   PublicHoliday,  CreateHolidayInput,
   UpdateHolidayInput,
-  ApprovalFlow,
-  CreateApprovalFlowInput,
-  UpdateApprovalFlowInput,
 } from '@flc/types';
 import { supabase } from '../shared/supabaseClient';
 
@@ -116,40 +113,6 @@ function rowToHoliday(r: Record<string, unknown>): PublicHoliday {
     date:        String(r.date ?? ''),
     holidayType: (r.holiday_type ?? 'public') as PublicHoliday['holidayType'],
     isRecurring: Boolean(r.is_recurring),
-    createdAt:   String(r.created_at ?? ''),
-    updatedAt:   String(r.updated_at ?? ''),
-  };
-}
-
-function rowToApprovalFlow(r: Record<string, unknown>): ApprovalFlow {
-  const steps = Array.isArray(r.approval_steps) ? r.approval_steps : [];
-  return {
-    id:          String(r.id ?? ''),
-    companyId:   String(r.company_id ?? ''),
-    name:        String(r.name ?? ''),
-    description: r.description ? String(r.description) : undefined,
-    entityType:   r.entity_type as ApprovalFlow['entityType'],
-    isActive:     Boolean(r.is_active),
-    isDefault:    Boolean(r.is_default),
-    departmentId: r.department_id ? String(r.department_id) : null,
-    createdBy:    r.created_by ? String(r.created_by) : undefined,
-    steps:       (steps as Record<string, unknown>[]).map(s => ({
-      id:                   String(s.id ?? ''),
-      flowId:               String(s.flow_id ?? ''),
-      stepOrder:            Number(s.step_order ?? 0),
-      name:                 String(s.name ?? ''),
-      approverType:         s.approver_type as ApprovalFlow['steps'][number]['approverType'],
-      approverRoleName:     s.approver_role_name ? String(s.approver_role_name) : undefined,
-      approverRole:         s.approver_role ? String(s.approver_role) : undefined,
-      approverUserId:       s.approver_user_id ? String(s.approver_user_id) : undefined,
-      approverUserName:     s.approver_user_name ? String(s.approver_user_name) : undefined,
-      fallbackApproverUserId: s.fallback_approver_user_id ? String(s.fallback_approver_user_id) : undefined,
-      fallbackApproverUserName: s.fallback_approver_user_name ? String(s.fallback_approver_user_name) : undefined,
-      escalationRule:       s.escalation_rule ? String(s.escalation_rule) : undefined,
-      conditionRule:        s.condition_rule ? String(s.condition_rule) : undefined,
-      isActive:             Boolean(s.is_active ?? true),
-      allowSelfApproval:    Boolean(s.allow_self_approval),
-    })),
     createdAt:   String(r.created_at ?? ''),
     updatedAt:   String(r.updated_at ?? ''),
   };
@@ -453,133 +416,6 @@ export async function deletePublicHoliday(companyId: string, id: string): Promis
   const { error } = await supabase
     .from('public_holidays')
     .delete()
-    .eq('company_id', companyId)
-    .eq('id', id);
-  if (error) throw new Error(error.message);
-}
-
-// ─── Approval flows ───────────────────────────────────────────────────────────
-
-export async function listApprovalFlows(companyId: string): Promise<ApprovalFlow[]> {
-  const { data, error } = await supabase
-    .from('approval_flows')
-    .select('*, approval_steps(*)')
-    .eq('company_id', companyId)
-    .order('name');
-  if (error) throw new Error(error.message);
-  return (data ?? []).map(r => rowToApprovalFlow(r as Record<string, unknown>));
-}
-
-export async function createApprovalFlow(
-  companyId: string,
-  actorId: string,
-  input: CreateApprovalFlowInput,
-): Promise<ApprovalFlow> {
-  const { data: flow, error: flowError } = await supabase
-    .from('approval_flows')
-    .insert({
-      company_id:  companyId,
-      name:        input.name,
-      description: input.description ?? null,
-      entity_type: input.entityType,
-      is_active:   input.isActive,
-      created_by:  actorId,
-    })
-    .select('*')
-    .single();
-  if (flowError) throw new Error(flowError.message);
-
-  if (input.steps.length > 0) {
-    const stepRows = input.steps.map((s, idx) => ({
-      flow_id:                    flow.id,
-      step_order:                 s.stepOrder ?? idx + 1,
-      name:                       s.name,
-      approver_type:              s.approverType,
-      approver_role:              s.approverRole ?? null,
-      approver_user_id:           s.approverUserId ?? null,
-      fallback_approver_user_id:  s.fallbackApproverUserId ?? null,
-      escalation_rule:            s.escalationRule ?? null,
-      condition_rule:             s.conditionRule ?? null,
-      is_active:                  s.isActive ?? true,
-      allow_self_approval:        s.allowSelfApproval ?? false,
-    }));
-    // approval_steps has extra columns not in generated types — use any cast
-    const { error: stepsError } = await (supabase as any)
-      .from('approval_steps')
-      .insert(stepRows);
-    if (stepsError) throw new Error((stepsError as { message: string }).message);
-  }
-
-  return listApprovalFlows(companyId).then(flows =>
-    flows.find(f => f.id === flow.id) ?? rowToApprovalFlow(flow as Record<string, unknown>),
-  );
-}
-
-export async function updateApprovalFlow(
-  companyId: string,
-  id: string,
-  input: UpdateApprovalFlowInput,
-): Promise<void> {
-  const { error } = await supabase
-    .from('approval_flows')
-    .update({
-      name:        input.name,
-      description: input.description ?? null,
-      entity_type: input.entityType,
-      is_active:   input.isActive,
-      updated_at:  new Date().toISOString(),
-    })
-    .eq('company_id', companyId)
-    .eq('id', id);
-  if (error) throw new Error(error.message);
-
-  // Replace steps
-  // approval_steps has extra columns not in generated types — use any cast
-  const { error: deleteStepsError } = await (supabase as any)
-    .from('approval_steps')
-    .delete()
-    .eq('flow_id', id);
-  if (deleteStepsError) throw new Error((deleteStepsError as { message: string }).message);
-
-  if (input.steps.length > 0) {
-    const stepRows = input.steps.map((s, idx) => ({
-      flow_id:                    id,
-      step_order:                 s.stepOrder ?? idx + 1,
-      name:                       s.name,
-      approver_type:              s.approverType,
-      approver_role:              s.approverRole ?? null,
-      approver_user_id:           s.approverUserId ?? null,
-      fallback_approver_user_id:  s.fallbackApproverUserId ?? null,
-      escalation_rule:            s.escalationRule ?? null,
-      condition_rule:             s.conditionRule ?? null,
-      is_active:                  s.isActive ?? true,
-      allow_self_approval:        s.allowSelfApproval ?? false,
-    }));
-    // approval_steps has extra columns not in generated types — use any cast
-    const { error: stepsError } = await (supabase as any)
-      .from('approval_steps')
-      .insert(stepRows);
-    if (stepsError) throw new Error((stepsError as { message: string }).message);
-  }
-}
-
-export async function deleteApprovalFlow(companyId: string, id: string): Promise<void> {
-  const { error } = await supabase
-    .from('approval_flows')
-    .delete()
-    .eq('company_id', companyId)
-    .eq('id', id);
-  if (error) throw new Error(error.message);
-}
-
-export async function toggleApprovalFlowActive(
-  companyId: string,
-  id: string,
-  isActive: boolean,
-): Promise<void> {
-  const { error } = await supabase
-    .from('approval_flows')
-    .update({ is_active: isActive, updated_at: new Date().toISOString() })
     .eq('company_id', companyId)
     .eq('id', id);
   if (error) throw new Error(error.message);
