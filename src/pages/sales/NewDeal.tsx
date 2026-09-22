@@ -51,6 +51,7 @@ export default function NewDeal() {
         ...form,
         company_id: user.company_id,
         sales_advisor_id: user.id,
+        sales_advisor_employee_id: user.employee_id ?? null,
         sales_advisor_name: user.name || user.email,
       }, user.id);
 

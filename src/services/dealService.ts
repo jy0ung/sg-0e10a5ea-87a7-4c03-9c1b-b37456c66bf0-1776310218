@@ -43,6 +43,7 @@ export interface Deal {
   accessories_amount: number | null;
   total_amount: number | null;
   sales_advisor_id: string | null;
+  sales_advisor_employee_id: string | null;
   sales_advisor_name: string | null;
   lead_source: string | null;
   lead_source_detail: string | null;
@@ -152,7 +153,7 @@ export type CreateDealInput = Pick<Database['public']['Tables']['deals']['Insert
   'customer_email' | 'customer_id' | 'model_id' | 'model_name' | 'variant' | 'colour' |
   'chassis_no' | 'vehicle_id' | 'selling_price' | 'deposit_amount' | 'deposit_date' |
   'discount_amount' | 'accessories_amount' | 'total_amount' | 'sales_advisor_id' |
-  'sales_advisor_name' | 'lead_source' | 'lead_source_detail' | 'notes' | 'vso_no'>;
+  'sales_advisor_employee_id' | 'sales_advisor_name' | 'lead_source' | 'lead_source_detail' | 'notes' | 'vso_no'>;
 
 export type UpdateDealInput = Partial<CreateDealInput> & { stage?: DealStage };
 
@@ -161,6 +162,7 @@ export interface DealFilters {
   branch_id?: string;
   stage?: DealStage | DealStage[];
   sales_advisor_id?: string;
+  sales_advisor_employee_id?: string;
   search?: string;
   date_from?: string;
   date_to?: string;
@@ -372,6 +374,10 @@ export async function listDeals(filters: DealFilters): Promise<{ data: Deal[]; e
 
     if (filters.sales_advisor_id) {
       query = query.eq('sales_advisor_id', filters.sales_advisor_id);
+    }
+
+    if (filters.sales_advisor_employee_id) {
+      query = query.eq('sales_advisor_employee_id', filters.sales_advisor_employee_id);
     }
 
     if (filters.search) {
@@ -648,7 +654,10 @@ export async function setupRegistration(dealId: string, companyId: string, input
 // Pipeline
 // ============================================================
 
-export async function getPipeline(companyId: string, filters?: { branch_id?: string; sales_advisor_id?: string }): Promise<{ data: PipelineColumn[]; error: Error | null }> {
+export async function getPipeline(
+  companyId: string,
+  filters?: { branch_id?: string; sales_advisor_id?: string; sales_advisor_employee_id?: string },
+): Promise<{ data: PipelineColumn[]; error: Error | null }> {
   try {
     let query = supabase
       .from('deals')
@@ -662,6 +671,9 @@ export async function getPipeline(companyId: string, filters?: { branch_id?: str
     }
     if (filters?.sales_advisor_id) {
       query = query.eq('sales_advisor_id', filters.sales_advisor_id);
+    }
+    if (filters?.sales_advisor_employee_id) {
+      query = query.eq('sales_advisor_employee_id', filters.sales_advisor_employee_id);
     }
 
     const { data, error } = await query;

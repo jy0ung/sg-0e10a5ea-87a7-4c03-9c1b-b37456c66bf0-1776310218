@@ -141,9 +141,13 @@ export default function Home() {
   const dealActionsQuery = useQuery({
     queryKey: ['home-deal-actions', companyId, user?.id],
     queryFn: async () => {
+      const ownerFilter = user!.employee_id
+        ? { sales_advisor_employee_id: user!.employee_id }
+        : { sales_advisor_id: user!.id };
+
       const { data, error } = await listDeals({
         company_id: companyId,
-        sales_advisor_id: user!.id,
+        ...ownerFilter,
         limit: 50,
       });
       if (error) throw error;
