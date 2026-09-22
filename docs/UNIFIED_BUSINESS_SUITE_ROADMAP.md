@@ -56,6 +56,8 @@ This remains P0 and may proceed in parallel with documentation-only architecture
 
 ### Epic 1 — Unified Business Core
 
+**Audit baseline — 2026-09-23:** `docs/BUSINESS_CORE_IDENTITY_MIGRATION_MAP_2026-09-23.md` records the current-to-canonical identity map required by #49. It confirms Employee as workforce truth, Profile as account truth, module/HRMS-role assignments as separate authority relationships, Employee-backed Deal ownership, and the legacy `sales_advisors` table as compatibility only.
+
 **Objective:** Establish the shared identity and organisation spine.
 
 Canonical relationships:
