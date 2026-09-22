@@ -5,6 +5,8 @@ const queued: Result[] = [];
 const selectCalls: Array<{ table: string; columns: unknown; options: unknown }> = [];
 const eqCalls: Array<{ table: string; column: string; value: unknown }> = [];
 const inCalls: Array<{ table: string; column: string; values: unknown[] }> = [];
+const insertCalls: Array<{ table: string; payload: unknown }> = [];
+const updateCalls: Array<{ table: string; payload: unknown }> = [];
 const deleteCalls: string[] = [];
 
 function nextResult(): Result {
@@ -27,8 +29,14 @@ vi.mock('../shared/supabaseClient', () => {
       return q;
     };
     q.order = () => q;
-    q.insert = () => q;
-    q.update = () => q;
+    q.insert = (payload: unknown) => {
+      insertCalls.push({ table, payload });
+      return q;
+    };
+    q.update = (payload: unknown) => {
+      updateCalls.push({ table, payload });
+      return q;
+    };
     q.delete = () => {
       deleteCalls.push(table);
       return q;
@@ -51,9 +59,12 @@ vi.mock('../shared/supabaseClient', () => {
 import {
   createDepartment,
   deleteDepartment,
+  createLeaveType,
   deleteJobTitle,
+  deleteLeaveType,
   listDepartments,
   listJobTitles,
+  updateLeaveType,
 } from './settingsService';
 
 beforeEach(() => {
@@ -61,6 +72,8 @@ beforeEach(() => {
   selectCalls.length = 0;
   eqCalls.length = 0;
   inCalls.length = 0;
+  insertCalls.length = 0;
+  updateCalls.length = 0;
   deleteCalls.length = 0;
   vi.clearAllMocks();
 });
@@ -213,6 +226,147 @@ describe('canonical Job Title settings service', () => {
     expect(eqCalls).toEqual(expect.arrayContaining([
       { table: 'job_titles', column: 'company_id', value: 'c1' },
       { table: 'job_titles', column: 'id', value: 'job-1' },
+    ]));
+  });
+});
+
+
+describe('canonical Leave Type settings service', () => {
+  it('creates with all business rules and canonical defaults', async () => {
+    queued.push({
+      data: {
+        id: 'lt-1',
+        company_id: 'c1',
+        name: 'Annual Leave',
+        code: 'AL',
+        days_per_year: 14,
+        default_days: 14,
+        carry_forward: true,
+        is_paid: true,
+        requires_balance: true,
+        min_advance_notice_days: 7,
+        active: true,
+        created_at: '2026-09-22T00:00:00.000Z',
+        updated_at: '2026-09-22T00:00:00.000Z',
+      },
+      error: null,
+    });
+
+    const result = await createLeaveType('c1', {
+      name: 'Annual Leave',
+      code: 'al',
+      daysPerYear: 14,
+      isPaid: true,
+      minAdvanceNoticeDays: 7,
+      active: true,
+    });
+
+    expect(result).toMatchObject({
+      code: 'AL',
+      carryForward: true,
+      requiresBalance: true,
+      minAdvanceNoticeDays: 7,
+    });
+    expect(insertCalls).toEqual([
+      {
+        table: 'leave_types',
+        payload: expect.objectContaining({
+          company_id: 'c1',
+          code: 'AL',
+          days_per_year: 14,
+          default_days: 14,
+          carry_forward: true,
+          is_paid: true,
+          requires_balance: true,
+          min_advance_notice_days: 7,
+          active: true,
+        }),
+      },
+    ]);
+  });
+
+  it('updates the complete Leave Type rule set', async () => {
+    queued.push({ data: null, error: null });
+
+    await expect(updateLeaveType('c1', 'lt-1', {
+      name: 'Unpaid Leave',
+      code: 'ul',
+      daysPerYear: 0,
+      defaultDays: 0,
+      carryForward: false,
+      isPaid: false,
+      requiresBalance: false,
+      minAdvanceNoticeDays: null,
+      active: true,
+    })).resolves.toBeUndefined();
+
+    expect(updateCalls).toEqual([
+      {
+        table: 'leave_types',
+        payload: expect.objectContaining({
+          name: 'Unpaid Leave',
+          code: 'UL',
+          days_per_year: 0,
+          default_days: 0,
+          carry_forward: false,
+          is_paid: false,
+          requires_balance: false,
+          min_advance_notice_days: null,
+          active: true,
+        }),
+      },
+    ]);
+    expect(eqCalls).toEqual(expect.arrayContaining([
+      { table: 'leave_types', column: 'company_id', value: 'c1' },
+      { table: 'leave_types', column: 'id', value: 'lt-1' },
+    ]));
+  });
+
+  it('does not mutate when Leave Type reference lookup fails', async () => {
+    queued.push({
+      data: null,
+      error: { message: 'balance lookup denied' },
+      count: null,
+    });
+
+    await expect(deleteLeaveType('c1', 'lt-1')).rejects.toThrow(
+      'balance lookup denied',
+    );
+
+    expect(updateCalls).toEqual([]);
+    expect(deleteCalls).toEqual([]);
+  });
+
+  it('soft-deactivates a Leave Type referenced by balances', async () => {
+    queued.push(
+      { data: null, error: null, count: 3 },
+      { data: null, error: null },
+    );
+
+    await expect(deleteLeaveType('c1', 'lt-1')).resolves.toBe('deactivated');
+
+    expect(updateCalls).toEqual([
+      {
+        table: 'leave_types',
+        payload: expect.objectContaining({ active: false }),
+      },
+    ]);
+    expect(deleteCalls).toEqual([]);
+  });
+
+  it('hard-deletes an unreferenced Leave Type', async () => {
+    queued.push(
+      { data: null, error: null, count: 0 },
+      { data: null, error: null },
+    );
+
+    await expect(deleteLeaveType('c1', 'lt-1')).resolves.toBe('deleted');
+
+    expect(deleteCalls).toEqual(['leave_types']);
+    expect(eqCalls).toEqual(expect.arrayContaining([
+      { table: 'leave_balances', column: 'leave_type_id', value: 'lt-1' },
+      { table: 'leave_types', column: 'company_id', value: 'c1' },
+      { table: 'leave_types', column: 'id', value: 'lt-1' },
     ]));
   });
 });
