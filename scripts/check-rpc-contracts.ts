@@ -196,6 +196,43 @@ const targets: FunctionTarget[] = [
       },
     ],
   },
+  // ─── Internal Requests — canonical approval review ─────────────────────────
+  {
+    functionName: 'review_internal_request_approval',
+    checks: [
+      {
+        kind: 'required',
+        pattern: /p_company_id\s+text[\s\S]*?p_ticket_id\s+uuid[\s\S]*?p_expected_step_id\s+uuid[\s\S]*?p_decision\s+text/i,
+        message: 'review_internal_request_approval must keep company, ticket, expected-step, and decision named arguments',
+      },
+      {
+        kind: 'required',
+        pattern: /security\s+definer/i,
+        message: 'review_internal_request_approval must remain SECURITY DEFINER because it coordinates authorized workflow, ticket, and activity writes',
+      },
+      {
+        kind: 'required',
+        pattern: /set\s+search_path\s*=\s*pg_catalog\s*,\s*public/i,
+        message: 'review_internal_request_approval must keep a fixed pg_catalog, public search_path',
+      },
+      {
+        kind: 'required',
+        pattern: /from\s+public\.approval_instances[\s\S]*?for\s+update/i,
+        message: 'review_internal_request_approval must lock the approval instance before deciding it',
+      },
+      {
+        kind: 'required',
+        pattern: /current_step_id\s+is\s+distinct\s+from\s+p_expected_step_id/i,
+        message: 'review_internal_request_approval must reject stale/replayed approval-step tokens',
+      },
+      {
+        kind: 'required',
+        pattern: /assignment\.hrms_role_id::text\s*=\s*instance_row\.current_approver_role/i,
+        message: 'review_internal_request_approval must verify role-routed approvers against HRMS role assignments',
+      },
+    ],
+  },
+
   // ─── Phase 6a — Webhook outbox ────────────────────────────────────────────
   {
     functionName: 'emit_webhook_event',
