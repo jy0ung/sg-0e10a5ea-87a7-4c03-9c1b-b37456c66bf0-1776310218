@@ -33,6 +33,13 @@ jobs:
       TARGET_ENV: ${{ github.event.inputs.environment || 'production' }}
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       DB_BACKUP_GPG_PASSPHRASE: ${{ secrets.DB_BACKUP_GPG_PASSPHRASE }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION || 'ap-southeast-1' }}
@@ -41,28 +48,88 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Resolve backup transport
+        id: transport
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${DB_BACKUP_GPG_PASSPHRASE:-}" ]]; then
+            echo "Missing required secret: DB_BACKUP_GPG_PASSPHRASE" >&2
+            exit 1
+          fi
+
+          if [[ -n "${SUPABASE_DB_URL:-}" ]]; then
+            echo "mode=direct" >> "$GITHUB_OUTPUT"
+            echo "Using direct Postgres backup transport."
+            exit 0
+          fi
+
+          missing=0
+          for name in SSH_PRIVATE_KEY SSH_KNOWN_HOSTS SSH_HOST SSH_USER CF_ACCESS_CLIENT_ID CF_ACCESS_CLIENT_SECRET; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing SSH backup secret: ${name}" >&2
+              missing=1
+            fi
+          done
+
+          if [[ "$missing" -ne 0 ]]; then
+            echo "Backup requires either SUPABASE_DB_URL or the complete Cloudflare Access SSH credential set." >&2
+            exit 1
+          fi
+
+          echo "mode=ssh" >> "$GITHUB_OUTPUT"
+          echo "Using Cloudflare Access SSH backup transport; no database URL is exposed to the runner."
+
       - name: Install backup tools
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends postgresql-client gnupg
 
-      - name: Verify required secrets
+      - name: Install cloudflared
+        if: steps.transport.outputs.mode == 'ssh'
+        shell: bash
         run: |
           set -euo pipefail
-          missing=0
-          for name in SUPABASE_DB_URL DB_BACKUP_GPG_PASSPHRASE; do
-            if [[ -z "${!name:-}" ]]; then
-              echo "Missing required secret: ${name}" >&2
-              missing=1
-            fi
-          done
-          if [[ "$missing" -ne 0 ]]; then
-            exit 1
-          fi
+          curl -fsSL -o /tmp/cloudflared.deb \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i /tmp/cloudflared.deb
+          cloudflared --version
+
+      - name: Configure SSH backup transport
+        if: steps.transport.outputs.mode == 'ssh'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_backup
+          chmod 600 ~/.ssh/id_backup
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+          cat > ~/.ssh/config <<EOF
+          Host backup-target
+            HostName $SSH_HOST
+            Port $SSH_PORT
+            User $SSH_USER
+            IdentityFile ~/.ssh/id_backup
+            IdentitiesOnly yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+            ProxyCommand cloudflared access ssh --hostname %h
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Create encrypted logical dump
         id: dump
+        shell: bash
+        env:
+          BACKUP_TRANSPORT: ${{ steps.transport.outputs.mode }}
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           mkdir -p backup
@@ -71,25 +138,54 @@ jobs:
           encrypted_file="${dump_file}.gpg"
           checksum_file="${encrypted_file}.sha256"
 
-          pg_dump \
+          cleanup_plaintext() {
+            rm -f "$dump_file"
+          }
+          trap cleanup_plaintext EXIT
+
+          if [[ "$BACKUP_TRANSPORT" == "direct" ]]; then
+            pg_dump \
+              --format=custom \
+              --no-owner \
+              --no-privileges \
+              --file "$dump_file" \
+              "$SUPABASE_DB_URL"
+          elif [[ "$BACKUP_TRANSPORT" == "ssh" ]]; then
+            ssh -T backup-target 'bash -se' > "$dump_file" <<'REMOTE'
+          set -euo pipefail
+          db_container="$(docker ps --format '{{.Names}}' | grep -E '^supabase_db_' | head -1 || true)"
+          if [[ -z "$db_container" ]]; then
+            echo 'No production Supabase DB container matched ^supabase_db_' >&2
+            exit 1
+          fi
+          docker exec "$db_container" pg_dump \
+            -U postgres \
+            -d postgres \
             --format=custom \
             --no-owner \
-            --no-privileges \
-            --file "$dump_file" \
-            "$SUPABASE_DB_URL"
+            --no-privileges
+          REMOTE
+          else
+            echo "Unsupported backup transport: $BACKUP_TRANSPORT" >&2
+            exit 1
+          fi
 
-          gpg \
+          test -s "$dump_file"
+          pg_restore --list "$dump_file" >/dev/null
+
+          printf '%s' "$DB_BACKUP_GPG_PASSPHRASE" | gpg \
             --batch \
             --yes \
             --pinentry-mode loopback \
-            --passphrase "$DB_BACKUP_GPG_PASSPHRASE" \
+            --passphrase-fd 0 \
             --symmetric \
             --cipher-algo AES256 \
             --output "$encrypted_file" \
             "$dump_file"
 
-          rm -f "$dump_file"
+          cleanup_plaintext
           sha256sum "$encrypted_file" > "$checksum_file"
+          sha256sum -c "$checksum_file"
 
           echo "encrypted_file=${encrypted_file}" >> "$GITHUB_OUTPUT"
           echo "checksum_file=${checksum_file}" >> "$GITHUB_OUTPUT"
@@ -121,7 +217,9 @@ jobs:
           {
             echo "### Database Backup"
             echo ""
-            echo "- Environment: \`${TARGET_ENV}\`"
-            echo "- Encrypted artifact: \`${{ steps.dump.outputs.artifact_name }}\`"
-            echo "- S3 upload configured: \`${DB_BACKUP_S3_BUCKET:+yes}\`"
+            echo "- Environment: `${TARGET_ENV}`"
+            echo "- Transport: `${{ steps.transport.outputs.mode }}`"
+            echo "- Encrypted artifact: `${{ steps.dump.outputs.artifact_name }}`"
+            echo "- S3 upload configured: `${DB_BACKUP_S3_BUCKET:+yes}`"
+            echo "- Plaintext dump retained: `no`"
           } >> "$GITHUB_STEP_SUMMARY"
