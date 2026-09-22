@@ -40,6 +40,7 @@ export type {
 } from './approval/approvalTypes';
 export { rowToApprovalStep, rowToApprovalInstance, rowToApprovalDecision } from './approval/approvalTypes';
 export { resolveStepRouting, userHasAssignedHrmsRole } from './approval/approvalRouting';
+export * from './approval/approvalFlowAdminService';
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
