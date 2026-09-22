@@ -55,7 +55,7 @@ One-time gate before first production cutover. Every box must be checked.
 
 - [ ] Supabase PITR enabled on production — repository docs define the target, but current production enablement has not been evidenced in this repository
 - [x] Nightly logical dump workflow defined in `.github/workflows/db-backup.yml`
-- [ ] Nightly logical dump job green with production secrets configured — blocked on `SUPABASE_DB_URL` and `DB_BACKUP_GPG_PASSPHRASE`
+- [ ] Nightly logical dump job green with production secrets configured — code supports direct `SUPABASE_DB_URL` or Cloudflare Access SSH fallback; production `DB_BACKUP_GPG_PASSPHRASE` + transport secrets and a successful encrypted run are still unverified
 - [ ] Monthly restore-to-staging drill scheduled and executed at least once
 - [ ] Uptime monitoring (StatusCake / BetterUptime) pinging `/health`
 - [ ] Error-budget policy documented per module
@@ -103,7 +103,7 @@ Repository-enforced controls now present:
 
 Still requires external/operator evidence:
 
-- production backup connection + encryption secrets and one successful encrypted backup artifact;
+- production backup encryption secret plus one configured direct-DB or Cloudflare Access SSH transport, and one successful encrypted backup artifact;
 - checksum verification and isolated restore drill with recorded RTO/RPO;
 - confirmation of production PITR/storage-versioning configuration;
 - branch/ruleset governance. The connected GitHub integration reports no repository rulesets and does not have administration permission to inspect or change classic branch protection.
