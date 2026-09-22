@@ -178,6 +178,100 @@ export async function getInternalRequestApprovalGate(
   return { data: result.data.get(ticketId) ?? null, error: null };
 }
 
+const APPROVER_ROLE_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * UI/workspace permission helper for the materialized current approver.
+ *
+ * This is intentionally fail-closed and mirrors the atomic review command's
+ * routing authority. The database RPC remains the final authorization boundary.
+ */
+export async function canProfileReviewInternalRequestApproval(
+  companyId: string,
+  ticketId: string,
+  profileId: string,
+): Promise<{ data: boolean; error: string | null }> {
+  if (!companyId || !ticketId || !profileId) {
+    return { data: false, error: null };
+  }
+
+  const { data: instance, error: instanceError } = await supabase
+    .from('approval_instances')
+    .select('flow_id, requester_id, status, current_step_id, current_approver_role, current_approver_user_id')
+    .eq('company_id', companyId)
+    .eq('entity_type', 'internal_request')
+    .eq('entity_id', ticketId)
+    .maybeSingle();
+
+  if (instanceError) return { data: false, error: instanceError.message };
+  if (!instance || instance.status !== 'pending' || !instance.current_step_id) {
+    return { data: false, error: null };
+  }
+
+  const { data: step, error: stepError } = await supabase
+    .from('approval_steps')
+    .select('allow_self_approval, is_active')
+    .eq('id', instance.current_step_id)
+    .eq('flow_id', instance.flow_id)
+    .maybeSingle();
+
+  if (stepError) return { data: false, error: stepError.message };
+  if (!step || !step.is_active) return { data: false, error: null };
+
+  if (instance.requester_id === profileId && !step.allow_self_approval) {
+    return { data: false, error: null };
+  }
+
+  if (instance.current_approver_user_id) {
+    return {
+      data: instance.current_approver_user_id === profileId,
+      error: null,
+    };
+  }
+
+  const materializedRole = instance.current_approver_role?.trim();
+  if (!materializedRole) return { data: false, error: null };
+
+  let roleQuery = supabase
+    .from('hrms_roles')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('is_active', true);
+
+  roleQuery = APPROVER_ROLE_UUID_PATTERN.test(materializedRole)
+    ? roleQuery.eq('id', materializedRole)
+    : roleQuery.eq('code', materializedRole);
+
+  const { data: role, error: roleError } = await roleQuery.maybeSingle();
+  if (roleError) return { data: false, error: roleError.message };
+  if (!role?.id) return { data: false, error: null };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('employee_id')
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (profileError) return { data: false, error: profileError.message };
+
+  const employeeId = profile?.employee_id ? String(profile.employee_id) : null;
+  let assignmentQuery = supabase
+    .from('employee_hrms_role_assignments')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('hrms_role_id', String(role.id))
+    .limit(1);
+
+  assignmentQuery = employeeId
+    ? assignmentQuery.or(`profile_id.eq.${profileId},employee_id.eq.${employeeId}`)
+    : assignmentQuery.eq('profile_id', profileId);
+
+  const { data: assignments, error: assignmentError } = await assignmentQuery;
+  if (assignmentError) return { data: false, error: assignmentError.message };
+
+  return { data: (assignments ?? []).length > 0, error: null };
+}
+
 interface AtomicInternalRequestReviewResult {
   instanceId: string;
   ticketId: string;
