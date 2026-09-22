@@ -23,11 +23,12 @@ describe('Approval Flow admin integrity migration', () => {
   });
 
   it('blocks structural deletion after either approval engine has used the flow', () => {
-    expect(migration).toContain('guard_used_approval_flow_step_delete');
+    expect(migration).toContain('guard_used_approval_flow_step_mutation');
     expect(migration).toContain('guard_used_approval_flow_delete');
     expect(migration).toContain('FROM public.approval_instances ai WHERE ai.flow_id');
     expect(migration).toContain('FROM public.approval_requests ar WHERE ar.flow_id');
     expect(migration).toContain('structurally immutable');
+    expect(migration).toContain('routing structure is immutable');
   });
 
   it('validates company ownership for Department, Profile, and UUID-form HRMS roles', () => {
