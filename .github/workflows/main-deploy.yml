@@ -244,11 +244,13 @@ jobs:
           set -euo pipefail
           scp \
             scripts/deploy-image.sh \
+            scripts/rollback-image.sh \
             scripts/verify-migration-ledger.sh \
             /tmp/flc-release-migrations.txt \
             deploy-target:/tmp/
 
       - name: Run deploy on host through the tunnel
+        id: deploy
         shell: bash
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
@@ -261,7 +263,7 @@ jobs:
         run: |
           set -euo pipefail
           ssh deploy-target \
-            "chmod +x /tmp/deploy-image.sh && \
+            "chmod +x /tmp/deploy-image.sh /tmp/rollback-image.sh && \
              CONTAINER_NAME='${CONTAINER_NAME}' \
              HOST_PORT='${HOST_PORT}' \
              GHCR_USERNAME='${GHCR_USERNAME:-}' \
@@ -269,6 +271,7 @@ jobs:
              VERIFY_MIGRATION_LEDGER='1' \
              MIGRATION_LEDGER_SCRIPT='/tmp/verify-migration-ledger.sh' \
              MIGRATION_MANIFEST='/tmp/flc-release-migrations.txt' \
+             ROLLBACK_SCRIPT='/tmp/rollback-image.sh' \
              /tmp/deploy-image.sh '${IMAGE}'"
 
       - name: Verify production deployment
@@ -306,6 +309,37 @@ jobs:
           PROD_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
           PROD_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
         run: npm run smoke:production
+
+      - name: Roll back failed production candidate
+        if: ${{ failure() && steps.deploy.outcome != 'skipped' }}
+        shell: bash
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CONTAINER_NAME: ${{ secrets.DEPLOY_CONTAINER_NAME }}
+          HOST_PORT: ${{ secrets.DEPLOY_HOST_PORT }}
+        run: |
+          set -euo pipefail
+          ssh deploy-target \
+            "if docker ps -a --format '{{.Names}}' | grep -qx '${CONTAINER_NAME}-rollback'; then \
+               CONTAINER_NAME='${CONTAINER_NAME}' HOST_PORT='${HOST_PORT}' /tmp/rollback-image.sh; \
+             else \
+               echo 'No preserved rollback container is available; nothing to restore.'; \
+             fi"
+
+      - name: Remove preserved rollback container after successful verification
+        if: ${{ success() && steps.deploy.outcome == 'success' }}
+        shell: bash
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CONTAINER_NAME: ${{ secrets.DEPLOY_CONTAINER_NAME }}
+        run: |
+          set -euo pipefail
+          ssh deploy-target \
+            "if docker ps -a --format '{{.Names}}' | grep -qx '${CONTAINER_NAME}-rollback'; then \
+               docker rm -f '${CONTAINER_NAME}-rollback' >/dev/null; \
+             fi"
 
       - name: Summary
         if: always()
