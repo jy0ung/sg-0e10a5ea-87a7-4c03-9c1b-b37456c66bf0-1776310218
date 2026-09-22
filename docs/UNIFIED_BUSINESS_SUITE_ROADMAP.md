@@ -116,6 +116,12 @@ Exit criteria:
 - approver routing remains auditable and domain-neutral;
 - approved decisions invoke domain-owned commands.
 
+**Implementation record — 2026-09-22:**
+- Internal Request flow resolution now uses canonical Profile -> Employee workforce identity for Department authority, validates pinned flows, and resolves condition/match-priority precedence deterministically (PR #74, merge `317fba7`).
+- Internal Request approval review is now one concurrency-safe database command across Decision, Instance, Ticket, and Activity state. Stale rendered Steps fail as an explicit `PT409` conflict instead of a retryable PostgreSQL serialization error (PR #76, merge `5a73286`).
+- Workspace approval permission now follows the materialized specific Profile or active same-company HRMS Role assignment through Profile/Employee identity. App-level admin role is not approval authority (PR #83, merge `859d5c4`).
+- These merges were code/integrity changes only; no production deployment was performed as part of this refactor sequence.
+
 ### Epic 4 — Internal Requests
 
 **Objective:** Make Internal Requests the company-wide service-intake and collaboration platform.
