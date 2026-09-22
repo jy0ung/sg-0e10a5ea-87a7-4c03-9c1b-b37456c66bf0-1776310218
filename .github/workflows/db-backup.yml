@@ -111,7 +111,8 @@ jobs:
           set -euo pipefail
           container="$(
             ssh backup-target \
-              "docker ps --format '{{.Names}}' | grep -E '$DB_CONTAINER_PATTERN' | head -1"
+              "docker ps --format '{{.Names}}' | grep -E '$DB_CONTAINER_PATTERN' | head -1" \
+              || true
           )"
           if [[ -z "$container" ]]; then
             echo "No running database container matched $DB_CONTAINER_PATTERN" >&2
