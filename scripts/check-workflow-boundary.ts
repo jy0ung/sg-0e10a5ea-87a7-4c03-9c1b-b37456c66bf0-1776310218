@@ -1,9 +1,10 @@
 #!/usr/bin/env -S npx tsx
 /**
  * Enterprise architecture gate: `approval_instances` is the canonical workflow
- * runtime. The legacy `approval_requests` service is allowed to remain as a
- * compatibility island, but new callers must not be added while migration is
- * in progress.
+ * runtime. Runtime application code must not access the legacy
+ * `approval_requests` table. A direct release-compatibility test is retained
+ * temporarily while the database table/dual-target decision compatibility is
+ * still supported.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -15,10 +16,7 @@ const sourceRoots = [
   join(root, 'packages'),
 ];
 
-const allowedLegacyFiles = new Set([
-  'src/services/approvalEngineService.ts',
-  'apps/hrms-web/src/services/approvalEngineService.ts',
-  // Direct compatibility coverage for the dual-target decision migration.
+const allowedCompatibilityFiles = new Set([
   'src/test/release-workflows.spec.ts',
 ]);
 
@@ -50,15 +48,11 @@ function walk(dir: string): string[] {
     }
 
     if (stat.isDirectory()) {
-      if (!ignoredDirs.has(entry)) {
-        files.push(...walk(full));
-      }
+      if (!ignoredDirs.has(entry)) files.push(...walk(full));
       continue;
     }
 
-    if (entry.endsWith('.ts') || entry.endsWith('.tsx')) {
-      files.push(full);
-    }
+    if (entry.endsWith('.ts') || entry.endsWith('.tsx')) files.push(full);
   }
 
   return files;
@@ -76,7 +70,7 @@ const approvalRequestsCallPattern = /\.from\s*\(\s*['"]approval_requests['"]/;
 for (const sourceRoot of sourceRoots) {
   for (const filePath of walk(sourceRoot)) {
     const relativePath = relative(root, filePath);
-    if (allowedLegacyFiles.has(relativePath)) continue;
+    if (allowedCompatibilityFiles.has(relativePath)) continue;
 
     const lines = readFileSync(filePath, 'utf8').split(/\r?\n/);
     lines.forEach((line, index) => {
@@ -92,21 +86,17 @@ for (const sourceRoot of sourceRoots) {
 }
 
 if (findings.length > 0) {
-  console.error('Legacy approval_requests access found outside the approved compatibility island.');
+  console.error('Legacy approval_requests access found in runtime/application code.');
   console.error('Use approval_instances through the canonical workflow engine instead.');
   console.error('');
   for (const finding of findings) {
     console.error(`- ${finding.file}:${finding.line}`);
     console.error(`  ${finding.source}`);
   }
-  console.error('');
-  console.error('Allowed legacy files:');
-  for (const file of [...allowedLegacyFiles].sort()) {
-    console.error(`- ${file}`);
-  }
   process.exit(1);
 }
 
 console.info(
-  `Workflow boundary check passed: approval_requests is confined to ${allowedLegacyFiles.size} legacy compatibility files.`,
+  'Workflow boundary check passed: approval_requests has zero runtime application accesses; ' +
+    'only explicit release-compatibility coverage is allowlisted.',
 );
