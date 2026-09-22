@@ -1869,6 +1869,7 @@ export type Database = {
           model_id: string | null
           model_name: string | null
           notes: string | null
+          sales_advisor_employee_id: string | null
           sales_advisor_id: string | null
           sales_advisor_name: string | null
           selling_price: number | null
@@ -1906,6 +1907,7 @@ export type Database = {
           model_id?: string | null
           model_name?: string | null
           notes?: string | null
+          sales_advisor_employee_id?: string | null
           sales_advisor_id?: string | null
           sales_advisor_name?: string | null
           selling_price?: number | null
@@ -1943,6 +1945,7 @@ export type Database = {
           model_id?: string | null
           model_name?: string | null
           notes?: string | null
+          sales_advisor_employee_id?: string | null
           sales_advisor_id?: string | null
           sales_advisor_name?: string | null
           selling_price?: number | null
@@ -1990,6 +1993,13 @@ export type Database = {
             columns: ["model_id"]
             isOneToOne: false
             referencedRelation: "vehicle_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_sales_advisor_employee_id_fkey"
+            columns: ["sales_advisor_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
           {
@@ -8445,6 +8455,19 @@ export type Database = {
           p_vehicles: Json
         }
         Returns: Json
+      }
+      create_sales_advisor_employee: {
+        Args: {
+          p_branch_id: string
+          p_company_id: string
+          p_contact_no?: string | null
+          p_ic_no?: string | null
+          p_join_date?: string | null
+          p_name: string
+          p_staff_code: string
+          p_work_email?: string | null
+        }
+        Returns: string
       }
       create_grn: {
         Args: {

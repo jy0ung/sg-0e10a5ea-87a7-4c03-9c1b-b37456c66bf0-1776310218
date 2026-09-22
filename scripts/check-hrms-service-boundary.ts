@@ -3,7 +3,7 @@
  * Enterprise architecture gate: HRMS web stays a separately deployed host, but
  * it must not regain a second copy of HRMS domain service wrapper logic.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = process.cwd();
@@ -14,9 +14,12 @@ const canonicalReExports = new Map<string, string>([
   ['apps/hrms-web/src/services/hrms/announcementService.ts', "export * from '../../../../../src/services/hrms/announcementService';"],
   ['apps/hrms-web/src/services/hrms/appraisalService.ts', "export * from '../../../../../src/services/hrms/appraisalService';"],
   ['apps/hrms-web/src/services/hrms/attendanceService.ts', "export * from '../../../../../src/services/hrms/attendanceService';"],
+  ['apps/hrms-web/src/services/hrms/employeeService.ts', "export * from '../../../../../src/services/hrms/employeeService';"],
   ['apps/hrms-web/src/services/hrms/leaveService.ts', "export * from '../../../../../src/services/hrms/leaveService';"],
   ['apps/hrms-web/src/services/hrms/payrollService.ts', "export * from '../../../../../src/services/hrms/payrollService';"],
-  ['apps/hrms-web/src/services/hrms/shared.ts', "export * from '../../../../../src/services/hrms/shared';"],
+  ['apps/hrms-web/src/services/hrmsRoleService.ts', "export * from '../../../../src/services/hrmsRoleService';"],
+  ['apps/hrms-web/src/services/hrmsAdminService.ts', "export * from '../../../../src/services/hrmsAdminService';"],
+  ['apps/hrms-web/src/services/approvalFlowService.ts', "export * from '../../../../src/services/approvalFlowService';"],
   ['apps/hrms-web/src/services/hrms/index.ts', "export * from '../../../../../src/services/hrms';"],
 ]);
 
@@ -36,6 +39,20 @@ type Finding = {
 };
 
 const findings: Finding[] = [];
+
+const retiredCompatibilityFiles = [
+  'src/services/hrms/shared.ts',
+  'apps/hrms-web/src/services/hrms/shared.ts',
+];
+
+for (const file of retiredCompatibilityFiles) {
+  if (existsSync(join(root, file))) {
+    findings.push({
+      file,
+      detail: 'retired compatibility service must remain deleted; use @flc/hrms-services instead',
+    });
+  }
+}
 
 for (const [file, expectedExport] of canonicalReExports) {
   let source = '';
@@ -67,4 +84,7 @@ if (findings.length > 0) {
   process.exit(1);
 }
 
-console.info(`HRMS service boundary check passed: ${canonicalReExports.size} HRMS service/access wrappers are canonical re-exports.`);
+console.info(
+  `HRMS service boundary check passed: ${canonicalReExports.size} wrappers are canonical re-exports and ` +
+    `${retiredCompatibilityFiles.length} retired shared compatibility files remain absent.`,
+);

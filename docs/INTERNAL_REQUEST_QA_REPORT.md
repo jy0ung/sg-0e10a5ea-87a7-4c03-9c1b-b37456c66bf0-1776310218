@@ -75,9 +75,10 @@ if (ticket.status === 'cancelled' || ticket.status === 'closed' || ticket.status
 
 **Impact:** Any approval flow using role-based steps (the recommended pattern) would silently hide approval buttons from every admin in the queue, making role-based approval flows completely non-functional from the UI.
 
-**Fix:** Rewrote the logic:
-- If `current_approver_user_id` is set: only match the specific assigned user (unchanged)
-- If `current_approver_role` is set (role-based): allow `super_admin` and `company_admin` to see and attempt the approval; the backend enforces actual HRMS role membership
+**Fix history:**
+- The original QA hotfix exposed role-based approval to `super_admin` / `company_admin` as an interim UI workaround while the backend remained authoritative.
+- **Superseded on 2026-09-22 by PR #83 (`859d5c4`)**: workspace approval permission now resolves the canonical materialized approver. Specific-user routing requires the exact Profile; role routing requires an active same-company HRMS Role assignment through Profile or canonical linked Employee identity. App-level admin role alone no longer grants approval permission.
+- Self-approval visibility is also checked against the current approval Step; the atomic database command remains the final authorization boundary.
 
 ---
 
@@ -162,7 +163,7 @@ After a request is fully approved, `reviewInternalRequestApproval` notifies the 
 | 9 | Self-approval guard | PASS | `allowSelfApproval = false` blocks at backend |
 | 10 | Cancel request while open and unassigned | FIXED (BUG-004) | Approval instance now cleaned up |
 | 11 | Attempt approval on cancelled ticket | FIXED (BUG-002) | Returns error message |
-| 12 | Role-based approval buttons visible to admins | FIXED (BUG-003) | Buttons shown; backend enforces role |
+| 12 | Role-based approval buttons visible to the materialized HRMS Role assignee | FIXED (BUG-003; superseded by PR #83) | Exact Profile/Employee HRMS Role assignment drives UI permission; unrelated app admins are not granted review authority |
 | 13 | Resolve ticket with pending approval | PASS | `updateTicket` gate blocks at `approved` check |
 | 14 | SLA fields and overdue badge | PASS | `isOverdue()` and `TicketSlaSummary` correct |
 | 15 | Attachment upload failure doesn't block submit | PASS | Best-effort, separate from ticket insert |
@@ -189,7 +190,31 @@ After a request is fully approved, `reviewInternalRequestApproval` notifies the 
 
 ---
 
-## 6. Post-Fix Validation
+## 6. 2026-09-22 Approval Integrity Addendum
+
+The original QA fixes were followed by three repository-level hardening slices:
+
+1. **PR #74 / `317fba7` — approval-flow resolution**
+   - canonical Profile -> Employee Department authority;
+   - validation of category/subcategory pinned flows;
+   - deterministic conditions and `match_priority` precedence.
+
+2. **PR #76 / `5a73286` — atomic approval review**
+   - one `review_internal_request_approval(...)` transaction for Decision, Instance, Ticket, and Activity state;
+   - Approval Instance and same-company Ticket row locking;
+   - stale rendered-Step protection;
+   - stale business conflicts return `PT409` instead of PostgreSQL `40001`, preventing Data API retry loops;
+   - local-Supabase Production Readiness passed **158/158** live tests.
+
+3. **PR #83 / `859d5c4` — canonical approval UI permission**
+   - specific-user permission is exact Profile identity;
+   - role permission uses active same-company HRMS Role assignment through Profile/Employee identity;
+   - valid approvers can enter the workspace without inheriting queue/admin/internal-note/audit privileges;
+   - all CI, Playwright, and local-Supabase readiness gates passed.
+
+No production deployment was performed as part of these three refactor merges.
+
+## 7. Post-Fix Validation
 
 | Check | Result |
 |---|---|

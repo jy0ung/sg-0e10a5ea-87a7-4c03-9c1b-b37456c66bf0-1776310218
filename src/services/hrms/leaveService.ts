@@ -4,7 +4,6 @@ import * as pkg from '@flc/hrms-services';
 import {
   LeaveType, LeaveBalance, LeaveRequest, CreateLeaveRequestInput,
 } from '@/types';
-import { resolveRequiredProfileId } from './shared';
 
 const LEAVE_ATTACHMENT_BUCKET = 'leave-attachments';
 const LEAVE_ATTACHMENT_MAX_BYTES = 3 * 1024 * 1024;
@@ -146,8 +145,7 @@ export async function createLeaveRequest(
 ): Promise<{ error: string | null }> {
   let uploadedAttachment: Awaited<ReturnType<typeof uploadLeaveAttachment>> | null = null;
   try {
-    const requesterProfileId = await resolveRequiredProfileId(employeeId);
-    if (requesterProfileId.error) return { error: requesterProfileId.error };
+    const requesterProfileId = await pkg.resolveRequiredProfileId(employeeId);
 
     if (input.attachmentFile) {
       uploadedAttachment = await uploadLeaveAttachment(input.attachmentFile, companyId, employeeId);
@@ -164,7 +162,7 @@ export async function createLeaveRequest(
       attachmentFileSize: uploadedAttachment?.fileSize ?? input.attachmentFileSize,
       attachmentMimeType: uploadedAttachment?.mimeType ?? input.attachmentMimeType,
     });
-    void logUserAction(requesterProfileId.data, 'create', 'leave_request', leaveRequestId, {
+    void logUserAction(requesterProfileId, 'create', 'leave_request', leaveRequestId, {
       leaveTypeId: input.leaveTypeId,
       startDate:   input.startDate,
       endDate:     input.endDate,
@@ -206,9 +204,8 @@ export async function reviewLeaveRequest(
 
     if (!approvalInstance) {
       // Legacy path: no approval workflow — check assigned HRMS approval roles directly.
-      const requesterProfileId = await resolveRequiredProfileId(requestOwnerId);
-      if (requesterProfileId.error) return { error: requesterProfileId.error };
-      if (requesterProfileId.data === reviewerId) {
+      const requesterProfileId = await pkg.resolveRequiredProfileId(requestOwnerId);
+      if (requesterProfileId === reviewerId) {
         return { error: 'You cannot approve or reject your own leave request.' };
       }
       const reviewerApprovalAccess = await reviewerCanApproveLeave(String((req as Record<string, unknown> | null)?.company_id ?? ''), reviewerId);

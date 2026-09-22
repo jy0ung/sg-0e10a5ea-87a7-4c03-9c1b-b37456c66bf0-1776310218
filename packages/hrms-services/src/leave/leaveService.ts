@@ -7,6 +7,7 @@ import { supabase, untypedSupabase } from '../shared/supabaseClient';
 import { resolveRequiredProfileId, resolveStoredEmployeeIdentities } from '../shared/identity';
 import { bootstrapApprovalInstanceForEntity, submitApprovalDecision } from '../approval/approvalEngine';
 import { rowToApprovalDecision } from '../approval/approvalTypes';
+import { resolveApprovalFlowForRequester } from '../approval/approvalFlowResolver';
 import type { ApprovalAuditAdapter } from '../approval/approvalTypes';
 
 // ─── Attachment payload (passed in from wrappers that handle file upload) ──────
@@ -273,22 +274,13 @@ export async function getLeaveApprovalPreview(
   companyId: string,
   employeeId: string,
 ): Promise<LeaveApprovalPreview | null> {
-  const { data: flows, error: flowError } = await supabase
-    .from('approval_flows')
-    .select('id')
-    .eq('company_id', companyId)
-    .eq('entity_type', 'leave_request')
-    .eq('is_active', true)
-    .order('updated_at', { ascending: false })
-    .limit(2);
-  if (flowError) throw new Error(flowError.message);
-  if (!flows?.length) return null;
-  if (flows.length > 1) throw new Error('Multiple active leave approval flows are configured.');
+  const flowId = await resolveApprovalFlowForRequester(companyId, 'leave_request', employeeId);
+  if (!flowId) return null;
 
   const { data: steps, error: stepError } = await supabase
     .from('approval_steps')
     .select('id, step_order, name, approver_type, approver_role, approver_user_id')
-    .eq('flow_id', String(flows[0].id))
+    .eq('flow_id', flowId)
     .order('step_order');
   if (stepError) throw new Error(stepError.message);
   if (!steps?.length) throw new Error('The active leave approval flow has no steps configured.');

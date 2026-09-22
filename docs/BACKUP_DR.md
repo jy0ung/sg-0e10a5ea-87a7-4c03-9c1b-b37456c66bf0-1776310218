@@ -4,24 +4,24 @@ Scope: Supabase Postgres data, storage buckets, edge function code, and configur
 
 ## Backup posture
 
-| Asset                      | Mechanism                            | Retention  | Owner          |
-| -------------------------- | ------------------------------------ | ---------- | -------------- |
-| Postgres (staging + prod)  | Supabase PITR (point-in-time)        | 7 days     | Platform team  |
-| Daily logical dump         | `pg_dump` → encrypted S3 bucket       | 30 days    | Platform team  |
-| Storage buckets            | Object versioning + lifecycle rule    | 30 days    | Platform team  |
-| Edge function source       | Git (tagged releases)                 | Forever    | Engineering    |
-| `.env.*` templates         | Git                                   | Forever    | Engineering    |
-| Supabase project config    | `supabase/config.toml` in repo        | Forever    | Engineering    |
+The table below is the **target recovery posture**, not proof that each production control is currently enabled. Production PITR, storage versioning, backup delivery, retention, and restore evidence must be verified operationally.
+
+| Asset                      | Target mechanism                      | Target retention | Owner          | Current evidence |
+| -------------------------- | ------------------------------------- | ---------------- | -------------- | ---------------- |
+| Postgres (staging + prod)  | Supabase PITR (point-in-time)         | 7 days           | Platform team  | Not yet recorded in-repo |
+| Daily logical dump         | `pg_dump` → GPG-encrypted artifact/S3 | 30 days in S3    | Platform team  | Direct DB URL and Cloudflare Access SSH transports implemented; production encrypted-run evidence still open |
+| Storage buckets            | Object versioning + lifecycle rule     | 30 days          | Platform team  | Not yet recorded in-repo |
+| Edge function source       | Git (tagged releases)                  | Forever          | Engineering    | Repository-backed |
+| `.env.*` templates         | Git                                    | Forever          | Engineering    | Repository-backed |
+| Supabase project config    | `supabase/config.toml` in repo         | Forever          | Engineering    | Repository-backed |
 
 ## Enablement (one-time per project)
 
 ```bash
 # 1. Turn on PITR in the Supabase dashboard for staging and prod projects.
-# 2. Configure DB_BACKUP_GPG_PASSPHRASE in each backup environment.
-#    The backup reuses the existing Cloudflare Access + SSH deployment secrets
-#    to stream pg_dump from the host-local Supabase database container.
-# 3. Optionally configure S3 backup secrets for 30-day encrypted retention.
-# 4. Enable object versioning on every storage bucket.
+# 2. Configure .github/workflows/db-backup.yml with DB_BACKUP_GPG_PASSPHRASE
+#    plus either SUPABASE_DB_URL or the complete Cloudflare Access SSH secret set.
+# 3. Enable object versioning on every storage bucket.
 ```
 
 ## Nightly logical dump workflow
@@ -33,10 +33,12 @@ configured.
 
 Required environment secrets:
 
-- `DB_BACKUP_GPG_PASSPHRASE` — dedicated passphrase used to symmetrically encrypt database dumps.
-- Existing deployment tunnel secrets: `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `SSH_HOST`, `SSH_USER`, `CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET`.
+- `DB_BACKUP_GPG_PASSPHRASE` — passphrase used to symmetrically encrypt dumps.
+- Backup transport: either
+  - `SUPABASE_DB_URL` for direct Postgres access, or
+  - the complete Cloudflare Access SSH set already used by production operations: `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `SSH_HOST`, `SSH_USER`, `CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET` (with `SSH_PORT` optional/defaulting to 22).
 
-The workflow deliberately does **not** require a directly reachable `SUPABASE_DB_URL`. It runs `pg_dump` inside the host-local Supabase Postgres container and streams the archive over the encrypted Cloudflare Access/SSH tunnel into GPG on the runner. The unencrypted archive is not written to runner disk.
+In SSH mode the runner does not receive a production DB URL. The workflow connects through Cloudflare Access, finds the host-local `supabase_db_*` container, runs `pg_dump` inside that container, and streams the custom-format dump back to the runner before encryption.
 
 Optional environment secrets:
 
@@ -44,46 +46,32 @@ Optional environment secrets:
 - `DB_BACKUP_S3_PREFIX` — key prefix; defaults to `flc-bi/db-backups`.
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` — required only for S3 upload.
 
-If S3 is not configured, the workflow still uploads the encrypted dump,
-checksum, and non-sensitive restore metadata as short-lived GitHub Actions
-artifacts. Treat those artifacts as sensitive even though the database content
-is encrypted.
+If S3 is not configured, the workflow still uploads the encrypted dump and
+checksum as short-lived GitHub Actions artifacts. Treat those artifacts as
+sensitive even though the database content is encrypted.
 
-Before upload, the workflow verifies the encrypted-file checksum and decrypts
-the archive as a stream into the database container's matching `pg_restore
---list`. This validates encryption/decryption and archive readability, but it
-is **not** a substitute for the separate full restore drill.
+### Current production blocker — 2026-09-22
 
-## Logical dump restore drill
+PR #88 / `c5f3153` added the Cloudflare Access SSH fallback while preserving mandatory encryption, checksum validation, plaintext cleanup, and encrypted-only artifact upload. The workflow still deliberately fails before `pg_dump` unless `DB_BACKUP_GPG_PASSPHRASE` is present and one complete backup transport is available. Production secret configuration and an actual successful encrypted production run have not been evidenced in-repo. Do not weaken encryption, invent credentials, or mark backup readiness complete based only on workflow code.
 
-`.github/workflows/db-restore-drill.yml` is a manual safety workflow for encrypted
-logical dumps. It:
+Backup readiness requires evidence of:
+1. a successful encrypted production dump;
+2. checksum verification;
+3. retention/destination confirmation;
+4. an isolated restore;
+5. application/schema smoke against the restored target;
+6. measured RTO/RPO recorded in `docs/DR_DRILLS.md`.
 
-1. downloads a successful `Database Backup` Actions artifact;
-2. validates its checksum and environment metadata;
-3. starts an isolated scratch Postgres container using the exact database image
-   recorded by the backup;
-4. decrypts the dump only as a stream into `pg_restore`;
-5. restores to a scratch database, never production;
-6. verifies critical UBS relations and the Supabase migration ledger;
-7. uploads non-sensitive restore evidence; and
-8. destroys the scratch container and volume.
-
-Run this after backup changes and periodically thereafter. A successful logical
-restore proves that the encrypted archive is usable; it does not prove PITR.
-
-## PITR restore drill (monthly)
+## Restore drill (monthly)
 
 1. Pick a timestamp T within the PITR window on the **production** project.
-2. Restore into a **new isolated target**, never over the live database during a drill.
-3. Deploy the matching immutable application image/tag to the restored target.
-4. Run the release smoke suite against the restored stack.
+2. Use the Supabase dashboard to restore the DB into a **new** staging project at T.
+3. Deploy the matching git tag to the restored project.
+4. Run the e2e smoke suite (`npm run test:e2e`) against the restored stack.
 5. Record pass/fail + duration in `docs/DR_DRILLS.md`.
-6. Tear down the scratch target.
+6. Tear down the scratch staging project.
 
-Target RTO: ≤ 2 hours. Target RPO: ≤ 5 minutes when PITR is actually enabled and
-configured with that granularity. The nightly logical dump has a separate,
-coarser RPO and must not be described as meeting the PITR target.
+Target RTO: ≤ 2 hours. Target RPO: ≤ 5 minutes (PITR granularity).
 
 ## Incident-driven restore (prod)
 

@@ -41,7 +41,7 @@ Migration `20260915090000_production_readiness_security.sql`:
 
 Migration `20260915100000_approval_decision_compatibility.sql` repairs the dual approval-engine decision model, validates both legacy and canonical targets, and enforces assigned-approver access in database policy.
 
-Privileged edge-function rate limiting now fails closed when its database counter is unavailable. Production image builds require explicit HTTPS public URLs, a public client key, and an internal Supabase proxy URL. The production deploy now requires credentialed login verification after promotion.
+Privileged edge-function rate limiting now fails closed when its database counter is unavailable. Production image builds require explicit HTTPS public URLs, a public client key, and an internal Supabase proxy URL. Production promotion is manual-only. The deploy always installs Chromium for public verification, conditionally runs credentialed smoke checks after a credential precheck, requires migration-ledger compatibility before promotion, and preserves the previous container for rollback until all verification succeeds.
 
 ## Repeatable gates
 
@@ -56,7 +56,7 @@ git diff --check
 
 The production Docker image was also built with explicit synthetic HTTPS configuration, started as its non-root nginx user, and returned `200 ok` from `/healthz` with the configured CSP, HSTS, no-sniff, frame-denial, and no-store response headers.
 
-CI runs the disposable Supabase gate for every eligible main/dev pull request or push and keeps the existing optional non-production remote RLS job. Every disposable run uses a unique project ID and deletes its database volumes so cached schemas cannot skip migrations. The production deploy remains downstream of a successful CI workflow.
+CI runs the disposable Supabase gate for every eligible main/dev pull request or push and keeps the existing optional non-production remote RLS job. Every disposable run uses a unique project ID and deletes its database volumes so cached schemas cannot skip migrations. The production deploy is deliberately **not** an automatic downstream action of CI. CI is evidence; an operator must explicitly dispatch production promotion after reviewing the release gates.
 
 ## Required staging evidence
 
@@ -77,3 +77,24 @@ Before release approval:
 - Browser smoke suites outside the live integration gate still use mocked data.
 
 These items are release gates, not evidence of a repository defect. Production approval should remain withheld until the staging and operational evidence is recorded.
+
+
+## 2026-09-22 P0 Release-Safety Status
+
+Completed repository controls:
+
+- manual-only production promotion;
+- unconditional browser dependency for production verification;
+- pre-promotion migration-ledger compatibility check;
+- preserved-container rollback with automatic restore on failed post-promotion verification;
+- encrypted logical-backup workflow can use either direct Postgres access or the existing Cloudflare Access SSH path to the host-local Supabase DB container, with mandatory GPG encryption, checksum validation, and plaintext cleanup (PR #88 / `c5f3153`).
+
+Operational evidence still open:
+
+- successful encrypted production logical backup;
+- verified checksum and isolated restore;
+- measured RTO/RPO drill;
+- production PITR/storage-versioning confirmation;
+- repository branch/ruleset governance.
+
+The connected GitHub integration can read repository rulesets and currently reports none. It cannot access classic branch-protection administration, so governance cannot be completed from this session.

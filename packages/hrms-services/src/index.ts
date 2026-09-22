@@ -8,18 +8,21 @@
  */
 import { supabase } from './shared/supabaseClient';
 import { resolveRequiredProfileId } from './shared/identity';
+export { resolveRequiredProfileId };
 import type { Notification } from '@flc/types';
 
 // ─── Domain barrel exports ─────────────────────────────────────────────────────
 export * from './announcement/announcementService';
 export * from './attendance/attendanceService';
 export * from './employee/employeeService';
+export * from './employee/salesAdvisorService';
 export * from './leave/leaveService';
 export * from './payroll/payrollService';
 export * from './appraisal/appraisalService';
 export * from './settings/settingsService';
 export * from './settings/rolloverService';
 export * from './access/access';
+export * from './access/hrmsRoleService';
 
 // Backward-compat alias used by apps/hrms-mobile
 export { listLeaveTypes as getLeaveTypes } from './leave/leaveService';
@@ -37,6 +40,7 @@ export type {
 } from './approval/approvalTypes';
 export { rowToApprovalStep, rowToApprovalInstance, rowToApprovalDecision } from './approval/approvalTypes';
 export { resolveStepRouting, userHasAssignedHrmsRole } from './approval/approvalRouting';
+export * from './approval/approvalFlowAdminService';
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 

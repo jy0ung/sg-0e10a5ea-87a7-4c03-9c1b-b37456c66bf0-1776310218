@@ -9,11 +9,11 @@ One-time gate before first production cutover. Every box must be checked.
 - [x] DNS + TLS cert for `ubs.protonfookloi.com`
 - [x] DNS + TLS cert for `hrms.protonfookloi.com`
 - [x] Docker image published to GHCR via `main-deploy.yml`
-- [x] Push-to-main production deploy workflow enabled and verified (`main-deploy.yml`)
+- [x] Production deploy workflow is manual-only (`workflow_dispatch`) and separated from push-to-main CI (`main-deploy.yml`)
 - [ ] Production host bootstrapped via `scripts/setup-production-host.sh`
 - [ ] Nginx/reverse proxy routes `/` to the static bundle with HSTS +
       CSP headers
-- [x] Production deploy verification passes with `npm run verify:production`
+- [x] Production deploy verification has an unconditional Chromium dependency and is wired to `npm run verify:production`
 
 ## Security
 
@@ -53,10 +53,10 @@ One-time gate before first production cutover. Every box must be checked.
 
 ## Reliability
 
-- [ ] Supabase PITR enabled on production
+- [ ] Supabase PITR enabled on production — repository docs define the target, but current production enablement has not been evidenced in this repository
 - [x] Nightly logical dump workflow defined in `.github/workflows/db-backup.yml`
-- [ ] Nightly logical dump job green with production secrets configured
-- [ ] Monthly restore-to-staging drill scheduled
+- [ ] Nightly logical dump job green with production secrets configured — code supports direct `SUPABASE_DB_URL` or Cloudflare Access SSH fallback; production `DB_BACKUP_GPG_PASSPHRASE` + transport secrets and a successful encrypted run are still unverified
+- [ ] Monthly restore-to-staging drill scheduled and executed at least once
 - [ ] Uptime monitoring (StatusCake / BetterUptime) pinging `/health`
 - [ ] Error-budget policy documented per module
 - [x] Incident response runbook linked from README
@@ -85,7 +85,27 @@ Phase decision: Phase 2 local engineering readiness is formally closed. Keep thi
 ## Process
 
 - [x] Changeset / CHANGELOG entry for the release tag
-- [ ] Rollback playbook tested (revert + re-deploy previous tag)
+- [ ] Rollback playbook exercised against a non-production target; repository scripts preserve/restore the previous container but live drill evidence is still required
 - [ ] Backup + DR drill recorded (`docs/DR_DRILLS.md`)
 - [ ] RLS pen-test report filed
 - [ ] CLA / DPA in place if required for enterprise customers
+
+
+## 2026-09-22 Release-Safety Rebaseline
+
+Repository-enforced controls now present:
+
+- production deploy is manual-only and is not triggered by a successful push/CI run;
+- Playwright Chromium is installed whenever production verification executes;
+- release migration-ledger compatibility is checked before the existing application container is touched;
+- the previous production container is preserved through post-promotion verification and restored on failure;
+- static regression tests cover the workflow trigger, verifier dependency, migration preflight ordering, and rollback preservation.
+
+Still requires external/operator evidence:
+
+- production backup encryption secret plus one configured direct-DB or Cloudflare Access SSH transport, and one successful encrypted backup artifact;
+- checksum verification and isolated restore drill with recorded RTO/RPO;
+- confirmation of production PITR/storage-versioning configuration;
+- branch/ruleset governance. The connected GitHub integration reports no repository rulesets and does not have administration permission to inspect or change classic branch protection.
+
+No production deployment or production database mutation was performed during this rebaseline.

@@ -9,32 +9,40 @@ This repo now uses one production deployment path. UAT and HRMS-UAT deployment w
 
 ## CI Gates
 
-Pushes to `main` run the CI workflow before deployment. The production deploy workflow only runs after a successful CI result.
+Pushes to `main` run CI, but **CI success does not deploy production**. Production promotion is a separate explicit operator action through the `Production Deploy` workflow.
 
 ## Production Deploy
 
-Pushes to `main` trigger `.github/workflows/main-deploy.yml` after CI passes. The workflow:
+`.github/workflows/main-deploy.yml` is **manual-only** (`workflow_dispatch`). A production operator chooses when to promote after reviewing the CI/staging/operational evidence.
 
-1. Resolves the source SHA from the successful CI run.
-2. Builds the `main-with-hrms` image by default.
-3. Publishes `sha-<shortsha>` and `latest` tags to GHCR.
-4. Copies `scripts/deploy-image.sh` to the production host through Cloudflare Access SSH.
-5. Swaps the live container only after the new container passes health checks.
-6. Runs `npm run verify:production` against the public production URL.
-7. Runs `npm run smoke:production` when `PROD_LOGIN_EMAIL` and `PROD_LOGIN_PASSWORD` are configured.
+The workflow:
 
-Manual redeploys are available from the Production Deploy workflow:
+1. Resolves the explicitly dispatched source SHA.
+2. Builds a `sha-<shortsha>` image unless an existing `image_tag` was supplied.
+3. Publishes the candidate to GHCR when building.
+4. Builds a release migration manifest and requires every release migration to exist in the production migration ledger **before touching the current app container**.
+5. Starts the candidate on a staging port and requires `/healthz` to pass.
+6. Preserves the current production container as `<container>-rollback` before promotion.
+7. Promotes the candidate and verifies the canonical local endpoint.
+8. Installs Playwright Chromium unconditionally and runs `npm run verify:production` against the public production URL.
+9. Runs RPC canaries and credentialed module smoke when the configured smoke login is valid.
+10. Restores the preserved previous container automatically when post-promotion verification fails; the preserved rollback container is removed only after the complete workflow succeeds.
 
-- leave `image_tag` empty to rebuild from `main`
-- set `image_tag` to deploy an existing published image tag
-- use `build_target=main-with-hrms` for the current production architecture
+Dispatch options:
+
+- leave `image_tag` empty to build from the dispatched source SHA
+- set `image_tag` to deploy an already-published image tag
+
+This separation is deliberate: merging to `main` is not production permission.
 
 ## Apply Database Migrations (required when migrations land on `main`)
 
 **The container deploy in `main-deploy.yml` does NOT apply Supabase migrations.**
-If the PR being deployed adds files under `supabase/migrations/`, an operator
-**must** apply them to the production host-local Supabase stack before the
-new web app talks to users:
+If the release adds files under `supabase/migrations/`, an operator
+**must** apply them to the production host-local Supabase stack before
+dispatching the application promotion. The deploy then verifies the release
+manifest against `supabase_migrations.schema_migrations` and refuses to
+promote the image if any required migration is absent:
 
 ```bash
 # On the production host (after `git pull` lands the new migrations):
@@ -133,8 +141,17 @@ The module smoke logs into the main app, checks the active platform modules, ver
 
 ## Rollback
 
-If a production deploy misbehaves:
+During a deployment, `scripts/deploy-image.sh` preserves the current production
+container as `<container>-rollback`. If canonical health verification or any
+subsequent workflow verification fails, `scripts/rollback-image.sh` restores
+that preserved container. The workflow removes it only after successful
+verification.
 
-1. Re-deploy the previous image tag from `main-deploy.yml` with `image_tag`.
-2. If needed, revert the offending commit on `main` and let CI/deploy run.
-3. If database changes caused the issue, restore the host-local Supabase data from backup before re-enabling traffic.
+For a later rollback after a completed release:
+
+1. Manually dispatch `main-deploy.yml` with the previous known-good `image_tag`.
+2. Verify production with `npm run verify:production` and the configured smoke checks.
+3. Revert/fix-forward source separately; a source revert does not deploy by itself.
+4. If database state itself is damaged, follow `docs/BACKUP_DR.md`; do not assume an older application image can reverse destructive database changes.
+
+The migration-ledger preflight permits the database to be ahead of an older image so rollback images remain deployable when schema changes are backward compatible.

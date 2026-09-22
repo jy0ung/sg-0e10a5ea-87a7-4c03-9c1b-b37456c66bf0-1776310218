@@ -142,6 +142,7 @@ export default function NewTicket() {
 
   const selectedCategoryKey = form.watch('category');
   const selectedSubcategoryKeyForFields = form.watch('subcategory');
+  const selectedPriority = form.watch('priority');
   const { fields: customFields } = useRequestFormFields(selectedCategoryKey ? user?.company_id : undefined, {
     categoryKey: selectedCategoryKey || undefined,
     subcategoryKey: selectedSubcategoryKeyForFields || undefined,
@@ -170,7 +171,14 @@ export default function NewTicket() {
   });
 
   const { data: approvalPlan = 'loading' } = useQuery<ApprovalPlanState>({
-    queryKey: ['approval-plan', user?.company_id, user?.id, selectedCategoryKey, selectedSubcategoryKeyForFields],
+    queryKey: [
+      'approval-plan',
+      user?.company_id,
+      user?.id,
+      selectedCategoryKey,
+      selectedSubcategoryKeyForFields,
+      selectedPriority,
+    ],
     queryFn: async (): Promise<ApprovalPlanState> => {
       const { data, error } = await getInternalRequestApprovalPlan(
         user!.company_id,
@@ -178,6 +186,7 @@ export default function NewTicket() {
         {
           categoryKey: selectedCategoryKey || null,
           subcategoryKey: selectedSubcategoryKeyForFields || null,
+          priority: selectedPriority || null,
         },
       );
       if (error) return 'error';
