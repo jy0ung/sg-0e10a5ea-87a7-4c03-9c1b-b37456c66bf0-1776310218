@@ -152,19 +152,19 @@ jobs:
               "$SUPABASE_DB_URL"
           elif [[ "$BACKUP_TRANSPORT" == "ssh" ]]; then
             ssh -T backup-target 'bash -se' > "$dump_file" <<'REMOTE'
-set -euo pipefail
-db_container="$(docker ps --format '{{.Names}}' | grep -E '^supabase_db_' | head -1 || true)"
-if [[ -z "$db_container" ]]; then
-  echo 'No production Supabase DB container matched ^supabase_db_' >&2
-  exit 1
-fi
-docker exec "$db_container" pg_dump \
-  -U postgres \
-  -d postgres \
-  --format=custom \
-  --no-owner \
-  --no-privileges
-REMOTE
+          set -euo pipefail
+          db_container="$(docker ps --format '{{.Names}}' | grep -E '^supabase_db_' | head -1 || true)"
+          if [[ -z "$db_container" ]]; then
+            echo 'No production Supabase DB container matched ^supabase_db_' >&2
+            exit 1
+          fi
+          docker exec "$db_container" pg_dump \
+            -U postgres \
+            -d postgres \
+            --format=custom \
+            --no-owner \
+            --no-privileges
+          REMOTE
           else
             echo "Unsupported backup transport: $BACKUP_TRANSPORT" >&2
             exit 1
