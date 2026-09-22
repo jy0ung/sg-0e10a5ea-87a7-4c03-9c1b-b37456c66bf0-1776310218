@@ -101,6 +101,12 @@ Exit criteria:
 - employee changes propagate through explicit contracts;
 - sensitive payroll/PII remains HRMS-authorized even though employee identity is shared.
 
+**Implementation record — 2026-09-22:**
+- Employee hard-delete is now reserved for genuinely unused/erroneous workforce rows. Historical leave balances/requests, attendance, payroll items, and appraisal items use restrictive Employee ownership so deleting an Employee cannot erase HR history (PR #81, merge `5462064`).
+- The normal lifecycle for an Employee with business history is `active -> inactive/resigned`, not hard delete.
+- Pending-invite/auth cleanup occurs only after the Employee deletion succeeds; linked active user accounts block hard delete. Live local-Supabase readiness passed **164/164** tests, including **6/6** dedicated Employee-history deletion cases.
+- This integrity merge was not deployed to production as part of the refactor sequence.
+
 ### Epic 3 — Workflow Platform + Unified Inbox
 
 **Objective:** Finish one cross-suite work orchestration layer.
@@ -115,6 +121,12 @@ Exit criteria:
 - new modules do not implement their own approval runtime;
 - approver routing remains auditable and domain-neutral;
 - approved decisions invoke domain-owned commands.
+
+**Implementation record — 2026-09-22:**
+- Internal Request flow resolution now uses canonical Profile -> Employee workforce identity for Department authority, validates pinned flows, and resolves condition/match-priority precedence deterministically (PR #74, merge `317fba7`).
+- Internal Request approval review is now one concurrency-safe database command across Decision, Instance, Ticket, and Activity state. Stale rendered Steps fail as an explicit `PT409` conflict instead of a retryable PostgreSQL serialization error (PR #76, merge `5a73286`).
+- Workspace approval permission now follows the materialized specific Profile or active same-company HRMS Role assignment through Profile/Employee identity. App-level admin role is not approval authority (PR #83, merge `859d5c4`).
+- These merges were code/integrity changes only; no production deployment was performed as part of this refactor sequence.
 
 ### Epic 4 — Internal Requests
 

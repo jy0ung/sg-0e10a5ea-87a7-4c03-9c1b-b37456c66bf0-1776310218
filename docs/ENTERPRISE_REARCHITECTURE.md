@@ -88,6 +88,19 @@ Portal roles are first-class `AppRole` values. HRMS role assignments remain orth
 
 The first implementation slice adds `packages/auth/src/accessControl.ts` as the shared pure access surface for app-role checks, portal-only routing, portal queue/setup authority, and role-section lookups. Main and HRMS portal helpers should re-export these utilities instead of carrying app-local role logic.
 
+### Workforce lifecycle integrity
+
+`employees` is the canonical workforce identity. Hard-delete is only valid for genuinely unused/erroneous Employee rows; the ordinary lifecycle for a workforce record with business history is inactive/resigned.
+
+As of PR #81 (`5462064`):
+- `leave_balances.employee_id`, `leave_requests.employee_id`, `attendance_records.employee_id`, `payroll_items.employee_id`, and `appraisal_items.employee_id` restrict Employee deletion;
+- Profile linkage continues to use `profiles.employee_id -> employees.id ON DELETE SET NULL`, but only after the Employee deletion actually succeeds;
+- module/HRMS-role assignments remain derived/access relationships and may cascade;
+- linked active user accounts block Employee hard-delete;
+- pending invite/auth cleanup is post-delete and recoverable rather than pre-emptively unlinking the account.
+
+This keeps historical HR records authoritative and prevents lifecycle cleanup from becoming destructive data deletion.
+
 ## Workflow Engine
 
 The target workflow engine is entity-adapter based:
@@ -114,6 +127,9 @@ Current implementation status:
 - `@flc/hrms-services` owns the canonical `approval_instances` engine for HRMS leave, payroll, appraisal, and resubmission flows.
 - `resubmitApprovalInstance` is covered by a package-level regression test that verifies the rejected-instance reset path queries `approval_steps`, resolves first-step routing, and updates the existing instance back to `pending`.
 - Internal Requests write to `approval_instances` through package-owned orchestration in `@flc/internal-requests`; app-local request approval services are compatibility shims guarded by `check:internal-request-service-boundary`.
+- Internal Request flow resolution is package-owned in `approvalFlowResolver.ts`: canonical Profile -> Employee workforce identity supplies Department authority, pinned flows are validated before use, and conditions plus `match_priority` resolve deterministically (PR #74, merge `317fba7`).
+- Internal Request review execution is atomic through `review_internal_request_approval(...)`. The RPC locks the Approval Instance as the serialization boundary, locks the same-company Ticket, and commits Decision/Instance/Ticket/Activity state together. A stale rendered Step returns PostgREST conflict `PT409`, avoiding retry semantics associated with PostgreSQL `40001` (PR #76, merge `5a73286`).
+- Internal Request workspace approval permission is a package-owned experience gate that mirrors materialized routing: exact specific Profile or active same-company HRMS Role assignment through Profile/Employee identity, with self-approval visibility enforced from the current Step. The database RPC remains authoritative (PR #83, merge `859d5c4`).
 - The app-local legacy `approvalEngineService` implementations have been retired after repository-wide importer checks showed no runtime callers.
 - The `approval_requests` table remains database compatibility only; `npm run check:workflow-boundary` permits direct access only in the explicit release-compatibility test and blocks all runtime application access.
 

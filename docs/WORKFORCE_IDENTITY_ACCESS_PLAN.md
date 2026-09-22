@@ -263,6 +263,21 @@ Potential long-term fields retained on `profiles`:
 - `access_scope`
 - minimal fallback role during transition
 
+## 2026-09-22 Implementation Record
+
+The workforce lifecycle now has an explicit history-preservation invariant (PR #81, merge `5462064`):
+
+- `employees` remains the canonical workforce master.
+- Hard-delete is reserved for genuinely unused/erroneous Employee rows.
+- Employees with HR/business history follow `active -> inactive/resigned` rather than hard delete.
+- Leave balances/requests, attendance, payroll items, and appraisal items block Employee deletion through restrictive foreign keys.
+- `profiles.employee_id` remains `ON DELETE SET NULL`, but account unlinking occurs only after a successful Employee delete.
+- A linked active user account blocks hard delete; pending-invite cleanup runs after successful Employee deletion and has a disable/follow-up fallback.
+- Module and HRMS-role assignments remain derived/access relationships rather than historical records.
+- Live local-Supabase qualification passed **164/164**, including **6/6** dedicated Employee-history deletion tests.
+
+The next integrity slice is to make `employees.primary_role = 'sales'` and the canonical `employee_module_assignments(module_key='sales', assignment_role='sales_advisor')` mutation transactional rather than separate client/service writes (issue #82).
+
 ## Immediate Implementation Decision
 
 Do not create separate user databases for Employee Directory, User & Roles, Sales Advisor, or future staff categories.
