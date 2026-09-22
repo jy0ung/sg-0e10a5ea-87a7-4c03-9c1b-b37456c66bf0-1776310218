@@ -14,6 +14,7 @@ export default defineConfig({
       'src/test/ap-foundation.spec.ts',
       'src/test/production-readiness.spec.ts',
       'src/test/release-workflows.spec.ts',
+      'src/test/internal-request-approval-review-live.spec.ts',
     ],
     exclude: ['**/node_modules/**', '**/dist/**'],
   },
