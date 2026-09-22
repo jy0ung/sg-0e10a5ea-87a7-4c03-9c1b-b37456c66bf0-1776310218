@@ -4,14 +4,16 @@ Scope: Supabase Postgres data, storage buckets, edge function code, and configur
 
 ## Backup posture
 
-| Asset                      | Mechanism                            | Retention  | Owner          |
-| -------------------------- | ------------------------------------ | ---------- | -------------- |
-| Postgres (staging + prod)  | Supabase PITR (point-in-time)        | 7 days     | Platform team  |
-| Daily logical dump         | `pg_dump` → encrypted S3 bucket       | 30 days    | Platform team  |
-| Storage buckets            | Object versioning + lifecycle rule    | 30 days    | Platform team  |
-| Edge function source       | Git (tagged releases)                 | Forever    | Engineering    |
-| `.env.*` templates         | Git                                   | Forever    | Engineering    |
-| Supabase project config    | `supabase/config.toml` in repo        | Forever    | Engineering    |
+The table below is the **target recovery posture**, not proof that each production control is currently enabled. Production PITR, storage versioning, backup delivery, retention, and restore evidence must be verified operationally.
+
+| Asset                      | Target mechanism                      | Target retention | Owner          | Current evidence |
+| -------------------------- | ------------------------------------- | ---------------- | -------------- | ---------------- |
+| Postgres (staging + prod)  | Supabase PITR (point-in-time)         | 7 days           | Platform team  | Not yet recorded in-repo |
+| Daily logical dump         | `pg_dump` → GPG-encrypted artifact/S3 | 30 days in S3    | Platform team  | Workflow exists; production run blocked until required secrets are configured |
+| Storage buckets            | Object versioning + lifecycle rule     | 30 days          | Platform team  | Not yet recorded in-repo |
+| Edge function source       | Git (tagged releases)                  | Forever          | Engineering    | Repository-backed |
+| `.env.*` templates         | Git                                    | Forever          | Engineering    | Repository-backed |
+| Supabase project config    | `supabase/config.toml` in repo         | Forever          | Engineering    | Repository-backed |
 
 ## Enablement (one-time per project)
 
@@ -43,6 +45,22 @@ Optional environment secrets:
 If S3 is not configured, the workflow still uploads the encrypted dump and
 checksum as short-lived GitHub Actions artifacts. Treat those artifacts as
 sensitive even though the database content is encrypted.
+
+### Current production blocker — 2026-09-22
+
+The workflow deliberately fails before `pg_dump` when either
+`SUPABASE_DB_URL` or `DB_BACKUP_GPG_PASSPHRASE` is absent. Those production
+environment secrets have not been proven configured. Do not weaken encryption,
+invent credentials, or mark backup readiness complete based only on workflow
+code.
+
+Backup readiness requires evidence of:
+1. a successful encrypted production dump;
+2. checksum verification;
+3. retention/destination confirmation;
+4. an isolated restore;
+5. application/schema smoke against the restored target;
+6. measured RTO/RPO recorded in `docs/DR_DRILLS.md`.
 
 ## Restore drill (monthly)
 
