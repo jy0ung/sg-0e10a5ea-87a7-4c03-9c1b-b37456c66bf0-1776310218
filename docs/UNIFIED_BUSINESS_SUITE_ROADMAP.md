@@ -103,6 +103,7 @@ Exit criteria:
 
 **Implementation record — 2026-09-22:**
 - Employee hard-delete is now reserved for genuinely unused/erroneous workforce rows. Historical leave balances/requests, attendance, payroll items, and appraisal items use restrictive Employee ownership so deleting an Employee cannot erase HR history (PR #81, merge `5462064`).
+- HRMS Employee creation and updates now use one database-owned atomic mutation command. When `primary_role='sales'`, the canonical Sales Advisor module assignment is active; when the role leaves Sales, that assignment is deactivated in the same transaction. Same-company Branch/manager/Department/Job Title references are validated before mutation (PR #85, merge `1cfc8fa`).
 - The normal lifecycle for an Employee with business history is `active -> inactive/resigned`, not hard delete.
 - Pending-invite/auth cleanup occurs only after the Employee deletion succeeds; linked active user accounts block hard delete. Live local-Supabase readiness passed **164/164** tests, including **6/6** dedicated Employee-history deletion cases.
 - This integrity merge was not deployed to production as part of the refactor sequence.
