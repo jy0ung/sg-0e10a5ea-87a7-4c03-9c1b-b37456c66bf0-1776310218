@@ -88,6 +88,19 @@ Portal roles are first-class `AppRole` values. HRMS role assignments remain orth
 
 The first implementation slice adds `packages/auth/src/accessControl.ts` as the shared pure access surface for app-role checks, portal-only routing, portal queue/setup authority, and role-section lookups. Main and HRMS portal helpers should re-export these utilities instead of carrying app-local role logic.
 
+### Workforce lifecycle integrity
+
+`employees` is the canonical workforce identity. Hard-delete is only valid for genuinely unused/erroneous Employee rows; the ordinary lifecycle for a workforce record with business history is inactive/resigned.
+
+As of PR #81 (`5462064`):
+- `leave_balances.employee_id`, `leave_requests.employee_id`, `attendance_records.employee_id`, `payroll_items.employee_id`, and `appraisal_items.employee_id` restrict Employee deletion;
+- Profile linkage continues to use `profiles.employee_id -> employees.id ON DELETE SET NULL`, but only after the Employee deletion actually succeeds;
+- module/HRMS-role assignments remain derived/access relationships and may cascade;
+- linked active user accounts block Employee hard-delete;
+- pending invite/auth cleanup is post-delete and recoverable rather than pre-emptively unlinking the account.
+
+This keeps historical HR records authoritative and prevents lifecycle cleanup from becoming destructive data deletion.
+
 ## Workflow Engine
 
 The target workflow engine is entity-adapter based:
