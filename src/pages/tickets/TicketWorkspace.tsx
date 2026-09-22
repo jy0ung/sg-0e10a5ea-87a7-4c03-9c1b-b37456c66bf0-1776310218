@@ -1584,16 +1584,17 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
               type="button"
               disabled={saving || !reviewDecision}
               onClick={async () => {
-                if (!user || !reviewDecision) return;
+                if (!user || !reviewDecision || !ticket.current_approval_step_id) return;
                 const decision = reviewDecision;
+                const expectedStepId = ticket.current_approval_step_id;
                 const ok = await runWorkflow(
                   () => transitionTicketWorkflow({
                     ticketId: ticket.id,
                     action: decision === 'approved' ? 'approve_step' : 'reject_step',
                     actor: workflowActor!,
                     payload: decision === 'approved'
-                      ? { kind: 'approve_step', note: reviewNote.value }
-                      : { kind: 'reject_step', note: reviewNote.value },
+                      ? { kind: 'approve_step', expectedStepId, note: reviewNote.value }
+                      : { kind: 'reject_step', expectedStepId, note: reviewNote.value },
                   })
                     .then((result) => ({ error: result.error })),
                   decision === 'approved' ? 'Approval recorded' : 'Rejection recorded',
