@@ -1,5 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
+import {
+  listJobTitles as listCanonicalJobTitles,
+  createJobTitle as createCanonicalJobTitle,
+  updateJobTitle as updateCanonicalJobTitle,
+  deleteJobTitle as deleteCanonicalJobTitle,
+} from '@flc/hrms-services';
 import type {
   Department, CreateDepartmentInput, UpdateDepartmentInput,
   JobTitle, CreateJobTitleInput, UpdateJobTitleInput,
@@ -173,29 +179,13 @@ export async function deleteDepartment(companyId: string, id: string, actorId: s
 // JOB TITLES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function rowToJobTitle(r: Record<string, unknown>): JobTitle {
-  return {
-    id:             String(r.id ?? ''),
-    companyId:      String(r.company_id ?? ''),
-    name:           String(r.name ?? ''),
-    departmentId:   r.department_id ? String(r.department_id) : undefined,
-    departmentName: r.department ? String((r.department as Record<string, unknown>)?.name ?? '') : undefined,
-    level:          r.level ? (r.level as JobTitle['level']) : undefined,
-    description:    r.description ? String(r.description) : undefined,
-    isActive:       Boolean(r.is_active),
-    createdAt:      String(r.created_at ?? ''),
-    updatedAt:      String(r.updated_at ?? ''),
-  };
-}
-
 export async function listJobTitles(companyId: string): Promise<{ data: JobTitle[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from('job_titles')
-    .select('*, department:departments!profiles_department_id_fkey(name)')
-    .eq('company_id', companyId)
-    .order('name');
-  if (error) return { data: [], error: error.message };
-  return { data: (data ?? []).map(r => rowToJobTitle(r as Record<string, unknown>)), error: null };
+  try {
+    const data = await listCanonicalJobTitles(companyId);
+    return { data: data as JobTitle[], error: null };
+  } catch (error) {
+    return { data: [], error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function createJobTitle(
@@ -203,21 +193,13 @@ export async function createJobTitle(
   actorId: string,
   input: CreateJobTitleInput,
 ): Promise<{ data: JobTitle | null; error: string | null }> {
-  const { data, error } = await supabase
-    .from('job_titles')
-    .insert({
-      company_id:    companyId,
-      name:          input.name,
-      department_id: input.departmentId ?? null,
-      level:         input.level || null,
-      description:   input.description ?? null,
-      is_active:     input.isActive,
-    })
-    .select('*, department:departments!job_titles_department_id_fkey(name)')
-    .single();
-  if (error) return { data: null, error: error.message };
-  void logUserAction(actorId, 'create', 'job_title', String(data.id), { name: input.name });
-  return { data: rowToJobTitle(data as Record<string, unknown>), error: null };
+  try {
+    const data = await createCanonicalJobTitle(companyId, input);
+    void logUserAction(actorId, 'create', 'job_title', String(data.id), { name: input.name });
+    return { data: data as JobTitle, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function updateJobTitle(
@@ -226,35 +208,27 @@ export async function updateJobTitle(
   actorId: string,
   input: UpdateJobTitleInput,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase
-    .from('job_titles')
-    .update({
-      name:          input.name,
-      department_id: input.departmentId ?? null,
-      level:         input.level || null,
-      description:   input.description ?? null,
-      is_active:     input.isActive,
-      updated_at:    new Date().toISOString(),
-    })
-    .eq('company_id', companyId)
-    .eq('id', id);
-  if (!error) void logUserAction(actorId, 'update', 'job_title', id, { name: input.name });
-  return { error: error?.message ?? null };
+  try {
+    await updateCanonicalJobTitle(companyId, id, input);
+    void logUserAction(actorId, 'update', 'job_title', id, { name: input.name });
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
-export async function deleteJobTitle(companyId: string, id: string, actorId: string): Promise<{ error: string | null }> {
-  // Check if any employees have this job title
-  const { count } = await supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('company_id', companyId)
-    .eq('job_title_id', id);
-  if ((count ?? 0) > 0) {
-    return { error: `Cannot delete: ${count} employee(s) have this job title. Reassign them first.` };
+export async function deleteJobTitle(
+  companyId: string,
+  id: string,
+  actorId: string,
+): Promise<{ error: string | null }> {
+  try {
+    await deleteCanonicalJobTitle(companyId, id);
+    void logUserAction(actorId, 'delete', 'job_title', id, {});
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
   }
-  const { error } = await supabase.from('job_titles').delete().eq('company_id', companyId).eq('id', id);
-  if (!error) void logUserAction(actorId, 'delete', 'job_title', id, {});
-  return { error: error?.message ?? null };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

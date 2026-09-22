@@ -239,7 +239,7 @@ export async function deleteDepartment(companyId: string, id: string): Promise<v
 export async function listJobTitles(companyId: string): Promise<JobTitle[]> {
   const { data, error } = await supabase
     .from('job_titles')
-    .select('*, department:departments(name)')
+    .select('*, department:departments!job_titles_department_id_fkey(name)')
     .eq('company_id', companyId)
     .order('name');
   if (error) throw new Error(error.message);
@@ -260,7 +260,7 @@ export async function createJobTitle(
       description:   input.description ?? null,
       is_active:     input.isActive,
     })
-    .select('*, department:departments(name)')
+    .select('*, department:departments!job_titles_department_id_fkey(name)')
     .single();
   if (error) throw new Error(error.message);
   return rowToJobTitle(data as Record<string, unknown>);
@@ -287,6 +287,19 @@ export async function updateJobTitle(
 }
 
 export async function deleteJobTitle(companyId: string, id: string): Promise<void> {
+  const { count, error: countError } = await supabase
+    .from('employees')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+    .eq('job_title_id', id);
+  if (countError) throw new Error(countError.message);
+
+  if ((count ?? 0) > 0) {
+    throw new Error(
+      `Cannot delete: ${count} employee(s) are assigned to this job title. Reassign them first.`,
+    );
+  }
+
   const { error } = await supabase
     .from('job_titles')
     .delete()
