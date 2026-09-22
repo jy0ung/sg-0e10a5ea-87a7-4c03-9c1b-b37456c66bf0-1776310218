@@ -86,7 +86,8 @@ Completed repository controls:
 - manual-only production promotion;
 - unconditional browser dependency for production verification;
 - pre-promotion migration-ledger compatibility check;
-- preserved-container rollback with automatic restore on failed post-promotion verification.
+- preserved-container rollback with automatic restore on failed post-promotion verification;
+- encrypted logical-backup workflow can use either direct Postgres access or the existing Cloudflare Access SSH path to the host-local Supabase DB container, with mandatory GPG encryption, checksum validation, and plaintext cleanup (PR #88 / `c5f3153`).
 
 Operational evidence still open:
 
