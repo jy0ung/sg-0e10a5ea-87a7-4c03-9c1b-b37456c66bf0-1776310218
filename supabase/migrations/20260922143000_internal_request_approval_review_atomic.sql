@@ -9,6 +9,7 @@
 CREATE OR REPLACE FUNCTION public.review_internal_request_approval(
   p_company_id text,
   p_ticket_id uuid,
+  p_expected_step_id uuid,
   p_decision text,
   p_note text DEFAULT NULL
 )
@@ -84,6 +85,12 @@ BEGIN
   IF instance_row.current_step_id IS NULL THEN
     RAISE EXCEPTION 'Approval instance has no current step'
       USING ERRCODE = '23514';
+  END IF;
+
+  IF p_expected_step_id IS NULL
+     OR instance_row.current_step_id IS DISTINCT FROM p_expected_step_id THEN
+    RAISE EXCEPTION 'Approval step changed before this review was committed. Reload the request and try again.'
+      USING ERRCODE = '40001';
   END IF;
 
   SELECT t.*
@@ -411,12 +418,12 @@ END
 $$;
 
 REVOKE ALL
-  ON FUNCTION public.review_internal_request_approval(text, uuid, text, text)
+  ON FUNCTION public.review_internal_request_approval(text, uuid, uuid, text, text)
   FROM PUBLIC, anon;
 
 GRANT EXECUTE
   ON FUNCTION public.review_internal_request_approval(text, uuid, text, text)
   TO authenticated;
 
-COMMENT ON FUNCTION public.review_internal_request_approval(text, uuid, text, text) IS
+COMMENT ON FUNCTION public.review_internal_request_approval(text, uuid, uuid, text, text) IS
   'Atomically reviews the current pending Internal Request approval step after explicitly verifying the materialized workflow approver.';
