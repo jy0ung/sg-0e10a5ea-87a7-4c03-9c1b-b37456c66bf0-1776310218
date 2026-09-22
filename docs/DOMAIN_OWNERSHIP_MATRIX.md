@@ -20,7 +20,7 @@ This document defines which FLC UBS domain is authoritative for each major busin
 | Deal | Sales / CRM | `deal_id` | Inventory, Accounts, Commission, Analytics | Sales contracts only |
 | DMS Retail Order evidence | Integration / DMS | source record identity | Sales, Reconciliation, Analytics | Integration pipeline only |
 | Vehicle / Chassis | Inventory / Vehicle domain | `vehicle_id` + chassis identity | Sales, Accounts, Commission, Analytics | Inventory/vehicle contracts |
-| Sales Advisor assignment | Sales + HRMS relationship | advisor record linked to `employee_id` | Sales, Commission, Analytics | Sales assignment contract; HR data remains HRMS-owned |
+| Sales Advisor assignment | Sales + HRMS relationship | Employee + active `employee_module_assignments` row (`sales / sales_advisor`) | Sales, Commission, Analytics | Sales assignment contract; HR data remains HRMS-owned |
 | Commission Rule | Commission domain | versioned rule id | Sales, Payroll, Finance | Commission contracts only |
 | Commission Earning | Commission domain | earning/accrual id | HRMS Payroll, Accounts, Finance, Analytics | Commission engine only |
 | Supplier | Purchasing / Commercial master | `supplier_id` | Accounts, Finance, Analytics | Purchasing/Admin master-data contract |
@@ -50,7 +50,7 @@ This document defines which FLC UBS domain is authoritative for each major busin
 ## High-priority convergence items
 
 - `profiles.employee_id` remains the canonical User -> Employee link.
-- `sales_advisors.employee_id` should become the durable Sales Advisor -> Employee link for new work.
+- Sales Advisor identity is Employee-backed through `employee_module_assignments`; the legacy `sales_advisors` person table has no Employee FK in the current generated schema and is compatibility only.
 - `deals` remains the canonical FLC sales workflow; legacy Sales Orders are compatibility/history only.
 - `approval_instances` / `approval_decisions` remain the canonical approval runtime.
 - Operational modules must post to Finance through backend contracts instead of direct journal row writes.
