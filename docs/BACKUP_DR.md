@@ -46,8 +46,8 @@ Optional environment secrets:
 - `DB_BACKUP_S3_PREFIX` — key prefix; defaults to `flc-bi/db-backups`.
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` — required only for S3 upload.
 
-If S3 is not configured, the workflow still uploads the encrypted dump and
-checksum as short-lived GitHub Actions artifacts. Treat those artifacts as
+If S3 is not configured, the workflow still uploads the encrypted dump,
+checksum, and non-sensitive restore metadata as short-lived GitHub Actions artifacts. Treat those artifacts as
 sensitive even though the database content is encrypted.
 
 ### Current production blocker — 2026-09-22
