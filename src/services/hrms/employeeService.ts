@@ -124,10 +124,7 @@ export async function deleteEmployee(
       const { error: authCleanupError } = await deleteInvitedUser(linkedProfile.id);
       if (authCleanupError) {
         try {
-          await pkg.disableEmployeeProfileAccess(
-            linkedProfile.id,
-            linkedProfile.companyId ?? companyId,
-          );
+          await pkg.disableEmployeeProfileAccess(linkedProfile.id);
         } catch (disableError) {
           return {
             error:
