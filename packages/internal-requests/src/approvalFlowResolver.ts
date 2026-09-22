@@ -221,6 +221,34 @@ export async function resolveApprovalFlowId(
   );
 }
 
+interface RequesterProfileContext {
+  department_id: string | null;
+  branch_id: string | null;
+  role: string;
+}
+
+interface RequesterEmployeeContext {
+  department_id: string | null;
+  branch_id: string | null;
+  primary_role: string;
+}
+
+export function buildRequesterResolutionContext(
+  profile: RequesterProfileContext,
+  employee: RequesterEmployeeContext | null,
+  options: InternalRequestApprovalPlanOptions,
+): ApprovalFlowResolutionContext {
+  return {
+    departmentId: employee ? employee.department_id : profile.department_id,
+    branchId: employee ? employee.branch_id : profile.branch_id,
+    requesterRole: employee ? employee.primary_role : profile.role,
+    categoryKey: options.categoryKey ?? null,
+    subcategoryKey: options.subcategoryKey ?? null,
+    priority: options.priority ?? null,
+    amount: null,
+  };
+}
+
 async function loadRequesterResolutionContext(
   companyId: string,
   requesterId: string,
@@ -257,26 +285,10 @@ async function loadRequesterResolutionContext(
       );
     }
 
-    return {
-      departmentId: employee.department_id,
-      branchId: employee.branch_id,
-      requesterRole: employee.primary_role,
-      categoryKey: options.categoryKey ?? null,
-      subcategoryKey: options.subcategoryKey ?? null,
-      priority: options.priority ?? null,
-      amount: null,
-    };
+    return buildRequesterResolutionContext(profile, employee, options);
   }
 
-  return {
-    departmentId: profile.department_id,
-    branchId: profile.branch_id,
-    requesterRole: profile.role,
-    categoryKey: options.categoryKey ?? null,
-    subcategoryKey: options.subcategoryKey ?? null,
-    priority: options.priority ?? null,
-    amount: null,
-  };
+  return buildRequesterResolutionContext(profile, null, options);
 }
 
 async function validatePinnedInternalRequestFlow(
