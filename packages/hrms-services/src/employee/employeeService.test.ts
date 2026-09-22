@@ -9,6 +9,7 @@ const queued: Result[] = [];
 const eqCalls: Array<{ table: string; column: string; value: unknown }> = [];
 const updateCalls: Array<{ table: string; payload: unknown }> = [];
 const deleteCalls: string[] = [];
+const { rpcMock } = vi.hoisted(() => ({ rpcMock: vi.fn() }));
 
 function nextResult(): Result {
   return queued.shift() ?? { data: null, error: null };
@@ -41,14 +42,17 @@ vi.mock('../shared/supabaseClient', () => {
   return {
     supabase: {
       from: (table: string) => query(table),
+      rpc: rpcMock,
     },
   };
 });
 
 import {
+  createEmployeeRecord,
   deleteEmployeeRecord,
   disableEmployeeProfileAccess,
   getLinkedEmployeeProfile,
+  updateEmployee,
 } from './employeeService';
 
 beforeEach(() => {
@@ -57,6 +61,94 @@ beforeEach(() => {
   updateCalls.length = 0;
   deleteCalls.length = 0;
   vi.clearAllMocks();
+  rpcMock.mockResolvedValue({ data: 'employee-1', error: null });
+});
+
+describe('atomic Employee mutation', () => {
+  it('creates a Sales Employee through the database-owned mutation command', async () => {
+    await expect(createEmployeeRecord({
+      id: 'employee-1',
+      companyId: 'c1',
+      name: 'Sales User',
+      role: 'sales',
+      branchId: 'branch-1',
+      staffCode: 'sa001',
+      workEmail: 'sales@company.com',
+    })).resolves.toBeUndefined();
+
+    expect(rpcMock).toHaveBeenCalledWith(
+      'mutate_employee_with_assignments',
+      {
+        p_company_id: 'c1',
+        p_employee_id: 'employee-1',
+        p_create: true,
+        p_changes: expect.objectContaining({
+          name: 'Sales User',
+          primary_role: 'sales',
+          branch_id: 'branch-1',
+          staff_code: 'sa001',
+          work_email: 'sales@company.com',
+          status: 'active',
+        }),
+      },
+    );
+  });
+
+  it('preserves explicit nulls when updating nullable workforce references', async () => {
+    await expect(updateEmployee(
+      'employee-1',
+      {
+        role: 'manager',
+        branchId: null,
+        managerId: null,
+        departmentId: null,
+        jobTitleId: null,
+      },
+      'c1',
+    )).resolves.toBeUndefined();
+
+    expect(rpcMock).toHaveBeenCalledWith(
+      'mutate_employee_with_assignments',
+      {
+        p_company_id: 'c1',
+        p_employee_id: 'employee-1',
+        p_create: false,
+        p_changes: {
+          primary_role: 'manager',
+          branch_id: null,
+          manager_employee_id: null,
+          department_id: null,
+          job_title_id: null,
+        },
+      },
+    );
+  });
+
+  it('fails before mutation when company scope is missing', async () => {
+    await expect(
+      updateEmployee('employee-1', { role: 'sales' }),
+    ).rejects.toThrow('Company is required for Employee mutation.');
+
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it('propagates database command failures without a second client-side write', async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'Branch does not belong to the Employee company' },
+    });
+
+    await expect(createEmployeeRecord({
+      id: 'employee-1',
+      companyId: 'c1',
+      name: 'Bad Reference',
+      role: 'sales',
+      branchId: 'branch-other',
+    })).rejects.toThrow('Branch does not belong to the Employee company');
+
+    expect(updateCalls).toEqual([]);
+    expect(deleteCalls).toEqual([]);
+  });
 });
 
 describe('Employee deletion primitives', () => {

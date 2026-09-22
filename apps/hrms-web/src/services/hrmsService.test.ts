@@ -115,6 +115,7 @@ vi.mock('@flc/hrms-services', () => ({
   listAttendanceRecords: vi.fn().mockResolvedValue([]),
   upsertAttendance: vi.fn().mockResolvedValue(undefined),
   listEmployeeDirectory: vi.fn().mockResolvedValue([]),
+  createEmployeeRecord: vi.fn().mockResolvedValue(undefined),
   updateEmployee: vi.fn().mockResolvedValue(undefined),
   getLinkedEmployeeProfile: vi.fn().mockResolvedValue(null),
   deleteEmployeeRecord: vi.fn().mockResolvedValue(undefined),
@@ -217,12 +218,7 @@ describe('listEmployeeDirectory', () => {
 });
 
 describe('createEmployee', () => {
-  it('creates workforce employees in the new schema', async () => {
-    queueResolves(
-      { data: null, error: null },
-      { data: null, error: null },
-    );
-
+  it('creates workforce employees through the atomic package command', async () => {
     const result = await createEmployee({
       id: 'emp-1',
       email: 'sales@company.com',
@@ -234,17 +230,23 @@ describe('createEmployee', () => {
     }, 'actor-1');
 
     expect(result.error).toBeNull();
-    expect(insertCalls).toContainEqual(expect.objectContaining({
-      table: 'employees',
-      values: expect.objectContaining({
+    expect(hrmsServicesMock.createEmployeeRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
         id: 'emp-1',
-        primary_role: 'sales',
+        companyId: 'c1',
+        role: 'sales',
+        branchId: 'b1',
+        staffCode: 'SA001',
+        workEmail: 'sales@company.com',
       }),
-    }));
+    );
+    expect(insertCalls.filter(call => call.table === 'employees')).toEqual([]);
   });
 
-  it('surfaces an error when workforce employee creation is unavailable', async () => {
-    queueResolves({ data: null, error: { message: 'relation "employees" does not exist' } });
+  it('surfaces an error when the atomic workforce create command is unavailable', async () => {
+    vi.mocked(hrmsServicesMock.createEmployeeRecord).mockRejectedValueOnce(
+      new Error('relation "employees" does not exist'),
+    );
 
     const result = await createEmployee({
       id: 'legacy-1',
@@ -256,21 +258,13 @@ describe('createEmployee', () => {
     }, 'actor-1');
 
     expect(result.error).toBe('relation "employees" does not exist');
-    expect(insertCalls).toEqual([
-      {
-        table: 'employees',
-        values: expect.objectContaining({
-          id: 'legacy-1',
-          primary_role: 'analyst',
-        }),
-      },
-    ]);
+    expect(insertCalls.filter(call => call.table === 'employees')).toEqual([]);
   });
 
   it('surfaces an error when workforce employee updates are unavailable', async () => {
     vi.mocked(hrmsServicesMock.updateEmployee).mockRejectedValueOnce(new Error('relation "employees" does not exist'));
 
-    const result = await updateEmployee('emp-1', { status: 'inactive' }, 'actor-1');
+    const result = await updateEmployee('emp-1', { status: 'inactive' }, 'actor-1', 'c1');
 
     expect(result.error).toBe('relation "employees" does not exist');
   });
