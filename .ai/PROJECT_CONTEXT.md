@@ -65,7 +65,7 @@ Current phase as of 2026-06-25: **Enterprise Redesign phases 1–4 complete and 
 - Tickets/internal requests API: `src/services/ticketService.ts` is the only intended table surface for `tickets`; it handles list/create/update, comments, auto-routing via `src/services/requestRoutingService.ts`, activity entries, and notifications. It includes fallback selects for older schemas missing operational/custom field columns. `ticketAttachmentService` supports batched attachment listing and signed attachment download URLs for queue/requester views.
 - Request setup APIs: `requestCategoryService`, `requestSubcategoryService`, `requestTemplateService`, `requestRoutingService`, `requestFormFieldService`, `ticketAttachmentService`, plus hooks under `src/hooks/useRequest*`.
 - Sales APIs: `salesOrderService`, `customerService`, `invoiceService`, `salesAdvisorService`, `salesTargetService`, and `masterDataService`; `SalesContext` also subscribes to realtime `sales_orders`.
-- HRMS admin APIs: `src/services/hrmsAdminService.ts`, `approvalFlowService.ts`, `approvalEngineService.ts`, and services under `src/services/hrms/*`.
+- HRMS admin APIs: `src/services/hrmsAdminService.ts`, `approvalFlowService.ts`, and services under `src/services/hrms/*`. Workflow execution is package-owned by `@flc/hrms-services`; the app-local legacy `approvalEngineService` files have been retired.
 - Shared HRMS self-service API: `packages/hrms-services/src/index.ts` is consumed by HRMS mobile and includes profile contact update, leave types/requests, attendance clocking, payslips, announcements, notifications, appraisals, and leave approval bootstrap logic.
 - Edge functions:
   - `invite-user`: authenticated admin invite/profile provisioning.

@@ -114,8 +114,8 @@ Current implementation status:
 - `@flc/hrms-services` owns the canonical `approval_instances` engine for HRMS leave, payroll, appraisal, and resubmission flows.
 - `resubmitApprovalInstance` is covered by a package-level regression test that verifies the rejected-instance reset path queries `approval_steps`, resolves first-step routing, and updates the existing instance back to `pending`.
 - Internal Requests write to `approval_instances` through package-owned orchestration in `@flc/internal-requests`; app-local request approval services are compatibility shims guarded by `check:internal-request-service-boundary`.
-- Legacy `approvalEngineService` files that write `approval_requests` remain compatibility debt and must not receive new entity integrations.
-- `npm run check:workflow-boundary` fails if `approval_requests` access appears outside the documented legacy compatibility files.
+- The app-local legacy `approvalEngineService` implementations have been retired after repository-wide importer checks showed no runtime callers.
+- The `approval_requests` table remains database compatibility only; `npm run check:workflow-boundary` permits direct access only in the explicit release-compatibility test and blocks all runtime application access.
 
 ## Service Boundary Strategy
 
