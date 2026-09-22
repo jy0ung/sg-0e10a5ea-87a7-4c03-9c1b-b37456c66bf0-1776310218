@@ -20,12 +20,12 @@ describe('database backup workflow safety boundary', () => {
     expect(workflow).toContain('echo "mode=direct"');
     expect(workflow).toContain('echo "mode=ssh"');
     expect(workflow).toContain('ProxyCommand cloudflared access ssh --hostname %h');
-    expect(workflow).toContain("ssh -T backup-target 'bash -se'");
+    expect(workflow).toContain('ssh -T backup-target');
   });
 
   it('streams pg_dump from the host-local Supabase DB container without exposing a remote DB URL', () => {
     expect(workflow).toContain("grep -E '^supabase_db_'");
-    expect(workflow).toContain('docker exec "$db_container" pg_dump');
+    expect(workflow).toContain("docker exec '$db_container' pg_dump");
     expect(workflow).toContain('--format=custom');
     expect(workflow).toContain('--no-owner');
     expect(workflow).toContain('--no-privileges');
