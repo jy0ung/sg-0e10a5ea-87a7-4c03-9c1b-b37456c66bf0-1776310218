@@ -250,7 +250,7 @@ export async function deleteEmployeeRecord(
   if (error) {
     if (error.code === '23503') {
       throw new Error(
-        'Cannot delete this employee because HR or business history exists. Mark the employee as resigned instead.',
+        'Cannot delete this employee because HR history exists. Mark the employee as resigned instead.',
       );
     }
     throw new Error(error.message);
