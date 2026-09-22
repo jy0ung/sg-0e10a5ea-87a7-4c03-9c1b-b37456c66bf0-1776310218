@@ -323,23 +323,34 @@ async function validatePinnedInternalRequestFlow(
   return String(data.id);
 }
 
-async function getPinnedFlowId(
-  table: 'request_categories' | 'request_subcategories',
+async function getCategoryPinnedFlowId(
   companyId: string,
   categoryKey: string,
-  subcategoryKey?: string | null,
 ): Promise<string | null> {
-  let query = supabase
-    .from(table)
+  const { data, error } = await supabase
+    .from('request_categories')
     .select('approval_flow_id')
     .eq('company_id', companyId)
-    .eq('category_key', categoryKey);
+    .eq('category_key', categoryKey)
+    .maybeSingle();
 
-  if (table === 'request_subcategories') {
-    query = query.eq('subcategory_key', subcategoryKey ?? '');
-  }
+  if (error) throw new Error(error.message);
+  return data?.approval_flow_id ?? null;
+}
 
-  const { data, error } = await query.maybeSingle<{ approval_flow_id: string | null }>();
+async function getSubcategoryPinnedFlowId(
+  companyId: string,
+  categoryKey: string,
+  subcategoryKey: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('request_subcategories')
+    .select('approval_flow_id')
+    .eq('company_id', companyId)
+    .eq('category_key', categoryKey)
+    .eq('subcategory_key', subcategoryKey)
+    .maybeSingle();
+
   if (error) throw new Error(error.message);
   return data?.approval_flow_id ?? null;
 }
@@ -358,8 +369,7 @@ export async function resolveInternalRequestApprovalFlowId(
   options: InternalRequestApprovalPlanOptions = {},
 ): Promise<string | null> {
   if (options.categoryKey && options.subcategoryKey) {
-    const subcategoryPin = await getPinnedFlowId(
-      'request_subcategories',
+    const subcategoryPin = await getSubcategoryPinnedFlowId(
       companyId,
       options.categoryKey,
       options.subcategoryKey,
@@ -374,8 +384,7 @@ export async function resolveInternalRequestApprovalFlowId(
   }
 
   if (options.categoryKey) {
-    const categoryPin = await getPinnedFlowId(
-      'request_categories',
+    const categoryPin = await getCategoryPinnedFlowId(
       companyId,
       options.categoryKey,
     );
