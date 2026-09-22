@@ -231,7 +231,6 @@ jobs:
           find supabase/migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort > /tmp/flc-release-migrations.txt
           test -s /tmp/flc-release-migrations.txt
           if grep -Ev '^[0-9]{14}_.+\.sql
-      - name: Run deploy on host through the tunnel
         shell: bash
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
