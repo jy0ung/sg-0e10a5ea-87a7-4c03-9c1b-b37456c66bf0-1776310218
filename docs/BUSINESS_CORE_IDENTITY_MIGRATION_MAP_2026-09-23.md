@@ -250,6 +250,17 @@ Two older statements are now explicitly superseded:
 1. `sales_advisors.employee_id` is **not** present in current generated schema. The canonical Sales Advisor relationship is Employee + `employee_module_assignments`.
 2. Employee company/branch integrity is not represented by generated physical company/branch FKs. The supported mutation RPC currently validates these references transactionally; physical constraints require reconciliation before introduction.
 
+## First measured implementation slice
+
+Issue #90 implements the first post-audit step as a read-only reconciliation pack:
+
+- `scripts/business-core-identity-reconciliation.sql` produces summary counts and detailed exceptions for Profile/Employee, Employee organisation references, Deal salesperson ownership, legacy Sales Advisor compatibility, and Vehicle salesperson compatibility;
+- `docs/BUSINESS_CORE_IDENTITY_RECONCILIATION.md` defines operator scoping and evidence handling;
+- automatic matching remains deterministic only: same-company staff code for legacy Advisors and the existing Vehicle Profile -> Employee FK chain;
+- no repair, backfill, constraint change, destructive cleanup, or production deployment is authorized by this slice.
+
+The output of #90 should be used to size the next migration rather than assuming compatibility debt is already zero.
+
 ## Exit conclusion
 
 The canonical identity model is sufficiently established to specify the next implementation slices without guessing:
