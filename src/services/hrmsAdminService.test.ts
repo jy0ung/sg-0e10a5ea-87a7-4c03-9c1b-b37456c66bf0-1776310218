@@ -23,6 +23,10 @@ vi.mock('@flc/hrms-services', () => ({
   createJobTitle: vi.fn(),
   updateJobTitle: vi.fn(),
   deleteJobTitle: vi.fn(),
+  listPublicHolidays: vi.fn(),
+  createPublicHoliday: vi.fn(),
+  updatePublicHoliday: vi.fn(),
+  deletePublicHoliday: vi.fn(),
 }));
 
 vi.mock('@/integrations/supabase/client', () => ({

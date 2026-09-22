@@ -1,4 +1,3 @@
-import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
 import {
   listDepartments as listCanonicalDepartments,
@@ -13,6 +12,10 @@ import {
   createLeaveType as createCanonicalLeaveType,
   updateLeaveType as updateCanonicalLeaveType,
   deleteLeaveType as deleteCanonicalLeaveType,
+  listPublicHolidays as listCanonicalPublicHolidays,
+  createPublicHoliday as createCanonicalPublicHoliday,
+  updatePublicHoliday as updateCanonicalPublicHoliday,
+  deletePublicHoliday as deleteCanonicalPublicHoliday,
 } from '@flc/hrms-services';
 import type {
   Department, CreateDepartmentInput, UpdateDepartmentInput,
@@ -206,27 +209,17 @@ export async function deleteLeaveType(
 // PUBLIC / COMPANY HOLIDAYS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function rowToHoliday(r: Record<string, unknown>): PublicHoliday {
-  return {
-    id:          String(r.id ?? ''),
-    companyId:   String(r.company_id ?? ''),
-    name:        String(r.name ?? ''),
-    date:        String(r.date ?? ''),
-    holidayType: (r.holiday_type as PublicHoliday['holidayType']) ?? 'public',
-    isRecurring: Boolean(r.is_recurring),
-    createdAt:   String(r.created_at ?? ''),
-    updatedAt:   String(r.updated_at ?? ''),
-  };
-}
-
-export async function listHolidays(companyId: string): Promise<{ data: PublicHoliday[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from('public_holidays')
-    .select('*')
-    .eq('company_id', companyId)
-    .order('date');
-  if (error) return { data: [], error: error.message };
-  return { data: (data ?? []).map(r => rowToHoliday(r as Record<string, unknown>)), error: null };
+export async function listHolidays(
+  companyId: string,
+): Promise<{ data: PublicHoliday[]; error: string | null }> {
+  try {
+    return {
+      data: await listCanonicalPublicHolidays(companyId),
+      error: null,
+    };
+  } catch (error) {
+    return { data: [], error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function createHoliday(
@@ -234,20 +227,16 @@ export async function createHoliday(
   actorId: string,
   input: CreateHolidayInput,
 ): Promise<{ data: PublicHoliday | null; error: string | null }> {
-  const { data, error } = await supabase
-    .from('public_holidays')
-    .insert({
-      company_id:   companyId,
-      name:         input.name,
-      date:         input.date,
-      holiday_type: input.holidayType,
-      is_recurring: input.isRecurring,
-    })
-    .select('*')
-    .single();
-  if (error) return { data: null, error: error.message };
-  void logUserAction(actorId, 'create', 'holiday', String(data.id), { name: input.name, date: input.date });
-  return { data: rowToHoliday(data as Record<string, unknown>), error: null };
+  try {
+    const data = await createCanonicalPublicHoliday(companyId, input);
+    void logUserAction(actorId, 'create', 'holiday', String(data.id), {
+      name: input.name,
+      date: input.date,
+    });
+    return { data, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function updateHoliday(
@@ -256,23 +245,25 @@ export async function updateHoliday(
   actorId: string,
   input: UpdateHolidayInput,
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase
-    .from('public_holidays')
-    .update({
-      name:         input.name,
-      date:         input.date,
-      holiday_type: input.holidayType,
-      is_recurring: input.isRecurring,
-      updated_at:   new Date().toISOString(),
-    })
-    .eq('company_id', companyId)
-    .eq('id', id);
-  if (!error) void logUserAction(actorId, 'update', 'holiday', id, { name: input.name });
-  return { error: error?.message ?? null };
+  try {
+    await updateCanonicalPublicHoliday(companyId, id, input);
+    void logUserAction(actorId, 'update', 'holiday', id, { name: input.name });
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
-export async function deleteHoliday(companyId: string, id: string, actorId: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('public_holidays').delete().eq('company_id', companyId).eq('id', id);
-  if (!error) void logUserAction(actorId, 'delete', 'holiday', id, {});
-  return { error: error?.message ?? null };
+export async function deleteHoliday(
+  companyId: string,
+  id: string,
+  actorId: string,
+): Promise<{ error: string | null }> {
+  try {
+    await deleteCanonicalPublicHoliday(companyId, id);
+    void logUserAction(actorId, 'delete', 'holiday', id, {});
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
 }
