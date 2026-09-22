@@ -422,7 +422,7 @@ REVOKE ALL
   FROM PUBLIC, anon;
 
 GRANT EXECUTE
-  ON FUNCTION public.review_internal_request_approval(text, uuid, text, text)
+  ON FUNCTION public.review_internal_request_approval(text, uuid, uuid, text, text)
   TO authenticated;
 
 COMMENT ON FUNCTION public.review_internal_request_approval(text, uuid, uuid, text, text) IS
