@@ -239,21 +239,26 @@ export async function deleteEmployeeRecord(
   employeeId: string,
   companyId: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('employees')
     .delete()
     .eq('id', employeeId)
-    .eq('company_id', companyId);
+    .eq('company_id', companyId)
+    .select('id')
+    .maybeSingle();
 
-  if (!error) return;
-
-  if (error.code === '23503') {
-    throw new Error(
-      'Cannot delete this employee because HR or business history exists. Mark the employee as resigned instead.',
-    );
+  if (error) {
+    if (error.code === '23503') {
+      throw new Error(
+        'Cannot delete this employee because HR or business history exists. Mark the employee as resigned instead.',
+      );
+    }
+    throw new Error(error.message);
   }
 
-  throw new Error(error.message);
+  if (!data) {
+    throw new Error('Employee was not found in the requested company.');
+  }
 }
 
 /**
@@ -262,16 +267,11 @@ export async function deleteEmployeeRecord(
  */
 export async function disableEmployeeProfileAccess(
   profileId: string,
-  companyId: string | null,
 ): Promise<void> {
-  let query = supabase
+  const { error } = await supabase
     .from('profiles')
     .update({ status: 'inactive', employee_id: null })
     .eq('id', profileId);
-
-  if (companyId) query = query.eq('company_id', companyId);
-
-  const { error } = await query;
   if (error) throw new Error(error.message);
 }
 
