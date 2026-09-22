@@ -22,7 +22,7 @@ This dictionary defines the canonical meaning of shared business terms. It is in
 | Retail Order / RO | Proton DMS retail-order evidence/source record | DMS Integration | Upstream source evidence; not the local Deal entity |
 | Sales Order | Legacy FLC workflow/history object | Sales compatibility | Read-only/deprecation path; do not revive for new workflow |
 | Vehicle | Canonical FLC operational vehicle/stock record | Inventory/Vehicle | Chassis number is a strong business identifier but not a substitute for internal FK everywhere |
-| Sales Advisor | Sales-role assignment linked to an Employee | Sales + HRMS relationship | Do not duplicate the employee as a second person record |
+| Sales Advisor | Active Sales module assignment for an Employee | Sales + HRMS relationship | Do not duplicate the employee as a second person record; legacy `sales_advisors` rows are compatibility only |
 | Supplier | External vendor party | Purchasing/Commercial master | Separate from customer |
 | Purchase Order | Approved commitment to buy goods/services | Purchasing | Precedes GRN/invoice where applicable |
 | GRN | Goods Receipt Note confirming receipt | Purchasing | Operational receipt, not supplier invoice |
@@ -56,7 +56,7 @@ Current production code already contains important pieces of the target model:
 
 - `employees` is the workforce record.
 - `profiles.employee_id` links login identity to workforce identity.
-- `sales_advisors` has an employee relationship in the documented implementation model.
+- Sales Advisor runtime identity is derived from `employees` plus active `employee_module_assignments`; the legacy `sales_advisors` table remains compatibility/import data and has no Employee FK in the current generated schema.
 - `deals` is the canonical local Sales workflow.
 - `approval_instances` and `approval_decisions` are the canonical approval runtime.
 - Finance foundations already include accounts, accounting periods, journal entries, journal entry lines, and posting/trial-balance RPCs.
