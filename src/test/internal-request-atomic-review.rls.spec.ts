@@ -254,16 +254,6 @@ async function createScenario(
   };
 }
 
-async function createConcurrentActorSession(actor: Actor): Promise<Actor> {
-  const client = anonClient();
-  const { error } = await client.auth.signInWithPassword({
-    email: actor.email,
-    password,
-  });
-  if (error) throw new Error(`Failed to create concurrent reviewer session: ${error.message}`);
-  return { ...actor, client };
-}
-
 async function review(
   actor: Actor,
   scenario: Scenario,
@@ -284,6 +274,7 @@ describeIfLive('Internal Request atomic approval review', () => {
   let requester: Actor;
   let specificApprover: Actor;
   let roleApprover: Actor;
+  let concurrentRoleApprover: Actor;
   let manager: Actor;
   let fallbackApprover: Actor;
   let otherActor: Actor;
@@ -294,6 +285,7 @@ describeIfLive('Internal Request atomic approval review', () => {
     requester = await createActor('requester');
     specificApprover = await createActor('specific');
     roleApprover = await createActor('role');
+    concurrentRoleApprover = await createActor('role-concurrent');
     manager = await createActor('manager');
     fallbackApprover = await createActor('fallback');
     otherActor = await createActor('other');
@@ -301,6 +293,7 @@ describeIfLive('Internal Request atomic approval review', () => {
     const requesterEmployee = await createEmployee(requester, 'Atomic Requester');
     const managerEmployee = await createEmployee(manager, 'Atomic Manager');
     await createEmployee(roleApprover, 'Atomic Role Approver');
+    await createEmployee(concurrentRoleApprover, 'Atomic Concurrent Role Approver');
 
     const { error: managerError } = await adminClient().from('employees')
       .update({ manager_employee_id: managerEmployee })
@@ -310,6 +303,7 @@ describeIfLive('Internal Request atomic approval review', () => {
     assignedRoleId = await createRole(`atomic_reviewer_${Date.now()}`);
     fallbackRoleId = await createRole(`atomic_fallback_${Date.now()}`);
     await assignRole(roleApprover, assignedRoleId);
+    await assignRole(concurrentRoleApprover, assignedRoleId);
   }, 60_000);
 
   afterAll(async () => {
@@ -430,7 +424,7 @@ describeIfLive('Internal Request atomic approval review', () => {
     expect(count).toBe(0);
   });
 
-  it('serializes duplicate reviews and rejects the stale expected Step even for the same next Role', async () => {
+  it('serializes two valid Role assignees and rejects the stale expected Step', async () => {
     const scenario = await createScenario(requester, [
       {
         name: 'Role Step 1',
@@ -444,10 +438,9 @@ describeIfLive('Internal Request atomic approval review', () => {
       },
     ]);
 
-    const concurrentReviewer = await createConcurrentActorSession(roleApprover);
     const [first, second] = await Promise.all([
       review(roleApprover, scenario, 'approved'),
-      review(concurrentReviewer, scenario, 'approved'),
+      review(concurrentRoleApprover, scenario, 'approved'),
     ]);
 
     const outcomes = [first, second];
