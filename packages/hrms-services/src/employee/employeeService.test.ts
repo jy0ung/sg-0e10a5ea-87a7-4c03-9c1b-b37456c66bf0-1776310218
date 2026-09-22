@@ -117,7 +117,7 @@ describe('Employee deletion primitives', () => {
     await expect(
       deleteEmployeeRecord('employee-1', 'c1'),
     ).rejects.toThrow(
-      'Cannot delete this employee because HR or business history exists. Mark the employee as resigned instead.',
+      'Cannot delete this employee because HR history exists. Mark the employee as resigned instead.',
     );
 
     expect(deleteCalls).toEqual(['employees']);
