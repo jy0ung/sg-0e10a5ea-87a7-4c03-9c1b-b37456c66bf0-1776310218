@@ -10,6 +10,7 @@ export default defineConfig({
     include: [
       'src/test/rls-matrix.spec.ts',
       'src/test/internal-request-atomic-review.rls.spec.ts',
+      'src/test/employee-history-delete.rls.spec.ts',
       'src/test/dms-normalizer.spec.ts',
       'src/test/sales-pipeline.spec.ts',
       'src/test/ap-foundation.spec.ts',

@@ -14,6 +14,7 @@ const canonicalReExports = new Map<string, string>([
   ['apps/hrms-web/src/services/hrms/announcementService.ts', "export * from '../../../../../src/services/hrms/announcementService';"],
   ['apps/hrms-web/src/services/hrms/appraisalService.ts', "export * from '../../../../../src/services/hrms/appraisalService';"],
   ['apps/hrms-web/src/services/hrms/attendanceService.ts', "export * from '../../../../../src/services/hrms/attendanceService';"],
+  ['apps/hrms-web/src/services/hrms/employeeService.ts', "export * from '../../../../../src/services/hrms/employeeService';"],
   ['apps/hrms-web/src/services/hrms/leaveService.ts', "export * from '../../../../../src/services/hrms/leaveService';"],
   ['apps/hrms-web/src/services/hrms/payrollService.ts', "export * from '../../../../../src/services/hrms/payrollService';"],
   ['apps/hrms-web/src/services/hrmsRoleService.ts', "export * from '../../../../src/services/hrmsRoleService';"],
