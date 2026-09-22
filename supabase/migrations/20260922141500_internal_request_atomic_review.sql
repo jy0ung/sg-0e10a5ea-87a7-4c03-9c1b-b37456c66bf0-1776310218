@@ -338,7 +338,7 @@ BEGIN
           USING ERRCODE = '23514';
       END IF;
 
-      SELECT e.requester_manager_employee_id
+      SELECT e.manager_employee_id
         INTO requester_manager_employee_id
         FROM public.employees e
        WHERE e.id = requester_employee_id
