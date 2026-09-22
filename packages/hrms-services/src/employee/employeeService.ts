@@ -188,3 +188,90 @@ export async function resolveNamesToIds(
   }
   return result;
 }
+
+export interface LinkedEmployeeProfile {
+  id: string;
+  status: string;
+  companyId: string | null;
+  accessScope: string | null;
+}
+
+/**
+ * Resolves the single login Profile linked to a canonical Employee.
+ * No mutation is performed.
+ */
+export async function getLinkedEmployeeProfile(
+  employeeId: string,
+  companyId: string,
+): Promise<LinkedEmployeeProfile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, status, company_id, access_scope')
+    .eq('employee_id', employeeId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+
+  const profileCompanyId = data.company_id ? String(data.company_id) : null;
+  const accessScope = data.access_scope ? String(data.access_scope) : null;
+  if (
+    profileCompanyId !== null
+    && profileCompanyId !== companyId
+    && accessScope !== 'global'
+  ) {
+    throw new Error('Linked user Profile does not belong to the Employee company.');
+  }
+
+  return {
+    id: String(data.id),
+    status: String(data.status ?? ''),
+    companyId: profileCompanyId,
+    accessScope,
+  };
+}
+
+/**
+ * Hard-deletes an Employee only when database history constraints allow it.
+ * Historical HR tables use ON DELETE RESTRICT; this helper translates the
+ * foreign-key violation into the lifecycle guidance shown by the UI.
+ */
+export async function deleteEmployeeRecord(
+  employeeId: string,
+  companyId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('employees')
+    .delete()
+    .eq('id', employeeId)
+    .eq('company_id', companyId);
+
+  if (!error) return;
+
+  if (error.code === '23503') {
+    throw new Error(
+      'Cannot delete this employee because HR or business history exists. Mark the employee as resigned instead.',
+    );
+  }
+
+  throw new Error(error.message);
+}
+
+/**
+ * Safety fallback when post-delete auth cleanup fails.
+ * The Employee FK has already SET NULL on profiles.employee_id.
+ */
+export async function disableEmployeeProfileAccess(
+  profileId: string,
+  companyId: string | null,
+): Promise<void> {
+  let query = supabase
+    .from('profiles')
+    .update({ status: 'inactive', employee_id: null })
+    .eq('id', profileId);
+
+  if (companyId) query = query.eq('company_id', companyId);
+
+  const { error } = await query;
+  if (error) throw new Error(error.message);
+}
+
