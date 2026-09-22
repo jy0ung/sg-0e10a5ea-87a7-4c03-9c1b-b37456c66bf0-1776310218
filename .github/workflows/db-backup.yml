@@ -40,7 +40,6 @@ jobs:
       SSH_USER: ${{ secrets.SSH_USER }}
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-      DB_BACKUP_DB_CONTAINER_PATTERN: ${{ vars.DB_BACKUP_DB_CONTAINER_PATTERN || '^supabase_db_' }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION || 'ap-southeast-1' }}
@@ -152,12 +151,20 @@ jobs:
               --file "$dump_file" \
               "$SUPABASE_DB_URL"
           elif [[ "$BACKUP_TRANSPORT" == "ssh" ]]; then
-            ssh -T backup-target \
-              "set -euo pipefail; \
-               db_container=\$(docker ps --format '{{.Names}}' | grep -E '${DB_BACKUP_DB_CONTAINER_PATTERN}' | head -1 || true); \
-               if [[ -z \"\$db_container\" ]]; then echo 'No production Supabase DB container matched ${DB_BACKUP_DB_CONTAINER_PATTERN}' >&2; exit 1; fi; \
-               docker exec \"\$db_container\" pg_dump -U postgres -d postgres --format=custom --no-owner --no-privileges" \
-              > "$dump_file"
+            ssh -T backup-target 'bash -se' > "$dump_file" <<'REMOTE'
+set -euo pipefail
+db_container="$(docker ps --format '{{.Names}}' | grep -E '^supabase_db_' | head -1 || true)"
+if [[ -z "$db_container" ]]; then
+  echo 'No production Supabase DB container matched ^supabase_db_' >&2
+  exit 1
+fi
+docker exec "$db_container" pg_dump \
+  -U postgres \
+  -d postgres \
+  --format=custom \
+  --no-owner \
+  --no-privileges
+REMOTE
           else
             echo "Unsupported backup transport: $BACKUP_TRANSPORT" >&2
             exit 1
@@ -166,11 +173,11 @@ jobs:
           test -s "$dump_file"
           pg_restore --list "$dump_file" >/dev/null
 
-          gpg \
+          printf '%s' "$DB_BACKUP_GPG_PASSPHRASE" | gpg \
             --batch \
             --yes \
             --pinentry-mode loopback \
-            --passphrase "$DB_BACKUP_GPG_PASSPHRASE" \
+            --passphrase-fd 0 \
             --symmetric \
             --cipher-algo AES256 \
             --output "$encrypted_file" \
