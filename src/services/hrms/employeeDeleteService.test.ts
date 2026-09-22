@@ -124,7 +124,7 @@ describe('Employee deletion adapter', () => {
 
     expect(result.error).toContain('Employee deleted');
     expect(result.error).toContain('account was disabled');
-    expect(disableProfileMock).toHaveBeenCalledWith('profile-1', 'c1');
+    expect(disableProfileMock).toHaveBeenCalledWith('profile-1');
     expect(auditMock).toHaveBeenCalledWith(
       'actor-1', 'delete', 'employee', 'employee-1', {},
     );
