@@ -17,9 +17,11 @@ Scope: Supabase Postgres data, storage buckets, edge function code, and configur
 
 ```bash
 # 1. Turn on PITR in the Supabase dashboard for staging and prod projects.
-# 2. Configure .github/workflows/db-backup.yml with SUPABASE_DB_URL and
-#    DB_BACKUP_GPG_PASSPHRASE secrets in the target environment.
-# 3. Enable object versioning on every storage bucket.
+# 2. Configure DB_BACKUP_GPG_PASSPHRASE in each backup environment.
+#    The backup reuses the existing Cloudflare Access + SSH deployment secrets
+#    to stream pg_dump from the host-local Supabase database container.
+# 3. Optionally configure S3 backup secrets for 30-day encrypted retention.
+# 4. Enable object versioning on every storage bucket.
 ```
 
 ## Nightly logical dump workflow
@@ -31,8 +33,10 @@ configured.
 
 Required environment secrets:
 
-- `SUPABASE_DB_URL` — Postgres connection string for the target Supabase project.
-- `DB_BACKUP_GPG_PASSPHRASE` — passphrase used to symmetrically encrypt dumps.
+- `DB_BACKUP_GPG_PASSPHRASE` — dedicated passphrase used to symmetrically encrypt database dumps.
+- Existing deployment tunnel secrets: `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `SSH_HOST`, `SSH_USER`, `CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET`.
+
+The workflow deliberately does **not** require a directly reachable `SUPABASE_DB_URL`. It runs `pg_dump` inside the host-local Supabase Postgres container and streams the archive over the encrypted Cloudflare Access/SSH tunnel into GPG on the runner. The unencrypted archive is not written to runner disk.
 
 Optional environment secrets:
 
@@ -40,9 +44,15 @@ Optional environment secrets:
 - `DB_BACKUP_S3_PREFIX` — key prefix; defaults to `flc-bi/db-backups`.
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` — required only for S3 upload.
 
-If S3 is not configured, the workflow still uploads the encrypted dump and
-checksum as short-lived GitHub Actions artifacts. Treat those artifacts as
-sensitive even though the database content is encrypted.
+If S3 is not configured, the workflow still uploads the encrypted dump,
+checksum, and non-sensitive restore metadata as short-lived GitHub Actions
+artifacts. Treat those artifacts as sensitive even though the database content
+is encrypted.
+
+Before upload, the workflow verifies the encrypted-file checksum and decrypts
+the archive as a stream into the database container's matching `pg_restore
+--list`. This validates encryption/decryption and archive readability, but it
+is **not** a substitute for the separate full restore drill.
 
 ## Restore drill (monthly)
 
