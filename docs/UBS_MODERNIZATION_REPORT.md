@@ -360,7 +360,7 @@ Core entities:
 | `goods_receipt_notes` / `grn_lines` | Receiving against PO | GRN header/lines and PO references | `create_grn`; later migration auto-updates stock | `src/services/grnService.ts`, `20260624010000_grn_auto_stock.sql` |
 | `purchase_invoices` / `supplier_payment_events` | AP invoice and immutable payment ledger | supplier invoice, lifecycle status, payment events | Lifecycle via `transition_pi_lifecycle`; payment RPCs enforce state | `src/services/apService.ts`, `purchaseInvoiceService.ts` |
 | GL tables | Chart, periods, journals | `accounts`, `accounting_periods`, `journal_entries`, `journal_entry_lines` | Balance validation, posting RPCs, reporting RPCs | `src/services/glService.ts`, `20260514200000_gl_foundation.sql` |
-| HRMS employee/workforce | Employees and assignments | `employees`, `employee_module_assignments`, `hrms_roles`, `employee_hrms_role_assignments` | HRMS access and approval routing | `packages/hrms-services/src/employee/employeeService.ts`, `settingsService.ts` |
+| HRMS employee/workforce | Employees and assignments | `employees`, `employee_module_assignments`, `hrms_roles`, `employee_hrms_role_assignments` | HRMS access, approval routing, and history-safe employment lifecycle | `packages/hrms-services/src/employee/employeeService.ts`, `settingsService.ts`, `20260922143000_employee_history_delete_restrict.sql` |
 | Leave/attendance/payroll/appraisal | HR workflows | `leave_requests`, `leave_balances`, `attendance_records`, `payroll_runs`, `payroll_items`, `appraisals`, `appraisal_items` | Approval instances, rollover, self/manager permissions | `packages/hrms-services/src/leave/leaveService.ts`, `payrollService.ts`, `appraisalService.ts` |
 | `approval_flows` / `approval_steps` | Workflow definitions | entity type, department, routing, approver role/user | Admin-managed workflow setup | `packages/hrms-services/src/settings/settingsService.ts` |
 | `approval_instances` / `approval_decisions` | Canonical workflow runtime | entity type/id, requester, current step, decision history | Submit, approve, reject, resubmit, advance | `packages/hrms-services/src/approval/approvalEngine.ts`, `packages/internal-requests/src/requestApprovalService.ts` |
@@ -375,6 +375,7 @@ Current data model summary:
 - The database is broad but coherent around tenant-scoped tables with `company_id`, RLS, RPCs for high-risk workflows, and append-only event tables for ledgers/audit-style events.
 - There is some historical drift: early migrations had broad/anon policies later hardened by hotfixes, older workflow tables remain, and generated TS types lag newer migrations.
 - Business-critical consistency increasingly lives in database RPCs/triggers: import commits, vehicle search, pipeline transitions, ledgers, AP lifecycle, reports, DMS ops, reconciliation, PO/GRN/3-way match, and ticket functions.
+- Employee lifecycle integrity now treats historical HR ownership as restrictive: leave balances/requests, attendance, payroll items, and appraisal items block Employee hard-delete. Hard delete is for unused/erroneous rows; established workforce records should become inactive/resigned (PR #81, `5462064`).
 
 Entity relationship map:
 
@@ -820,6 +821,13 @@ Rollback strategy:
 | P2 | HRMS duplication cleanup | Reduces dual-host maintenance cost |
 | P3 | DMS live sync/reconciliation maturation | Requires operational discipline and careful rollout |
 | P3 | Full admin IA redesign | Valuable after domains stabilize |
+
+### 2026-09-22 Workforce history integrity update
+
+- PR #81 (`5462064`): converted historical Employee ownership for leave balances/requests, attendance, payroll items, and appraisal items to deletion-restrictive foreign keys.
+- Employee delete orchestration now checks database history before auth cleanup, blocks linked active accounts, and leaves pending-account cleanup recoverable.
+- Local-Supabase Production Readiness passed **164/164** tests, including **6/6** live Employee-history deletion cases.
+- No production deployment was performed for this refactor merge.
 
 ### 2026-09-22 Internal Request workflow integrity update
 
