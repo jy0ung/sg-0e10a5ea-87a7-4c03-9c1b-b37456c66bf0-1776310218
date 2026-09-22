@@ -521,8 +521,10 @@ Business rules already visible:
 - RLS is the authority for tenant isolation (`docs/SECURITY.md`, `docs/RLS_MATRIX.md`).
 - AP payment recording requires purchase invoice lifecycle `approved` or `scheduled`; transition rules are in `transition_pi_lifecycle`.
 - AR/AP ledgers are append-only and recompute parent paid/payment status through triggers/RPCs.
-- Internal request approval flow resolution prefers subcategory pin, then category pin, then department/default flow (`packages/internal-requests/src/requestApprovalService.ts`).
-- Workflow should use `approval_instances`; `approval_requests` is legacy compatibility (`scripts/check-workflow-boundary.ts`, `docs/ENTERPRISE_REARCHITECTURE.md`).
+- Internal request approval flow resolution is package-owned in `packages/internal-requests/src/approvalFlowResolver.ts`: subcategory pin, category pin, then canonical Employee Department / condition / priority resolution. Pins are validated and deterministic precedence is regression-covered (PR #74, `317fba7`).
+- Internal request approval review is atomic through `review_internal_request_approval(...)`, with Approval Instance/Ticket locking and one transaction for Decision, Instance, Ticket, and Activity state. Stale-Step conflicts use `PT409` rather than retryable `40001` (PR #76, `5a73286`).
+- Internal request approval UI permission follows the materialized approver through exact Profile or active same-company HRMS Role assignment via Profile/Employee identity; app-level admin role is not approval authority (PR #83, `859d5c4`).
+- Workflow should use `approval_instances`; `approval_requests` is database compatibility only and runtime access is blocked by `scripts/check-workflow-boundary.ts` and release-compatibility tests.
 - Webhook failures retry with exponential backoff and become `dead` after max attempts (`docs/PHASE6_WEBHOOK_OUTBOX.md`, `webhook-deliverer`).
 
 Business logic gaps:
@@ -544,7 +546,7 @@ Cleaner business logic architecture:
 ## 11. Main Problems and Risks
 
 High-priority risks:
-- Workflow split: `approval_instances` is canonical, but legacy `approval_requests` still exists in compatibility services.
+- Legacy workflow debt is now containment rather than a runtime split: `approval_instances` is canonical and runtime access to `approval_requests` is boundary-blocked, but the legacy table still requires an explicit retention/retirement decision.
 - Dirty current-state work: ticket collaboration/auto-close migration/function changes are uncommitted; they should be reviewed before being treated as stable.
 - Mixed service ownership: HRMS/Internal Requests/Auth are package-oriented; Sales/Finance/Inventory/Auto Aging mostly remain app-local.
 - Database type drift: services contain comments indicating generated types miss newer columns.
@@ -811,13 +813,20 @@ Rollback strategy:
 | P0 | Stabilize current ticket portal WIP and generated types | Dirty current state touches service-desk core and migrations |
 | P0 | Keep CI/typecheck/boundary checks green | Prevent architecture regression |
 | P1 | Ticket lifecycle use-case/state machine | Internal Requests are actively changing and business-critical |
-| P1 | Workflow runtime cleanup around `approval_instances` | Reduces approval bugs and duplicated logic |
+| P1 | Workflow runtime cleanup around `approval_instances` | Core Internal Request resolution/review/permission slices completed on 2026-09-22; continue cross-domain workflow convergence |
 | P1 | Home/Inbox command center | Highest cross-module UX leverage |
 | P2 | Sales lifecycle/domain extraction | Central to automotive operations and vehicle/invoice linkage |
 | P2 | Purchasing/Finance contract hardening | Financial invariants need backend confidence |
 | P2 | HRMS duplication cleanup | Reduces dual-host maintenance cost |
 | P3 | DMS live sync/reconciliation maturation | Requires operational discipline and careful rollout |
 | P3 | Full admin IA redesign | Valuable after domains stabilize |
+
+### 2026-09-22 Internal Request workflow integrity update
+
+- PR #74 (`317fba7`): canonical Employee-backed flow resolution, validated pins, deterministic condition/`match_priority` precedence.
+- PR #76 (`5a73286`): atomic and concurrency-safe approval review; local-Supabase readiness passed **158/158** live tests after stale-Step conflicts were corrected to `PT409`.
+- PR #83 (`859d5c4`): workspace approval permission aligned with canonical HRMS Role assignments and specific-user routing; all CI/readiness gates passed.
+- No production deployment was performed as part of these refactor merges.
 
 ## 18. Quick Wins
 
