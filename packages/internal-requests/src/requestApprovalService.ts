@@ -4,7 +4,6 @@ import {
   rowToApprovalDecision,
   rowToApprovalStep,
   resolveStepRouting,
-  userHasAssignedHrmsRole,
   type ApprovalStepRecord,
 } from '@flc/hrms-services';
 import { createNotifications, logUserAction } from '@flc/platform-services';
@@ -179,171 +178,185 @@ export async function getInternalRequestApprovalGate(
   return { data: result.data.get(ticketId) ?? null, error: null };
 }
 
+const APPROVER_ROLE_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * UI/workspace permission helper for the materialized current approver.
+ *
+ * This is intentionally fail-closed and mirrors the atomic review command's
+ * routing authority. The database RPC remains the final authorization boundary.
+ */
+export async function canProfileReviewInternalRequestApproval(
+  companyId: string,
+  ticketId: string,
+  profileId: string,
+): Promise<{ data: boolean; error: string | null }> {
+  if (!companyId || !ticketId || !profileId) {
+    return { data: false, error: null };
+  }
+
+  const { data: instance, error: instanceError } = await supabase
+    .from('approval_instances')
+    .select('flow_id, requester_id, status, current_step_id, current_approver_role, current_approver_user_id')
+    .eq('company_id', companyId)
+    .eq('entity_type', 'internal_request')
+    .eq('entity_id', ticketId)
+    .maybeSingle();
+
+  if (instanceError) return { data: false, error: instanceError.message };
+  if (!instance || instance.status !== 'pending' || !instance.current_step_id) {
+    return { data: false, error: null };
+  }
+
+  const { data: step, error: stepError } = await supabase
+    .from('approval_steps')
+    .select('allow_self_approval, is_active')
+    .eq('id', instance.current_step_id)
+    .eq('flow_id', instance.flow_id)
+    .maybeSingle();
+
+  if (stepError) return { data: false, error: stepError.message };
+  if (!step || !step.is_active) return { data: false, error: null };
+
+  if (instance.requester_id === profileId && !step.allow_self_approval) {
+    return { data: false, error: null };
+  }
+
+  if (instance.current_approver_user_id) {
+    return {
+      data: instance.current_approver_user_id === profileId,
+      error: null,
+    };
+  }
+
+  const materializedRole = instance.current_approver_role?.trim();
+  if (!materializedRole) return { data: false, error: null };
+
+  let roleQuery = supabase
+    .from('hrms_roles')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('is_active', true);
+
+  roleQuery = APPROVER_ROLE_UUID_PATTERN.test(materializedRole)
+    ? roleQuery.eq('id', materializedRole)
+    : roleQuery.eq('code', materializedRole);
+
+  const { data: role, error: roleError } = await roleQuery.maybeSingle();
+  if (roleError) return { data: false, error: roleError.message };
+  if (!role?.id) return { data: false, error: null };
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('employee_id')
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (profileError) return { data: false, error: profileError.message };
+
+  const employeeId = profile?.employee_id ? String(profile.employee_id) : null;
+  let assignmentQuery = supabase
+    .from('employee_hrms_role_assignments')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('hrms_role_id', String(role.id))
+    .limit(1);
+
+  assignmentQuery = employeeId
+    ? assignmentQuery.or(`profile_id.eq.${profileId},employee_id.eq.${employeeId}`)
+    : assignmentQuery.eq('profile_id', profileId);
+
+  const { data: assignments, error: assignmentError } = await assignmentQuery;
+  if (assignmentError) return { data: false, error: assignmentError.message };
+
+  return { data: (assignments ?? []).length > 0, error: null };
+}
+
+interface AtomicInternalRequestReviewResult {
+  instanceId: string;
+  ticketId: string;
+  submittedBy: string | null;
+  subject: string;
+  decision: RequestApprovalDecision;
+  approvalStep: string;
+  finalDecision: boolean;
+  nextApprovalStep: string | null;
+}
+
 export async function reviewInternalRequestApproval(
   ticketId: string,
+  expectedStepId: string,
   decision: RequestApprovalDecision,
   note: string | undefined,
   context: { userId: string; companyId: string },
 ): Promise<{ error: string | null }> {
   try {
-    const { data: ticket, error: ticketError } = await supabase.from('tickets')
-      .select('id, company_id, submitted_by, subject, status')
-      .eq('company_id', context.companyId)
-      .eq('id', ticketId)
-      .single();
-    if (ticketError) return { error: ticketError.message };
-    if (!ticket) return { error: 'Request not found.' };
+    const rpcClient = supabase as unknown as {
+      rpc: (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{
+        data: unknown;
+        error: { message: string } | null;
+      }>;
+    };
 
-    const { data: approvalRow, error: approvalError } = await supabase.from('approval_instances')
-      .select('id, flow_id, requester_id, status, current_step_id, current_step_order, current_step_name, current_approver_role, current_approver_user_id')
-      .eq('company_id', context.companyId)
-      .eq('entity_type', 'internal_request')
-      .eq('entity_id', ticketId)
-      .maybeSingle();
-    if (approvalError) return { error: approvalError.message };
-    if (!approvalRow) return { error: 'This request does not have an approval workflow.' };
+    const { data, error } = await rpcClient.rpc(
+      'review_internal_request_approval',
+      {
+        p_company_id: context.companyId,
+        p_ticket_id: ticketId,
+        p_expected_step_id: expectedStepId,
+        p_decision: decision,
+        p_note: note?.trim() ? note.trim() : null,
+      },
+    );
 
-    const approval = approvalRow as Record<string, unknown>;
-    if (approval.status !== 'pending') return { error: `This request approval is already ${approval.status}.` };
-
-    const { data: stepRows, error: stepsError } = await supabase.from('approval_steps')
-      .select('id, step_order, name, approver_type, approver_role, approver_user_id, fallback_approver_user_id, escalation_rule, condition_rule, is_active, allow_self_approval')
-      .eq('flow_id', String(approval.flow_id))
-      .order('step_order');
-    if (stepsError) return { error: stepsError.message };
-
-    const steps: ApprovalStepRecord[] = (stepRows as Record<string, unknown>[] ?? [])
-      .map((row) => rowToApprovalStep(row))
-      .filter((step: ApprovalStepRecord) => step.isActive);
-    const currentStep = steps.find((step: ApprovalStepRecord) => step.id === approval.current_step_id)
-      ?? steps.find((step: ApprovalStepRecord) => step.stepOrder === Number(approval.current_step_order));
-    if (!currentStep) return { error: 'The current approval step could not be resolved.' };
-
-    const requesterId = String(approval.requester_id ?? ticket.submitted_by ?? '');
-    if (requesterId === context.userId && !currentStep.allowSelfApproval) {
-      return { error: 'You cannot approve or reject your own request.' };
+    if (error) return { error: error.message };
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return { error: 'Approval review did not return workflow metadata.' };
     }
 
-    let isAssignedApprover = Boolean(approval.current_approver_user_id) && approval.current_approver_user_id === context.userId;
-    if (currentStep.approverType === 'role' && approval.current_approver_role) {
-      const assigned = await userHasAssignedHrmsRole(context.companyId, context.userId, String(approval.current_approver_role));
-      isAssignedApprover = assigned;
-    }
-    if (!isAssignedApprover) return { error: 'You are not the assigned approver for the current step.' };
+    const result = data as unknown as AtomicInternalRequestReviewResult;
 
-    const nextStep = decision === 'approved'
-      ? steps.find((step: ApprovalStepRecord) => step.stepOrder > currentStep.stepOrder)
-      : undefined;
-    const nextRouting = nextStep
-      ? await resolveStepRouting(nextStep, requesterId, context.companyId)
-      : { approverRole: null, approverUserId: null, error: null };
-
-    const decidedAt = new Date().toISOString();
-    const normalizedNote = note?.trim() ? note.trim() : null;
-    const { error: decisionError } = await supabase
-      .from('approval_decisions')
-      .insert({
-        instance_id: String(approval.id),
-        step_id: currentStep.id,
-        step_order: currentStep.stepOrder,
-        approver_id: context.userId,
-        decision,
-        note: normalizedNote,
-        decided_at: decidedAt,
-      });
-    if (decisionError) return { error: decisionError.message };
-
-    if (decision === 'rejected') {
-      const [{ error: workflowError }, { error: requestError }, { error: activityError }] = await Promise.all([
-        supabase.from('approval_instances')
-          .update({
-            status: 'rejected',
-            current_step_id: null,
-            current_step_order: null,
-            current_step_name: null,
-            current_approver_role: null,
-            current_approver_user_id: null,
-            updated_at: decidedAt,
-          })
-          .eq('id', String(approval.id)),
-        supabase.from('tickets')
-          .update({
-            status: 'cancelled',
-            resolved_at: decidedAt,
-            resolution_note: normalizedNote ?? 'Request rejected during approval.',
-          })
-          .eq('company_id', context.companyId)
-          .eq('id', ticketId),
-        supabase.from('ticket_activity').insert({
-          ticket_id: ticketId,
-          company_id: context.companyId,
-          actor_id: context.userId,
-          event_type: 'status_changed',
-          message: 'Request rejected during approval.',
-          metadata: { before: ticket.status, after: 'cancelled', approvalStep: currentStep.name, note: normalizedNote },
-        }),
-      ]);
-      if (workflowError) return { error: workflowError.message };
-      if (requestError) return { error: requestError.message };
-      if (activityError) return { error: activityError.message };
-    } else if (nextStep) {
-      const { error: workflowError } = await supabase.from('approval_instances')
-        .update({
-          current_step_id: nextStep.id,
-          current_step_order: nextStep.stepOrder,
-          current_step_name: nextStep.name,
-          current_approver_role: nextRouting.approverRole,
-          current_approver_user_id: nextRouting.approverUserId,
-          updated_at: decidedAt,
-        })
-        .eq('id', String(approval.id));
-      if (workflowError) return { error: workflowError.message };
-    } else {
-      const [{ error: workflowError }, { error: activityError }] = await Promise.all([
-        supabase.from('approval_instances')
-          .update({
-            status: 'approved',
-            current_step_id: null,
-            current_step_order: null,
-            current_step_name: null,
-            current_approver_role: null,
-            current_approver_user_id: null,
-            updated_at: decidedAt,
-          })
-          .eq('id', String(approval.id)),
-        supabase.from('ticket_activity').insert({
-          ticket_id: ticketId,
-          company_id: context.companyId,
-          actor_id: context.userId,
-          event_type: 'comment_added',
-          message: 'Request approval completed.',
-          metadata: { approvalStep: currentStep.name, note: normalizedNote },
-        }),
-      ]);
-      if (workflowError) return { error: workflowError.message };
-      if (activityError) return { error: activityError.message };
-    }
-
-    if (ticket.submitted_by && ticket.submitted_by !== context.userId) {
+    if (result.submittedBy && result.submittedBy !== context.userId) {
       void createNotifications([{
-        userId: String(ticket.submitted_by),
-        title: decision === 'approved' && !nextStep ? 'Request approved' : decision === 'rejected' ? 'Request rejected' : 'Request approval advanced',
-        message: `"${String(ticket.subject)}" ${decision === 'approved' && nextStep ? `advanced to ${nextStep.name}.` : `was ${decision}.`}`,
+        userId: result.submittedBy,
+        title:
+          decision === 'approved' && !result.finalDecision
+            ? 'Request approval advanced'
+            : decision === 'rejected'
+              ? 'Request rejected'
+              : 'Request approved',
+        message:
+          `"${result.subject}" ${
+            decision === 'approved' && !result.finalDecision
+              ? `advanced to ${result.nextApprovalStep ?? 'the next approval step'}.`
+              : `was ${decision}.`
+          }`,
         type: decision === 'rejected' ? 'warning' : 'success',
       }]);
     }
 
-    void logUserAction(context.userId, 'update', 'internal_request_approval', String(approval.id), {
-      ticketId,
-      decision,
-      approvalStep: currentStep.name,
-      finalDecision: decision === 'rejected' || !nextStep,
-      nextApprovalStep: nextStep?.name ?? null,
-    });
+    void logUserAction(
+      context.userId,
+      'update',
+      'internal_request_approval',
+      result.instanceId,
+      {
+        ticketId: result.ticketId,
+        decision,
+        approvalStep: result.approvalStep,
+        finalDecision: result.finalDecision,
+        nextApprovalStep: result.nextApprovalStep,
+      },
+    );
 
     return { error: null };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error) };
+    return {
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 

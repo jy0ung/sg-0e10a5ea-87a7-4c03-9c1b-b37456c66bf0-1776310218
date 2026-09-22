@@ -12,6 +12,7 @@ import {
   getInternalRequestApprovalPlan,
   listInternalRequestApprovalMetadata,
   reviewInternalRequestApproval,
+  canProfileReviewInternalRequestApproval,
   canTransition,
   createTicketWorkflowUseCases,
   getAvailableTicketActions,
@@ -87,6 +88,7 @@ export interface TicketRecord {
   first_responded_at: string | null;
   approval_instance_id: string | null;
   approval_status: InternalRequestApprovalMetadata['status'] | null;
+  current_approval_step_id?: string | null;
   current_approval_step_name: string | null;
   current_approver_role: string | null;
   current_approver_user_id: string | null;
@@ -315,6 +317,7 @@ type TicketRow = TicketDbRow;
 type TicketDbRow = Database['public']['Tables']['tickets']['Row'] & {
   approval_instance_id?: string | null;
   approval_status?: InternalRequestApprovalMetadata['status'] | null;
+  current_approval_step_id?: string | null;
   current_approval_step_name?: string | null;
   current_approver_role?: string | null;
   current_approver_user_id?: string | null;
@@ -447,6 +450,7 @@ function mapTicket(row: TicketDbRow): TicketRecord {
     first_responded_at: row.first_responded_at ?? null,
     approval_instance_id: row.approval_instance_id ?? null,
     approval_status: row.approval_status ?? null,
+    current_approval_step_id: row.current_approval_step_id ?? null,
     current_approval_step_name: row.current_approval_step_name ?? null,
     current_approver_role: row.current_approver_role ?? null,
     current_approver_user_id: row.current_approver_user_id ?? null,
@@ -853,6 +857,7 @@ function attachApprovalMetadata<T extends TicketRecord>(
     ...ticket,
     approval_instance_id: approval.id,
     approval_status: approval.status,
+    current_approval_step_id: approval.currentStepId,
     current_approval_step_name: approval.currentStepName,
     current_approver_role: approval.currentApproverRole,
     current_approver_user_id: approval.currentApproverUserId,
@@ -1181,16 +1186,6 @@ async function getCompanyTicketById(ticketId: string, companyId: string): Promis
   return ticket ?? null;
 }
 
-function canReviewTicketApproval(
-  ticket: CompanyTicketRecord,
-  user: { id: string; role?: string | null },
-) {
-  if (ticket.approval_status !== 'pending') return false;
-  if (ticket.current_approver_user_id) return ticket.current_approver_user_id === user.id;
-  if (ticket.current_approver_role) return user.role === 'super_admin' || user.role === 'company_admin';
-  return false;
-}
-
 export async function getTicketWorkspaceData(
   ticketId: string,
   context: { userId: string; companyId: string; userRole?: string | null; canManagePortalQueue?: boolean },
@@ -1201,7 +1196,21 @@ export async function getTicketWorkspaceData(
 
     const canManagePortalQueue = Boolean(context.canManagePortalQueue);
     const isRequester = ticket.submitted_by === context.userId;
-    if (!isRequester && !canManagePortalQueue) {
+    const reviewPermission = await canProfileReviewInternalRequestApproval(
+      context.companyId,
+      ticket.id,
+      context.userId,
+    );
+    if (reviewPermission.error) {
+      loggingService.warn(
+        'Failed to resolve canonical Internal Request approval permission',
+        { error: reviewPermission.error, ticketId: ticket.id, userId: context.userId },
+        'TicketService',
+      );
+    }
+    const canReviewApproval = reviewPermission.data;
+
+    if (!isRequester && !canManagePortalQueue && !canReviewApproval) {
       return { data: null, error: new Error('You do not have access to this request.') };
     }
 
@@ -1210,7 +1219,7 @@ export async function getTicketWorkspaceData(
       canCloseAsRequester: isRequester,
       canViewInternalNotes: canManagePortalQueue,
       canViewAuditTrail: canManagePortalQueue,
-      canReviewApproval: canReviewTicketApproval(ticket, { id: context.userId, role: context.userRole }),
+      canReviewApproval,
     };
 
     const [{ data: activitiesByTicket }, { data: chatSummariesByTicket }, internalNoteResult, auditResult] = await Promise.all([
@@ -2476,6 +2485,7 @@ async function executeTicketTransitionCommand(
     case 'reject_step': {
       const review = await reviewInternalRequestApproval(
         ticketId,
+        command.payload.expectedStepId,
         command.payload.kind === 'approve_step' ? 'approved' : 'rejected',
         command.payload.note ?? undefined,
         context,

@@ -94,8 +94,8 @@ export type TicketTransitionPayload =
   | { kind: 'auto_close'; autoCloseDays: number }
   | { kind: 'reopen_by_requester'; reason: string }
   | { kind: 'cancel_by_requester'; reason?: string | null }
-  | { kind: 'approve_step'; note?: string | null }
-  | { kind: 'reject_step'; note?: string | null }
+  | { kind: 'approve_step'; expectedStepId: string; note?: string | null }
+  | { kind: 'reject_step'; expectedStepId: string; note?: string | null }
   | { kind: 'reassign_owner'; newOwnerId: string | null; transitionNote: string }
   | { kind: 'escalate'; reason: string; escalationOwnerId?: string | null }
   | { kind: 'admin_override_status'; targetStatus: PersistedTicketStatus; reason: string };
@@ -494,9 +494,13 @@ function validateTicketTransitionPayload(
     case 'cancel_by_requester':
       return { ok: true };
     case 'approve_step':
-      return { ok: true };
+      return payload.expectedStepId.trim()
+        ? { ok: true }
+        : { ok: false, reason: 'Expected approval Step is required.' };
     case 'reject_step':
-      return { ok: true };
+      return payload.expectedStepId.trim()
+        ? { ok: true }
+        : { ok: false, reason: 'Expected approval Step is required.' };
     case 'reassign_owner':
       return payload.transitionNote.trim() ? { ok: true } : { ok: false, reason: 'Transition note is required.' };
     case 'escalate':
@@ -533,9 +537,9 @@ function minimalPayloadForAction(action: TicketTransitionAction): TicketTransiti
     case 'cancel_by_requester':
       return { kind: action };
     case 'approve_step':
-      return { kind: action };
+      return { kind: action, expectedStepId: '00000000-0000-0000-0000-000000000000' };
     case 'reject_step':
-      return { kind: action };
+      return { kind: action, expectedStepId: '00000000-0000-0000-0000-000000000000' };
     case 'reassign_owner':
       return { kind: action, newOwnerId: null, transitionNote: 'Reassigning request' };
     case 'escalate':
