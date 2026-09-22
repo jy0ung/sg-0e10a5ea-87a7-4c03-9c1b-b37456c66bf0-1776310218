@@ -35,6 +35,28 @@ DECLARE
   actor_company_id text;
   actor_access_scope text;
 BEGIN
+  IF TG_OP = 'UPDATE'
+     AND (
+       NEW.company_id IS DISTINCT FROM OLD.company_id
+       OR NEW.entity_type IS DISTINCT FROM OLD.entity_type
+       OR NEW.department_id IS DISTINCT FROM OLD.department_id
+       OR NEW.is_default IS DISTINCT FROM OLD.is_default
+       OR NEW.conditions IS DISTINCT FROM OLD.conditions
+       OR NEW.match_priority IS DISTINCT FROM OLD.match_priority
+     )
+     AND (
+       EXISTS (
+         SELECT 1 FROM public.approval_instances ai WHERE ai.flow_id = OLD.id
+       )
+       OR EXISTS (
+         SELECT 1 FROM public.approval_requests ar WHERE ar.flow_id = OLD.id
+       )
+     ) THEN
+    RAISE EXCEPTION
+      'Approval Flow has workflow history and its routing structure is immutable. Deactivate it and create a replacement Flow.'
+      USING ERRCODE = '23514';
+  END IF;
+
   IF NEW.department_id IS NOT NULL THEN
     SELECT d.company_id
       INTO department_company_id
