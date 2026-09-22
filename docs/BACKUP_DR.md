@@ -9,7 +9,7 @@ The table below is the **target recovery posture**, not proof that each producti
 | Asset                      | Target mechanism                      | Target retention | Owner          | Current evidence |
 | -------------------------- | ------------------------------------- | ---------------- | -------------- | ---------------- |
 | Postgres (staging + prod)  | Supabase PITR (point-in-time)         | 7 days           | Platform team  | Not yet recorded in-repo |
-| Daily logical dump         | `pg_dump` → GPG-encrypted artifact/S3 | 30 days in S3    | Platform team  | Workflow exists; production run blocked until required secrets are configured |
+| Daily logical dump         | `pg_dump` → GPG-encrypted artifact/S3 | 30 days in S3    | Platform team  | Direct DB URL and Cloudflare Access SSH transports implemented; production encrypted-run evidence still open |
 | Storage buckets            | Object versioning + lifecycle rule     | 30 days          | Platform team  | Not yet recorded in-repo |
 | Edge function source       | Git (tagged releases)                  | Forever          | Engineering    | Repository-backed |
 | `.env.*` templates         | Git                                    | Forever          | Engineering    | Repository-backed |
@@ -19,8 +19,8 @@ The table below is the **target recovery posture**, not proof that each producti
 
 ```bash
 # 1. Turn on PITR in the Supabase dashboard for staging and prod projects.
-# 2. Configure .github/workflows/db-backup.yml with SUPABASE_DB_URL and
-#    DB_BACKUP_GPG_PASSPHRASE secrets in the target environment.
+# 2. Configure .github/workflows/db-backup.yml with DB_BACKUP_GPG_PASSPHRASE
+#    plus either SUPABASE_DB_URL or the complete Cloudflare Access SSH secret set.
 # 3. Enable object versioning on every storage bucket.
 ```
 
@@ -33,8 +33,12 @@ configured.
 
 Required environment secrets:
 
-- `SUPABASE_DB_URL` — Postgres connection string for the target Supabase project.
 - `DB_BACKUP_GPG_PASSPHRASE` — passphrase used to symmetrically encrypt dumps.
+- Backup transport: either
+  - `SUPABASE_DB_URL` for direct Postgres access, or
+  - the complete Cloudflare Access SSH set already used by production operations: `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `SSH_HOST`, `SSH_USER`, `CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET` (with `SSH_PORT` optional/defaulting to 22).
+
+In SSH mode the runner does not receive a production DB URL. The workflow connects through Cloudflare Access, finds the host-local `supabase_db_*` container, runs `pg_dump` inside that container, and streams the custom-format dump back to the runner before encryption.
 
 Optional environment secrets:
 
@@ -48,11 +52,7 @@ sensitive even though the database content is encrypted.
 
 ### Current production blocker — 2026-09-22
 
-The workflow deliberately fails before `pg_dump` when either
-`SUPABASE_DB_URL` or `DB_BACKUP_GPG_PASSPHRASE` is absent. Those production
-environment secrets have not been proven configured. Do not weaken encryption,
-invent credentials, or mark backup readiness complete based only on workflow
-code.
+PR #88 / `c5f3153` added the Cloudflare Access SSH fallback while preserving mandatory encryption, checksum validation, plaintext cleanup, and encrypted-only artifact upload. The workflow still deliberately fails before `pg_dump` unless `DB_BACKUP_GPG_PASSPHRASE` is present and one complete backup transport is available. Production secret configuration and an actual successful encrypted production run have not been evidenced in-repo. Do not weaken encryption, invent credentials, or mark backup readiness complete based only on workflow code.
 
 Backup readiness requires evidence of:
 1. a successful encrypted production dump;
