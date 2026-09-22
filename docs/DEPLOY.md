@@ -4,7 +4,7 @@ This repository supports an all-in-one production host:
 
 - the web app is built as a static image and served by nginx
 - the host runs the Supabase stack locally
-- GitHub Actions pushes app updates through `main-deploy.yml`
+- production promotion is an explicit manual GitHub Actions dispatch through `main-deploy.yml`; merging to `main` does not deploy
 - the app container reaches local Supabase through Docker's host gateway alias
 
 ## Host Bootstrap
@@ -69,14 +69,16 @@ environment secrets:
 
 ## Deploy Flow
 
-1. Push code to `main`.
-2. CI runs on the branch.
-3. `main-deploy.yml` builds the image, stages it on the host, health-checks it,
-   and swaps the live container only if the new container is healthy.
-4. Optional login verification runs when `PROD_LOGIN_EMAIL` and
-  `PROD_LOGIN_PASSWORD` are present.
-5. Optional module smoke testing runs with those same credentials and checks the
-  production main app, HRMS launcher, and standalone HRMS workspace.
+1. Merge code to `main`; CI runs, but **no production deployment starts automatically**.
+2. Review CI, staging qualification, migration, backup, and change-window evidence.
+3. Apply any required production database migrations separately.
+4. Explicitly dispatch `main-deploy.yml`.
+5. The deploy verifies that every release migration is already present in the production migration ledger before the live app container is touched.
+6. The candidate image is staged on a temporary port and health-checked.
+7. The current production container is preserved as a rollback container before the candidate is promoted.
+8. Public production verification always has Playwright Chromium available.
+9. Credentialed RPC/module smoke checks run when the configured production smoke credentials validate.
+10. If post-promotion verification fails, the workflow restores the preserved previous container. It is deleted only after full success.
 
 Required production secrets for the main-deploy workflow:
 
@@ -125,6 +127,11 @@ npm run smoke:production
 
 ## Rollback
 
-If a main-branch deploy misbehaves, redeploy the previous image tag or restore
-the previous container version on the host. If the database changes caused the
-issue, restore the local Supabase data from backup before re-enabling traffic.
+The deployment script preserves the prior live container until all
+post-promotion verification succeeds. A failed candidate is automatically
+replaced by that preserved container through `scripts/rollback-image.sh`.
+
+After a completed release, manually dispatch `main-deploy.yml` with the
+previous known-good `image_tag` when an application rollback is required.
+Database recovery is separate: follow `docs/BACKUP_DR.md` and require restore
+evidence before relying on it for a production incident.
