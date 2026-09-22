@@ -72,7 +72,7 @@ describe('Employee deletion adapter', () => {
     });
     deleteEmployeeRecordMock.mockRejectedValue(
       new Error(
-        'Cannot delete this employee because HR or business history exists. Mark the employee as resigned instead.',
+        'Cannot delete this employee because HR history exists. Mark the employee as resigned instead.',
       ),
     );
 
