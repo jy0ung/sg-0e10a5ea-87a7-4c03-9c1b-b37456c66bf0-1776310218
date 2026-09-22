@@ -1,10 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Admin settings service — departments, job titles, leave-type config,
- * holiday config, approval flows, and HRMS roles.
- *
- * Naming note: hrms_roles and employee_hrms_role_assignments are NOT in the
- * generated Database types, so those queries use `(supabase as any)`.
+ * holiday config, and approval flows.
  *
  * All functions throw on error (consistent with the rest of @flc/hrms-services).
  */
@@ -20,10 +17,6 @@ import type {
   UpdateLeaveTypeInput,
   PublicHoliday,  CreateHolidayInput,
   UpdateHolidayInput,
-  HrmsRole,
-  CreateHrmsRoleInput,
-  UpdateHrmsRoleInput,
-  HrmsRoleAssignment,
   ApprovalFlow,
   CreateApprovalFlowInput,
   UpdateApprovalFlowInput,
@@ -125,43 +118,6 @@ function rowToHoliday(r: Record<string, unknown>): PublicHoliday {
     isRecurring: Boolean(r.is_recurring),
     createdAt:   String(r.created_at ?? ''),
     updatedAt:   String(r.updated_at ?? ''),
-  };
-}
-
-function rowToHrmsRole(r: Record<string, any>): HrmsRole {
-  return {
-    id:                      String(r.id ?? ''),
-    companyId:               String(r.company_id ?? ''),
-    code:                    String(r.code ?? ''),
-    name:                    String(r.name ?? ''),
-    category:                r.category as HrmsRole['category'],
-    scope:                   r.scope as HrmsRole['scope'],
-    authorityLevel:          Number(r.authority_level ?? 0),
-    description:             r.description ? String(r.description) : undefined,
-    canApproveRequests:      Boolean(r.can_approve_requests),
-    canManageEmployeeRecords:Boolean(r.can_manage_employee_records),
-    canViewHrmsReports:      Boolean(r.can_view_hrms_reports),
-    isActive:                Boolean(r.is_active),
-    isSystemDefault:         Boolean(r.is_system_default),
-    assignedUserCount:       Number(r.assigned_user_count ?? r._assigned_count ?? 0),
-    lastUpdatedByName:       r.last_updated_by_name ? String(r.last_updated_by_name) : undefined,
-    createdAt:               String(r.created_at ?? ''),
-    updatedAt:               String(r.updated_at ?? ''),
-  };
-}
-
-function rowToHrmsRoleAssignment(r: Record<string, any>): HrmsRoleAssignment {
-  return {
-    id:           String(r.id ?? ''),
-    companyId:    String(r.company_id ?? ''),
-    hrmsRoleId:   String(r.hrms_role_id ?? ''),
-    employeeId:   r.employee_id ? String(r.employee_id) : undefined,
-    profileId:    r.profile_id ? String(r.profile_id) : undefined,
-    employeeName: r.employee_name ? String(r.employee_name) : undefined,
-    profileName:  r.profile_name ? String(r.profile_name) : undefined,
-    isPrimary:    Boolean(r.is_primary),
-    createdAt:    String(r.created_at ?? ''),
-    updatedAt:    String(r.updated_at ?? ''),
   };
 }
 
@@ -500,114 +456,6 @@ export async function deletePublicHoliday(companyId: string, id: string): Promis
     .eq('company_id', companyId)
     .eq('id', id);
   if (error) throw new Error(error.message);
-}
-
-// ─── HRMS roles ───────────────────────────────────────────────────────────────
-// Note: hrms_roles and employee_hrms_role_assignments are NOT in the generated
-// Database types — hence the (supabase as any) casts below.
-
-export async function listHrmsRoles(companyId: string): Promise<HrmsRole[]> {
-  const { data, error } = await (supabase as any)
-    .from('hrms_roles')
-    .select('*')
-    .eq('company_id', companyId)
-    .order('authority_level', { ascending: false });
-  if (error) throw new Error((error as { message: string }).message);
-  return (data ?? []).map((r: Record<string, any>) => rowToHrmsRole(r));
-}
-
-export async function createHrmsRole(
-  companyId: string,
-  input: CreateHrmsRoleInput,
-): Promise<HrmsRole> {
-  const code = input.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-  const { data, error } = await (supabase as any)
-    .from('hrms_roles')
-    .insert({
-      company_id:                  companyId,
-      code,
-      name:                        input.name,
-      category:                    input.category,
-      scope:                       input.scope,
-      authority_level:             input.authorityLevel,
-      description:                 input.description ?? null,
-      can_approve_requests:        input.canApproveRequests,
-      can_manage_employee_records: input.canManageEmployeeRecords,
-      can_view_hrms_reports:       input.canViewHrmsReports,
-      is_active:                   input.isActive,
-      is_system_default:           false,
-    })
-    .select('*')
-    .single();
-  if (error) throw new Error((error as { message: string }).message);
-  return rowToHrmsRole(data as Record<string, any>);
-}
-
-export async function updateHrmsRole(
-  companyId: string,
-  id: string,
-  input: UpdateHrmsRoleInput,
-): Promise<void> {
-  const { error } = await (supabase as any)
-    .from('hrms_roles')
-    .update({
-      name:                        input.name,
-      category:                    input.category,
-      scope:                       input.scope,
-      authority_level:             input.authorityLevel,
-      description:                 input.description ?? null,
-      can_approve_requests:        input.canApproveRequests,
-      can_manage_employee_records: input.canManageEmployeeRecords,
-      can_view_hrms_reports:       input.canViewHrmsReports,
-      is_active:                   input.isActive,
-      updated_at:                  new Date().toISOString(),
-    })
-    .eq('company_id', companyId)
-    .eq('id', id);
-  if (error) throw new Error((error as { message: string }).message);
-}
-
-export async function deleteHrmsRole(companyId: string, id: string): Promise<void> {
-  const { error } = await (supabase as any)
-    .from('hrms_roles')
-    .delete()
-    .eq('company_id', companyId)
-    .eq('id', id)
-    .eq('is_system_default', false);
-  if (error) throw new Error((error as { message: string }).message);
-}
-
-export async function listHrmsRoleAssignments(companyId: string): Promise<HrmsRoleAssignment[]> {
-  const { data, error } = await (supabase as any)
-    .from('employee_hrms_role_assignments')
-    .select('*, employees(name), profiles(name)')
-    .eq('company_id', companyId);
-  if (error) throw new Error((error as { message: string }).message);
-  return (data ?? []).map((r: Record<string, any>) => rowToHrmsRoleAssignment(r));
-}
-
-export async function replaceHrmsRoleEmployees(
-  companyId: string,
-  hrmsRoleId: string,
-  employeeIds: string[],
-): Promise<void> {
-  const { error: deleteError } = await (supabase as any)
-    .from('employee_hrms_role_assignments')
-    .delete()
-    .eq('company_id', companyId)
-    .eq('hrms_role_id', hrmsRoleId);
-  if (deleteError) throw new Error((deleteError as { message: string }).message);
-  if (employeeIds.length === 0) return;
-  const rows = employeeIds.map(eid => ({
-    company_id:    companyId,
-    hrms_role_id:  hrmsRoleId,
-    employee_id:   eid,
-    is_primary:    false,
-  }));
-  const { error: insertError } = await (supabase as any)
-    .from('employee_hrms_role_assignments')
-    .insert(rows);
-  if (insertError) throw new Error((insertError as { message: string }).message);
 }
 
 // ─── Approval flows ───────────────────────────────────────────────────────────
