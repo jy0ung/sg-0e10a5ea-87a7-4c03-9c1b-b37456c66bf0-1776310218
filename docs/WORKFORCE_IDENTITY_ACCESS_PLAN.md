@@ -275,8 +275,11 @@ The workforce lifecycle now has an explicit history-preservation invariant (PR #
 - A linked active user account blocks hard delete; pending-invite cleanup runs after successful Employee deletion and has a disable/follow-up fallback.
 - Module and HRMS-role assignments remain derived/access relationships rather than historical records.
 - Live local-Supabase qualification passed **164/164**, including **6/6** dedicated Employee-history deletion tests.
-
-The next integrity slice is to make `employees.primary_role = 'sales'` and the canonical `employee_module_assignments(module_key='sales', assignment_role='sales_advisor')` mutation transactional rather than separate client/service writes (issue #82).
+- **Issue #82 completed by PR #85 (`1cfc8fa`)**: HRMS Employee create/update now routes through `mutate_employee_with_assignments(...)`, a SECURITY INVOKER database command that commits `employees.primary_role` and the canonical Sales Advisor module assignment in one transaction.
+- The command validates same-company Branch, manager Employee, Department, and Job Title references before mutation; Sales role activation/deactivation and assignment activation/deactivation cannot drift through the supported HRMS mutation path.
+- The dedicated `create_sales_advisor_employee(...)` command remains compatible and independently atomic.
+- Final local-Supabase Production Readiness passed **171/171**, including **7/7** dedicated Employee/Sales assignment atomicity cases.
+- No production deployment was performed for this integrity merge.
 
 ## Immediate Implementation Decision
 
