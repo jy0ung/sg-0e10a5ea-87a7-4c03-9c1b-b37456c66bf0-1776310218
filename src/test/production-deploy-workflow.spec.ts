@@ -41,10 +41,21 @@ describe('production deploy workflow safety boundary', () => {
 
   it('verifies migration compatibility before touching the existing application container', () => {
     const ledgerCheck = deployScript.indexOf('Verifying release migrations against production DB ledger');
-    const stopExisting = deployScript.indexOf('Stopping existing $CONTAINER_NAME');
+    const preserveExisting = deployScript.indexOf('Preserving existing $CONTAINER_NAME as $ROLLBACK_NAME');
 
     expect(ledgerCheck).toBeGreaterThan(-1);
-    expect(stopExisting).toBeGreaterThan(-1);
-    expect(ledgerCheck).toBeLessThan(stopExisting);
+    expect(preserveExisting).toBeGreaterThan(-1);
+    expect(ledgerCheck).toBeLessThan(preserveExisting);
+  });
+
+  it('preserves and restores the previous production container on failure', () => {
+    expect(deployScript).toContain('ROLLBACK_NAME="' + '$' + '{CONTAINER_NAME}-rollback"');
+    expect(deployScript).toContain('docker rename "$CONTAINER_NAME" "$ROLLBACK_NAME"');
+    expect(deployScript).toContain('bash "$ROLLBACK_SCRIPT"');
+
+    expect(workflow).toContain('scripts/rollback-image.sh');
+    expect(workflow).toContain('- name: Roll back failed production candidate');
+    expect(workflow).toContain("steps.deploy.outcome != 'skipped'");
+    expect(workflow).toContain('- name: Remove preserved rollback container after successful verification');
   });
 });
