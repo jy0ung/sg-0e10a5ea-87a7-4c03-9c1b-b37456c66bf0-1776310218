@@ -6,10 +6,18 @@ const shouldRun = process.env.RLS_E2E === '1';
 const describeIfLive = shouldRun ? describe : describe.skip;
 const companyId = process.env.RLS_COMPANY_A_ID ?? 'rls-a';
 const password = 'Test1234!';
-const clientOptions: Parameters<typeof createClient>[2] = {
-  auth: { persistSession: false },
-  realtime: { transport: WebSocket as never },
-};
+let clientSequence = 0;
+
+function isolatedClientOptions(scope: string): Parameters<typeof createClient>[2] {
+  clientSequence += 1;
+  return {
+    auth: {
+      persistSession: false,
+      storageKey: `atomic-review-${scope}-${clientSequence}`,
+    },
+    realtime: { transport: WebSocket as never },
+  };
+}
 
 interface Actor {
   id: string;
@@ -52,7 +60,7 @@ function adminClient() {
   if (!url() || !serviceKey) {
     throw new Error('Live atomic review tests require Supabase URL and service-role key.');
   }
-  return createClient(url(), serviceKey, clientOptions);
+  return createClient(url(), serviceKey, isolatedClientOptions('admin'));
 }
 
 function anonClient() {
@@ -60,7 +68,7 @@ function anonClient() {
   if (!url() || !anon) {
     throw new Error('Live atomic review tests require Supabase URL and anon key.');
   }
-  return createClient(url(), anon, clientOptions);
+  return createClient(url(), anon, isolatedClientOptions('actor'));
 }
 
 async function createActor(label: string): Promise<Actor> {
