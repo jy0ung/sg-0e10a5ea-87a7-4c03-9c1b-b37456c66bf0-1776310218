@@ -29,7 +29,7 @@ const STATUS_BADGE: Record<SAStatus, string> = {
   resigned: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 };
 
-const EMPTY_FORM = { code: '', name: '', ic: '', email: '', contact: '', branch: '', joinDate: new Date().toISOString().split('T')[0] };
+const EMPTY_FORM = { code: '', name: '', ic: '', email: '', contact: '', branchId: '', joinDate: new Date().toISOString().split('T')[0] };
 
 const advisorsKey = (companyId: string) => ['sales-advisors', companyId] as const;
 const branchesKey = (companyId: string) => ['branches', companyId] as const;
@@ -58,7 +58,7 @@ export default function SalesAdvisors() {
 
   const branchNameMap = useMemo(() => {
     const map: Record<string, string> = {};
-    for (const b of branchRecords) map[b.code] = b.name;
+    for (const b of branchRecords) map[b.id] = `${b.name} (${b.code})`;
     return map;
   }, [branchRecords]);
 
@@ -70,9 +70,9 @@ export default function SalesAdvisors() {
 
   const filtered = advisors.filter(a => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
-    if (branchFilter !== 'all' && a.branch !== branchFilter) return false;
+    if (branchFilter !== 'all' && a.branchId !== branchFilter) return false;
     const q = search.toLowerCase();
-    return !q || [a.code, a.name, a.email, a.branch].join(' ').toLowerCase().includes(q);
+    return !q || [a.code, a.name, a.email, branchNameMap[a.branchId] ?? a.branchId].join(' ').toLowerCase().includes(q);
   });
 
   const createMutation = useMutation({
@@ -85,7 +85,7 @@ export default function SalesAdvisors() {
         email: input.email || null,
         ic: input.ic || null,
         contact: input.contact || null,
-        branch: input.branch,
+        branchId: input.branchId,
         joinDate: input.joinDate || null,
       });
       if (error) throw new Error(error.message);
@@ -126,7 +126,7 @@ export default function SalesAdvisors() {
   });
 
   const handleCreate = () => {
-    if (!form.code || !form.name || !form.branch) {
+    if (!form.code || !form.name || !form.branchId) {
       return toast({ title: 'Code, Name, and Branch are required', variant: 'destructive' });
     }
     if (advisors.some(a => a.code === form.code.toUpperCase())) {
@@ -211,7 +211,7 @@ export default function SalesAdvisors() {
             <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="All Branches" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Branches</SelectItem>
-              {branchRecords.map(b => <SelectItem key={b.code} value={b.code}>{b.name} ({b.code})</SelectItem>)}
+              {branchRecords.map(b => <SelectItem key={b.id} value={b.id}>{b.name} ({b.code})</SelectItem>)}
             </SelectContent>
           </Select>
           <span className="text-xs text-muted-foreground ml-auto">{filtered.length} advisors</span>
@@ -243,7 +243,7 @@ export default function SalesAdvisors() {
                     <td className="py-2 pr-4 text-xs text-muted-foreground">{a.ic}</td>
                     <td className="py-2 pr-4 text-xs text-muted-foreground">{a.contact}</td>
                     <td className="py-2 pr-4 text-xs text-muted-foreground">{a.email}</td>
-                    <td className="py-2 pr-4 text-xs">{branchNameMap[a.branch] ?? a.branch}</td>
+                    <td className="py-2 pr-4 text-xs">{branchNameMap[a.branchId] ?? a.branchId}</td>
                     <td className="py-2 pr-4 text-xs text-muted-foreground">{a.joinDate}</td>
                     <td className="py-2 pr-4">
                       <Badge className={`text-[10px] capitalize ${STATUS_BADGE[a.status]}`}>{a.status}</Badge>
@@ -273,9 +273,9 @@ export default function SalesAdvisors() {
               </div>
               <div className="space-y-1">
                 <label htmlFor="sales-advisor-branch" className="text-xs font-medium text-muted-foreground">Branch *</label>
-                <Select value={form.branch} onValueChange={v => setForm(f => ({ ...f, branch: v }))}>
+                <Select value={form.branchId} onValueChange={v => setForm(f => ({ ...f, branchId: v }))}>
                   <SelectTrigger id="sales-advisor-branch" className="h-8 text-sm"><SelectValue placeholder="Select…" /></SelectTrigger>
-                  <SelectContent>{branchRecords.map(b => <SelectItem key={b.code} value={b.code}>{b.name} ({b.code})</SelectItem>)}</SelectContent>
+                  <SelectContent>{branchRecords.map(b => <SelectItem key={b.id} value={b.id}>{b.name} ({b.code})</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
