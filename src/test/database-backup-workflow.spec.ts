@@ -12,30 +12,30 @@ describe('database backup workflow safety boundary', () => {
     expect(workflow).toContain('Missing required secret: DB_BACKUP_GPG_PASSPHRASE');
     expect(workflow).toContain('--cipher-algo AES256');
     expect(workflow).toContain('--passphrase-fd 0');
-    expect(workflow).not.toContain('--passphrase \"$DB_BACKUP_GPG_PASSPHRASE\"');
+    expect(workflow).not.toContain('--passphrase "$DB_BACKUP_GPG_PASSPHRASE"');
   });
 
   it('prefers a direct DB URL but can fall back to the existing Cloudflare Access SSH path', () => {
-    expect(workflow).toContain('if [[ -n \"${SUPABASE_DB_URL:-}\" ]]');
-    expect(workflow).toContain('echo \"mode=direct\"');
-    expect(workflow).toContain('echo \"mode=ssh\"');
+    expect(workflow).toContain('if [[ -n "${SUPABASE_DB_URL:-}" ]]');
+    expect(workflow).toContain('echo "mode=direct"');
+    expect(workflow).toContain('echo "mode=ssh"');
     expect(workflow).toContain('ProxyCommand cloudflared access ssh --hostname %h');
-    expect(workflow).toContain(\"ssh -T backup-target 'bash -se'\");
+    expect(workflow).toContain("ssh -T backup-target 'bash -se'");
   });
 
   it('streams pg_dump from the host-local Supabase DB container without exposing a remote DB URL', () => {
-    expect(workflow).toContain(\"grep -E '^supabase_db_'\");
-    expect(workflow).toContain('docker exec \"$db_container\" pg_dump');
+    expect(workflow).toContain("grep -E '^supabase_db_'");
+    expect(workflow).toContain('docker exec "$db_container" pg_dump');
     expect(workflow).toContain('--format=custom');
     expect(workflow).toContain('--no-owner');
     expect(workflow).toContain('--no-privileges');
   });
 
   it('validates the custom dump and its encrypted checksum before upload', () => {
-    expect(workflow).toContain('test -s \"$dump_file\"');
-    expect(workflow).toContain('pg_restore --list \"$dump_file\"');
-    expect(workflow).toContain('sha256sum \"$encrypted_file\" > \"$checksum_file\"');
-    expect(workflow).toContain('sha256sum -c \"$checksum_file\"');
+    expect(workflow).toContain('test -s "$dump_file"');
+    expect(workflow).toContain('pg_restore --list "$dump_file"');
+    expect(workflow).toContain('sha256sum "$encrypted_file" > "$checksum_file"');
+    expect(workflow).toContain('sha256sum -c "$checksum_file"');
   });
 
   it('never uploads the plaintext dump artifact', () => {
