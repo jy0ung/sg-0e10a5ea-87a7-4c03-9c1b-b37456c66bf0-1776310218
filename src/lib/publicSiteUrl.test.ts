@@ -40,11 +40,24 @@ describe('isLocalHostname', () => {
 });
 
 describe('auth email templates', () => {
-  it('uses ConfirmationURL for recovery links so redirectTo is preserved', () => {
-    const template = readFileSync(join(process.cwd(), 'supabase/templates/recovery.html'), 'utf8');
+  it('uses portable token-hash links for invitation and recovery emails', () => {
+    const inviteTemplate = readFileSync(join(process.cwd(), 'supabase/templates/invite.html'), 'utf8');
+    const recoveryTemplate = readFileSync(join(process.cwd(), 'supabase/templates/recovery.html'), 'utf8');
 
-    expect(template).toContain('{{ .ConfirmationURL }}');
-    expect(template).not.toContain('{{ .SiteURL }}/reset-password');
+    expect(inviteTemplate).toContain('{{ .RedirectTo }}?token_hash={{ .TokenHash }}&amp;type=invite');
+    expect(recoveryTemplate).toContain('{{ .RedirectTo }}?token_hash={{ .TokenHash }}&amp;type=recovery');
+    expect(inviteTemplate).not.toContain('{{ .ConfirmationURL }}');
+    expect(recoveryTemplate).not.toContain('{{ .ConfirmationURL }}');
+  });
+
+  it('keeps visible expiry guidance aligned with the auth configuration', () => {
+    const config = readFileSync(join(process.cwd(), 'supabase/config.toml'), 'utf8');
+    const inviteTemplate = readFileSync(join(process.cwd(), 'supabase/templates/invite.html'), 'utf8');
+    const recoveryTemplate = readFileSync(join(process.cwd(), 'supabase/templates/recovery.html'), 'utf8');
+
+    expect(config).toMatch(/\[auth\.email\][\s\S]*?otp_expiry\s*=\s*3600/);
+    expect(inviteTemplate).toContain('Invitation expires in 1 hour.');
+    expect(recoveryTemplate).toContain('This link expires in 1 hour');
   });
 });
 

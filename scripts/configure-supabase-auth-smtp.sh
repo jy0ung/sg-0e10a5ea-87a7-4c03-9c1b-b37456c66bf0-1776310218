@@ -247,7 +247,7 @@ INVITE_TEMPLATE_BLOCK="$(build_invite_template_block)"
 if grep -q '^\[auth\.email\.template\.invite\]$' "$CONFIG_FILE"; then
   INVITE_TEMPLATE_BLOCK="$INVITE_TEMPLATE_BLOCK" perl -0pi -e '
     my $block = $ENV{INVITE_TEMPLATE_BLOCK};
-    s{^\[auth\.email\.template\.invite\]\n(?:(?!^\[).)*}{$block . "\n\n"}mse;
+    s{^\[auth\.email\.template\.invite\]\n(?:(?!^\[|^# BEGIN managed auth SMTP relay).)*}{$block . "\n\n"}mse;
   ' "$CONFIG_FILE"
 else
   printf '\n%s\n' "$INVITE_TEMPLATE_BLOCK" >>"$CONFIG_FILE"
@@ -267,7 +267,7 @@ RECOVERY_TEMPLATE_BLOCK="$(build_recovery_template_block)"
 if grep -q '^\[auth\.email\.template\.recovery\]$' "$CONFIG_FILE"; then
   RECOVERY_TEMPLATE_BLOCK="$RECOVERY_TEMPLATE_BLOCK" perl -0pi -e '
     my $block = $ENV{RECOVERY_TEMPLATE_BLOCK};
-    s{^\[auth\.email\.template\.recovery\]\n(?:(?!^\[).)*}{$block . "\n\n"}mse;
+    s{^\[auth\.email\.template\.recovery\]\n(?:(?!^\[|^# BEGIN managed auth SMTP relay).)*}{$block . "\n\n"}mse;
   ' "$CONFIG_FILE"
 else
   printf '\n%s\n' "$RECOVERY_TEMPLATE_BLOCK" >>"$CONFIG_FILE"

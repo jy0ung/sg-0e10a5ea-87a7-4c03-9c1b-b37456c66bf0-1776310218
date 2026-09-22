@@ -21,6 +21,7 @@ export default function ForgotPasswordPage() {
 
   const form = useForm<ForgotPasswordFormData>({
     resolver: zodResolver(forgotPasswordSchema),
+    mode: 'onChange',
     defaultValues: { email },
   });
 

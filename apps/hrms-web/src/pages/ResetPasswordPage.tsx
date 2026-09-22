@@ -4,6 +4,7 @@ import {
   getAuthCallbackParams,
   initializePasswordRecovery,
   resetLinkTimeoutMessage,
+  signOutAuthSession,
   subscribeToPasswordRecovery,
   updateRecoveryPassword,
 } from '@flc/auth';
@@ -77,6 +78,7 @@ export default function ResetPasswordPage() {
     if (error) {
       setError(error);
     } else {
+      await signOutAuthSession();
       setSuccess(true);
       setTimeout(() => navigate('/login', { replace: true }), 2000);
     }

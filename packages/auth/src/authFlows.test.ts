@@ -82,6 +82,53 @@ describe('authFlows', () => {
     expect(supabase.auth.exchangeCodeForSession).toHaveBeenCalledWith('invite-code');
   });
 
+  it('does not treat an ordinary signed-in session as an invitation', async () => {
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+      data: {
+        session: {
+          access_token: makeAccessToken('password'),
+          user: { id: 'user-1', email: 'user@example.com' },
+        },
+      },
+      error: null,
+    } as never);
+
+    await expect(initializeInviteSignup({
+      type: null,
+      accessToken: null,
+      refreshToken: null,
+      tokenHash: null,
+      code: null,
+      error: null,
+      errorCode: null,
+      errorDescription: null,
+    })).resolves.toEqual({
+      ok: false,
+      error: 'Invalid or expired invitation link. Please ask your administrator to resend the invitation.',
+    });
+    expect(supabase.auth.getUser).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid or expired invite token hashes', async () => {
+    vi.mocked(supabase.auth.verifyOtp).mockResolvedValueOnce({
+      error: { message: 'Token has expired or is invalid' },
+    } as never);
+
+    await expect(initializeInviteSignup({
+      type: 'invite',
+      accessToken: null,
+      refreshToken: null,
+      tokenHash: 'expired-token',
+      code: null,
+      error: null,
+      errorCode: null,
+      errorDescription: null,
+    })).resolves.toEqual({
+      ok: false,
+      error: 'Invalid or expired invitation link. Please ask your administrator to resend the invitation.',
+    });
+  });
+
   it('initializes recovery from an already-consumed recovery session', async () => {
     vi.mocked(supabase.auth.getSession).mockResolvedValue({
       data: { session: { access_token: makeAccessToken('recovery') } },

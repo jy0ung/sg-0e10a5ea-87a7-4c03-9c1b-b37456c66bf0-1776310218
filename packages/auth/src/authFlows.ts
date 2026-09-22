@@ -116,8 +116,6 @@ export async function initializeInviteSignup(params: AuthCallbackParams): Promis
     !!(accessToken || tokenHash || code);
 
   if (!isInviteCallback) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) return userToInviteResult(session.user);
     return {
       ok: false,
       error: 'Invalid or expired invitation link. Please ask your administrator to resend the invitation.',

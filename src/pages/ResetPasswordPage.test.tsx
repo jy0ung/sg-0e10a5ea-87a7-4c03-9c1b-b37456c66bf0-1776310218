@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ResetPasswordPage from './ResetPasswordPage';
 
@@ -9,6 +9,7 @@ const mockSetSession = vi.fn();
 const mockExchangeCodeForSession = vi.fn();
 const mockVerifyOtp = vi.fn();
 const mockUpdateUser = vi.fn();
+const mockSignOut = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 
 vi.mock('@flc/supabase/client', () => ({
@@ -19,6 +20,7 @@ vi.mock('@flc/supabase/client', () => ({
       exchangeCodeForSession: (code: string) => mockExchangeCodeForSession(code),
       verifyOtp: (params: unknown) => mockVerifyOtp(params),
       updateUser: (params: unknown) => mockUpdateUser(params),
+      signOut: () => mockSignOut(),
       onAuthStateChange: (callback: unknown) => mockOnAuthStateChange(callback),
     },
   },
@@ -46,6 +48,7 @@ describe('ResetPasswordPage', () => {
     mockExchangeCodeForSession.mockResolvedValue({ error: null });
     mockVerifyOtp.mockResolvedValue({ error: null });
     mockUpdateUser.mockResolvedValue({ error: null });
+    mockSignOut.mockResolvedValue({ error: null });
     mockOnAuthStateChange.mockReturnValue({
       data: { subscription: { unsubscribe: vi.fn() } },
     });
@@ -96,5 +99,19 @@ describe('ResetPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/Invalid or expired reset link/i)).toBeInTheDocument();
     });
+  });
+
+  it('ends the recovery session after changing the password', async () => {
+    renderPage('/reset-password?type=recovery&token_hash=recovery-token');
+
+    await screen.findByText('Set your new password');
+    fireEvent.change(screen.getByLabelText(/new password/i), { target: { value: 'NewPassword123!' } });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'NewPassword123!' } });
+    const submit = screen.getByRole('button', { name: /update password/i });
+    await waitFor(() => expect(submit).not.toBeDisabled());
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
+    expect(await screen.findByText(/password updated successfully/i)).toBeInTheDocument();
   });
 });
