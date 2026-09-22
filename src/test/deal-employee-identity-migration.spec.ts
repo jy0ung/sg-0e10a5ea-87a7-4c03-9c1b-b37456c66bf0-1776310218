@@ -27,4 +27,10 @@ describe('Deal Employee identity migration', () => {
     expect(migration).toContain('employee_company_id IS DISTINCT FROM NEW.company_id');
     expect(migration).toContain("ERRCODE = '23514'");
   });
+
+  it('does not expose the trigger function to anonymous callers', () => {
+    expect(migration).toContain(
+      'REVOKE ALL ON FUNCTION public.enforce_deal_sales_advisor_employee_company() FROM PUBLIC, anon',
+    );
+  });
 });
