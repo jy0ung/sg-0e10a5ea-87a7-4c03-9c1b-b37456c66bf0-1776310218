@@ -6,6 +6,10 @@ const workflow = readFileSync(
   resolve(process.cwd(), '.github/workflows/main-deploy.yml'),
   'utf8',
 );
+const deployScript = readFileSync(
+  resolve(process.cwd(), 'scripts/deploy-image.sh'),
+  'utf8',
+);
 
 describe('production deploy workflow safety boundary', () => {
   it('requires an explicit manual dispatch instead of auto-deploying after CI', () => {
@@ -26,5 +30,21 @@ describe('production deploy workflow safety boundary', () => {
     expect(workflow).toContain(
       "PROD_LOGIN_REQUIRED: ${{ steps.login.outputs.enabled == 'true' && '1' || '0' }}",
     );
+  });
+
+  it('ships and requires a migration manifest before production promotion', () => {
+    expect(workflow).toContain('Build release migration manifest');
+    expect(workflow).toContain('scripts/verify-migration-ledger.sh');
+    expect(workflow).toContain("VERIFY_MIGRATION_LEDGER='1'");
+    expect(workflow).toContain("MIGRATION_MANIFEST='/tmp/flc-release-migrations.txt'");
+  });
+
+  it('verifies migration compatibility before touching the existing application container', () => {
+    const ledgerCheck = deployScript.indexOf('Verifying release migrations against production DB ledger');
+    const stopExisting = deployScript.indexOf('Stopping existing $CONTAINER_NAME');
+
+    expect(ledgerCheck).toBeGreaterThan(-1);
+    expect(stopExisting).toBeGreaterThan(-1);
+    expect(ledgerCheck).toBeLessThan(stopExisting);
   });
 });
