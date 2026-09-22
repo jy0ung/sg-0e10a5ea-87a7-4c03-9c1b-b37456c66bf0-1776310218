@@ -194,13 +194,14 @@ export async function listAssignedHrmsRoles(
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  const roles = (data ?? [])
+  const roles: HrmsRole[] = (data ?? [])
     .map((row: Record<string, any>) => row.hrms_role as Record<string, any> | null)
-    .filter(Boolean)
+    .filter((row: Record<string, any> | null): row is Record<string, any> => Boolean(row))
     .map((row: Record<string, any>) => rowToHrmsRole(row));
 
   return roles.filter(
-    (role, index) => roles.findIndex(candidate => candidate.id === role.id) === index,
+    (role: HrmsRole, index: number) =>
+      roles.findIndex((candidate: HrmsRole) => candidate.id === role.id) === index,
   );
 }
 
