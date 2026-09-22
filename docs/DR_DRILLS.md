@@ -23,3 +23,10 @@ Follow-up owners:
 ## Drill History
 
 No completed drills recorded yet.
+
+## Automation Status — 2026-09-22
+
+- Encrypted logical backup transport is implemented with direct Postgres and Cloudflare Access SSH modes.
+- PR #51 adds a manual `Database Restore Drill` workflow that restores only into a network-isolated scratch Postgres container and records non-sensitive timing/smoke evidence.
+- Repository automation does **not** count as a completed drill until the workflow runs successfully against a real encrypted backup artifact and the evidence is reviewed.
+- PITR enablement and a PITR restore drill still require separate operational evidence.

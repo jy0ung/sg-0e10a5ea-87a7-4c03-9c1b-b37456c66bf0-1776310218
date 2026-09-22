@@ -123,6 +123,45 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
+      - name: Capture backup source metadata
+        id: source
+        shell: bash
+        env:
+          BACKUP_TRANSPORT: ${{ steps.transport.outputs.mode }}
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+
+          database_image=""
+          database_container=""
+
+          if [[ "$BACKUP_TRANSPORT" == "direct" ]]; then
+            postgres_version="$(PGDATABASE="$SUPABASE_DB_URL" psql -t -A -v ON_ERROR_STOP=1 -c 'show server_version;')"
+          elif [[ "$BACKUP_TRANSPORT" == "ssh" ]]; then
+            database_container="$(
+              ssh -T backup-target "docker ps --format '{{.Names}}' | grep -E '^supabase_db_' | head -1"
+            )"
+            if [[ -z "$database_container" ]]; then
+              echo "No production Supabase DB container matched ^supabase_db_" >&2
+              exit 1
+            fi
+
+            database_image="$(
+              ssh -T backup-target "docker inspect -f '{{.Config.Image}}' '$database_container'"
+            )"
+            postgres_version="$(
+              ssh -T backup-target "docker exec '$database_container' psql -U postgres -d postgres -t -A -v ON_ERROR_STOP=1 -c 'show server_version;'"
+            )"
+          else
+            echo "Unsupported backup transport: $BACKUP_TRANSPORT" >&2
+            exit 1
+          fi
+
+          echo "database_container=$database_container" >> "$GITHUB_OUTPUT"
+          echo "database_image=$database_image" >> "$GITHUB_OUTPUT"
+          echo "postgres_version=$postgres_version" >> "$GITHUB_OUTPUT"
+
       - name: Create encrypted logical dump
         id: dump
         shell: bash
@@ -137,6 +176,7 @@ jobs:
           dump_file="backup/${TARGET_ENV}-${timestamp}.dump"
           encrypted_file="${dump_file}.gpg"
           checksum_file="${encrypted_file}.sha256"
+          metadata_file="${encrypted_file}.metadata.txt"
 
           cleanup_plaintext() {
             rm -f "$dump_file"
@@ -144,27 +184,20 @@ jobs:
           trap cleanup_plaintext EXIT
 
           if [[ "$BACKUP_TRANSPORT" == "direct" ]]; then
-            pg_dump \
+            PGDATABASE="$SUPABASE_DB_URL" pg_dump \
               --format=custom \
               --no-owner \
               --no-privileges \
-              --file "$dump_file" \
-              "$SUPABASE_DB_URL"
+              --file "$dump_file"
           elif [[ "$BACKUP_TRANSPORT" == "ssh" ]]; then
-            ssh -T backup-target 'bash -se' > "$dump_file" <<'REMOTE'
-          set -euo pipefail
-          db_container="$(docker ps --format '{{.Names}}' | grep -E '^supabase_db_' | head -1 || true)"
-          if [[ -z "$db_container" ]]; then
-            echo 'No production Supabase DB container matched ^supabase_db_' >&2
-            exit 1
-          fi
-          docker exec "$db_container" pg_dump \
-            -U postgres \
-            -d postgres \
-            --format=custom \
-            --no-owner \
-            --no-privileges
-          REMOTE
+            db_container="${{ steps.source.outputs.database_container }}"
+            if [[ -z "$db_container" ]]; then
+              echo "Backup source metadata did not resolve a database container." >&2
+              exit 1
+            fi
+            ssh -T backup-target \
+              "docker exec '$db_container' pg_dump -U postgres -d postgres --format=custom --no-owner --no-privileges" \
+              > "$dump_file"
           else
             echo "Unsupported backup transport: $BACKUP_TRANSPORT" >&2
             exit 1
@@ -187,8 +220,19 @@ jobs:
           sha256sum "$encrypted_file" > "$checksum_file"
           sha256sum -c "$checksum_file"
 
+          {
+            echo "environment=$TARGET_ENV"
+            echo "created_at_utc=$timestamp"
+            echo "transport=$BACKUP_TRANSPORT"
+            echo "database_image=${{ steps.source.outputs.database_image }}"
+            echo "postgres_version=${{ steps.source.outputs.postgres_version }}"
+            echo "github_sha=$GITHUB_SHA"
+            echo "github_run_id=$GITHUB_RUN_ID"
+          } > "$metadata_file"
+
           echo "encrypted_file=${encrypted_file}" >> "$GITHUB_OUTPUT"
           echo "checksum_file=${checksum_file}" >> "$GITHUB_OUTPUT"
+          echo "metadata_file=${metadata_file}" >> "$GITHUB_OUTPUT"
           echo "artifact_name=$(basename "$encrypted_file")" >> "$GITHUB_OUTPUT"
 
       - name: Upload encrypted dump to S3
@@ -201,6 +245,9 @@ jobs:
           aws s3 cp "${{ steps.dump.outputs.checksum_file }}" \
             "s3://${DB_BACKUP_S3_BUCKET}/${DB_BACKUP_S3_PREFIX}/${TARGET_ENV}/${{ steps.dump.outputs.artifact_name }}.sha256" \
             --sse AES256
+          aws s3 cp "${{ steps.dump.outputs.metadata_file }}" \
+            "s3://${DB_BACKUP_S3_BUCKET}/${DB_BACKUP_S3_PREFIX}/${TARGET_ENV}/${{ steps.dump.outputs.artifact_name }}.metadata.txt" \
+            --sse AES256
 
       - name: Upload encrypted dump artifact
         uses: actions/upload-artifact@v4
@@ -209,6 +256,7 @@ jobs:
           path: |
             ${{ steps.dump.outputs.encrypted_file }}
             ${{ steps.dump.outputs.checksum_file }}
+            ${{ steps.dump.outputs.metadata_file }}
           retention-days: 7
 
       - name: Summary
@@ -220,6 +268,8 @@ jobs:
             echo "- Environment: `${TARGET_ENV}`"
             echo "- Transport: `${{ steps.transport.outputs.mode }}`"
             echo "- Encrypted artifact: `${{ steps.dump.outputs.artifact_name }}`"
+            echo "- PostgreSQL version: `${{ steps.source.outputs.postgres_version }}`"
+            echo "- Restore image metadata: `${{ steps.source.outputs.database_image || 'explicit restore_image required' }}`"
             echo "- S3 upload configured: `${DB_BACKUP_S3_BUCKET:+yes}`"
             echo "- Plaintext dump retained: `no`"
           } >> "$GITHUB_STEP_SUMMARY"

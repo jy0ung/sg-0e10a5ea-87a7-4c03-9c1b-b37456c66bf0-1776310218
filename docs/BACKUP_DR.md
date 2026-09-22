@@ -46,8 +46,8 @@ Optional environment secrets:
 - `DB_BACKUP_S3_PREFIX` — key prefix; defaults to `flc-bi/db-backups`.
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` — required only for S3 upload.
 
-If S3 is not configured, the workflow still uploads the encrypted dump and
-checksum as short-lived GitHub Actions artifacts. Treat those artifacts as
+If S3 is not configured, the workflow still uploads the encrypted dump,
+checksum, and non-sensitive restore metadata as short-lived GitHub Actions artifacts. Treat those artifacts as
 sensitive even though the database content is encrypted.
 
 ### Current production blocker — 2026-09-22
@@ -62,7 +62,15 @@ Backup readiness requires evidence of:
 5. application/schema smoke against the restored target;
 6. measured RTO/RPO recorded in `docs/DR_DRILLS.md`.
 
-## Restore drill (monthly)
+## Isolated logical restore drill
+
+`.github/workflows/db-restore-drill.yml` is a **manual-only** restore-safety workflow. It consumes a successful encrypted Database Backup artifact, verifies its checksum/environment metadata, starts a scratch Postgres container with `--network none`, decrypts directly into `pg_restore` without writing a plaintext restore dump, verifies critical UBS relations plus the Supabase migration ledger, records restore duration/logical-backup age, and destroys the scratch container and volume on every outcome.
+
+For SSH-produced backups the workflow can reuse the recorded Supabase Postgres image. For a direct-DB backup whose metadata does not contain an image, the operator must provide an explicit `restore_image` input. This workflow does not connect to production and does not replace PITR evidence.
+
+A successful workflow run is required before marking the logical restore drill complete.
+
+## PITR restore drill (monthly)
 
 1. Pick a timestamp T within the PITR window on the **production** project.
 2. Use the Supabase dashboard to restore the DB into a **new** staging project at T.

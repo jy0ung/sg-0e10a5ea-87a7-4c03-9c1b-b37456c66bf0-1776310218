@@ -87,7 +87,8 @@ Completed repository controls:
 - unconditional browser dependency for production verification;
 - pre-promotion migration-ledger compatibility check;
 - preserved-container rollback with automatic restore on failed post-promotion verification;
-- encrypted logical-backup workflow can use either direct Postgres access or the existing Cloudflare Access SSH path to the host-local Supabase DB container, with mandatory GPG encryption, checksum validation, and plaintext cleanup (PR #88 / `c5f3153`).
+- encrypted logical-backup workflow can use either direct Postgres access or the existing Cloudflare Access SSH path to the host-local Supabase DB container, with mandatory GPG encryption, checksum validation, and plaintext cleanup (PR #88 / `c5f3153`);
+- manual logical restore-drill automation consumes only successful encrypted backup artifacts, restores into a network-isolated scratch database, verifies critical relations/migration ledger, records timing evidence, and always cleans scratch state (PR #51).
 
 Operational evidence still open:
 

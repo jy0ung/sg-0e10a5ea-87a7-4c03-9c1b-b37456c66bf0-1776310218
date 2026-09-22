@@ -56,7 +56,7 @@ One-time gate before first production cutover. Every box must be checked.
 - [ ] Supabase PITR enabled on production — repository docs define the target, but current production enablement has not been evidenced in this repository
 - [x] Nightly logical dump workflow defined in `.github/workflows/db-backup.yml`
 - [ ] Nightly logical dump job green with production secrets configured — code supports direct `SUPABASE_DB_URL` or Cloudflare Access SSH fallback; production `DB_BACKUP_GPG_PASSPHRASE` + transport secrets and a successful encrypted run are still unverified
-- [ ] Monthly restore-to-staging drill scheduled and executed at least once
+- [ ] Monthly restore drill executed at least once — manual isolated logical-restore workflow is implemented; successful real-artifact evidence is still required
 - [ ] Uptime monitoring (StatusCake / BetterUptime) pinging `/health`
 - [ ] Error-budget policy documented per module
 - [x] Incident response runbook linked from README
@@ -99,7 +99,8 @@ Repository-enforced controls now present:
 - Playwright Chromium is installed whenever production verification executes;
 - release migration-ledger compatibility is checked before the existing application container is touched;
 - the previous production container is preserved through post-promotion verification and restored on failure;
-- static regression tests cover the workflow trigger, verifier dependency, migration preflight ordering, and rollback preservation.
+- manual encrypted logical-backup restore automation restores only into a network-isolated scratch database and records timing/smoke evidence;
+- static regression tests cover the workflow trigger, verifier dependency, migration preflight ordering, rollback preservation, backup safety, and restore isolation.
 
 Still requires external/operator evidence:
 
