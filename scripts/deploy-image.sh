@@ -21,6 +21,7 @@
 #   VERIFY_MIGRATION_LEDGER (default: 0)            — require release migrations before any app swap
 #   MIGRATION_LEDGER_SCRIPT (default: /tmp/verify-migration-ledger.sh)
 #   MIGRATION_MANIFEST (default: /tmp/flc-release-migrations.txt)
+#   ROLLBACK_SCRIPT   (default: /tmp/rollback-image.sh) — restore preserved previous container
 #   RUN_RPC_SMOKE    (default: auto)               — run import RPC rollback smoke before swap
 #   RPC_SMOKE_SCRIPT (default: /tmp/verify-import-rpc-contracts.sh)
 #   RPC_SMOKE_DB_CONTAINER_PATTERN (default: ^supabase_db_)
@@ -40,10 +41,12 @@ SKIP_PULL="${SKIP_PULL:-0}"
 VERIFY_MIGRATION_LEDGER="${VERIFY_MIGRATION_LEDGER:-0}"
 MIGRATION_LEDGER_SCRIPT="${MIGRATION_LEDGER_SCRIPT:-/tmp/verify-migration-ledger.sh}"
 MIGRATION_MANIFEST="${MIGRATION_MANIFEST:-/tmp/flc-release-migrations.txt}"
+ROLLBACK_SCRIPT="${ROLLBACK_SCRIPT:-/tmp/rollback-image.sh}"
 RUN_RPC_SMOKE="${RUN_RPC_SMOKE:-auto}"
 RPC_SMOKE_SCRIPT="${RPC_SMOKE_SCRIPT:-/tmp/verify-import-rpc-contracts.sh}"
 RPC_SMOKE_DB_CONTAINER_PATTERN="${RPC_SMOKE_DB_CONTAINER_PATTERN:-^supabase_db_}"
 STAGING_NAME="${CONTAINER_NAME}-staging"
+ROLLBACK_NAME="${CONTAINER_NAME}-rollback"
 STAGING_PORT="$(( HOST_PORT + 1 ))"
 
 log() { printf '\033[1;34m[deploy]\033[0m %s\n' "$*"; }
@@ -290,14 +293,20 @@ elif [[ "$RUN_RPC_SMOKE" == "auto" ]]; then
   fi
 fi
 
+# Preserve the current production container until post-promotion verification
+# succeeds. This gives the workflow a deterministic frontend rollback target.
+if docker ps -a --format '{{.Names}}' | grep -qx "$ROLLBACK_NAME"; then
+  log "Removing stale rollback container $ROLLBACK_NAME"
+  docker rm -f "$ROLLBACK_NAME" >/dev/null
+fi
+
 # Swap. There is a brief (≤1s) moment where neither container is bound to
-# HOST_PORT — acceptable for UAT; for true zero-downtime put both behind a
-# local nginx upstream that can drain connections. Cloudflare retries
-# failed requests automatically so end users typically don't notice.
-if docker ps --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
-  log "Stopping existing $CONTAINER_NAME"
+# HOST_PORT. The previous production container is stopped and renamed, not
+# deleted, so it can be restored if canonical or external verification fails.
+if docker ps -a --format '{{.Names}}' | grep -qx "$CONTAINER_NAME"; then
+  log "Preserving existing $CONTAINER_NAME as $ROLLBACK_NAME"
   docker stop "$CONTAINER_NAME" >/dev/null
-  docker rm "$CONTAINER_NAME" >/dev/null
+  docker rename "$CONTAINER_NAME" "$ROLLBACK_NAME"
 fi
 
 log "Promoting staging to $CONTAINER_NAME on 127.0.0.1:$HOST_PORT"
@@ -321,4 +330,16 @@ for i in 1 2 3 4 5; do
   sleep 1
 done
 
-die "Canonical container failed to come up. Check: docker logs $CONTAINER_NAME"
+warn "Canonical candidate failed health verification"
+
+if docker ps -a --format '{{.Names}}' | grep -qx "$ROLLBACK_NAME"; then
+  if [[ -f "$ROLLBACK_SCRIPT" ]]; then
+    warn "Restoring previous production container"
+    CONTAINER_NAME="$CONTAINER_NAME" HOST_PORT="$HOST_PORT" HEALTH_TIMEOUT="$HEALTH_TIMEOUT" \
+      bash "$ROLLBACK_SCRIPT"
+    die "Candidate failed canonical health verification; previous production container restored."
+  fi
+  die "Candidate failed and rollback script is unavailable: $ROLLBACK_SCRIPT"
+fi
+
+die "Canonical container failed to come up and no rollback container is available. Check: docker logs $CONTAINER_NAME"
