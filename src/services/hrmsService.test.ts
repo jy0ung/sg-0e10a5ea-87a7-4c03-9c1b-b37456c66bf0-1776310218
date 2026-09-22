@@ -116,6 +116,9 @@ vi.mock('@flc/hrms-services', () => ({
   upsertAttendance: vi.fn().mockResolvedValue(undefined),
   listEmployeeDirectory: vi.fn().mockResolvedValue([]),
   updateEmployee: vi.fn().mockResolvedValue(undefined),
+  getLinkedEmployeeProfile: vi.fn().mockResolvedValue(null),
+  deleteEmployeeRecord: vi.fn().mockResolvedValue(undefined),
+  disableEmployeeProfileAccess: vi.fn().mockResolvedValue(undefined),
   resolveRequiredProfileId: vi.fn(async (employeeId: string) => {
     const directProfile = drainResolve();
     if (directProfile.error) throw new Error(directProfile.error.message);
