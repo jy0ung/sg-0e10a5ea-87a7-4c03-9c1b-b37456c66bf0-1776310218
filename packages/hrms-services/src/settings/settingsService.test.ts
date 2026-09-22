@@ -322,6 +322,21 @@ describe('canonical Leave Type settings service', () => {
     ]));
   });
 
+  it('does not mutate when Leave Type reference lookup fails', async () => {
+    queued.push({
+      data: null,
+      error: { message: 'balance lookup denied' },
+      count: null,
+    });
+
+    await expect(deleteLeaveType('c1', 'lt-1')).rejects.toThrow(
+      'balance lookup denied',
+    );
+
+    expect(updateCalls).toEqual([]);
+    expect(deleteCalls).toEqual([]);
+  });
+
   it('soft-deactivates a Leave Type referenced by balances', async () => {
     queued.push(
       { data: null, error: null, count: 3 },
