@@ -60,6 +60,10 @@ import {
   createDepartment,
   deleteDepartment,
   createLeaveType,
+  createPublicHoliday,
+  deletePublicHoliday,
+  listPublicHolidays,
+  updatePublicHoliday,
   deleteJobTitle,
   deleteLeaveType,
   listDepartments,
@@ -367,6 +371,111 @@ describe('canonical Leave Type settings service', () => {
       { table: 'leave_balances', column: 'leave_type_id', value: 'lt-1' },
       { table: 'leave_types', column: 'company_id', value: 'c1' },
       { table: 'leave_types', column: 'id', value: 'lt-1' },
+    ]));
+  });
+});
+
+
+describe('canonical Public Holiday settings service', () => {
+  const holidayInput = {
+    name: 'Malaysia Day',
+    date: '2026-09-16',
+    holidayType: 'public' as const,
+    isRecurring: true,
+  };
+
+  it('lists company-scoped Holidays and maps the public contract', async () => {
+    queued.push({
+      data: [{
+        id: 'holiday-1',
+        company_id: 'c1',
+        name: 'Malaysia Day',
+        date: '2026-09-16',
+        holiday_type: 'public',
+        is_recurring: true,
+        created_at: '2026-09-22T00:00:00.000Z',
+        updated_at: '2026-09-22T00:00:00.000Z',
+      }],
+      error: null,
+    });
+
+    const result = await listPublicHolidays('c1');
+
+    expect(result).toEqual([{
+      id: 'holiday-1',
+      companyId: 'c1',
+      name: 'Malaysia Day',
+      date: '2026-09-16',
+      holidayType: 'public',
+      isRecurring: true,
+      createdAt: '2026-09-22T00:00:00.000Z',
+      updatedAt: '2026-09-22T00:00:00.000Z',
+    }]);
+    expect(eqCalls).toContainEqual({
+      table: 'public_holidays',
+      column: 'company_id',
+      value: 'c1',
+    });
+  });
+
+  it('creates a Holiday through the canonical package service', async () => {
+    queued.push({
+      data: {
+        id: 'holiday-1',
+        company_id: 'c1',
+        name: 'Malaysia Day',
+        date: '2026-09-16',
+        holiday_type: 'public',
+        is_recurring: true,
+        created_at: '2026-09-22T00:00:00.000Z',
+        updated_at: '2026-09-22T00:00:00.000Z',
+      },
+      error: null,
+    });
+
+    const result = await createPublicHoliday('c1', holidayInput);
+
+    expect(result.id).toBe('holiday-1');
+    expect(insertCalls).toEqual([
+      {
+        table: 'public_holidays',
+        payload: {
+          company_id: 'c1',
+          name: 'Malaysia Day',
+          date: '2026-09-16',
+          holiday_type: 'public',
+          is_recurring: true,
+        },
+      },
+    ]);
+  });
+
+  it('updates and deletes only within the requested company', async () => {
+    queued.push(
+      { data: null, error: null },
+      { data: null, error: null },
+    );
+
+    await expect(
+      updatePublicHoliday('c1', 'holiday-1', holidayInput),
+    ).resolves.toBeUndefined();
+    await expect(
+      deletePublicHoliday('c1', 'holiday-1'),
+    ).resolves.toBeUndefined();
+
+    expect(updateCalls[0]).toEqual({
+      table: 'public_holidays',
+      payload: expect.objectContaining({
+        name: 'Malaysia Day',
+        date: '2026-09-16',
+        holiday_type: 'public',
+        is_recurring: true,
+      }),
+    });
+    expect(deleteCalls).toEqual(['public_holidays']);
+    expect(eqCalls).toEqual(expect.arrayContaining([
+      { table: 'public_holidays', column: 'company_id', value: 'c1' },
+      { table: 'public_holidays', column: 'id', value: 'holiday-1' },
     ]));
   });
 });
