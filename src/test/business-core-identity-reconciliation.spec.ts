@@ -81,9 +81,9 @@ describe('Business Core identity reconciliation pack', () => {
   });
 
   it('derives Vehicle Employee candidates only from the existing Profile FK chain', () => {
-    const vehicleSection = executable.slice(
-      executable.indexOf('WITH params AS (', executable.indexOf('VEHICLE SALESPERSON COMPATIBILITY')),
-    );
+    const vehicleHeading = sql.indexOf('6. VEHICLE SALESPERSON COMPATIBILITY');
+    expect(vehicleHeading).toBeGreaterThanOrEqual(0);
+    const vehicleSection = executableSql(sql.slice(vehicleHeading));
 
     expect(sql).toContain('LEFT JOIN public.profiles p ON p.id = v.salesman_id');
     expect(sql).toContain('LEFT JOIN public.employees e ON e.id = p.employee_id');
