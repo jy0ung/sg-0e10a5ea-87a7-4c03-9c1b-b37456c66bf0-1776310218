@@ -26,7 +26,7 @@ DECLARE
   v_invalid_key text;
 
   v_name text;
-  v_role text;
+  v_role public.employees.primary_role%TYPE;
   v_branch_id text;
   v_manager_employee_id uuid;
   v_staff_code text;
@@ -35,7 +35,7 @@ DECLARE
   v_contact_no text;
   v_join_date date;
   v_resign_date date;
-  v_status text;
+  v_status public.employees.status%TYPE;
   v_department_id uuid;
   v_job_title_id uuid;
 BEGIN
