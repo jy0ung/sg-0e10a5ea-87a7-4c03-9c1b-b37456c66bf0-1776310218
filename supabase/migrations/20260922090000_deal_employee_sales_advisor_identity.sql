@@ -78,5 +78,7 @@ WHERE d.sales_advisor_employee_id IS NULL
 COMMENT ON COLUMN public.deals.sales_advisor_employee_id IS
   'Canonical workforce owner for the Deal. sales_advisor_id remains a temporary Profile/login compatibility reference.';
 
+REVOKE ALL ON FUNCTION public.enforce_deal_sales_advisor_employee_company() FROM PUBLIC, anon;
+
 COMMENT ON FUNCTION public.enforce_deal_sales_advisor_employee_company() IS
   'Rejects Deal ownership that references an Employee from another company.';
