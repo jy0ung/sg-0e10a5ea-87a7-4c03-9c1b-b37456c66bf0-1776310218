@@ -200,6 +200,12 @@ export async function reviewInternalRequestApproval(
   context: { userId: string; companyId: string },
 ): Promise<{ error: string | null }> {
   try {
+    const gate = await getInternalRequestApprovalGate(ticketId);
+    if (gate.error) return { error: gate.error };
+    if (!gate.data?.currentStepId) {
+      return { error: 'This request does not have a pending approval step.' };
+    }
+
     const { data, error } = await (supabase as unknown as {
       rpc: (
         fn: string,
@@ -208,6 +214,7 @@ export async function reviewInternalRequestApproval(
     }).rpc('review_internal_request_approval', {
       p_company_id: context.companyId,
       p_ticket_id: ticketId,
+      p_expected_step_id: gate.data.currentStepId,
       p_decision: decision,
       p_note: note?.trim() || null,
     });
