@@ -1,5 +1,5 @@
 import type { FlowEntityType } from '@flc/types';
-import { supabase, untypedSupabase } from '../shared/supabaseClient';
+import { untypedSupabase } from '../shared/supabaseClient';
 import {
   rowToApprovalStep,
   rowToApprovalInstance,
@@ -9,6 +9,7 @@ import {
   type ApprovalAuditEvent,
 } from './approvalTypes';
 import { resolveStepRouting, userMatchesAssignedApproverRole } from './approvalRouting';
+import { resolveApprovalFlowForRequester } from './approvalFlowResolver';
 
 // ─── Approval Step select fragment ─────────────────────────────────────────────
 const APPROVAL_STEP_SELECT =
@@ -19,12 +20,12 @@ const APPROVAL_STEP_SELECT =
 
 /**
  * Creates an `approval_instances` row for an entity that has just been
- * submitted. Finds the single active approval flow for the entity type,
- * resolves the first step's approver, and inserts the instance.
+ * submitted. Resolves the applicable active flow using canonical Employee
+ * department scope, resolves the first step's approver, and inserts the instance.
  *
- * No-ops silently if no active flow is configured for the entity type.
- * Throws on any other error (multiple active flows, step configuration issues,
- * routing failures, database errors).
+ * No-ops silently if no matching flow is configured for the entity type.
+ * Throws on ambiguous same-priority flows, step configuration issues,
+ * routing failures, or database errors.
  */
 export async function bootstrapApprovalInstanceForEntity(
   companyId: string,
@@ -32,23 +33,8 @@ export async function bootstrapApprovalInstanceForEntity(
   entityId: string,
   requesterId: string,
 ): Promise<void> {
-  const { data: flows, error: flowError } = await supabase
-    .from('approval_flows')
-    .select('id')
-    .eq('company_id', companyId)
-    .eq('entity_type', entityType)
-    .eq('is_active', true)
-    .order('updated_at', { ascending: false })
-    .limit(2);
-  if (flowError) throw new Error(flowError.message);
-  if (!flows?.length) return; // No flow configured — not an error.
-  if (flows.length > 1) {
-    throw new Error(
-      `Multiple active approval flows found for ${entityType}. Deactivate extras before continuing.`,
-    );
-  }
-
-  const flowId = String(flows[0].id);
+  const flowId = await resolveApprovalFlowForRequester(companyId, entityType, requesterId);
+  if (!flowId) return; // No matching flow configured — not an error.
   const { data: steps, error: stepError } = await untypedSupabase
     // TODO: Replace untypedSupabase after APPROVAL_STEP_SELECT is updated to use select('*')
     // and rowToApprovalStep() is updated to accept ApprovalStepRow.
