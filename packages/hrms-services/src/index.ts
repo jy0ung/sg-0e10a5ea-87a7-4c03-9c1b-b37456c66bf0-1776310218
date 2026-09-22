@@ -8,6 +8,7 @@
  */
 import { supabase } from './shared/supabaseClient';
 import { resolveRequiredProfileId } from './shared/identity';
+export { resolveRequiredProfileId };
 import type { Notification } from '@flc/types';
 
 // ─── Domain barrel exports ─────────────────────────────────────────────────────
