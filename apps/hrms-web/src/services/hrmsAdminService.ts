@@ -1,4 +1,3 @@
-import { supabase } from '@/integrations/supabase/client';
 import { logUserAction } from '@/services/auditService';
 import {
   listDepartments as listCanonicalDepartments,
