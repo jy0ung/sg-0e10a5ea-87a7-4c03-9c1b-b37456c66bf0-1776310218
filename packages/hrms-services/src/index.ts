@@ -14,6 +14,7 @@ import type { Notification } from '@flc/types';
 export * from './announcement/announcementService';
 export * from './attendance/attendanceService';
 export * from './employee/employeeService';
+export * from './employee/salesAdvisorService';
 export * from './leave/leaveService';
 export * from './payroll/payrollService';
 export * from './appraisal/appraisalService';

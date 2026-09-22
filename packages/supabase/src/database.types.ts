@@ -8456,6 +8456,19 @@ export type Database = {
         }
         Returns: Json
       }
+      create_sales_advisor_employee: {
+        Args: {
+          p_branch_id: string
+          p_company_id: string
+          p_contact_no?: string | null
+          p_ic_no?: string | null
+          p_join_date?: string | null
+          p_name: string
+          p_staff_code: string
+          p_work_email?: string | null
+        }
+        Returns: string
+      }
       create_grn: {
         Args: {
           p_company_id: string
