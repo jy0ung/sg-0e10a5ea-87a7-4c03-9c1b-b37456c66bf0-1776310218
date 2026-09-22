@@ -101,6 +101,12 @@ Exit criteria:
 - employee changes propagate through explicit contracts;
 - sensitive payroll/PII remains HRMS-authorized even though employee identity is shared.
 
+**Implementation record — 2026-09-22:**
+- Employee hard-delete is now reserved for genuinely unused/erroneous workforce rows. Historical leave balances/requests, attendance, payroll items, and appraisal items use restrictive Employee ownership so deleting an Employee cannot erase HR history (PR #81, merge `5462064`).
+- The normal lifecycle for an Employee with business history is `active -> inactive/resigned`, not hard delete.
+- Pending-invite/auth cleanup occurs only after the Employee deletion succeeds; linked active user accounts block hard delete. Live local-Supabase readiness passed **164/164** tests, including **6/6** dedicated Employee-history deletion cases.
+- This integrity merge was not deployed to production as part of the refactor sequence.
+
 ### Epic 3 — Workflow Platform + Unified Inbox
 
 **Objective:** Finish one cross-suite work orchestration layer.
