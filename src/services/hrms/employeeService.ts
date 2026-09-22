@@ -31,21 +31,23 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
   if (input.role === 'portal_admin' || input.role === 'portal_manager' || input.role === 'portal_staff') {
     return { error: 'Select a workforce role when creating an employee.' };
   }
-  const { error } = await supabase.from('employees').insert({
-    id:                  input.id,
-    company_id:          input.companyId,
-    branch_id:           input.branchId ?? null,
-    manager_employee_id: input.managerId ?? null,
-    primary_role:        input.role,
-    status:              'active',
-    staff_code:          input.staffCode?.toUpperCase() ?? null,
-    name:                input.name,
-    work_email:          input.email || null,
-    ic_no:               input.icNo ?? null,
-    contact_no:          input.contactNo ?? null,
-    join_date:           input.joinDate ?? null,
-  });
-  if (error) return { error: error.message };
+  try {
+    await pkg.createEmployeeRecord({
+      id: input.id,
+      companyId: input.companyId,
+      name: input.name,
+      role: input.role,
+      branchId: input.branchId ?? null,
+      managerId: input.managerId ?? null,
+      staffCode: input.staffCode ?? null,
+      workEmail: input.email || null,
+      icNo: input.icNo ?? null,
+      contactNo: input.contactNo ?? null,
+      joinDate: input.joinDate ?? null,
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
 
   if (input.email && !input.email.endsWith('@company.local')) {
     const inviteResult = await inviteUser({
@@ -84,6 +86,7 @@ export interface UpdateEmployeeInput {
 
 export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string, companyId?: string): Promise<{ error: string | null }> {
   try {
+    if (!companyId) return { error: 'Company is required for Employee mutation.' };
     await pkg.updateEmployee(id, input, companyId);
     if (actorId) {
       void logUserAction(actorId, 'update', 'employee', id, { changes: input as unknown as import('@/integrations/supabase/types').Json });
