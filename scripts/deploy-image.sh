@@ -18,6 +18,9 @@
 #   HOST_PORT        (default: 8080)               — port bound on 127.0.0.1
 #   HEALTH_TIMEOUT   (default: 60)                 — seconds to wait for /healthz
 #   SKIP_PULL        (default: 0)                  — set to 1 for local images
+#   VERIFY_MIGRATION_LEDGER (default: 0)            — require release migrations before any app swap
+#   MIGRATION_LEDGER_SCRIPT (default: /tmp/verify-migration-ledger.sh)
+#   MIGRATION_MANIFEST (default: /tmp/flc-release-migrations.txt)
 #   RUN_RPC_SMOKE    (default: auto)               — run import RPC rollback smoke before swap
 #   RPC_SMOKE_SCRIPT (default: /tmp/verify-import-rpc-contracts.sh)
 #   RPC_SMOKE_DB_CONTAINER_PATTERN (default: ^supabase_db_)
@@ -34,6 +37,9 @@ CONTAINER_NAME="${CONTAINER_NAME:-flc-bi-uat}"
 HOST_PORT="${HOST_PORT:-8080}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-60}"
 SKIP_PULL="${SKIP_PULL:-0}"
+VERIFY_MIGRATION_LEDGER="${VERIFY_MIGRATION_LEDGER:-0}"
+MIGRATION_LEDGER_SCRIPT="${MIGRATION_LEDGER_SCRIPT:-/tmp/verify-migration-ledger.sh}"
+MIGRATION_MANIFEST="${MIGRATION_MANIFEST:-/tmp/flc-release-migrations.txt}"
 RUN_RPC_SMOKE="${RUN_RPC_SMOKE:-auto}"
 RPC_SMOKE_SCRIPT="${RPC_SMOKE_SCRIPT:-/tmp/verify-import-rpc-contracts.sh}"
 RPC_SMOKE_DB_CONTAINER_PATTERN="${RPC_SMOKE_DB_CONTAINER_PATTERN:-^supabase_db_}"
@@ -175,6 +181,19 @@ SQL
 }
 
 command -v docker >/dev/null || die "docker not installed"
+
+if [[ "$VERIFY_MIGRATION_LEDGER" == "1" || "$VERIFY_MIGRATION_LEDGER" == "true" ]]; then
+  DB_CONTAINER="$(docker ps --format '{{.Names}}' | grep -E "$RPC_SMOKE_DB_CONTAINER_PATTERN" | head -1 || true)"
+  [[ -n "$DB_CONTAINER" ]] || die "Migration ledger verification required but no DB container matched $RPC_SMOKE_DB_CONTAINER_PATTERN"
+  [[ -f "$MIGRATION_LEDGER_SCRIPT" ]] || die "Migration ledger verifier not found: $MIGRATION_LEDGER_SCRIPT"
+  [[ -f "$MIGRATION_MANIFEST" ]] || die "Migration manifest not found: $MIGRATION_MANIFEST"
+
+  log "Verifying release migrations against production DB ledger in $DB_CONTAINER"
+  if ! bash "$MIGRATION_LEDGER_SCRIPT" --manifest "$MIGRATION_MANIFEST" --docker-container "$DB_CONTAINER"; then
+    die "Production database is missing one or more migrations required by this release. Existing application container untouched."
+  fi
+  log "Migration ledger compatibility passed"
+fi
 
 log "Docker storage before cleanup"
 docker system df || true
