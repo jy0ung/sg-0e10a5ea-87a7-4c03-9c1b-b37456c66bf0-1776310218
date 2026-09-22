@@ -128,7 +128,7 @@ describe('Employee deletion primitives', () => {
   });
 
   it('deletes an unused Employee within company scope', async () => {
-    queued.push({ data: null, error: null });
+    queued.push({ data: { id: 'employee-1' }, error: null });
 
     await expect(
       deleteEmployeeRecord('employee-1', 'c1'),
@@ -141,7 +141,7 @@ describe('Employee deletion primitives', () => {
     queued.push({ data: null, error: null });
 
     await expect(
-      disableEmployeeProfileAccess('profile-1', 'c1'),
+      disableEmployeeProfileAccess('profile-1'),
     ).resolves.toBeUndefined();
 
     expect(updateCalls).toEqual([
@@ -150,9 +150,10 @@ describe('Employee deletion primitives', () => {
         payload: { status: 'inactive', employee_id: null },
       },
     ]);
-    expect(eqCalls).toEqual(expect.arrayContaining([
-      { table: 'profiles', column: 'id', value: 'profile-1' },
-      { table: 'profiles', column: 'company_id', value: 'c1' },
-    ]));
+    expect(eqCalls).toContainEqual({
+      table: 'profiles',
+      column: 'id',
+      value: 'profile-1',
+    });
   });
 });
