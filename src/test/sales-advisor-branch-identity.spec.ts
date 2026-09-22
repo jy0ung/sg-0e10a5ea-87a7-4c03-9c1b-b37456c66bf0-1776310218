@@ -21,6 +21,6 @@ describe('Sales Advisor branch identity contract', () => {
 
   it('passes branchId to the canonical create RPC', () => {
     expect(service).toContain('p_branch_id: input.branchId');
-    expect(service).not.toContain('p_branch_id: input.branch');
+    expect(service).not.toMatch(/p_branch_id:\s*input\.branch(?:\s|,|$)/);
   });
 });
