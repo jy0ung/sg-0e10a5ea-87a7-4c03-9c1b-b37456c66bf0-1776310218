@@ -103,44 +103,49 @@ export async function deleteEmployee(
   companyId: string,
   actorId?: string,
 ): Promise<{ error: string | null }> {
-  // 1. Find linked profile (if any)
-  const { data: profileRows } = await supabase
-    .from('profiles')
-    .select('id, status')
-    .eq('employee_id', employeeId)
-    .eq('company_id', companyId)
-    .limit(1);
-  const profile = (profileRows ?? [])[0] as { id: string; status: string } | undefined;
+  try {
+    const linkedProfile = await pkg.getLinkedEmployeeProfile(employeeId, companyId);
 
-  // 2. Handle linked auth user before deleting the employee record
-  if (profile) {
-    if (profile.status === 'pending') {
-      // Never signed in — hard-delete the auth user
-      const { error: delAuthErr } = await deleteInvitedUser(profile.id);
-      if (delAuthErr) return { error: `Could not remove pending invite: ${delAuthErr}` };
-    } else {
-      // Already signed in — just unlink employee_id from their profile
-      await supabase.from('profiles').update({ employee_id: null }).eq('id', profile.id);
+    if (linkedProfile && linkedProfile.status !== 'pending') {
+      return {
+        error:
+          'Cannot hard-delete an employee with a linked user account. Mark the employee as resigned or manage the user account separately.',
+      };
     }
+
+    // Database history constraints are evaluated before any auth cleanup.
+    await pkg.deleteEmployeeRecord(employeeId, companyId);
+
+    if (actorId) {
+      void logUserAction(actorId, 'delete', 'employee', employeeId, {});
+    }
+
+    if (linkedProfile?.status === 'pending') {
+      const { error: authCleanupError } = await deleteInvitedUser(linkedProfile.id);
+      if (authCleanupError) {
+        try {
+          await pkg.disableEmployeeProfileAccess(
+            linkedProfile.id,
+            linkedProfile.companyId ?? companyId,
+          );
+        } catch (disableError) {
+          return {
+            error:
+              `Employee deleted, but pending user cleanup failed (${authCleanupError}) and the account could not be disabled: ${disableError instanceof Error ? disableError.message : String(disableError)}`,
+          };
+        }
+
+        return {
+          error:
+            `Employee deleted, but pending user cleanup failed: ${authCleanupError}. The account was disabled; remove it from User Management.`,
+        };
+      }
+    }
+
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
   }
-
-  // 3. Delete the employee row
-  const { error } = await supabase
-    .from('employees')
-    .delete()
-    .eq('id', employeeId)
-    .eq('company_id', companyId);
-
-  if (error) {
-    return {
-      error: error.code === '23503'
-        ? 'Cannot delete: this employee has linked records (leave requests, payroll, etc.). Mark them as resigned instead.'
-        : error.message,
-    };
-  }
-
-  if (actorId) void logUserAction(actorId, 'delete', 'employee', employeeId, {});
-  return { error: null };
 }
 
 export async function reInviteEmployee(
