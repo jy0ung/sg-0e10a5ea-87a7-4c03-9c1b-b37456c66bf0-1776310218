@@ -1,0 +1,325 @@
+name: Database Restore Drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Backup environment to restore-test'
+        type: choice
+        required: true
+        default: production
+        options:
+          - production
+          - uat
+          - staging
+      backup_run_id:
+        description: 'Optional successful Database Backup run ID; blank selects the latest successful backup run'
+        required: false
+      restore_image:
+        description: 'Optional scratch Postgres image override when the backup metadata has no database image'
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: db-restore-drill-${{ github.event.inputs.environment || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  restore-drill:
+    name: Restore drill (${{ github.event.inputs.environment || 'production' }})
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+    env:
+      TARGET_ENV: ${{ github.event.inputs.environment || 'production' }}
+      DB_BACKUP_GPG_PASSPHRASE: ${{ secrets.DB_BACKUP_GPG_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify restore secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${DB_BACKUP_GPG_PASSPHRASE:-}" ]]; then
+            echo "Missing required secret: DB_BACKUP_GPG_PASSPHRASE" >&2
+            exit 1
+          fi
+
+      - name: Resolve and download encrypted backup artifact
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_BACKUP_RUN_ID: ${{ github.event.inputs.backup_run_id }}
+          INPUT_RESTORE_IMAGE: ${{ github.event.inputs.restore_image }}
+        run: |
+          set -euo pipefail
+
+          run_id="${INPUT_BACKUP_RUN_ID:-}"
+          if [[ -z "$run_id" ]]; then
+            run_id="$(
+              gh run list \
+                --workflow db-backup.yml \
+                --status success \
+                --limit 1 \
+                --json databaseId \
+                --jq '.[0].databaseId'
+            )"
+          fi
+
+          if [[ -z "$run_id" || "$run_id" == "null" ]]; then
+            echo "No successful Database Backup workflow run is available." >&2
+            exit 1
+          fi
+
+          conclusion="$(gh run view "$run_id" --json conclusion --jq '.conclusion')"
+          if [[ "$conclusion" != "success" ]]; then
+            echo "Backup run $run_id is not successful (conclusion=$conclusion)." >&2
+            exit 1
+          fi
+
+          mkdir -p restore-source
+          gh run download "$run_id" --dir restore-source
+
+          encrypted_file="$(find restore-source -type f -name '*.dump.gpg' | head -1)"
+          checksum_file="$(find restore-source -type f -name '*.dump.gpg.sha256' | head -1)"
+          metadata_file="$(find restore-source -type f -name '*.dump.gpg.metadata.txt' | head -1)"
+
+          [[ -n "$encrypted_file" && -f "$encrypted_file" ]] || { echo "Encrypted dump not found in run $run_id" >&2; exit 1; }
+          [[ -n "$checksum_file" && -f "$checksum_file" ]] || { echo "Checksum not found in run $run_id" >&2; exit 1; }
+          [[ -n "$metadata_file" && -f "$metadata_file" ]] || { echo "Backup metadata not found in run $run_id" >&2; exit 1; }
+
+          expected_sha="$(awk '{print $1}' "$checksum_file" | head -1)"
+          actual_sha="$(sha256sum "$encrypted_file" | awk '{print $1}')"
+          if [[ -z "$expected_sha" || "$expected_sha" != "$actual_sha" ]]; then
+            echo "Encrypted backup checksum mismatch." >&2
+            exit 1
+          fi
+
+          backup_env="$(awk -F= '$1 == "environment" {print substr($0, index($0, "=") + 1)}' "$metadata_file")"
+          created_at="$(awk -F= '$1 == "created_at_utc" {print substr($0, index($0, "=") + 1)}' "$metadata_file")"
+          metadata_image="$(awk -F= '$1 == "database_image" {print substr($0, index($0, "=") + 1)}' "$metadata_file")"
+          postgres_version="$(awk -F= '$1 == "postgres_version" {print substr($0, index($0, "=") + 1)}' "$metadata_file")"
+
+          if [[ "$backup_env" != "$TARGET_ENV" ]]; then
+            echo "Backup run $run_id belongs to environment '$backup_env', not requested '$TARGET_ENV'." >&2
+            exit 1
+          fi
+
+          restore_image="${INPUT_RESTORE_IMAGE:-$metadata_image}"
+          if [[ -z "$restore_image" ]]; then
+            echo "Backup metadata has no database image. Supply the restore_image workflow input explicitly." >&2
+            exit 1
+          fi
+
+          if [[ ! "$restore_image" =~ ^[A-Za-z0-9._/-]+:[A-Za-z0-9._-]+$ ]]; then
+            echo "Restore image has an invalid container-image format." >&2
+            exit 1
+          fi
+
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "encrypted_file=$encrypted_file" >> "$GITHUB_OUTPUT"
+          echo "backup_created_at=$created_at" >> "$GITHUB_OUTPUT"
+          echo "postgres_version=$postgres_version" >> "$GITHUB_OUTPUT"
+          echo "restore_image=$restore_image" >> "$GITHUB_OUTPUT"
+
+      - name: Start isolated scratch database
+        id: scratch
+        shell: bash
+        env:
+          RESTORE_IMAGE: ${{ steps.source.outputs.restore_image }}
+        run: |
+          set -euo pipefail
+          container="flc-db-restore-drill-${GITHUB_RUN_ID}"
+          volume="${container}-data"
+
+          docker pull "$RESTORE_IMAGE"
+          docker volume create "$volume" >/dev/null
+          docker run -d \
+            --name "$container" \
+            --network none \
+            --memory 4g \
+            --cpus 2 \
+            -e POSTGRES_HOST_AUTH_METHOD=trust \
+            -v "$volume:/var/lib/postgresql/data" \
+            "$RESTORE_IMAGE" >/dev/null
+
+          deadline=$(( $(date +%s) + 90 ))
+          until docker exec "$container" pg_isready -U postgres -d postgres >/dev/null 2>&1; do
+            if (( $(date +%s) >= deadline )); then
+              docker logs --tail 100 "$container" >&2 || true
+              echo "Scratch database did not become ready." >&2
+              exit 1
+            fi
+            sleep 2
+          done
+
+          echo "container=$container" >> "$GITHUB_OUTPUT"
+          echo "volume=$volume" >> "$GITHUB_OUTPUT"
+
+      - name: Bootstrap restore roles and database
+        shell: bash
+        env:
+          DB_CONTAINER: ${{ steps.scratch.outputs.container }}
+        run: |
+          set -euo pipefail
+          docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          declare
+            role_name text;
+          begin
+            foreach role_name in array array[
+              'anon',
+              'authenticated',
+              'service_role',
+              'authenticator',
+              'supabase_auth_admin',
+              'supabase_storage_admin',
+              'supabase_functions_admin',
+              'dashboard_user'
+            ]
+            loop
+              if not exists (select 1 from pg_roles where rolname = role_name) then
+                execute format('create role %I nologin', role_name);
+              end if;
+            end loop;
+          end
+          $$;
+          SQL
+
+          docker exec "$DB_CONTAINER" createdb -U postgres flc_restore_drill
+
+      - name: Restore encrypted backup
+        id: restore
+        shell: bash
+        env:
+          DB_CONTAINER: ${{ steps.scratch.outputs.container }}
+          ENCRYPTED_FILE: ${{ steps.source.outputs.encrypted_file }}
+          BACKUP_CREATED_AT: ${{ steps.source.outputs.backup_created_at }}
+        run: |
+          set -euo pipefail
+          started_at="$(date +%s)"
+
+          gpg \
+            --batch \
+            --yes \
+            --pinentry-mode loopback \
+            --passphrase-fd 3 \
+            --decrypt "$ENCRYPTED_FILE" \
+            3<<<"$DB_BACKUP_GPG_PASSPHRASE" \
+            | docker exec -i "$DB_CONTAINER" pg_restore \
+                -U postgres \
+                -d flc_restore_drill \
+                --no-owner \
+                --no-privileges \
+                --exit-on-error
+
+          finished_at="$(date +%s)"
+          backup_epoch="$(date -d "$BACKUP_CREATED_AT" +%s)"
+          echo "duration_seconds=$((finished_at - started_at))" >> "$GITHUB_OUTPUT"
+          echo "backup_age_seconds=$((finished_at - backup_epoch))" >> "$GITHUB_OUTPUT"
+
+      - name: Run restore smoke checks
+        shell: bash
+        env:
+          DB_CONTAINER: ${{ steps.scratch.outputs.container }}
+        run: |
+          set -euo pipefail
+          docker exec -i "$DB_CONTAINER" psql -U postgres -d flc_restore_drill -v ON_ERROR_STOP=1 <<'SQL'
+          do $$
+          declare
+            relation_name text;
+          begin
+            foreach relation_name in array array[
+              'public.profiles',
+              'public.employees',
+              'public.vehicles',
+              'public.deals',
+              'public.invoices',
+              'public.purchase_invoices',
+              'public.accounting_periods',
+              'public.tickets',
+              'supabase_migrations.schema_migrations'
+            ]
+            loop
+              if to_regclass(relation_name) is null then
+                raise exception 'Restore smoke missing required relation: %', relation_name;
+              end if;
+            end loop;
+
+            if not exists (select 1 from supabase_migrations.schema_migrations) then
+              raise exception 'Restore smoke found an empty migration ledger';
+            end if;
+          end
+          $$;
+          SQL
+
+      - name: Write restore evidence
+        if: success()
+        shell: bash
+        env:
+          BACKUP_RUN_ID: ${{ steps.source.outputs.run_id }}
+          BACKUP_CREATED_AT: ${{ steps.source.outputs.backup_created_at }}
+          POSTGRES_VERSION: ${{ steps.source.outputs.postgres_version }}
+          RESTORE_IMAGE: ${{ steps.source.outputs.restore_image }}
+          RESTORE_DURATION: ${{ steps.restore.outputs.duration_seconds }}
+          BACKUP_AGE: ${{ steps.restore.outputs.backup_age_seconds }}
+        run: |
+          set -euo pipefail
+          mkdir -p restore-evidence
+          evidence="restore-evidence/restore-drill-${GITHUB_RUN_ID}.txt"
+          {
+            echo "drill_run_id=$GITHUB_RUN_ID"
+            echo "environment=$TARGET_ENV"
+            echo "backup_run_id=$BACKUP_RUN_ID"
+            echo "backup_created_at_utc=$BACKUP_CREATED_AT"
+            echo "postgres_version=$POSTGRES_VERSION"
+            echo "restore_image=$RESTORE_IMAGE"
+            echo "restore_duration_seconds=$RESTORE_DURATION"
+            echo "logical_backup_age_seconds=$BACKUP_AGE"
+            echo "smoke_result=pass"
+            echo "scope=logical_dump_full_restore_to_network_isolated_scratch_database"
+          } > "$evidence"
+
+      - name: Upload restore evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-drill-evidence-${{ github.run_id }}
+          path: restore-evidence/*.txt
+          retention-days: 30
+
+      - name: Cleanup scratch database
+        if: always()
+        shell: bash
+        env:
+          DB_CONTAINER: ${{ steps.scratch.outputs.container }}
+          DB_VOLUME: ${{ steps.scratch.outputs.volume }}
+        run: |
+          set +e
+          container="${DB_CONTAINER:-flc-db-restore-drill-${GITHUB_RUN_ID}}"
+          volume="${DB_VOLUME:-${container}-data}"
+          docker rm -f "$container" >/dev/null 2>&1 || true
+          docker volume rm "$volume" >/dev/null 2>&1 || true
+          exit 0
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Database Restore Drill"
+            echo ""
+            echo "- Environment: `${TARGET_ENV}`"
+            echo "- Backup run: `${{ steps.source.outputs.run_id }}`"
+            echo "- Backup created: `${{ steps.source.outputs.backup_created_at }}`"
+            echo "- Scratch image: `${{ steps.source.outputs.restore_image }}`"
+            echo "- Restore duration: `${{ steps.restore.outputs.duration_seconds }} seconds`"
+            echo "- Logical backup age at restore: `${{ steps.restore.outputs.backup_age_seconds }} seconds`"
+            echo "- Result: `${{ job.status }}`"
+            echo ""
+            echo "This validates a logical-dump restore into a network-isolated scratch database. It does not replace the separate production PITR drill."
+          } >> "$GITHUB_STEP_SUMMARY"
