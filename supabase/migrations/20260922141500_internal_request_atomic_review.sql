@@ -87,8 +87,8 @@ BEGIN
 
   IF p_expected_step_id IS NULL
      OR approval.current_step_id IS DISTINCT FROM p_expected_step_id THEN
-    RAISE EXCEPTION 'Approval review is stale because the current step has changed'
-      USING ERRCODE = '40001';
+    RAISE SQLSTATE 'PT409'
+      USING MESSAGE = 'Approval review is stale because the current step has changed';
   END IF;
 
   SELECT t.*
