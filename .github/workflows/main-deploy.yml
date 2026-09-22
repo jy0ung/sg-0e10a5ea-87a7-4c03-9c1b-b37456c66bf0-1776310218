@@ -224,14 +224,104 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Copy deploy script through the tunnel
+      - name: Build release migration manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort > /tmp/flc-release-migrations.txt
+          test -s /tmp/flc-release-migrations.txt
+          if grep -Ev '^[0-9]{14}_.+\.sql
+      - name: Run deploy on host through the tunnel
+        shell: bash
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CONTAINER_NAME: ${{ secrets.DEPLOY_CONTAINER_NAME }}
+          HOST_PORT: ${{ secrets.DEPLOY_HOST_PORT }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+          IMAGE: ${{ steps.mode.outputs.image_ref }}
+        run: |
+          set -euo pipefail
+          ssh deploy-target \
+            "chmod +x /tmp/deploy-image.sh && \
+             CONTAINER_NAME='${CONTAINER_NAME}' \
+             HOST_PORT='${HOST_PORT}' \
+             GHCR_USERNAME='${GHCR_USERNAME:-}' \
+             GHCR_TOKEN='${GHCR_TOKEN:-}' \
+             VERIFY_MIGRATION_LEDGER='1' \
+             MIGRATION_LEDGER_SCRIPT='/tmp/verify-migration-ledger.sh' \
+             MIGRATION_MANIFEST='/tmp/flc-release-migrations.txt' \
+             /tmp/deploy-image.sh '${IMAGE}'"
+
+      - name: Verify production deployment
+        shell: bash
+        env:
+          PROD_APP: main
+          PROD_URL: ${{ env.UBS_PRODUCTION_URL }}
+          PROD_EXPECTED_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          PROD_EXPECTED_HRMS_APP_URL: ''
+          PROD_VERIFY_HRMS_LINK: '0'
+          PROD_HEALTH_URL: ${{ format('{0}/healthz', env.UBS_PRODUCTION_URL) }}
+          PROD_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
+          PROD_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
+          PROD_LOGIN_REQUIRED: ${{ steps.login.outputs.enabled == 'true' && '1' || '0' }}
+          PROD_VERIFY_FETCH_ATTEMPTS: '3'
+        run: npm run verify:production
+
+      - name: Probe RPC canaries
+        if: steps.login.outputs.enabled == 'true'
+        shell: bash
+        env:
+          SMOKE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SMOKE_SUPABASE_ANON: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SMOKE_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
+          SMOKE_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
+        run: npm run health:rpc-canaries
+
+      - name: Smoke production modules
+        if: steps.login.outputs.enabled == 'true'
+        shell: bash
+        env:
+          PROD_URL: ${{ env.UBS_PRODUCTION_URL }}
+          PROD_HRMS_URL: ''
+          PROD_SMOKE_APPS: main
+          PROD_LOGIN_EMAIL: ${{ secrets.PROD_LOGIN_EMAIL }}
+          PROD_LOGIN_PASSWORD: ${{ secrets.PROD_LOGIN_PASSWORD }}
+        run: npm run smoke:production
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Production deploy"
+            echo ""
+            echo "- Source SHA: \`${{ steps.source.outputs.sha }}\`"
+            echo "- Image: \`${{ steps.mode.outputs.image_ref }}\`"
+            echo "- Container: \`${{ secrets.DEPLOY_CONTAINER_NAME }}\`"
+            echo "- Host: \`${{ secrets.SSH_HOST }}\`"
+            echo "- Build target: \`${{ steps.mode.outputs.build_target }}\`"
+            echo "- Credentialed module smoke: \`${{ steps.login.outputs.enabled }}\`"
+            echo "- Migration compatibility preflight: \`required\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+ /tmp/flc-release-migrations.txt; then
+            echo "Migration manifest contains an invalid filename" >&2
+            exit 1
+          fi
+
+      - name: Copy deploy safety scripts through the tunnel
         shell: bash
         env:
           TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          scp scripts/deploy-image.sh deploy-target:/tmp/deploy-image.sh
+          scp \
+            scripts/deploy-image.sh \
+            scripts/verify-migration-ledger.sh \
+            /tmp/flc-release-migrations.txt \
+            deploy-target:/tmp/
 
       - name: Run deploy on host through the tunnel
         shell: bash
