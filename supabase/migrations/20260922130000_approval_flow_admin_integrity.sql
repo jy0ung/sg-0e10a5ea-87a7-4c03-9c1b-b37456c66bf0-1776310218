@@ -108,8 +108,10 @@ DROP TRIGGER IF EXISTS trg_approval_flow_admin_integrity
 CREATE TRIGGER trg_approval_flow_admin_integrity
   BEFORE INSERT OR UPDATE OF
     company_id,
+    entity_type,
     department_id,
     is_default,
+    conditions,
     match_priority,
     created_by,
     updated_by
@@ -233,37 +235,49 @@ REVOKE ALL
   ON FUNCTION public.enforce_approval_step_admin_integrity()
   FROM PUBLIC, anon;
 
-CREATE OR REPLACE FUNCTION public.guard_used_approval_flow_step_delete()
+CREATE OR REPLACE FUNCTION public.guard_used_approval_flow_step_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
+DECLARE
+  target_flow_id uuid;
 BEGIN
+  target_flow_id := CASE
+    WHEN TG_OP = 'DELETE' THEN OLD.flow_id
+    ELSE NEW.flow_id
+  END;
+
   IF EXISTS (
-    SELECT 1 FROM public.approval_instances ai WHERE ai.flow_id = OLD.flow_id
+    SELECT 1 FROM public.approval_instances ai WHERE ai.flow_id = target_flow_id
   ) OR EXISTS (
-    SELECT 1 FROM public.approval_requests ar WHERE ar.flow_id = OLD.flow_id
+    SELECT 1 FROM public.approval_requests ar WHERE ar.flow_id = target_flow_id
   ) THEN
     RAISE EXCEPTION
-      'Approval Flow has workflow history and its steps are immutable. Deactivate it and create a replacement Flow.'
+      'Approval Flow has workflow history and its steps are structurally immutable. Deactivate it and create a replacement Flow.'
       USING ERRCODE = '23514';
   END IF;
 
-  RETURN OLD;
+  IF TG_OP = 'DELETE' THEN
+    RETURN OLD;
+  END IF;
+  RETURN NEW;
 END
 $$;
 
 DROP TRIGGER IF EXISTS trg_guard_used_approval_flow_step_delete
   ON public.approval_steps;
+DROP TRIGGER IF EXISTS trg_guard_used_approval_flow_step_mutation
+  ON public.approval_steps;
 
-CREATE TRIGGER trg_guard_used_approval_flow_step_delete
-  BEFORE DELETE ON public.approval_steps
+CREATE TRIGGER trg_guard_used_approval_flow_step_mutation
+  BEFORE INSERT OR UPDATE OR DELETE ON public.approval_steps
   FOR EACH ROW
-  EXECUTE FUNCTION public.guard_used_approval_flow_step_delete();
+  EXECUTE FUNCTION public.guard_used_approval_flow_step_mutation();
 
 REVOKE ALL
-  ON FUNCTION public.guard_used_approval_flow_step_delete()
+  ON FUNCTION public.guard_used_approval_flow_step_mutation()
   FROM PUBLIC, anon;
 
 CREATE OR REPLACE FUNCTION public.guard_used_approval_flow_delete()
@@ -330,8 +344,12 @@ BEGIN
     RAISE EXCEPTION 'Approval Flow name is required' USING ERRCODE = '23514';
   END IF;
 
-  IF jsonb_typeof(COALESCE(p_steps, '[]'::jsonb)) <> 'array'
-     OR jsonb_array_length(COALESCE(p_steps, '[]'::jsonb)) = 0 THEN
+  IF jsonb_typeof(COALESCE(p_steps, '[]'::jsonb)) IS DISTINCT FROM 'array' THEN
+    RAISE EXCEPTION 'Approval Flow steps must be a JSON array'
+      USING ERRCODE = '23514';
+  END IF;
+
+  IF jsonb_array_length(COALESCE(p_steps, '[]'::jsonb)) = 0 THEN
     RAISE EXCEPTION 'Approval Flow requires at least one step'
       USING ERRCODE = '23514';
   END IF;
