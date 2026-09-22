@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { addTicketComment, cancelMyTicket, createTicket, listMyTickets, listTicketActivity, updateTicket } from './ticketService';
 import { logUserAction } from './auditService';
 import { createNotifications } from './notificationService';
-import { evaluateRoutingRules } from '@flc/internal-requests';
+import { evaluateRoutingRules, getInternalRequestApprovalPlan } from '@flc/internal-requests';
 
 const mockSupabaseClient = vi.hoisted(() => ({
   from: vi.fn(),
@@ -35,6 +35,7 @@ vi.mock('./loggingService', () => ({
 vi.mock('@flc/internal-requests', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@flc/internal-requests')>()),
   evaluateRoutingRules: vi.fn().mockResolvedValue(null),
+  getInternalRequestApprovalPlan: vi.fn().mockResolvedValue({ data: null, error: null }),
 }));
 
 describe('ticketService', () => {
@@ -42,42 +43,8 @@ describe('ticketService', () => {
     vi.clearAllMocks();
     vi.mocked(supabase.from).mockReset();
     vi.mocked(supabase.rpc).mockReset();
+    vi.mocked(getInternalRequestApprovalPlan).mockResolvedValue({ data: null, error: null });
   });
-
-  function mockNoActiveInternalRequestApprovalFlow() {
-    const order = vi.fn().mockResolvedValue({ data: [], error: null });
-    const activeEq = vi.fn(() => ({ order }));
-    const entityEq = vi.fn(() => ({ eq: activeEq }));
-    const companyEq = vi.fn(() => ({ eq: entityEq }));
-    const select = vi.fn(() => ({ eq: companyEq }));
-    return { select, companyEq, entityEq, activeEq, order };
-  }
-
-  function mockProfilesDepartmentLookup() {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const eq = vi.fn(() => ({ maybeSingle }));
-    const select = vi.fn(() => ({ eq }));
-    return { select };
-  }
-
-  // request_subcategories.select('approval_flow_id').eq().eq().eq().maybeSingle()
-  function mockNoSubcategoryFlowPin() {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const subcategoryKeyEq = vi.fn(() => ({ maybeSingle }));
-    const categoryKeyEq = vi.fn(() => ({ eq: subcategoryKeyEq }));
-    const companyEq = vi.fn(() => ({ eq: categoryKeyEq }));
-    const select = vi.fn(() => ({ eq: companyEq }));
-    return { select };
-  }
-
-  // request_categories.select('approval_flow_id').eq().eq().maybeSingle()
-  function mockNoCategoryFlowPin() {
-    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-    const categoryKeyEq = vi.fn(() => ({ maybeSingle }));
-    const companyEq = vi.fn(() => ({ eq: categoryKeyEq }));
-    const select = vi.fn(() => ({ eq: companyEq }));
-    return { select };
-  }
 
   function mockNoInternalRequestApprovalMetadata() {
     const inFn = vi.fn().mockResolvedValue({ data: [], error: null });
@@ -101,18 +68,10 @@ describe('ticketService', () => {
   });
 
   it('derives ticket owner and company from authenticated context', async () => {
-    const profilesLookup = mockProfilesDepartmentLookup();
-    const subcategoryPinLookup = mockNoSubcategoryFlowPin();
-    const categoryPinLookup = mockNoCategoryFlowPin();
-    const approvalFlowSelect = mockNoActiveInternalRequestApprovalFlow();
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-1' }, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
     vi.mocked(supabase.from)
-      .mockImplementationOnce(() => ({ select: profilesLookup.select }) as never)
-      .mockImplementationOnce(() => ({ select: subcategoryPinLookup.select }) as never)
-      .mockImplementationOnce(() => ({ select: categoryPinLookup.select }) as never)
-      .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
       .mockImplementationOnce(() => ({ insert }) as never);
 
     const result = await createTicket({
@@ -254,16 +213,10 @@ describe('ticketService', () => {
   it('auto-assigns the ticket when a routing rule matches the submission context', async () => {
     vi.mocked(evaluateRoutingRules).mockResolvedValueOnce('agent-7');
 
-    const profilesLookup = mockProfilesDepartmentLookup();
-    const categoryPinLookup = mockNoCategoryFlowPin();
-    const approvalFlowSelect = mockNoActiveInternalRequestApprovalFlow();
     const single = vi.fn().mockResolvedValue({ data: { id: 'ticket-2' }, error: null });
     const select = vi.fn(() => ({ single }));
     const insert = vi.fn(() => ({ select }));
     vi.mocked(supabase.from)
-      .mockImplementationOnce(() => ({ select: profilesLookup.select }) as never)
-      .mockImplementationOnce(() => ({ select: categoryPinLookup.select }) as never)
-      .mockImplementationOnce(() => ({ select: approvalFlowSelect.select }) as never)
       .mockImplementationOnce(() => ({ insert }) as never);
 
     const result = await createTicket({
