@@ -12,6 +12,7 @@ import {
 import { listEmployeeDirectory } from '../employee/employeeService';
 import { bootstrapApprovalInstanceForEntity, submitApprovalDecision, resubmitApprovalInstance } from '../approval/approvalEngine';
 import { rowToApprovalDecision } from '../approval/approvalTypes';
+import { resolveApprovalFlowForRequester } from '../approval/approvalFlowResolver';
 import type { ApprovalAuditAdapter } from '../approval/approvalTypes';
 
 // ─── Internal types ───────────────────────────────────────────────────────────
@@ -259,19 +260,12 @@ export async function createAppraisal(
   input: { title: string; cycle: AppraisalCycle; periodStart: string; periodEnd: string },
   createdBy: string,
 ): Promise<void> {
-  const { data: flows, error: flowError } = await supabase
-    .from('approval_flows')
-    .select('id')
-    .eq('company_id', companyId)
-    .eq('entity_type', 'appraisal')
-    .eq('is_active', true)
-    .limit(2);
-  if (flowError) throw new Error(flowError.message);
-  if ((flows?.length ?? 0) > 1) {
-    throw new Error('Multiple active approval flows found for appraisal. Deactivate extras before continuing.');
-  }
-
-  const requiresApproval = Boolean(flows?.length);
+  const approvalFlowId = await resolveApprovalFlowForRequester(
+    companyId,
+    'appraisal',
+    createdBy,
+  );
+  const requiresApproval = Boolean(approvalFlowId);
   const { data, error } = await supabase.from('appraisals').insert({
     company_id:   companyId,
     title:        input.title,
