@@ -254,6 +254,16 @@ async function createScenario(
   };
 }
 
+async function createConcurrentActorSession(actor: Actor): Promise<Actor> {
+  const client = anonClient();
+  const { error } = await client.auth.signInWithPassword({
+    email: actor.email,
+    password,
+  });
+  if (error) throw new Error(`Failed to create concurrent reviewer session: ${error.message}`);
+  return { ...actor, client };
+}
+
 async function review(
   actor: Actor,
   scenario: Scenario,
@@ -434,9 +444,10 @@ describeIfLive('Internal Request atomic approval review', () => {
       },
     ]);
 
+    const concurrentReviewer = await createConcurrentActorSession(roleApprover);
     const [first, second] = await Promise.all([
       review(roleApprover, scenario, 'approved'),
-      review(roleApprover, scenario, 'approved'),
+      review(concurrentReviewer, scenario, 'approved'),
     ]);
 
     const outcomes = [first, second];
