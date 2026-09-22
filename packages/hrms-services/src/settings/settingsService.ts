@@ -46,6 +46,40 @@ function rowToDepartment(r: Record<string, unknown>): Department {
   };
 }
 
+async function hydrateDepartmentHeads(
+  companyId: string,
+  rows: Record<string, unknown>[],
+): Promise<Department[]> {
+  const headIds = [...new Set(
+    rows
+      .map(row => row.head_employee_id ? String(row.head_employee_id) : '')
+      .filter(Boolean),
+  )];
+
+  if (headIds.length === 0) {
+    return rows.map(row => rowToDepartment(row));
+  }
+
+  const { data: employees, error } = await supabase
+    .from('employees')
+    .select('id, name')
+    .eq('company_id', companyId)
+    .in('id', headIds);
+  if (error) throw new Error(error.message);
+
+  const names = new Map(
+    (employees ?? []).map(employee => [String(employee.id), String(employee.name ?? '')]),
+  );
+
+  return rows.map(row => {
+    const headId = row.head_employee_id ? String(row.head_employee_id) : '';
+    return rowToDepartment({
+      ...row,
+      head_name: headId ? names.get(headId) ?? null : null,
+    });
+  });
+}
+
 function rowToJobTitle(r: Record<string, unknown>): JobTitle {
   const dept = r.department as Record<string, unknown> | null;
   return {
@@ -173,7 +207,10 @@ export async function listDepartments(companyId: string): Promise<Department[]> 
     .eq('company_id', companyId)
     .order('name');
   if (error) throw new Error(error.message);
-  return (data ?? []).map(r => rowToDepartment(r as Record<string, unknown>));
+  return hydrateDepartmentHeads(
+    companyId,
+    (data ?? []) as Record<string, unknown>[],
+  );
 }
 
 export async function createDepartment(
@@ -193,7 +230,11 @@ export async function createDepartment(
     .select('*')
     .single();
   if (error) throw new Error(error.message);
-  return rowToDepartment(data as Record<string, unknown>);
+  const [department] = await hydrateDepartmentHeads(
+    companyId,
+    [data as Record<string, unknown>],
+  );
+  return department;
 }
 
 export async function updateDepartment(

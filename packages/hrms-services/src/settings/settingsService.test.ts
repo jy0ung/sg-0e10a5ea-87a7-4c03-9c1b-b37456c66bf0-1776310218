@@ -4,6 +4,7 @@ type Result = { data: any; error: { message: string } | null; count?: number | n
 const queued: Result[] = [];
 const selectCalls: Array<{ table: string; columns: unknown; options: unknown }> = [];
 const eqCalls: Array<{ table: string; column: string; value: unknown }> = [];
+const inCalls: Array<{ table: string; column: string; values: unknown[] }> = [];
 const deleteCalls: string[] = [];
 
 function nextResult(): Result {
@@ -19,6 +20,10 @@ vi.mock('../shared/supabaseClient', () => {
     };
     q.eq = (column: string, value: unknown) => {
       eqCalls.push({ table, column, value });
+      return q;
+    };
+    q.in = (column: string, values: unknown[]) => {
+      inCalls.push({ table, column, values });
       return q;
     };
     q.order = () => q;
@@ -43,14 +48,111 @@ vi.mock('../shared/supabaseClient', () => {
   };
 });
 
-import { deleteJobTitle, listJobTitles } from './settingsService';
+import {
+  createDepartment,
+  deleteDepartment,
+  deleteJobTitle,
+  listDepartments,
+  listJobTitles,
+} from './settingsService';
 
 beforeEach(() => {
   queued.length = 0;
   selectCalls.length = 0;
   eqCalls.length = 0;
+  inCalls.length = 0;
   deleteCalls.length = 0;
   vi.clearAllMocks();
+});
+
+describe('canonical Department settings service', () => {
+  it('hydrates Employee-backed department-head names', async () => {
+    queued.push(
+      {
+        data: [{
+          id: 'dept-1',
+          company_id: 'c1',
+          name: 'Sales',
+          description: null,
+          head_employee_id: 'employee-1',
+          cost_centre: 'CC-SALES',
+          is_active: true,
+          created_at: '2026-09-22T00:00:00.000Z',
+          updated_at: '2026-09-22T00:00:00.000Z',
+        }],
+        error: null,
+      },
+      {
+        data: [{ id: 'employee-1', name: 'Aisyah Rahman' }],
+        error: null,
+      },
+    );
+
+    const result = await listDepartments('c1');
+
+    expect(result[0]).toMatchObject({
+      id: 'dept-1',
+      headEmployeeId: 'employee-1',
+      headEmployeeName: 'Aisyah Rahman',
+    });
+    expect(eqCalls).toEqual(expect.arrayContaining([
+      { table: 'departments', column: 'company_id', value: 'c1' },
+      { table: 'employees', column: 'company_id', value: 'c1' },
+    ]));
+    expect(inCalls).toEqual([
+      { table: 'employees', column: 'id', values: ['employee-1'] },
+    ]);
+  });
+
+  it('returns the hydrated Employee head after create', async () => {
+    queued.push(
+      {
+        data: {
+          id: 'dept-1',
+          company_id: 'c1',
+          name: 'Sales',
+          description: null,
+          head_employee_id: 'employee-1',
+          cost_centre: 'CC-SALES',
+          is_active: true,
+          created_at: '2026-09-22T00:00:00.000Z',
+          updated_at: '2026-09-22T00:00:00.000Z',
+        },
+        error: null,
+      },
+      {
+        data: [{ id: 'employee-1', name: 'Aisyah Rahman' }],
+        error: null,
+      },
+    );
+
+    const result = await createDepartment('c1', {
+      name: 'Sales',
+      headEmployeeId: 'employee-1',
+      costCentre: 'CC-SALES',
+      isActive: true,
+    });
+
+    expect(result).toMatchObject({
+      id: 'dept-1',
+      headEmployeeId: 'employee-1',
+      headEmployeeName: 'Aisyah Rahman',
+    });
+  });
+
+  it('blocks deletion while canonical Employees are assigned', async () => {
+    queued.push({ data: null, error: null, count: 2 });
+
+    await expect(deleteDepartment('c1', 'dept-1')).rejects.toThrow(
+      'Cannot delete: 2 employee(s) are assigned to this department. Reassign them first.',
+    );
+
+    expect(eqCalls).toEqual(expect.arrayContaining([
+      { table: 'employees', column: 'company_id', value: 'c1' },
+      { table: 'employees', column: 'department_id', value: 'dept-1' },
+    ]));
+    expect(deleteCalls).toEqual([]);
+  });
 });
 
 describe('canonical Job Title settings service', () => {
