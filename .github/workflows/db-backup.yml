@@ -31,8 +31,8 @@ jobs:
       name: ${{ github.event.inputs.environment || 'production' }}
     env:
       TARGET_ENV: ${{ github.event.inputs.environment || 'production' }}
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       DB_BACKUP_GPG_PASSPHRASE: ${{ secrets.DB_BACKUP_GPG_PASSPHRASE }}
+      DB_CONTAINER_PATTERN: ${{ secrets.BACKUP_DB_CONTAINER_PATTERN || '^supabase_db_' }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION || 'ap-southeast-1' }}
@@ -45,13 +45,24 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends postgresql-client gnupg
+          sudo apt-get install -y --no-install-recommends gnupg
+          curl -fsSL -o /tmp/cloudflared.deb \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i /tmp/cloudflared.deb
+          cloudflared --version
 
       - name: Verify required secrets
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           missing=0
-          for name in SUPABASE_DB_URL DB_BACKUP_GPG_PASSPHRASE; do
+          for name in DB_BACKUP_GPG_PASSPHRASE SSH_PRIVATE_KEY SSH_KNOWN_HOSTS SSH_HOST SSH_USER CF_ACCESS_CLIENT_ID CF_ACCESS_CLIENT_SECRET; do
             if [[ -z "${!name:-}" ]]; then
               echo "Missing required secret: ${name}" >&2
               missing=1
@@ -61,39 +72,115 @@ jobs:
             exit 1
           fi
 
+      - name: Configure SSH through Cloudflare Access
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_backup
+          chmod 600 ~/.ssh/id_backup
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+          cat > ~/.ssh/config <<EOF
+          Host backup-target
+            HostName $SSH_HOST
+            Port $SSH_PORT
+            User $SSH_USER
+            IdentityFile ~/.ssh/id_backup
+            IdentitiesOnly yes
+            UserKnownHostsFile ~/.ssh/known_hosts
+            ProxyCommand cloudflared access ssh --hostname %h
+            ServerAliveInterval 30
+            ServerAliveCountMax 3
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Resolve database container
+        id: database
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          container="$(
+            ssh backup-target \
+              "docker ps --format '{{.Names}}' | grep -E '$DB_CONTAINER_PATTERN' | head -1"
+          )"
+          if [[ -z "$container" ]]; then
+            echo "No running database container matched $DB_CONTAINER_PATTERN" >&2
+            exit 1
+          fi
+
+          image="$(ssh backup-target "docker inspect -f '{{.Config.Image}}' '$container'")"
+          server_version="$(ssh backup-target "docker exec '$container' psql -U postgres -d postgres -t -A -v ON_ERROR_STOP=1 -c 'show server_version;'")"
+
+          echo "container=$container" >> "$GITHUB_OUTPUT"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "server_version=$server_version" >> "$GITHUB_OUTPUT"
+
       - name: Create encrypted logical dump
         id: dump
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          DB_CONTAINER: ${{ steps.database.outputs.container }}
         run: |
           set -euo pipefail
           mkdir -p backup
           timestamp="$(date -u +'%Y%m%dT%H%M%SZ')"
-          dump_file="backup/${TARGET_ENV}-${timestamp}.dump"
-          encrypted_file="${dump_file}.gpg"
+          encrypted_file="backup/${TARGET_ENV}-${timestamp}.dump.gpg"
           checksum_file="${encrypted_file}.sha256"
+          metadata_file="${encrypted_file}.metadata.txt"
 
-          pg_dump \
-            --format=custom \
-            --no-owner \
-            --no-privileges \
-            --file "$dump_file" \
-            "$SUPABASE_DB_URL"
+          ssh backup-target \
+            "docker exec '$DB_CONTAINER' pg_dump -U postgres -d postgres --format=custom --no-owner --no-privileges" \
+            | gpg \
+                --batch \
+                --yes \
+                --pinentry-mode loopback \
+                --passphrase "$DB_BACKUP_GPG_PASSPHRASE" \
+                --symmetric \
+                --cipher-algo AES256 \
+                --output "$encrypted_file"
 
+          sha256sum "$encrypted_file" > "$checksum_file"
+
+          {
+            echo "environment=$TARGET_ENV"
+            echo "created_at_utc=$timestamp"
+            echo "database_image=${{ steps.database.outputs.image }}"
+            echo "postgres_version=${{ steps.database.outputs.server_version }}"
+            echo "github_sha=$GITHUB_SHA"
+            echo "github_run_id=$GITHUB_RUN_ID"
+          } > "$metadata_file"
+
+          echo "encrypted_file=${encrypted_file}" >> "$GITHUB_OUTPUT"
+          echo "checksum_file=${checksum_file}" >> "$GITHUB_OUTPUT"
+          echo "metadata_file=${metadata_file}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$(basename "$encrypted_file")" >> "$GITHUB_OUTPUT"
+
+      - name: Validate encrypted archive
+        env:
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          DB_CONTAINER: ${{ steps.database.outputs.container }}
+        run: |
+          set -euo pipefail
+          sha256sum --check "${{ steps.dump.outputs.checksum_file }}"
           gpg \
             --batch \
             --yes \
             --pinentry-mode loopback \
             --passphrase "$DB_BACKUP_GPG_PASSPHRASE" \
-            --symmetric \
-            --cipher-algo AES256 \
-            --output "$encrypted_file" \
-            "$dump_file"
-
-          rm -f "$dump_file"
-          sha256sum "$encrypted_file" > "$checksum_file"
-
-          echo "encrypted_file=${encrypted_file}" >> "$GITHUB_OUTPUT"
-          echo "checksum_file=${checksum_file}" >> "$GITHUB_OUTPUT"
-          echo "artifact_name=$(basename "$encrypted_file")" >> "$GITHUB_OUTPUT"
+            --decrypt "${{ steps.dump.outputs.encrypted_file }}" \
+            | ssh backup-target "docker exec -i '$DB_CONTAINER' pg_restore --list >/dev/null"
 
       - name: Upload encrypted dump to S3
         if: ${{ env.DB_BACKUP_S3_BUCKET != '' }}
@@ -105,6 +192,9 @@ jobs:
           aws s3 cp "${{ steps.dump.outputs.checksum_file }}" \
             "s3://${DB_BACKUP_S3_BUCKET}/${DB_BACKUP_S3_PREFIX}/${TARGET_ENV}/${{ steps.dump.outputs.artifact_name }}.sha256" \
             --sse AES256
+          aws s3 cp "${{ steps.dump.outputs.metadata_file }}" \
+            "s3://${DB_BACKUP_S3_BUCKET}/${DB_BACKUP_S3_PREFIX}/${TARGET_ENV}/${{ steps.dump.outputs.artifact_name }}.metadata.txt" \
+            --sse AES256
 
       - name: Upload encrypted dump artifact
         uses: actions/upload-artifact@v4
@@ -113,6 +203,7 @@ jobs:
           path: |
             ${{ steps.dump.outputs.encrypted_file }}
             ${{ steps.dump.outputs.checksum_file }}
+            ${{ steps.dump.outputs.metadata_file }}
           retention-days: 7
 
       - name: Summary
@@ -122,6 +213,9 @@ jobs:
             echo "### Database Backup"
             echo ""
             echo "- Environment: \`${TARGET_ENV}\`"
+            echo "- Database image: \`${{ steps.database.outputs.image }}\`"
+            echo "- PostgreSQL version: \`${{ steps.database.outputs.server_version }}\`"
             echo "- Encrypted artifact: \`${{ steps.dump.outputs.artifact_name }}\`"
+            echo "- Archive validation: encrypted checksum + pg_restore catalogue"
             echo "- S3 upload configured: \`${DB_BACKUP_S3_BUCKET:+yes}\`"
           } >> "$GITHUB_STEP_SUMMARY"
