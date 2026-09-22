@@ -87,6 +87,7 @@ export interface TicketRecord {
   first_responded_at: string | null;
   approval_instance_id: string | null;
   approval_status: InternalRequestApprovalMetadata['status'] | null;
+  current_approval_step_id?: string | null;
   current_approval_step_name: string | null;
   current_approver_role: string | null;
   current_approver_user_id: string | null;
@@ -315,6 +316,7 @@ type TicketRow = TicketDbRow;
 type TicketDbRow = Database['public']['Tables']['tickets']['Row'] & {
   approval_instance_id?: string | null;
   approval_status?: InternalRequestApprovalMetadata['status'] | null;
+  current_approval_step_id?: string | null;
   current_approval_step_name?: string | null;
   current_approver_role?: string | null;
   current_approver_user_id?: string | null;
@@ -447,6 +449,7 @@ function mapTicket(row: TicketDbRow): TicketRecord {
     first_responded_at: row.first_responded_at ?? null,
     approval_instance_id: row.approval_instance_id ?? null,
     approval_status: row.approval_status ?? null,
+    current_approval_step_id: row.current_approval_step_id ?? null,
     current_approval_step_name: row.current_approval_step_name ?? null,
     current_approver_role: row.current_approver_role ?? null,
     current_approver_user_id: row.current_approver_user_id ?? null,
@@ -853,6 +856,7 @@ function attachApprovalMetadata<T extends TicketRecord>(
     ...ticket,
     approval_instance_id: approval.id,
     approval_status: approval.status,
+    current_approval_step_id: approval.currentStepId,
     current_approval_step_name: approval.currentStepName,
     current_approver_role: approval.currentApproverRole,
     current_approver_user_id: approval.currentApproverUserId,
@@ -1185,7 +1189,7 @@ function canReviewTicketApproval(
   ticket: CompanyTicketRecord,
   user: { id: string; role?: string | null },
 ) {
-  if (ticket.approval_status !== 'pending') return false;
+  if (ticket.approval_status !== 'pending' || !ticket.current_approval_step_id) return false;
   if (ticket.current_approver_user_id) return ticket.current_approver_user_id === user.id;
   if (ticket.current_approver_role) return user.role === 'super_admin' || user.role === 'company_admin';
   return false;
@@ -2476,6 +2480,7 @@ async function executeTicketTransitionCommand(
     case 'reject_step': {
       const review = await reviewInternalRequestApproval(
         ticketId,
+        command.payload.expectedStepId,
         command.payload.kind === 'approve_step' ? 'approved' : 'rejected',
         command.payload.note ?? undefined,
         context,
