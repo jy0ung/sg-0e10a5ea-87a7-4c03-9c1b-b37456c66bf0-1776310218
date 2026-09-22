@@ -12,6 +12,7 @@ import {
   getInternalRequestApprovalPlan,
   listInternalRequestApprovalMetadata,
   reviewInternalRequestApproval,
+  canProfileReviewInternalRequestApproval,
   canTransition,
   createTicketWorkflowUseCases,
   getAvailableTicketActions,
@@ -1185,16 +1186,6 @@ async function getCompanyTicketById(ticketId: string, companyId: string): Promis
   return ticket ?? null;
 }
 
-function canReviewTicketApproval(
-  ticket: CompanyTicketRecord,
-  user: { id: string; role?: string | null },
-) {
-  if (ticket.approval_status !== 'pending' || !ticket.current_approval_step_id) return false;
-  if (ticket.current_approver_user_id) return ticket.current_approver_user_id === user.id;
-  if (ticket.current_approver_role) return user.role === 'super_admin' || user.role === 'company_admin';
-  return false;
-}
-
 export async function getTicketWorkspaceData(
   ticketId: string,
   context: { userId: string; companyId: string; userRole?: string | null; canManagePortalQueue?: boolean },
@@ -1205,7 +1196,21 @@ export async function getTicketWorkspaceData(
 
     const canManagePortalQueue = Boolean(context.canManagePortalQueue);
     const isRequester = ticket.submitted_by === context.userId;
-    if (!isRequester && !canManagePortalQueue) {
+    const reviewPermission = await canProfileReviewInternalRequestApproval(
+      context.companyId,
+      ticket.id,
+      context.userId,
+    );
+    if (reviewPermission.error) {
+      loggingService.warn(
+        'Failed to resolve canonical Internal Request approval permission',
+        { error: reviewPermission.error, ticketId: ticket.id, userId: context.userId },
+        'TicketService',
+      );
+    }
+    const canReviewApproval = reviewPermission.data;
+
+    if (!isRequester && !canManagePortalQueue && !canReviewApproval) {
       return { data: null, error: new Error('You do not have access to this request.') };
     }
 
@@ -1214,7 +1219,7 @@ export async function getTicketWorkspaceData(
       canCloseAsRequester: isRequester,
       canViewInternalNotes: canManagePortalQueue,
       canViewAuditTrail: canManagePortalQueue,
-      canReviewApproval: canReviewTicketApproval(ticket, { id: context.userId, role: context.userRole }),
+      canReviewApproval,
     };
 
     const [{ data: activitiesByTicket }, { data: chatSummariesByTicket }, internalNoteResult, auditResult] = await Promise.all([
