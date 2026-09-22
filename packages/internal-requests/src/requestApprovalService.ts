@@ -8,7 +8,12 @@ import {
   type ApprovalStepRecord,
 } from '@flc/hrms-services';
 import { createNotifications, logUserAction } from '@flc/platform-services';
-import { resolveApprovalFlowId } from './approvalFlowResolver';
+import {
+  resolveInternalRequestApprovalFlowId,
+  type InternalRequestApprovalPlanOptions,
+} from './approvalFlowResolver';
+
+export type { InternalRequestApprovalPlanOptions } from './approvalFlowResolver';
 
 export interface InternalRequestApprovalPlan {
   flowId: string;
@@ -57,95 +62,17 @@ function mapApproval(row: ApprovalInstanceRow): InternalRequestApprovalMetadata 
   };
 }
 
-/**
- * Optional category/priority context used when resolving which approval flow
- * a request should follow.
- *
- * Resolution order (most specific wins, first non-null result returned):
- *   1. `subcategoryKey` → `request_subcategories.approval_flow_id`
- *   2. `categoryKey`    → `request_categories.approval_flow_id`
- *   3. department-scoped scorer / company default
- *
- * `priority` is accepted for forward-compatibility with future condition-rule
- * routing; it is currently informational.
- */
-export interface InternalRequestApprovalPlanOptions {
-  categoryKey?: string | null;
-  subcategoryKey?: string | null;
-  priority?: string | null;
-}
-
-/**
- * Look up the approval flow id pinned directly on a request_categories row,
- * if any. Returns null when the category is unknown or has no pinning.
- */
-async function getCategoryPinnedFlowId(
-  companyId: string,
-  categoryKey: string | null | undefined,
-): Promise<string | null> {
-  if (!categoryKey) return null;
-  // approval_flow_id was added in migration 20260518030000 — the generated
-  // database types are older and miss the column, so narrow the row shape
-  // at the call site rather than the table accessor.
-  const { data } = await supabase.from('request_categories')
-    .select('approval_flow_id')
-    .eq('company_id', companyId)
-    .eq('category_key', categoryKey)
-    .maybeSingle<{ approval_flow_id: string | null }>();
-  return data?.approval_flow_id ?? null;
-}
-
-/**
- * Look up the approval flow id pinned directly on a request_subcategories row,
- * if any. Takes priority over the category-level pin so a single subcategory
- * can override its parent's default.
- */
-async function getSubcategoryPinnedFlowId(
-  companyId: string,
-  categoryKey: string | null | undefined,
-  subcategoryKey: string | null | undefined,
-): Promise<string | null> {
-  if (!categoryKey || !subcategoryKey) return null;
-  // approval_flow_id was added in migration 20260527020000 — see the
-  // category-pin helper above for the same generated-types caveat.
-  const { data } = await supabase.from('request_subcategories')
-    .select('approval_flow_id')
-    .eq('company_id', companyId)
-    .eq('category_key', categoryKey)
-    .eq('subcategory_key', subcategoryKey)
-    .maybeSingle<{ approval_flow_id: string | null }>();
-  return data?.approval_flow_id ?? null;
-}
-
 export async function getInternalRequestApprovalPlan(
   companyId: string,
   requesterId: string,
   options: InternalRequestApprovalPlanOptions = {},
 ): Promise<{ data: InternalRequestApprovalPlan | null; error: string | null }> {
   try {
-    // Look up requester's department for department-scoped flow resolution
-    const { data: requesterProfile } = await supabase.from('profiles')
-      .select('department_id')
-      .eq('id', requesterId)
-      .maybeSingle();
-    const departmentId = requesterProfile?.department_id ?? null;
-
-    // Resolution order (most specific wins):
-    //   1. subcategory pin — migration 20260527020000_request_subcategories_approval_flow_fk
-    //   2. category pin    — migration 20260518030000_request_categories_approval_flow_fk
-    //   3. department-scoped / company-default scorer in approvalFlowService
-    // Lookups are sequenced rather than parallel because the more specific pin
-    // short-circuits the rest; if subcategoryKey is unset, the call is a no-op
-    // round-trip back to the caller.
-    const subcategoryPinnedFlowId = await getSubcategoryPinnedFlowId(
+    const flowId = await resolveInternalRequestApprovalFlowId(
       companyId,
-      options.categoryKey,
-      options.subcategoryKey,
+      requesterId,
+      options,
     );
-    const categoryPinnedFlowId = subcategoryPinnedFlowId
-      ?? await getCategoryPinnedFlowId(companyId, options.categoryKey);
-    const flowId = categoryPinnedFlowId
-      ?? await resolveApprovalFlowId(companyId, 'internal_request', departmentId);
     if (!flowId) return { data: null, error: null };
 
     const { data: steps, error: stepsError } = await supabase.from('approval_steps')
