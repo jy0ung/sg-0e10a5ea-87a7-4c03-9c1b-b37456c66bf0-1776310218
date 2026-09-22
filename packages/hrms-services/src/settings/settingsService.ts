@@ -17,6 +17,7 @@ import type {
   UpdateJobTitleInput,
   LeaveType,
   CreateLeaveTypeInput,
+  UpdateLeaveTypeInput,
   PublicHoliday,  CreateHolidayInput,
   UpdateHolidayInput,
   HrmsRole,
@@ -365,53 +366,81 @@ export async function createLeaveType(
   companyId: string,
   input: CreateLeaveTypeInput,
 ): Promise<LeaveType> {
-  const { data, error } = await supabase
+  // Generated Supabase types lag requires_balance/min_advance_notice_days.
+  // Keep the untyped boundary local to this table until type generation catches up.
+  const { data, error } = await (supabase as any)
     .from('leave_types')
     .insert({
-      company_id:   companyId,
-      name:         input.name,
-      code:         input.code,
-      days_per_year:input.daysPerYear,
-      default_days: input.defaultDays ?? input.daysPerYear,
-      carry_forward:input.carryForward ?? false,
-      is_paid:      input.isPaid,
-      active:       input.active,
+      company_id:               companyId,
+      name:                     input.name,
+      code:                     input.code.toUpperCase(),
+      days_per_year:            input.daysPerYear,
+      default_days:             input.defaultDays ?? input.daysPerYear,
+      carry_forward:            input.carryForward ?? true,
+      is_paid:                  input.isPaid,
+      requires_balance:         input.requiresBalance ?? true,
+      min_advance_notice_days:  input.minAdvanceNoticeDays ?? null,
+      active:                   input.active,
     })
     .select('*')
     .single();
-  if (error) throw new Error(error.message);
+  if (error) throw new Error((error as { message: string }).message);
   return rowToLeaveType(data as Record<string, unknown>);
 }
 
 export async function updateLeaveType(
   companyId: string,
   id: string,
-  input: Partial<CreateLeaveTypeInput>,
+  input: UpdateLeaveTypeInput,
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('leave_types')
     .update({
-      ...(input.name !== undefined && { name: input.name }),
-      ...(input.code !== undefined && { code: input.code }),
-      ...(input.daysPerYear !== undefined && { days_per_year: input.daysPerYear, default_days: input.daysPerYear }),
-      ...(input.defaultDays !== undefined && { default_days: input.defaultDays }),
-      ...(input.carryForward !== undefined && { carry_forward: input.carryForward }),
-      ...(input.isPaid !== undefined && { is_paid: input.isPaid }),
-      ...(input.active !== undefined && { active: input.active }),
-      updated_at: new Date().toISOString(),
+      name:                     input.name,
+      code:                     input.code.toUpperCase(),
+      days_per_year:            input.daysPerYear,
+      default_days:             input.defaultDays ?? input.daysPerYear,
+      carry_forward:            input.carryForward ?? true,
+      is_paid:                  input.isPaid,
+      requires_balance:         input.requiresBalance ?? true,
+      min_advance_notice_days:  input.minAdvanceNoticeDays ?? null,
+      active:                   input.active,
+      updated_at:               new Date().toISOString(),
     })
     .eq('company_id', companyId)
     .eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) throw new Error((error as { message: string }).message);
 }
 
-export async function deleteLeaveType(companyId: string, id: string): Promise<void> {
+export type DeleteLeaveTypeResult = 'deactivated' | 'deleted';
+
+export async function deleteLeaveType(
+  companyId: string,
+  id: string,
+): Promise<DeleteLeaveTypeResult> {
+  const { count, error: countError } = await supabase
+    .from('leave_balances')
+    .select('id', { count: 'exact', head: true })
+    .eq('leave_type_id', id);
+  if (countError) throw new Error(countError.message);
+
+  if ((count ?? 0) > 0) {
+    const { error } = await supabase
+      .from('leave_types')
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .eq('company_id', companyId)
+      .eq('id', id);
+    if (error) throw new Error(`Could not deactivate: ${error.message}`);
+    return 'deactivated';
+  }
+
   const { error } = await supabase
     .from('leave_types')
     .delete()
     .eq('company_id', companyId)
     .eq('id', id);
   if (error) throw new Error(error.message);
+  return 'deleted';
 }
 
 // ─── Public holidays (admin) ──────────────────────────────────────────────────

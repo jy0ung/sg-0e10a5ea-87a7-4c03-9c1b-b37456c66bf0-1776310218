@@ -1,6 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const untypedSupabase = supabase as any;
 import { logUserAction } from '@/services/auditService';
 import {
   listDepartments as listCanonicalDepartments,
@@ -11,6 +9,10 @@ import {
   createJobTitle as createCanonicalJobTitle,
   updateJobTitle as updateCanonicalJobTitle,
   deleteJobTitle as deleteCanonicalJobTitle,
+  listAllLeaveTypes as listCanonicalLeaveTypes,
+  createLeaveType as createCanonicalLeaveType,
+  updateLeaveType as updateCanonicalLeaveType,
+  deleteLeaveType as deleteCanonicalLeaveType,
 } from '@flc/hrms-services';
 import type {
   Department, CreateDepartmentInput, UpdateDepartmentInput,
@@ -137,33 +139,16 @@ export async function deleteJobTitle(
 // LEAVE TYPES (admin CRUD — listLeaveTypes is in hrmsService.ts)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function rowToLeaveType(r: Record<string, unknown>): LeaveType {
-  return {
-    id:                   String(r.id ?? ''),
-    companyId:            String(r.company_id ?? ''),
-    name:                 String(r.name ?? ''),
-    code:                 String(r.code ?? ''),
-    daysPerYear:          Number(r.days_per_year),
-    defaultDays:          Number(r.default_days ?? r.days_per_year),
-    carryForward:         Boolean(r.carry_forward ?? true),
-    isPaid:               Boolean(r.is_paid),
-    requiresBalance:      r.requires_balance != null ? Boolean(r.requires_balance) : true,
-    minAdvanceNoticeDays: r.min_advance_notice_days != null ? Number(r.min_advance_notice_days) : null,
-    active:               Boolean(r.active),
-    createdAt:            String(r.created_at ?? ''),
-    updatedAt:            String(r.updated_at ?? ''),
-  };
-}
-
 /** List ALL leave types (including inactive) for admin use. */
-export async function listAllLeaveTypes(companyId: string): Promise<{ data: LeaveType[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from('leave_types')
-    .select('*')
-    .eq('company_id', companyId)
-    .order('name');
-  if (error) return { data: [], error: error.message };
-  return { data: (data ?? []).map(r => rowToLeaveType(r as Record<string, unknown>)), error: null };
+export async function listAllLeaveTypes(
+  companyId: string,
+): Promise<{ data: LeaveType[]; error: string | null }> {
+  try {
+    const data = await listCanonicalLeaveTypes(companyId);
+    return { data: data as LeaveType[], error: null };
+  } catch (error) {
+    return { data: [], error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function createLeaveType(
@@ -171,26 +156,16 @@ export async function createLeaveType(
   actorId: string,
   input: CreateLeaveTypeInput,
 ): Promise<{ data: LeaveType | null; error: string | null }> {
-  // TODO: Replace untypedSupabase after Database generated types include requires_balance + min_advance_notice_days columns.
-  const { data, error } = await untypedSupabase
-    .from('leave_types')
-    .insert({
-      company_id:               companyId,
-      name:                     input.name,
-      code:                     input.code.toUpperCase(),
-      days_per_year:            input.daysPerYear,
-      default_days:             input.defaultDays ?? input.daysPerYear,
-      carry_forward:            input.carryForward ?? true,
-      is_paid:                  input.isPaid,
-      requires_balance:         input.requiresBalance ?? true,
-      min_advance_notice_days:  input.minAdvanceNoticeDays ?? null,
-      active:                   input.active,
-    })
-    .select('*')
-    .single();
-  if (error) return { data: null, error: error.message };
-  void logUserAction(actorId, 'create', 'leave_type', String(data.id), { name: input.name, code: input.code });
-  return { data: rowToLeaveType(data as Record<string, unknown>), error: null };
+  try {
+    const data = await createCanonicalLeaveType(companyId, input);
+    void logUserAction(actorId, 'create', 'leave_type', String(data.id), {
+      name: input.name,
+      code: input.code,
+    });
+    return { data: data as LeaveType, error: null };
+  } catch (error) {
+    return { data: null, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 export async function updateLeaveType(
@@ -199,46 +174,32 @@ export async function updateLeaveType(
   actorId: string,
   input: UpdateLeaveTypeInput,
 ): Promise<{ error: string | null }> {
-  // TODO: Replace untypedSupabase after Database generated types include requires_balance + min_advance_notice_days columns.
-  const { error } = await untypedSupabase
-    .from('leave_types')
-    .update({
-      name:                     input.name,
-      code:                     input.code.toUpperCase(),
-      days_per_year:            input.daysPerYear,
-      default_days:             input.defaultDays ?? input.daysPerYear,
-      carry_forward:            input.carryForward ?? true,
-      is_paid:                  input.isPaid,
-      requires_balance:         input.requiresBalance ?? true,
-      min_advance_notice_days:  input.minAdvanceNoticeDays ?? null,
-      active:                   input.active,
-      updated_at:               new Date().toISOString(),
-    })
-    .eq('company_id', companyId)
-    .eq('id', id);
-  if (!error) void logUserAction(actorId, 'update', 'leave_type', id, { name: input.name });
-  return { error: error?.message ?? null };
+  try {
+    await updateCanonicalLeaveType(companyId, id, input);
+    void logUserAction(actorId, 'update', 'leave_type', id, { name: input.name });
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
-/** Soft delete: deactivates the leave type. Hard delete only if no balances reference it. */
-export async function deleteLeaveType(companyId: string, id: string, actorId: string): Promise<{ error: string | null }> {
-  const { count } = await supabase
-    .from('leave_balances')
-    .select('id', { count: 'exact', head: true })
-    .eq('leave_type_id', id);
-  if ((count ?? 0) > 0) {
-    // Soft delete: just deactivate
-    const { error } = await supabase
-      .from('leave_types')
-      .update({ active: false, updated_at: new Date().toISOString() })
-      .eq('company_id', companyId)
-      .eq('id', id);
-    if (!error) void logUserAction(actorId, 'update', 'leave_type', id, { action: 'deactivated' });
-    return { error: error ? `Could not deactivate: ${error.message}` : null };
+/** Soft-deactivates referenced Leave Types; hard-deletes unreferenced ones. */
+export async function deleteLeaveType(
+  companyId: string,
+  id: string,
+  actorId: string,
+): Promise<{ error: string | null }> {
+  try {
+    const result = await deleteCanonicalLeaveType(companyId, id);
+    if (result === 'deactivated') {
+      void logUserAction(actorId, 'update', 'leave_type', id, { action: 'deactivated' });
+    } else {
+      void logUserAction(actorId, 'delete', 'leave_type', id, {});
+    }
+    return { error: null };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
   }
-  const { error } = await supabase.from('leave_types').delete().eq('company_id', companyId).eq('id', id);
-  if (!error) void logUserAction(actorId, 'delete', 'leave_type', id, {});
-  return { error: error?.message ?? null };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
