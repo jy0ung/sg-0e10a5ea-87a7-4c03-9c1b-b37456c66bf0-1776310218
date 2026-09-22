@@ -48,6 +48,16 @@ describe('database backup workflow safety boundary', () => {
     expect(artifactStep).not.toContain('dump_file');
   });
 
+  it('records non-sensitive restore metadata without weakening transport safety', () => {
+    expect(workflow).toContain('- name: Capture backup source metadata');
+    expect(workflow).toContain('postgres_version=');
+    expect(workflow).toContain('database_image=');
+    expect(workflow).toContain('metadata_file=');
+    expect(workflow).toContain('${{ steps.dump.outputs.metadata_file }}');
+    expect(workflow).toContain('PGDATABASE="$SUPABASE_DB_URL" pg_dump');
+    expect(workflow).not.toContain('pg_dump "$SUPABASE_DB_URL"');
+  });
+
   it('cleans plaintext even when encryption or upload preparation fails', () => {
     expect(workflow).toContain('trap cleanup_plaintext EXIT');
     expect(workflow).toContain('cleanup_plaintext');
