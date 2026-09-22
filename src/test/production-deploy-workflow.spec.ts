@@ -14,12 +14,9 @@ describe('production deploy workflow safety boundary', () => {
   });
 
   it('installs Chromium whenever production verification runs', () => {
-    const installStep = [
-      '- name: Install Playwright Chromium for production verification',
-      'run: npx playwright install --with-deps chromium',
-    ].join('\n');
-
-    expect(workflow).toContain(installStep);
+    expect(workflow).toMatch(
+      /- name: Install Playwright Chromium for production verification\n\s+run: npx playwright install --with-deps chromium/,
+    );
     expect(workflow).not.toMatch(
       /Install Playwright Chromium for production verification\n\s+if:/,
     );
