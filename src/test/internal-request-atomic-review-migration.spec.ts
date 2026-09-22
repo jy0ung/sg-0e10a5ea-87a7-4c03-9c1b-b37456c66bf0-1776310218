@@ -31,7 +31,7 @@ describe('Internal Request atomic approval review migration', () => {
     expect(migration).toContain(
       'Approval review is stale because the current step has changed',
     );
-    expect(migration).toContain("ERRCODE = '40001'");
+    expect(migration).toContain("RAISE SQLSTATE 'PT409'");
   });
 
   it('keeps Decision, Instance, Ticket, and Activity state in one command', () => {
