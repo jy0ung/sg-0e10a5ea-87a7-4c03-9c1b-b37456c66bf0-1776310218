@@ -54,16 +54,36 @@ the archive as a stream into the database container's matching `pg_restore
 --list`. This validates encryption/decryption and archive readability, but it
 is **not** a substitute for the separate full restore drill.
 
-## Restore drill (monthly)
+## Logical dump restore drill
+
+`.github/workflows/db-restore-drill.yml` is a manual safety workflow for encrypted
+logical dumps. It:
+
+1. downloads a successful `Database Backup` Actions artifact;
+2. validates its checksum and environment metadata;
+3. starts an isolated scratch Postgres container using the exact database image
+   recorded by the backup;
+4. decrypts the dump only as a stream into `pg_restore`;
+5. restores to a scratch database, never production;
+6. verifies critical UBS relations and the Supabase migration ledger;
+7. uploads non-sensitive restore evidence; and
+8. destroys the scratch container and volume.
+
+Run this after backup changes and periodically thereafter. A successful logical
+restore proves that the encrypted archive is usable; it does not prove PITR.
+
+## PITR restore drill (monthly)
 
 1. Pick a timestamp T within the PITR window on the **production** project.
-2. Use the Supabase dashboard to restore the DB into a **new** staging project at T.
-3. Deploy the matching git tag to the restored project.
-4. Run the e2e smoke suite (`npm run test:e2e`) against the restored stack.
+2. Restore into a **new isolated target**, never over the live database during a drill.
+3. Deploy the matching immutable application image/tag to the restored target.
+4. Run the release smoke suite against the restored stack.
 5. Record pass/fail + duration in `docs/DR_DRILLS.md`.
-6. Tear down the scratch staging project.
+6. Tear down the scratch target.
 
-Target RTO: ≤ 2 hours. Target RPO: ≤ 5 minutes (PITR granularity).
+Target RTO: ≤ 2 hours. Target RPO: ≤ 5 minutes when PITR is actually enabled and
+configured with that granularity. The nightly logical dump has a separate,
+coarser RPO and must not be described as meeting the PITR target.
 
 ## Incident-driven restore (prod)
 
