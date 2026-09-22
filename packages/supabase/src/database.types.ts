@@ -1869,6 +1869,7 @@ export type Database = {
           model_id: string | null
           model_name: string | null
           notes: string | null
+          sales_advisor_employee_id: string | null
           sales_advisor_id: string | null
           sales_advisor_name: string | null
           selling_price: number | null
@@ -1906,6 +1907,7 @@ export type Database = {
           model_id?: string | null
           model_name?: string | null
           notes?: string | null
+          sales_advisor_employee_id?: string | null
           sales_advisor_id?: string | null
           sales_advisor_name?: string | null
           selling_price?: number | null
@@ -1943,6 +1945,7 @@ export type Database = {
           model_id?: string | null
           model_name?: string | null
           notes?: string | null
+          sales_advisor_employee_id?: string | null
           sales_advisor_id?: string | null
           sales_advisor_name?: string | null
           selling_price?: number | null
@@ -1990,6 +1993,13 @@ export type Database = {
             columns: ["model_id"]
             isOneToOne: false
             referencedRelation: "vehicle_models"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_sales_advisor_employee_id_fkey"
+            columns: ["sales_advisor_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
           {
