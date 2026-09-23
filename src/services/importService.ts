@@ -366,7 +366,6 @@ export async function commitImportBatch(
       reg_to_delivery: vehicle.reg_to_delivery ?? null,
       bg_to_disb: vehicle.bg_to_disb ?? null,
       delivery_to_disb: vehicle.delivery_to_disb ?? null,
-      salesman_id: vehicle.salesman_id ?? null,
       company_id: companyId,
     }));
 
