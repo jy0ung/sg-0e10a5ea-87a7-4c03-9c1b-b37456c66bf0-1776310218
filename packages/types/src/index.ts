@@ -751,7 +751,7 @@ export interface VehicleCanonical {
   // Incomplete-record flags — set when vehicle was imported with missing reference/person data
   is_incomplete?: boolean;
   pending_fields?: string[];
-  // HRMS link — resolved profile UUID of the salesman
+  // Compatibility Profile link for a locally assigned salesperson. Import source names must not populate this field.
   salesman_id?: string | null;
 }
 

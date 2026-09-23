@@ -8,7 +8,6 @@ export function publishCanonical(
   rows: VehicleRaw[],
   branchMap?: Map<string, string>,
   paymentMap?: Map<string, string>,
-  nameToIdMap?: Map<string, string>,
 ): { canonical: VehicleCanonical[]; issues: DataQualityIssue[] } {
   try {
     const grouped = new Map<string, VehicleRaw[]>();
@@ -106,9 +105,6 @@ export function publishCanonical(
         delivery_to_disb: diffDays(normalizedDates.delivery_date, normalizedDates.disb_date),
         is_incomplete: pendingFields.length > 0,
         pending_fields: pendingFields.length > 0 ? pendingFields : undefined,
-        salesman_id: (nameToIdMap && best.salesman_name)
-          ? (nameToIdMap.get(best.salesman_name) ?? null)
-          : null,
       };
 
       vehicle.stage = deriveVehicleStage(vehicle);

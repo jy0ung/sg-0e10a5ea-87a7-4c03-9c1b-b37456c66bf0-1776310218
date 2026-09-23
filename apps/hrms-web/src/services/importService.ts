@@ -6,7 +6,6 @@ import { loadBranchMappingLookup, loadPaymentMappingLookup } from "./mappingServ
 import { loggingService } from "./loggingService";
 import { performanceService } from "./performanceService";
 import { logVehicleEdit } from "./auditService";
-import { resolveNamesToIds } from "./hrmsService";
 import { validateImportBatch } from "./validationService";
 import type { ImportBatch, ImportBatchInsert, ValidationError, VehicleRaw } from "@/types";
 import type { ImportReviewRowInsertInput } from "@/lib/import-review";
@@ -225,17 +224,10 @@ export async function validateAndInsertVehicles(
       loadBranchMappingLookup(companyId),
       loadPaymentMappingLookup(companyId),
     ]);
-    const allNames = [...new Set(
-      vehicles
-        .map(vehicle => typeof vehicle.salesman_name === 'string' ? vehicle.salesman_name.trim() : '')
-        .filter(Boolean)
-    )];
-    const nameToIdMap = await resolveNamesToIds(companyId, allNames);
     const { canonical } = publishCanonical(
       vehicles as unknown as VehicleRaw[],
       branchLookup,
       paymentLookup,
-      nameToIdMap,
     );
 
     const dbVehicles = canonical.map((vehicle) => ({
@@ -274,7 +266,6 @@ export async function validateAndInsertVehicles(
       reg_to_delivery: vehicle.reg_to_delivery ?? null,
       bg_to_disb: vehicle.bg_to_disb ?? null,
       delivery_to_disb: vehicle.delivery_to_disb ?? null,
-      salesman_id: vehicle.salesman_id ?? null,
       company_id: companyId,
     }));
 
@@ -337,17 +328,7 @@ export async function commitImportBatch(
       loadBranchMappingLookup(companyId),
       loadPaymentMappingLookup(companyId),
     ]);
-    const allNames = [
-      ...new Set(
-        rows
-          .map((vehicle) =>
-            typeof vehicle.salesman_name === "string" ? vehicle.salesman_name.trim() : "",
-          )
-          .filter(Boolean),
-      ),
-    ];
-    const nameToIdMap = await resolveNamesToIds(companyId, allNames);
-    const { canonical } = publishCanonical(rows, branchLookup, paymentLookup, nameToIdMap);
+    const { canonical } = publishCanonical(rows, branchLookup, paymentLookup);
 
     const dbVehicles = canonical.map((vehicle) => ({
       chassis_no: vehicle.chassis_no,
@@ -385,7 +366,6 @@ export async function commitImportBatch(
       reg_to_delivery: vehicle.reg_to_delivery ?? null,
       bg_to_disb: vehicle.bg_to_disb ?? null,
       delivery_to_disb: vehicle.delivery_to_disb ?? null,
-      salesman_id: vehicle.salesman_id ?? null,
       company_id: companyId,
     }));
 

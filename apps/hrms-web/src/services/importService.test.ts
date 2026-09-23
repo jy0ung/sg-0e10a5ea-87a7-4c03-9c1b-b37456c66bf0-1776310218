@@ -1,14 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { commitImportBatch, validateAndInsertVehicles } from './importService';
 
-const { mockSupabase, mockLoadBranchMappingLookup, mockLoadPaymentMappingLookup, mockResolveNamesToIds } = vi.hoisted(() => ({
+const { mockSupabase, mockLoadBranchMappingLookup, mockLoadPaymentMappingLookup } = vi.hoisted(() => ({
   mockSupabase: {
     from: vi.fn(),
     rpc: vi.fn(),
   },
   mockLoadBranchMappingLookup: vi.fn(),
   mockLoadPaymentMappingLookup: vi.fn(),
-  mockResolveNamesToIds: vi.fn(),
 }));
 
 vi.mock('@/integrations/supabase/client', () => ({
@@ -18,10 +17,6 @@ vi.mock('@/integrations/supabase/client', () => ({
 vi.mock('./mappingService', () => ({
   loadBranchMappingLookup: mockLoadBranchMappingLookup,
   loadPaymentMappingLookup: mockLoadPaymentMappingLookup,
-}));
-
-vi.mock('./hrmsService', () => ({
-  resolveNamesToIds: mockResolveNamesToIds,
 }));
 
 vi.mock('./loggingService', () => ({
@@ -51,7 +46,6 @@ describe('ImportService', () => {
     vi.clearAllMocks();
     mockLoadBranchMappingLookup.mockResolvedValue(new Map());
     mockLoadPaymentMappingLookup.mockResolvedValue(new Map());
-    mockResolveNamesToIds.mockResolvedValue(new Map());
     mockSupabase.rpc.mockResolvedValue({ data: null, error: null });
   });
 
@@ -87,8 +81,12 @@ describe('ImportService', () => {
     expect(upsert).toHaveBeenCalledWith([
       expect.objectContaining({
         branch_code: 'KCH',
+        salesman_name: 'Jane Smith',
       }),
     ], { onConflict: 'chassis_no,company_id' });
+
+    const [vehiclePayload] = upsert.mock.calls[0][0] as Array<Record<string, unknown>>;
+    expect(vehiclePayload).not.toHaveProperty('salesman_id');
   });
 
   it('fills missing required text fields with incomplete placeholders', async () => {
@@ -251,9 +249,14 @@ describe('ImportService', () => {
     expect(result.error).toBeNull();
     expect(mockSupabase.rpc).toHaveBeenCalledWith('commit_import_batch', expect.objectContaining({
       p_vehicles: expect.arrayContaining([
-        expect.objectContaining({ chassis_no: 'ABC123456789', dealer_transfer_price: null }),
-        expect.objectContaining({ chassis_no: 'XYZ123456789', dealer_transfer_price: '45308' }),
+        expect.objectContaining({ chassis_no: 'ABC123456789', dealer_transfer_price: null, salesman_name: 'Jane Smith' }),
+        expect.objectContaining({ chassis_no: 'XYZ123456789', dealer_transfer_price: '45308', salesman_name: 'Jane Smith' }),
       ]),
     }));
+
+    const rpcPayload = mockSupabase.rpc.mock.calls[0][1] as { p_vehicles: Array<Record<string, unknown>> };
+    for (const vehicle of rpcPayload.p_vehicles) {
+      expect(vehicle).not.toHaveProperty('salesman_id');
+    }
   });
 });

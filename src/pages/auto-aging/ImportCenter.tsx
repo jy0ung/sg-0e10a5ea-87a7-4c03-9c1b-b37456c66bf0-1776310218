@@ -20,7 +20,6 @@ import { splitImportRowsForPublish } from '@/lib/import-review';
 import { loadBranchMappingLookup, loadPaymentMappingLookup, createBranchMapping } from '@/services/mappingService';
 import { validateVehicleImportBatch } from '@/services/validationService';
 import { createImportBatch, insertImportReviewRows, validateAndInsertVehicles } from '@/services/importService';
-import { resolveNamesToIds } from '@/services/hrmsService';
 import type { DataQualityIssue, ImportBatch, ImportBatchInsert, ImportStatus, VehicleRaw, ValidationError } from '@/types';
 import { loggingService } from '@flc/platform-services';
 
@@ -917,13 +916,11 @@ export default function ImportCenter() {
       }
 
       if (cleanRows.length > 0) {
-        const allNames = [...new Set(cleanRows.map(r => r.salesman_name).filter((n): n is string => Boolean(n)))];
-        const [branchMap, paymentMap, nameToIdMap] = await Promise.all([
+        const [branchMap, paymentMap] = await Promise.all([
           loadBranchMappingLookup(companyId),
           loadPaymentMappingLookup(companyId),
-          resolveNamesToIds(companyId, allNames),
         ]);
-        const { issues } = publishCanonical(cleanRows, branchMap, paymentMap, nameToIdMap);
+        const { issues } = publishCanonical(cleanRows, branchMap, paymentMap);
         addQualityIssues([...reviewValidation.previewIssues, ...issues]);
         // Server-side insert already happened in validateAndInsertVehicles.
         // Reload DataContext to pick up the new vehicles from DB.
