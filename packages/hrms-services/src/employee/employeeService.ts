@@ -209,8 +209,11 @@ export async function updateEmployee(
 }
 
 /**
- * Batch-resolves salesman names to profile IDs for a given company.
- * Returns a Map from original name string → profile UUID.
+ * Compatibility-only helper for legacy callers that still resolve display names
+ * to Profile IDs.
+ *
+ * @deprecated Do not use for imports, analytics, automation, or new identity
+ * relationships. Canonical cross-module identity must use stable IDs.
  */
 export async function resolveNamesToIds(
   companyId: string,
