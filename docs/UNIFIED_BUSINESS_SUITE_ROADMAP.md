@@ -18,12 +18,12 @@ Statuses describe architectural convergence, not whether a module has existing f
 
 | Epic | Status | Landed work / remaining exit evidence |
 |---|---|---|
-| 0 — Platform Safety | In Progress | Repository release, rollback, encrypted backup/restore controls landed. #48 still requires real backup, restore, PITR/storage and governance evidence. |
+| 0 — Platform Safety | In Progress | Repository release, rollback and backup/restore automation landed. #48 still requires final production recovery evidence; this does not block Dev/UAT feature work. Admin Backup & Recovery remains an application capability to build. |
 | 1 — Unified Business Core | In Progress | Employee/account separation, Deal ownership, Sales assignments, migration map and reconciliation pack landed. Authoritative full reconciliation is blocked by production schema lag. |
 | 2 — HRMS | In Progress | Job Title, Department, Leave Type, Holiday, role authority, history preservation and atomic Sales assignments landed. Broader lifecycle contracts and exit evidence remain. |
 | 3 — Workflow + Unified Inbox | In Progress | Canonical routing and atomic review landed. Unified Inbox and cross-domain outcome commands remain. |
 | 4 — Internal Requests | In Progress | Canonical flow selection and HRMS-role review authority landed. Broader domain-command integration remains. |
-| 5 — Sales + Inventory | In Progress | Employee-backed Deals and Vehicle import identity safeguards landed. Target/report caller migration (#94) is the current implementation slice; release and reconciliation remain gated. |
+| 5 — Sales + Inventory | In Progress | Employee-backed Deals, Vehicle import safeguards, and Employee-backed targets/reports (#94, PR #95) landed. Legacy identity reconciliation and production release remain separate. |
 | 6 — Commission | Not Started | Existing features still use salesperson names; convergence follows the target/report slice. |
 | 7 — Purchasing | Not Started | Existing functionality; convergence not systematically executed. |
 | 8 — Accounts | Not Started | Existing functionality; convergence not systematically executed. |
@@ -52,6 +52,8 @@ Verified against `origin/main@3a0da12df47a61d1a8ee081d3a9e14af44ec873f` and GitH
 
 ### Current checkpoint and dependency order
 
+[Web application UAT checkpoint](UBS_WEB_UAT_CHECKPOINT_2026-09-27.md) separates completed repository work, functional gaps and eventual production-infrastructure evidence. PRs #95–#97 are merged on `main`. The functional web application is now the priority; #48 production recovery evidence proceeds independently.
+
 [Business Core reconciliation and Sales identity evidence](BUSINESS_CORE_RECONCILIATION_2026-09-27.md) records the measured limits and the implementation/rollout contract.
 
 1. Rebaseline tracking and supersede contradictory architecture guidance.
@@ -61,7 +63,7 @@ Verified against `origin/main@3a0da12df47a61d1a8ee081d3a9e14af44ec873f` and GitH
 5. Converge Commission identity, then introduce canonical Vehicle ownership with deterministic evidence.
 6. Migrate remaining Profile workforce callers; physical FK hardening and compatibility retirement come last.
 
-#48 remains open independently. Repository tests never stand in for production recovery or governance evidence.
+#48 remains open independently. Repository tests never stand in for production recovery or governance evidence; missing final production infrastructure must not stop Dev/UAT feature development.
 
 ## Product direction
 
@@ -96,7 +98,7 @@ Proton DMS remains an upstream authority for Proton/HQ facts. FLC UBS is authori
 
 ### Epic 0 — Platform Safety
 
-**Objective:** Make production releases and recovery trustworthy before broad feature work.
+**Objective:** Make production releases and recovery trustworthy while web application feature work continues on isolated Dev/UAT infrastructure.
 
 Outcomes:
 - production deploy verification cannot false-red after a successful promotion;
@@ -105,7 +107,7 @@ Outcomes:
 - database backup completes successfully and a restore drill is evidenced;
 - branch/release governance is strengthened.
 
-This remains P0 and may proceed in parallel with documentation-only architecture work.
+This remains a production release requirement. It proceeds in parallel with application implementation and does not gate ordinary Dev/UAT feature work. Provider-neutral Admin Backup & Recovery is a separate product capability.
 
 ### Epic 1 — Unified Business Core
 
@@ -301,11 +303,9 @@ Analytics may combine domains for reading, but must not become a write path back
 
 ## Delivery order
 
-The practical sequence is:
+The architectural dependency sequence is:
 
 ```
-Platform Safety
-    +
 Architecture Baseline
     |
 Unified Business Core
@@ -330,6 +330,8 @@ Unified Analytics
 ```
 
 Some existing modules are already ahead of this sequence. The order describes **architectural convergence and dependency**, not a requirement to stop using capabilities already in production.
+
+Production Platform Safety (#48) runs in parallel; its final infrastructure evidence gates production promotion, not functional web-app implementation. Admin Backup & Recovery product capability is tracked in the [web UAT checkpoint](UBS_WEB_UAT_CHECKPOINT_2026-09-27.md).
 
 ## Change-control rule
 
