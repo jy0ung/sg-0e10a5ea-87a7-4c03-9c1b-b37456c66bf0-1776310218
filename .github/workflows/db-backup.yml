@@ -33,6 +33,7 @@ jobs:
       TARGET_ENV: ${{ github.event.inputs.environment || 'production' }}
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       DB_BACKUP_GPG_PASSPHRASE: ${{ secrets.DB_BACKUP_GPG_PASSPHRASE }}
+      DB_BACKUP_CONTAINER: ${{ vars.DB_BACKUP_CONTAINER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
       SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -75,6 +76,11 @@ jobs:
 
           if [[ "$missing" -ne 0 ]]; then
             echo "Backup requires either SUPABASE_DB_URL or the complete Cloudflare Access SSH credential set." >&2
+            exit 1
+          fi
+
+          if [[ ! "${DB_BACKUP_CONTAINER:-}" =~ ^supabase_db_[A-Za-z0-9_-]+$ ]]; then
+            echo "SSH backup requires an exact DB_BACKUP_CONTAINER environment variable." >&2
             exit 1
           fi
 
@@ -139,11 +145,10 @@ jobs:
           if [[ "$BACKUP_TRANSPORT" == "direct" ]]; then
             postgres_version="$(PGDATABASE="$SUPABASE_DB_URL" psql -t -A -v ON_ERROR_STOP=1 -c 'show server_version;')"
           elif [[ "$BACKUP_TRANSPORT" == "ssh" ]]; then
-            database_container="$(
-              ssh -T backup-target "docker ps --format '{{.Names}}' | grep -E '^supabase_db_' | head -1"
-            )"
-            if [[ -z "$database_container" ]]; then
-              echo "No production Supabase DB container matched ^supabase_db_" >&2
+            database_container="$DB_BACKUP_CONTAINER"
+            running="$(ssh -T backup-target "docker inspect -f '{{.State.Running}}' '$database_container'")"
+            if [[ "$running" != "true" ]]; then
+              echo "Configured production DB container is not running." >&2
               exit 1
             fi
 

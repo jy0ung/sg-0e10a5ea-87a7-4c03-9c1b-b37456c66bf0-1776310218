@@ -36,9 +36,9 @@ Required environment secrets:
 - `DB_BACKUP_GPG_PASSPHRASE` — passphrase used to symmetrically encrypt dumps.
 - Backup transport: either
   - `SUPABASE_DB_URL` for direct Postgres access, or
-  - the complete Cloudflare Access SSH set already used by production operations: `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `SSH_HOST`, `SSH_USER`, `CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET` (with `SSH_PORT` optional/defaulting to 22).
+  - the complete Cloudflare Access SSH set already used by production operations: `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `SSH_HOST`, `SSH_USER`, `CF_ACCESS_CLIENT_ID`, and `CF_ACCESS_CLIENT_SECRET` (with `SSH_PORT` optional/defaulting to 22), plus the `DB_BACKUP_CONTAINER` environment variable set to the exact production Supabase DB container name.
 
-In SSH mode the runner does not receive a production DB URL. The workflow connects through Cloudflare Access, finds the host-local `supabase_db_*` container, runs `pg_dump` inside that container, and streams the custom-format dump back to the runner before encryption.
+In SSH mode the runner does not receive a production DB URL. The workflow connects through Cloudflare Access, verifies the configured production database container is running, runs `pg_dump` inside that exact container, and streams the custom-format dump back to the runner before encryption. Never pick the first `supabase_db_*` container: production and local HRMS stacks can run on the same host.
 
 Optional environment secrets:
 

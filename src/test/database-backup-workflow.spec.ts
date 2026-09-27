@@ -24,7 +24,11 @@ describe('database backup workflow safety boundary', () => {
   });
 
   it('streams pg_dump from the host-local Supabase DB container without exposing a remote DB URL', () => {
-    expect(workflow).toContain("grep -E '^supabase_db_'");
+    expect(workflow).toContain('DB_BACKUP_CONTAINER: ${{ vars.DB_BACKUP_CONTAINER }}');
+    expect(workflow).toContain('SSH backup requires an exact DB_BACKUP_CONTAINER environment variable.');
+    expect(workflow).toContain('database_container="$DB_BACKUP_CONTAINER"');
+    expect(workflow).toContain("docker inspect -f '{{.State.Running}}' '$database_container'");
+    expect(workflow).not.toContain("grep -E '^supabase_db_'");
     expect(workflow).toContain("docker exec '$db_container' pg_dump");
     expect(workflow).toContain('--format=custom');
     expect(workflow).toContain('--no-owner');
