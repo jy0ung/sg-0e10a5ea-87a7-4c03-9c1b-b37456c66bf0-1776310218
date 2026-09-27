@@ -7,6 +7,7 @@ import { performanceService } from './performanceService';
 function mapTarget(row: Record<string, unknown>): SalesmanTarget {
   return {
     id: row.id as string,
+    employeeId: (row.employee_id as string | null) ?? null,
     companyId: row.company_id as string,
     salesmanName: row.salesman_name as string,
     branchCode: row.branch_code as string,
@@ -34,9 +35,14 @@ function missingCompanyError(): Error {
 
 export async function upsertSalesmanTarget(companyId: string, fields: Omit<SalesmanTarget, 'id' | 'companyId'>, actorId?: string): Promise<{ data: SalesmanTarget | null; error: Error | null }> {
   if (!companyId) return { data: null, error: missingCompanyError() };
+  if (!fields.employeeId) return { data: null, error: new Error('Select an Employee for this target') };
+  if (!Number.isInteger(fields.targetUnits) || fields.targetUnits < 0 || !Number.isFinite(fields.targetRevenue) || fields.targetRevenue < 0) {
+    return { data: null, error: new Error('Targets must be nonnegative numbers; units must be whole') };
+  }
   const { data, error } = await supabase
     .from('salesman_targets')
     .upsert({
+      employee_id: fields.employeeId,
       company_id: companyId,
       salesman_name: fields.salesmanName,
       branch_code: fields.branchCode,
@@ -44,7 +50,7 @@ export async function upsertSalesmanTarget(companyId: string, fields: Omit<Sales
       period_month: fields.periodMonth,
       target_units: fields.targetUnits,
       target_revenue: fields.targetRevenue,
-    }, { onConflict: 'company_id,salesman_name,branch_code,period_year,period_month' })
+    }, { onConflict: 'company_id,employee_id,branch_code,period_year,period_month' })
     .select()
     .single();
   if (error) { loggingService.error('upsertSalesmanTarget failed', { error }); return { data: null, error: new Error(error.message) }; }
@@ -54,75 +60,40 @@ export async function upsertSalesmanTarget(companyId: string, fields: Omit<Sales
 
 export async function deleteSalesmanTarget(companyId: string, id: string, actorId?: string): Promise<{ error: Error | null }> {
   if (!companyId) return { error: missingCompanyError() };
-  const { error } = await supabase.from('salesman_targets').delete().eq('company_id', companyId).eq('id', id);
+  const { data, error } = await supabase.from('salesman_targets').delete().eq('company_id', companyId).eq('id', id).select('id').maybeSingle();
   if (error) return { error: new Error(error.message) };
+  if (!data) return { error: new Error('Target was not found or you do not have permission to remove it') };
   if (actorId) void logUserAction(actorId, 'delete', 'salesman_target', id, { component: 'SalesTargetService' });
   return { error: null };
 }
 
-/**
- * Compute actual performance across sales_orders for the given period and compare to targets.
- */
+/** Booking-month order metrics, resolved to Employees by stable source relationships. */
 export async function computeSalesmanActuals(companyId: string, year: number, month: number): Promise<{ data: SalesmanPerformance[]; error: Error | null }> {
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-  const endDate = new Date(year, month, 0).toISOString().split('T')[0];
-
-  // Statuses considered "closed/delivered" in the legacy order_status field.
-  const DELIVERED_STATUSES = new Set(['delivered', 'Delivered', 'DELIVERED', 'completed', 'Completed', 'COMPLETED']);
-
-  const [ordersResult, targetsResult] = await Promise.all([
-    supabase
-      .from('sales_orders')
-      .select('salesman_id, salesman_name, branch_code, selling_price, order_status')
-      .eq('company_id', companyId)
-      .gte('booking_date', startDate)
-      .lte('booking_date', endDate),
-    getSalesmanTargets(companyId, year, month),
-  ]);
-
-  if (ordersResult.error) return { data: [], error: new Error(ordersResult.error.message) };
-
-  const orders = (ordersResult.data ?? []) as unknown as Record<string, unknown>[];
-
-  // Group by salesman_id (UUID) when available, fall back to salesman_name string.
-  // Key format: "id:<uuid>" or "name:<salesman_name>"
-  const map = new Map<string, { id: string | null; name: string; branch: string; totalUnits: number; totalRevenue: number; deliveredUnits: number; prices: number[] }>();
-  for (const o of orders) {
-    const sid  = (o.salesman_id  as string | null) ?? null;
-    const name = ((o.salesman_name as string) ?? 'unknown').trim() || 'unknown';
-    const key  = sid ? `id:${sid}` : `name:${name}`;
-    if (!map.has(key)) {
-      map.set(key, { id: sid, name, branch: (o.branch_code as string) ?? '', totalUnits: 0, totalRevenue: 0, deliveredUnits: 0, prices: [] });
-    }
-    const entry = map.get(key)!;
-    entry.totalUnits++;
-    const price = Number(o.selling_price ?? 0);
-    entry.totalRevenue += price;
-    entry.prices.push(price);
-    if (DELIVERED_STATUSES.has(o.order_status as string)) entry.deliveredUnits++;
+  if (!companyId) return { data: [], error: missingCompanyError() };
+  if (!Number.isInteger(year) || year < 1 || year > 9999 || !Number.isInteger(month) || month < 1 || month > 12) {
+    return { data: [], error: new Error('A valid year and month are required') };
   }
-
-  const targets = targetsResult.data;
-  // Target lookup: by salesmanName string (salesman_id FK on salesman_targets is a future enhancement)
-  const targetMap = new Map(targets.map(t => [t.salesmanName, t]));
-
-  const result: SalesmanPerformance[] = [];
-  for (const s of map.values()) {
-    const target = targetMap.get(s.name);
-    const avgPrice = s.prices.length > 0 ? s.totalRevenue / s.prices.length : 0;
-    result.push({
-      salesmanName: s.name,
-      branchCode: s.branch,
-      totalDeals: s.totalUnits,
-      closedDeals: s.deliveredUnits,
-      totalRevenue: s.totalRevenue,
-      avgDealValue: avgPrice,
-      conversionRate: s.totalUnits > 0 ? (s.deliveredUnits / s.totalUnits) * 100 : 0,
+  const { data, error } = await supabase.rpc('salesman_actuals', {
+    p_company_id: companyId, p_year: year, p_month: month,
+  });
+  if (error) return { data: [], error: new Error(error.message) };
+  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  return { data: rows.map(row => {
+    const totalDeals = Number(row.total_deals);
+    const closedDeals = Number(row.closed_deals);
+    const totalRevenue = Number(row.total_revenue);
+    const employeeId = (row.employee_id as string | null) ?? null;
+    const targetUnits = row.target_units == null ? undefined : Number(row.target_units);
+    return {
+      identityKey: String(row.identity_key), employeeId,
+      identityStatus: employeeId ? 'employee' as const : 'unresolved' as const,
+      salesmanName: String(row.salesman_name), branchCode: String(row.branch_code ?? ''),
+      totalDeals, closedDeals, totalRevenue,
+      avgDealValue: totalDeals ? totalRevenue / totalDeals : 0,
+      conversionRate: totalDeals ? closedDeals / totalDeals * 100 : 0,
       commissionEarned: 0,
-      targetUnits: target?.targetUnits ?? 0,
-      targetRevenue: target?.targetRevenue ?? 0,
-      targetAchievement: target?.targetUnits ? (s.totalUnits / target.targetUnits) * 100 : undefined,
-    });
-  }
-  return { data: result.sort((a, b) => b.totalDeals - a.totalDeals), error: null };
+      targetUnits, targetRevenue: row.target_revenue == null ? undefined : Number(row.target_revenue),
+      targetAchievement: employeeId && targetUnits ? totalDeals / targetUnits * 100 : undefined,
+    };
+  }), error: null };
 }

@@ -30,6 +30,12 @@ To audit all companies, leave the token unchanged. The query converts the untouc
 
 Do not replace the token with a company name, branch code, or display label.
 
+## Execution preflight
+
+Confirm the target and migration ledger before running the pack. In particular, `deals.sales_advisor_employee_id` must exist. An older schema is a blocked measurement, not zero exceptions; do not apply migrations merely to make this audit run. The [2026-09-27 evidence](BUSINESS_CORE_RECONCILIATION_2026-09-27.md) records such a production schema gap.
+
+The company sentinel is split on the right side of `NULLIF` so replacing every full `__COMPANY_ID__` token changes only the input, not the sentinel. Preserve that split. Run under a read-only transaction and a bounded statement timeout; execute only the summary when collecting repository evidence.
+
 ## Execution
 
 Use an authorized read-capable PostgreSQL/Supabase SQL session. Review the SQL before execution and retain the repository commit SHA with the evidence.

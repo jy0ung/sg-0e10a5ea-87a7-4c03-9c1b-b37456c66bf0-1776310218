@@ -6817,6 +6817,7 @@ export type Database = {
           branch_code: string
           company_id: string
           created_at: string
+          employee_id: string | null
           id: string
           period_month: number
           period_year: number
@@ -6829,6 +6830,7 @@ export type Database = {
           branch_code: string
           company_id: string
           created_at?: string
+          employee_id?: string | null
           id?: string
           period_month: number
           period_year: number
@@ -6841,6 +6843,7 @@ export type Database = {
           branch_code?: string
           company_id?: string
           created_at?: string
+          employee_id?: string | null
           id?: string
           period_month?: number
           period_year?: number
@@ -6850,6 +6853,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "salesman_targets_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "salesman_targets_company_id_fkey"
             columns: ["company_id"]
@@ -9008,6 +9018,14 @@ export type Database = {
       reverse_supplier_payment_event: {
         Args: { p_event_id: string; p_reason?: string | null }
         Returns: string
+      }
+      salesman_actuals: {
+        Args: {
+          p_company_id: string
+          p_month: number
+          p_year: number
+        }
+        Returns: Json
       }
       search_vehicles: {
         Args: {

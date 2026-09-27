@@ -25,7 +25,7 @@ describe('Business Core identity reconciliation pack', () => {
   it('supports one-company or all-company scoping', () => {
     expect(sql).toContain('__COMPANY_ID__');
     expect(sql).toContain(
-      "NULLIF('__COMPANY_ID__', '__COMPANY_ID__')::text AS company_id",
+      "NULLIF('__COMPANY_ID__', '__COMPANY_' || 'ID__')::text AS company_id",
     );
   });
 

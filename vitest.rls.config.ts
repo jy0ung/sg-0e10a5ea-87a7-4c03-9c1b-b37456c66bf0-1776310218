@@ -9,6 +9,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: [
       'src/test/rls-matrix.spec.ts',
+      'src/test/sales-identity.rls.spec.ts',
       'src/test/internal-request-atomic-review.rls.spec.ts',
       'src/test/employee-history-delete.rls.spec.ts',
       'src/test/employee-sales-assignment-atomicity.rls.spec.ts',
