@@ -21,7 +21,7 @@ Statuses describe architectural convergence, not whether a module has existing f
 | 0 — Platform Safety | In Progress | Repository release, rollback and backup/restore automation landed. Admin Backup & Recovery has a manual encrypted export slice; provider destinations and restore remain. #48 still requires final production evidence and does not block Dev/UAT feature work. |
 | 1 — Unified Business Core | In Progress | Employee/account separation, Deal ownership, Sales assignments, migration map and reconciliation pack landed. Authoritative full reconciliation is blocked by production schema lag. |
 | 2 — HRMS | In Progress | Job Title, Department, Leave Type, Holiday, role authority, history preservation and atomic Sales assignments landed. Broader lifecycle contracts and exit evidence remain. |
-| 3 — Workflow + Unified Inbox | In Progress | Canonical routing and atomic review landed. Unified Inbox and cross-domain outcome commands remain. |
+| 3 — Workflow + Unified Inbox | In Progress | Canonical routing and atomic review landed. Assigned Internal Request approvals now reach the Inbox with matching reviewer ticket access. Wider aggregation and cross-domain outcome commands remain. |
 | 4 — Internal Requests | In Progress | Canonical flow selection and HRMS-role review authority landed. Broader domain-command integration remains. |
 | 5 — Sales + Inventory | In Progress | Employee-backed Deals, Vehicle import safeguards, and Employee-backed targets/reports (#94, PR #95) landed. Legacy identity reconciliation and production release remain separate. |
 | 6 — Commission | In Progress | Employee-backed rules/records, guarded calculation and audited transitions landed. Rule catalogue, reversals and payout/Finance handoff still need UAT and implementation. |
@@ -184,6 +184,7 @@ Exit criteria:
 - Internal Request flow resolution now uses canonical Profile -> Employee workforce identity for Department authority, validates pinned flows, and resolves condition/match-priority precedence deterministically (PR #74, merge `317fba7`).
 - Internal Request approval review is now one concurrency-safe database command across Decision, Instance, Ticket, and Activity state. Stale rendered Steps fail as an explicit `PT409` conflict instead of a retryable PostgreSQL serialization error (PR #76, merge `5a73286`).
 - Workspace approval permission now follows the materialized specific Profile or active same-company HRMS Role assignment through Profile/Employee identity. App-level admin role is not approval authority (PR #83, merge `859d5c4`).
+- The Inbox now obtains pending Internal Request approvals from a server-scoped reviewer query. Matching ticket RLS grants current reviewers access and retains read-only access for prior decision makers; the review command remains the sole decision write path.
 - These merges were code/integrity changes only; no production deployment was performed as part of this refactor sequence.
 
 ### Epic 4 — Internal Requests

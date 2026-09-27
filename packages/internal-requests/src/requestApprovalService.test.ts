@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { supabase } from '@flc/supabase';
-import { canProfileReviewInternalRequestApproval } from './requestApprovalService';
+import {
+  canProfileReviewInternalRequestApproval,
+  hasProfileReviewedInternalRequestApproval,
+  listMyPendingInternalRequestApprovals,
+} from './requestApprovalService';
 
 vi.mock('@flc/supabase', () => ({
-  supabase: { from: vi.fn() },
+  supabase: { from: vi.fn(), rpc: vi.fn() },
 }));
 
 type QueryResult = { data: unknown; error: { message: string } | null };
@@ -179,5 +183,33 @@ describe('canProfileReviewInternalRequestApproval', () => {
 
     expect(result).toEqual({ data: false, error: null });
     expect(supabase.from).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('reviewer Inbox reads', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('maps the backend-owned pending approval list to stable request IDs', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({
+      data: [{ instance_id: 'instance-1', ticket_id: 'ticket-1', subject: 'Transfer',
+        priority: 'high', current_step_name: 'Manager', updated_at: '2026-09-27T00:00:00Z' }],
+      error: null,
+    } as never);
+    const result = await listMyPendingInternalRequestApprovals('company-1', 25);
+    expect(supabase.rpc).toHaveBeenCalledWith('list_my_pending_internal_request_approvals', {
+      p_company_id: 'company-1', p_limit: 25,
+    });
+    expect(result.data).toEqual([{
+      instanceId: 'instance-1', ticketId: 'ticket-1', subject: 'Transfer',
+      priority: 'high', currentStepName: 'Manager', updatedAt: '2026-09-27T00:00:00Z',
+    }]);
+  });
+
+  it('allows read-only workspace access after the current approval step has ended', async () => {
+    vi.mocked(supabase.from)
+      .mockReturnValueOnce(maybeSingleChain({ data: { id: 'instance-1' }, error: null }) as never)
+      .mockReturnValueOnce(assignmentChain({ data: [{ id: 'decision-1' }], error: null }) as never);
+    expect(await hasProfileReviewedInternalRequestApproval('company-1', 'ticket-1', 'approver-1'))
+      .toEqual({ data: true, error: null });
   });
 });

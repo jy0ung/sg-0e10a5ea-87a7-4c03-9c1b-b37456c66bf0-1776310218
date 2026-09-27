@@ -386,6 +386,57 @@ describeIfLive('Internal Request atomic approval review', () => {
     expect(instance?.status).toBe('approved');
   });
 
+  it('shows only the current reviewer in the Inbox and preserves ticket read access after a decision', async () => {
+    const scenario = await createScenario(requester, [{
+      name: 'Inbox Role Approval',
+      approverType: 'role',
+      approverRole: assignedRoleId,
+    }]);
+    const list = (actor: Actor, scopedCompany = companyId) => actor.client.rpc(
+      'list_my_pending_internal_request_approvals' as never,
+      { p_company_id: scopedCompany, p_limit: 50 } as never,
+    );
+
+    const [mine, unrelated, wrongCompany] = await Promise.all([
+      list(roleApprover), list(otherActor), list(roleApprover, process.env.RLS_COMPANY_B_ID ?? 'rls-b'),
+    ]);
+    expect(mine.error).toBeNull();
+    expect((mine.data as Array<{ ticket_id: string }>).some(row => row.ticket_id === scenario.ticketId)).toBe(true);
+    expect((unrelated.data as Array<{ ticket_id: string }>).some(row => row.ticket_id === scenario.ticketId)).toBe(false);
+    expect((wrongCompany.data as Array<{ ticket_id: string }>).some(row => row.ticket_id === scenario.ticketId)).toBe(false);
+
+    const [{ data: visible }, { data: hidden }] = await Promise.all([
+      roleApprover.client.from('tickets').select('id').eq('id', scenario.ticketId),
+      otherActor.client.from('tickets').select('id').eq('id', scenario.ticketId),
+    ]);
+    expect(visible?.map(row => row.id)).toContain(scenario.ticketId);
+    expect(hidden).toHaveLength(0);
+
+    const { error: reviewError } = await review(roleApprover, scenario, 'approved');
+    expect(reviewError).toBeNull();
+    const [after, reviewedTicket] = await Promise.all([
+      list(roleApprover),
+      roleApprover.client.from('tickets').select('id').eq('id', scenario.ticketId),
+    ]);
+    expect((after.data as Array<{ ticket_id: string }>).some(row => row.ticket_id === scenario.ticketId)).toBe(false);
+    expect(reviewedTicket.data?.map(row => row.id)).toContain(scenario.ticketId);
+  });
+
+  it('does not offer a disallowed self-approval as pending reviewer work', async () => {
+    const scenario = await createScenario(requester, [{
+      name: 'Self Review Disabled',
+      approverType: 'specific_user',
+      approverUserId: requester.id,
+      allowSelfApproval: false,
+    }]);
+    const { data, error } = await requester.client.rpc(
+      'internal_request_reviewer_is_current' as never,
+      { p_company_id: companyId, p_ticket_id: scenario.ticketId } as never,
+    );
+    expect(error).toBeNull();
+    expect(data).toBe(false);
+  });
+
   it('denies a same-company actor who is not the materialized approver', async () => {
     const scenario = await createScenario(requester, [{
       name: 'Assigned User Only',

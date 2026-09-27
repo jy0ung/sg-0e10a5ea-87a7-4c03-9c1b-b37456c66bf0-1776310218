@@ -13,8 +13,9 @@ describe('Internal Request approval UI permission boundary', () => {
     expect(ticketService).toContain(
       'const reviewPermission = await canProfileReviewInternalRequestApproval(',
     );
+    expect(ticketService).toContain('hasProfileReviewedInternalRequestApproval');
     expect(ticketService).toContain(
-      'if (!isRequester && !canManagePortalQueue && !canReviewApproval)',
+      'if (!isRequester && !canManagePortalQueue && !canReviewApproval && !priorReview.data)',
     );
   });
 

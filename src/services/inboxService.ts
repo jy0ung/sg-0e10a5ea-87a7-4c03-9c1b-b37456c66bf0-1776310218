@@ -3,6 +3,7 @@ import { listMyTickets, type RequestTicketRecord } from './ticketService';
 import { getReconciliationQueue, getReconciliationStatusCounts } from './reconciliationService';
 import { listLeaveRequests, listPayrollRuns, listAppraisals } from './hrmsService';
 import { buildApprovalInboxItems, type ApprovalInboxApproverIdentity, type ApprovalInboxItem } from '@/lib/hrms/approvalInbox';
+import { listMyPendingInternalRequestApprovals, type PendingInternalRequestApproval } from './requestApprovalService';
 import type { ReconciliationMatch } from '@/types';
 
 export type InboxSource = 'approval' | 'reconciliation' | 'ticket' | 'notification';
@@ -70,6 +71,19 @@ export function approvalToInbox(item: ApprovalInboxItem): InboxItem {
   };
 }
 
+export function internalRequestApprovalToInbox(item: PendingInternalRequestApproval): InboxItem {
+  return {
+    id: `approval:internal_request:${item.instanceId}`,
+    source: 'approval',
+    title: `Request approval · ${item.subject}`,
+    subtitle: item.currentStepName ?? 'Pending review',
+    updatedAt: item.updatedAt,
+    href: `/portal/tickets/${item.ticketId}`,
+    badge: item.priority === 'high' ? 'High priority' : 'Pending',
+    badgeTone: item.priority === 'high' ? 'red' : 'amber',
+  };
+}
+
 export function reconciliationToInbox(row: ReconciliationMatch): InboxItem {
   const tone: InboxTone =
     row.matchStatus === 'conflict'    ? 'red'
@@ -100,7 +114,7 @@ export function ticketToInbox(row: RequestTicketRecord): InboxItem {
     subtitle:  `${row.category}${row.subcategory ? ' · ' + row.subcategory : ''}`,
     description: row.status,
     updatedAt: row.updated_at,
-    href:      `/portal/tickets/new?ticket=${row.id}`,
+    href:      `/portal/tickets/${row.id}`,
     badge:     row.priority,
     badgeTone: tone,
   };
@@ -141,10 +155,11 @@ export async function loadInbox(
   const limit = opts.perSourceLimit ?? 50;
   const errors: string[] = [];
 
-  const [leaveR, payrollR, appraisalR, ticketsR, notifsR, reconR, reconCountsR] = await Promise.all([
+  const [leaveR, payrollR, appraisalR, requestApprovalsR, ticketsR, notifsR, reconR, reconCountsR] = await Promise.all([
     listLeaveRequests(companyId, { includeApprovalHistory: true }).catch(e => ({ data: [], error: String(e) })),
     listPayrollRuns(companyId, { includeApprovalHistory: true }).catch(e => ({ data: [], error: String(e) })),
     listAppraisals(companyId, { includeApprovalHistory: true }).catch(e => ({ data: [], error: String(e) })),
+    listMyPendingInternalRequestApprovals(companyId, limit).catch(e => ({ data: [], error: String(e) })),
     listMyTickets(opts.userId, companyId).catch(e => ({ data: null, error: e as Error })),
     getNotifications(opts.userId).catch(e => ({ data: [], error: e as Error })),
     opts.includeReconciliation
@@ -158,16 +173,20 @@ export async function loadInbox(
   if (leaveR.error)    errors.push(`Approvals (leave): ${leaveR.error}`);
   if (payrollR.error)  errors.push(`Approvals (payroll): ${payrollR.error}`);
   if (appraisalR.error) errors.push(`Approvals (appraisal): ${appraisalR.error}`);
+  if (requestApprovalsR.error) errors.push(`Approvals (Internal Requests): ${requestApprovalsR.error}`);
   if (ticketsR.error)  errors.push(`Tickets: ${(ticketsR.error as Error).message ?? ticketsR.error}`);
   if (notifsR.error)   errors.push(`Notifications: ${(notifsR.error as Error).message ?? notifsR.error}`);
   if (reconR.error)    errors.push(`Reconciliation: ${(reconR.error as Error).message ?? reconR.error}`);
 
-  const approvalItems = buildApprovalInboxItems(
+  const hrmsApprovalItems = buildApprovalInboxItems(
     leaveR.data ?? [],
     payrollR.data ?? [],
     appraisalR.data ?? [],
     opts.approver,
   ).slice(0, limit).map(approvalToInbox);
+  const approvalItems = [...hrmsApprovalItems, ...(requestApprovalsR.data ?? []).map(internalRequestApprovalToInbox)]
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    .slice(0, limit);
 
   const reconItems = (reconR.data ?? [])
     .filter(r => r.matchStatus === 'candidate' || r.matchStatus === 'conflict')
