@@ -21,7 +21,22 @@ Scope: all companies, including historical/deleted source rows (the reconciliati
 | Vehicles with nonblank salesperson name and NULL salesperson Profile ID | 22,185 |
 | Sales Target rows | 0 |
 
-**Full reconciliation: blocked by schema prerequisites.** The pack expects canonical Deal ownership added by `20260922090000_deal_employee_sales_advisor_identity.sql`. The preflight stopped full execution rather than fabricating counts or changing production. Profile workforce mismatches, invalid organisation references, canonical Deal exceptions, failed Advisor mappings, and the remaining Vehicle categories are **not measured**. The partial counts above are not a full pack result, and zero target rows does not imply clean identity data.
+The full-pack summary was then rerun as a **partial, read-only projection**: only the Deal CTEs/categories that require the missing canonical column were omitted. The transaction used repeatable-read isolation, a 30-second timeout and `ROLLBACK`. It emitted category names and counts only.
+
+| Measurable exception category | Count |
+|---|---:|
+| Profiles without Employee link | 15 |
+| Profile/Employee workforce-copy mismatches | 2 |
+| Employees with invalid Branch reference | 3 |
+| Legacy Sales Advisors without same-company staff-code Employee match | 195 |
+| Vehicles with nonblank salesperson name and no Profile ID | 22,185 |
+| Broken or cross-company Profile/Employee links | 0 |
+| Invalid Employee manager, Department or Job Title references | 0 |
+| Other Vehicle salesperson Profile/Employee FK exceptions | 0 |
+
+The `legacy_sales_advisors_without_active_canonical_assignment` query returned zero **because it only examines matched Employees**. All 195 legacy Advisor rows were unmatched, so that zero is not assignment-readiness evidence. The three Branch exceptions and two workforce-copy mismatches need review before any automatic repair or stronger physical constraints.
+
+**Full reconciliation: blocked by schema prerequisites.** The pack expects canonical Deal ownership added by `20260922090000_deal_employee_sales_advisor_identity.sql`. The preflight stopped full execution rather than fabricating counts or changing production. Canonical Deal ownership and Deal/Profile agreement categories remain **unmeasured**. The partial counts above are not a full pack result, and zero target rows does not imply clean identity data.
 
 The company-scope defect in the existing pack was corrected: the replacement token now differs textually from the sentinel expression. Previously replacing every occurrence left `NULLIF` comparing the supplied company ID with itself, which silently widened the query to all companies.
 
