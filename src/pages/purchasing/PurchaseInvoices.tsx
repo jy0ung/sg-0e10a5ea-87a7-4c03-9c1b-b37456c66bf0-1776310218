@@ -14,9 +14,9 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import {
   createPurchaseInvoice,
   listPurchaseInvoices,
-  markPurchaseInvoiceReceived,
   type PurchaseInvoiceRecord,
 } from '@/services/purchaseInvoiceService';
+import { PurchaseInvoiceReceiptDialog } from './PurchaseInvoiceReceiptDialog';
 import {
   transitionPiLifecycle,
   recordSupplierPaymentEvent,
@@ -67,6 +67,7 @@ export default function PurchaseInvoices() {
   const [addOpen, setAddOpen]     = useState(false);
   const [form, setForm]           = useState(EMPTY_FORM);
   const [saving, setSaving]       = useState(false);
+  const [receiptTarget, setReceiptTarget] = useState<PurchaseInvoiceRecord | null>(null);
 
   // Payment dialog state
   const [payOpen, setPayOpen]       = useState(false);
@@ -185,23 +186,6 @@ export default function PurchaseInvoices() {
     invalidate();
   };
 
-  const markReceived = async (id: string) => {
-    const prev = invoices.find(i => i.id === id);
-    if (!prev) return;
-    if (!user?.company_id) return;
-    const { error } = await markPurchaseInvoiceReceived(id, {
-      companyId: user.company_id,
-      chassisNo: prev.chassisNo,
-      model: prev.model,
-      actorId: user.id,
-    });
-    if (error) {
-      toast({ title: 'Failed to mark received', description: error.message, variant: 'destructive' });
-      return;
-    }
-    invalidate();
-  };
-
   if (isLoading) {
     return (
       <div className="flex h-full min-h-0 w-full flex-col gap-4 animate-fade-in">
@@ -317,7 +301,7 @@ export default function PurchaseInvoices() {
                           <ExternalLink className="h-3 w-3 mr-0.5" />View
                         </Button>
                         {pi.status === 'pending' && (
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-emerald-600" onClick={() => markReceived(pi.id)}>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-emerald-600" onClick={() => setReceiptTarget(pi)}>
                             <Truck className="h-3 w-3 mr-0.5" />Receive
                           </Button>
                         )}
@@ -345,6 +329,8 @@ export default function PurchaseInvoices() {
           </table>
         </ScrollableRegion>
       </div>
+
+      <PurchaseInvoiceReceiptDialog invoice={receiptTarget} companyId={companyId} onClose={() => setReceiptTarget(null)} onReceived={invalidate} />
 
       {/* Record Payment Dialog */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>

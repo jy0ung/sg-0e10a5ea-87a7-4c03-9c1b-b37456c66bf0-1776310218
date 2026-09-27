@@ -9186,6 +9186,22 @@ export type Database = {
         Args: { p_actor_id?: string | null; p_id: string; p_target_status: string }
         Returns: string
       }
+      receive_purchase_invoice: {
+        Args: { p_company_id: string; p_invoice_id: string; p_branch_id: string }
+        Returns: string
+      }
+      record_vehicle_purchase_receipt: {
+        Args: {
+          p_company_id: string
+          p_chassis_no: string
+          p_model: string
+          p_branch_id: string
+          p_branch_code: string
+          p_invoice_no: string
+          p_received_date: string
+        }
+        Returns: string
+      }
       transition_po_status: {
         Args: { p_company_id: string; p_id: string; p_target_status: string }
         Returns: string

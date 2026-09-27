@@ -1,7 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { logUserAction } from './auditService';
 import { loggingService } from "./loggingService";
-import { insertVehicle } from "./vehicleService";
 import type { PurchaseInvoiceLifecycleStatus, ApPaymentStatus } from '@/types';
 
 export type PurchaseInvoiceStatus = 'pending' | 'received' | 'cancelled';
@@ -124,67 +123,21 @@ export async function createPurchaseInvoice(
   return { error: null };
 }
 
-/**
- * Mark a purchase invoice as received and ensure a corresponding vehicle row
- * exists. If the vehicle already exists but has no received date, backfill it.
- * Otherwise insert a stub vehicle record so it appears in inventory.
- */
+/** Receive a PI and record its Vehicle through one audited database command. */
 export async function markPurchaseInvoiceReceived(
   id: string,
-  options: { companyId: string; chassisNo: string; model: string; actorId?: string },
+  options: { companyId: string; branchId: string },
 ): Promise<{ error: Error | null }> {
-  const receivedDate = new Date().toISOString().split('T')[0];
-
-  const { error } = await supabase
-    .from('purchase_invoices')
-    .update({ status: 'received', received_date: receivedDate })
-    .eq('company_id', options.companyId)
-    .eq('id', id);
+  const { error } = await supabase.rpc('receive_purchase_invoice', {
+    p_company_id: options.companyId,
+    p_invoice_id: id,
+    p_branch_id: options.branchId,
+  });
   if (error) {
     loggingService.error('markPurchaseInvoiceReceived failed', { id, error }, 'PurchaseInvoiceService');
     return { error: new Error(error.message) };
   }
-
-  if (!options.chassisNo || !options.companyId) {
-    return { error: null };
-  }
-
-  const { data: existing, error: lookupError } = await supabase
-    .from('vehicles')
-    .select('id, date_received_by_outlet')
-    .eq('chassis_no', options.chassisNo)
-    .eq('company_id', options.companyId)
-    .maybeSingle();
-
-  if (lookupError) {
-    loggingService.error('Vehicle lookup after PI receive failed', { id, error: lookupError }, 'PurchaseInvoiceService');
-    return { error: new Error(lookupError.message) };
-  }
-
-  if (existing) {
-    const row = existing as { id: string; date_received_by_outlet: string | null };
-    if (!row.date_received_by_outlet) {
-      const { error: updateError } = await supabase
-        .from('vehicles')
-        .update({ date_received_by_outlet: receivedDate })
-        .eq('company_id', options.companyId)
-        .eq('id', row.id);
-      if (updateError) {
-        return { error: new Error(updateError.message) };
-      }
-    }
-    return { error: null };
-  }
-
-  const { error: insertError } = await insertVehicle(options.companyId, {
-    chassis_no: options.chassisNo,
-    model: options.model,
-    date_received_by_outlet: receivedDate,
-  }, options.actorId);
-  if (!insertError && options.actorId) {
-    void logUserAction(options.actorId, 'update', 'purchase_invoice', id, { component: 'PurchaseInvoiceService' });
-  }
-  return { error: insertError };
+  return { error: null };
 }
 
 export async function getPurchaseInvoiceById(
