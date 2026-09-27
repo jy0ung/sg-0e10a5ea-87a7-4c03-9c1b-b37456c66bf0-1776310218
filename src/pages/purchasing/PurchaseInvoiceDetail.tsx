@@ -17,9 +17,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import {
   getPurchaseInvoiceById,
-  markPurchaseInvoiceReceived,
   updatePurchaseInvoice,
 } from '@/services/purchaseInvoiceService';
+import { PurchaseInvoiceReceiptDialog } from './PurchaseInvoiceReceiptDialog';
 import {
   getSupplierPaymentEvents,
   recordSupplierPaymentEvent,
@@ -76,6 +76,7 @@ export default function PurchaseInvoiceDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
   const [saving, setSaving]     = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['purchase-invoice', companyId, id] });
@@ -116,19 +117,6 @@ export default function PurchaseInvoiceDetail() {
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
-
-  const handleReceive = async () => {
-    if (!invoice || !user?.company_id) return;
-    const { error: err } = await markPurchaseInvoiceReceived(invoice.id, {
-      companyId: user.company_id,
-      chassisNo: invoice.chassisNo,
-      model: invoice.model,
-      actorId: user.id,
-    });
-    if (err) { toast({ title: 'Failed to mark received', description: err.message, variant: 'destructive' }); return; }
-    toast({ title: 'Invoice marked received' });
-    invalidate();
-  };
 
   const handleVerify = async () => {
     if (!invoice) return;
@@ -469,7 +457,7 @@ export default function PurchaseInvoiceDetail() {
             {/* Action buttons */}
             <div className="flex flex-col gap-2 border-t pt-3">
               {invoice.status === 'pending' && (
-                <Button size="sm" variant="outline" className="w-full gap-1.5 text-emerald-600" onClick={handleReceive}>
+                <Button size="sm" variant="outline" className="w-full gap-1.5 text-emerald-600" onClick={() => setReceiptOpen(true)}>
                   <Truck className="h-3.5 w-3.5" />Mark as Received
                 </Button>
               )}
@@ -572,6 +560,13 @@ export default function PurchaseInvoiceDetail() {
           )}
         </CardContent>
       </Card>
+
+      <PurchaseInvoiceReceiptDialog
+        invoice={receiptOpen ? invoice : null}
+        companyId={companyId}
+        onClose={() => setReceiptOpen(false)}
+        onReceived={invalidate}
+      />
 
       {/* ── Record Payment Dialog ──────────────────────────────────────────── */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
