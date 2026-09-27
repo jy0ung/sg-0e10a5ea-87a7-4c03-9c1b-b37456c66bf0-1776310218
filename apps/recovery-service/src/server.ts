@@ -100,7 +100,7 @@ export function createRecoveryServer(
       response.writeHead(200, {
         'Content-Type': 'application/octet-stream',
         'Content-Length': archive.size,
-        'Content-Disposition': `attachment; filename="ubs-backup-${id}.dump.gpg"`,
+        'Content-Disposition': `attachment; filename="ubs-backup-${id}.tar.gpg"`,
         'Cache-Control': 'no-store',
         'X-Content-Type-Options': 'nosniff',
       });

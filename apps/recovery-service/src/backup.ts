@@ -78,7 +78,7 @@ function providePassphrase(child: ChildProcess, passphrase: string): void {
 
 async function encryptedDump(config: BackupConfig, outputPath: string): Promise<void> {
   const env = postgresEnvironment(config.databaseUrl);
-  const dump = spawn('pg_dump', ['--format=custom', '--no-owner', '--no-acl'], {
+  const dump = spawn('pg_dump', ['--format=tar', '--no-owner', '--no-acl'], {
     env, stdio: ['ignore', 'pipe', 'ignore'],
   });
   const encrypt = spawn('gpg', [
@@ -98,7 +98,9 @@ async function validateArchive(config: BackupConfig, inputPath: string): Promise
     '--batch', '--no-symkey-cache', '--pinentry-mode', 'loopback',
     '--passphrase-fd', '3', '--decrypt', inputPath,
   ], { stdio: ['ignore', 'pipe', 'ignore', 'pipe'] });
-  const inspect = spawn('pg_restore', ['--list'], { stdio: ['pipe', 'pipe', 'ignore'] });
+  // tar reads the full archive stream, so GPG can finish and verify integrity
+  // even for archives whose table data is much larger than their catalogue.
+  const inspect = spawn('tar', ['-tf', '-'], { stdio: ['pipe', 'pipe', 'ignore'] });
   providePassphrase(decrypt, config.passphrase);
   inspect.stdin!.on('error', () => undefined);
   decrypt.stdout!.pipe(inspect.stdin!);
@@ -152,7 +154,7 @@ export class BackupManager {
   get(id: string): BackupJob | undefined { return this.jobs.get(id); }
 
   private metadataPath(id: string): string { return join(this.exportDir, `${id}.json`); }
-  private archivePath(id: string): string { return join(this.exportDir, `${id}.dump.gpg`); }
+  private archivePath(id: string): string { return join(this.exportDir, `${id}.tar.gpg`); }
 
   async initialize(): Promise<void> {
     process.umask(0o077);

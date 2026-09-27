@@ -75,7 +75,7 @@ interface SavePickerWindow extends Window {
 }
 
 export async function downloadManualBackup(job: RecoveryJob): Promise<void> {
-  const filename = `ubs-backup-${job.id}.dump.gpg`;
+  const filename = `ubs-backup-${job.id}.tar.gpg`;
   const picker = (window as SavePickerWindow).showSaveFilePicker;
   // Invoke the picker before the first await so the browser retains the click gesture.
   const handle = picker ? await picker.call(window, {
