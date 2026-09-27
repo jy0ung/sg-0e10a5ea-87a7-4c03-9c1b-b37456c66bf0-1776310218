@@ -18,7 +18,7 @@ Statuses describe architectural convergence, not whether a module has existing f
 
 | Epic | Status | Landed work / remaining exit evidence |
 |---|---|---|
-| 0 — Platform Safety | In Progress | Repository release, rollback and backup/restore automation landed. #48 still requires final production recovery evidence; this does not block Dev/UAT feature work. Admin Backup & Recovery remains an application capability to build. |
+| 0 — Platform Safety | In Progress | Repository release, rollback and backup/restore automation landed. Admin Backup & Recovery has a manual encrypted export slice; provider destinations and restore remain. #48 still requires final production evidence and does not block Dev/UAT feature work. |
 | 1 — Unified Business Core | In Progress | Employee/account separation, Deal ownership, Sales assignments, migration map and reconciliation pack landed. Authoritative full reconciliation is blocked by production schema lag. |
 | 2 — HRMS | In Progress | Job Title, Department, Leave Type, Holiday, role authority, history preservation and atomic Sales assignments landed. Broader lifecycle contracts and exit evidence remain. |
 | 3 — Workflow + Unified Inbox | In Progress | Canonical routing and atomic review landed. Unified Inbox and cross-domain outcome commands remain. |
@@ -107,7 +107,7 @@ Outcomes:
 - database backup completes successfully and a restore drill is evidenced;
 - branch/release governance is strengthened.
 
-This remains a production release requirement. It proceeds in parallel with application implementation and does not gate ordinary Dev/UAT feature work. Provider-neutral Admin Backup & Recovery is a separate product capability.
+This remains a production release requirement. It proceeds in parallel with application implementation and does not gate ordinary Dev/UAT feature work. Provider-neutral [Admin Backup & Recovery](ADMIN_BACKUP_RECOVERY_PRODUCT.md) is a separate product capability.
 
 ### Epic 1 — Unified Business Core
 

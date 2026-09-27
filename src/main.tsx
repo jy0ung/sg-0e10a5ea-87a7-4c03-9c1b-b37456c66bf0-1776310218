@@ -94,6 +94,7 @@ const ReconciliationDetail = lazy(() => import("./pages/admin/ReconciliationDeta
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
 const SystemHealth = lazy(() => import("./pages/admin/SystemHealth"));
+const BackupRecovery = lazy(() => import("./pages/admin/BackupRecovery"));
 const SettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
 const SalesDashboard = lazy(() => import("./pages/sales/SalesDashboard"));
 const DealPipeline = lazy(() => import("./pages/sales/DealPipeline"));
@@ -303,6 +304,7 @@ const router = createBrowserRouter([
       { path: "admin/users", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Users"><S><UserManagement /></S></R></RequireRole> },
       { path: "admin/audit", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Audit Log"><S><AuditLog /></S></R></RequireRole> },
       { path: "admin/health", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="System Health"><S><SystemHealth /></S></R></RequireRole> },
+      { path: "admin/backup-recovery", element: <RequireRole roles={['super_admin']} section="Admin"><R scope="Backup & Recovery"><S><BackupRecovery /></S></R></RequireRole> },
       // admin/settings intentionally has NO RequireRole guard — it doubles as
       // the /profile redirect target (personal name/password/branch editing).
       // Admin-only features (branding, modules, user roles) are gated internally

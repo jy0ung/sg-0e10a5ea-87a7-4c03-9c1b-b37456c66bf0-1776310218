@@ -12,7 +12,8 @@
 #   BUILD_HRMS_WEB — when true, additionally build HRMS web at `/hrms/` and
 #   a root-mounted HRMS web bundle for a dedicated HRMS host.
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_APP_ENV, VITE_SENTRY_DSN,
-#   VITE_APP_URL, VITE_HRMS_APP_URL, VITE_APP_VERSION — inlined into the client bundle. Only public values.
+#   VITE_APP_URL, VITE_HRMS_APP_URL, VITE_APP_VERSION, VITE_RECOVERY_API_URL
+#   — inlined into the client bundle. Only public values.
 # ============================================================================
 
 FROM node:20-alpine AS build
@@ -38,6 +39,7 @@ ARG VITE_SENTRY_DSN
 ARG VITE_APP_URL
 ARG VITE_HRMS_APP_URL
 ARG VITE_APP_VERSION
+ARG VITE_RECOVERY_API_URL
 ARG BUILD_WORKSPACE=
 ARG BUILD_OUTPUT_DIR=dist
 ARG BUILD_HRMS_WEB=false
@@ -47,7 +49,8 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
     VITE_APP_URL=$VITE_APP_URL \
     VITE_HRMS_APP_URL=$VITE_HRMS_APP_URL \
-    VITE_APP_VERSION=$VITE_APP_VERSION
+    VITE_APP_VERSION=$VITE_APP_VERSION \
+    VITE_RECOVERY_API_URL=$VITE_RECOVERY_API_URL
 
 RUN if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ] || [ -z "$VITE_APP_URL" ]; then \
       echo "ERROR: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, and VITE_APP_URL are required." >&2; \
@@ -87,6 +90,7 @@ RUN if [ -n "$BUILD_WORKSPACE" ]; then npm run build --workspace "$BUILD_WORKSPA
 FROM nginx:1.27-alpine AS runtime
 
 ARG SUPABASE_INTERNAL_URL
+ARG RECOVERY_INTERNAL_URL
 
 RUN if [ -z "$SUPABASE_INTERNAL_URL" ]; then \
       echo "ERROR: SUPABASE_INTERNAL_URL is required for the runtime API proxy." >&2; \
@@ -96,7 +100,15 @@ RUN if [ -z "$SUPABASE_INTERNAL_URL" ]; then \
 # Drop the stock default.conf and ship a hardened SPA config.
 RUN rm /etc/nginx/conf.d/default.conf
 COPY docker/nginx.conf /etc/nginx/conf.d/app.conf
+COPY docker/recovery-proxy.conf.template /tmp/recovery-proxy.conf.template
 RUN sed -i "s|__SUPABASE_INTERNAL_URL__|${SUPABASE_INTERNAL_URL}|g" /etc/nginx/conf.d/app.conf
+RUN if [ -n "$RECOVERY_INTERNAL_URL" ]; then \
+      case "$RECOVERY_INTERNAL_URL" in http://*|https://*) ;; *) echo 'RECOVERY_INTERNAL_URL must be an HTTP(S) upstream' >&2; exit 1 ;; esac; \
+      upstream="${RECOVERY_INTERNAL_URL%/}"; \
+      sed "s|__RECOVERY_INTERNAL_URL__|${upstream}|g" /tmp/recovery-proxy.conf.template > /etc/nginx/recovery-proxy.conf; \
+    else \
+      : > /etc/nginx/recovery-proxy.conf; \
+    fi
 
 # Copy static bundle selected by the build stage.
 COPY --from=build /app/.deploy-dist /usr/share/nginx/html

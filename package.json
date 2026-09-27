@@ -53,7 +53,7 @@
     "gen:types": "tsx scripts/gen-types.ts",
     "gen:types:write": "tsx scripts/gen-types.ts --write",
     "prepare": "husky",
-    "typecheck:apps": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p apps/hrms-web/tsconfig.json && tsc --noEmit -p apps/hrms-mobile/tsconfig.json",
+    "typecheck:apps": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p apps/hrms-web/tsconfig.json && tsc --noEmit -p apps/hrms-mobile/tsconfig.json && npm run typecheck --workspace=@flc/recovery-service",
     "check:repo-hygiene": "tsx scripts/check-repo-hygiene.ts",
     "check:baseline": "npm run check:repo-hygiene && npm run lint && npm run typecheck && npm test && npm run security:no-service-role && npm run security:edge-functions && npm audit --audit-level=low && npm run build:budget && npm run build --workspace=@flc/hrms-web && npm run build --workspace=hrms-mobile",
     "check:production-readiness": "npm run check:baseline && npm run test:integration",
