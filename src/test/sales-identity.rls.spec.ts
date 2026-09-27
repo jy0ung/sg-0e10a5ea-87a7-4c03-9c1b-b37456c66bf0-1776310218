@@ -25,6 +25,8 @@ live('Employee-backed Sales targets and reports', () => {
   const orders: string[] = [];
   const profiles: string[] = [];
   const vehicles: string[] = [];
+  const commissionRules: string[] = [];
+  const commissionRecords: string[] = [];
   const year = 2035;
   const month = 2;
   const target = (id: string, code = branch) => ({ company_id: company, employee_id: id,
@@ -91,6 +93,8 @@ live('Employee-backed Sales targets and reports', () => {
 
   afterAll(async () => {
     if (!admin) return;
+    if (commissionRecords.length) await admin.from('commission_records').delete().in('id', commissionRecords);
+    if (commissionRules.length) await admin.from('commission_rules').delete().in('id', commissionRules);
     await admin.from('salesman_targets').delete().eq('company_id', company).in('branch_code', [branch, branch2]);
     if (orders.length) await admin.from('sales_orders').delete().in('id', orders);
     if (vehicles.length) await admin.from('vehicles').delete().in('id', vehicles);
@@ -218,5 +222,66 @@ live('Employee-backed Sales targets and reports', () => {
     const result = await actor.from('salesman_targets').delete().eq('employee_id', employee2).eq('company_id', company).select();
     expect(result.error).toBeNull();
     expect(result.data).toHaveLength(1);
+  });
+
+  it('keeps Commission identities distinct when Employee names match and rejects cross-company links', async () => {
+    expect((await admin.from('employees').update({ name: 'Same display name' }).eq('id', employee)).error).toBeNull();
+    const first = await admin.from('commission_rules').insert({
+      company_id: company, employee_id: employee, salesman_name: 'Untrusted label',
+      rule_name: 'Commission ID fixture', amount: 100,
+    }).select('id,employee_id,salesman_name').single();
+    const second = await admin.from('commission_rules').insert({
+      company_id: company, employee_id: employee2, salesman_name: 'Untrusted label',
+      rule_name: 'Commission ID fixture', amount: 100,
+    }).select('id,employee_id,salesman_name').single();
+    expect(first.error).toBeNull();
+    expect(second.error).toBeNull();
+    commissionRules.push(first.data!.id, second.data!.id);
+    expect(first.data!.employee_id).toBe(employee);
+    expect(second.data!.employee_id).toBe(employee2);
+    expect(first.data!.salesman_name).toBe('Same display name');
+    expect(second.data!.salesman_name).toBe('Same display name');
+
+    const unresolved = await admin.from('commission_rules').insert({
+      company_id: company, salesman_name: 'Same display name',
+      rule_name: 'Legacy commission fixture', amount: 100,
+    }).select('id,employee_id').single();
+    expect(unresolved.error).toBeNull();
+    commissionRules.push(unresolved.data!.id);
+    expect(unresolved.data!.employee_id).toBeNull();
+
+    const record = await admin.from('commission_records').insert({
+      company_id: company, vehicle_id: vehicles[0], chassis_no: 'Test chassis',
+      employee_id: employee, salesman_name: 'Untrusted label', rule_id: first.data!.id,
+      amount: 100, period: '2035-02',
+    }).select('id,employee_id,salesman_name').single();
+    expect(record.error).toBeNull();
+    commissionRecords.push(record.data!.id);
+    expect(record.data!.salesman_name).toBe('Same display name');
+
+    const legacyRecord = await admin.from('commission_records').insert({
+      company_id: company, chassis_no: 'Legacy test chassis', salesman_name: 'Same display name',
+      amount: 100, period: '2035-02',
+    }).select('id,employee_id').single();
+    expect(legacyRecord.error).toBeNull();
+    commissionRecords.push(legacyRecord.data!.id);
+    expect(legacyRecord.data!.employee_id).toBeNull();
+
+    const wrongRule = await admin.from('commission_rules').insert({
+      company_id: company, employee_id: foreignEmployee, rule_name: 'Wrong tenant', amount: 10,
+    });
+    const wrongRecord = await admin.from('commission_records').insert({
+      company_id: company, employee_id: foreignEmployee, chassis_no: 'Wrong tenant',
+      salesman_name: 'Untrusted label', amount: 10, period: '2035-02',
+    });
+    expect(wrongRule.error?.code).toBe('23514');
+    expect(wrongRecord.error?.code).toBe('23514');
+
+    const clear = await admin.from('commission_rules').update({ employee_id: null }).eq('id', first.data!.id);
+    expect(clear.error?.code).toBe('23514');
+    const foreignRead = await other.from('commission_rules').select('id').in('id', commissionRules);
+    expect(foreignRead.data).toEqual([]);
+    const foreignRecords = await other.from('commission_records').select('id').in('id', commissionRecords);
+    expect(foreignRecords.data).toEqual([]);
   });
 });

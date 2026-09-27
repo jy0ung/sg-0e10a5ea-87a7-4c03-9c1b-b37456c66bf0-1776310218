@@ -16,6 +16,7 @@ import {
   getCommissionRecords, updateCommissionRecordStatus,
 } from '@/services/commissionService';
 import type { CommissionRule, CommissionRecord } from '@/types';
+import { listSalesAdvisors } from '@/services/salesAdvisorService';
 import { Plus, Pencil, Trash2, Check, Loader2, DollarSign, TrendingUp } from 'lucide-react';
 
 const PERIODS = Array.from({ length: 12 }, (_, i) => {
@@ -41,7 +42,7 @@ export default function CommissionDashboard() {
   const queryClient = useQueryClient();
 
   const [periodFilter, setPeriodFilter] = useState(PERIODS[0]);
-  const [salesmanFilter, setSalesmanFilter] = useState('all');
+  const [employeeFilter, setEmployeeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<CommissionRule | null>(null);
@@ -58,14 +59,22 @@ export default function CommissionDashboard() {
     queryFn: async () => { const r = await getCommissionRecords(companyId, { period: periodFilter }); return r.data; },
     enabled: !!companyId,
   });
-  const loading = loadingRules || loadingRecords;
+  const { data: advisors = [], isPending: loadingAdvisors } = useQuery({
+    queryKey: ['sales-advisors', companyId],
+    queryFn: () => listSalesAdvisors(companyId),
+    enabled: !!companyId,
+  });
+  const loading = loadingRules || loadingRecords || loadingAdvisors;
 
-  // Derive salesmen from commission records (avoids loading full vehicles array)
-  const salesmen = [...new Set(records.map(r => r.salesmanName))].sort();
+  const advisorById = new Map(advisors.map(advisor => [advisor.id, advisor]));
+  const recordEmployees = [...new Map(records.filter(record => record.employeeId).map(record => [
+    record.employeeId!, record.salesmanName,
+  ])).entries()].sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]));
   const branches = availableBranches;
 
   const filteredRecords = records.filter(r => {
-    if (salesmanFilter !== 'all' && r.salesmanName !== salesmanFilter) return false;
+    if (employeeFilter === 'unresolved' && r.employeeId) return false;
+    if (employeeFilter !== 'all' && employeeFilter !== 'unresolved' && r.employeeId !== employeeFilter) return false;
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
     return true;
   });
@@ -75,7 +84,7 @@ export default function CommissionDashboard() {
   // ─── Rule CRUD ───────────────────────────────────────────────────────────────
   const openNewRule = () => {
     setEditingRule(null);
-    setRuleForm({ companyId });
+    setRuleForm({ companyId, employeeId: null });
     setRuleDialogOpen(true);
   };
 
@@ -87,6 +96,10 @@ export default function CommissionDashboard() {
 
   const handleSaveRule = async () => {
     if (!ruleForm.ruleName || ruleForm.amount === undefined) return;
+    if (ruleForm.salesmanName && ruleForm.employeeId === undefined) {
+      toast({ title: 'Select an Employee or explicitly choose all advisors', variant: 'destructive' });
+      return;
+    }
     if (editingRule) {
       const { error } = await updateCommissionRule(companyId, editingRule.id, ruleForm);
       if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
@@ -119,7 +132,7 @@ export default function CommissionDashboard() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Commission Dashboard"
-        description="Manage commission rules and track incentive payouts per salesman"
+        description="Manage Employee-backed commission rules and track incentive payouts"
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Auto Aging', path: '/auto-aging' }, { label: 'Commissions' }]}
       />
 
@@ -163,7 +176,7 @@ export default function CommissionDashboard() {
             <thead>
               <tr className="border-b border-border bg-secondary/30 text-left">
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Rule Name</th>
-                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Salesman</th>
+                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Advisor</th>
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Branch</th>
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Threshold (days)</th>
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Amount (MYR)</th>
@@ -174,7 +187,9 @@ export default function CommissionDashboard() {
               {rules.map(rule => (
                 <tr key={rule.id} className="data-table-row">
                   <td className="px-4 py-2 font-medium">{rule.ruleName}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{rule.salesmanName ?? 'All'}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{rule.employeeId
+                    ? `${advisorById.get(rule.employeeId)?.name ?? rule.salesmanName ?? 'Former advisor'} (${advisorById.get(rule.employeeId)?.code ?? rule.employeeId.slice(0, 8)})`
+                    : rule.salesmanName ? `${rule.salesmanName} · needs identity review` : 'All advisors'}</td>
                   <td className="px-4 py-2 text-muted-foreground">{rule.branchCode ?? 'All'}</td>
                   <td className="px-4 py-2 text-muted-foreground">{rule.thresholdDays ?? '—'}</td>
                   <td className="px-4 py-2 font-semibold">{rule.amount.toLocaleString()}</td>
@@ -205,11 +220,12 @@ export default function CommissionDashboard() {
               <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>{PERIODS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
             </Select>
-            <Select value={salesmanFilter} onValueChange={setSalesmanFilter}>
-              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="All Salesmen" /></SelectTrigger>
+            <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="All Advisors" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Salesmen</SelectItem>
-                {salesmen.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                <SelectItem value="all">All Advisors</SelectItem>
+                {recordEmployees.map(([id, name]) => <SelectItem key={id} value={id}>{name} · {id.slice(0, 8)}</SelectItem>)}
+                {records.some(record => !record.employeeId) && <SelectItem value="unresolved">Needs identity review</SelectItem>}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -230,7 +246,7 @@ export default function CommissionDashboard() {
             <thead>
               <tr className="border-b border-border bg-secondary/30 text-left">
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Chassis</th>
-                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Salesman</th>
+                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Advisor</th>
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Rule</th>
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Amount (MYR)</th>
                 <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Status</th>
@@ -241,7 +257,7 @@ export default function CommissionDashboard() {
               {filteredRecords.map(rec => (
                 <tr key={rec.id} className="data-table-row">
                   <td className="px-4 py-2 font-mono text-xs">{rec.chassisNo}</td>
-                  <td className="px-4 py-2">{rec.salesmanName}</td>
+                  <td className="px-4 py-2">{rec.salesmanName}{!rec.employeeId && <span className="ml-1 text-xs text-warning">· needs identity review</span>}</td>
                   <td className="px-4 py-2 text-muted-foreground">{rec.ruleName ?? '—'}</td>
                   <td className="px-4 py-2 font-semibold">{rec.amount.toLocaleString()}</td>
                   <td className="px-4 py-2">
@@ -276,12 +292,15 @@ export default function CommissionDashboard() {
               <Input id="commission-rule-name" value={ruleForm.ruleName ?? ''} onChange={e => setRuleForm(f => ({ ...f, ruleName: e.target.value }))} placeholder="e.g. Fast Delivery Bonus" />
             </div>
             <div className="space-y-1">
-              <label htmlFor="commission-rule-salesman" className="text-xs text-muted-foreground">Salesman (leave blank for all)</label>
-              <Select value={ruleForm.salesmanName ?? '_all'} onValueChange={v => setRuleForm(f => ({ ...f, salesmanName: v === '_all' ? undefined : v }))}>
-                <SelectTrigger id="commission-rule-salesman"><SelectValue placeholder="All salesmen" /></SelectTrigger>
+              <label htmlFor="commission-rule-salesman" className="text-xs text-muted-foreground">Sales advisor Employee</label>
+              <Select value={ruleForm.employeeId ?? (ruleForm.salesmanName ? '_legacy' : '_all')}
+                disabled={!!editingRule?.employeeId}
+                onValueChange={v => setRuleForm(f => ({ ...f, employeeId: v === '_all' ? null : v, salesmanName: undefined }))}>
+                <SelectTrigger id="commission-rule-salesman"><SelectValue placeholder="All advisors" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="_all">All salesmen</SelectItem>
-                  {salesmen.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  <SelectItem value="_all">All advisors</SelectItem>
+                  {ruleForm.salesmanName && !ruleForm.employeeId && <SelectItem value="_legacy" disabled>Needs identity review</SelectItem>}
+                  {advisors.map(advisor => <SelectItem key={advisor.id} value={advisor.id}>{advisor.name} · {advisor.code}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -306,7 +325,7 @@ export default function CommissionDashboard() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRuleDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveRule} disabled={!ruleForm.ruleName || ruleForm.amount === undefined}>
+            <Button onClick={handleSaveRule} disabled={!ruleForm.ruleName || ruleForm.amount === undefined || (!!ruleForm.salesmanName && ruleForm.employeeId === undefined)}>
               {editingRule ? 'Save Changes' : 'Create Rule'}
             </Button>
           </DialogFooter>

@@ -13,6 +13,7 @@ const mockUpdateCommissionRule = vi.fn();
 const mockDeleteCommissionRule = vi.fn();
 const mockGetCommissionRecords = vi.fn();
 const mockUpdateCommissionRecordStatus = vi.fn();
+const mockListSalesAdvisors = vi.fn();
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1', role: 'company_admin' } }),
@@ -53,6 +54,9 @@ vi.mock('@/services/commissionService', () => ({
   deleteCommissionRule: (...args: unknown[]) => mockDeleteCommissionRule(...args),
   getCommissionRecords: (...args: unknown[]) => mockGetCommissionRecords(...args),
   updateCommissionRecordStatus: (...args: unknown[]) => mockUpdateCommissionRecordStatus(...args),
+}));
+vi.mock('@/services/salesAdvisorService', () => ({
+  listSalesAdvisors: (...args: unknown[]) => mockListSalesAdvisors(...args),
 }));
 
 let commissionRules: CommissionRule[];
@@ -112,6 +116,7 @@ describe('CommissionDashboard', () => {
     ];
 
     mockGetCommissionRules.mockResolvedValue({ data: commissionRules, error: null });
+    mockListSalesAdvisors.mockResolvedValue([]);
     mockGetCommissionRecords.mockImplementation(async () => ({ data: [...commissionRecords], error: null }));
     mockCreateCommissionRule.mockResolvedValue({ data: null, error: null });
     mockUpdateCommissionRule.mockResolvedValue({ error: null });
