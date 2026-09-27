@@ -8,9 +8,9 @@ The table below is the **target recovery posture**, not proof that each producti
 
 | Asset                      | Target mechanism                      | Target retention | Owner          | Current evidence |
 | -------------------------- | ------------------------------------- | ---------------- | -------------- | ---------------- |
-| Postgres (staging + prod)  | Supabase PITR (point-in-time)         | 7 days           | Platform team  | Not yet recorded in-repo |
+| Postgres (staging + prod)  | Self-hosted base backups + archived WAL for PITR | 7 days | Platform team | Production `archive_mode=off` on 2026-09-27; not enabled |
 | Daily logical dump         | `pg_dump` → GPG-encrypted artifact/S3 | 30 days in S3    | Platform team  | Direct DB URL and Cloudflare Access SSH transports implemented; production encrypted-run evidence still open |
-| Storage buckets            | Object versioning + lifecycle rule     | 30 days          | Platform team  | Not yet recorded in-repo |
+| Storage buckets            | Off-host versioned object storage or verified file-backend replication | 30 days | Platform team | Production uses local file backend; no off-host versioning evidence |
 | Edge function source       | Git (tagged releases)                  | Forever          | Engineering    | Repository-backed |
 | `.env.*` templates         | Git                                    | Forever          | Engineering    | Repository-backed |
 | Supabase project config    | `supabase/config.toml` in repo         | Forever          | Engineering    | Repository-backed |
@@ -18,10 +18,13 @@ The table below is the **target recovery posture**, not proof that each producti
 ## Enablement (one-time per project)
 
 ```bash
-# 1. Turn on PITR in the Supabase dashboard for staging and prod projects.
+# 1. For this self-hosted deployment, configure a tested PostgreSQL base-backup
+#    and continuous WAL-archiving path to retained off-host storage. Managed
+#    Supabase dashboard PITR is not available for a self-hosted stack.
 # 2. Configure .github/workflows/db-backup.yml with DB_BACKUP_GPG_PASSPHRASE
 #    plus either SUPABASE_DB_URL or the complete Cloudflare Access SSH secret set.
-# 3. Enable object versioning on every storage bucket.
+# 3. Move Storage to a versioned off-host S3 backend, or replicate the current
+#    file backend to versioned off-host storage and prove object recovery.
 ```
 
 ## Nightly logical dump workflow
@@ -72,12 +75,12 @@ A successful workflow run is required before marking the logical restore drill c
 
 ## PITR restore drill (monthly)
 
-1. Pick a timestamp T within the PITR window on the **production** project.
-2. Use the Supabase dashboard to restore the DB into a **new** staging project at T.
-3. Deploy the matching git tag to the restored project.
-4. Run the e2e smoke suite (`npm run test:e2e`) against the restored stack.
-5. Record pass/fail + duration in `docs/DR_DRILLS.md`.
-6. Tear down the scratch staging project.
+1. Pick a timestamp T within the retained **production** base-backup/WAL window.
+2. Restore the appropriate base backup and archived WAL into a new isolated PostgreSQL cluster, stopping replay at T. Never replay into the live production data directory.
+3. Connect a matching application image or schema-smoke harness to the restored cluster.
+4. Check the migration ledger, critical UBS relations and a bounded authenticated smoke path. Verify the restored timestamp is at or before T.
+5. Record pass/fail, recovery duration and effective RPO in `docs/DR_DRILLS.md`.
+6. Destroy the isolated cluster after evidence review.
 
 Target RTO: ≤ 2 hours. Target RPO: ≤ 5 minutes (PITR granularity).
 
@@ -86,7 +89,7 @@ Target RTO: ≤ 2 hours. Target RPO: ≤ 5 minutes (PITR granularity).
 1. Declare incident; freeze writes by disabling the frontend (put the app in
    maintenance mode via env flag `VITE_MAINTENANCE=1`).
 2. Identify the last-known-good timestamp T.
-3. Use Supabase dashboard → Database → Backups → "Restore to point in time".
+3. Select a verified off-host base backup and WAL archive; restore to an isolated replacement cluster at T. Fail over only after data and schema checks pass.
 4. Verify row counts on critical tables (`vehicles`, `sales_orders`,
    `invoices`, `import_batches`).
 5. Re-enable writes; monitor Sentry for anomaly spike.
@@ -97,3 +100,5 @@ Target RTO: ≤ 2 hours. Target RPO: ≤ 5 minutes (PITR granularity).
 - Edge functions: `supabase functions deploy <name>` from the tagged git commit.
 - Storage objects: restore via versioning; manual for bucket-level loss.
 - Auth users: covered by the logical dump (auth schema).
+
+For the current self-hosted architecture, follow [PostgreSQL's continuous archiving and PITR procedure](https://www.postgresql.org/docs/17/continuous-archiving.html) and [Supabase's self-hosted Storage backend guidance](https://supabase.com/docs/guides/self-hosting/self-hosted-s3). Supabase's managed-project PITR dashboard does not operate this host-local stack.
