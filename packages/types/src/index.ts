@@ -1072,6 +1072,7 @@ export interface ApAgingSummary {
 }
 
 export interface SalesmanTarget {
+  employeeId: string | null;
   id: string;
   salesmanName: string;
   branchCode: string;
@@ -1083,6 +1084,9 @@ export interface SalesmanTarget {
 }
 
 export interface SalesmanPerformance {
+  identityKey: string;
+  employeeId: string | null;
+  identityStatus: 'employee' | 'unresolved';
   salesmanName: string;
   branchCode: string;
   totalDeals: number;

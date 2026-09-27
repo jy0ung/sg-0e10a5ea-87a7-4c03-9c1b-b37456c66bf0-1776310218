@@ -28,7 +28,7 @@
 -- ============================================================================
 
 WITH params AS (
-  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_ID__')::text AS company_id
+  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_' || 'ID__')::text AS company_id
 ),
 scoped_profiles AS (
   SELECT p.*
@@ -279,7 +279,7 @@ ORDER BY issue;
 -- ============================================================================
 
 WITH params AS (
-  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_ID__')::text AS company_id
+  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_' || 'ID__')::text AS company_id
 )
 SELECT
   CASE
@@ -330,7 +330,7 @@ ORDER BY issue, p.company_id, p.id;
 -- ============================================================================
 
 WITH params AS (
-  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_ID__')::text AS company_id
+  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_' || 'ID__')::text AS company_id
 )
 SELECT
   e.company_id,
@@ -384,7 +384,7 @@ ORDER BY e.company_id, issue, e.id;
 -- ============================================================================
 
 WITH params AS (
-  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_ID__')::text AS company_id
+  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_' || 'ID__')::text AS company_id
 )
 SELECT
   d.company_id,
@@ -430,7 +430,7 @@ ORDER BY d.company_id, issue, d.deal_no;
 -- The report deliberately does not match by name, email, IC, or phone.
 
 WITH params AS (
-  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_ID__')::text AS company_id
+  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_' || 'ID__')::text AS company_id
 )
 SELECT
   sa.company_id,
@@ -470,7 +470,7 @@ ORDER BY sa.company_id, reconciliation_status, sa.code NULLS LAST, sa.id;
 -- source evidence only and is never used to manufacture an Employee link.
 
 WITH params AS (
-  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_ID__')::text AS company_id
+  SELECT NULLIF('__COMPANY_ID__', '__COMPANY_' || 'ID__')::text AS company_id
 )
 SELECT
   v.company_id,

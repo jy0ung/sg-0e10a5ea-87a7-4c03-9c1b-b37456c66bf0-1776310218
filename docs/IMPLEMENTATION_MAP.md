@@ -1,5 +1,7 @@
 # FLC BI — Implementation Map
 
+> **Historical assessment — architecture superseded (2026-09-27).** Use [the roadmap](UNIFIED_BUSINESS_SUITE_ROADMAP.md), programme #47 and [the identity migration map](BUSINESS_CORE_IDENTITY_MIGRATION_MAP_2026-09-23.md) for current implementation decisions. Employee + `employee_module_assignments` is the Sales Advisor registry. `sales_advisors` is legacy compatibility/import data and has no `employee_id` relationship. Deals own new local Sales workflow. Proposals below to restore legacy Sales Advisor authority or add new target FKs to that table are withdrawn. Historical counts and feature gaps below are not current evidence.
+
 > **Last updated**: 2026-05-19 (Phase 1b fixes applied)  
 > **Scope**: Full structured codebase discovery — entry point, tech stack, module/route map, data flow, permissions, schema, UI architecture, risks, and safe implementation strategy.  
 > **Source of truth**: Actual files in the repository.
@@ -512,7 +514,7 @@ These defaults are **overridden** by the `role_sections` DB table (loaded by `us
 | `sales_order_status_history` | Status change audit | sales_order_id → sales_orders.id |
 | `sales_activities` | CRM follow-ups | sales_order_id → sales_orders.id, customer_id |
 | `deal_stages` | Pipeline stage definitions | company_id |
-| `sales_advisors` | Sales staff registry | company_id, employee_id → employees.id |
+| `sales_advisors` | Legacy compatibility/import data | company_id, code; no employee_id FK. Canonical staffing uses employees + employee_module_assignments. |
 | `salesman_targets` | Sales targets | company_id, salesman_id |
 | `customers` | Customer records | company_id (dedup unique indexes) |
 | `bank_financings` / `registration_records` / `insurance_cover_notes` | Per-order tracking | sales_order_id |

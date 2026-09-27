@@ -1,5 +1,7 @@
 # Sales Module — Full GAP Assessment
 
+> **Historical assessment — architecture superseded (2026-09-27).** Use [the roadmap](UNIFIED_BUSINESS_SUITE_ROADMAP.md), programme #47 and [the identity migration map](BUSINESS_CORE_IDENTITY_MIGRATION_MAP_2026-09-23.md) for current implementation decisions. Employee + `employee_module_assignments` is the Sales Advisor registry. `sales_advisors` is legacy compatibility/import data and has no `employee_id` relationship. Deals own new local Sales workflow. Proposals below to restore legacy Sales Advisor authority or add new target FKs to that table are withdrawn. Historical counts and feature gaps below are not current evidence.
+
 > **Prepared by:** Senior Full-Stack Architect / Sales Operations Analyst / DB Architect / Workflow Engineer / RBAC Reviewer / Enterprise UI/UX Auditor
 > **Assessment Scope:** All Sales submodules, routes, services, DB tables, RLS policies, workflows, and UI/UX patterns
 > **Overall Readiness:** ~38% — functional shells exist, but critical workflow, data-model, relationship, and UI/UX gaps block production viability at scale.
@@ -577,14 +579,14 @@ The following tables, which must be created per Section D, will require RLS poli
 
 Before any new features are built, the Sales Advisor data source must be consolidated. The options are:
 
-**Option A (Recommended):** Make `sales_advisors` the authoritative source.
+**Option A (withdrawn):** Historical proposal to make `sales_advisors` authoritative. Do not implement; PR #55 established Employee + module assignment authority.
 - Fix the `sales_advisors` write RLS (Phase 0).
 - Rewrite `salesAdvisorService.ts` to query `sales_advisors` directly.
 - Build a one-time migration to populate `sales_advisors` from `employee_module_assignments` for existing records.
 - Deprecate the `employee_module_assignments` + `employees` path for Sales Advisor lookups.
 - Add `salesman_id` FK on `sales_orders` pointing to `sales_advisors.id`.
 
-**Option B (Higher complexity, avoid):** Merge `sales_advisors` into `employee_module_assignments`.
+**Current direction:** Employee + module assignments are authoritative. Retain legacy `sales_advisors` for measured compatibility migration; see the identity migration map.
 - This would require HRMS module changes and is out-of-scope for the Sales GAP fix.
 
 ### J2. Add the `sales_order_status_history` Table Immediately

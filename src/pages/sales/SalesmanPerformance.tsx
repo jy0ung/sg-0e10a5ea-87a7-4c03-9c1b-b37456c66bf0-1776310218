@@ -10,7 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
 import { computeSalesmanActuals, upsertSalesmanTarget, deleteSalesmanTarget } from '@/services/salesTargetService';
-import { SalesmanTarget } from '@/types';
+import { listSalesAdvisors } from '@/services/salesAdvisorService';
+import { listBranches } from '@/services/branchService';
 import { Target, Plus, Trash2 } from 'lucide-react';
 import { PageErrorState } from '@/components/shared/PageState';
 
@@ -24,13 +25,20 @@ export default function SalesmanPerformancePage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [targetOpen, setTargetOpen] = useState(false);
-  const [_editTarget, setEditTarget] = useState<SalesmanTarget | null>(null);
-  const [form, setForm] = useState({ salesmanId: '', salesmanName: '', branchCode: '', targetUnits: '', targetRevenue: '' });
+  const [form, setForm] = useState({ employeeId: '', salesmanName: '', branchCode: '', targetUnits: '', targetRevenue: '' });
+
+  const advisorsQuery = useQuery({
+    queryKey: ['sales-advisors', companyId], queryFn: () => listSalesAdvisors(companyId), enabled: !!companyId,
+  });
+  const branchesQuery = useQuery({
+    queryKey: ['branches', companyId], queryFn: () => listBranches(companyId), enabled: !!companyId,
+  });
 
   const { data: performance = [], isFetching: loading, isError, error, refetch } = useQuery({
     queryKey: ['salesman-performance', companyId, year, month],
     queryFn: async () => {
-      const { data } = await computeSalesmanActuals(companyId, year, month);
+      const { data, error } = await computeSalesmanActuals(companyId, year, month);
+      if (error) throw error;
       return data;
     },
     enabled: !!companyId,
@@ -40,14 +48,15 @@ export default function SalesmanPerformancePage() {
   const invalidatePerf = () => queryClient.invalidateQueries({ queryKey: ['salesman-performance', companyId, year, month] });
 
   const handleSaveTarget = async () => {
-    if (!form.salesmanName.trim() || !form.targetUnits) return toast({ title: 'Salesman name and Target Units required', variant: 'destructive' });
+    if (!form.employeeId || !form.branchCode || !form.targetUnits) return toast({ title: 'Employee, Branch and Target Units required', variant: 'destructive' });
     const { error } = await upsertSalesmanTarget(companyId, {
-      salesmanName: form.salesmanName.trim(),
+      employeeId: form.employeeId,
+      salesmanName: form.salesmanName,
       branchCode: form.branchCode,
       periodYear: year,
       periodMonth: month,
-      targetUnits: parseInt(form.targetUnits),
-      targetRevenue: form.targetRevenue ? parseFloat(form.targetRevenue) : 0,
+      targetUnits: Number(form.targetUnits),
+      targetRevenue: form.targetRevenue ? Number(form.targetRevenue) : 0,
     }, user?.id);
     if (error) return toast({ title: 'Error', description: error.message, variant: 'destructive' });
     await queryClient.invalidateQueries({ queryKey: ['sales', companyId] });
@@ -57,7 +66,8 @@ export default function SalesmanPerformancePage() {
   };
 
   const handleDeleteTarget = async (id: string) => {
-    await deleteSalesmanTarget(companyId, id, user?.id);
+    const { error } = await deleteSalesmanTarget(companyId, id, user?.id);
+    if (error) return toast({ title: 'Unable to remove target', description: error.message, variant: 'destructive' });
     await queryClient.invalidateQueries({ queryKey: ['sales', companyId] });
     await invalidatePerf();
     toast({ title: 'Target removed' });
@@ -71,9 +81,9 @@ export default function SalesmanPerformancePage() {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Salesman Performance"
-        description="Actual orders vs targets by salesman"
+        description="Booking-month orders vs Employee targets; unresolved identities are shown separately"
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Performance' }]}
-        actions={<Button size="sm" onClick={() => { setEditTarget(null); setForm({ salesmanId:'',salesmanName:'',branchCode:'',targetUnits:'',targetRevenue:'' }); setTargetOpen(true); }}><Plus className="h-4 w-4 mr-1" />Set Target</Button>}
+        actions={<Button size="sm" onClick={() => { setForm({ employeeId:'',salesmanName:'',branchCode:'',targetUnits:'',targetRevenue:'' }); setTargetOpen(true); }}><Plus className="h-4 w-4 mr-1" />Set Target</Button>}
       />
 
       {isError && <PageErrorState title="Unable to load salesman performance" error={error} onRetry={() => void refetch()} />}
@@ -103,11 +113,11 @@ export default function SalesmanPerformancePage() {
           </thead>
           <tbody>
             {performance.map(p => {
-              const pct = p.targetAchievement ?? (p.targetUnits && p.targetUnits > 0 ? (p.totalDeals / p.targetUnits) * 100 : undefined);
+              const pct = p.targetAchievement;
               const color = pct === undefined ? '' : pct >= 100 ? 'text-emerald-600' : pct >= 70 ? 'text-yellow-600' : 'text-red-500';
               return (
-                <tr key={`${p.salesmanName}-${p.branchCode}`} className="border-b border-border last:border-0 hover:bg-secondary/20">
-                  <td className="px-3 py-2 font-medium">{p.salesmanName}</td>
+                <tr key={`${p.identityKey}-${p.branchCode}`} className="border-b border-border last:border-0 hover:bg-secondary/20">
+                  <td className="px-3 py-2 font-medium">{p.salesmanName}{p.identityStatus === 'unresolved' && <span className="ml-2 text-xs text-muted-foreground">Needs identity review</span>}</td>
                   <td className="px-3 py-2 text-muted-foreground">{p.branchCode}</td>
                   <td className="px-3 py-2">{p.totalDeals}</td>
                   <td className="px-3 py-2">{p.closedDeals}</td>
@@ -136,7 +146,7 @@ export default function SalesmanPerformancePage() {
             {monthTargets.map(t => (
               <div key={t.id} className="flex items-center gap-1.5 text-xs bg-secondary rounded-lg px-2.5 py-1.5">
                 <Target className="h-3 w-3 text-muted-foreground" />
-                <span className="font-medium">{t.salesmanName}</span>
+                <span className="font-medium">{t.salesmanName}{!t.employeeId && ' — needs identity review'}</span>
                 <span className="text-muted-foreground">— {t.targetUnits} units</span>
                 <Button variant="ghost" size="icon" className="h-4 w-4 ml-1" onClick={() => handleDeleteTarget(t.id)} aria-label={`Delete target for ${t.salesmanName}`}>
                   <Trash2 className="h-3 w-3 text-muted-foreground" />
@@ -152,10 +162,25 @@ export default function SalesmanPerformancePage() {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Set Target — {months[month-1].label} {year}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
+            {(advisorsQuery.isError || branchesQuery.isError) && <div role="alert" className="text-sm text-destructive">Unable to load Employees or Branches. <Button variant="link" onClick={() => { void advisorsQuery.refetch(); void branchesQuery.refetch(); }}>Retry</Button></div>}
+            <div className="space-y-1">
+              <label htmlFor="target-employee" className="text-xs text-muted-foreground">Sales Advisor *</label>
+              <Select value={form.employeeId} onValueChange={id => {
+                const advisor = advisorsQuery.data?.find(a => a.id === id);
+                setForm(f => ({ ...f, employeeId: id, salesmanName: advisor?.name ?? '', branchCode: branchesQuery.data?.find(b => b.id === advisor?.branchId)?.code ?? '' }));
+              }}>
+                <SelectTrigger id="target-employee"><SelectValue placeholder="Select an Employee" /></SelectTrigger>
+                <SelectContent>{(advisorsQuery.data ?? []).filter(a => a.status === 'active').map(a => <SelectItem key={a.id} value={a.id}>{a.name} ({a.code})</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="target-branch" className="text-xs text-muted-foreground">Branch *</label>
+              <Select value={form.branchCode} onValueChange={branchCode => setForm(f => ({ ...f, branchCode }))}>
+                <SelectTrigger id="target-branch"><SelectValue placeholder="Select a Branch" /></SelectTrigger>
+                <SelectContent>{(branchesQuery.data ?? []).map(b => <SelectItem key={b.id} value={b.code}>{b.name} ({b.code})</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
             {[
-              { field: 'salesmanId', label: 'Salesman ID *' },
-              { field: 'salesmanName', label: 'Salesman Name' },
-              { field: 'branchCode', label: 'Branch Code' },
               { field: 'targetUnits', label: 'Target Units *', type: 'number' },
               { field: 'targetRevenue', label: 'Target Revenue', type: 'number' },
             ].map(({ field, label, type }) => (

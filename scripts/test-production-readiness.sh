@@ -85,6 +85,7 @@ echo 'Linting the migrated database...'
 supabase db lint --local --workdir "$READINESS_WORKDIR" --level warning
 
 DB_CONTAINER="supabase_db_${READINESS_PROJECT_ID}"
+export RLS_DB_CONTAINER="$DB_CONTAINER"
 assert_zero() {
   local label="$1"
   local sql="$2"

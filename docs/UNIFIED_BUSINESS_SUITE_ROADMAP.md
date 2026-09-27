@@ -1,6 +1,6 @@
 # FLC Unified Business Suite Roadmap
 
-**Status:** Architecture baseline  
+**Status:** Active execution roadmap (rebaselined 2026-09-27)
 **Date:** 2026-09-22  
 **Scope:** Fook Loi Unified Business Suite (UBS) across Platform, HRMS, Internal Requests, Sales, Inventory, Purchasing, Accounts, Finance, and Analytics.
 
@@ -9,6 +9,59 @@
 FLC UBS is one internal business platform composed of independently owned business domains. The suite must feel unified to users while preserving clear data ownership, security boundaries, auditable state transitions, and replaceable implementations.
 
 This roadmap does not authorize a big-bang rewrite. Existing production-proven services, migrations, RLS policies, workflows, and packages remain the foundation. New work should converge the current system toward the target model incrementally.
+
+## Programme status — 2026-09-27
+
+This roadmap and [programme #47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) are the refactor control plane. The [identity migration map](BUSINESS_CORE_IDENTITY_MIGRATION_MAP_2026-09-23.md) defines identity contracts; the [reconciliation runbook](BUSINESS_CORE_IDENTITY_RECONCILIATION.md) defines measurement. Older implementation/gap assessments are historical when they disagree with these sources.
+
+Statuses describe architectural convergence, not whether a module has existing features. **Not Started** means convergence has not been systematically executed; **In Progress** means implementation or evidence remains; **Exit Criteria Met** requires every stated exit criterion and its evidence. No epic currently has sufficient evidence for Exit Criteria Met.
+
+| Epic | Status | Landed work / remaining exit evidence |
+|---|---|---|
+| 0 — Platform Safety | In Progress | Repository release, rollback, encrypted backup/restore controls landed. #48 still requires real backup, restore, PITR/storage and governance evidence. |
+| 1 — Unified Business Core | In Progress | Employee/account separation, Deal ownership, Sales assignments, migration map and reconciliation pack landed. Authoritative full reconciliation is blocked by production schema lag. |
+| 2 — HRMS | In Progress | Job Title, Department, Leave Type, Holiday, role authority, history preservation and atomic Sales assignments landed. Broader lifecycle contracts and exit evidence remain. |
+| 3 — Workflow + Unified Inbox | In Progress | Canonical routing and atomic review landed. Unified Inbox and cross-domain outcome commands remain. |
+| 4 — Internal Requests | In Progress | Canonical flow selection and HRMS-role review authority landed. Broader domain-command integration remains. |
+| 5 — Sales + Inventory | In Progress | Employee-backed Deals and Vehicle import identity safeguards landed. Target/report caller migration (#94) is the current implementation slice; release and reconciliation remain gated. |
+| 6 — Commission | Not Started | Existing features still use salesperson names; convergence follows the target/report slice. |
+| 7 — Purchasing | Not Started | Existing functionality; convergence not systematically executed. |
+| 8 — Accounts | Not Started | Existing functionality; convergence not systematically executed. |
+| 9 — Finance | Not Started | Existing functionality; convergence not systematically executed. |
+| 10 — Unified Analytics | Not Started | Existing reports; canonical cross-domain read models remain. |
+
+### Verified merge record, PRs #74–#93
+
+Verified against `origin/main@3a0da12df47a61d1a8ee081d3a9e14af44ec873f` and GitHub on 2026-09-27. Gaps in numbering are issues, not missing merged PRs.
+
+| PR | Merge | Contribution |
+|---|---|---|
+| #74 | `317fba7` | Canonical Approval Flow resolution and pin safety |
+| #76 | `5a73286` | Atomic, concurrency-safe Internal Request review |
+| #79 | `2556284` | Public Holiday authority |
+| #81 | `5462064` | Employee history deletion protection |
+| #83 | `859d5c4` | Approval UI follows HRMS roles |
+| #84 | `d8ea61d` | Workflow implementation record |
+| #85 | `1cfc8fa` | Atomic Employee/Sales assignment |
+| #86 | `8f520ef` | Workforce integrity implementation record |
+| #87 | `ec0c1f8` | P0 release-safety rebaseline |
+| #88 | `c5f3153` | Encrypted backup SSH transport |
+| #89 | `fb20a86` | Canonical Business Core identity map |
+| #91 | `b7b6825` | Read-only identity reconciliation pack |
+| #93 | `3a0da12` | Stop name-based Vehicle salesperson assignment |
+
+### Current checkpoint and dependency order
+
+[Business Core reconciliation and Sales identity evidence](BUSINESS_CORE_RECONCILIATION_2026-09-27.md) records the measured limits and the implementation/rollout contract.
+
+1. Rebaseline tracking and supersede contradictory architecture guidance.
+2. Measure authoritative identity debt read-only; resolve schema prerequisites through a separately authorized release.
+3. Implement Employee-backed targets and salesperson reports additively; validate in disposable infrastructure.
+4. Rerun the full reconciliation on the compatible authoritative schema before production promotion.
+5. Converge Commission identity, then introduce canonical Vehicle ownership with deterministic evidence.
+6. Migrate remaining Profile workforce callers; physical FK hardening and compatibility retirement come last.
+
+#48 remains open independently. Repository tests never stand in for production recovery or governance evidence.
 
 ## Product direction
 
