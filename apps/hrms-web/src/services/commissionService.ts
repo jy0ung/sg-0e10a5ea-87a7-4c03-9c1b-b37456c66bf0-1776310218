@@ -3,23 +3,6 @@ import type { CommissionRule, CommissionRecord } from '@/types';
 import { loggingService } from './loggingService';
 import { performanceService } from './performanceService';
 
-// commission_records is now in the generated Supabase schema types.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function commissionRecordsTable(): any {
-  return supabase.from('commission_records');
-}
-
-interface CommissionRecordInsert {
-  vehicle_id: string;
-  chassis_no: string;
-  salesman_name: string;
-  rule_id: string;
-  status: 'pending';
-  amount: number;
-  period: string;
-  company_id: string;
-}
-
 // ─── Commission Rules ─────────────────────────────────────────────────────────
 
 export async function getCommissionRules(companyId: string): Promise<{ data: CommissionRule[]; error: Error | null }> {
@@ -42,6 +25,7 @@ export async function getCommissionRules(companyId: string): Promise<{ data: Com
   return {
     data: (data || []).map(r => ({
       id: r.id,
+      employeeId: r.employee_id ?? undefined,
       salesmanName: r.salesman_name ?? undefined,
       branchCode: r.branch_code ?? undefined,
       ruleName: r.rule_name,
@@ -59,7 +43,8 @@ export async function createCommissionRule(
   const { data, error } = await supabase
     .from('commission_rules')
     .insert({
-      salesman_name: rule.salesmanName ?? null,
+      employee_id: rule.employeeId ?? null,
+      salesman_name: null,
       branch_code: rule.branchCode ?? null,
       rule_name: rule.ruleName,
       threshold_days: rule.thresholdDays ?? null,
@@ -77,6 +62,7 @@ export async function createCommissionRule(
   return {
     data: {
       id: data.id,
+      employeeId: data.employee_id ?? undefined,
       salesmanName: data.salesman_name ?? undefined,
       branchCode: data.branch_code ?? undefined,
       ruleName: data.rule_name,
@@ -94,7 +80,10 @@ export async function updateCommissionRule(
   updates: Partial<Omit<CommissionRule, 'id' | 'companyId'>>,
 ): Promise<{ error: Error | null }> {
   const dbUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (updates.salesmanName !== undefined) dbUpdates.salesman_name = updates.salesmanName ?? null;
+  if (updates.employeeId !== undefined) {
+    dbUpdates.employee_id = updates.employeeId ?? null;
+    dbUpdates.salesman_name = null;
+  }
   if (updates.branchCode !== undefined) dbUpdates.branch_code = updates.branchCode ?? null;
   if (updates.ruleName !== undefined) dbUpdates.rule_name = updates.ruleName;
   if (updates.thresholdDays !== undefined) dbUpdates.threshold_days = updates.thresholdDays ?? null;
@@ -121,7 +110,7 @@ export async function deleteCommissionRule(companyId: string, id: string): Promi
 
 export async function getCommissionRecords(
   companyId: string,
-  filters?: { salesmanName?: string; period?: string; status?: CommissionRecord['status'] }
+  filters?: { employeeId?: string; period?: string; status?: CommissionRecord['status'] }
 ): Promise<{ data: CommissionRecord[]; error: Error | null }> {
   const qid = `commission-records-${Date.now()}`;
   performanceService.startQueryTimer(qid);
@@ -132,7 +121,7 @@ export async function getCommissionRecords(
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
 
-  if (filters?.salesmanName) query = query.eq('salesman_name', filters.salesmanName);
+  if (filters?.employeeId) query = query.eq('employee_id', filters.employeeId);
   if (filters?.period) query = query.eq('period', filters.period);
   if (filters?.status) query = query.eq('status', filters.status);
 
@@ -147,6 +136,7 @@ export async function getCommissionRecords(
   return {
     data: (data || []).map(r => ({
       id: r.id,
+      employeeId: r.employee_id ?? undefined,
       vehicleId: r.vehicle_id ?? undefined,
       chassisNo: r.chassis_no,
       salesmanName: r.salesman_name,
@@ -178,64 +168,4 @@ export async function updateCommissionRecordStatus(
     return { error: new Error(error.message) };
   }
   return { error: null };
-}
-
-/**
- * Compute and persist commission records for a given period.
- * For each vehicle closed (has delivery_date) in the period, checks applicable rules.
- * Simple rule: if bg_to_delivery ≤ rule.threshold_days → award rule.amount.
- */
-export async function computeAndSaveCommissions(
-  companyId: string,
-  period: string,       // 'YYYY-MM'
-  vehicles: Array<{ id: string; chassis_no: string; salesman_name: string; branch_code: string; bg_to_delivery?: number | null; delivery_date?: string }>,
-  rules: CommissionRule[],
-): Promise<{ created: number; error: Error | null }> {
-  const [year, month] = period.split('-').map(Number);
-  const periodVehicles = vehicles.filter(v => {
-    if (!v.delivery_date) return false;
-    const d = new Date(v.delivery_date);
-    return d.getFullYear() === year && d.getMonth() + 1 === month;
-  });
-
-  const records: CommissionRecordInsert[] = [];
-
-  for (const vehicle of periodVehicles) {
-    for (const rule of rules) {
-      // Match rule to vehicle (salesman + branch filters)
-      if (rule.salesmanName && rule.salesmanName !== vehicle.salesman_name) continue;
-      if (rule.branchCode && rule.branchCode !== vehicle.branch_code) continue;
-
-      // Threshold check: if rule has threshold_days, vehicle must be within it
-      if (rule.thresholdDays !== undefined && rule.thresholdDays !== null) {
-        if (vehicle.bg_to_delivery == null || vehicle.bg_to_delivery > rule.thresholdDays) continue;
-      }
-
-      records.push({
-        vehicle_id: vehicle.id,
-        chassis_no: vehicle.chassis_no,
-        salesman_name: vehicle.salesman_name,
-        rule_id: rule.id,
-        status: 'pending',
-        amount: rule.amount,
-        period,
-        company_id: companyId,
-      });
-    }
-  }
-
-  if (records.length === 0) return { created: 0, error: null };
-
-  const { error: upsertError } = await commissionRecordsTable()
-    .upsert(records, {
-      onConflict: 'vehicle_id,rule_id',
-      ignoreDuplicates: true,
-    });
-
-  if (upsertError) {
-    loggingService.error('Failed to save commission records', { error: upsertError }, 'CommissionService');
-    return { created: 0, error: new Error(upsertError.message) };
-  }
-
-  return { created: records.length, error: null };
 }

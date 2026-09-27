@@ -971,6 +971,7 @@ export type Database = {
           chassis_no: string
           company_id: string
           created_at: string
+          employee_id: string | null
           id: string
           period: string
           rule_id: string | null
@@ -984,6 +985,7 @@ export type Database = {
           chassis_no: string
           company_id: string
           created_at?: string
+          employee_id?: string | null
           id?: string
           period: string
           rule_id?: string | null
@@ -997,6 +999,7 @@ export type Database = {
           chassis_no?: string
           company_id?: string
           created_at?: string
+          employee_id?: string | null
           id?: string
           period?: string
           rule_id?: string | null
@@ -1006,6 +1009,13 @@ export type Database = {
           vehicle_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "commission_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "commission_records_company_id_fkey"
             columns: ["company_id"]
@@ -1035,6 +1045,7 @@ export type Database = {
           branch_code: string | null
           company_id: string
           created_at: string
+          employee_id: string | null
           id: string
           rule_name: string
           salesman_name: string | null
@@ -1046,6 +1057,7 @@ export type Database = {
           branch_code?: string | null
           company_id: string
           created_at?: string
+          employee_id?: string | null
           id?: string
           rule_name: string
           salesman_name?: string | null
@@ -1057,6 +1069,7 @@ export type Database = {
           branch_code?: string | null
           company_id?: string
           created_at?: string
+          employee_id?: string | null
           id?: string
           rule_name?: string
           salesman_name?: string | null
@@ -1064,6 +1077,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "commission_rules_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "commission_rules_company_id_fkey"
             columns: ["company_id"]

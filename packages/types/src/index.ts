@@ -1102,6 +1102,7 @@ export interface SalesmanPerformance {
 
 export interface CommissionRule {
   id: string;
+  employeeId?: string | null;
   salesmanName?: string;
   branchCode?: string;
   ruleName: string;
@@ -1112,6 +1113,7 @@ export interface CommissionRule {
 
 export interface CommissionRecord {
   id: string;
+  employeeId?: string;
   vehicleId?: string;
   chassisNo: string;
   salesmanName: string;
