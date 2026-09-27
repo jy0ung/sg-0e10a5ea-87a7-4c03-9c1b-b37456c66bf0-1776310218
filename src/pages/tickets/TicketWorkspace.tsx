@@ -588,6 +588,10 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
       navigate(state.path, { state: { ticketWorkspaceReturnState: state } });
       return;
     }
+    if (!canManageQueue && ticket.submitted_by !== user?.id) {
+      navigate('/inbox');
+      return;
+    }
     navigate(getFallbackTicketListPath(canManageQueue, ticket.status === 'closed'));
   };
 
@@ -1600,6 +1604,7 @@ export default function TicketWorkspace({ ticketIdProp, onClose }: { ticketIdPro
                   decision === 'approved' ? 'Approval recorded' : 'Rejection recorded',
                 );
                 if (ok) {
+                  await queryClient.invalidateQueries({ queryKey: ['unified-inbox'] });
                   setReviewDecision(null);
                   reviewNote.clearValue();
                 }

@@ -13,6 +13,7 @@ import {
   listInternalRequestApprovalMetadata,
   reviewInternalRequestApproval,
   canProfileReviewInternalRequestApproval,
+  hasProfileReviewedInternalRequestApproval,
   canTransition,
   createTicketWorkflowUseCases,
   getAvailableTicketActions,
@@ -1209,8 +1210,11 @@ export async function getTicketWorkspaceData(
       );
     }
     const canReviewApproval = reviewPermission.data;
+    const priorReview = !isRequester && !canManagePortalQueue && !canReviewApproval
+      ? await hasProfileReviewedInternalRequestApproval(context.companyId, ticket.id, context.userId)
+      : { data: false, error: null };
 
-    if (!isRequester && !canManagePortalQueue && !canReviewApproval) {
+    if (!isRequester && !canManagePortalQueue && !canReviewApproval && !priorReview.data) {
       return { data: null, error: new Error('You do not have access to this request.') };
     }
 

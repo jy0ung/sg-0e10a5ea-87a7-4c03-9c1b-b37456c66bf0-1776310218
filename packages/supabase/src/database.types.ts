@@ -8949,6 +8949,14 @@ export type Database = {
           rank_score: number
         }[]
       }
+      internal_request_reviewer_can_read_ticket: {
+        Args: { p_company_id: string; p_ticket_id: string }
+        Returns: boolean
+      }
+      internal_request_reviewer_is_current: {
+        Args: { p_company_id: string; p_ticket_id: string }
+        Returns: boolean
+      }
       is_same_company: { Args: { target_company_id: string }; Returns: boolean }
       link_vehicle_to_sales_order: {
         Args: {
@@ -8957,6 +8965,17 @@ export type Database = {
           p_vehicle_id?: string
         }
         Returns: Json
+      }
+      list_my_pending_internal_request_approvals: {
+        Args: { p_company_id: string; p_limit?: number }
+        Returns: {
+          instance_id: string
+          ticket_id: string
+          subject: string
+          priority: string
+          current_step_name: string | null
+          updated_at: string
+        }[]
       }
       mark_sync_run_for_retry: {
         Args: { p_company_id: string; p_run_id: string }

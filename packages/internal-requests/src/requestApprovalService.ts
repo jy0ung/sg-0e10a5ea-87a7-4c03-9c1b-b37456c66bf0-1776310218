@@ -35,6 +35,41 @@ export interface InternalRequestApprovalMetadata {
   history?: ApprovalDecision[];
 }
 
+export interface PendingInternalRequestApproval {
+  instanceId: string;
+  ticketId: string;
+  subject: string;
+  priority: string;
+  currentStepName: string | null;
+  updatedAt: string;
+}
+
+export async function listMyPendingInternalRequestApprovals(
+  companyId: string,
+  limit = 50,
+): Promise<{ data: PendingInternalRequestApproval[]; error: string | null }> {
+  try {
+    const { data, error } = await supabase.rpc('list_my_pending_internal_request_approvals', {
+      p_company_id: companyId,
+      p_limit: limit,
+    });
+    if (error) return { data: [], error: error.message };
+    return {
+      data: (data ?? []).map(row => ({
+        instanceId: String(row.instance_id),
+        ticketId: String(row.ticket_id),
+        subject: String(row.subject),
+        priority: String(row.priority),
+        currentStepName: row.current_step_name == null ? null : String(row.current_step_name),
+        updatedAt: String(row.updated_at),
+      })),
+      error: null,
+    };
+  } catch (error) {
+    return { data: [], error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 interface ApprovalInstanceRow {
   id: string;
   entity_id: string;
@@ -270,6 +305,29 @@ export async function canProfileReviewInternalRequestApproval(
   if (assignmentError) return { data: false, error: assignmentError.message };
 
   return { data: (assignments ?? []).length > 0, error: null };
+}
+
+/** Prior reviewers retain read-only access to the request they decided. */
+export async function hasProfileReviewedInternalRequestApproval(
+  companyId: string,
+  ticketId: string,
+  profileId: string,
+): Promise<{ data: boolean; error: string | null }> {
+  if (!companyId || !ticketId || !profileId) return { data: false, error: null };
+  const { data: instance, error: instanceError } = await supabase.from('approval_instances')
+    .select('id')
+    .eq('company_id', companyId)
+    .eq('entity_type', 'internal_request')
+    .eq('entity_id', ticketId)
+    .maybeSingle();
+  if (instanceError) return { data: false, error: instanceError.message };
+  if (!instance) return { data: false, error: null };
+  const { data: decisions, error: decisionError } = await supabase.from('approval_decisions')
+    .select('id')
+    .eq('instance_id', instance.id)
+    .eq('approver_id', profileId)
+    .limit(1);
+  return { data: !decisionError && (decisions?.length ?? 0) > 0, error: decisionError?.message ?? null };
 }
 
 interface AtomicInternalRequestReviewResult {

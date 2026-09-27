@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   approvalToInbox,
+  internalRequestApprovalToInbox,
   loadInbox,
   notificationToInbox,
   reconciliationToInbox,
@@ -10,6 +11,7 @@ import * as notificationService from './notificationService';
 import * as ticketService from './ticketService';
 import * as reconciliationService from './reconciliationService';
 import * as hrmsService from './hrmsService';
+import * as requestApprovalService from './requestApprovalService';
 import type { ApprovalInboxItem } from '@/lib/hrms/approvalInbox';
 import type { LeaveRequest, ReconciliationMatch } from '@/types';
 
@@ -28,9 +30,13 @@ vi.mock('./hrmsService', () => ({
   listPayrollRuns: vi.fn(),
   listAppraisals: vi.fn(),
 }));
+vi.mock('./requestApprovalService', () => ({
+  listMyPendingInternalRequestApprovals: vi.fn(),
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(requestApprovalService.listMyPendingInternalRequestApprovals).mockResolvedValue({ data: [], error: null });
 });
 
 // ── mapping helpers ─────────────────────────────────────────────────────────
@@ -89,6 +95,18 @@ describe('reconciliationToInbox', () => {
   });
 });
 
+describe('internalRequestApprovalToInbox', () => {
+  it('opens the real request workspace for the assigned approval', () => {
+    expect(internalRequestApprovalToInbox({
+      instanceId: 'approval-1', ticketId: 'request-1', subject: 'Move Employee',
+      priority: 'high', currentStepName: 'HR review', updatedAt: '2026-09-27T00:00:00Z',
+    })).toMatchObject({
+      source: 'approval', id: 'approval:internal_request:approval-1',
+      href: '/portal/tickets/request-1', badgeTone: 'red',
+    });
+  });
+});
+
 describe('ticketToInbox', () => {
   const baseTicket = {
     id: 't-1', company_id: 'co-1', subject: 'Need access', category: 'access' as never,
@@ -105,6 +123,7 @@ describe('ticketToInbox', () => {
 
   it('marks high priority as red', () => {
     expect(ticketToInbox({ ...baseTicket, priority: 'high' }).badgeTone).toBe('red');
+    expect(ticketToInbox(baseTicket).href).toBe('/portal/tickets/t-1');
   });
 
   it('marks requester-action ticket statuses as amber regardless of priority', () => {
@@ -172,6 +191,11 @@ describe('loadInbox', () => {
     });
     vi.mocked(reconciliationService.getReconciliationQueue).mockResolvedValue({ data: [], error: null });
     vi.mocked(reconciliationService.getReconciliationStatusCounts).mockResolvedValue({ data: [], error: null });
+    vi.mocked(requestApprovalService.listMyPendingInternalRequestApprovals).mockResolvedValue({
+      data: [{ instanceId: 'approval-1', ticketId: 'request-1', subject: 'Approve transfer',
+        priority: 'high', currentStepName: 'HR review', updatedAt: '2026-05-27T00:00:00Z' }],
+      error: null,
+    });
 
     const bundle = await loadInbox('co-1', {
       approver: null,
@@ -179,7 +203,8 @@ describe('loadInbox', () => {
       includeReconciliation: true,
     });
 
-    expect(bundle.items[0]!.id).toBe('notification:n-1');
+    expect(bundle.items[0]!.id).toBe('approval:internal_request:approval-1');
+    expect(bundle.counts.approval).toBe(1);
     expect(bundle.counts.notification).toBe(1); // unread only
     expect(bundle.counts.ticket).toBe(1);
   });

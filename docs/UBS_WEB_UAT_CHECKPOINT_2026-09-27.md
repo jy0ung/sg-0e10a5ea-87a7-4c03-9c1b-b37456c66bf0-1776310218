@@ -13,7 +13,7 @@
 | Area | Current repository capability | Remaining UAT/convergence work |
 |---|---|---|
 | Core identity and HRMS | Employee/Profile distinction, Employee-backed Deal and Sales assignment, HRMS workforce integrity commands, HRMS web/mobile surfaces | Reconcile legacy Advisors and Profile workforce copies, finish lifecycle contracts and role/scope UAT |
-| Workflow, Inbox, Requests | Canonical approval runtime and Internal Request routing/review; Inbox and request pages exist | Unified cross-domain action inbox, owning-domain outcome commands, complete lifecycle/SLA UAT |
+| Workflow, Inbox, Requests | Canonical approval runtime and Internal Request routing/review; Inbox includes assigned Internal Request approvals with matching ticket-read RLS | Broader cross-domain action aggregation, owning-domain outcome commands, complete lifecycle/SLA UAT |
 | Sales and Inventory | Deal/customer/vehicle routes, DMS import/reconciliation, Employee-backed targets and salesperson reports | Resolve legacy name-only ownership, deterministic Vehicle ownership, end-to-end Deal/stock operational UAT |
 | Commission | Rule/record page, Employee-backed rule entry, backend-owned calculation and audited approval/payment commands | Validate business rule catalogue, corrections/reversals, payout evidence and Finance/Payroll handoff; reconcile legacy name-only records |
 | Purchasing | PO, GRN, purchase invoice and three-way-match pages exist | Verify server-enforced lifecycle, AP handoff, permissions, audit and UAT cases |
@@ -25,7 +25,7 @@ Presence of a route or table is not evidence of a complete day-to-day workflow. 
 ## Dependency-ordered implementation backlog
 
 1. **Commission UAT and payout contract:** Employee links, guarded backend calculation, rule/source snapshots and audited transitions are implemented in the Commission slices. Validate FLC rule definitions, effective dates, corrections/reversals and actual payout/Finance handoff; review unresolved historical rows explicitly. Sales Target/report ID work is already merged.
-2. **Workflow and Internal Requests:** Aggregate actionable records in one Inbox and connect approved outcomes to owning-domain commands, with no page-level cross-domain writes.
+2. **Workflow and Internal Requests:** Assigned Internal Request approvals now appear in the Inbox and open a ticket workspace under reviewer RLS. Aggregate other actionable records and connect approved outcomes to owning-domain commands, with no page-level cross-domain writes.
 3. **Purchasing → Accounts → Finance:** Test and close the requisition/PO/GRN/invoice/match/AP/settlement/posting chain using server-side transitions and Finance-owned journals.
 4. **Sales/Inventory and Analytics:** Complete deterministic Vehicle ownership and reconcile imported evidence; use canonical read models for management reporting.
 5. **Admin Backup & Recovery product capability:** The provider-neutral worker, super-admin page, status/history, checksum and manual encrypted export are implemented; add configured destination adapters, scheduling/retention and controlled restore. Unconfigured destinations remain visibly unavailable. Keep secrets out of client state and database-readable settings. This proceeds alongside business modules without assuming this Dev/UAT host is the final production topology.
