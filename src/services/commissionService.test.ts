@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { supabase } from '@/integrations/supabase/client';
-import { createCommissionRule, getCommissionRecords, updateCommissionRule } from './commissionService';
+import { calculateCommissions, createCommissionRule, getCommissionRecords, updateCommissionRecordStatus, updateCommissionRule } from './commissionService';
 
-vi.mock('@/integrations/supabase/client', () => ({ supabase: { from: vi.fn() } }));
+vi.mock('@/integrations/supabase/client', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }));
 vi.mock('./loggingService', () => ({ loggingService: { error: vi.fn() } }));
 vi.mock('./performanceService', () => ({ performanceService: { startQueryTimer: vi.fn(), endQueryTimer: vi.fn() } }));
 
@@ -50,5 +50,20 @@ describe('Commission Employee identity caller', () => {
     const result = await updateCommissionRule('company-1', 'rule-1', { employeeId: null });
     expect(result.error).toBeNull();
     expect(query.update).toHaveBeenCalledWith(expect.objectContaining({ employee_id: null, salesman_name: null }));
+  });
+
+  it('uses server-owned calculation and guarded status transitions', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 2, error: null } as never)
+      .mockResolvedValueOnce({ data: null, error: null } as never);
+    expect(await calculateCommissions('company-1', '2035-02')).toEqual({ created: 2, error: null });
+    expect(supabase.rpc).toHaveBeenCalledWith('calculate_commissions', {
+      p_company_id: 'company-1', p_period: '2035-02',
+    });
+    expect((await updateCommissionRecordStatus('company-1', 'record-1', 'approved')).error).toBeNull();
+    expect(supabase.rpc).toHaveBeenCalledWith('advance_commission_record', {
+      p_company_id: 'company-1', p_record_id: 'record-1',
+      p_expected_status: 'pending', p_next_status: 'approved',
+    });
+    expect((await updateCommissionRecordStatus('company-1', 'record-1', 'pending')).error).not.toBeNull();
   });
 });

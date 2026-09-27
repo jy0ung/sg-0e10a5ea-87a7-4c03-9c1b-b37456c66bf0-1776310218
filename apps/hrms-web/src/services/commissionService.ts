@@ -137,6 +137,7 @@ export async function getCommissionRecords(
     data: (data || []).map(r => ({
       id: r.id,
       employeeId: r.employee_id ?? undefined,
+      calculationKey: r.calculation_key ?? undefined,
       vehicleId: r.vehicle_id ?? undefined,
       chassisNo: r.chassis_no,
       salesmanName: r.salesman_name,
@@ -157,15 +158,34 @@ export async function updateCommissionRecordStatus(
   id: string,
   status: CommissionRecord['status'],
 ): Promise<{ error: Error | null }> {
-  const { error } = await supabase
-    .from('commission_records')
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq('company_id', companyId)
-    .eq('id', id);
+  if (status !== 'approved' && status !== 'paid') {
+    return { error: new Error('Only approval and payment transitions are available') };
+  }
+  const { error } = await supabase.rpc('advance_commission_record', {
+    p_company_id: companyId,
+    p_record_id: id,
+    p_expected_status: status === 'approved' ? 'pending' : 'approved',
+    p_next_status: status,
+  });
 
   if (error) {
     loggingService.error('Failed to update commission record status', { error }, 'CommissionService');
     return { error: new Error(error.message) };
   }
   return { error: null };
+}
+
+export async function calculateCommissions(
+  companyId: string,
+  period: string,
+): Promise<{ created: number; error: Error | null }> {
+  const { data, error } = await supabase.rpc('calculate_commissions', {
+    p_company_id: companyId,
+    p_period: period,
+  });
+  if (error) {
+    loggingService.error('Failed to calculate commissions', { error }, 'CommissionService');
+    return { created: 0, error: new Error(error.message) };
+  }
+  return { created: Number(data ?? 0), error: null };
 }

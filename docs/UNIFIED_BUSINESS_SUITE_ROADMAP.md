@@ -24,7 +24,7 @@ Statuses describe architectural convergence, not whether a module has existing f
 | 3 — Workflow + Unified Inbox | In Progress | Canonical routing and atomic review landed. Unified Inbox and cross-domain outcome commands remain. |
 | 4 — Internal Requests | In Progress | Canonical flow selection and HRMS-role review authority landed. Broader domain-command integration remains. |
 | 5 — Sales + Inventory | In Progress | Employee-backed Deals, Vehicle import safeguards, and Employee-backed targets/reports (#94, PR #95) landed. Legacy identity reconciliation and production release remain separate. |
-| 6 — Commission | Not Started | Existing features still use salesperson names; convergence follows the target/report slice. |
+| 6 — Commission | In Progress | Employee-backed rules/records, guarded calculation and audited transitions landed. Rule catalogue, reversals and payout/Finance handoff still need UAT and implementation. |
 | 7 — Purchasing | Not Started | Existing functionality; convergence not systematically executed. |
 | 8 — Accounts | Not Started | Existing functionality; convergence not systematically executed. |
 | 9 — Finance | Not Started | Existing functionality; convergence not systematically executed. |
@@ -237,6 +237,8 @@ Output:
 - immutable or append-only commission earning/accrual records with rule version and source references.
 
 Commission calculation remains separate from payroll payment and GL posting.
+
+**Implementation record — 2026-09-27:** Nullable Employee identity preserves unresolved historical Commission rows without name matching. New rules use active Sales Advisor Employee IDs. Commission-owned backend commands calculate idempotent delivery-month earnings with rule/source snapshots and audit entries, then guard approval/payment transitions. `paid` remains an operational state, not proof of payroll disbursement or Finance posting. See [Commission identity contract](COMMISSION_EMPLOYEE_IDENTITY_2026-09-27.md).
 
 ### Epic 7 — Purchasing
 

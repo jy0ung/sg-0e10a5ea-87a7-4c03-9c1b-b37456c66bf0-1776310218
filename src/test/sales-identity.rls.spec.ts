@@ -93,6 +93,7 @@ live('Employee-backed Sales targets and reports', () => {
 
   afterAll(async () => {
     if (!admin) return;
+    if (commissionRecords.length) await admin.from('audit_logs').delete().eq('entity_type', 'commission_record').in('entity_id', commissionRecords);
     if (commissionRecords.length) await admin.from('commission_records').delete().in('id', commissionRecords);
     if (commissionRules.length) await admin.from('commission_rules').delete().in('id', commissionRules);
     await admin.from('salesman_targets').delete().eq('company_id', company).in('branch_code', [branch, branch2]);
@@ -283,5 +284,54 @@ live('Employee-backed Sales targets and reports', () => {
     expect(foreignRead.data).toEqual([]);
     const foreignRecords = await other.from('commission_records').select('id').in('id', commissionRecords);
     expect(foreignRecords.data).toEqual([]);
+  });
+
+  it('calculates canonical earnings once, audits them and guards approval/payment transitions', async () => {
+    expect((await admin.from('profiles').update({ role: 'company_admin' }).eq('id', actorId)).error).toBeNull();
+    expect((await admin.from('vehicles').update({ delivery_date: '2035-02-10', bg_to_delivery: 10 }).eq('id', vehicles[1])).error).toBeNull();
+
+    const first = await actor.rpc('calculate_commissions', { p_company_id: company, p_period: '2035-02' });
+    expect(first.error).toBeNull();
+    expect(first.data).toBe(1);
+    const again = await actor.rpc('calculate_commissions', { p_company_id: company, p_period: '2035-02' });
+    expect(again).toMatchObject({ data: 0, error: null });
+
+    const created = await admin.from('commission_records').select('id,employee_id,calculation_key,source_snapshot,status,amount')
+      .eq('company_id', company).eq('vehicle_id', vehicles[1]).eq('rule_id', commissionRules[0]).single();
+    expect(created.error).toBeNull();
+    commissionRecords.push(created.data!.id);
+    expect(created.data).toMatchObject({ employee_id: employee, status: 'pending', amount: 100 });
+    expect(created.data!.calculation_key).toBe(`${vehicles[1]}:${commissionRules[0]}`);
+    expect(created.data!.source_snapshot).toMatchObject({ employee_id: employee, delivery_date: '2035-02-10' });
+
+    const noDirectInsert = await actor.from('commission_records').insert({
+      company_id: company, employee_id: employee, chassis_no: 'Forged', salesman_name: 'Forged',
+      amount: 999, period: '2035-02',
+    });
+    expect(noDirectInsert.error).not.toBeNull();
+    const directUpdate = await actor.from('commission_records').update({ status: 'paid' }).eq('id', created.data!.id).select('id');
+    expect(directUpdate.data).toEqual([]);
+    const changedAmount = await admin.from('commission_records').update({ amount: 999 }).eq('id', created.data!.id);
+    expect(changedAmount.error?.code).toBe('23514');
+
+    const approve = await actor.rpc('advance_commission_record', {
+      p_company_id: company, p_record_id: created.data!.id, p_expected_status: 'pending', p_next_status: 'approved',
+    });
+    expect(approve.error).toBeNull();
+    const stale = await actor.rpc('advance_commission_record', {
+      p_company_id: company, p_record_id: created.data!.id, p_expected_status: 'pending', p_next_status: 'approved',
+    });
+    expect(stale.error?.code).toBe('PT409');
+    const paid = await actor.rpc('advance_commission_record', {
+      p_company_id: company, p_record_id: created.data!.id, p_expected_status: 'approved', p_next_status: 'paid',
+    });
+    expect(paid.error).toBeNull();
+    const final = await admin.from('commission_records').select('status,amount').eq('id', created.data!.id).single();
+    expect(final.data).toMatchObject({ status: 'paid', amount: 100 });
+    const audit = await admin.from('audit_logs').select('action').eq('entity_type', 'commission_record').eq('entity_id', created.data!.id);
+    expect(audit.data).toHaveLength(3);
+
+    expect((await other.rpc('calculate_commissions', { p_company_id: company, p_period: '2035-02' })).error?.code).toBe('42501');
+    expect((await actor.rpc('calculate_commissions', { p_company_id: company, p_period: '2035-13' })).error?.code).toBe('22023');
   });
 });
