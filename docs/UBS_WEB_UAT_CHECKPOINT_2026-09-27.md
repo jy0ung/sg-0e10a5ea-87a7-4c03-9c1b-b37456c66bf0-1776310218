@@ -18,7 +18,7 @@
 | Commission | Rule/record page, Employee-backed rule entry, backend-owned calculation and audited approval/payment commands | Validate business rule catalogue, corrections/reversals, payout evidence and Finance/Payroll handoff; reconcile legacy name-only records |
 | Purchasing | PO, GRN, purchase invoice and three-way-match pages exist | Verify server-enforced lifecycle, AP handoff, permissions, audit and UAT cases |
 | Accounts and Finance | Aging/cash and GL, journal, period-close and statement pages exist | Verify subledger settlement and Finance-owned posting contracts, close and reports against UAT scenarios |
-| Analytics, Admin, responsive UX | Reports, KPI, audit, user and settings pages exist | Canonical cross-domain read models, role/RLS scenarios, responsive workflow UAT; no Admin Backup & Recovery product area exists yet |
+| Analytics, Admin, responsive UX | Reports, KPI, audit, user and settings pages exist; Admin Backup & Recovery has a configurable server-side manual encrypted export slice | Canonical cross-domain read models, role/RLS scenarios, responsive workflow UAT; backup destination adapters, scheduling and controlled restore remain |
 
 Presence of a route or table is not evidence of a complete day-to-day workflow. The older roadmap labels some epics “Not Started” to mean *convergence has not been measured*, not that the feature has no implementation.
 
@@ -28,7 +28,7 @@ Presence of a route or table is not evidence of a complete day-to-day workflow. 
 2. **Workflow and Internal Requests:** Aggregate actionable records in one Inbox and connect approved outcomes to owning-domain commands, with no page-level cross-domain writes.
 3. **Purchasing → Accounts → Finance:** Test and close the requisition/PO/GRN/invoice/match/AP/settlement/posting chain using server-side transitions and Finance-owned journals.
 4. **Sales/Inventory and Analytics:** Complete deterministic Vehicle ownership and reconcile imported evidence; use canonical read models for management reporting.
-5. **Admin Backup & Recovery product capability:** Design a provider-neutral, backend-controlled job and destination interface; add authorized status/history, checksum, manual encrypted export and controlled restore. Unconfigured destinations must be visibly unavailable. Keep secrets out of client state and database-readable settings. This can proceed alongside business modules, without assuming this Dev/UAT host is the final production topology.
+5. **Admin Backup & Recovery product capability:** The provider-neutral worker, super-admin page, status/history, checksum and manual encrypted export are implemented; add configured destination adapters, scheduling/retention and controlled restore. Unconfigured destinations remain visibly unavailable. Keep secrets out of client state and database-readable settings. This proceeds alongside business modules without assuming this Dev/UAT host is the final production topology.
 6. **UAT closure:** Exercise complete role/RLS, audit, mobile/responsive and day-to-day scenarios on isolated UAT infrastructure. Record failures and resolve them before calling the web application complete.
 
 ## Separate production work

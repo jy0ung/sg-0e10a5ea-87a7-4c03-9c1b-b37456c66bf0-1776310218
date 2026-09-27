@@ -35,8 +35,11 @@ const SKIP_DIRS = new Set([
 //     RLS and cross-tenant scenarios. The vitest harness reads the key
 //     from process.env; nothing reaches the browser bundle.
 //   - rls-matrix / dms-normalizer / sales-pipeline / ap-foundation specs.
+//   - apps/recovery-service is a separately built Node-only backend process;
+//     its source is not imported by any browser entrypoint or workspace.
 const SKIP_PATHS: RegExp[] = [
   /(^|\/)src\/test\//,
+  /^apps\/recovery-service\/src\//,
 ];
 
 const SKIP_FILE_SUFFIXES = ['.snap', '.lockb', '.lock', '.md', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.ico'];

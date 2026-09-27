@@ -11,6 +11,7 @@ export default defineConfig({
     include: [
       "src/**/*.{test,spec}.{ts,tsx}",
       "apps/hrms-web/src/**/*.{test,spec}.{ts,tsx}",
+      "apps/recovery-service/src/**/*.{test,spec}.ts",
       "packages/*/src/**/*.{test,spec}.{ts,tsx}",
     ],
     // RLS matrix requires a live Supabase stack + seeded users. Run via
