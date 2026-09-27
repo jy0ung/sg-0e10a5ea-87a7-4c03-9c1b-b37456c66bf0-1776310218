@@ -13,6 +13,7 @@ const mockUpdateCommissionRule = vi.fn();
 const mockDeleteCommissionRule = vi.fn();
 const mockGetCommissionRecords = vi.fn();
 const mockUpdateCommissionRecordStatus = vi.fn();
+const mockCalculateCommissions = vi.fn();
 const mockListSalesAdvisors = vi.fn();
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -54,6 +55,7 @@ vi.mock('@/services/commissionService', () => ({
   deleteCommissionRule: (...args: unknown[]) => mockDeleteCommissionRule(...args),
   getCommissionRecords: (...args: unknown[]) => mockGetCommissionRecords(...args),
   updateCommissionRecordStatus: (...args: unknown[]) => mockUpdateCommissionRecordStatus(...args),
+  calculateCommissions: (...args: unknown[]) => mockCalculateCommissions(...args),
 }));
 vi.mock('@/services/salesAdvisorService', () => ({
   listSalesAdvisors: (...args: unknown[]) => mockListSalesAdvisors(...args),
@@ -89,6 +91,8 @@ describe('CommissionDashboard', () => {
     commissionRecords = [
       {
         id: 'record-1',
+        employeeId: 'employee-1',
+        calculationKey: 'vehicle-1:rule-1',
         vehicleId: 'vehicle-1',
         chassisNo: 'CHASSIS-001',
         salesmanName: 'Alice',
@@ -102,6 +106,8 @@ describe('CommissionDashboard', () => {
       },
       {
         id: 'record-2',
+        employeeId: 'employee-2',
+        calculationKey: 'vehicle-2:rule-1',
         vehicleId: 'vehicle-2',
         chassisNo: 'CHASSIS-002',
         salesmanName: 'Bob',
@@ -127,6 +133,7 @@ describe('CommissionDashboard', () => {
       ));
       return { error: null };
     });
+    mockCalculateCommissions.mockResolvedValue({ created: 1, error: null });
   });
 
   it('approves pending commission records and updates the row actions', async () => {
@@ -167,5 +174,21 @@ describe('CommissionDashboard', () => {
       expect(within(updatedRow).getByText('paid')).toBeInTheDocument();
       expect(within(updatedRow).queryByRole('button', { name: 'Mark Paid' })).not.toBeInTheDocument();
     });
+  });
+
+  it('calculates the selected period through the backend command', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<MemoryRouter><QueryClientProvider client={qc}><CommissionDashboard /></QueryClientProvider></MemoryRouter>);
+    await screen.findByText('CHASSIS-001');
+    fireEvent.click(screen.getByRole('button', { name: 'Calculate Period' }));
+    await waitFor(() => expect(mockCalculateCommissions).toHaveBeenCalledWith('company-1', expect.stringMatching(/^\d{4}-\d{2}$/)));
+  });
+
+  it('does not offer approval actions for unresolved legacy earnings', async () => {
+    commissionRecords[0] = { ...commissionRecords[0], employeeId: undefined, calculationKey: undefined };
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<MemoryRouter><QueryClientProvider client={qc}><CommissionDashboard /></QueryClientProvider></MemoryRouter>);
+    await screen.findByText('CHASSIS-001');
+    expect(within(getRecordRow('CHASSIS-001')).queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
   });
 });

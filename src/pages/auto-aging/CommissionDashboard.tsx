@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   getCommissionRules, createCommissionRule, updateCommissionRule, deleteCommissionRule,
   getCommissionRecords, updateCommissionRecordStatus,
+  calculateCommissions,
 } from '@/services/commissionService';
 import type { CommissionRule, CommissionRecord } from '@/types';
 import { listSalesAdvisors } from '@/services/salesAdvisorService';
@@ -48,6 +49,7 @@ export default function CommissionDashboard() {
   const [editingRule, setEditingRule] = useState<CommissionRule | null>(null);
   const [deleteRuleId, setDeleteRuleId] = useState<string | null>(null);
   const [ruleForm, setRuleForm] = useState<Partial<CommissionRule>>({});
+  const [calculating, setCalculating] = useState(false);
 
   const { data: rules = [], isPending: loadingRules } = useQuery({
     queryKey: ['commission-rules', companyId],
@@ -126,6 +128,21 @@ export default function CommissionDashboard() {
     const { error } = await updateCommissionRecordStatus(companyId, recordId, status);
     if (error) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); return; }
     void queryClient.invalidateQueries({ queryKey: ['commission-records', companyId, periodFilter] });
+  };
+
+  const handleCalculate = async () => {
+    setCalculating(true);
+    try {
+      const result = await calculateCommissions(companyId, periodFilter);
+      if (result.error) {
+        toast({ title: 'Calculation failed', description: result.error.message, variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Calculation complete', description: `${result.created} new earning(s) recorded.` });
+      await queryClient.invalidateQueries({ queryKey: ['commission-records', companyId, periodFilter] });
+    } finally {
+      setCalculating(false);
+    }
   };
 
   return (
@@ -215,6 +232,8 @@ export default function CommissionDashboard() {
             <h3 className="text-sm font-semibold">Commission Records</h3>
             <p className="text-xs text-muted-foreground">{filteredRecords.length} record(s)</p>
           </div>
+          {canManage && <Button size="sm" variant="outline" disabled={calculating || !companyId}
+            onClick={handleCalculate}>{calculating ? 'Calculating…' : 'Calculate Period'}</Button>}
           <div className="ml-auto flex items-center gap-2">
             <Select value={periodFilter} onValueChange={setPeriodFilter}>
               <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
@@ -265,10 +284,10 @@ export default function CommissionDashboard() {
                   </td>
                   {canManage && (
                     <td className="px-4 py-2">
-                      {rec.status === 'pending' && (
+                      {rec.status === 'pending' && rec.employeeId && rec.calculationKey && (
                         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleStatusChange(rec.id, 'approved')}>Approve</Button>
                       )}
-                      {rec.status === 'approved' && (
+                      {rec.status === 'approved' && rec.employeeId && rec.calculationKey && (
                         <Button size="sm" variant="outline" className="h-7 text-xs text-success" onClick={() => handleStatusChange(rec.id, 'paid')}>Mark Paid</Button>
                       )}
                     </td>

@@ -188,6 +188,7 @@ export interface CommissionRule {
 export interface CommissionRecord {
   id: string;
   employeeId?: string;
+  calculationKey?: string;
   vehicleId?: string;
   chassisNo: string;
   salesmanName: string;

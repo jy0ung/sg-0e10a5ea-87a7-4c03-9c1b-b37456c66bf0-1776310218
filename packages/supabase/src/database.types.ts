@@ -968,6 +968,9 @@ export type Database = {
       commission_records: {
         Row: {
           amount: number
+          calculated_at: string | null
+          calculated_by: string | null
+          calculation_key: string | null
           chassis_no: string
           company_id: string
           created_at: string
@@ -976,12 +979,16 @@ export type Database = {
           period: string
           rule_id: string | null
           salesman_name: string
+          source_snapshot: Json | null
           status: Database["public"]["Enums"]["commission_record_status"]
           updated_at: string
           vehicle_id: string | null
         }
         Insert: {
           amount?: number
+          calculated_at?: string | null
+          calculated_by?: string | null
+          calculation_key?: string | null
           chassis_no: string
           company_id: string
           created_at?: string
@@ -990,12 +997,16 @@ export type Database = {
           period: string
           rule_id?: string | null
           salesman_name: string
+          source_snapshot?: Json | null
           status?: Database["public"]["Enums"]["commission_record_status"]
           updated_at?: string
           vehicle_id?: string | null
         }
         Update: {
           amount?: number
+          calculated_at?: string | null
+          calculated_by?: string | null
+          calculation_key?: string | null
           chassis_no?: string
           company_id?: string
           created_at?: string
@@ -1004,11 +1015,19 @@ export type Database = {
           period?: string
           rule_id?: string | null
           salesman_name?: string
+          source_snapshot?: Json | null
           status?: Database["public"]["Enums"]["commission_record_status"]
           updated_at?: string
           vehicle_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "commission_records_calculated_by_fkey"
+            columns: ["calculated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "commission_records_employee_id_fkey"
             columns: ["employee_id"]
@@ -8359,6 +8378,15 @@ export type Database = {
         }
         Returns: string
       }
+      advance_commission_record: {
+        Args: {
+          p_company_id: string
+          p_expected_status: string
+          p_next_status: string
+          p_record_id: string
+        }
+        Returns: undefined
+      }
       auto_aging_dashboard_summary: {
         Args: {
           p_branch?: string
@@ -8405,6 +8433,10 @@ export type Database = {
           remaining: number
           reset_at: string
         }[]
+      }
+      calculate_commissions: {
+        Args: { p_company_id: string; p_period: string }
+        Returns: number
       }
       can_access_row: {
         Args: {
