@@ -246,6 +246,20 @@ export async function updateOwnProfileName(
   return { error: error?.message ?? null };
 }
 
+/** Self-service profile edit. The authenticated session determines the target. */
+export async function updateOwnProfile(name: string): Promise<{ error: string | null }> {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return { error: authError?.message ?? 'Not authenticated' };
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ name, updated_at: new Date().toISOString() })
+    .eq('id', user.id)
+    .select('id')
+    .single();
+  return { error: error?.message ?? null };
+}
+
 /**
  * Grant or revoke main-app access for a user.
  * portalAccessOnly = true  → HRMS access only (default for new employees)

@@ -8,6 +8,7 @@ export {
   listProfiles,
   reactivateUser,
   setPortalAccess,
+  updateOwnProfile,
   updateOwnProfileName,
   updateProfile,
 } from '@flc/auth';

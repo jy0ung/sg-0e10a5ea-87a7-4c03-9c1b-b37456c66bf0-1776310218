@@ -105,8 +105,6 @@ export const userUpdateSchema = z.object({
 // Settings schemas
 export const profileUpdateSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  role: z.enum(APP_ROLES),
-  branch_id: z.string().nullable().optional(),
 });
 
 export const changePasswordSchema = z.object({

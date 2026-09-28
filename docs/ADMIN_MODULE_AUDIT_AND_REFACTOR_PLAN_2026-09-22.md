@@ -4,6 +4,10 @@ Date: 2026-09-22
 Status: Source, architecture, security, and automated-test audit complete. Browser visual audit and lifecycle reproduction are pending an approved browser choice.
 Scope: Main application Admin module (`/admin/*`), its shared UI, auth/session dependencies, Supabase services and policies, and the reported refresh/form-loss behavior.
 
+## Implementation checkpoint — 2026-09-28
+
+This document preserves the original audit findings. The self-service branch-assignment defect (H3) is corrected in the current bounded Admin integrity slice: Profile Settings displays branch and role as read-only context, the personal form validates and submits only display name, and `updateOwnProfile` derives the target profile from the authenticated session. Administrative branch assignment remains in User Management. The existing database trigger still enforces the privilege boundary. Component and service regression tests cover the personal form and mutation payload. This does not resolve the separate Permission Editor, role matrix, webhook-secret, form-loss, or Admin navigation findings.
+
 ## Executive summary
 
 The Admin module is functional but has grown as a collection of route-level pages rather than a cohesive administrative product. It has useful shared foundations—central route metadata, route and database authorization layers, TanStack Query defaults, `StandardTable`, reusable page states, Zod-backed forms on several CRUD pages, and tenant-scoped RLS—but information architecture, form safety, and implementation quality are inconsistent.

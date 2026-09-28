@@ -45,8 +45,6 @@ interface ProfileSettingsProps {
   form: UseFormReturn<ProfileUpdateFormData>;
   user: SettingsUser | null | undefined;
   branches: BranchRecord[];
-  branchId: string;
-  setBranchId: (branchId: string) => void;
   branding: ResolvedBranding;
   saving: boolean;
   onSave: (data: ProfileUpdateFormData) => void | Promise<void>;
@@ -56,8 +54,6 @@ export function ProfileSettings({
   form,
   user,
   branches,
-  branchId,
-  setBranchId,
   branding,
   saving,
   onSave,
@@ -85,30 +81,15 @@ export function ProfileSettings({
             </div>
             <div className="space-y-2">
               <Label htmlFor="branch">Branch Assignment</Label>
-              <Select
-                value={branchId}
-                onValueChange={(value) => {
-                  setBranchId(value);
-                  form.setValue('branch_id', value === 'none' ? null : value, { shouldDirty: true });
-                }}
-              >
-                <SelectTrigger id="branch">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No branch assigned</SelectItem>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input id="branch" value={branches.find(branch => branch.id === user?.branch_id)?.name ?? (user?.branch_id || 'No branch assigned')} disabled className="bg-muted/50" />
+              <p className="text-xs text-muted-foreground">An administrator manages branch assignments in Users.</p>
             </div>
             <div className="p-3 rounded-lg bg-secondary/50 text-xs space-y-1">
               <p className="font-medium text-foreground">Your Access Level</p>
               <p className="text-muted-foreground">
                 Scope: <strong className="text-foreground capitalize">{user?.access_scope || 'company'}</strong>
                 {' • '}Role: <strong className="text-foreground capitalize">{formatRole(user?.role)}</strong>
-                {branchId !== 'none' && <> • Branch: <strong className="text-foreground">{branchId}</strong></>}
+                {user?.branch_id && <> • Branch: <strong className="text-foreground">{branches.find(branch => branch.id === user.branch_id)?.name ?? user.branch_id}</strong></>}
               </p>
             </div>
             <Button type="submit" disabled={saving || !form.formState.isValid} className="w-full">
