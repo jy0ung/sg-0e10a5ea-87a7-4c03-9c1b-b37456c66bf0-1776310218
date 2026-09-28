@@ -443,7 +443,7 @@ RPCs and functions:
 - Purchasing: `create_purchase_order`, `transition_po_status`, `create_grn`, `get_po_line_receipts`, 3-way match RPCs.
 - DMS/Reconciliation: `get_dms_sync_runs_summary`, `get_dms_raw_staging_counts`, `mark_sync_run_for_retry`, `get_reconciliation_queue`, `decide_reconciliation_match`, related detail/count RPCs.
 - Platform: `global_search`, `get_role_home_kpis`, `upsert_role_kpi_defaults`, `bump_rate_limit`.
-- Webhooks: `emit_webhook_event`, `upsert_webhook_endpoint`, `requeue_webhook_delivery`.
+- Webhooks: `emit_webhook_event`, `list_webhook_endpoints`, `create_webhook_endpoint`, `update_webhook_endpoint`, `rotate_webhook_endpoint_secret`, `get_webhook_delivery_secret` (service role only), `requeue_webhook_delivery`.
 - Tickets: `cancel_own_ticket`, `ticket_reply_and_wait`, `reassign_ticket`, `auto_close_resolved_tickets`, `is_ticket_collaborator` in current dirty migrations.
 
 Edge functions:

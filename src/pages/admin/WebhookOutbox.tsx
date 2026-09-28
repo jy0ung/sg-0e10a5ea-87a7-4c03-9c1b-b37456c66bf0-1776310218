@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Loader2, Plus, RefreshCcw } from 'lucide-react';
+import { Copy, KeyRound, Loader2, Plus, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
@@ -18,7 +18,9 @@ import {
   listWebhookDeliveries,
   listWebhookEndpoints,
   requeueWebhookDelivery,
-  upsertWebhookEndpoint,
+  createWebhookEndpoint,
+  updateWebhookEndpoint,
+  rotateWebhookEndpointSecret,
   type WebhookDelivery,
   type WebhookEndpoint,
 } from '@/services/webhookOutboxService';
@@ -43,13 +45,12 @@ interface EndpointForm {
   id:         string | null;
   name:       string;
   url:        string;
-  secret:     string;
   eventTypes: string;     // comma-separated in the form; split on save
   active:     boolean;
 }
 
 const EMPTY_FORM: EndpointForm = {
-  id: null, name: '', url: 'https://', secret: '', eventTypes: '', active: true,
+  id: null, name: '', url: 'https://', eventTypes: '', active: true,
 };
 
 export default function WebhookOutbox() {
@@ -60,6 +61,9 @@ export default function WebhookOutbox() {
   const [dialogOpen, setDialogOpen]   = useState(false);
   const [saving,     setSaving]       = useState(false);
   const [form,       setForm]         = useState<EndpointForm>(EMPTY_FORM);
+  const [rotateTarget, setRotateTarget] = useState<WebhookEndpoint | null>(null);
+  const [rotating, setRotating] = useState(false);
+  const [newSecret, setNewSecret] = useState<string | null>(null);
 
   const endpointsQuery = useQuery({
     queryKey: ['webhook-endpoints', companyId],
@@ -85,7 +89,7 @@ export default function WebhookOutbox() {
   });
 
   const openCreate = () => {
-    setForm({ ...EMPTY_FORM, secret: crypto.randomUUID().replace(/-/g, '') });
+    setForm({ ...EMPTY_FORM });
     setDialogOpen(true);
   };
 
@@ -94,7 +98,6 @@ export default function WebhookOutbox() {
       id:         ep.id,
       name:       ep.name,
       url:        ep.url,
-      secret:     ep.secret,
       eventTypes: ep.eventTypes.join(', '),
       active:     ep.active,
     });
@@ -102,8 +105,8 @@ export default function WebhookOutbox() {
   };
 
   const save = async () => {
-    if (!form.name.trim() || !form.url.trim() || !form.secret.trim()) {
-      toast.error('Name, URL, and secret are required');
+    if (!form.name.trim() || !form.url.trim()) {
+      toast.error('Name and URL are required');
       return;
     }
     if (!form.url.startsWith('https://')) {
@@ -111,15 +114,16 @@ export default function WebhookOutbox() {
       return;
     }
     setSaving(true);
-    const result = await upsertWebhookEndpoint({
-      id:         form.id,
+    const fields = {
       companyId,
       name:       form.name.trim(),
       url:        form.url.trim(),
-      secret:     form.secret.trim(),
       eventTypes: form.eventTypes.split(',').map(s => s.trim()).filter(Boolean),
       active:     form.active,
-    });
+    };
+    const result = form.id
+      ? await updateWebhookEndpoint({ ...fields, id: form.id })
+      : await createWebhookEndpoint(fields);
     setSaving(false);
     if (result.error) {
       toast.error(result.error.message);
@@ -127,7 +131,32 @@ export default function WebhookOutbox() {
     }
     toast.success(form.id ? 'Endpoint updated' : 'Endpoint created');
     setDialogOpen(false);
+    if ('secret' in result && typeof result.secret === 'string' && result.secret) setNewSecret(result.secret);
     queryClient.invalidateQueries({ queryKey: ['webhook-endpoints', companyId] });
+  };
+
+  const rotateSecret = async () => {
+    if (!rotateTarget) return;
+    setRotating(true);
+    const result = await rotateWebhookEndpointSecret(rotateTarget.id);
+    setRotating(false);
+    if (result.error || !result.secret) {
+      toast.error(result.error?.message ?? 'Unable to rotate signing key');
+      return;
+    }
+    setRotateTarget(null);
+    setNewSecret(result.secret);
+    toast.success('Signing key rotated');
+  };
+
+  const copySecret = async () => {
+    if (!newSecret) return;
+    try {
+      await navigator.clipboard.writeText(newSecret);
+      toast.success('Signing key copied');
+    } catch {
+      toast.error('Unable to copy signing key');
+    }
   };
 
   const handleRequeue = async (id: string) => {
@@ -157,9 +186,10 @@ export default function WebhookOutbox() {
     },
     { key: 'actions', label: '', sortable: false,
       render: ep => (
-        <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); openEdit(ep); }}>
-          Edit
-        </Button>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); openEdit(ep); }}>Edit</Button>
+          <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); setRotateTarget(ep); }}>Rotate Secret</Button>
+        </div>
       ),
     },
   ], []);
@@ -277,14 +307,9 @@ export default function WebhookOutbox() {
               <Label htmlFor="ep-url">URL (HTTPS only)</Label>
               <Input id="ep-url" value={form.url} onChange={e => setForm({ ...form, url: e.target.value })} placeholder="https://" />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="ep-secret">HMAC secret</Label>
-              <Input id="ep-secret" value={form.secret} onChange={e => setForm({ ...form, secret: e.target.value })} className="font-mono text-xs" />
-              <p className="text-[10px] text-muted-foreground">
-                Used to sign each delivery as <code>HMAC-SHA256(secret, "&lt;unix&gt;.&lt;body&gt;")</code>.
-                Rotate by editing and re-saving.
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              {form.id ? 'The signing key is stored securely. Use Rotate Secret to replace it.' : 'A signing key will be generated and shown once after registration.'}
+            </p>
             <div className="space-y-1">
               <Label htmlFor="ep-events">Event types (comma-separated; empty = all)</Label>
               <Input id="ep-events" value={form.eventTypes} onChange={e => setForm({ ...form, eventTypes: e.target.value })} placeholder="vehicle.transferred, sales_order.created" />
@@ -301,6 +326,31 @@ export default function WebhookOutbox() {
               {form.id ? 'Save changes' : 'Register endpoint'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!rotateTarget} onOpenChange={open => { if (!open && !rotating) setRotateTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Rotate signing key</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Deliveries to {rotateTarget?.name} will use the new key immediately. Update the receiver before retrying any failed deliveries.
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRotateTarget(null)} disabled={rotating}>Cancel</Button>
+            <Button onClick={rotateSecret} disabled={rotating}>{rotating ? 'Rotating…' : 'Rotate Secret'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!newSecret} onOpenChange={open => { if (!open) setNewSecret(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Save this signing key</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This key is shown once. Store it in your receiver's secret manager before closing.</p>
+          <div className="flex items-center gap-2">
+            <Input aria-label="New signing key" value={newSecret ?? ''} readOnly className="font-mono text-xs" />
+            <Button variant="outline" onClick={copySecret} aria-label="Copy signing key"><Copy className="h-4 w-4" /></Button>
+          </div>
+          <DialogFooter><Button onClick={() => setNewSecret(null)}>Done</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

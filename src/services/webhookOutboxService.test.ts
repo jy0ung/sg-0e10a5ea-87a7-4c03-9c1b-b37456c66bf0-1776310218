@@ -5,7 +5,9 @@ import {
   listWebhookDeliveries,
   listWebhookEndpoints,
   requeueWebhookDelivery,
-  upsertWebhookEndpoint,
+  createWebhookEndpoint,
+  updateWebhookEndpoint,
+  rotateWebhookEndpointSecret,
 } from './webhookOutboxService';
 
 vi.mock('@/integrations/supabase/client', () => ({
@@ -30,8 +32,8 @@ function makeFromChain(returnValue: { data: unknown; error: unknown }) {
 }
 
 describe('listWebhookEndpoints', () => {
-  it('selects by company_id and maps rows', async () => {
-    const chain = makeFromChain({
+  it('uses a masked RPC projection and never exposes a stored secret', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
       data: [
         {
           id: 'ep-1', company_id: 'co-1', name: 'Slack relay',
@@ -43,22 +45,21 @@ describe('listWebhookEndpoints', () => {
         },
       ],
       error: null,
-    });
-    vi.mocked(supabase.from).mockReturnValue(chain as never);
+    } as never);
 
     const result = await listWebhookEndpoints('co-1');
 
-    expect(supabase.from).toHaveBeenCalledWith('webhook_endpoints');
-    expect(chain.eq).toHaveBeenCalledWith('company_id', 'co-1');
+    expect(supabase.rpc).toHaveBeenCalledWith('list_webhook_endpoints', { p_company_id: 'co-1' });
+    expect(supabase.from).not.toHaveBeenCalledWith('webhook_endpoints');
     expect(result.data).toHaveLength(1);
     expect(result.data[0]).toMatchObject({
       id: 'ep-1', companyId: 'co-1', eventTypes: ['vehicle.transferred'], active: true,
     });
+    expect(JSON.stringify(result.data)).not.toContain('shh');
   });
 
   it('surfaces a sane error envelope on supabase failure', async () => {
-    const chain = makeFromChain({ data: null, error: { message: 'permission denied' } });
-    vi.mocked(supabase.from).mockReturnValue(chain as never);
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'permission denied' } } as never);
 
     const result = await listWebhookEndpoints('co-1');
 
@@ -67,32 +68,53 @@ describe('listWebhookEndpoints', () => {
   });
 });
 
-describe('upsertWebhookEndpoint', () => {
-  it('forwards every field including null id (create) to the RPC', async () => {
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 'new-id-1', error: null } as never);
+describe('webhook endpoint mutations', () => {
+  it('creates a server-generated secret without sending one from the browser', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: { id: 'new-id-1', secret: 'one-time-key' }, error: null } as never);
 
-    const result = await upsertWebhookEndpoint({
-      id: null, companyId: 'co-1', name: 'New', url: 'https://x',
-      secret: 'k', eventTypes: ['a'], active: true,
+    const result = await createWebhookEndpoint({
+      companyId: 'co-1', name: 'New', url: 'https://x',
+      eventTypes: ['a'], active: true,
     });
 
-    expect(supabase.rpc).toHaveBeenCalledWith('upsert_webhook_endpoint', {
-      p_id: null, p_company_id: 'co-1', p_name: 'New', p_url: 'https://x',
-      p_secret: 'k', p_event_types: ['a'], p_active: true,
+    expect(supabase.rpc).toHaveBeenCalledWith('create_webhook_endpoint', {
+      p_company_id: 'co-1', p_name: 'New', p_url: 'https://x',
+      p_event_types: ['a'], p_active: true,
     });
     expect(result.id).toBe('new-id-1');
+    expect(result.secret).toBe('one-time-key');
   });
 
   it('returns an error envelope when the RPC rejects', async () => {
     vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'Webhook URL must be HTTPS' } } as never);
 
-    const result = await upsertWebhookEndpoint({
-      id: null, companyId: 'co-1', name: 'Bad', url: 'http://x',
-      secret: 'k', eventTypes: [], active: true,
+    const result = await createWebhookEndpoint({
+      companyId: 'co-1', name: 'Bad', url: 'http://x',
+      eventTypes: [], active: true,
     });
 
     expect(result.id).toBeNull();
     expect(result.error?.message).toBe('Webhook URL must be HTTPS');
+  });
+
+  it('edits metadata without round-tripping or replacing a signing key', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 'ep-1', error: null } as never);
+    const result = await updateWebhookEndpoint({
+      id: 'ep-1', companyId: 'co-1', name: 'Renamed', url: 'https://x',
+      eventTypes: ['a'], active: false,
+    });
+    expect(result.error).toBeNull();
+    expect(supabase.rpc).toHaveBeenCalledWith('update_webhook_endpoint', {
+      p_id: 'ep-1', p_company_id: 'co-1', p_name: 'Renamed', p_url: 'https://x',
+      p_event_types: ['a'], p_active: false,
+    });
+  });
+
+  it('rotates through a separate operation', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: 'replacement-key', error: null } as never);
+    const result = await rotateWebhookEndpointSecret('ep-1');
+    expect(result.secret).toBe('replacement-key');
+    expect(supabase.rpc).toHaveBeenCalledWith('rotate_webhook_endpoint_secret', { p_id: 'ep-1' });
   });
 });
 

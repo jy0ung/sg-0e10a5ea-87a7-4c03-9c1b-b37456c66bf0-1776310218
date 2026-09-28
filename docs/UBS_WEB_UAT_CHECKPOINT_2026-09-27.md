@@ -6,6 +6,8 @@
 
 **Admin integrity follow-up:** PR #109 merged at `8212ef1`. The next bounded slice makes Vehicle Permission Editor saves atomic and audited across general and column grants, in both UBS and HRMS web. It does not complete the role matrix, webhook secret protection, or Admin information architecture.
 
+**Admin permissions follow-up:** PR #110 merged at `5325754`. The webhook-secret slice now moves endpoint keys into Supabase Vault, removes direct browser table access and plaintext edit fields, and changes the deliverer to fetch signing keys through a service-role-only RPC. This is a pending implementation and test checkpoint, not evidence of production deployment or end-to-end webhook delivery.
+
 ## Scope and issue accuracy
 
 - [#47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) remains the architecture and web-app completion programme. Its old linear sequence overstates the dependency on final production recovery; business-feature work can proceed with disposable UAT infrastructure.

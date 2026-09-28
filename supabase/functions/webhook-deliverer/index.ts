@@ -43,7 +43,6 @@ interface OutboxRow {
   payload:          Record<string, unknown>;
   attempts:         number;
   endpoint_url:     string;
-  endpoint_secret:  string;
   endpoint_active:  boolean;
 }
 
@@ -71,7 +70,7 @@ interface DeliveryOutcome {
   errorMessage: string | null;
 }
 
-async function deliver(row: OutboxRow, log: EdgeLogger): Promise<DeliveryOutcome> {
+async function deliver(row: OutboxRow, secret: string, log: EdgeLogger): Promise<DeliveryOutcome> {
   const ts   = Math.floor(Date.now() / 1000);
   const body = JSON.stringify({
     id:         row.id,
@@ -80,7 +79,7 @@ async function deliver(row: OutboxRow, log: EdgeLogger): Promise<DeliveryOutcome
     emitted_at: new Date().toISOString(),
     data:       row.payload,
   });
-  const sig = await hmacHex(row.endpoint_secret, `${ts}.${body}`);
+  const sig = await hmacHex(secret, `${ts}.${body}`);
 
   try {
     const res = await fetch(row.endpoint_url, {
@@ -186,7 +185,7 @@ Deno.serve(withRequestLogging('webhook-deliverer', async ({ req, log }) => {
     .limit(limit)
     .select(`
       id, endpoint_id, company_id, event_type, payload, attempts,
-      endpoint:webhook_endpoints!inner ( url, secret, active )
+      endpoint:webhook_endpoints!inner ( url, active )
     `);
 
   if (role === 'company_admin') {
@@ -219,7 +218,6 @@ Deno.serve(withRequestLogging('webhook-deliverer', async ({ req, log }) => {
       payload:         (r.payload as Record<string, unknown>) ?? {},
       attempts:        Number(r.attempts ?? 0),
       endpoint_url:    String(ep.url ?? ''),
-      endpoint_secret: String(ep.secret ?? ''),
       endpoint_active: Boolean(ep.active),
     };
   });
@@ -241,7 +239,12 @@ Deno.serve(withRequestLogging('webhook-deliverer', async ({ req, log }) => {
       continue;
     }
 
-    const outcome = await deliver(row, log);
+    const { data: signingKey, error: keyError } = await admin.rpc(
+      'get_webhook_delivery_secret', { p_endpoint_id: row.endpoint_id },
+    );
+    const outcome = keyError || typeof signingKey !== 'string' || !signingKey
+      ? { ok: false, status: null, errorMessage: 'Signing key unavailable' }
+      : await deliver(row, signingKey, log);
     const nextAttempt = row.attempts + 1;
 
     if (outcome.ok) {
