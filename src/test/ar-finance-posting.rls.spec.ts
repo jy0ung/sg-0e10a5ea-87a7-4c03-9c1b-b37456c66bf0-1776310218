@@ -105,7 +105,7 @@ live('Finance AR posting', () => {
     if (oldRole && actorId) await svc.from('profiles').update({ role: oldRole }).eq('id', actorId);
   });
 
-  it('posts once with balanced Cash/AR lines and rejects posted reversal', async () => {
+  it('corrects a posted payment with an immutable balancing journal and mandatory reason', async () => {
     const invoiceId = await seedInvoice();
     const payment = await finance.rpc('record_payment_event', {
       p_invoice_id: invoiceId, p_amount: 50_000,
@@ -115,29 +115,100 @@ live('Finance AR posting', () => {
     const eventId = payment.data as string;
     eventIds.push(eventId);
 
-    const denied = await outsider.rpc('post_ar_payment_to_gl', { p_payment_event_id: eventId });
-    expect(denied.error?.message).toContain('Not authorized');
-    const before = await finance.rpc('get_period_close_unposted', {
-      p_company_id: companyId, p_period_id: periodId,
-    });
-    expect((before.data as Array<{ event_id: string }>).some(row => row.event_id === eventId)).toBe(true);
+    const deniedPost = await outsider.rpc('post_ar_payment_to_gl', { p_payment_event_id: eventId });
+    expect(deniedPost.error?.message).toContain('Not authorized');
     const posted = await finance.rpc('post_ar_payment_to_gl', { p_payment_event_id: eventId });
     expect(posted.error).toBeNull();
     const journalId = posted.data as string;
     journalIds.push(journalId);
-    const replay = await finance.rpc('post_ar_payment_to_gl', { p_payment_event_id: eventId });
-    expect(replay.data).toBe(journalId);
-    const { data: lines } = await svc.from('journal_entry_lines')
-      .select('debit,credit').eq('journal_entry_id', journalId);
-    expect(lines).toHaveLength(2);
-    expect(lines?.reduce((sum, row) => sum + Number(row.debit), 0)).toBe(50_000);
-    expect(lines?.reduce((sum, row) => sum + Number(row.credit), 0)).toBe(50_000);
-    const reversal = await finance.rpc('reverse_payment_event', { p_event_id: eventId });
-    expect(reversal.error?.message).toContain('Finance correction');
-    const after = await finance.rpc('get_period_close_unposted', {
-      p_company_id: companyId, p_period_id: periodId,
+
+    const { data: originalBefore } = await svc.from('journal_entries')
+      .select('id,period_id,entry_date,description,source_type,source_id')
+      .eq('id', journalId).single();
+    const { data: originalLinesBefore } = await svc.from('journal_entry_lines')
+      .select('account_id,debit,credit').eq('journal_entry_id', journalId).order('account_id');
+    expect(originalLinesBefore).toHaveLength(2);
+    expect(originalLinesBefore?.reduce((sum, row) => sum + Number(row.debit), 0)).toBe(50_000);
+    expect(originalLinesBefore?.reduce((sum, row) => sum + Number(row.credit), 0)).toBe(50_000);
+
+    const missingReason = await finance.rpc('reverse_payment_event', { p_event_id: eventId });
+    expect(missingReason.error?.message).toContain('reason is required');
+
+    const deniedCorrection = await outsider.rpc('reverse_payment_event', {
+      p_event_id: eventId, p_reason: 'Unauthorized attempt',
     });
-    expect((after.data as Array<{ event_id: string }>).some(row => row.event_id === eventId)).toBe(false);
+    expect(deniedCorrection.error?.message).toContain('Not authorized');
+
+    const reversed = await finance.rpc('reverse_payment_event', {
+      p_event_id: eventId, p_reason: 'Customer receipt entered against wrong invoice',
+    });
+    expect(reversed.error).toBeNull();
+    eventIds.push(reversed.data as string);
+
+    const { data: correction, error: correctionError } = await svc.from('journal_entries')
+      .select('id,period_id,entry_date,source_type,source_id,posted_by')
+      .eq('source_type', 'adjustment').eq('source_id', journalId).single();
+    expect(correctionError).toBeNull();
+    expect(correction?.period_id).toBe(periodId);
+    expect(correction?.source_id).toBe(journalId);
+    expect(correction?.posted_by).toBe(actorId);
+    journalIds.push(correction!.id);
+
+    const { data: correctionLines } = await svc.from('journal_entry_lines')
+      .select('account_id,debit,credit').eq('journal_entry_id', correction!.id).order('account_id');
+    expect(correctionLines).toHaveLength(2);
+    for (let i = 0; i < (originalLinesBefore?.length ?? 0); i += 1) {
+      expect(Number(correctionLines?.[i].debit)).toBe(Number(originalLinesBefore?.[i].credit));
+      expect(Number(correctionLines?.[i].credit)).toBe(Number(originalLinesBefore?.[i].debit));
+    }
+
+    const { data: originalAfter } = await svc.from('journal_entries')
+      .select('id,period_id,entry_date,description,source_type,source_id')
+      .eq('id', journalId).single();
+    const { data: originalLinesAfter } = await svc.from('journal_entry_lines')
+      .select('account_id,debit,credit').eq('journal_entry_id', journalId).order('account_id');
+    expect(originalAfter).toEqual(originalBefore);
+    expect(originalLinesAfter).toEqual(originalLinesBefore);
+
+    const duplicate = await finance.rpc('reverse_payment_event', {
+      p_event_id: eventId, p_reason: 'Second attempt',
+    });
+    expect(duplicate.error?.message).toContain('already reversed');
+
+    const { data: invoice } = await svc.from('invoices')
+      .select('paid_amount,payment_status').eq('id', invoiceId).single();
+    expect(Number(invoice?.paid_amount)).toBe(0);
+    expect(invoice?.payment_status).toBe('unpaid');
+  });
+
+  it('requires an open correction period for a posted payment', async () => {
+    const invoiceId = await seedInvoice();
+    const payment = await finance.rpc('record_payment_event', {
+      p_invoice_id: invoiceId, p_amount: 5_000,
+      p_payment_date: new Date().toISOString().slice(0, 10),
+    });
+    expect(payment.error).toBeNull();
+    const eventId = payment.data as string;
+    eventIds.push(eventId);
+    const posted = await finance.rpc('post_ar_payment_to_gl', { p_payment_event_id: eventId });
+    expect(posted.error).toBeNull();
+    journalIds.push(posted.data as string);
+
+    const closed = await svc.from('accounting_periods').update({ status: 'closed' }).eq('id', periodId);
+    expect(closed.error).toBeNull();
+    try {
+      const reversal = await finance.rpc('reverse_payment_event', {
+        p_event_id: eventId, p_reason: 'Correction needs an open period',
+      });
+      expect(reversal.error?.message).toContain('No open accounting period');
+      const { data: invoice } = await svc.from('invoices')
+        .select('paid_amount,payment_status').eq('id', invoiceId).single();
+      expect(Number(invoice?.paid_amount)).toBe(5_000);
+      expect(invoice?.payment_status).toBe('partial');
+    } finally {
+      const reopened = await svc.from('accounting_periods').update({ status: 'open' }).eq('id', periodId);
+      expect(reopened.error).toBeNull();
+    }
   });
 
   it('excludes a reversed unposted AR event from the close queue', async () => {
