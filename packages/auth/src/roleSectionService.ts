@@ -1,14 +1,14 @@
-import { supabase } from '@flc/supabase';
+import { supabase, type Json } from '@flc/supabase';
 import { loggingService } from '@flc/platform-services';
-import { ALL_SECTIONS, type SectionName } from './rolePermissions';
-import type { AppRole } from '@flc/types';
+import { ALL_SECTIONS, DEFAULT_ROLE_SECTIONS, type SectionName } from './rolePermissions';
+import { APP_ROLES, type AppRole } from '@flc/types';
 
 /**
  * Role-section service — reads the `role_sections` table that replaces the
  * legacy `src/config/rolePermissions.ts` localStorage matrix (Phase 2 #15).
  *
- * The generated Database type hasn't been regenerated yet, so we declare a
- * local shape. The cast is isolated here — callers see a fully-typed API.
+ * Runtime navigation reads ordinary tenant-visible rows. Admin edits use
+ * versioned RPCs that validate and save the complete matrix atomically.
  */
 
 export interface RoleSectionRow {
@@ -27,10 +27,6 @@ type RoleSectionsClient = {
         error: Error | null;
       }>;
     };
-    upsert: (
-      rows: Omit<RoleSectionRow, 'id'>[],
-      opts?: { onConflict?: string },
-    ) => Promise<{ data: unknown; error: Error | null }>;
   };
 };
 
@@ -61,9 +57,8 @@ export async function fetchRoleSections(
 
     const matrix: Partial<RoleSectionsMatrix> = {};
     for (const row of data) {
-      if (!row.allowed) continue;
       if (!matrix[row.role]) matrix[row.role] = [];
-      matrix[row.role]!.push(row.section);
+      if (row.allowed) matrix[row.role]!.push(row.section);
     }
     return { data: matrix as RoleSectionsMatrix, error: null };
   } catch (err) {
@@ -77,36 +72,54 @@ export async function fetchRoleSections(
   }
 }
 
-/**
- * Write-through update for a single role's allowed sections. Called by the
- * admin role matrix editor. UI callers restrict this to `super_admin` and
- * `company_admin`; RLS remains the final authority.
- */
-export async function saveRoleSections(
-  companyId: string,
-  role: AppRole,
-  sections: SectionName[],
-): Promise<{ error: Error | null }> {
-  try {
-    const allowedSections = new Set(sections);
-    const rows: Omit<RoleSectionRow, 'id'>[] = ALL_SECTIONS.map((section) => ({
-      company_id: companyId,
-      role,
-      section,
-      allowed: allowedSections.has(section),
-    }));
-    const { error } = await client.from('role_sections').upsert(rows, {
-      onConflict: 'company_id,role,section',
-    });
-    if (error) throw error;
-    return { error: null };
-  } catch (err) {
-    const error = err instanceof Error ? err : new Error('Failed to save role sections');
-    loggingService.error(
-      'Failed to save role_sections',
-      { error: error.message, companyId, role },
-      'RoleSectionService',
-    );
-    return { error };
+export interface RoleSectionMatrixSnapshot {
+  matrix: RoleSectionsMatrix;
+  version: number;
+}
+
+function normalizeMatrix(raw: Record<string, unknown>): RoleSectionsMatrix {
+  const matrix = {} as RoleSectionsMatrix;
+  for (const role of APP_ROLES) {
+    const entries = raw[role];
+    matrix[role] = Array.isArray(entries)
+      ? entries.filter((section): section is SectionName => ALL_SECTIONS.includes(section as SectionName))
+      : [...DEFAULT_ROLE_SECTIONS[role]];
   }
+  return matrix;
+}
+
+/** Admin: read the matrix and its compare-and-swap version in one snapshot. */
+export async function fetchRoleSectionMatrix(
+  companyId: string,
+): Promise<{ data: RoleSectionMatrixSnapshot | null; error: Error | null }> {
+  const { data, error } = await supabase.rpc('get_role_section_matrix', {
+    p_company_id: companyId,
+  });
+  if (error) {
+    loggingService.error('Failed to load role matrix', { companyId, error }, 'RoleSectionService');
+    return { data: null, error: new Error(error.message) };
+  }
+  const result = data as { version?: number; matrix?: Record<string, unknown> } | null;
+  if (!result || typeof result.version !== 'number' || !result.matrix) {
+    return { data: null, error: new Error('Invalid role matrix response') };
+  }
+  return { data: { version: result.version, matrix: normalizeMatrix(result.matrix) }, error: null };
+}
+
+/** Admin: save every role/section in one audited transaction at the loaded version. */
+export async function saveRoleSectionMatrix(
+  companyId: string,
+  expectedVersion: number,
+  matrix: RoleSectionsMatrix,
+): Promise<{ version: number | null; error: Error | null }> {
+  const { data, error } = await supabase.rpc('save_role_section_matrix', {
+    p_company_id: companyId,
+    p_expected_version: expectedVersion,
+    p_matrix: matrix as unknown as Json,
+  });
+  if (error) {
+    loggingService.error('Failed to save role matrix', { companyId, error }, 'RoleSectionService');
+    return { version: null, error: new Error(error.message) };
+  }
+  return { version: Number(data), error: null };
 }

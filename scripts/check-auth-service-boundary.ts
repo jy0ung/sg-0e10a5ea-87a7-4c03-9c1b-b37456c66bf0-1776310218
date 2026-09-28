@@ -18,12 +18,12 @@ const shimFiles = new Map<string, readonly string[]>([
     "export type { AuthError, AuthUser } from '@flc/auth';",
   ]],
   ['src/services/roleSectionService.ts', [
-    "export { fetchRoleSections, saveRoleSections } from '@flc/auth';",
-    "export type { RoleSectionRow, RoleSectionsMatrix } from '@flc/auth';",
+    "export { fetchRoleSections, fetchRoleSectionMatrix, saveRoleSectionMatrix } from '@flc/auth';",
+    "export type { RoleSectionRow, RoleSectionsMatrix, RoleSectionMatrixSnapshot } from '@flc/auth';",
   ]],
   ['apps/hrms-web/src/services/roleSectionService.ts', [
-    "export { fetchRoleSections, saveRoleSections } from '@flc/auth';",
-    "export type { RoleSectionRow, RoleSectionsMatrix } from '@flc/auth';",
+    "export { fetchRoleSections, fetchRoleSectionMatrix, saveRoleSectionMatrix } from '@flc/auth';",
+    "export type { RoleSectionRow, RoleSectionsMatrix, RoleSectionMatrixSnapshot } from '@flc/auth';",
   ]],
   ['src/services/permissionService.ts', [
     "} from '@flc/auth';",

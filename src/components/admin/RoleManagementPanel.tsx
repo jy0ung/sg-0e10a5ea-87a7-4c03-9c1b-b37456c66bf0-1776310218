@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CheckSquare, LockKeyhole, Pencil, Plus, RotateCcw, Save, Shield, Square, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -12,9 +12,9 @@ import {
 import { APP_ROLES, ROLE_DEFAULT_SCOPE, type AppRole } from '@/types';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchRoleSections, saveRoleSections } from '@flc/auth';
+import { fetchRoleSectionMatrix, saveRoleSectionMatrix, type RoleSectionsMatrix } from '@flc/auth';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 
 const ALL_ROLES: readonly AppRole[] = APP_ROLES;
@@ -45,12 +45,29 @@ type RoleManagementPanelProps = {
 export function RoleManagementPanel({ embedded = false }: RoleManagementPanelProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const canManage = !!user && ['super_admin', 'company_admin'].includes(user.role);
-  const [permissions, setPermissions] = useState<Record<AppRole, SectionName[]>>(
-    () => ({ ...DEFAULT_ROLE_SECTIONS })
-  );
+  const [draft, setDraft] = useState<RoleSectionsMatrix>(() => ({ ...DEFAULT_ROLE_SECTIONS }));
   const [dirty, setDirty] = useState(false);
+  const [baseVersion, setBaseVersion] = useState<number | null>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole | null>(null);
+
+  useEffect(() => {
+    setDirty(false);
+    setBaseVersion(null);
+  }, [user?.company_id]);
+
+  const roleQuery = useQuery({
+    queryKey: ['role-sections', user?.company_id],
+    queryFn: async () => {
+      const result = await fetchRoleSectionMatrix(user!.company_id);
+      if (result.error || !result.data) throw result.error ?? new Error('Unable to load role matrix');
+      return result.data;
+    },
+    enabled: !!user?.company_id && canManage,
+    staleTime: STALE.reference,
+  });
+  const permissions = dirty ? draft : roleQuery.data?.matrix ?? DEFAULT_ROLE_SECTIONS;
 
   const roleRows = useMemo(
     () => ALL_ROLES.map((role) => ({
@@ -63,52 +80,41 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
     [permissions],
   );
 
-  useQuery({
-    queryKey: ['role-sections', user?.company_id],
-    queryFn: async () => {
-      const { data } = await fetchRoleSections(user!.company_id);
-      if (data) {
-        const merged: Record<AppRole, SectionName[]> = { ...DEFAULT_ROLE_SECTIONS };
-        for (const role of Object.keys(data) as AppRole[]) {
-          merged[role] = data[role] as SectionName[];
-        }
-        setPermissions(merged);
-      }
-      return data;
-    },
-    enabled: !!user?.company_id,
-    staleTime: STALE.reference,
-  });
-
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!user?.company_id) throw new Error('No company');
-      const results = await Promise.all(
-        (Object.keys(permissions) as AppRole[]).map((role) =>
-          saveRoleSections(user.company_id, role, permissions[role] ?? []),
-        ),
-      );
-      const failed = results.find((r) => r.error);
-      if (failed?.error) throw failed.error;
+      if (!user?.company_id || baseVersion === null) throw new Error('Role matrix has not loaded');
+      const result = await saveRoleSectionMatrix(user.company_id, baseVersion, draft);
+      if (result.error || result.version === null) throw result.error ?? new Error('Unable to save role matrix');
+      return result.version;
     },
-    onSuccess: () => {
+    onSuccess: (version) => {
+      queryClient.setQueryData(['role-sections', user?.company_id], { matrix: draft, version });
       setDirty(false);
+      setBaseVersion(null);
+      queryClient.invalidateQueries({ queryKey: ['role-sections', user?.company_id] });
       toast({ title: 'Permissions saved', description: 'Role permissions updated. Changes apply on next navigation.' });
     },
     onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: ['role-sections', user?.company_id] });
       toast({ title: 'Failed to save permissions', description: error.message, variant: 'destructive' });
     },
   });
 
+  const editDraft = (update: (current: RoleSectionsMatrix) => RoleSectionsMatrix) => {
+    if (!roleQuery.data || saveMutation.isPending) return;
+    if (!dirty) setBaseVersion(roleQuery.data.version);
+    setDraft(update(permissions));
+    setDirty(true);
+  };
+
   const toggle = (role: AppRole, section: SectionName) => {
-    setPermissions((prev) => {
+    editDraft((prev) => {
       const current = prev[role] ?? [];
       const updated = current.includes(section)
         ? current.filter((s) => s !== section)
         : [...current, section];
       return { ...prev, [role]: updated };
     });
-    setDirty(true);
   };
 
   const isAllowed = (role: AppRole, section: SectionName) =>
@@ -117,17 +123,15 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
   const handleSave = () => saveMutation.mutate();
 
   const handleReset = () => {
-    setPermissions({ ...DEFAULT_ROLE_SECTIONS });
-    setDirty(true);
+    editDraft(() => ({ ...DEFAULT_ROLE_SECTIONS }));
     toast({ title: 'Reset to defaults', description: 'Review and save to apply the default matrix.' });
   };
 
   const resetRole = (role: AppRole) => {
-    setPermissions((prev) => ({
+    editDraft((prev) => ({
       ...prev,
       [role]: [...(DEFAULT_ROLE_SECTIONS[role] ?? [])],
     }));
-    setDirty(true);
     toast({ title: 'Role reset', description: `${ROLE_LABELS[role]} restored to default permissions. Save to apply.` });
   };
 
@@ -135,17 +139,16 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
   const toggleAll = (role: AppRole) => {
     const current = permissions[role] ?? [];
     const allGranted = ALL_SECTIONS.every((s) => current.includes(s));
-    setPermissions((prev) => ({
+    editDraft((prev) => ({
       ...prev,
       [role]: allGranted ? [] : [...ALL_SECTIONS],
     }));
-    setDirty(true);
   };
 
   // Toggle a section across all roles
   const toggleSection = (section: SectionName) => {
     const allGranted = ALL_ROLES.every((r) => (permissions[r] ?? []).includes(section));
-    setPermissions((prev) => {
+    editDraft((prev) => {
       const updated = { ...prev };
       for (const role of ALL_ROLES) {
         const current = updated[role] ?? [];
@@ -157,7 +160,6 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
       }
       return updated;
     });
-    setDirty(true);
   };
 
   if (!canManage) return <UnauthorizedAccess />;
@@ -182,16 +184,20 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
             <Plus className="h-4 w-4 mr-1.5" />
             New role
           </Button>
-          <Button variant="outline" size="sm" onClick={handleReset}>
+          <Button variant="outline" size="sm" onClick={handleReset} disabled={!roleQuery.data || saveMutation.isPending}>
             <RotateCcw className="h-4 w-4 mr-1.5" />
             Reset defaults
           </Button>
+          {dirty && <Button variant="ghost" size="sm" onClick={() => { setDirty(false); setBaseVersion(null); }} disabled={saveMutation.isPending}>Discard changes</Button>}
           <Button size="sm" onClick={handleSave} disabled={!dirty || saveMutation.isPending}>
             <Save className="h-4 w-4 mr-1.5" />
             {saveMutation.isPending ? 'Saving…' : 'Save changes'}
           </Button>
         </div>
       </div>
+
+      {roleQuery.isLoading && <p className="text-sm text-muted-foreground">Loading role permissions…</p>}
+      {roleQuery.isError && <p role="alert" className="text-sm text-destructive">{roleQuery.error.message}</p>}
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <div className="border-b border-border px-4 py-3">
@@ -231,11 +237,11 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setSelectedRole(row.role)}>
+                      <Button variant="outline" size="sm" onClick={() => setSelectedRole(row.role)} disabled={!roleQuery.data || saveMutation.isPending}>
                         <Pencil className="h-4 w-4 mr-1.5" />
                         Permissions
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => resetRole(row.role)} aria-label={`Reset ${row.label}`}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => resetRole(row.role)} disabled={!roleQuery.data || saveMutation.isPending} aria-label={`Reset ${row.label}`}>
                         <RotateCcw className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" disabled title="System roles cannot be deleted from this screen." aria-label={`Delete ${row.label}`}>
@@ -266,6 +272,7 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
                     </span>
                     <button
                       onClick={() => toggleAll(role)}
+                      disabled={!roleQuery.data || saveMutation.isPending}
                       className="text-[10px] text-primary hover:underline"
                       title={`Toggle all for ${ROLE_LABELS[role]}`}
                     >
@@ -289,6 +296,7 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => toggleSection(section)}
+                      disabled={!roleQuery.data || saveMutation.isPending}
                       className="text-[10px] text-primary hover:underline mr-1"
                       title={`Toggle all roles for ${section}`}
                     >
@@ -303,6 +311,7 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
                     <td key={role} className="px-3 py-3 text-center">
                       <button
                         onClick={() => toggle(role, section)}
+                        disabled={!roleQuery.data || saveMutation.isPending}
                         className={cn(
                           'inline-flex items-center justify-center rounded transition-colors p-0.5',
                           allowed
@@ -378,6 +387,7 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
                         key={section}
                         type="button"
                         onClick={() => toggle(selectedRole, section)}
+                        disabled={!roleQuery.data || saveMutation.isPending}
                         className={cn(
                           'flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors',
                           allowed ? 'border-primary/40 bg-primary/10 text-foreground' : 'border-border bg-background text-muted-foreground hover:bg-muted/40',

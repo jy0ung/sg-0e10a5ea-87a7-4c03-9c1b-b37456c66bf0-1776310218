@@ -55,8 +55,8 @@ export {
   HRMS_PAYROLL,
   MANAGER_AND_UP,
 } from './routeRoles';
-export { fetchRoleSections, saveRoleSections } from './roleSectionService';
-export type { RoleSectionRow, RoleSectionsMatrix } from './roleSectionService';
+export { fetchRoleSections, fetchRoleSectionMatrix, saveRoleSectionMatrix } from './roleSectionService';
+export type { RoleSectionRow, RoleSectionsMatrix, RoleSectionMatrixSnapshot } from './roleSectionService';
 export {
   expiredResetLinkMessage,
   getAuthCallbackParams,
