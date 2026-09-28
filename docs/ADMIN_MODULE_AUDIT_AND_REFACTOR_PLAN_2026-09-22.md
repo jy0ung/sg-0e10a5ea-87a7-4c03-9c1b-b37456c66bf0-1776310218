@@ -6,7 +6,11 @@ Scope: Main application Admin module (`/admin/*`), its shared UI, auth/session d
 
 ## Implementation checkpoint — 2026-09-28
 
-This document preserves the original audit findings. The self-service branch-assignment defect (H3) is corrected in the current bounded Admin integrity slice: Profile Settings displays branch and role as read-only context, the personal form validates and submits only display name, and `updateOwnProfile` derives the target profile from the authenticated session. Administrative branch assignment remains in User Management. The existing database trigger still enforces the privilege boundary. Component and service regression tests cover the personal form and mutation payload. This does not resolve the separate Permission Editor, role matrix, webhook-secret, form-loss, or Admin navigation findings.
+This document preserves the original audit findings. The self-service branch-assignment defect (H3) was corrected in PR #109: Profile Settings displays branch and role as read-only context, the personal form validates and submits only display name, and `updateOwnProfile` derives the target profile from the authenticated session. Administrative branch assignment remains in User Management. The existing database trigger still enforces the privilege boundary.
+
+The current bounded Permission Editor slice addresses H1: both UBS and HRMS web editors use one explicit draft; general switches, column changes, and templates become dirty; one company-scoped backend transaction saves all fields and writes an audit row. Direct client writes to `column_permissions` are revoked. Role-matrix atomicity, webhook-secret handling, form-loss diagnosis, and Admin navigation remain open.
+
+Migration/compatibility: the new RPC and grants are additive; revoking direct column-permission writes intentionally makes a cached old editor fail closed until it reloads the updated client. The legacy package service delegates Vehicle saves to the new command, preserving in-repository callers. A rollback of the client alone would leave the old editor unable to save; any rollback must keep the new client contract or restore direct grants through a reviewed migration. Disposable Supabase tests cover the new write path and denial of direct writes.
 
 ## Executive summary
 

@@ -1,5 +1,5 @@
 import { supabase, type Tables } from '@flc/supabase';
-import { loggingService, logPermissionChange } from '@flc/platform-services';
+import { loggingService } from '@flc/platform-services';
 
 export type PermissionLevel = 'none' | 'view' | 'edit';
 export type ColumnPermission = Tables<'column_permissions'>;
@@ -11,18 +11,55 @@ export interface UserPermissions {
   canBulkEdit: boolean;
 }
 
+export interface VehiclePermissionDraft {
+  canEdit: boolean;
+  canBulkEdit: boolean;
+  canViewDetails: boolean;
+  columns: Record<string, PermissionLevel>;
+}
+
+/** Read the stored draft, including flags that an admin role may override at runtime. */
+export async function getVehiclePermissionDraft(userId: string): Promise<VehiclePermissionDraft> {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('can_edit_vehicles,can_bulk_edit_vehicles,can_view_vehicle_details')
+    .eq('id', userId)
+    .single();
+  if (profileError || !profile) throw new Error(profileError?.message ?? 'User not found');
+
+  const { data: columns, error: columnsError } = await supabase
+    .from('column_permissions')
+    .select('column_name,permission_level')
+    .eq('user_id', userId)
+    .eq('table_name', 'vehicles');
+  if (columnsError) throw new Error(columnsError.message);
+
+  return {
+    canEdit: profile.can_edit_vehicles ?? false,
+    canBulkEdit: profile.can_bulk_edit_vehicles ?? false,
+    canViewDetails: profile.can_view_vehicle_details ?? true,
+    columns: Object.fromEntries((columns ?? []).map(column => [column.column_name, column.permission_level as PermissionLevel])),
+  };
+}
+
+/** Save the entire Vehicle permission draft in one audited backend transaction. */
+export async function saveVehiclePermissionDraft(
+  userId: string,
+  draft: VehiclePermissionDraft,
+): Promise<{ error: Error | null }> {
+  const { error } = await supabase.rpc('save_vehicle_user_permissions' as never, {
+    p_user_id: userId,
+    p_can_edit: draft.canEdit,
+    p_can_bulk_edit: draft.canBulkEdit,
+    p_can_view_details: draft.canViewDetails,
+    p_columns: draft.columns,
+  } as never);
+  return { error: error ? new Error(error.message) : null };
+}
+
 interface PermissionMutationAuditContext {
   actorId?: string;
   companyId?: string;
-}
-
-function serializePermissions(permissions: { column_name: string; permission_level: PermissionLevel }[]) {
-  return permissions
-    .map(permission => ({
-      column_name: permission.column_name,
-      permission_level: permission.permission_level,
-    }))
-    .sort((a, b) => a.column_name.localeCompare(b.column_name));
 }
 
 async function assertTargetUserInCompany(
@@ -64,68 +101,31 @@ export async function getUserColumnPermissions(
   return data || [];
 }
 
-/**
- * Set column permissions for a user (replaces existing)
- */
+/** @deprecated Prefer saveVehiclePermissionDraft for a complete atomic edit. */
 export async function setUserColumnPermissions(
   userId: string,
   permissions: { column_name: string; permission_level: PermissionLevel }[],
   tableName: string = 'vehicles',
   auditContext: PermissionMutationAuditContext = {}
 ): Promise<{ error: Error | null }> {
+  if (tableName !== 'vehicles') {
+    return { error: new Error('A domain-specific atomic command is required for this permission table') };
+  }
   const scopeCheck = await assertTargetUserInCompany(userId, auditContext.companyId);
   if (scopeCheck.error) {
     loggingService.error('Permission update blocked by company scope check', { userId, tableName, error: scopeCheck.error }, 'PermissionService');
     return scopeCheck;
   }
 
-  const previousPermissions = await getUserColumnPermissions(userId, tableName);
-
-  // Delete existing permissions for this user/table
-  const { error: deleteError } = await supabase
-    .from('column_permissions')
-    .delete()
-    .eq('user_id', userId)
-    .eq('table_name', tableName);
-
-  if (deleteError) {
-    loggingService.error('Error deleting old permissions', { error: deleteError }, 'PermissionService');
-    return { error: deleteError };
-  }
-
-  // Insert new permissions
-  if (permissions.length > 0) {
-    const { error: insertError } = await supabase
-      .from('column_permissions')
-      .insert(
-        permissions.map(p => ({
-          user_id: userId,
-          table_name: tableName,
-          column_name: p.column_name,
-          permission_level: p.permission_level,
-        }))
-      );
-
-    if (insertError) {
-      loggingService.error('Error inserting new permissions', { error: insertError }, 'PermissionService');
-      return { error: insertError };
-    }
-  }
-
-  if (auditContext.actorId) {
-    void logPermissionChange(auditContext.actorId, userId, {
-      column_permissions: {
-        before: serializePermissions(previousPermissions as unknown as { column_name: string; permission_level: PermissionLevel }[]),
-        after: serializePermissions(permissions),
-      },
-      table_name: {
-        before: tableName,
-        after: tableName,
-      },
+  try {
+    const stored = await getVehiclePermissionDraft(userId);
+    return saveVehiclePermissionDraft(userId, {
+      ...stored,
+      columns: Object.fromEntries(permissions.map(permission => [permission.column_name, permission.permission_level])),
     });
+  } catch (error) {
+    return { error: error instanceof Error ? error : new Error('Unable to load Vehicle permissions') };
   }
-
-  return { error: null };
 }
 
 /**

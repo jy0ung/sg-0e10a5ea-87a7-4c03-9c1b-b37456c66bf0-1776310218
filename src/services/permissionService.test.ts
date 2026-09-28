@@ -1,96 +1,80 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { supabase } from '@flc/supabase';
 import { setUserColumnPermissions } from './permissionService';
-import { logPermissionChange } from '@flc/platform-services';
 
 vi.mock('@flc/supabase', () => ({
   supabase: {
     from: vi.fn(),
+    rpc: vi.fn(),
   },
 }));
 
 vi.mock('@flc/platform-services', () => ({
-  logPermissionChange: vi.fn().mockResolvedValue({ error: null }),
-  loggingService: {
-    error: vi.fn(),
-  },
+  loggingService: { error: vi.fn() },
 }));
 
 function createQueryBuilder(result: { data?: unknown; error?: Error | null }) {
   const builder = {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    delete: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue({ data: result.data ?? null, error: result.error ?? null }),
+    single: vi.fn().mockResolvedValue({ data: result.data ?? null, error: result.error ?? null }),
     then: (resolve: (value: { data?: unknown; error: Error | null }) => unknown) =>
       Promise.resolve({ data: result.data, error: result.error ?? null }).then(resolve),
   };
   return builder;
 }
 
-describe('permissionService', () => {
+describe('permissionService legacy adapter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('scopes column permission updates to the actor company and audits the change', async () => {
-    const targetProfile = createQueryBuilder({ data: { id: 'target-1' } });
-    const existingPermissions = createQueryBuilder({
-      data: [{ column_name: 'remark', permission_level: 'view' }],
-    });
-    const deleteBuilder = createQueryBuilder({ data: null });
-    const insertBuilder = {
-      insert: vi.fn().mockResolvedValue({ error: null }),
-    };
-
+  it('delegates a scoped Vehicle update to the atomic command with stored general flags', async () => {
+    const target = createQueryBuilder({ data: { id: 'target-1' } });
+    const profile = createQueryBuilder({ data: {
+      can_edit_vehicles: true,
+      can_bulk_edit_vehicles: false,
+      can_view_vehicle_details: true,
+    } });
+    const columns = createQueryBuilder({ data: [{ column_name: 'remark', permission_level: 'view' }] });
     vi.mocked(supabase.from)
-      .mockReturnValueOnce(targetProfile as never)
-      .mockReturnValueOnce(existingPermissions as never)
-      .mockReturnValueOnce(deleteBuilder as never)
-      .mockReturnValueOnce(insertBuilder as never);
+      .mockReturnValueOnce(target as never)
+      .mockReturnValueOnce(profile as never)
+      .mockReturnValueOnce(columns as never);
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: null } as never);
 
-    const permissions = [{ column_name: 'customer_name', permission_level: 'view' as const }];
-    const result = await setUserColumnPermissions('target-1', permissions, 'vehicles', {
-      actorId: 'actor-1',
-      companyId: 'company-1',
-    });
+    const result = await setUserColumnPermissions('target-1', [
+      { column_name: 'customer_name', permission_level: 'view' },
+    ], 'vehicles', { actorId: 'actor-1', companyId: 'company-1' });
 
     expect(result.error).toBeNull();
-    expect(targetProfile.eq).toHaveBeenNthCalledWith(1, 'id', 'target-1');
-    expect(targetProfile.eq).toHaveBeenNthCalledWith(2, 'company_id', 'company-1');
-    expect(deleteBuilder.eq).toHaveBeenNthCalledWith(1, 'user_id', 'target-1');
-    expect(deleteBuilder.eq).toHaveBeenNthCalledWith(2, 'table_name', 'vehicles');
-    expect(insertBuilder.insert).toHaveBeenCalledWith([
-      {
-        user_id: 'target-1',
-        table_name: 'vehicles',
-        column_name: 'customer_name',
-        permission_level: 'view',
-      },
-    ]);
-    expect(logPermissionChange).toHaveBeenCalledWith('actor-1', 'target-1', {
-      column_permissions: {
-        before: [{ column_name: 'remark', permission_level: 'view' }],
-        after: permissions,
-      },
-      table_name: {
-        before: 'vehicles',
-        after: 'vehicles',
-      },
+    expect(target.eq).toHaveBeenNthCalledWith(1, 'id', 'target-1');
+    expect(target.eq).toHaveBeenNthCalledWith(2, 'company_id', 'company-1');
+    expect(supabase.rpc).toHaveBeenCalledWith('save_vehicle_user_permissions', {
+      p_user_id: 'target-1',
+      p_can_edit: true,
+      p_can_bulk_edit: false,
+      p_can_view_details: true,
+      p_columns: { customer_name: 'view' },
     });
   });
 
-  it('blocks permission updates for users outside the actor company scope', async () => {
-    const targetProfile = createQueryBuilder({ data: null });
-    vi.mocked(supabase.from).mockReturnValueOnce(targetProfile as never);
+  it('blocks users outside the actor company before attempting a save', async () => {
+    const target = createQueryBuilder({ data: null });
+    vi.mocked(supabase.from).mockReturnValueOnce(target as never);
 
     const result = await setUserColumnPermissions('target-1', [], 'vehicles', {
-      actorId: 'actor-1',
-      companyId: 'company-1',
+      actorId: 'actor-1', companyId: 'company-1',
     });
 
     expect(result.error?.message).toBe('Target user is outside the current company scope');
-    expect(supabase.from).toHaveBeenCalledTimes(1);
-    expect(logPermissionChange).not.toHaveBeenCalled();
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it('rejects permission tables without an atomic domain command', async () => {
+    const result = await setUserColumnPermissions('target-1', [], 'other_table');
+    expect(result.error?.message).toContain('domain-specific atomic command');
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 });
