@@ -10,9 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import { useSales } from '@/contexts/SalesContext';
-import { createInvoice, recordPaymentEvent } from '@/services/invoiceService';
-import { Invoice, InvoicePaymentStatus, InvoiceType } from '@/types';
-import { Plus, CreditCard } from 'lucide-react';
+import { createInvoice, getPaymentEvents, recordPaymentEvent, reversePaymentEvent } from '@/services/invoiceService';
+import { Invoice, InvoicePaymentStatus, InvoiceType, PaymentEvent } from '@/types';
+import { Plus, CreditCard, History, RotateCcw } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 
 const STATUS_BADGE: Record<InvoicePaymentStatus, string> = {
@@ -21,7 +21,7 @@ const STATUS_BADGE: Record<InvoicePaymentStatus, string> = {
   paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
 };
 
-function InvoiceTable({ invoices, onPay, canRecordPayment }: { invoices: Invoice[]; onPay: (inv: Invoice) => void; canRecordPayment: boolean }) {
+function InvoiceTable({ invoices, onPay, onHistory, canRecordPayment }: { invoices: Invoice[]; onPay: (inv: Invoice) => void; onHistory: (inv: Invoice) => void; canRecordPayment: boolean }) {
   return (
     <div className="glass-panel overflow-auto">
       <table className="w-full text-sm">
@@ -43,11 +43,18 @@ function InvoiceTable({ invoices, onPay, canRecordPayment }: { invoices: Invoice
               <td className="px-3 py-2 text-muted-foreground">RM {(inv.paidAmount ?? 0).toLocaleString()}</td>
               <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-[11px] font-medium capitalize ${STATUS_BADGE[inv.paymentStatus]}`}>{inv.paymentStatus}</span></td>
               <td className="px-3 py-2 text-right">
-                {canRecordPayment && inv.paymentStatus !== 'paid' && (
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onPay(inv)}>
-                    <CreditCard className="h-3.5 w-3.5 mr-1" />Pay
-                  </Button>
-                )}
+                <div className="flex justify-end gap-1">
+                  {canRecordPayment && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onHistory(inv)}>
+                      <History className="h-3.5 w-3.5 mr-1" />Payments
+                    </Button>
+                  )}
+                  {canRecordPayment && inv.paymentStatus !== 'paid' && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onPay(inv)}>
+                      <CreditCard className="h-3.5 w-3.5 mr-1" />Pay
+                    </Button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -73,6 +80,12 @@ export default function Invoices() {
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
   const [payMethod, setPayMethod] = useState('');
   const [payRef, setPayRef] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyTarget, setHistoryTarget] = useState<Invoice | null>(null);
+  const [paymentEvents, setPaymentEvents] = useState<PaymentEvent[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [reverseTarget, setReverseTarget] = useState<PaymentEvent | null>(null);
+  const [reverseReason, setReverseReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ invoiceNo: '', salesOrderId: '', customerId: '', issueDate: new Date().toISOString().split('T')[0], dueDate: '', subtotal: '', taxAmount: '', discountAmount: '', notes: '', invoiceType: 'customer_sales' as InvoiceType });
 
@@ -153,6 +166,39 @@ export default function Invoices() {
 
   const openPay = (inv: Invoice) => { setPayTarget(inv); setPayAmount(''); setPayDate(new Date().toISOString().slice(0, 10)); setPayMethod(''); setPayRef(''); setPayOpen(true); };
 
+  const loadPaymentHistory = async (invoice: Invoice) => {
+    setHistoryTarget(invoice);
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    const { data, error } = await getPaymentEvents(invoice.id);
+    setHistoryLoading(false);
+    if (error) {
+      setPaymentEvents([]);
+      toast({ title: 'Unable to load payment history', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setPaymentEvents(data);
+  };
+
+  const handleReversePayment = async () => {
+    if (!reverseTarget || !reverseReason.trim()) {
+      toast({ title: 'A reversal reason is required', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    const { error } = await reversePaymentEvent(reverseTarget.id, reverseReason.trim());
+    setSaving(false);
+    if (error) {
+      toast({ title: 'Unable to reverse payment', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setReverseTarget(null);
+    setReverseReason('');
+    if (historyTarget) await loadPaymentHistory(historyTarget);
+    await reloadSales();
+    toast({ title: 'Payment reversed', description: 'Posted payments create a balancing Finance correction in the current open period.' });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -184,9 +230,9 @@ export default function Invoices() {
           <TabsTrigger value="dealer_sales">Dealer Sales ({byType('dealer_sales').length})</TabsTrigger>
           <TabsTrigger value="purchase">Purchase ({byType('purchase').length})</TabsTrigger>
         </TabsList>
-        <TabsContent value="customer_sales" className="mt-4"><InvoiceTable invoices={byType('customer_sales')} onPay={openPay} canRecordPayment={canRecordPayment} /></TabsContent>
-        <TabsContent value="dealer_sales" className="mt-4"><InvoiceTable invoices={byType('dealer_sales')} onPay={openPay} canRecordPayment={canRecordPayment} /></TabsContent>
-        <TabsContent value="purchase" className="mt-4"><InvoiceTable invoices={byType('purchase')} onPay={openPay} canRecordPayment={canRecordPayment} /></TabsContent>
+        <TabsContent value="customer_sales" className="mt-4"><InvoiceTable invoices={byType('customer_sales')} onPay={openPay} onHistory={loadPaymentHistory} canRecordPayment={canRecordPayment} /></TabsContent>
+        <TabsContent value="dealer_sales" className="mt-4"><InvoiceTable invoices={byType('dealer_sales')} onPay={openPay} onHistory={loadPaymentHistory} canRecordPayment={canRecordPayment} /></TabsContent>
+        <TabsContent value="purchase" className="mt-4"><InvoiceTable invoices={byType('purchase')} onPay={openPay} onHistory={loadPaymentHistory} canRecordPayment={canRecordPayment} /></TabsContent>
       </Tabs>
       </>)}
 
@@ -242,6 +288,57 @@ export default function Invoices() {
             <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={saving}>{saving ? 'Creating…' : 'Create'}</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment history and controlled reversal */}
+      <Dialog open={historyOpen} onOpenChange={open => { setHistoryOpen(open); if (!open) { setReverseTarget(null); setReverseReason(''); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Payment History</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Invoice: {historyTarget?.invoiceNo}. Posted payments are corrected with a balancing Finance journal; the original journal remains unchanged.
+          </p>
+          <div className="max-h-80 space-y-2 overflow-auto py-2">
+            {historyLoading ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">Loading payment history…</p>
+            ) : paymentEvents.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">No payment events recorded.</p>
+            ) : paymentEvents.map(event => (
+              <div key={event.id} className="rounded-md border p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium capitalize">{event.eventType} · RM {Number(event.amount).toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {event.paymentDate}{event.receiptReference ? ' · ' + event.receiptReference : ''}
+                    </div>
+                    {event.notes && <div className="mt-1 text-xs text-muted-foreground">{event.notes}</div>}
+                  </div>
+                  {event.eventType === 'payment' && !event.isReversed && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setReverseTarget(event); setReverseReason(''); }}>
+                      <RotateCcw className="mr-1 h-3.5 w-3.5" />Reverse
+                    </Button>
+                  )}
+                  {event.eventType === 'payment' && event.isReversed && <span className="text-xs text-muted-foreground">Reversed</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          {reverseTarget && (
+            <div className="space-y-2 rounded-md border p-3">
+              <p className="text-sm font-medium">Reverse payment of RM {Number(reverseTarget.amount).toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">
+                A reason is mandatory. If the payment is already posted, Finance will create an equal and opposite adjustment journal in the current open accounting period.
+              </p>
+              <label htmlFor="sales-reversal-reason" className="text-xs font-medium text-muted-foreground">Reason *</label>
+              <Input id="sales-reversal-reason" value={reverseReason} onChange={e => setReverseReason(e.target.value)} placeholder="Why is this payment being reversed?" />
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => { setReverseTarget(null); setReverseReason(''); }}>Cancel</Button>
+                <Button size="sm" onClick={handleReversePayment} disabled={saving || !reverseReason.trim()}>
+                  {saving ? 'Reversing…' : 'Confirm reversal'}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
