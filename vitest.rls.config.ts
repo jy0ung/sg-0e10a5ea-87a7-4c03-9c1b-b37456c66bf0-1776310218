@@ -16,6 +16,7 @@ export default defineConfig({
       'src/test/dms-normalizer.spec.ts',
       'src/test/sales-pipeline.spec.ts',
       'src/test/ap-foundation.spec.ts',
+      'src/test/ar-finance-posting.rls.spec.ts',
       'src/test/purchase-invoice-receipt.rls.spec.ts',
       'src/test/production-readiness.spec.ts',
       'src/test/release-workflows.spec.ts',

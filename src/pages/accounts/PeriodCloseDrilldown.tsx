@@ -8,7 +8,7 @@ import { useCompanyId } from '@/hooks/useCompanyId';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
-import { listAccountingPeriods, getPeriodCloseSummary, getPeriodCloseUnposted, postApPaymentToGl } from '@/services/glService';
+import { listAccountingPeriods, getPeriodCloseSummary, getPeriodCloseUnposted, postApPaymentToGl, postArPaymentToGl } from '@/services/glService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
 import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
@@ -24,7 +24,7 @@ export default function PeriodCloseDrilldown() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const canUseReports = useFeatureFlag('phase3b.financial-reports-v2', false);
-  const canPostAp = hasRole(['super_admin', 'company_admin', 'director', 'general_manager', 'accounts']);
+  const canPostPayments = hasRole(['super_admin', 'company_admin', 'director', 'general_manager', 'accounts']);
 
   const [periodId, setPeriodId] = useState<string>('');
   const [postingId, setPostingId] = useState<string | null>(null);
@@ -71,16 +71,18 @@ export default function PeriodCloseDrilldown() {
 
   const summary = summaryQuery.data ?? null;
 
-  const postAp = async (eventId: string) => {
+  const postPayment = async (kind: 'ar_payment' | 'ap_payment', eventId: string) => {
     if (postingId) return;
     setPostingId(eventId);
-    const { error } = await postApPaymentToGl(eventId);
+    const { error } = kind === 'ar_payment'
+      ? await postArPaymentToGl(eventId)
+      : await postApPaymentToGl(eventId);
     setPostingId(null);
     if (error) {
-      toast({ title: 'AP posting failed', description: error.message, variant: 'destructive' });
+      toast({ title: 'Payment posting failed', description: error.message, variant: 'destructive' });
       return;
     }
-    toast({ title: 'Supplier payment posted to the General Ledger' });
+    toast({ title: `${kind === 'ar_payment' ? 'Customer' : 'Supplier'} payment posted to the General Ledger` });
     void queryClient.invalidateQueries({ queryKey: ['period_close_summary', companyId, periodId] });
     void queryClient.invalidateQueries({ queryKey: ['period_close_unposted', companyId, periodId] });
   };
@@ -215,7 +217,7 @@ export default function PeriodCloseDrilldown() {
                           <th className="px-4 py-2 text-left font-medium text-muted-foreground">Reference</th>
                           <th className="px-4 py-2 text-right font-medium text-muted-foreground">Amount (RM)</th>
                           <th className="px-4 py-2 text-left font-medium text-muted-foreground">Event ID</th>
-                          {canPostAp && <th className="px-4 py-2 text-right font-medium text-muted-foreground">Action</th>}
+                          {canPostPayments && <th className="px-4 py-2 text-right font-medium text-muted-foreground">Action</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -230,10 +232,10 @@ export default function PeriodCloseDrilldown() {
                             <td className="px-4 py-2.5">{row.reference ?? <span className="text-muted-foreground">—</span>}</td>
                             <td className="px-4 py-2.5 text-right tabular-nums font-medium">{fmt(row.amount)}</td>
                             <td className="px-4 py-2.5 font-mono text-[10px] text-muted-foreground">{row.eventId}</td>
-                            {canPostAp && <td className="px-4 py-2.5 text-right">
-                              {row.kind === 'ap_payment' && summary.periodStatus === 'open' && (
+                            {canPostPayments && <td className="px-4 py-2.5 text-right">
+                              {summary.periodStatus === 'open' && (
                                 <Button size="sm" variant="outline" disabled={!!postingId}
-                                  onClick={() => void postAp(row.eventId)}>
+                                  onClick={() => void postPayment(row.kind, row.eventId)}>
                                   <BookCheck className="mr-1.5 h-3.5 w-3.5" />
                                   {postingId === row.eventId ? 'Posting…' : 'Post to GL'}
                                 </Button>
