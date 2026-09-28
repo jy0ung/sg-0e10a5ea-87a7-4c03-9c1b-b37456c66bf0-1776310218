@@ -67,10 +67,12 @@ async function signInAs(email: string, password: string): Promise<Session> {
 let svc: SupabaseClient;
 let userA: Session;
 let userB: Session;
+let userAOriginalRole = '';
 
 const cleanup = {
   invoiceIds: [] as string[],
   eventIds:   [] as string[],
+  poIds: [] as string[],
 };
 
 // Seed a purchase invoice and return its id.
@@ -113,6 +115,13 @@ describeIfLive('AP Foundation RPCs', () => {
       process.env.RLS_USER_B_EMAIL ?? 'b@rls.test',
       process.env.RLS_USER_B_PASSWORD ?? 'Test1234!',
     );
+    const { data: profile, error: profileError } = await svc.from('profiles')
+      .select('role').eq('id', userA.userId).single();
+    if (profileError || !profile) throw new Error(profileError?.message ?? 'Actor role unavailable');
+    userAOriginalRole = profile.role;
+    const { error: roleError } = await svc.from('profiles')
+      .update({ role: 'company_admin' }).eq('id', userA.userId);
+    if (roleError) throw new Error(roleError.message);
   });
 
   afterAll(async () => {
@@ -121,6 +130,12 @@ describeIfLive('AP Foundation RPCs', () => {
     }
     if (cleanup.invoiceIds.length > 0) {
       await svc.from('purchase_invoices').delete().in('id', cleanup.invoiceIds);
+    }
+    if (cleanup.poIds.length > 0) {
+      await svc.from('purchase_orders').delete().in('id', cleanup.poIds);
+    }
+    if (userAOriginalRole) {
+      await svc.from('profiles').update({ role: userAOriginalRole }).eq('id', userA.userId);
     }
   });
 
@@ -262,12 +277,17 @@ describeIfLive('AP Foundation RPCs', () => {
 
     const { data: pi } = await svc
       .from('purchase_invoices')
-      .select('lifecycle_status, verified_at, approved_at')
+      .select('lifecycle_status, verified_at, verified_by, approved_at, approved_by')
       .eq('id', piId)
       .single();
     expect(pi?.lifecycle_status).toBe('approved');
     expect(pi?.verified_at).not.toBeNull();
+    expect(pi?.verified_by).toBe(userA.userId);
     expect(pi?.approved_at).not.toBeNull();
+    expect(pi?.approved_by).toBe(userA.userId);
+    const tamper = await userA.client.from('purchase_invoices')
+      .update({ amount: 1 }).eq('id', piId);
+    expect(tamper.error?.message).toContain('controlled correction');
   });
 
   // 7. Invalid lifecycle jump rejected ───────────────────────────────────────
@@ -303,5 +323,103 @@ describeIfLive('AP Foundation RPCs', () => {
     });
     // userB belongs to a different company → RLS returns empty
     expect((events as unknown[])?.length ?? 0).toBe(0);
+  });
+
+  it('rejects direct client state edits and verification before physical receipt', async () => {
+    const piId = await seedInvoice(userA.companyId, { lifecycleStatus: 'received' });
+    const { error: directError } = await userA.client.from('purchase_invoices')
+      .update({ lifecycle_status: 'approved' }).eq('id', piId);
+    expect(directError?.message).toContain('domain command');
+    const { error: pendingError } = await svc.from('purchase_invoices')
+      .update({ status: 'pending', received_date: null }).eq('id', piId);
+    expect(pendingError).toBeNull();
+    const verification = await userA.client.rpc('transition_pi_lifecycle', {
+      p_id: piId, p_target_status: 'verified', p_actor_id: userA.userId,
+    });
+    expect(verification.error?.message).toContain('Physical invoice receipt');
+  });
+
+  it('rejects forged lifecycle actors and unprivileged payments', async () => {
+    const piId = await seedInvoice(userA.companyId, { lifecycleStatus: 'received' });
+    const forged = await userA.client.rpc('transition_pi_lifecycle', {
+      p_id: piId, p_target_status: 'verified', p_actor_id: userB.userId,
+    });
+    expect(forged.error?.message).toContain('signed-in user');
+
+    const ordinaryPiId = await seedInvoice(userB.companyId, { lifecycleStatus: 'approved' });
+    const denied = await userB.client.rpc('record_supplier_payment_event', {
+      p_purchase_invoice_id: ordinaryPiId, p_amount: 1,
+      p_payment_date: new Date().toISOString().slice(0, 10),
+    });
+    expect(denied.error?.message).toContain('Not authorized');
+  });
+
+  it('rejects overpayment and cross-company AP aging', async () => {
+    const piId = await seedInvoice(userA.companyId, { lifecycleStatus: 'approved' });
+    const payment = await userA.client.rpc('record_supplier_payment_event', {
+      p_purchase_invoice_id: piId, p_amount: 60_000,
+      p_payment_date: new Date().toISOString().slice(0, 10),
+    });
+    expect(payment.error).toBeNull();
+    cleanup.eventIds.push(payment.data as string);
+    const overpayment = await userA.client.rpc('record_supplier_payment_event', {
+      p_purchase_invoice_id: piId, p_amount: 50_000,
+      p_payment_date: new Date().toISOString().slice(0, 10),
+    });
+    expect(overpayment.error?.message).toContain('outstanding balance');
+    const foreignAging = await userB.client.rpc('get_ap_aging_summary', {
+      p_company_id: userA.companyId,
+    });
+    expect(foreignAging.error?.message).toContain('Not authorized');
+    const foreignBranchAging = await userB.client.rpc('get_ap_aging_by_branch', {
+      p_company_id: userA.companyId,
+    });
+    expect(foreignBranchAging.error?.message).toContain('Not authorized');
+  });
+
+  it('blocks approval of a PO-linked invoice without its GRN receipt', async () => {
+    const poNo = `AP-MATCH-${Date.now()}`;
+    const { data: po, error: poError } = await svc.from('purchase_orders').insert({
+      company_id: userA.companyId, po_no: poNo, supplier: 'Test Supplier',
+      order_date: new Date().toISOString().slice(0, 10), lifecycle_status: 'approved',
+      total_amount: 100_000,
+    }).select('id').single();
+    if (poError || !po) throw new Error(poError?.message ?? 'PO insert failed');
+    cleanup.poIds.push(po.id);
+    const { data: line, error: lineError } = await svc.from('purchase_order_lines').insert({
+      company_id: userA.companyId, purchase_order_id: po.id, line_no: 1,
+      model: 'Test Model', quantity: 1, unit_price: 100_000,
+    }).select('id').single();
+    if (lineError || !line) throw new Error(lineError?.message ?? 'PO line insert failed');
+
+    const piId = await seedInvoice(userA.companyId, { lifecycleStatus: 'verified' });
+    const linked = await svc.from('purchase_invoices').update({ po_line_id: line.id }).eq('id', piId);
+    expect(linked.error).toBeNull();
+    const approval = await userA.client.rpc('transition_pi_lifecycle', {
+      p_id: piId, p_target_status: 'approved', p_actor_id: userA.userId,
+    });
+    expect(approval.error?.message).toContain('Linked PO, GRN and invoice must match');
+    const { data: invoice } = await svc.from('purchase_invoices')
+      .select('lifecycle_status').eq('id', piId).single();
+    expect(invoice?.lifecycle_status).toBe('verified');
+
+    const { data: foreignPo, error: foreignPoError } = await svc.from('purchase_orders').insert({
+      company_id: userB.companyId, po_no: `${poNo}-B`, supplier: 'Other supplier',
+      order_date: new Date().toISOString().slice(0, 10), total_amount: 100_000,
+    }).select('id').single();
+    if (foreignPoError || !foreignPo) throw new Error(foreignPoError?.message ?? 'Foreign PO insert failed');
+    cleanup.poIds.push(foreignPo.id);
+    const { data: foreignLine, error: foreignLineError } = await svc.from('purchase_order_lines').insert({
+      company_id: userB.companyId, purchase_order_id: foreignPo.id, line_no: 1,
+      model: 'Test Model', quantity: 1, unit_price: 100_000,
+    }).select('id').single();
+    if (foreignLineError || !foreignLine) throw new Error(foreignLineError?.message ?? 'Foreign PO line insert failed');
+    const relink = await svc.from('purchase_invoices')
+      .update({ po_line_id: foreignLine.id }).eq('id', piId);
+    expect(relink.error).toBeNull();
+    const foreignApproval = await userA.client.rpc('transition_pi_lifecycle', {
+      p_id: piId, p_target_status: 'approved', p_actor_id: userA.userId,
+    });
+    expect(foreignApproval.error?.message).toContain('Linked PO must belong to invoice company');
   });
 });

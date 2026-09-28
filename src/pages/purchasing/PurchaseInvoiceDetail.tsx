@@ -63,6 +63,10 @@ export default function PurchaseInvoiceDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const canReceive = !!user && ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'].includes(user.role);
+  const canVerify = !!user && ['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'accounts'].includes(user.role);
+  const canApprove = !!user && ['super_admin', 'company_admin', 'director', 'general_manager'].includes(user.role);
+  const canPay = !!user && ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'].includes(user.role);
 
   // Payment dialog
   const [payOpen, setPayOpen]     = useState(false);
@@ -243,7 +247,7 @@ export default function PurchaseInvoiceDetail() {
   // ── Derived ──────────────────────────────────────────────────────────────────
 
   const outstanding  = invoice.amount - invoice.paidAmount;
-  const isEditable   = invoice.lifecycleStatus !== 'paid' && invoice.lifecycleStatus !== 'cancelled';
+  const isEditable   = canReceive && invoice.lifecycleStatus === 'received';
   const stepIndex    = LIFECYCLE_STEPS.indexOf(invoice.lifecycleStatus as PurchaseInvoiceLifecycleStatus);
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -456,22 +460,22 @@ export default function PurchaseInvoiceDetail() {
 
             {/* Action buttons */}
             <div className="flex flex-col gap-2 border-t pt-3">
-              {invoice.status === 'pending' && (
+              {invoice.status === 'pending' && canReceive && (
                 <Button size="sm" variant="outline" className="w-full gap-1.5 text-emerald-600" onClick={() => setReceiptOpen(true)}>
                   <Truck className="h-3.5 w-3.5" />Mark as Received
                 </Button>
               )}
-              {invoice.lifecycleStatus === 'received' && (
+              {invoice.status === 'received' && invoice.lifecycleStatus === 'received' && canVerify && (
                 <Button size="sm" variant="outline" className="w-full gap-1.5 text-purple-600" onClick={handleVerify}>
                   <CheckCircle className="h-3.5 w-3.5" />Verify Invoice
                 </Button>
               )}
-              {invoice.lifecycleStatus === 'verified' && (
+              {invoice.status === 'received' && invoice.lifecycleStatus === 'verified' && canApprove && (
                 <Button size="sm" variant="outline" className="w-full gap-1.5 text-emerald-600" onClick={handleApprove}>
                   <ThumbsUp className="h-3.5 w-3.5" />Approve Invoice
                 </Button>
               )}
-              {(invoice.lifecycleStatus === 'approved' || invoice.lifecycleStatus === 'scheduled') && invoice.paymentStatus !== 'paid' && (
+              {invoice.status === 'received' && canPay && (invoice.lifecycleStatus === 'approved' || invoice.lifecycleStatus === 'scheduled') && invoice.paymentStatus !== 'paid' && (
                 <Button size="sm" className="w-full gap-1.5" onClick={openPayDialog}>
                   <CreditCard className="h-3.5 w-3.5" />Record Payment
                 </Button>
@@ -542,7 +546,7 @@ export default function PurchaseInvoiceDetail() {
                       {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
                     </td>
                     <td className="py-2.5 pr-6">
-                      {event.eventType === 'payment' && !event.isReversed && invoice.lifecycleStatus !== 'paid' && (
+                      {canPay && event.eventType === 'payment' && !event.isReversed && invoice.lifecycleStatus !== 'paid' && (
                         <Button
                           variant="ghost"
                           size="sm"

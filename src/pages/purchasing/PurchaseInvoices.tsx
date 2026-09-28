@@ -61,6 +61,10 @@ export default function PurchaseInvoices() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const canReceive = !!user && ['super_admin', 'company_admin', 'director', 'general_manager', 'manager'].includes(user.role);
+  const canVerify = !!user && ['super_admin', 'company_admin', 'director', 'general_manager', 'manager', 'accounts'].includes(user.role);
+  const canApprove = !!user && ['super_admin', 'company_admin', 'director', 'general_manager'].includes(user.role);
+  const canPay = !!user && ['super_admin', 'company_admin', 'director', 'general_manager', 'accounts'].includes(user.role);
 
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatus] = useState<string>('all');
@@ -212,11 +216,11 @@ export default function PurchaseInvoices() {
         title="Purchase Invoices"
         description="CBU vehicle procurement invoices from suppliers"
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Purchasing', path: '/purchasing/invoices' }, { label: 'Purchase Invoices' }]}
-        actions={
+        actions={canReceive ?
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />New Invoice
           </Button>
-        }
+        : undefined}
       />
 
       <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-4">
@@ -300,22 +304,22 @@ export default function PurchaseInvoices() {
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-muted-foreground" onClick={() => navigate(`/purchasing/invoices/${pi.id}`)}>
                           <ExternalLink className="h-3 w-3 mr-0.5" />View
                         </Button>
-                        {pi.status === 'pending' && (
+                        {pi.status === 'pending' && canReceive && (
                           <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-emerald-600" onClick={() => setReceiptTarget(pi)}>
                             <Truck className="h-3 w-3 mr-0.5" />Receive
                           </Button>
                         )}
-                        {pi.lifecycleStatus === 'received' && (
+                        {pi.status === 'received' && pi.lifecycleStatus === 'received' && canVerify && (
                           <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-purple-600" onClick={() => handleVerify(pi)}>
                             <CheckCircle className="h-3 w-3 mr-0.5" />Verify
                           </Button>
                         )}
-                        {pi.lifecycleStatus === 'verified' && (
+                        {pi.status === 'received' && pi.lifecycleStatus === 'verified' && canApprove && (
                           <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-emerald-600" onClick={() => handleApprove(pi)}>
                             <ThumbsUp className="h-3 w-3 mr-0.5" />Approve
                           </Button>
                         )}
-                        {(pi.lifecycleStatus === 'approved' || pi.lifecycleStatus === 'scheduled') && pi.paymentStatus !== 'paid' && (
+                        {pi.status === 'received' && canPay && (pi.lifecycleStatus === 'approved' || pi.lifecycleStatus === 'scheduled') && pi.paymentStatus !== 'paid' && (
                           <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-blue-600" onClick={() => openPayDialog(pi)}>
                             <CreditCard className="h-3 w-3 mr-0.5" />Pay
                           </Button>
