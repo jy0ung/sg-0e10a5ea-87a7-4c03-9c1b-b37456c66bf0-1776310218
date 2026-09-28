@@ -8190,7 +8190,7 @@ export type Database = {
           last_failure_at: string | null
           last_success_at: string | null
           name: string
-          secret: string
+          secret_id: string
           updated_at: string
           url: string
         }
@@ -8205,7 +8205,7 @@ export type Database = {
           last_failure_at?: string | null
           last_success_at?: string | null
           name: string
-          secret: string
+          secret_id: string
           updated_at?: string
           url: string
         }
@@ -8220,7 +8220,7 @@ export type Database = {
           last_failure_at?: string | null
           last_success_at?: string | null
           name?: string
-          secret?: string
+          secret_id?: string
           updated_at?: string
           url?: string
         }
@@ -8515,6 +8515,16 @@ export type Database = {
           p_quality_issues: Json
           p_valid_rows: number
           p_vehicles: Json
+        }
+        Returns: Json
+      }
+      create_webhook_endpoint: {
+        Args: {
+          p_active: boolean
+          p_company_id: string
+          p_event_types: string[]
+          p_name: string
+          p_url: string
         }
         Returns: Json
       }
@@ -8830,6 +8840,10 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_webhook_delivery_secret: {
+        Args: { p_endpoint_id: string }
+        Returns: string
+      }
       get_reconciliation_status_counts: {
         Args: { p_company_id: string }
         Returns: {
@@ -8977,6 +8991,22 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_webhook_endpoints: {
+        Args: { p_company_id: string }
+        Returns: {
+          id: string
+          company_id: string
+          name: string
+          url: string
+          event_types: string[]
+          active: boolean
+          last_success_at: string | null
+          last_failure_at: string | null
+          consecutive_failures: number
+          created_at: string
+          updated_at: string
+        }[]
+      }
       mark_sync_run_for_retry: {
         Args: { p_company_id: string; p_run_id: string }
         Returns: string
@@ -9118,6 +9148,10 @@ export type Database = {
           total_count: number
         }[]
       }
+      rotate_webhook_endpoint_secret: {
+        Args: { p_id: string }
+        Returns: string
+      }
       seed_source_reconciliation_candidates: {
         Args: { p_company_id?: string }
         Returns: Json
@@ -9223,14 +9257,13 @@ export type Database = {
         Args: { p_company_id: string; p_kpi_codes: string[]; p_role: string }
         Returns: string
       }
-      upsert_webhook_endpoint: {
+      update_webhook_endpoint: {
         Args: {
           p_active: boolean
           p_company_id: string
           p_event_types: string[]
-          p_id: string | null
+          p_id: string
           p_name: string
-          p_secret: string
           p_url: string
         }
         Returns: string

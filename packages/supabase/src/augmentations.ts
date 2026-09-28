@@ -123,9 +123,6 @@ export const nullableRpcArgs: Record<string, string[]> = {
   "cancel_own_ticket": [
     "p_cancellation_note"
   ],
-  "upsert_webhook_endpoint": [
-    "p_id"
-  ],
   "record_supplier_payment_event": [
     "p_notes",
     "p_payment_method",

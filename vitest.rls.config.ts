@@ -18,6 +18,7 @@ export default defineConfig({
       'src/test/ap-foundation.spec.ts',
       'src/test/ar-finance-posting.rls.spec.ts',
       'src/test/admin-vehicle-permissions.rls.spec.ts',
+      'src/test/admin-webhook-secrets.rls.spec.ts',
       'src/test/purchase-invoice-receipt.rls.spec.ts',
       'src/test/production-readiness.spec.ts',
       'src/test/release-workflows.spec.ts',

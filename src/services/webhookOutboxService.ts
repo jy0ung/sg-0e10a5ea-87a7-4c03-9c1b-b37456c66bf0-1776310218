@@ -7,8 +7,6 @@ export interface WebhookEndpoint {
   companyId:           string;
   name:                string;
   url:                 string;
-  /** Never round-tripped to non-admin clients in plaintext. */
-  secret:              string;
   eventTypes:          string[];
   active:              boolean;
   lastSuccessAt:       string | null;
@@ -42,7 +40,6 @@ function mapEndpoint(row: Record<string, unknown>): WebhookEndpoint {
     companyId:           String(row.company_id ?? ''),
     name:                String(row.name ?? ''),
     url:                 String(row.url ?? ''),
-    secret:              String(row.secret ?? ''),
     eventTypes:          Array.isArray(row.event_types) ? (row.event_types as string[]) : [],
     active:              Boolean(row.active),
     lastSuccessAt:       row.last_success_at == null ? null : String(row.last_success_at),
@@ -76,41 +73,69 @@ export async function listWebhookEndpoints(
   companyId: string,
 ): Promise<{ data: WebhookEndpoint[]; error: Error | null }> {
   const { data, error } = await supabase
-    .from('webhook_endpoints')
-    .select('*')
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false });
+    .rpc('list_webhook_endpoints', { p_company_id: companyId });
   if (error) {
     loggingService.error('listWebhookEndpoints failed', { companyId, error }, 'webhookOutboxService');
     return { data: [], error: new Error(error.message) };
   }
-  return { data: (data ?? []).map(mapEndpoint), error: null };
+  return { data: ((data ?? []) as Record<string, unknown>[]).map(mapEndpoint), error: null };
 }
 
-/** Admin: register / update an endpoint via SECURITY DEFINER RPC. */
-export async function upsertWebhookEndpoint(args: {
-  id:         string | null;
+/** Admin: create an endpoint. The signing key is returned once. */
+export async function createWebhookEndpoint(args: {
   companyId:  string;
   name:       string;
   url:        string;
-  secret:     string;
   eventTypes: string[];
   active:     boolean;
-}): Promise<{ id: string | null; error: Error | null }> {
-  const { data, error } = await supabase.rpc('upsert_webhook_endpoint', {
-    p_id:          args.id,
+}): Promise<{ id: string | null; secret: string | null; error: Error | null }> {
+  const { data, error } = await supabase.rpc('create_webhook_endpoint', {
     p_company_id:  args.companyId,
     p_name:        args.name,
     p_url:         args.url,
-    p_secret:      args.secret,
     p_event_types: args.eventTypes,
     p_active:      args.active,
   });
   if (error) {
-    loggingService.error('upsertWebhookEndpoint failed', { args: { ...args, secret: '[redacted]' }, error }, 'webhookOutboxService');
-    return { id: null, error: new Error(error.message) };
+    loggingService.error('createWebhookEndpoint failed', { companyId: args.companyId, error }, 'webhookOutboxService');
+    return { id: null, secret: null, error: new Error(error.message) };
   }
-  return { id: data as string, error: null };
+  const created = data as { id?: string; secret?: string } | null;
+  return { id: created?.id ?? null, secret: created?.secret ?? null, error: null };
+}
+
+/** Admin: edit endpoint metadata without reading or replacing the key. */
+export async function updateWebhookEndpoint(args: {
+  id: string;
+  companyId: string;
+  name: string;
+  url: string;
+  eventTypes: string[];
+  active: boolean;
+}): Promise<{ error: Error | null }> {
+  const { error } = await supabase.rpc('update_webhook_endpoint', {
+    p_id: args.id,
+    p_company_id: args.companyId,
+    p_name: args.name,
+    p_url: args.url,
+    p_event_types: args.eventTypes,
+    p_active: args.active,
+  });
+  if (error) {
+    loggingService.error('updateWebhookEndpoint failed', { endpointId: args.id, error }, 'webhookOutboxService');
+  }
+  return { error: error ? new Error(error.message) : null };
+}
+
+/** Admin: rotate the key. The new plaintext is returned for one-time reveal. */
+export async function rotateWebhookEndpointSecret(
+  endpointId: string,
+): Promise<{ secret: string | null; error: Error | null }> {
+  const { data, error } = await supabase.rpc('rotate_webhook_endpoint_secret', { p_id: endpointId });
+  if (error) {
+    loggingService.error('rotateWebhookEndpointSecret failed', { endpointId, error }, 'webhookOutboxService');
+  }
+  return { secret: error ? null : data as string, error: error ? new Error(error.message) : null };
 }
 
 /** Admin: list recent deliveries for a company, newest first. */
