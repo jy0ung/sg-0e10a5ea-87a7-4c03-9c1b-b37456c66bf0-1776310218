@@ -21,7 +21,7 @@ const STATUS_BADGE: Record<InvoicePaymentStatus, string> = {
   paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
 };
 
-function InvoiceTable({ invoices, onPay }: { invoices: Invoice[]; onPay: (inv: Invoice) => void }) {
+function InvoiceTable({ invoices, onPay, canRecordPayment }: { invoices: Invoice[]; onPay: (inv: Invoice) => void; canRecordPayment: boolean }) {
   return (
     <div className="glass-panel overflow-auto">
       <table className="w-full text-sm">
@@ -43,7 +43,7 @@ function InvoiceTable({ invoices, onPay }: { invoices: Invoice[]; onPay: (inv: I
               <td className="px-3 py-2 text-muted-foreground">RM {(inv.paidAmount ?? 0).toLocaleString()}</td>
               <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-[11px] font-medium capitalize ${STATUS_BADGE[inv.paymentStatus]}`}>{inv.paymentStatus}</span></td>
               <td className="px-3 py-2 text-right">
-                {inv.paymentStatus !== 'paid' && (
+                {canRecordPayment && inv.paymentStatus !== 'paid' && (
                   <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onPay(inv)}>
                     <CreditCard className="h-3.5 w-3.5 mr-1" />Pay
                   </Button>
@@ -59,7 +59,9 @@ function InvoiceTable({ invoices, onPay }: { invoices: Invoice[]; onPay: (inv: I
 }
 
 export default function Invoices() {
-  const { user: _user } = useAuth();
+  const { hasRole } = useAuth();
+  const canCreateInvoice = hasRole(['super_admin', 'company_admin', 'director', 'general_manager', 'manager']);
+  const canRecordPayment = hasRole(['super_admin', 'company_admin', 'director', 'general_manager', 'accounts']);
   const companyId = useCompanyId();
   const { invoices, customers, salesOrders, reloadSales, loading } = useSales();
   const { toast } = useToast();
@@ -131,8 +133,14 @@ export default function Invoices() {
 
   const handlePay = async () => {
     if (!payTarget || !payAmount) return;
+    const amount = Number(payAmount);
+    const outstanding = payTarget.totalAmount - (payTarget.paidAmount ?? 0);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > outstanding) {
+      toast({ title: 'Enter an amount within the outstanding balance', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
-    const { error } = await recordPaymentEvent(payTarget.id, parseFloat(payAmount), payDate, {
+    const { error } = await recordPaymentEvent(payTarget.id, amount, payDate, {
       paymentMethod: payMethod || undefined,
       receiptReference: payRef || undefined,
     });
@@ -151,7 +159,7 @@ export default function Invoices() {
         title="Invoices"
         description="Track invoices and payment status"
         breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Sales', path: '/sales' }, { label: 'Invoices' }]}
-        actions={<Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" />New Invoice</Button>}
+        actions={canCreateInvoice ? <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4 mr-1" />New Invoice</Button> : undefined}
       />
 
       {loading ? (
@@ -176,9 +184,9 @@ export default function Invoices() {
           <TabsTrigger value="dealer_sales">Dealer Sales ({byType('dealer_sales').length})</TabsTrigger>
           <TabsTrigger value="purchase">Purchase ({byType('purchase').length})</TabsTrigger>
         </TabsList>
-        <TabsContent value="customer_sales" className="mt-4"><InvoiceTable invoices={byType('customer_sales')} onPay={openPay} /></TabsContent>
-        <TabsContent value="dealer_sales" className="mt-4"><InvoiceTable invoices={byType('dealer_sales')} onPay={openPay} /></TabsContent>
-        <TabsContent value="purchase" className="mt-4"><InvoiceTable invoices={byType('purchase')} onPay={openPay} /></TabsContent>
+        <TabsContent value="customer_sales" className="mt-4"><InvoiceTable invoices={byType('customer_sales')} onPay={openPay} canRecordPayment={canRecordPayment} /></TabsContent>
+        <TabsContent value="dealer_sales" className="mt-4"><InvoiceTable invoices={byType('dealer_sales')} onPay={openPay} canRecordPayment={canRecordPayment} /></TabsContent>
+        <TabsContent value="purchase" className="mt-4"><InvoiceTable invoices={byType('purchase')} onPay={openPay} canRecordPayment={canRecordPayment} /></TabsContent>
       </Tabs>
       </>)}
 
@@ -245,11 +253,11 @@ export default function Invoices() {
           <div className="space-y-3 py-2">
             <div className="space-y-1">
               <label htmlFor="sales-pay-amount" className="text-xs font-medium text-muted-foreground">Amount Paid *</label>
-              <Input id="sales-pay-amount" type="number" className="h-8 text-sm" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+              <Input id="sales-pay-amount" type="number" min="0.01" step="0.01" max={(payTarget?.totalAmount ?? 0) - (payTarget?.paidAmount ?? 0)} className="h-8 text-sm" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
             </div>
             <div className="space-y-1">
               <label htmlFor="sales-pay-date" className="text-xs font-medium text-muted-foreground">Payment Date *</label>
-              <Input id="sales-pay-date" type="date" className="h-8 text-sm" value={payDate} onChange={e => setPayDate(e.target.value)} />
+              <Input id="sales-pay-date" type="date" max={new Date().toISOString().slice(0, 10)} className="h-8 text-sm" value={payDate} onChange={e => setPayDate(e.target.value)} />
             </div>
             <div className="space-y-1">
               <label htmlFor="sales-pay-method" className="text-xs font-medium text-muted-foreground">Payment Method</label>
@@ -269,5 +277,4 @@ export default function Invoices() {
     </div>
   );
 }
-
 

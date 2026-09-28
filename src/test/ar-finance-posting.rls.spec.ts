@@ -94,7 +94,10 @@ live('Finance AR posting', () => {
       await svc.from('audit_logs').delete().in('entity_id', journalIds);
       await svc.from('journal_entries').delete().in('id', journalIds);
     }
-    if (eventIds.length) await svc.from('payment_events').delete().in('id', eventIds);
+    if (eventIds.length) {
+      await svc.from('audit_logs').delete().in('entity_id', eventIds);
+      await svc.from('payment_events').delete().in('id', eventIds);
+    }
     if (invoiceIds.length) await svc.from('invoices').delete().in('id', invoiceIds);
     if (orderIds.length) await svc.from('sales_orders').delete().in('id', orderIds);
     if (periodId) await svc.from('accounting_periods').delete().eq('id', periodId);
@@ -160,5 +163,65 @@ live('Finance AR posting', () => {
     });
     expect(summary.error).toBeNull();
     expect((summary.data as Array<{ unposted_ar_payment_count: number }>)[0]?.unposted_ar_payment_count).toBe(0);
+  });
+
+  it('guards Accounts settlement, outstanding balance, and computed invoice state', async () => {
+    const invoiceId = await seedInvoice();
+    const today = new Date().toISOString().slice(0, 10);
+    const forged = await finance.from('invoices').update({ paid_amount: 1, payment_status: 'partial' }).eq('id', invoiceId);
+    expect(forged.error?.message).toContain('domain commands');
+    const changedRole = await svc.from('profiles').update({ role: 'manager' }).eq('id', actorId);
+    expect(changedRole.error).toBeNull();
+    try {
+      const denied = await finance.rpc('record_payment_event', {
+        p_invoice_id: invoiceId, p_amount: 1, p_payment_date: today,
+      });
+      expect(denied.error?.message).toContain('Not authorized');
+    } finally {
+      const restored = await svc.from('profiles').update({ role: 'company_admin' }).eq('id', actorId);
+      expect(restored.error).toBeNull();
+    }
+    const overpay = await finance.rpc('record_payment_event', {
+      p_invoice_id: invoiceId, p_amount: 50_001, p_payment_date: today,
+    });
+    expect(overpay.error?.message).toContain('outstanding balance');
+    const future = await finance.rpc('record_payment_event', {
+      p_invoice_id: invoiceId, p_amount: 1, p_payment_date: '2999-01-01',
+    });
+    expect(future.error?.message).toContain('future');
+    const payment = await finance.rpc('record_payment_event', {
+      p_invoice_id: invoiceId, p_amount: 40_000, p_payment_date: today,
+    });
+    expect(payment.error).toBeNull();
+    eventIds.push(payment.data as string);
+    const concurrentBalance = await finance.rpc('record_payment_event', {
+      p_invoice_id: invoiceId, p_amount: 20_000, p_payment_date: today,
+    });
+    expect(concurrentBalance.error?.message).toContain('outstanding balance');
+    const altered = await finance.from('invoices').update({ total_amount: 1 }).eq('id', invoiceId);
+    expect(altered.error?.message).toContain('domain commands');
+    const reversal = await finance.rpc('reverse_payment_event', { p_event_id: payment.data });
+    expect(reversal.error).toBeNull();
+    eventIds.push(reversal.data as string);
+    const duplicate = await finance.rpc('reverse_payment_event', { p_event_id: payment.data });
+    expect(duplicate.error?.message).toContain('already reversed');
+    const { data: invoice } = await svc.from('invoices').select('paid_amount,payment_status').eq('id', invoiceId).single();
+    expect(Number(invoice?.paid_amount)).toBe(0);
+    expect(invoice?.payment_status).toBe('unpaid');
+  });
+
+  it('serializes simultaneous payments against one invoice balance', async () => {
+    const invoiceId = await seedInvoice();
+    const args = { p_invoice_id: invoiceId, p_amount: 30_000, p_payment_date: new Date().toISOString().slice(0, 10) };
+    const attempts = await Promise.all([
+      finance.rpc('record_payment_event', args),
+      finance.rpc('record_payment_event', args),
+    ]);
+    const successes = attempts.filter(result => !result.error);
+    expect(successes).toHaveLength(1);
+    expect(attempts.filter(result => result.error?.message.includes('outstanding balance'))).toHaveLength(1);
+    eventIds.push(successes[0].data as string);
+    const { data: invoice } = await svc.from('invoices').select('paid_amount').eq('id', invoiceId).single();
+    expect(Number(invoice?.paid_amount)).toBe(30_000);
   });
 });
