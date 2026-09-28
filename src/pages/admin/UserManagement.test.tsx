@@ -32,12 +32,12 @@ const authMocks = vi.hoisted(() => ({
 const flcAuthMocks = vi.hoisted(() => ({
   deactivateUser: vi.fn(),
   deleteInvitedUser: vi.fn(),
-  fetchRoleSections: vi.fn(),
+  fetchRoleSectionMatrix: vi.fn(),
   inviteUser: vi.fn(),
   listCompanyOptions: vi.fn(),
   listProfiles: vi.fn(),
   reactivateUser: vi.fn(),
-  saveRoleSections: vi.fn(),
+  saveRoleSectionMatrix: vi.fn(),
   updateProfile: vi.fn(),
 }));
 
@@ -63,12 +63,12 @@ vi.mock('@/contexts/AuthContext', () => ({
 vi.mock('@flc/auth', () => ({
   deactivateUser: flcAuthMocks.deactivateUser,
   deleteInvitedUser: flcAuthMocks.deleteInvitedUser,
-  fetchRoleSections: flcAuthMocks.fetchRoleSections,
+  fetchRoleSectionMatrix: flcAuthMocks.fetchRoleSectionMatrix,
   inviteUser: flcAuthMocks.inviteUser,
   listCompanyOptions: flcAuthMocks.listCompanyOptions,
   listProfiles: flcAuthMocks.listProfiles,
   reactivateUser: flcAuthMocks.reactivateUser,
-  saveRoleSections: flcAuthMocks.saveRoleSections,
+  saveRoleSectionMatrix: flcAuthMocks.saveRoleSectionMatrix,
   updateProfile: flcAuthMocks.updateProfile,
 }));
 
@@ -281,8 +281,8 @@ describe('UserManagement', () => {
     });
     flcAuthMocks.updateProfile.mockResolvedValue({ error: null });
     platformServiceMocks.logPermissionChange.mockResolvedValue({ error: null });
-    flcAuthMocks.fetchRoleSections.mockResolvedValue({ data: null, error: null });
-    flcAuthMocks.saveRoleSections.mockResolvedValue({ error: null });
+    flcAuthMocks.fetchRoleSectionMatrix.mockResolvedValue({ data: { version: 0, matrix: {} }, error: null });
+    flcAuthMocks.saveRoleSectionMatrix.mockResolvedValue({ version: 1, error: null });
     masterDataMocks.getBranches.mockResolvedValue({ data: [branch], error: null });
     authServiceMocks.resetPassword.mockResolvedValue({ error: null });
   });

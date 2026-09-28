@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ALL_SECTIONS } from './rolePermissions';
-import { fetchRoleSections, saveRoleSections } from './roleSectionService';
+import { DEFAULT_ROLE_SECTIONS } from './rolePermissions';
+import { fetchRoleSections, fetchRoleSectionMatrix, saveRoleSectionMatrix } from './roleSectionService';
 
 const fromMock = vi.fn();
+const rpcMock = vi.fn();
 const logErrorMock = vi.fn();
 
 vi.mock('@flc/supabase', () => ({
   supabase: {
     from: (...args: unknown[]) => fromMock(...args),
+    rpc: (...args: unknown[]) => rpcMock(...args),
   },
 }));
 
@@ -59,22 +61,31 @@ describe('roleSectionService', () => {
     });
   });
 
-  it('writes every known section for a role so revoked sections are persisted', async () => {
-    const upsert = vi.fn().mockResolvedValue({ data: null, error: null });
-    fromMock.mockReturnValueOnce({ upsert });
+  it('keeps a role explicitly denied when all its rows are false', async () => {
+    fromMock.mockReturnValueOnce(selectBuilder({
+      data: [{ role: 'manager', section: 'Sales', allowed: false }],
+    }));
+    const result = await fetchRoleSections('company-1');
+    expect(result.data?.manager).toEqual([]);
+  });
 
-    const result = await saveRoleSections('company-1', 'manager', ['Auto Aging', 'Sales']);
+  it('loads a versioned admin snapshot and saves the full matrix in one RPC', async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: { version: 4, matrix: { manager: [] } }, error: null,
+    });
+    const loaded = await fetchRoleSectionMatrix('company-1');
+    expect(loaded.data?.version).toBe(4);
+    expect(loaded.data?.matrix.manager).toEqual([]);
+    expect(loaded.data?.matrix.sales).toEqual(DEFAULT_ROLE_SECTIONS.sales);
+    expect(rpcMock).toHaveBeenCalledWith('get_role_section_matrix', { p_company_id: 'company-1' });
 
-    expect(result.error).toBeNull();
-    expect(upsert).toHaveBeenCalledWith(
-      ALL_SECTIONS.map((section) => ({
-        company_id: 'company-1',
-        role: 'manager',
-        section,
-        allowed: section === 'Auto Aging' || section === 'Sales',
-      })),
-      { onConflict: 'company_id,role,section' },
-    );
+    rpcMock.mockResolvedValueOnce({ data: 5, error: null });
+    const saved = await saveRoleSectionMatrix('company-1', 4, loaded.data!.matrix);
+    expect(saved).toEqual({ version: 5, error: null });
+    expect(rpcMock).toHaveBeenCalledWith('save_role_section_matrix', {
+      p_company_id: 'company-1', p_expected_version: 4, p_matrix: loaded.data!.matrix,
+    });
+    expect(fromMock).not.toHaveBeenCalled();
   });
 
   it('logs and returns load errors without throwing', async () => {

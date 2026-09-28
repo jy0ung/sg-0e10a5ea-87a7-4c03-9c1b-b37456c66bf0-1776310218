@@ -8840,6 +8840,10 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_role_section_matrix: {
+        Args: { p_company_id: string }
+        Returns: Json
+      }
       get_webhook_delivery_secret: {
         Args: { p_endpoint_id: string }
         Returns: string
@@ -9147,6 +9151,14 @@ export type Database = {
           rows: Json
           total_count: number
         }[]
+      }
+      save_role_section_matrix: {
+        Args: {
+          p_company_id: string
+          p_expected_version: number
+          p_matrix: Json
+        }
+        Returns: number
       }
       rotate_webhook_endpoint_secret: {
         Args: { p_id: string }
