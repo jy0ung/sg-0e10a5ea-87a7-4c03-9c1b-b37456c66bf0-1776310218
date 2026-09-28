@@ -4,6 +4,8 @@
 
 **2026-09-28 update:** PR #108 merged at `6cbe01c`: posted customer-payment reversal now creates an append-only balancing Finance adjustment and an Accounts reversal event in one transaction. The current Admin integrity slice removes self-service branch editing and narrows personal profile writes. End-to-end settlement UAT and the other Admin integrity findings remain open.
 
+**Admin integrity follow-up:** PR #109 merged at `8212ef1`. The next bounded slice makes Vehicle Permission Editor saves atomic and audited across general and column grants, in both UBS and HRMS web. It does not complete the role matrix, webhook secret protection, or Admin information architecture.
+
 ## Scope and issue accuracy
 
 - [#47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) remains the architecture and web-app completion programme. Its old linear sequence overstates the dependency on final production recovery; business-feature work can proceed with disposable UAT infrastructure.

@@ -85,12 +85,15 @@ export {
   getDefaultPermissionsForRole,
   getUserColumnPermissions,
   getUserPermissions,
+  getVehiclePermissionDraft,
+  saveVehiclePermissionDraft,
   setUserColumnPermissions,
 } from './permissionService';
 export type {
   ColumnPermission,
   PermissionLevel,
   UserPermissions,
+  VehiclePermissionDraft,
 } from './permissionService';
 export {
   changePassword,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Card, CardContent, CardDescription, CardHeader, CardTitle 
+  Card, CardContent, CardHeader, CardTitle
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,17 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { loggingService } from '@flc/platform-services';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  getUserPermissions, 
-  setUserColumnPermissions,
-  getUserColumnPermissions 
-} from '@flc/auth';
-import { useAuth } from '@/contexts/AuthContext';
+import { getVehiclePermissionDraft, saveVehiclePermissionDraft, type VehiclePermissionDraft } from '@flc/auth';
 import { User, Save, Eye, EyeOff, Edit, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { columnPermissionSchema, type ColumnPermissionFormData } from '@/lib/validations';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 
 interface PermissionEditorProps {
   userId: string;
@@ -61,8 +53,6 @@ const EXCEL_COLUMNS = [
   { key: 'remark', label: 'REMARK' },
 ];
 
-type PermissionLevel = 'none' | 'view' | 'edit';
-
 const PERMISSION_TEMPLATES = {
   full: EXCEL_COLUMNS.map(c => ({ column_name: c.key, permission_level: 'edit' as const })),
   readonly: EXCEL_COLUMNS.map(c => ({ column_name: c.key, permission_level: 'view' as const })),
@@ -75,45 +65,33 @@ const PERMISSION_TEMPLATES = {
 };
 
 export function PermissionEditor({ userId, userName, userRole, onSave, onCancel }: PermissionEditorProps) {
-  const { user: currentUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<VehiclePermissionDraft | null>(null);
+  const [draft, setDraft] = useState<VehiclePermissionDraft | null>(null);
 
-  const form = useForm<ColumnPermissionFormData>({
-    resolver: zodResolver(columnPermissionSchema),
-    defaultValues: {
-      column_key: '',
-      permission_level: 'none',
-    },
-  });
-
-  // Global permissions
-  const [canEdit, setCanEdit] = useState(false);
-  const [canBulkEdit, setCanBulkEdit] = useState(false);
-  const [canViewDetails, setCanViewDetails] = useState(true);
-
-  // Column permissions
-  const [columnPermissions, setColumnPermissions] = useState<Record<string, PermissionLevel>>({});
+  const unsavedChanges = !!snapshot && !!draft && (
+    snapshot.canEdit !== draft.canEdit ||
+    snapshot.canBulkEdit !== draft.canBulkEdit ||
+    snapshot.canViewDetails !== draft.canViewDetails ||
+    Object.keys({ ...snapshot.columns, ...draft.columns }).some(
+      key => (snapshot.columns[key] ?? 'none') !== (draft.columns[key] ?? 'none'),
+    )
+  );
 
   const loadPermissions = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const result = await getUserPermissions(userId);
-      setCanEdit(result.canEdit);
-      setCanBulkEdit(result.canBulkEdit);
-      setCanViewDetails(result.canViewDetails);
-
-      const columnPerms = await getUserColumnPermissions(userId);
-      if (columnPerms.length > 0) {
-        const perms: Record<string, PermissionLevel> = {};
-        columnPerms.forEach(p => {
-          perms[p.column_name] = p.permission_level as PermissionLevel;
-        });
-        setColumnPermissions(perms);
-      }
+      const result = await getVehiclePermissionDraft(userId);
+      setSnapshot(result);
+      setDraft(result);
     } catch (error) {
       loggingService.error('Error loading permissions', { error }, 'PermissionEditor');
+      setSnapshot(null);
+      setDraft(null);
+      setLoadError(error instanceof Error ? error.message : 'Unable to load permissions');
       toast.error('Failed to load permissions');
     } finally {
       setLoading(false);
@@ -126,46 +104,34 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
   }, [userId, loadPermissions]);
 
   const applyTemplate = (template: keyof typeof PERMISSION_TEMPLATES) => {
-    const newPerms: Record<string, PermissionLevel> = {};
-    EXCEL_COLUMNS.forEach(c => {
-      newPerms[c.key] = 'none';
+    setDraft(prev => {
+      if (!prev) return prev;
+      const columns = { ...prev.columns };
+      EXCEL_COLUMNS.forEach(column => { columns[column.key] = 'none'; });
+      PERMISSION_TEMPLATES[template].forEach(permission => {
+        columns[permission.column_name] = permission.permission_level;
+      });
+      return { ...prev, columns };
     });
-    PERMISSION_TEMPLATES[template].forEach(p => {
-      newPerms[p.column_name] = p.permission_level;
-    });
-    setColumnPermissions(newPerms);
-    setUnsavedChanges(true);
   };
 
   const handleUpdatePermission = (columnKey: string, permissionLevel: 'none' | 'view' | 'edit') => {
-    setColumnPermissions(prev => ({
+    setDraft(prev => prev ? {
       ...prev,
-      [columnKey]: permissionLevel,
-    }));
-    setUnsavedChanges(true);
-    form.setValue('column_key', columnKey);
-    form.setValue('permission_level', permissionLevel);
+      columns: { ...prev.columns, [columnKey]: permissionLevel },
+    } : prev);
   };
 
   const handleSave = async () => {
-    const isValid = form.formState.isValid;
-    if (!isValid) return;
+    if (!draft || !unsavedChanges) return;
 
     setSaving(true);
     try {
-      // Save column permissions
-      const permissions = Object.entries(columnPermissions)
-        .filter(([_, level]) => level !== 'none')
-        .map(([column, level]) => ({ column_name: column, permission_level: level }));
-
-      const { error } = await setUserColumnPermissions(userId, permissions, 'vehicles', {
-        actorId: currentUser?.id,
-        companyId: currentUser?.companyId ?? currentUser?.company_id,
-      });
+      const { error } = await saveVehiclePermissionDraft(userId, draft);
       if (error) throw error;
 
       toast.success('Permissions updated successfully');
-      setUnsavedChanges(false);
+      setSnapshot(draft);
       onSave?.();
     } catch (error) {
       loggingService.error('Error saving permissions', { error }, 'PermissionEditor');
@@ -188,6 +154,15 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
     );
   }
 
+  if (loadError || !draft) {
+    return (
+      <Card><CardContent className="flex items-center justify-between gap-3 p-6">
+        <span role="alert">{loadError ?? 'Unable to load permissions'}</span>
+        <Button variant="outline" onClick={loadPermissions}>Retry</Button>
+      </CardContent></Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -197,9 +172,9 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
               <User className="h-5 w-5" />
               {userName}
             </CardTitle>
-            <CardDescription>
+            <div className="text-sm text-muted-foreground">
               Role: <Badge variant="outline">{userRole}</Badge>
-            </CardDescription>
+            </div>
           </div>
           {unsavedChanges && (
             <div className="flex items-center gap-2 text-amber-600">
@@ -238,7 +213,7 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
             <ScrollArea className="h-[400px] border rounded-md">
               <div className="p-4 space-y-2">
                 {EXCEL_COLUMNS.map(column => {
-                  const level = columnPermissions[column.key] || 'none';
+                  const level = draft.columns[column.key] || 'none';
                   return (
                     <div key={column.key} className="flex items-center gap-4 p-2 hover:bg-secondary/50 rounded">
                       <div className="flex-1 font-medium text-sm">{column.label}</div>
@@ -288,8 +263,8 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
                   </p>
                 </div>
                 <Switch
-                  checked={canEdit}
-                  onCheckedChange={setCanEdit}
+                  checked={draft.canEdit}
+                  onCheckedChange={canEdit => setDraft(prev => prev ? { ...prev, canEdit } : prev)}
                 />
               </div>
 
@@ -301,8 +276,8 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
                   </p>
                 </div>
                 <Switch
-                  checked={canBulkEdit}
-                  onCheckedChange={setCanBulkEdit}
+                  checked={draft.canBulkEdit}
+                  onCheckedChange={canBulkEdit => setDraft(prev => prev ? { ...prev, canBulkEdit } : prev)}
                 />
               </div>
 
@@ -314,8 +289,8 @@ export function PermissionEditor({ userId, userName, userRole, onSave, onCancel 
                   </p>
                 </div>
                 <Switch
-                  checked={canViewDetails}
-                  onCheckedChange={setCanViewDetails}
+                  checked={draft.canViewDetails}
+                  onCheckedChange={canViewDetails => setDraft(prev => prev ? { ...prev, canViewDetails } : prev)}
                 />
               </div>
             </div>
