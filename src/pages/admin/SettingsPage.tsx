@@ -5,13 +5,13 @@ import { useBlocker } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { NotificationSettings } from '@/components/shared/NotificationSettings';
 import { useAuth } from '@/contexts/AuthContext';
-import { changePassword, listProfiles, updateProfile, type ProfileRow } from '@flc/auth';
+import { changePassword, listProfiles, updateOwnProfile, updateProfile, type ProfileRow } from '@flc/auth';
 import { saveBranding, uploadBrandingAsset } from '@flc/platform-services';
 import { useBranding } from '@/contexts/BrandingContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { getBranches } from '@/services/masterDataService';
-import { DEFAULT_APP_ROLE, type AppRole, type BranchRecord } from '@/types';
+import { type AppRole } from '@/types';
 import { profileUpdateSchema, type ProfileUpdateFormData, changePasswordSchema, type ChangePasswordFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -41,9 +41,7 @@ export default function SettingsPage() {
   const { branding, refresh: refreshBranding } = useBranding();
   const { modules, setModuleActive, canManageModules, loading: modulesLoading } = useModuleAccess();
   const isAdmin = user?.role === 'super_admin' || user?.role === 'company_admin';
-  const [branchId, setBranchId] = useState<string>('none');
   const [saving, setSaving] = useState(false);
-  const [branches, setBranches] = useState<BranchRecord[]>([]);
   const [changingPassword, setChangingPassword] = useState(false);
   const [updatingModuleId, setUpdatingModuleId] = useState<string | null>(null);
 
@@ -82,8 +80,6 @@ export default function SettingsPage() {
     resolver: zodResolver(profileUpdateSchema),
     defaultValues: {
       name: user?.name || '',
-      role: user?.role || DEFAULT_APP_ROLE,
-      branch_id: user?.branch_id || null,
     },
     mode: 'onChange',
   });
@@ -95,10 +91,7 @@ export default function SettingsPage() {
     if (user && !form.formState.isDirty) {
       form.reset({
         name: user.name || '',
-        role: user.role || DEFAULT_APP_ROLE,
-        branch_id: user.branch_id || null,
       });
-      setBranchId(user.branch_id || 'none');
     }
   }, [user, form]);
 
@@ -111,16 +104,12 @@ export default function SettingsPage() {
       form.formState.isDirty && currentLocation.pathname !== nextLocation.pathname,
   );
 
-  const { data: fetchedBranches = [] } = useQuery({
+  const { data: branches = [] } = useQuery({
     queryKey: ['branches', user?.company_id],
     queryFn: () => getBranches(user!.company_id || '').then(r => r.data),
     enabled: !!user?.company_id,
     staleTime: STALE.reference,
   });
-
-  useEffect(() => {
-    setBranches(fetchedBranches);
-  }, [fetchedBranches]);
 
   const { data: fetchedProfiles = [], isLoading: profilesLoading } = useQuery({
     queryKey: ['profiles', isAdmin ? (user?.role === 'super_admin' ? 'all' : user?.company_id) : null],
@@ -180,14 +169,7 @@ export default function SettingsPage() {
   const handleSave = async (data: ProfileUpdateFormData) => {
     if (!user) return;
     setSaving(true);
-    const { error } = await updateProfile({
-      id: user.id,
-      name: data.name,
-      branch_id: data.branch_id,
-    }, {
-      actorId: user.id,
-      companyId: user.company_id,
-    });
+    const { error } = await updateOwnProfile(data.name);
 
     if (error) {
       toast.error('Failed to update profile: ' + error);
@@ -311,8 +293,6 @@ export default function SettingsPage() {
             form={form}
             user={user}
             branches={branches}
-            branchId={branchId}
-            setBranchId={setBranchId}
             branding={branding}
             saving={saving}
             onSave={handleSave}

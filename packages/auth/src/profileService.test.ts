@@ -7,6 +7,7 @@ type QueuedResult = {
 
 const queuedResults: QueuedResult[] = [];
 const updateCalls: Array<{ table: string; values: unknown }> = [];
+const eqCalls: Array<{ table: string; column: string; value: unknown }> = [];
 const functionInvocations: Array<{ name: string; body: unknown }> = [];
 
 function queueResolves(...results: QueuedResult[]) {
@@ -22,7 +23,10 @@ vi.mock('@flc/supabase', () => {
     const proxy: Record<string, unknown> = {};
 
     proxy.select = (..._args: unknown[]) => proxy;
-    proxy.eq = (..._args: unknown[]) => proxy;
+    proxy.eq = (column: string, value: unknown) => {
+      eqCalls.push({ table, column, value });
+      return proxy;
+    };
     proxy.or = (..._args: unknown[]) => proxy;
     proxy.order = (..._args: unknown[]) => proxy;
     proxy.single = () => Promise.resolve(drainResolve());
@@ -47,6 +51,9 @@ vi.mock('@flc/supabase', () => {
           return Promise.resolve(drainResolve());
         },
       },
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null }),
+      },
     },
   };
 });
@@ -55,11 +62,12 @@ vi.mock('@flc/platform-services', () => ({
   logUserAction: vi.fn().mockResolvedValue({ error: null }),
 }));
 
-import { deactivateUser, deleteInvitedUser, inviteUser, listProfiles, reactivateUser, updateOwnProfileName, updateProfile } from './profileService';
+import { deactivateUser, deleteInvitedUser, inviteUser, listProfiles, reactivateUser, updateOwnProfile, updateOwnProfileName, updateProfile } from './profileService';
 
 beforeEach(() => {
   queuedResults.length = 0;
   updateCalls.length = 0;
+  eqCalls.length = 0;
   functionInvocations.length = 0;
   vi.clearAllMocks();
 });
@@ -247,6 +255,19 @@ describe('account status actions', () => {
 });
 
 describe('updateOwnProfileName', () => {
+  it('sends only a display name during self-service editing', async () => {
+    queueResolves({ data: { id: 'user-1' }, error: null });
+
+    const result = await updateOwnProfileName('user-1', 'Updated User');
+
+    expect(result.error).toBeNull();
+    expect(updateCalls[0]).toMatchObject({ table: 'profiles' });
+    expect(updateCalls[0].values).toEqual({
+      name: 'Updated User',
+      updated_at: expect.any(String),
+    });
+  });
+
   it('activates a pending invited profile when requested', async () => {
     queueResolves({ data: { id: 'user-1' }, error: null });
 
@@ -257,5 +278,21 @@ describe('updateOwnProfileName', () => {
       table: 'profiles',
       values: expect.objectContaining({ name: 'Invited User', status: 'active' }),
     });
+  });
+});
+
+describe('updateOwnProfile', () => {
+  it('uses the signed-in user and sends only a display name', async () => {
+    queueResolves({ data: { id: 'user-1' }, error: null });
+
+    const result = await updateOwnProfile('Updated User');
+
+    expect(result.error).toBeNull();
+    expect(updateCalls[0]).toMatchObject({ table: 'profiles' });
+    expect(updateCalls[0].values).toEqual({
+      name: 'Updated User',
+      updated_at: expect.any(String),
+    });
+    expect(eqCalls).toContainEqual({ table: 'profiles', column: 'id', value: 'user-1' });
   });
 });
