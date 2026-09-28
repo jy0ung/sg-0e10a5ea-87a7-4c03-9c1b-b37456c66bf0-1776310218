@@ -73,6 +73,9 @@ const cleanup = {
   invoiceIds: [] as string[],
   eventIds:   [] as string[],
   poIds: [] as string[],
+  journalIds: [] as string[],
+  periodIds: [] as string[],
+  accountIds: [] as string[],
 };
 
 // Seed a purchase invoice and return its id.
@@ -125,6 +128,10 @@ describeIfLive('AP Foundation RPCs', () => {
   });
 
   afterAll(async () => {
+    if (cleanup.journalIds.length > 0) {
+      await svc.from('audit_logs').delete().in('entity_id', cleanup.journalIds);
+      await svc.from('journal_entries').delete().in('id', cleanup.journalIds);
+    }
     if (cleanup.eventIds.length > 0) {
       await svc.from('supplier_payment_events').delete().in('id', cleanup.eventIds);
     }
@@ -133,6 +140,12 @@ describeIfLive('AP Foundation RPCs', () => {
     }
     if (cleanup.poIds.length > 0) {
       await svc.from('purchase_orders').delete().in('id', cleanup.poIds);
+    }
+    if (cleanup.periodIds.length > 0) {
+      await svc.from('accounting_periods').delete().in('id', cleanup.periodIds);
+    }
+    if (cleanup.accountIds.length > 0) {
+      await svc.from('accounts').delete().in('id', cleanup.accountIds);
     }
     if (userAOriginalRole) {
       await svc.from('profiles').update({ role: userAOriginalRole }).eq('id', userA.userId);
@@ -421,5 +434,107 @@ describeIfLive('AP Foundation RPCs', () => {
       p_id: piId, p_target_status: 'approved', p_actor_id: userA.userId,
     });
     expect(foreignApproval.error?.message).toContain('Linked PO must belong to invoice company');
+  });
+
+  it('posts an AP payment once, balances the journal, and blocks posted reversals', async () => {
+    for (const account of [
+      { code: '2100', name: 'Accounts Payable', type: 'liability' },
+      { code: '1000', name: 'Cash and Bank', type: 'asset' },
+    ]) {
+      const { data: existing } = await svc.from('accounts').select('id')
+        .eq('company_id', userA.companyId).eq('code', account.code).maybeSingle();
+      if (!existing) {
+        const { data: created, error } = await svc.from('accounts').insert({
+          company_id: userA.companyId, ...account, is_system: true, is_active: true,
+        }).select('id').single();
+        if (error || !created) throw new Error(error?.message ?? 'Account insert failed');
+        cleanup.accountIds.push(created.id);
+      }
+    }
+    const now = new Date();
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+    const { data: period, error: periodError } = await svc.from('accounting_periods').insert({
+      company_id: userA.companyId, name: `AP Posting ${Date.now()}`,
+      period_year: now.getUTCFullYear(), period_month: now.getUTCMonth() + 1,
+      start_date: start, end_date: end, status: 'open',
+    }).select('id').single();
+    if (periodError || !period) throw new Error(periodError?.message ?? 'Period insert failed');
+    cleanup.periodIds.push(period.id);
+
+    const invoiceId = await seedInvoice(userA.companyId, { lifecycleStatus: 'approved' });
+    const payment = await userA.client.rpc('record_supplier_payment_event', {
+      p_purchase_invoice_id: invoiceId, p_amount: 100_000,
+      p_payment_date: now.toISOString().slice(0, 10),
+    });
+    expect(payment.error).toBeNull();
+    const eventId = payment.data as string;
+    cleanup.eventIds.push(eventId);
+
+    const before = await userA.client.rpc('get_period_close_unposted', {
+      p_company_id: userA.companyId, p_period_id: period.id,
+    });
+    expect(before.error).toBeNull();
+    expect((before.data as Array<{ event_id: string }>).some(row => row.event_id === eventId)).toBe(true);
+    const denied = await userB.client.rpc('post_ap_payment_to_gl', {
+      p_supplier_payment_event_id: eventId,
+    });
+    expect(denied.error?.message).toContain('Not authorized');
+
+    const posted = await userA.client.rpc('post_ap_payment_to_gl', {
+      p_supplier_payment_event_id: eventId,
+    });
+    expect(posted.error).toBeNull();
+    const journalId = posted.data as string;
+    cleanup.journalIds.push(journalId);
+    const replay = await userA.client.rpc('post_ap_payment_to_gl', {
+      p_supplier_payment_event_id: eventId,
+    });
+    expect(replay.error).toBeNull();
+    expect(replay.data).toBe(journalId);
+    const { data: lines } = await svc.from('journal_entry_lines')
+      .select('debit,credit').eq('journal_entry_id', journalId);
+    expect(lines).toHaveLength(2);
+    expect(lines?.reduce((sum, row) => sum + Number(row.debit), 0)).toBe(100_000);
+    expect(lines?.reduce((sum, row) => sum + Number(row.credit), 0)).toBe(100_000);
+
+    const reversal = await userA.client.rpc('reverse_supplier_payment_event', { p_event_id: eventId });
+    expect(reversal.error?.message).toContain('Finance correction');
+    const after = await userA.client.rpc('get_period_close_unposted', {
+      p_company_id: userA.companyId, p_period_id: period.id,
+    });
+    expect((after.data as Array<{ event_id: string }>).some(row => row.event_id === eventId)).toBe(false);
+    const summaryBeforeReversal = await userA.client.rpc('get_period_close_summary', {
+      p_company_id: userA.companyId, p_period_id: period.id,
+    });
+    const unpostedCountBefore = (summaryBeforeReversal.data as Array<{ unposted_ap_payment_count: number }>)[0]?.unposted_ap_payment_count;
+    // A payment reversed before posting has no net GL settlement to post.
+    {
+      const periodId = period.id;
+      const invoiceId = await seedInvoice(userA.companyId, { lifecycleStatus: 'approved' });
+      const payment = await userA.client.rpc('record_supplier_payment_event', {
+        p_purchase_invoice_id: invoiceId, p_amount: 10_000,
+        p_payment_date: new Date().toISOString().slice(0, 10),
+      });
+      expect(payment.error).toBeNull();
+      const eventId = payment.data as string;
+      cleanup.eventIds.push(eventId);
+      const reversed = await userA.client.rpc('reverse_supplier_payment_event', { p_event_id: eventId });
+      expect(reversed.error).toBeNull();
+      cleanup.eventIds.push(reversed.data as string);
+      const posting = await userA.client.rpc('post_ap_payment_to_gl', {
+        p_supplier_payment_event_id: eventId,
+      });
+      expect(posting.error?.message).toContain('Reversed supplier payment');
+      const unposted = await userA.client.rpc('get_period_close_unposted', {
+        p_company_id: userA.companyId, p_period_id: periodId,
+      });
+      expect((unposted.data as Array<{ event_id: string }>).some(row => row.event_id === eventId)).toBe(false);
+      const summary = await userA.client.rpc('get_period_close_summary', {
+        p_company_id: userA.companyId, p_period_id: periodId,
+      });
+      expect(summary.error).toBeNull();
+      expect((summary.data as Array<{ unposted_ap_payment_count: number }>)[0]?.unposted_ap_payment_count).toBe(unpostedCountBefore);
+    }
   });
 });

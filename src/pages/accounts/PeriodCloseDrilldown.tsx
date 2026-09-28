@@ -1,15 +1,18 @@
 import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { ScrollableRegion } from '@/components/shared/ScrollableRegion';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCompanyId } from '@/hooks/useCompanyId';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
-import { listAccountingPeriods, getPeriodCloseSummary, getPeriodCloseUnposted } from '@/services/glService';
+import { listAccountingPeriods, getPeriodCloseSummary, getPeriodCloseUnposted, postApPaymentToGl } from '@/services/glService';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
 import { FeatureUnavailableState } from '@/components/shared/FeatureUnavailableState';
-import { AlertTriangle, CheckCircle2, Lock } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Lock, BookCheck } from 'lucide-react';
 
 function fmt(n: number) {
   return n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -17,9 +20,14 @@ function fmt(n: number) {
 
 export default function PeriodCloseDrilldown() {
   const companyId = useCompanyId();
+  const { hasRole } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const canUseReports = useFeatureFlag('phase3b.financial-reports-v2', false);
+  const canPostAp = hasRole(['super_admin', 'company_admin', 'director', 'general_manager', 'accounts']);
 
   const [periodId, setPeriodId] = useState<string>('');
+  const [postingId, setPostingId] = useState<string | null>(null);
 
   const { data: periods = [], isLoading: periodsLoading } = useQuery({
     queryKey: ['accounting_periods', companyId],
@@ -62,6 +70,20 @@ export default function PeriodCloseDrilldown() {
   });
 
   const summary = summaryQuery.data ?? null;
+
+  const postAp = async (eventId: string) => {
+    if (postingId) return;
+    setPostingId(eventId);
+    const { error } = await postApPaymentToGl(eventId);
+    setPostingId(null);
+    if (error) {
+      toast({ title: 'AP posting failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Supplier payment posted to the General Ledger' });
+    void queryClient.invalidateQueries({ queryKey: ['period_close_summary', companyId, periodId] });
+    void queryClient.invalidateQueries({ queryKey: ['period_close_unposted', companyId, periodId] });
+  };
 
   const isReady = useMemo(() => {
     if (!summary) return false;
@@ -193,6 +215,7 @@ export default function PeriodCloseDrilldown() {
                           <th className="px-4 py-2 text-left font-medium text-muted-foreground">Reference</th>
                           <th className="px-4 py-2 text-right font-medium text-muted-foreground">Amount (RM)</th>
                           <th className="px-4 py-2 text-left font-medium text-muted-foreground">Event ID</th>
+                          {canPostAp && <th className="px-4 py-2 text-right font-medium text-muted-foreground">Action</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -207,6 +230,15 @@ export default function PeriodCloseDrilldown() {
                             <td className="px-4 py-2.5">{row.reference ?? <span className="text-muted-foreground">—</span>}</td>
                             <td className="px-4 py-2.5 text-right tabular-nums font-medium">{fmt(row.amount)}</td>
                             <td className="px-4 py-2.5 font-mono text-[10px] text-muted-foreground">{row.eventId}</td>
+                            {canPostAp && <td className="px-4 py-2.5 text-right">
+                              {row.kind === 'ap_payment' && summary.periodStatus === 'open' && (
+                                <Button size="sm" variant="outline" disabled={!!postingId}
+                                  onClick={() => void postAp(row.eventId)}>
+                                  <BookCheck className="mr-1.5 h-3.5 w-3.5" />
+                                  {postingId === row.eventId ? 'Posting…' : 'Post to GL'}
+                                </Button>
+                              )}
+                            </td>}
                           </tr>
                         ))}
                       </tbody>
