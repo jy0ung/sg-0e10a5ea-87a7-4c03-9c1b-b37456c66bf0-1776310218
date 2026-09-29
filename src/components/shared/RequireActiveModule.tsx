@@ -57,7 +57,7 @@ export function RequireActiveModule({ moduleId, children }: RequireActiveModuleP
           </Button>
           {canManageModules && (
             <Button asChild variant="outline">
-              <Link to="/admin/settings">
+              <Link to="/admin/modules">
                 <Settings2 className="h-4 w-4 mr-2" />
                 Manage Module Access
               </Link>

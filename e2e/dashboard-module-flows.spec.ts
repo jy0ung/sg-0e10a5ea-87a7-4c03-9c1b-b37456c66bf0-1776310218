@@ -55,10 +55,8 @@ async function setupModuleSettingsMocks(page: Page) {
 test('deactivated modules disappear from Home and guard direct routes', async ({ page }) => {
   const { moduleSettings } = await setupModuleSettingsMocks(page);
 
-  await page.goto('/admin/settings');
-  await expect(page.getByRole('heading', { name: /settings/i })).toBeVisible({ timeout: 10000 });
-
-  await page.getByRole('tab', { name: 'Modules' }).click();
+  await page.goto('/admin/modules');
+  await expect(page.getByRole('heading', { name: 'Modules', exact: true })).toBeVisible({ timeout: 10000 });
   await expect(page.getByRole('heading', { name: /module availability/i })).toBeVisible();
 
   const salesToggle = page.getByRole('switch', { name: 'Toggle Sales Intelligence' });
@@ -71,10 +69,14 @@ test('deactivated modules disappear from Home and guard direct routes', async ({
   // Home no longer surfaces the deactivated module as an active card.
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('link', { name: /sales overview/i })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Administration/ }).click();
+  await expect(page).toHaveURL(/\/admin$/);
 
   // Direct route is guarded with a "coming soon" surface that links back to Home.
   await page.goto('/sales');
   await expect(page.getByRole('heading', { name: /coming soon/i })).toBeVisible();
   await expect(page.getByText(/currently disabled for your company/i)).toBeVisible();
   await expect(page.getByRole('link', { name: /back to home/i })).toBeVisible();
+  await page.getByRole('link', { name: 'Manage Module Access' }).click();
+  await expect(page).toHaveURL(/\/admin\/modules$/);
 });

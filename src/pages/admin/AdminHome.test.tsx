@@ -28,6 +28,7 @@ describe('AdminHome', () => {
     expect(screen.getByRole('heading', { name: 'Administration' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Users' })).toHaveAttribute('href', '/admin/users');
     expect(screen.getByRole('link', { name: 'Roles & Permissions' })).toHaveAttribute('href', '/admin/roles');
+    expect(screen.getByRole('link', { name: 'Modules' })).toHaveAttribute('href', '/admin/modules');
     expect(screen.getByRole('link', { name: 'System Health' })).toHaveAttribute('href', '/admin/health');
     expect(screen.queryByRole('link', { name: 'Backup & Recovery' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Webhook Outbox' })).not.toBeInTheDocument();
@@ -41,6 +42,7 @@ describe('AdminHome', () => {
     expect(screen.getByRole('link', { name: 'System Health' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Roles & Permissions' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Modules' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Webhook Outbox' })).not.toBeInTheDocument();
   });
 });
