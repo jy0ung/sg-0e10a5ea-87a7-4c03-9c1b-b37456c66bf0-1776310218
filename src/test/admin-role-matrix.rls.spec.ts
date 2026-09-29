@@ -87,8 +87,20 @@ live('Admin role matrix transaction', () => {
       p_matrix: { ...matrix, manager: ['Invented Section'] },
     });
     expect(invalid.error?.message).toContain('Invalid role matrix section');
+    const lockout = await admin.rpc('save_role_section_matrix', {
+      p_company_id: companyId, p_expected_version: baseVersion + 1,
+      p_matrix: { ...matrix, super_admin: matrix.super_admin.filter((section: string) => section !== 'Admin') },
+    });
+    expect(lockout.error?.message).toContain('Administrator roles must retain Admin access');
+    const companyLockout = await admin.rpc('save_role_section_matrix', {
+      p_company_id: companyId, p_expected_version: baseVersion + 1,
+      p_matrix: { ...matrix, company_admin: matrix.company_admin.filter((section: string) => section !== 'Admin') },
+    });
+    expect(companyLockout.error?.message).toContain('Administrator roles must retain Admin access');
     const afterFailures = await admin.rpc('get_role_section_matrix', { p_company_id: companyId });
     expect(afterFailures.data.version).toBe(baseVersion + 1);
+    expect(afterFailures.data.matrix.super_admin).toContain('Admin');
+    expect(afterFailures.data.matrix.company_admin).toContain('Admin');
     const audits = await svc.from('audit_logs').select('changes')
       .eq('entity_type', 'role_section_matrix').eq('user_id', actorId);
     expect(audits.data?.some(row => (row.changes as Record<string, unknown>)?.version === baseVersion + 1)).toBe(true);

@@ -49,4 +49,26 @@ describe('RoleManagementPanel', () => {
     await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1));
     expect(mocks.save).toHaveBeenCalledWith('company-1', 1, expect.objectContaining({ manager: [] }));
   });
+
+  it('retains administrator recovery access during bulk Admin toggles', async () => {
+    mocks.fetch.mockResolvedValue({ data: { version: 7, matrix: DEFAULT_ROLE_SECTIONS }, error: null });
+    mocks.save.mockResolvedValue({ version: 8, error: null });
+    renderPanel();
+    const required = await screen.findByRole('button', { name: 'Super Admin - Admin: required' });
+    await waitFor(() => expect(screen.getByTitle('Toggle eligible roles for Admin; administrator roles retain access')).toBeEnabled());
+    expect(required).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Company Admin - Admin: required' })).toBeDisabled();
+    const bulkToggle = screen.getByTitle('Toggle eligible roles for Admin; administrator roles retain access');
+    fireEvent.click(bulkToggle);
+    fireEvent.click(bulkToggle);
+    fireEvent.click(screen.getByTitle('Toggle all for Super Admin'));
+    expect(screen.getByRole('button', { name: 'Super Admin - Admin: required' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Company Admin - Admin: required' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Super Admin - Sales: denied' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith('company-1', 7, expect.objectContaining({
+      super_admin: expect.arrayContaining(['Admin']),
+      company_admin: expect.arrayContaining(['Admin']),
+    })));
+  });
 });
