@@ -99,6 +99,7 @@ const SettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
 const MyAccountPage = lazy(() => import("./pages/profile/MyAccountPage"));
 const AdminHome = lazy(() => import("./pages/admin/AdminHome"));
 const AdminRoles = lazy(() => import("./pages/admin/AdminRoles"));
+const AdminModules = lazy(() => import("./pages/admin/AdminModules"));
 const SalesDashboard = lazy(() => import("./pages/sales/SalesDashboard"));
 const DealPipeline = lazy(() => import("./pages/sales/DealPipeline"));
 const DealList = lazy(() => import("./pages/sales/DealList"));
@@ -317,6 +318,7 @@ const router = createBrowserRouter([
       { path: "admin/reconciliation/:matchId", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Reconciliation Match"><S><ReconciliationDetail /></S></R></RequireRole> },
       { path: "admin/users", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Users"><S><UserManagement /></S></R></RequireRole> },
       { path: "admin/roles", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Roles & Permissions"><S><AdminRoles /></S></R></RequireRole> },
+      { path: "admin/modules", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Modules"><S><AdminModules /></S></R></RequireRole> },
       { path: "admin/audit", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Audit Log"><S><AuditLog /></S></R></RequireRole> },
       { path: "admin/health", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="System Health"><S><SystemHealth /></S></R></RequireRole> },
       { path: "admin/backup-recovery", element: <RequireRole roles={['super_admin']} section="Admin"><R scope="Backup & Recovery"><S><BackupRecovery /></S></R></RequireRole> },

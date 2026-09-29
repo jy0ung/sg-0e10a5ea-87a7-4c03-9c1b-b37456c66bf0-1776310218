@@ -18,6 +18,8 @@
 
 **Roles route follow-up:** PR #115 merged at `e8b0d27`. A recovery-invariant slice now prevents role-matrix edits from removing Admin access from the Super Admin and Company Admin roles and repairs any existing denied rows while advancing the version. This addresses a confirmed UI lockout path; it does not establish the reported general form-loss root cause.
 
+**Role recovery follow-up:** PR #116 merged at `206a87e`. The next bounded Admin slice adds a dedicated Modules route, points the Home Administration card to `/admin`, and sends disabled-module administrators to the new controls. Organization/Branding and operational workbench data remain open.
+
 ## Scope and issue accuracy
 
 - [#47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) remains the architecture and web-app completion programme. Its old linear sequence overstates the dependency on final production recovery; business-feature work can proceed with disposable UAT infrastructure.

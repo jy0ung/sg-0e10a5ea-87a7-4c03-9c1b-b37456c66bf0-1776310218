@@ -22,6 +22,8 @@ The dedicated `/admin/roles` slice reuses the versioned role-matrix editor and i
 
 The recovery-invariant follow-up reserves Admin section access for the Super Admin and Company Admin roles, which are the roles allowed to open the role editor. A migration repairs any already-denied rows and advances each affected company's matrix version once; the RPC rejects future matrices that remove this access. The editor disables the reserved cells and preserves them during bulk changes. Other role/section grants remain configurable. The migration repair has no signed-in actor, so it is documented as a system migration rather than attributed to a user audit row.
 
+The Modules navigation slice gives company and super admins a dedicated `/admin/modules` page using the existing module-access context and RLS-backed upsert path. The Home Administration card opens `/admin` only when the signed-in role and section matrix permit that route, and the disabled-module recovery link opens `/admin/modules`. Legacy Settings remains usable for bookmarked administrators until the Organization/Branding split is complete.
+
 Migration/compatibility: the new RPC and grants are additive; revoking direct column-permission writes intentionally makes a cached old editor fail closed until it reloads the updated client. The legacy package service delegates Vehicle saves to the new command, preserving in-repository callers. A rollback of the client alone would leave the old editor unable to save; any rollback must keep the new client contract or restore direct grants through a reviewed migration. Disposable Supabase tests cover the new write path and denial of direct writes.
 
 ## Executive summary

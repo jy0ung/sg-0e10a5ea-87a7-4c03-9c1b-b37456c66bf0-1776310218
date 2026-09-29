@@ -10,6 +10,8 @@ import { EmptyState, PageErrorState } from '@/components/shared/PageState';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModuleAccess } from '@/contexts/ModuleAccessContext';
+import { useRoleSectionMatrix } from '@/hooks/usePermissions';
+import { canAccessSection } from '@flc/auth';
 import { useHrmsAccess } from '@/hooks/useHrmsAccess';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { getRoleHomeKpis, type RoleHomeKpi } from '@/services/kpiHomeService';
@@ -109,12 +111,15 @@ export default function Home() {
   const navigate = useNavigate();
   const { user, hasRole } = useAuth();
   const { modules, loading: modulesLoading } = useModuleAccess();
+  const roleSections = useRoleSectionMatrix();
   const hrmsAccess = useHrmsAccess();
   const canUseInbox = useFeatureFlag('phase4.unified-inbox', false);
 
   const companyId = user?.companyId ?? '';
   const role = user?.role ?? 'creator_updater';
   const includeReconciliation = hasRole(['super_admin', 'company_admin', 'director']);
+  const canOpenAdministration = hasRole(['super_admin', 'company_admin', 'director', 'general_manager'])
+    && canAccessSection(user, roleSections, 'Admin');
 
   const kpiQuery = useQuery({
     queryKey: ['role-home-kpis', companyId, role],
@@ -195,17 +200,21 @@ export default function Home() {
     staleTime: 30_000,
   });
 
+  const availableModules = useMemo(
+    () => modules.filter(module => module.id !== 'admin' || canOpenAdministration),
+    [modules, canOpenAdministration],
+  );
   const moduleById = useMemo(
-    () => Object.fromEntries(modules.map(m => [m.id, m])),
-    [modules],
+    () => Object.fromEntries(availableModules.map(m => [m.id, m])),
+    [availableModules],
   );
   const roadmapModules = useMemo(
-    () => modules.filter(m => m.status !== 'active'),
-    [modules],
+    () => availableModules.filter(m => m.status !== 'active'),
+    [availableModules],
   );
   const activeModuleCount = useMemo(
-    () => modules.filter(m => m.status === 'active').length,
-    [modules],
+    () => availableModules.filter(m => m.status === 'active').length,
+    [availableModules],
   );
 
   function openModule(path?: string) {

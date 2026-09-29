@@ -93,6 +93,9 @@ test.describe("Platform", () => {
     await expect(page).toHaveURL(/\/profile$/);
     await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
     await expect(page.getByLabel('Display Name')).toBeVisible();
+    await page.goto('/home', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: 'People & Administration' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Administration/ })).toHaveCount(0);
   });
 });
 

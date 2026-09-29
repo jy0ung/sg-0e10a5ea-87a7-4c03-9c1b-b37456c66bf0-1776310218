@@ -37,6 +37,7 @@ describe('platformRegistry', () => {
       '/admin/settings',
       '/admin/health',
       '/admin/roles',
+      '/admin/modules',
     ]));
     expect(MAIN_NAV_ROUTES.map((route) => route.path)).not.toContain('/hrms/');
   });
