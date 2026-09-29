@@ -205,6 +205,7 @@ export function useMainAppShellConfig() {
   const focusedSection = isFocused ? getFocusedPlatformSection(pathname) : null;
 
   const sectionIsVisible = (section: MainSectionDef) => {
+    if (section.name === 'Admin' && !hasRole(['super_admin', 'company_admin', 'director', 'general_manager'])) return false;
     const moduleId = getModuleIdForSection(section.name);
     return !moduleId || isModuleActive(moduleId);
   };
@@ -222,10 +223,6 @@ export function useMainAppShellConfig() {
 
   const sections = visibleSections
     .map((section): AppShellNavSection => {
-      const sectionPath = section.name === 'Admin'
-        && hasRole(['super_admin', 'company_admin', 'director', 'general_manager'])
-        ? '/admin'
-        : section.path;
       const items = navItems
         .filter((item) => item.section === section.name)
         .filter(itemIsVisible)
@@ -237,11 +234,11 @@ export function useMainAppShellConfig() {
       return {
         name: section.name,
         icon: section.icon,
-        path: sectionPath,
-        href: section.external && sectionPath ? resolveNavigationHref(sectionPath) : undefined,
+        path: section.path,
+        href: section.external && section.path ? resolveNavigationHref(section.path) : undefined,
         external: section.external,
         items,
-        showItems: !sectionPath || (isFocused && focusedSection === section.name),
+        showItems: !section.path || (isFocused && focusedSection === section.name),
         showGroupLabels: true,
       };
     })

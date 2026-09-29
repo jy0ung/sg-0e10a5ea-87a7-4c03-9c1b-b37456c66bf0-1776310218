@@ -146,7 +146,7 @@ export const PLATFORM_SECTIONS: readonly PlatformSectionDefinition[] = [
   { name: 'Accounts', icon: 'landmark', path: '/accounts/chart' },
   { name: 'Reports', icon: 'bar-chart', path: '/reports', moduleGate: 'reports' },
   { name: 'HRMS', icon: 'briefcase', path: '/hrms/', moduleGate: 'hrms', external: true },
-  { name: 'Admin', icon: 'shield', path: '/admin/settings', moduleGate: 'admin' },
+  { name: 'Admin', icon: 'shield', path: '/admin', moduleGate: 'admin' },
   { name: 'Internal Requests', icon: 'headphones', path: '/portal', moduleGate: 'support' },
 ] as const;
 
@@ -156,6 +156,9 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
   { id: 'platform-home', label: 'Home', path: '/home', shell: 'main', section: 'Platform', icon: 'layout-dashboard', end: true, navShell: 'main', smoke: { app: 'main' } },
   { id: 'platform-inbox', label: 'Inbox', path: '/inbox', shell: 'main', section: 'Platform', icon: 'inbox', navShell: 'main', featureFlag: 'phase4.unified-inbox', smoke: { app: 'main' } },
   { id: 'platform-notifications', label: 'Notifications', path: '/notifications', shell: 'main', section: 'Platform', icon: 'bell', navShell: 'main', smoke: { app: 'main' } },
+  { id: 'account-profile', label: 'My Profile', path: '/profile', shell: 'main', section: 'Platform', icon: 'user-check', smoke: { app: 'main' } },
+  { id: 'account-security', label: 'Security', path: '/profile/security', shell: 'main', section: 'Platform', icon: 'shield', smoke: { app: 'main' } },
+  { id: 'account-notifications', label: 'Notification Preferences', path: '/profile/notifications', shell: 'main', section: 'Platform', icon: 'bell', smoke: { app: 'main' } },
   { id: 'platform-internal-requests-shortcut', label: 'Internal Requests', path: '/portal/tickets/new', shell: 'portal', section: 'Platform', icon: 'headphones', moduleGate: 'support', navShell: 'main' },
 
   { id: 'portal-new-request', label: 'New Ticket', path: '/portal/tickets/new', shell: 'portal', section: 'Internal Requests', icon: 'headphones', moduleGate: 'support', smoke: { app: 'main' } },
@@ -222,7 +225,7 @@ export const PLATFORM_ROUTES: readonly PlatformRouteDefinition[] = [
   { id: 'hrms-open-workspace', label: 'Open HRMS Workspace', path: '/hrms/', shell: 'hrms', section: 'HRMS', icon: 'briefcase', group: 'Workspace', external: true, moduleGate: 'hrms', navShell: 'main' },
 
   { id: 'admin-home', label: 'Overview', path: '/admin', shell: 'main', section: 'Admin', icon: 'shield', group: 'Overview', end: true, moduleGate: 'admin', roles: ['super_admin', 'company_admin', 'director', 'general_manager'], navShell: 'main', smoke: { app: 'main' } },
-  { id: 'admin-settings', label: 'Settings', path: '/admin/settings', shell: 'main', section: 'Admin', icon: 'settings', group: 'Configuration', moduleGate: 'admin', navShell: 'main', smoke: { app: 'main' } },
+  { id: 'admin-settings', label: 'Settings', path: '/admin/settings', shell: 'main', section: 'Admin', icon: 'settings', group: 'Configuration', moduleGate: 'admin', roles: ['super_admin', 'company_admin'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'admin-backup-recovery', label: 'Backup & Recovery', path: '/admin/backup-recovery', shell: 'main', section: 'Admin', icon: 'database', group: 'Configuration', moduleGate: 'admin', roles: ['super_admin'], navShell: 'main' },
   { id: 'admin-activity', label: 'Activity Overview', path: '/admin/activity', shell: 'main', section: 'Admin', icon: 'bar-chart', group: 'Governance', moduleGate: 'admin', roles: ['super_admin', 'company_admin', 'director', 'general_manager'], navShell: 'main', smoke: { app: 'main' } },
   { id: 'admin-kpi-studio', label: 'KPI Studio', path: '/admin/kpi-studio', shell: 'main', section: 'Admin', icon: 'sparkles', group: 'Governance', moduleGate: 'admin', featureFlag: 'phase4.role-home', roles: ['super_admin', 'company_admin', 'director'], navShell: 'main', smoke: { app: 'main' } },
@@ -331,6 +334,9 @@ export const HRMS_NAV_ROUTES: readonly HrmsNavRouteDefinition[] = [
 export const MAIN_ROUTE_CHROME: readonly PlatformRouteChromeDefinition[] = [
   { pattern: /^\/(home)?$/, title: 'Home', kicker: 'Role-aware workspace' },
   { pattern: /^\/inbox/, title: 'Inbox', kicker: 'Approvals · Reconciliation · Requests · Alerts' },
+  { pattern: /^\/profile\/security$/, title: 'Security', kicker: 'My account' },
+  { pattern: /^\/profile\/notifications$/, title: 'Notification Preferences', kicker: 'My account' },
+  { pattern: /^\/profile$/, title: 'My Profile', kicker: 'My account' },
   { pattern: /^\/admin\/kpi-studio/, title: 'KPI Studio', kicker: 'Curate KPIs per role' },
   { pattern: /^\/notifications/, title: 'Notifications', kicker: 'Operational alerts' },
   { pattern: /^\/auto-aging\/vehicles/, title: 'Vehicle Explorer', kicker: 'Aging drilldown' },

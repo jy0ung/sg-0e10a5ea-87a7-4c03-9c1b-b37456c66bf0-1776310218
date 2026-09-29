@@ -12,6 +12,8 @@
 
 **Admin matrix follow-up:** PR #112 merged at `c021d35`. The next navigation slice adds a real Admin landing route and System Health navigation, with role-aware links. Personal account separation, form-loss diagnosis, and broader Admin workflow UAT remain open.
 
+**Admin navigation follow-up:** PR #113 merged at `1b07c6c`. A bounded account-route slice now moves personal Profile, Security, and Notifications out of Admin for normal users, while keeping administrator access to the legacy Settings page. Dedicated Modules and Organization routes, Admin workbench operational data, and form-loss root-cause evidence remain open.
+
 ## Scope and issue accuracy
 
 - [#47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) remains the architecture and web-app completion programme. Its old linear sequence overstates the dependency on final production recovery; business-feature work can proceed with disposable UAT infrastructure.

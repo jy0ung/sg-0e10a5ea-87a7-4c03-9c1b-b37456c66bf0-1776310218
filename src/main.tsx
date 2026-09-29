@@ -96,6 +96,7 @@ const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
 const SystemHealth = lazy(() => import("./pages/admin/SystemHealth"));
 const BackupRecovery = lazy(() => import("./pages/admin/BackupRecovery"));
 const SettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
+const MyAccountPage = lazy(() => import("./pages/profile/MyAccountPage"));
 const AdminHome = lazy(() => import("./pages/admin/AdminHome"));
 const SalesDashboard = lazy(() => import("./pages/sales/SalesDashboard"));
 const DealPipeline = lazy(() => import("./pages/sales/DealPipeline"));
@@ -156,6 +157,14 @@ function S({ children }: { children: React.ReactNode }) {
  */
 function R({ scope, children }: { scope: string; children: React.ReactNode }) {
   return <RouteErrorBoundary scope={scope}>{children}</RouteErrorBoundary>;
+}
+
+function LegacyAdminSettings() {
+  const { user } = useAuth();
+  if (user?.role !== 'super_admin' && user?.role !== 'company_admin') {
+    return <Navigate to="/profile" replace />;
+  }
+  return <SettingsPage />;
 }
 
 function ProtectedAppShell({ redirectTo = "/login" }: { redirectTo?: string | ((pathname: string) => string) }) {
@@ -232,7 +241,9 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to="/home" replace /> },
-      { path: "profile", element: <Navigate to="/admin/settings" replace /> },
+      { path: "profile", element: <R scope="My Profile"><S><MyAccountPage section="profile" /></S></R> },
+      { path: "profile/security", element: <R scope="Account Security"><S><MyAccountPage section="security" /></S></R> },
+      { path: "profile/notifications", element: <R scope="Notification Preferences"><S><MyAccountPage section="notifications" /></S></R> },
       // Legacy /modules URL — collapsed into /home (Phase 4 unification, 2026-05-28)
       { path: "modules", element: <Navigate to="/home" replace /> },
       { path: "notifications", element: <S><Notifications /></S> },
@@ -307,11 +318,9 @@ const router = createBrowserRouter([
       { path: "admin/audit", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Audit Log"><S><AuditLog /></S></R></RequireRole> },
       { path: "admin/health", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="System Health"><S><SystemHealth /></S></R></RequireRole> },
       { path: "admin/backup-recovery", element: <RequireRole roles={['super_admin']} section="Admin"><R scope="Backup & Recovery"><S><BackupRecovery /></S></R></RequireRole> },
-      // admin/settings intentionally has NO RequireRole guard — it doubles as
-      // the /profile redirect target (personal name/password/branch editing).
-      // Admin-only features (branding, modules, user roles) are gated internally
-      // via isAdmin checks in SettingsPage and by RLS on the backend tables.
-      { path: "admin/settings", element: <R scope="Settings"><S><SettingsPage /></S></R> },
+      // Keep the old Admin Settings path for administrators while personal
+      // account routes move out of the Admin workspace.
+      { path: "admin/settings", element: <R scope="Settings"><S><LegacyAdminSettings /></S></R> },
       { path: "admin/branches", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Branches"><S><BranchManagement /></S></R></RequireRole> },
       { path: "admin/master-data", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Master Data"><S><MasterData /></S></R></RequireRole> },
       { path: "admin/suppliers", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Suppliers"><S><Suppliers /></S></R></RequireRole> },
