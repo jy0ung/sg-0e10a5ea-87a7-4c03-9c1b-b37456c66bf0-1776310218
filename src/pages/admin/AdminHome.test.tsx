@@ -26,7 +26,8 @@ describe('AdminHome', () => {
   it('shows company administration paths with a real System Health link', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: 'Administration' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Users & Roles' })).toHaveAttribute('href', '/admin/users');
+    expect(screen.getByRole('link', { name: 'Users' })).toHaveAttribute('href', '/admin/users');
+    expect(screen.getByRole('link', { name: 'Roles & Permissions' })).toHaveAttribute('href', '/admin/roles');
     expect(screen.getByRole('link', { name: 'System Health' })).toHaveAttribute('href', '/admin/health');
     expect(screen.queryByRole('link', { name: 'Backup & Recovery' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Webhook Outbox' })).not.toBeInTheDocument();
@@ -38,7 +39,8 @@ describe('AdminHome', () => {
     renderPage();
     expect(screen.getByRole('link', { name: 'Reconciliation Queue' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'System Health' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Users & Roles' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Roles & Permissions' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Webhook Outbox' })).not.toBeInTheDocument();
   });
 });

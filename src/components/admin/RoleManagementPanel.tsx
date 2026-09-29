@@ -40,9 +40,10 @@ function scopeLabel(role: AppRole) {
 
 type RoleManagementPanelProps = {
   embedded?: boolean;
+  onDirtyChange?: (dirty: boolean) => void;
 };
 
-export function RoleManagementPanel({ embedded = false }: RoleManagementPanelProps) {
+export function RoleManagementPanel({ embedded = false, onDirtyChange }: RoleManagementPanelProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -51,6 +52,10 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
   const [dirty, setDirty] = useState(false);
   const [baseVersion, setBaseVersion] = useState<number | null>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole | null>(null);
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
   useEffect(() => {
     setDirty(false);
@@ -171,9 +176,9 @@ export function RoleManagementPanel({ embedded = false }: RoleManagementPanelPro
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Shield className="h-5 w-5 text-primary" />
-            <h1 className={cn('font-bold text-foreground', embedded ? 'text-xl' : 'text-2xl')}>
-              Role Management
-            </h1>
+            {embedded
+              ? <h2 className={cn('font-bold text-foreground', 'text-xl')}>Role Management</h2>
+              : <h1 className={cn('font-bold text-foreground', 'text-2xl')}>Role Management</h1>}
           </div>
           <p className="text-sm text-muted-foreground">
             Manage system roles and the section permissions attached to each role.

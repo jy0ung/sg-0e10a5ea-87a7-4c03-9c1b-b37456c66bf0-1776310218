@@ -18,6 +18,8 @@ The first navigation slice adds an authorized `/admin` landing page, registers S
 
 The next bounded account slice gives `/profile`, `/profile/security`, and `/profile/notifications` real personal pages for users of the main UBS shell. The profile and password forms retain unsaved-change protection, and the Admin section now points to `/admin` for authorized executive roles. `/admin/settings` remains a compatibility page for company and super admins; other main-shell roles are redirected to `/profile`. Moving Modules and Organization to dedicated Admin routes remains open.
 
+The dedicated `/admin/roles` slice reuses the versioned role-matrix editor and its existing package-owned RPC commands. The old `/admin/role-permissions` path redirects to the canonical route, and the Users page links to it instead of embedding a second editor. A dirty role draft blocks in-app navigation and warns on unload. Dedicated Modules and Organization routes remain open.
+
 Migration/compatibility: the new RPC and grants are additive; revoking direct column-permission writes intentionally makes a cached old editor fail closed until it reloads the updated client. The legacy package service delegates Vehicle saves to the new command, preserving in-repository callers. A rollback of the client alone would leave the old editor unable to save; any rollback must keep the new client contract or restore direct grants through a reviewed migration. Disposable Supabase tests cover the new write path and denial of direct writes.
 
 ## Executive summary

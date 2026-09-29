@@ -14,6 +14,8 @@
 
 **Admin navigation follow-up:** PR #113 merged at `1b07c6c`. A bounded account-route slice now moves personal Profile, Security, and Notifications out of Admin for normal users, while keeping administrator access to the legacy Settings page. Dedicated Modules and Organization routes, Admin workbench operational data, and form-loss root-cause evidence remain open.
 
+**Personal account follow-up:** PR #114 merged at `f6f408a`. The next bounded Admin slice gives Roles & Permissions its own guarded route, connects the Users page and old role-permissions redirect to it, and protects dirty role drafts on navigation. Modules, Organization, and operational workbench slices remain open.
+
 ## Scope and issue accuracy
 
 - [#47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) remains the architecture and web-app completion programme. Its old linear sequence overstates the dependency on final production recovery; business-feature work can proceed with disposable UAT infrastructure.
