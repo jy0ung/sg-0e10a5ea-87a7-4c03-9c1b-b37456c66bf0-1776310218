@@ -156,7 +156,7 @@ export default function BranchManagement() {
     <PageHeader
       title="Branch Management"
       description="Manage company branches and their document series"
-      breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Branches' }]}
+      breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Branches' }]}
       actions={<Button size="sm" onClick={openAdd}><Plus className="mr-1 h-4 w-4" />Add Branch</Button>}
     />
   );

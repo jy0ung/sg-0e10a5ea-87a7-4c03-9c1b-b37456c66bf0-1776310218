@@ -71,7 +71,7 @@ export default function BackupRecovery() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader title="Backup & Recovery" description="Create, verify and export an encrypted database archive"
-        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Backup & Recovery' }]} />
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Backup & Recovery' }]} />
 
       <div className="glass-panel p-5 md:p-6 space-y-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

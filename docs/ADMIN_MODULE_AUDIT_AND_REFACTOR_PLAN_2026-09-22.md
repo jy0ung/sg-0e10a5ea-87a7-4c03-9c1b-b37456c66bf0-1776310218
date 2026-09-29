@@ -14,6 +14,8 @@ The webhook-secret follow-up addresses H2 with a metadata-only endpoint list, se
 
 The bounded role-matrix follow-up addresses H4: the editor holds a draft outside the query callback, preserves it across background refetches, and saves the complete company matrix through one audited transaction. A version check rejects stale drafts; the editor retains the draft and refreshes its server snapshot so an administrator can review or discard it. Direct authenticated writes to `role_sections` are revoked while tenant reads for navigation remain. Cached old role editors fail closed on save until refreshed. Form-loss diagnosis and Admin navigation remain open.
 
+The first navigation slice adds an authorized `/admin` landing page, registers System Health in the shared navigation, and points Admin breadcrumbs to the real landing route. The landing directory uses the route registry, role metadata, and feature flags so it does not offer unavailable actions. Personal Settings still lives at `/admin/settings`; separating account and administration routes remains a distinct follow-up.
+
 Migration/compatibility: the new RPC and grants are additive; revoking direct column-permission writes intentionally makes a cached old editor fail closed until it reloads the updated client. The legacy package service delegates Vehicle saves to the new command, preserving in-repository callers. A rollback of the client alone would leave the old editor unable to save; any rollback must keep the new client contract or restore direct grants through a reviewed migration. Disposable Supabase tests cover the new write path and denial of direct writes.
 
 ## Executive summary

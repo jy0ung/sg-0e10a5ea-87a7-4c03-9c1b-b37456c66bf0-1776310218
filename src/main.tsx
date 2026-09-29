@@ -96,6 +96,7 @@ const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
 const SystemHealth = lazy(() => import("./pages/admin/SystemHealth"));
 const BackupRecovery = lazy(() => import("./pages/admin/BackupRecovery"));
 const SettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
+const AdminHome = lazy(() => import("./pages/admin/AdminHome"));
 const SalesDashboard = lazy(() => import("./pages/sales/SalesDashboard"));
 const DealPipeline = lazy(() => import("./pages/sales/DealPipeline"));
 const DealList = lazy(() => import("./pages/sales/DealList"));
@@ -295,6 +296,7 @@ const router = createBrowserRouter([
       { path: "accounts/cash-position", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Cash Position"><S><CashPosition /></S></R></RequireRole> },
       { path: "accounts/period-close", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Period Close"><S><PeriodCloseDrilldown /></S></R></RequireRole> },
       { path: "accounts/journal", element: <RequireRole roles={ACCOUNTS_AND_UP} section="Accounts"><R scope="Journal Entries"><S><JournalEntries /></S></R></RequireRole> },
+      { path: "admin", element: <RequireRole roles={EXECUTIVE} section="Admin"><R scope="Administration"><S><AdminHome /></S></R></RequireRole> },
       { path: "admin/activity", element: <RequireRole roles={EXECUTIVE} section="Admin"><R scope="Activity Dashboard"><S><ActivityDashboard /></S></R></RequireRole> },
       { path: "admin/kpi-studio", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="KPI Studio"><S><KpiStudio /></S></R></RequireRole> },
       { path: "admin/webhooks",   element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Webhook Outbox"><S><WebhookOutbox /></S></R></RequireRole> },

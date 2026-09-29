@@ -33,7 +33,9 @@ describe('platformRegistry', () => {
       '/sales/pipeline',
       '/purchasing/orders',
       '/accounts/profit-loss',
+      '/admin',
       '/admin/settings',
+      '/admin/health',
     ]));
     expect(MAIN_NAV_ROUTES.map((route) => route.path)).not.toContain('/hrms/');
   });

@@ -137,7 +137,7 @@ export default function UserGroups() {
     <PageHeader
       title="User Groups"
       description="Define groups for user access and permissions"
-      breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'User Groups' }]}
+      breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'User Groups' }]}
       actions={<Button size="sm" onClick={openAdd}><Plus className="mr-1 h-4 w-4" />Add Group</Button>}
     />
   );

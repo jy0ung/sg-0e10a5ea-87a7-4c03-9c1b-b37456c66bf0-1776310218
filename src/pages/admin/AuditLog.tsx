@@ -14,7 +14,7 @@ export default function AuditLog() {
         description="Track all system actions and changes" 
         breadcrumbs={[
           { label: 'FLC BI', path: '/' }, 
-          { label: 'Admin', path: '/admin/settings' }, 
+          { label: 'Admin', path: '/admin' },
           { label: 'Audit Log' }
         ]} 
       />

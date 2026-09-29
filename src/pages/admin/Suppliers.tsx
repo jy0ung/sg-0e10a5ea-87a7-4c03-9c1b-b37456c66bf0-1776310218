@@ -173,7 +173,7 @@ export default function Suppliers() {
     <PageHeader
       title="Suppliers"
       description="Manage vehicle and parts suppliers"
-      breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Suppliers' }]}
+      breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Suppliers' }]}
       actions={<Button size="sm" onClick={openAdd}><Plus className="mr-2 h-4 w-4" />Add Supplier</Button>}
     />
   );

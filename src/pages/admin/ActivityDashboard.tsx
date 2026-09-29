@@ -171,7 +171,7 @@ export default function ActivityDashboard() {
       <PageHeader
         title="Activity Overview"
         description="Track user actions, inventory changes, and platform activity trends."
-        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Activity Overview' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Activity Overview' }]}
         actions={
           <div className="flex items-center gap-2">
           <div className="flex items-center border rounded-md">
