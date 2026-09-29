@@ -64,9 +64,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { APP_ROLES, AppRole, AccessScope, DEFAULT_APP_ROLE, ROLE_DEFAULT_SCOPE, type BranchRecord } from '@/types';
 import { getBranches } from '@/services/masterDataService';
 import { PermissionEditor } from '@/components/admin/PermissionEditor';
-import { RoleManagementPanel } from '@/components/admin/RoleManagementPanel';
 import { userUpdateSchema, inviteUserSchema, type UserUpdateFormData, type InviteUserFormData } from '@/lib/validations';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { UnauthorizedAccess } from '@/components/shared/UnauthorizedAccess';
 import { authService } from '@/services/authService';
@@ -102,7 +102,6 @@ const SCOPES: { value: AccessScope; label: string }[] = [
 
 type AccountFilter = 'active' | 'pending' | 'inactive' | 'all';
 type RoleFilter = AppRole | 'all';
-type AdminUsersRoleTab = 'users' | 'roles';
 type AccountStatusAction = 'deactivate' | 'reactivate';
 const ARCHIVED_EMAIL_DOMAIN = '@archived.local';
 
@@ -135,6 +134,7 @@ function isArchivedAccountProfile(profile: ProfileRow): boolean {
 
 export default function UserManagement() {
   const { user, hasRole } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editUser, setEditUser] = useState<ProfileRow | null>(null);
   const [editBranch, setEditBranch] = useState<string>('none');
@@ -157,7 +157,6 @@ export default function UserManagement() {
   >({});
   const [accountFilter, setAccountFilter] = useState<AccountFilter>('active');
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
-  const [adminTab, setAdminTab] = useState<AdminUsersRoleTab>('users');
   const [search, setSearch] = useState('');
   const [statusActionUser, setStatusActionUser] = useState<ProfileRow | null>(null);
   const [statusAction, setStatusAction] = useState<AccountStatusAction>('deactivate');
@@ -649,7 +648,7 @@ export default function UserManagement() {
   if (loading) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <PageHeader title="Users & Roles" description="Manage platform users, roles, and account access" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Users & Roles' }]} />
+        <PageHeader title="Users" description="Manage platform users and account access" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Users' }]} />
         <div className="glass-panel p-4 animate-pulse space-y-3">
           <div className="h-9 w-48 bg-muted rounded" />
           <div className="border-t border-border" />
@@ -664,10 +663,10 @@ export default function UserManagement() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="Users & Roles"
-        description="Manage UBS account status, roles, branch assignments, and permissions"
-        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Users & Roles' }]}
-        actions={adminTab === 'users' ? (
+        title="Users"
+        description="Manage UBS account status, roles, branch assignments, and user permissions"
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Users' }]}
+        actions={
           <>
             <Button variant="outline" size="sm" onClick={handleCopySignupLink}>
               {copied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
@@ -678,10 +677,10 @@ export default function UserManagement() {
               Invite User
             </Button>
           </>
-        ) : undefined}
+        }
       />
 
-      <Tabs value={adminTab} onValueChange={(value) => setAdminTab(value as AdminUsersRoleTab)} className="space-y-6">
+      <Tabs value="users" onValueChange={(value) => { if (value === 'roles') void navigate('/admin/roles'); }} className="space-y-6">
         <TabsList className="h-auto flex-wrap justify-start">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="roles">Role management</TabsTrigger>
@@ -926,9 +925,6 @@ export default function UserManagement() {
           </div>
         </TabsContent>
 
-        <TabsContent value="roles" className="mt-0">
-          <RoleManagementPanel embedded />
-        </TabsContent>
       </Tabs>
 
       <Dialog open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)}>

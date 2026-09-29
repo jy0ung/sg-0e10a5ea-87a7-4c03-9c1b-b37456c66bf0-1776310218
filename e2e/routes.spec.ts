@@ -218,6 +218,25 @@ test.describe("Admin module", () => {
     await expect(page.locator("text=/user|management/i").first()).toBeVisible({ timeout: 8000 });
   });
 
+  test("Roles & Permissions has a dedicated route and guards a dirty draft", async ({ page }) => {
+    await page.route(`${SUPABASE_URL}/rest/v1/rpc/get_role_section_matrix*`, route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ version: 1, matrix: {} }),
+    }));
+    await assertPageLoaded(page, '/admin/users');
+    await page.getByRole('tab', { name: 'Role management' }).click();
+    await expect(page).toHaveURL(/\/admin\/roles$/);
+    await expect(page.getByRole('heading', { name: 'Roles & Permissions' })).toBeVisible();
+    const grant = page.getByRole('button', { name: /^Manager - Sales: (allowed|denied)$/ });
+    await expect(grant).toBeEnabled();
+    await grant.click();
+    await page.getByRole('navigation', { name: 'breadcrumb' }).getByRole('link', { name: 'Admin' }).click();
+    await expect(page.getByRole('alertdialog')).toContainText('Unsaved role changes');
+    await page.getByRole('button', { name: 'Stay and save' }).click();
+    await expect(page).toHaveURL(/\/admin\/roles$/);
+  });
+
   test("Audit Log (/admin/audit)", async ({ page }) => {
     await assertPageLoaded(page, "/admin/audit");
     await expect(page.locator("text=/audit|log/i").first()).toBeVisible({ timeout: 8000 });
