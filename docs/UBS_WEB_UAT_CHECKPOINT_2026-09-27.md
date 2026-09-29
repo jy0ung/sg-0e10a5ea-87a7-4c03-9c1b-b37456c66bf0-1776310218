@@ -22,6 +22,8 @@
 
 **Modules route follow-up:** PR #117 merged at `eba3b1f`. The next Admin slice gives Organization & Branding its own guarded route, redirects legacy Settings to My Profile, removes the duplicate Settings editors, protects unsaved branding drafts, and connects asset uploads to the company branding row. Admin operational workbench data and the reported general form-loss diagnosis remain open.
 
+**Organization route follow-up:** PR #118 merged at `4fc9033`; the Admin configuration routes now separate Roles, Modules, and Organization from personal Profile. The next Finance slice adds a controlled posted AP supplier-payment correction: it mirrors the original journal in an open period, appends the reversal event and audit in one transaction, and reopens a previously paid invoice for settlement. Full AP settlement UAT and the wider operational checks remain open.
+
 ## Scope and issue accuracy
 
 - [#47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) remains the architecture and web-app completion programme. Its old linear sequence overstates the dependency on final production recovery; business-feature work can proceed with disposable UAT infrastructure.

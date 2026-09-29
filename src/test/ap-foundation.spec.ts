@@ -498,8 +498,64 @@ describeIfLive('AP Foundation RPCs', () => {
     expect(lines?.reduce((sum, row) => sum + Number(row.debit), 0)).toBe(100_000);
     expect(lines?.reduce((sum, row) => sum + Number(row.credit), 0)).toBe(100_000);
 
-    const reversal = await userA.client.rpc('reverse_supplier_payment_event', { p_event_id: eventId });
-    expect(reversal.error?.message).toContain('Finance correction');
+    const noReason = await userA.client.rpc('reverse_supplier_payment_event', { p_event_id: eventId });
+    expect(noReason.error?.message).toContain('A reason is required');
+    const crossCompany = await userB.client.rpc('reverse_supplier_payment_event', {
+      p_event_id: eventId, p_reason: 'Not my tenant',
+    });
+    expect(crossCompany.error?.message).toContain('Not authorized');
+    const { error: markPaidError } = await userA.client.rpc('transition_pi_lifecycle', {
+      p_id: invoiceId, p_target_status: 'paid',
+    });
+    expect(markPaidError).toBeNull();
+    const { error: closeError } = await svc.from('accounting_periods')
+      .update({ status: 'closed' }).eq('id', period.id);
+    expect(closeError).toBeNull();
+    const closedPeriod = await userA.client.rpc('reverse_supplier_payment_event', {
+      p_event_id: eventId, p_reason: 'Incorrect bank instruction',
+    });
+    expect(closedPeriod.error?.message).toContain('No open accounting period');
+    const { error: reopenError } = await svc.from('accounting_periods')
+      .update({ status: 'open' }).eq('id', period.id);
+    expect(reopenError).toBeNull();
+    const originalLines = lines ?? [];
+    const reversal = await userA.client.rpc('reverse_supplier_payment_event', {
+      p_event_id: eventId, p_reason: 'Incorrect bank instruction',
+    });
+    expect(reversal.error).toBeNull();
+    cleanup.eventIds.push(reversal.data as string);
+    const { data: correctionRows } = await svc.from('journal_entries')
+      .select('id,source_id,period_id').eq('source_type', 'adjustment').eq('source_id', journalId);
+    expect(correctionRows).toHaveLength(1);
+    const correction = correctionRows![0];
+    cleanup.journalIds.push(correction.id);
+    expect(correction.period_id).toBe(period.id);
+    const { data: correctionAudit } = await svc.from('audit_logs')
+      .select('changes').eq('entity_id', correction.id).eq('action', 'correct').single();
+    expect(correctionAudit?.changes).toMatchObject({
+      original_journal_id: journalId,
+      supplier_payment_event_id: eventId,
+      reason: 'Incorrect bank instruction',
+    });
+    const { data: correctionLines } = await svc.from('journal_entry_lines')
+      .select('account_id,debit,credit').eq('journal_entry_id', correction.id);
+    const { data: sourceLines } = await svc.from('journal_entry_lines')
+      .select('account_id,debit,credit').eq('journal_entry_id', journalId);
+    expect(correctionLines).toHaveLength(originalLines.length);
+    expect(correctionLines?.map(line => ({
+      account_id: line.account_id, debit: Number(line.debit), credit: Number(line.credit),
+    })).sort((a, b) => a.account_id.localeCompare(b.account_id))).toEqual(sourceLines?.map(line => ({
+      account_id: line.account_id, debit: Number(line.credit), credit: Number(line.debit),
+    })).sort((a, b) => a.account_id.localeCompare(b.account_id)));
+    const { data: correctedInvoice } = await svc.from('purchase_invoices')
+      .select('paid_amount,payment_status,lifecycle_status').eq('id', invoiceId).single();
+    expect(Number(correctedInvoice?.paid_amount)).toBe(0);
+    expect(correctedInvoice?.payment_status).toBe('unpaid');
+    expect(correctedInvoice?.lifecycle_status).toBe('approved');
+    const duplicate = await userA.client.rpc('reverse_supplier_payment_event', {
+      p_event_id: eventId, p_reason: 'Duplicate request',
+    });
+    expect(duplicate.error?.message).toContain('already reversed');
     const after = await userA.client.rpc('get_period_close_unposted', {
       p_company_id: userA.companyId, p_period_id: period.id,
     });
