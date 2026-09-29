@@ -81,14 +81,14 @@ export const BRANDING_DEFAULTS: ResolvedBranding = {
   copyrightText: `© ${new Date().getFullYear()} ${brandName}. All rights reserved.`,
 };
 
-export async function fetchBranding(): Promise<{
+export async function fetchBranding(companyId: string): Promise<{
   data: CompanyBranding | null;
   error: string | null;
 }> {
   const { data, error } = await supabase
     .from('company_branding')
     .select('*')
-    .limit(1)
+    .eq('company_id', companyId)
     .maybeSingle();
 
   if (error) return { data: null, error: error.message };
@@ -118,14 +118,48 @@ export async function uploadBrandingAsset(
   slot: 'logo' | 'login_logo' | 'favicon',
   file: File,
 ): Promise<{ path: string | null; error: string | null }> {
-  const ext = file.name.split('.').pop() ?? 'png';
-  const path = `${companyId}/${slot}.${ext}`;
+  const extensions: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/svg+xml': 'svg',
+    'image/webp': 'webp',
+    'image/x-icon': 'ico',
+    'image/vnd.microsoft.icon': 'ico',
+  };
+  const ext = extensions[file.type];
+  if (!ext) return { path: null, error: 'Choose a PNG, JPG, SVG, WEBP, or ICO image.' };
+  if (file.size > 2 * 1024 * 1024) return { path: null, error: 'Image must be 2 MB or smaller.' };
+
+  // A new path avoids overwriting the current asset before the branding row
+  // successfully points to its replacement.
+  const path = `${companyId}/${slot}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage
     .from('company-assets')
-    .upload(path, file, { upsert: true, contentType: file.type });
+    .upload(path, file, { contentType: file.type });
 
   if (error) return { path: null, error: error.message };
+
+  const pathColumn = {
+    logo: 'logo_path',
+    login_logo: 'login_logo_path',
+    favicon: 'favicon_path',
+  } as const;
+  let saveError: string | null;
+  try {
+    saveError = (await saveBranding(companyId, { [pathColumn[slot]]: path })).error;
+  } catch (saveFailure) {
+    saveError = saveFailure instanceof Error ? saveFailure.message : 'Failed to save branding asset path.';
+  }
+  if (saveError) {
+    try {
+      await supabase.storage.from('company-assets').remove([path]);
+    } catch {
+      // Preserve the database error. The unreferenced upload can be cleaned up
+      // separately without changing the currently selected brand asset.
+    }
+    return { path: null, error: saveError };
+  }
   return { path, error: null };
 }
 

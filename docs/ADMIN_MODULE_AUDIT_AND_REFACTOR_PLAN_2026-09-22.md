@@ -24,6 +24,8 @@ The recovery-invariant follow-up reserves Admin section access for the Super Adm
 
 The Modules navigation slice gives company and super admins a dedicated `/admin/modules` page using the existing module-access context and RLS-backed upsert path. The Home Administration card opens `/admin` only when the signed-in role and section matrix permit that route, and the disabled-module recovery link opens `/admin/modules`. Legacy Settings remains usable for bookmarked administrators until the Organization/Branding split is complete.
 
+The Organization/Branding slice completes the first-class Admin route split: `/admin/organization` is guarded by the Admin role and section, and `/admin/settings` redirects to `/profile` for existing bookmarks. The duplicate Settings tabs and role editor are removed. The branding form guards a dirty draft against navigation and background branding refresh, and uploads now write the new asset path into the company branding row before reporting success. The read query explicitly filters by company ID, with RLS still authoritative. This does not establish the root cause of the broader reported form-loss issue or complete operational Admin workbench data.
+
 Migration/compatibility: the new RPC and grants are additive; revoking direct column-permission writes intentionally makes a cached old editor fail closed until it reloads the updated client. The legacy package service delegates Vehicle saves to the new command, preserving in-repository callers. A rollback of the client alone would leave the old editor unable to save; any rollback must keep the new client contract or restore direct grants through a reviewed migration. Disposable Supabase tests cover the new write path and denial of direct writes.
 
 ## Executive summary

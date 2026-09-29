@@ -95,7 +95,7 @@ const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const AuditLog = lazy(() => import("./pages/admin/AuditLog"));
 const SystemHealth = lazy(() => import("./pages/admin/SystemHealth"));
 const BackupRecovery = lazy(() => import("./pages/admin/BackupRecovery"));
-const SettingsPage = lazy(() => import("./pages/admin/SettingsPage"));
+const AdminOrganization = lazy(() => import("./pages/admin/AdminOrganization"));
 const MyAccountPage = lazy(() => import("./pages/profile/MyAccountPage"));
 const AdminHome = lazy(() => import("./pages/admin/AdminHome"));
 const AdminRoles = lazy(() => import("./pages/admin/AdminRoles"));
@@ -159,14 +159,6 @@ function S({ children }: { children: React.ReactNode }) {
  */
 function R({ scope, children }: { scope: string; children: React.ReactNode }) {
   return <RouteErrorBoundary scope={scope}>{children}</RouteErrorBoundary>;
-}
-
-function LegacyAdminSettings() {
-  const { user } = useAuth();
-  if (user?.role !== 'super_admin' && user?.role !== 'company_admin') {
-    return <Navigate to="/profile" replace />;
-  }
-  return <SettingsPage />;
 }
 
 function ProtectedAppShell({ redirectTo = "/login" }: { redirectTo?: string | ((pathname: string) => string) }) {
@@ -319,12 +311,13 @@ const router = createBrowserRouter([
       { path: "admin/users", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Users"><S><UserManagement /></S></R></RequireRole> },
       { path: "admin/roles", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Roles & Permissions"><S><AdminRoles /></S></R></RequireRole> },
       { path: "admin/modules", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Modules"><S><AdminModules /></S></R></RequireRole> },
+      { path: "admin/organization", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Organization & Branding"><S><AdminOrganization /></S></R></RequireRole> },
       { path: "admin/audit", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="Audit Log"><S><AuditLog /></S></R></RequireRole> },
       { path: "admin/health", element: <RequireRole roles={ADMIN_AND_DIRECTOR} section="Admin"><R scope="System Health"><S><SystemHealth /></S></R></RequireRole> },
       { path: "admin/backup-recovery", element: <RequireRole roles={['super_admin']} section="Admin"><R scope="Backup & Recovery"><S><BackupRecovery /></S></R></RequireRole> },
-      // Keep the old Admin Settings path for administrators while personal
-      // account routes move out of the Admin workspace.
-      { path: "admin/settings", element: <R scope="Settings"><S><LegacyAdminSettings /></S></R> },
+      // Old Settings opened on Profile by default. Personal and company
+      // configuration now have their own routes.
+      { path: "admin/settings", element: <Navigate to="/profile" replace /> },
       { path: "admin/branches", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Branches"><S><BranchManagement /></S></R></RequireRole> },
       { path: "admin/master-data", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Master Data"><S><MasterData /></S></R></RequireRole> },
       { path: "admin/suppliers", element: <RequireRole roles={ADMIN_ONLY} section="Admin"><R scope="Suppliers"><S><Suppliers /></S></R></RequireRole> },

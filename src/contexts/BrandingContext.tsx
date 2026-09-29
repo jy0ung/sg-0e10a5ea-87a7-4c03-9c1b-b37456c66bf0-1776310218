@@ -28,6 +28,7 @@ import { useAuth } from '@/contexts/AuthContext';
 interface BrandingContextValue {
   branding: ResolvedBranding;
   loading: boolean;
+  error: string | null;
   /** Imperatively re-fetch branding (call after saving changes). */
   refresh: () => void;
 }
@@ -35,6 +36,7 @@ interface BrandingContextValue {
 const BrandingContext = createContext<BrandingContextValue>({
   branding: BRANDING_DEFAULTS,
   loading: false,
+  error: null,
   refresh: () => {},
 });
 
@@ -43,9 +45,13 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const companyId = user?.company_id ?? null;
 
-  const { data: rawBranding, isLoading } = useQuery({
+  const { data: rawBranding, isLoading, error } = useQuery({
     queryKey: ['company_branding', companyId],
-    queryFn: () => fetchBranding().then(r => r.data),
+    queryFn: async () => {
+      const result = await fetchBranding(companyId!);
+      if (result.error) throw new Error(result.error);
+      return result.data;
+    },
     enabled: Boolean(companyId),
     staleTime: 5 * 60 * 1000, // 5 min — branding changes infrequently
     gcTime: 30 * 60 * 1000,
@@ -53,24 +59,34 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [resolved, setResolved] = useState<ResolvedBranding>(BRANDING_DEFAULTS);
+  const [resolvedCompanyId, setResolvedCompanyId] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     if (rawBranding === undefined) return; // still loading — keep defaults
+    let cancelled = false;
     setResolving(true);
     void resolveBranding(rawBranding ?? null).then(r => {
+      if (cancelled) return;
       setResolved(r);
+      setResolvedCompanyId(companyId);
+      setResolving(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setResolved(BRANDING_DEFAULTS);
+      setResolvedCompanyId(companyId);
       setResolving(false);
     });
-  }, [rawBranding]);
+    return () => { cancelled = true; };
+  }, [rawBranding, companyId]);
 
   const refresh = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['company_branding', companyId] });
   }, [queryClient, companyId]);
 
   const value = useMemo<BrandingContextValue>(
-    () => ({ branding: resolved, loading: isLoading || resolving, refresh }),
-    [resolved, isLoading, resolving, refresh],
+    () => ({ branding: resolvedCompanyId === companyId ? resolved : BRANDING_DEFAULTS, loading: isLoading || resolving || (Boolean(companyId) && resolvedCompanyId !== companyId && !error), error: error?.message ?? null, refresh }),
+    [resolved, resolvedCompanyId, companyId, isLoading, resolving, error, refresh],
   );
 
   return (

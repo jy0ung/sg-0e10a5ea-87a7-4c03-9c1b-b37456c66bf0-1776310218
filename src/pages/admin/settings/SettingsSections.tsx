@@ -1,17 +1,14 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import type { UseFormReturn } from 'react-hook-form';
-import { Building2, KeyRound, Loader2, Power, Save, Search, Upload, Users } from 'lucide-react';
-import { ROLE_LABELS } from '@/config/rolePermissions';
+import { Building2, KeyRound, Loader2, Power, Save, Upload } from 'lucide-react';
 import type { ResolvedPlatformModule } from '@/lib/moduleAccess';
 import type { ResolvedBranding } from '@flc/platform-services';
-import type { ProfileRow } from '@flc/auth';
 import type { AppRole, BranchRecord } from '@/types';
 import type { ChangePasswordFormData, ProfileUpdateFormData } from '@/lib/validations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 
 type SettingsUser = {
@@ -243,128 +240,10 @@ export function ModuleSettings({
   );
 }
 
-interface UserRoleSettingsProps {
-  profiles: ProfileRow[];
-  profilesLoading: boolean;
-  pendingRoles: Record<string, AppRole>;
-  savingRoleId: string | null;
-  userSearch: string;
-  user: SettingsUser | null | undefined;
-  setUserSearch: (search: string) => void;
-  setPendingRoles: React.Dispatch<React.SetStateAction<Record<string, AppRole>>>;
-  onRoleSave: (profileId: string) => void | Promise<void>;
-}
-
-export function UserRoleSettings({
-  profiles,
-  profilesLoading,
-  pendingRoles,
-  savingRoleId,
-  userSearch,
-  user,
-  setUserSearch,
-  setPendingRoles,
-  onRoleSave,
-}: UserRoleSettingsProps) {
-  const visibleProfiles = profiles.filter(profile => {
-    const query = userSearch.toLowerCase();
-    return !query || profile.name.toLowerCase().includes(query) || profile.email.toLowerCase().includes(query);
-  });
-
-  return (
-    <div className="glass-panel p-6 space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground">User Roles</h3>
-        </div>
-        <div className="relative max-w-xs w-full">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search users..."
-            value={userSearch}
-            onChange={event => setUserSearch(event.target.value)}
-            aria-label="Search users"
-            className="pl-8"
-          />
-        </div>
-      </div>
-
-      {profilesLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-          <Loader2 className="h-4 w-4 animate-spin" />Loading users...
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {visibleProfiles.map(profile => {
-            const isSelf = profile.id === user?.id;
-            const isTargetSuperAdmin = profile.role === 'super_admin';
-            const canEdit = !isSelf && !(isTargetSuperAdmin && user?.role !== 'super_admin');
-            const pending = pendingRoles[profile.id];
-            const displayRole = pending ?? profile.role;
-            const isDirty = Boolean(pending && pending !== profile.role);
-
-            return (
-              <div key={profile.id} className="flex flex-col gap-3 rounded-xl border border-border/60 bg-secondary/30 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-foreground truncate">{profile.name}</p>
-                    {isSelf && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">You</span>}
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-                      profile.status === 'active' ? 'bg-green-500/10 text-green-600 dark:text-green-400'
-                      : profile.status === 'pending' ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
-                      : 'bg-muted text-muted-foreground'
-                    }`}>{profile.status}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{profile.email}</p>
-                </div>
-
-                <div className="flex items-center gap-2 self-end sm:self-auto">
-                  <Select
-                    value={displayRole}
-                    disabled={!canEdit || savingRoleId === profile.id}
-                    onValueChange={value => setPendingRoles(prev => ({ ...prev, [profile.id]: value as AppRole }))}
-                  >
-                    <SelectTrigger className="w-44 text-sm" aria-label={`Role for ${profile.name}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(Object.entries(ROLE_LABELS) as [AppRole, string][]).map(([value, label]) => (
-                        (value !== 'super_admin' || user?.role === 'super_admin') && (
-                          <SelectItem key={value} value={value}>{label}</SelectItem>
-                        )
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {canEdit && isDirty && (
-                    <Button
-                      size="sm"
-                      disabled={savingRoleId === profile.id}
-                      onClick={() => onRoleSave(profile.id)}
-                      aria-label={`Save role for ${profile.name}`}
-                    >
-                      {savingRoleId === profile.id
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        : <Save className="h-3.5 w-3.5" />}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          {visibleProfiles.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted-foreground">No users found.</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 interface OrganizationBrandingSettingsProps {
   branding: ResolvedBranding;
   brandingFields: BrandingFields;
+  brandingDirty: boolean;
   savingBranding: boolean;
   uploadingSlot: string | null;
   logoInputRef: React.RefObject<HTMLInputElement>;
@@ -378,6 +257,7 @@ interface OrganizationBrandingSettingsProps {
 export function OrganizationBrandingSettings({
   branding,
   brandingFields,
+  brandingDirty,
   savingBranding,
   uploadingSlot,
   logoInputRef,
@@ -395,7 +275,7 @@ export function OrganizationBrandingSettings({
           <h3 className="text-sm font-semibold text-foreground">Organization &amp; Branding</h3>
         </div>
         <p className="text-xs text-muted-foreground">
-          These values are shown throughout the application. Changes take effect after the next page refresh.
+          These values are shown throughout the application. Saved changes update the current workspace after refresh.
         </p>
 
         <div className="grid md:grid-cols-2 gap-4">
@@ -441,7 +321,7 @@ export function OrganizationBrandingSettings({
           </div>
         </div>
 
-        <Button onClick={onSaveBranding} disabled={savingBranding} className="mt-2">
+        <Button onClick={onSaveBranding} disabled={!brandingDirty || savingBranding || uploadingSlot !== null} className="mt-2">
           {savingBranding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
           Save Branding
         </Button>
@@ -449,7 +329,7 @@ export function OrganizationBrandingSettings({
 
       <div className="glass-panel p-6 space-y-5">
         <h3 className="text-sm font-semibold text-foreground">Brand Assets</h3>
-        <p className="text-xs text-muted-foreground">Max 2 MB per file. Supported: PNG, JPG, SVG, WEBP.</p>
+        <p className="text-xs text-muted-foreground">Max 2 MB per file. Supported: PNG, JPG, SVG, WEBP, and ICO favicons.</p>
 
         <div className="grid sm:grid-cols-3 gap-6">
           <div className="space-y-3">
@@ -466,9 +346,10 @@ export function OrganizationBrandingSettings({
               onChange={event => {
                 const file = event.target.files?.[0];
                 if (file) void onAssetUpload('logo', file);
+                event.currentTarget.value = '';
               }}
             />
-            <Button variant="outline" size="sm" disabled={uploadingSlot === 'logo'} onClick={() => logoInputRef.current?.click()}>
+            <Button variant="outline" size="sm" disabled={uploadingSlot !== null || savingBranding} onClick={() => logoInputRef.current?.click()}>
               {uploadingSlot === 'logo' ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
               Upload Logo
             </Button>
@@ -488,9 +369,10 @@ export function OrganizationBrandingSettings({
               onChange={event => {
                 const file = event.target.files?.[0];
                 if (file) void onAssetUpload('login_logo', file);
+                event.currentTarget.value = '';
               }}
             />
-            <Button variant="outline" size="sm" disabled={uploadingSlot === 'login_logo'} onClick={() => loginLogoInputRef.current?.click()}>
+            <Button variant="outline" size="sm" disabled={uploadingSlot !== null || savingBranding} onClick={() => loginLogoInputRef.current?.click()}>
               {uploadingSlot === 'login_logo' ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
               Upload Login Logo
             </Button>
@@ -510,9 +392,10 @@ export function OrganizationBrandingSettings({
               onChange={event => {
                 const file = event.target.files?.[0];
                 if (file) void onAssetUpload('favicon', file);
+                event.currentTarget.value = '';
               }}
             />
-            <Button variant="outline" size="sm" disabled={uploadingSlot === 'favicon'} onClick={() => faviconInputRef.current?.click()}>
+            <Button variant="outline" size="sm" disabled={uploadingSlot !== null || savingBranding} onClick={() => faviconInputRef.current?.click()}>
               {uploadingSlot === 'favicon' ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
               Upload Favicon
             </Button>
