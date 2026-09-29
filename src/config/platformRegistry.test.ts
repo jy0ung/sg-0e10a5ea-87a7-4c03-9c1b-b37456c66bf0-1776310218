@@ -40,6 +40,16 @@ describe('platformRegistry', () => {
     expect(MAIN_NAV_ROUTES.map((route) => route.path)).not.toContain('/hrms/');
   });
 
+  it('registers personal account routes separately from Admin routes', () => {
+    expect(PLATFORM_ROUTES.filter(route => route.id.startsWith('account-')).map(route => route.path)).toEqual([
+      '/profile',
+      '/profile/security',
+      '/profile/notifications',
+    ]);
+    expect(PLATFORM_SECTIONS.find(section => section.name === 'Admin')?.path).toBe('/admin');
+    expect(PLATFORM_ROUTES.find(route => route.id === 'admin-settings')?.roles).toEqual(['super_admin', 'company_admin']);
+  });
+
   it('drives HRMS shell navigation and chrome from the shared route registry', () => {
     expect(HRMS_NAV_ROUTES.map((route) => route.path)).toEqual([
       '/dashboard',

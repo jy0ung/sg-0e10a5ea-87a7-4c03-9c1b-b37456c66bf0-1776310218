@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { setupAuthMocks } from "./helpers/auth-mock";
+import { MOCK_PROFILE, SUPABASE_URL, setupAuthMocks } from "./helpers/auth-mock";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTHENTICATED ROUTE RENDERING
@@ -51,6 +51,48 @@ test.describe("Platform", () => {
   test("Notifications (/notifications)", async ({ page }) => {
     await assertPageLoaded(page, "/notifications");
     await expect(page.locator("text=/notification/i").first()).toBeVisible({ timeout: 8000 });
+  });
+
+  test("My Account routes keep personal controls outside Admin Settings", async ({ page }) => {
+    await assertPageLoaded(page, "/profile");
+    await expect(page).toHaveURL(/\/profile$/);
+    await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
+    await expect(page.getByLabel('Display Name')).toBeVisible();
+
+    await page.getByRole('navigation', { name: 'My Account' }).getByRole('link', { name: 'Security' }).click();
+    await expect(page).toHaveURL(/\/profile\/security$/);
+    await expect(page.getByRole('heading', { name: 'Change Password' })).toBeVisible();
+
+    await page.getByRole('navigation', { name: 'My Account' }).getByRole('link', { name: 'Notifications' }).click();
+    await expect(page).toHaveURL(/\/profile\/notifications$/);
+    await expect(page.getByRole('heading', { name: 'Push Notifications' })).toBeVisible();
+  });
+
+  test("My Profile warns before leaving an unsaved edit", async ({ page }) => {
+    await assertPageLoaded(page, "/profile");
+    const name = page.getByLabel('Display Name');
+    await name.fill('Unsaved profile name');
+    await page.getByRole('navigation', { name: 'My Account' }).getByRole('link', { name: 'Security' }).click();
+    await expect(page.getByRole('alertdialog')).toContainText('Unsaved changes');
+    await page.getByRole('button', { name: 'Stay and save' }).click();
+    await expect(page).toHaveURL(/\/profile$/);
+    await expect(name).toHaveValue('Unsaved profile name');
+  });
+
+  test("a non-admin opening legacy Settings reaches My Profile", async ({ page }) => {
+    await page.route(`${SUPABASE_URL}/rest/v1/profiles*`, route => {
+      const wantsSingle = (route.request().headers()['accept'] ?? '').includes('pgrst.object');
+      const profile = { ...MOCK_PROFILE, role: 'sales', access_scope: 'self' };
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(wantsSingle ? profile : [profile]),
+      });
+    });
+    await page.goto('/admin/settings', { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(/\/profile$/);
+    await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
+    await expect(page.getByLabel('Display Name')).toBeVisible();
   });
 });
 

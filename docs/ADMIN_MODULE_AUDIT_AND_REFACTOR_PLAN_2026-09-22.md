@@ -16,6 +16,8 @@ The bounded role-matrix follow-up addresses H4: the editor holds a draft outside
 
 The first navigation slice adds an authorized `/admin` landing page, registers System Health in the shared navigation, and points Admin breadcrumbs to the real landing route. The landing directory uses the route registry, role metadata, and feature flags so it does not offer unavailable actions. Personal Settings still lives at `/admin/settings`; separating account and administration routes remains a distinct follow-up.
 
+The next bounded account slice gives `/profile`, `/profile/security`, and `/profile/notifications` real personal pages for users of the main UBS shell. The profile and password forms retain unsaved-change protection, and the Admin section now points to `/admin` for authorized executive roles. `/admin/settings` remains a compatibility page for company and super admins; other main-shell roles are redirected to `/profile`. Moving Modules and Organization to dedicated Admin routes remains open.
+
 Migration/compatibility: the new RPC and grants are additive; revoking direct column-permission writes intentionally makes a cached old editor fail closed until it reloads the updated client. The legacy package service delegates Vehicle saves to the new command, preserving in-repository callers. A rollback of the client alone would leave the old editor unable to save; any rollback must keep the new client contract or restore direct grants through a reviewed migration. Disposable Supabase tests cover the new write path and denial of direct writes.
 
 ## Executive summary
