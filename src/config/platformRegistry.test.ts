@@ -34,10 +34,10 @@ describe('platformRegistry', () => {
       '/purchasing/orders',
       '/accounts/profit-loss',
       '/admin',
-      '/admin/settings',
       '/admin/health',
       '/admin/roles',
       '/admin/modules',
+      '/admin/organization',
     ]));
     expect(MAIN_NAV_ROUTES.map((route) => route.path)).not.toContain('/hrms/');
   });
@@ -49,7 +49,8 @@ describe('platformRegistry', () => {
       '/profile/notifications',
     ]);
     expect(PLATFORM_SECTIONS.find(section => section.name === 'Admin')?.path).toBe('/admin');
-    expect(PLATFORM_ROUTES.find(route => route.id === 'admin-settings')?.roles).toEqual(['super_admin', 'company_admin']);
+    expect(PLATFORM_ROUTES.find(route => route.id === 'admin-settings')?.navShell).toBeUndefined();
+    expect(PLATFORM_ROUTES.find(route => route.id === 'admin-organization')?.roles).toEqual(['super_admin', 'company_admin']);
   });
 
   it('drives HRMS shell navigation and chrome from the shared route registry', () => {

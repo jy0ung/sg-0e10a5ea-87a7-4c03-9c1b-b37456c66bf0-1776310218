@@ -240,13 +240,67 @@ test.describe("Admin module", () => {
     await expect(page).toHaveURL(/\/admin\/roles$/);
   });
 
+  test("Organization branding saves through its own route and guards an unsaved draft", async ({ page }) => {
+    let companyName = 'FLC Test Company';
+    let savedCompanyId: string | null = null;
+    let savedAssetPath: string | null = null;
+    await page.route(`${SUPABASE_URL}/storage/v1/object/company-assets/**`, route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ Key: 'company-assets/test-logo' }),
+    }));
+    await page.route(`${SUPABASE_URL}/rest/v1/company_branding*`, async route => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: 'branding-1',
+            company_id: MOCK_PROFILE.company_id,
+            company_name: companyName,
+            app_name: 'FLC UBS',
+            app_short_name: 'FLC',
+          }),
+        });
+        return;
+      }
+      const submitted = route.request().postDataJSON() as { company_id: string; company_name?: string; logo_path?: string };
+      savedCompanyId = submitted.company_id;
+      if (submitted.company_name !== undefined) companyName = submitted.company_name;
+      if (submitted.logo_path !== undefined) savedAssetPath = submitted.logo_path;
+      await route.fulfill({ status: 201, contentType: 'application/json', body: '{}' });
+    });
+
+    await assertPageLoaded(page, '/admin/organization');
+    await expect(page.getByRole('heading', { level: 1, name: 'Organization & Branding' })).toBeVisible();
+    const name = page.getByLabel('Company Name');
+    await expect(name).toHaveValue('FLC Test Company');
+    await name.fill('Updated FLC Company');
+    await page.getByRole('navigation', { name: 'breadcrumb' }).getByRole('link', { name: 'Admin' }).click();
+    await expect(page.getByRole('alertdialog')).toContainText('Unsaved organization changes');
+    await page.getByRole('button', { name: 'Stay and save' }).click();
+    await expect(name).toHaveValue('Updated FLC Company');
+
+    await page.getByLabel('Upload app logo').setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from('test-image') });
+    await expect(page.getByText('Brand asset uploaded')).toBeVisible();
+    expect(savedAssetPath).toMatch(new RegExp(`^${MOCK_PROFILE.company_id}/logo/[a-f0-9-]+\\.png$`));
+    await expect(name).toHaveValue('Updated FLC Company');
+
+    await page.getByRole('button', { name: 'Save Branding' }).click();
+    await expect(page.getByRole('button', { name: 'Save Branding' })).toBeDisabled();
+    expect(savedCompanyId).toBe(MOCK_PROFILE.company_id);
+    await page.getByRole('navigation', { name: 'breadcrumb' }).getByRole('link', { name: 'Admin' }).click();
+    await expect(page).toHaveURL(/\/admin$/);
+  });
+
   test("Audit Log (/admin/audit)", async ({ page }) => {
     await assertPageLoaded(page, "/admin/audit");
     await expect(page.locator("text=/audit|log/i").first()).toBeVisible({ timeout: 8000 });
   });
 
-  test("Settings (/admin/settings)", async ({ page }) => {
+  test("Legacy Settings redirects to My Profile", async ({ page }) => {
     await assertPageLoaded(page, "/admin/settings");
-    await expect(page.locator("text=/setting/i").first()).toBeVisible({ timeout: 8000 });
+    await expect(page).toHaveURL(/\/profile$/);
+    await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
   });
 });
