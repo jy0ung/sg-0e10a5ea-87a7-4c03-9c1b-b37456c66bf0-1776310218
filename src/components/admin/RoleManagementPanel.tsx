@@ -108,7 +108,12 @@ export function RoleManagementPanel({ embedded = false, onDirtyChange }: RoleMan
   const editDraft = (update: (current: RoleSectionsMatrix) => RoleSectionsMatrix) => {
     if (!roleQuery.data || saveMutation.isPending) return;
     if (!dirty) setBaseVersion(roleQuery.data.version);
-    setDraft(update(permissions));
+    const updated = update(permissions);
+    setDraft({
+      ...updated,
+      super_admin: [...new Set([...updated.super_admin, 'Admin' as SectionName])],
+      company_admin: [...new Set([...updated.company_admin, 'Admin' as SectionName])],
+    });
     setDirty(true);
   };
 
@@ -303,7 +308,7 @@ export function RoleManagementPanel({ embedded = false, onDirtyChange }: RoleMan
                       onClick={() => toggleSection(section)}
                       disabled={!roleQuery.data || saveMutation.isPending}
                       className="text-[10px] text-primary hover:underline mr-1"
-                      title={`Toggle all roles for ${section}`}
+                      title={section === 'Admin' ? 'Toggle eligible roles for Admin; administrator roles retain access' : `Toggle all roles for ${section}`}
                     >
                       all
                     </button>
@@ -312,19 +317,20 @@ export function RoleManagementPanel({ embedded = false, onDirtyChange }: RoleMan
                 </td>
                 {ALL_ROLES.map((role) => {
                   const allowed = isAllowed(role, section);
+                  const recoveryAccess = (role === 'super_admin' || role === 'company_admin') && section === 'Admin';
                   return (
                     <td key={role} className="px-3 py-3 text-center">
                       <button
                         onClick={() => toggle(role, section)}
-                        disabled={!roleQuery.data || saveMutation.isPending}
+                        disabled={!roleQuery.data || saveMutation.isPending || recoveryAccess}
                         className={cn(
                           'inline-flex items-center justify-center rounded transition-colors p-0.5',
                           allowed
                             ? 'text-primary hover:text-primary/80'
                             : 'text-muted-foreground/40 hover:text-muted-foreground'
                         )}
-                        title={`${allowed ? 'Revoke' : 'Grant'} ${section} access for ${ROLE_LABELS[role]}`}
-                        aria-label={`${ROLE_LABELS[role]} - ${section}: ${allowed ? 'allowed' : 'denied'}`}
+                        title={recoveryAccess ? 'Required for administrator recovery' : `${allowed ? 'Revoke' : 'Grant'} ${section} access for ${ROLE_LABELS[role]}`}
+                        aria-label={`${ROLE_LABELS[role]} - ${section}: ${recoveryAccess ? 'required' : allowed ? 'allowed' : 'denied'}`}
                         aria-pressed={allowed}
                       >
                         {allowed ? (

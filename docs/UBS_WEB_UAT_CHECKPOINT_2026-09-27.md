@@ -16,6 +16,8 @@
 
 **Personal account follow-up:** PR #114 merged at `f6f408a`. The next bounded Admin slice gives Roles & Permissions its own guarded route, connects the Users page and old role-permissions redirect to it, and protects dirty role drafts on navigation. Modules, Organization, and operational workbench slices remain open.
 
+**Roles route follow-up:** PR #115 merged at `e8b0d27`. A recovery-invariant slice now prevents role-matrix edits from removing Admin access from the Super Admin and Company Admin roles and repairs any existing denied rows while advancing the version. This addresses a confirmed UI lockout path; it does not establish the reported general form-loss root cause.
+
 ## Scope and issue accuracy
 
 - [#47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) remains the architecture and web-app completion programme. Its old linear sequence overstates the dependency on final production recovery; business-feature work can proceed with disposable UAT infrastructure.

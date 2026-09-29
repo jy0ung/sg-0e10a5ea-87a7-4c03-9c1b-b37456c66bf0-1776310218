@@ -20,6 +20,8 @@ The next bounded account slice gives `/profile`, `/profile/security`, and `/prof
 
 The dedicated `/admin/roles` slice reuses the versioned role-matrix editor and its existing package-owned RPC commands. The old `/admin/role-permissions` path redirects to the canonical route, and the Users page links to it instead of embedding a second editor. A dirty role draft blocks in-app navigation and warns on unload. Dedicated Modules and Organization routes remain open.
 
+The recovery-invariant follow-up reserves Admin section access for the Super Admin and Company Admin roles, which are the roles allowed to open the role editor. A migration repairs any already-denied rows and advances each affected company's matrix version once; the RPC rejects future matrices that remove this access. The editor disables the reserved cells and preserves them during bulk changes. Other role/section grants remain configurable. The migration repair has no signed-in actor, so it is documented as a system migration rather than attributed to a user audit row.
+
 Migration/compatibility: the new RPC and grants are additive; revoking direct column-permission writes intentionally makes a cached old editor fail closed until it reloads the updated client. The legacy package service delegates Vehicle saves to the new command, preserving in-repository callers. A rollback of the client alone would leave the old editor unable to save; any rollback must keep the new client contract or restore direct grants through a reviewed migration. Disposable Supabase tests cover the new write path and denial of direct writes.
 
 ## Executive summary
