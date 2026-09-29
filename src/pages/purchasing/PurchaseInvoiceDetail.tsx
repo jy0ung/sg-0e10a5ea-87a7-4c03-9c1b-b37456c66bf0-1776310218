@@ -27,7 +27,7 @@ import {
   transitionPiLifecycle,
 } from '@/services/apService';
 import { purchaseInvoiceSchema } from '@/lib/validations';
-import type { PurchaseInvoiceLifecycleStatus } from '@/types';
+import type { PurchaseInvoiceLifecycleStatus, SupplierPaymentEvent } from '@/types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -75,6 +75,9 @@ export default function PurchaseInvoiceDetail() {
   const [payMethod, setPayMethod] = useState('');
   const [payRef, setPayRef]       = useState('');
   const [paying, setPaying]       = useState(false);
+  const [reverseTarget, setReverseTarget] = useState<SupplierPaymentEvent | null>(null);
+  const [reverseReason, setReverseReason] = useState('');
+  const [reversing, setReversing] = useState(false);
 
   // Edit dialog
   const [editOpen, setEditOpen] = useState(false);
@@ -165,10 +168,15 @@ export default function PurchaseInvoiceDetail() {
     invalidate();
   };
 
-  const handleReverse = async (eventId: string) => {
-    const { error: err } = await reverseSupplierPaymentEvent(eventId);
+  const handleReverse = async () => {
+    if (!reverseTarget || !reverseReason.trim()) return;
+    setReversing(true);
+    const { error: err } = await reverseSupplierPaymentEvent(reverseTarget.id, reverseReason.trim());
+    setReversing(false);
     if (err) { toast({ title: 'Reversal failed', description: err.message, variant: 'destructive' }); return; }
-    toast({ title: 'Payment reversed' });
+    setReverseTarget(null);
+    setReverseReason('');
+    toast({ title: 'Payment reversed', description: 'A posted payment also creates a balancing Finance correction.' });
     invalidate();
   };
 
@@ -546,12 +554,12 @@ export default function PurchaseInvoiceDetail() {
                       {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
                     </td>
                     <td className="py-2.5 pr-6">
-                      {canPay && event.eventType === 'payment' && !event.isReversed && invoice.lifecycleStatus !== 'paid' && (
+                      {canPay && event.eventType === 'payment' && !event.isReversed && (
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-7 px-2 text-[10px] text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          onClick={() => handleReverse(event.id)}
+                          onClick={() => { setReverseTarget(event); setReverseReason(''); }}
                         >
                           <RotateCcw className="h-3 w-3 mr-0.5" />Reverse
                         </Button>
@@ -613,6 +621,29 @@ export default function PurchaseInvoiceDetail() {
             <Button variant="outline" size="sm" onClick={() => setPayOpen(false)}>Cancel</Button>
             <Button size="sm" onClick={handleRecordPayment} disabled={paying || !payAmount}>
               {paying ? 'Recording…' : 'Record Payment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Reverse Supplier Payment Dialog ──────────────────────────────── */}
+      <Dialog open={reverseTarget !== null} onOpenChange={open => { if (!open && !reversing) setReverseTarget(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reverse Supplier Payment</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Reverse {reverseTarget ? fmt(reverseTarget.amount) : 'this payment'} from {invoice.invoiceNo}.
+            A posted payment creates an equal and opposite journal in the current open accounting period.
+          </p>
+          <div className="space-y-1">
+            <label htmlFor="pi-reversal-reason" className="text-xs font-medium text-muted-foreground">Reason *</label>
+            <Input id="pi-reversal-reason" value={reverseReason} onChange={event => setReverseReason(event.target.value)} placeholder="Why is this payment being reversed?" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" disabled={reversing} onClick={() => setReverseTarget(null)}>Cancel</Button>
+            <Button size="sm" disabled={reversing || !reverseReason.trim()} onClick={handleReverse}>
+              {reversing ? 'Reversing…' : 'Confirm reversal'}
             </Button>
           </DialogFooter>
         </DialogContent>

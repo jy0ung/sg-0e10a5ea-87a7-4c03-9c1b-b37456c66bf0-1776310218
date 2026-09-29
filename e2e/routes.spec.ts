@@ -113,6 +113,46 @@ test.describe("Customer portal", () => {
   });
 });
 
+test.describe('Purchasing payment correction', () => {
+  test('paid invoice offers a reasoned supplier reversal', async ({ page }) => {
+    const invoiceId = '00000000-0000-0000-0000-000000000100';
+    const eventId = '00000000-0000-0000-0000-000000000200';
+    let submittedReason: string | null = null;
+    await page.route(`${SUPABASE_URL}/rest/v1/purchase_invoices*`, route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: invoiceId, company_id: MOCK_PROFILE.company_id,
+        invoice_no: 'PI-100', supplier: 'Test Supplier', chassis_no: 'CHASSIS-100',
+        model: 'Test Model', invoice_date: '2026-09-01', amount: 1000,
+        status: 'received', lifecycle_status: 'paid', payment_status: 'paid', paid_amount: 1000,
+      }),
+    }));
+    await page.route(`${SUPABASE_URL}/rest/v1/rpc/get_supplier_payment_events*`, route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{
+        id: eventId, event_type: 'payment', amount: 1000, payment_date: '2026-09-01',
+        is_reversed: false, created_at: '2026-09-01T00:00:00Z',
+      }]),
+    }));
+    await page.route(`${SUPABASE_URL}/rest/v1/rpc/reverse_supplier_payment_event*`, route => {
+      submittedReason = (route.request().postDataJSON() as { p_reason: string }).p_reason;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify('00000000-0000-0000-0000-000000000300') });
+    });
+
+    await assertPageLoaded(page, `/purchasing/invoices/${invoiceId}`);
+    await expect(page.getByRole('heading', { name: 'PI-100' })).toBeVisible();
+    await page.getByRole('button', { name: 'Reverse' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Reverse Supplier Payment' });
+    await expect(dialog.getByRole('button', { name: 'Confirm reversal' })).toBeDisabled();
+    await dialog.getByLabel('Reason *').fill('Incorrect bank instruction');
+    await dialog.getByRole('button', { name: 'Confirm reversal' }).click();
+    await expect(dialog).not.toBeVisible();
+    expect(submittedReason).toBe('Incorrect bank instruction');
+  });
+});
+
 // ── Auto-Aging routes ─────────────────────────────────────────────────────────
 
 test.describe("Auto Aging module", () => {
