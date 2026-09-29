@@ -649,7 +649,7 @@ export default function UserManagement() {
   if (loading) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <PageHeader title="Users & Roles" description="Manage platform users, roles, and account access" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Users & Roles' }]} />
+        <PageHeader title="Users & Roles" description="Manage platform users, roles, and account access" breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Users & Roles' }]} />
         <div className="glass-panel p-4 animate-pulse space-y-3">
           <div className="h-9 w-48 bg-muted rounded" />
           <div className="border-t border-border" />
@@ -666,7 +666,7 @@ export default function UserManagement() {
       <PageHeader
         title="Users & Roles"
         description="Manage UBS account status, roles, branch assignments, and permissions"
-        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Users & Roles' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Users & Roles' }]}
         actions={adminTab === 'users' ? (
           <>
             <Button variant="outline" size="sm" onClick={handleCopySignupLink}>

@@ -51,7 +51,7 @@ export default function SystemHealth() {
       <PageHeader
         title="System Health"
         description="Monitor system status, data metrics, and sync health"
-        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'System Health' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'System Health' }]}
       />
 
       {isLoading ? (

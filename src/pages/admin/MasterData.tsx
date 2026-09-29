@@ -462,7 +462,7 @@ export default function MasterData() {
         <PageHeader
           title="Master Data"
           description="Manage Finance Companies, Insurance Companies, Vehicle Models and Colours"
-          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Master Data' }]}
+          breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Master Data' }]}
         />
         <div className="h-10 w-full bg-muted rounded animate-pulse" />
         <TableSkeleton rows={5} cols={3} />
@@ -475,7 +475,7 @@ export default function MasterData() {
       <PageHeader
         title="Master Data"
         description="Manage Finance Companies, Insurance Companies, Vehicle Models and Colours"
-        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Master Data' }]}
+        breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Master Data' }]}
       />
 
       <Tabs value={tab} onValueChange={onTabChange}>

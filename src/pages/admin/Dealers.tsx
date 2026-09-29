@@ -173,7 +173,7 @@ export default function Dealers() {
     <PageHeader
       title="Dealers"
       description="Manage authorised dealers and their accounts"
-      breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin/settings' }, { label: 'Dealers' }]}
+      breadcrumbs={[{ label: 'FLC BI', path: '/' }, { label: 'Admin', path: '/admin' }, { label: 'Dealers' }]}
       actions={<Button size="sm" onClick={openAdd}><Plus className="mr-2 h-4 w-4" />Add Dealer</Button>}
     />
   );

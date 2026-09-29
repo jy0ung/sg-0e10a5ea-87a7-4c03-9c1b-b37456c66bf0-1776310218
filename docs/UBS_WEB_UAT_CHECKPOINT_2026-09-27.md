@@ -10,6 +10,8 @@
 
 **Admin secret follow-up:** PR #111 merged at `1f2125d`. The next bounded slice makes the role-section matrix save transactional and versioned, and keeps dirty edits safe from background refetch. It does not establish the reported form-loss root cause or complete Admin information architecture.
 
+**Admin matrix follow-up:** PR #112 merged at `c021d35`. The next navigation slice adds a real Admin landing route and System Health navigation, with role-aware links. Personal account separation, form-loss diagnosis, and broader Admin workflow UAT remain open.
+
 ## Scope and issue accuracy
 
 - [#47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) remains the architecture and web-app completion programme. Its old linear sequence overstates the dependency on final production recovery; business-feature work can proceed with disposable UAT infrastructure.
