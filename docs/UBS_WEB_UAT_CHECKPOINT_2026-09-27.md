@@ -28,6 +28,8 @@
 
 **Finance reconciliation UAT follow-up — 2026-09-30:** PR #121 adds a disposable two-period, authenticated AR/AP payment-to-journal-to-close regression that confirmed three GL report RPCs included later-period journal lines in earlier reports. A bounded migration filters lines before aggregation without changing the RPC contract. The failing pre-migration run showed January Cash at 27,000 instead of 20,000 after a 7,000 February journal; the corrected local readiness run passed 203 live tests. See `docs/FINANCE_SETTLEMENT_REPORT_RECONCILIATION_UAT_2026-09-30.md`. This is Dev/UAT evidence, not production financial reconciliation or #48 recovery evidence.
 
+**Finance period-close authority follow-up — 2026-09-30:** A new live negative regression proved the old browser-facing update closed a period with unposted AR/AP payments. A separate Finance migration moves close and lock transitions to authenticated, same-company server commands, removes direct authenticated period updates, validates posting and exact journal balance under the period row lock, stamps closure metadata and audit evidence, and blocks new source payments dated in closed/locked periods. The corrected disposable readiness run passed 208 live tests; see the appended close-control evidence in `docs/FINANCE_SETTLEMENT_REPORT_RECONCILIATION_UAT_2026-09-30.md`. This does not change #48 production release/recovery status.
+
 ## Scope and issue accuracy
 
 - [#47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) remains the architecture and web-app completion programme. Its old linear sequence overstates the dependency on final production recovery; business-feature work can proceed with disposable UAT infrastructure.

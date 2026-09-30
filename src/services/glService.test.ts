@@ -12,6 +12,7 @@ import {
   listAccountingPeriods,
   createAccountingPeriod,
   closeAccountingPeriod,
+  lockAccountingPeriod,
   listAccounts,
   createGlAccount,
   listJournalEntries,
@@ -588,7 +589,7 @@ describe('createAccountingPeriod', () => {
 // ── closeAccountingPeriod ─────────────────────────────────────────────────────
 
 describe('closeAccountingPeriod', () => {
-  it('updates status to closed', async () => {
+  it('calls the authoritative close command and maps its result', async () => {
     const row = {
       id: 'period-1', company_id: 'co-1', name: 'Jan 2026',
       period_year: 2026, period_month: 1,
@@ -596,16 +597,28 @@ describe('closeAccountingPeriod', () => {
       status: 'closed', closed_at: '2026-02-01T00:00:00Z', closed_by: 'user-1',
       created_at: '2026-01-01T00:00:00Z', updated_at: '2026-02-01T00:00:00Z',
     };
-    const chain = makeChain({
-      single: vi.fn().mockResolvedValue({ data: row, error: null }),
-    });
-    vi.mocked(supabase.from).mockReturnValue(chain as never);
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: row, error: null } as never);
 
     const result = await closeAccountingPeriod('period-1');
 
-    expect(chain.update).toHaveBeenCalledWith({ status: 'closed' });
-    expect(chain.eq).toHaveBeenCalledWith('id', 'period-1');
+    expect(supabase.rpc).toHaveBeenCalledWith('close_accounting_period', { p_period_id: 'period-1' });
     expect(result.data!.status).toBe('closed');
+  });
+
+  it('surfaces the server readiness rejection', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: null, error: { message: 'Accounting period has unposted payments (AR: 1, AP: 0)' } } as never);
+    const result = await closeAccountingPeriod('period-1');
+    expect(result.data).toBeNull();
+    expect(result.error?.message).toContain('unposted payments');
+  });
+});
+
+describe('lockAccountingPeriod', () => {
+  it('uses the authenticated lock command', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: { id: 'period-1', status: 'locked' }, error: null } as never);
+    const result = await lockAccountingPeriod('period-1');
+    expect(supabase.rpc).toHaveBeenCalledWith('lock_accounting_period', { p_period_id: 'period-1' });
+    expect(result.data?.status).toBe('locked');
   });
 });
 

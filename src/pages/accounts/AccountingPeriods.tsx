@@ -113,7 +113,13 @@ export default function AccountingPeriods() {
       : await lockAccountingPeriod(actionTarget.id);
     setActioning(false);
     if (result.error) {
-      toast({ title: `Failed to ${actionType} period`, description: result.error.message, variant: 'destructive' });
+      toast({
+        title: `Failed to ${actionType} period`,
+        description: actionType === 'close'
+          ? `${result.error.message} Review the Period Close page for posting readiness.`
+          : result.error.message,
+        variant: 'destructive',
+      });
     } else {
       toast({ title: `Period ${actionType === 'close' ? 'closed' : 'locked'}` });
       queryClient.invalidateQueries({ queryKey: ['accounting_periods', companyId] });
@@ -306,9 +312,9 @@ export default function AccountingPeriods() {
             <AlertDialogDescription>
               {actionType === 'close' ? (
                 <>
-                  Closing <strong>{actionTarget?.name}</strong> will mark it as closed.
-                  Ensure all journal entries for this period are posted before closing.
-                  You can still lock the period after reviewing.
+                  The system will revalidate payment posting and journal balance
+                  before closing <strong>{actionTarget?.name}</strong>. If any checks
+                  fail, the period will stay open. You can lock it after reviewing.
                 </>
               ) : (
                 <>

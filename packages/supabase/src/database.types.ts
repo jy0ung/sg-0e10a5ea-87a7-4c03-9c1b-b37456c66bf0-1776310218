@@ -8508,6 +8508,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      close_accounting_period: {
+        Args: { p_period_id: string }
+        Returns: Database["public"]["Tables"]["accounting_periods"]["Row"]
+      }
       commit_import_batch: {
         Args: {
           p_batch_id: string
@@ -8994,6 +8998,10 @@ export type Database = {
           current_step_name: string | null
           updated_at: string
         }[]
+      }
+      lock_accounting_period: {
+        Args: { p_period_id: string }
+        Returns: Database["public"]["Tables"]["accounting_periods"]["Row"]
       }
       list_webhook_endpoints: {
         Args: { p_company_id: string }
