@@ -3,6 +3,7 @@ import { useBlocker } from 'react-router-dom';
 import { RoleManagementPanel } from '@/components/admin/RoleManagementPanel';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning';
+import { useDiagnosticForm, useDiagnosticMount } from '@/hooks/useLifecycleDiagnostics';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +16,9 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export default function AdminRoles() {
+  const pageMountId = useDiagnosticMount('roles');
   const [dirty, setDirty] = useState(false);
+  useDiagnosticForm('admin-roles', dirty, pageMountId);
   useBeforeUnloadWarning(dirty);
   const blocker = useBlocker(({ currentLocation, nextLocation }) =>
     dirty && currentLocation.pathname !== nextLocation.pathname,

@@ -100,10 +100,12 @@ export function AuthProvider({
   children,
   logger,
   errorTracker,
+  onAuthEvent,
 }: {
   children: React.ReactNode;
   logger?: AuthLogger;
   errorTracker?: AuthErrorTracker;
+  onAuthEvent?: (event: string, sessionPresent: boolean) => void;
 }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -210,6 +212,7 @@ export function AuthProvider({
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
+        onAuthEvent?.(event, !!newSession);
         setSession(newSession);
         if (newSession?.user) {
           const currentProfile = profileRef.current;
@@ -235,6 +238,7 @@ export function AuthProvider({
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+      onAuthEvent?.('SESSION_CHECK', !!existingSession);
       setSession(existingSession);
       if (existingSession?.user) {
         fetchProfile(existingSession.user.id).finally(() => {
@@ -247,7 +251,7 @@ export function AuthProvider({
     });
 
     return () => subscription.unsubscribe();
-  }, [clearSessionArtifacts, fetchProfile]);
+  }, [clearSessionArtifacts, fetchProfile, onAuthEvent]);
 
   const login = useCallback(async (email: string, password: string) => {
     try {

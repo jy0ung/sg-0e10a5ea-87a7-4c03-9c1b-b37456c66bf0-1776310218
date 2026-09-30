@@ -25,6 +25,7 @@ const envSchema = z.object({
   VITE_APP_URL: z.string().url().optional(),
   VITE_HRMS_APP_URL: z.string().url().optional(),
   VITE_APP_VERSION: z.string().optional(),
+  VITE_LIFECYCLE_DIAGNOSTICS: z.enum(['true', 'false']).default('false').catch('false'),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -60,6 +61,7 @@ function parseEnv(): AppEnv {
     VITE_APP_URL: import.meta.env.VITE_APP_URL || undefined,
     VITE_HRMS_APP_URL: import.meta.env.VITE_HRMS_APP_URL || undefined,
     VITE_APP_VERSION: import.meta.env.VITE_APP_VERSION || undefined,
+    VITE_LIFECYCLE_DIAGNOSTICS: import.meta.env.VITE_LIFECYCLE_DIAGNOSTICS,
   };
 
   const result = envSchema.safeParse(raw);

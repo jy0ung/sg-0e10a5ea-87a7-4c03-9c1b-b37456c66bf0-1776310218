@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning';
+import { useDiagnosticForm, useDiagnosticMount } from '@/hooks/useLifecycleDiagnostics';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +38,7 @@ function sameFields(a: BrandingFields, b: BrandingFields): boolean {
   return (Object.keys(a) as (keyof BrandingFields)[]).every(key => a[key] === b[key]);
 }
 
-function OrganizationForAccount({ companyId }: { companyId: string | null }) {
+function OrganizationForAccount({ companyId, pageMountId }: { companyId: string | null; pageMountId: string }) {
   const { branding, loading, error: loadError, refresh } = useBranding();
   const [fields, setFields] = useState<BrandingFields>(() => fieldsFromBranding(branding));
   const savedFields = useRef<BrandingFields>(fields);
@@ -47,6 +48,7 @@ function OrganizationForAccount({ companyId }: { companyId: string | null }) {
   const loginLogoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
   const dirty = !sameFields(fields, savedFields.current);
+  useDiagnosticForm('admin-organization', dirty, pageMountId);
   const pending = saving || uploadingSlot !== null;
 
   // A background refresh may update the displayed brand, but it cannot replace
@@ -159,9 +161,10 @@ function OrganizationForAccount({ companyId }: { companyId: string | null }) {
 }
 
 export default function AdminOrganization() {
+  const pageMountId = useDiagnosticMount('organization');
   const { user } = useAuth();
   const companyId = user?.company_id ?? null;
 
   // A different account must never inherit the previous account's draft.
-  return <OrganizationForAccount key={`${user?.id ?? 'guest'}:${companyId ?? 'none'}`} companyId={companyId} />;
+  return <OrganizationForAccount key={`${user?.id ?? 'guest'}:${companyId ?? 'none'}`} companyId={companyId} pageMountId={pageMountId} />;
 }

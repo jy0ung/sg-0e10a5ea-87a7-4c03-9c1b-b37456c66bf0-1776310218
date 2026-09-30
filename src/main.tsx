@@ -27,6 +27,7 @@ import { errorTrackingService } from "@flc/platform-services";
 import { subscribeWebVitals } from "@/services/webVitalsService";
 import { env } from "@/config/env";
 import { createAppQueryClient } from "@/lib/queryClient";
+import { startLifecycleDiagnostics } from '@/lib/lifecycleDiagnostics';
 import { hasPortalSpecificRole, isPortalOnlyUser } from '@/lib/portalAccess';
 import { getDedicatedHrmsWorkspacePath, HRMS_PATHS, isHrmsWorkspacePath } from '@/lib/hrmsWorkspace';
 import {
@@ -45,6 +46,7 @@ errorTrackingService.init({
   release: env.VITE_APP_VERSION,
   tracesSampleRate: env.VITE_SENTRY_TRACES_SAMPLE_RATE,
 });
+startLifecycleDiagnostics();
 
 // Ship all five Core Web Vitals to Sentry RUM (CLS, FCP, INP, LCP, TTFB).
 // Implementation lives in webVitalsService so the subscription set is

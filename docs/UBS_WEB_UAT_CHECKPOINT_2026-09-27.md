@@ -24,6 +24,8 @@
 
 **Organization route follow-up:** PR #118 merged at `4fc9033`; the Admin configuration routes now separate Roles, Modules, and Organization from personal Profile. The next Finance slice adds a controlled posted AP supplier-payment correction: it mirrors the original journal in an open period, appends the reversal event and audit in one transaction, and reopens a previously paid invoice for settlement. Full AP settlement UAT and the wider operational checks remain open.
 
+**Admin reliability diagnostic checkpoint — 2026-09-30:** PR #120 adds an opt-in, metadata-only lifecycle trace and mocked-session Chromium regressions. Normal dispatched visibility and explicit `TOKEN_REFRESHED` paths preserved a dirty Profile; hard reload classified as a new document. The intermittent report did not reproduce, and neither browser discard nor deployed service-worker update was proven. Keep the diagnostic flag dormant until Dev/UAT reproduction. After this PR, the next high-value slice is AR/AP settlement-chain and period-close/report reconciliation UAT; #48 production recovery remains separate.
+
 ## Scope and issue accuracy
 
 - [#47](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/issues/47) remains the architecture and web-app completion programme. Its old linear sequence overstates the dependency on final production recovery; business-feature work can proceed with disposable UAT infrastructure.

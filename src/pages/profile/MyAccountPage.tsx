@@ -10,6 +10,7 @@ import { NotificationSettings } from '@/components/shared/NotificationSettings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBranding } from '@/contexts/BrandingContext';
 import { useBeforeUnloadWarning } from '@/hooks/useBeforeUnloadWarning';
+import { useDiagnosticForm, useDiagnosticMount } from '@/hooks/useLifecycleDiagnostics';
 import { STALE } from '@/lib/queryClient';
 import {
   changePasswordSchema,
@@ -62,7 +63,7 @@ function UnsavedChangesGuard({ dirty }: { dirty: boolean }) {
   );
 }
 
-function PersonalProfile() {
+function PersonalProfile({ pageMountId }: { pageMountId: string }) {
   const { user, refreshProfile } = useAuth();
   const { branding } = useBranding();
   const [saving, setSaving] = useState(false);
@@ -71,6 +72,7 @@ function PersonalProfile() {
     defaultValues: { name: user?.name || '' },
     mode: 'onChange',
   });
+  useDiagnosticForm('my-profile', form.formState.isDirty, pageMountId);
   const { data: branches = [] } = useQuery({
     queryKey: ['branches', user?.company_id],
     queryFn: () => getBranches(user!.company_id || '').then(result => result.data),
@@ -146,6 +148,7 @@ function PersonalSecurity() {
 }
 
 export default function MyAccountPage({ section }: { section: AccountSection }) {
+  const pageMountId = useDiagnosticMount('profile');
   const current = ACCOUNT_LINKS.find(link => link.section === section)!;
   return (
     <div className="space-y-6 motion-safe:animate-fade-in">
@@ -166,7 +169,7 @@ export default function MyAccountPage({ section }: { section: AccountSection }) 
           </NavLink>
         ))}
       </nav>
-      {section === 'profile' && <PersonalProfile />}
+      {section === 'profile' && <PersonalProfile pageMountId={pageMountId} />}
       {section === 'security' && <PersonalSecurity />}
       {section === 'notifications' && <NotificationSettings />}
     </div>
