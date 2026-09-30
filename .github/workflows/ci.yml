@@ -154,6 +154,8 @@ jobs:
         run: npx playwright test e2e/routes.spec.ts --project=chromium
       - name: Run Admin lifecycle browser regression
         run: npx playwright test e2e/admin-lifecycle.spec.ts --project=chromium
+      - name: Run Accounting Periods close browser regression
+        run: npx playwright test e2e/accounting-period-close.spec.ts --project=chromium
       - name: Run responsive smoke specs
         run: npx playwright test e2e/responsive.spec.ts --project=mobile-chromium --project=tablet-chromium
       - name: Run accessibility smoke specs

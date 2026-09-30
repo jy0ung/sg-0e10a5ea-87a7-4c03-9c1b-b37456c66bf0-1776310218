@@ -196,12 +196,9 @@ export async function createAccountingPeriod(
 export async function lockAccountingPeriod(
   periodId: string,
 ): Promise<{ data: AccountingPeriod | null; error: Error | null }> {
-  const { data, error } = await supabase
-    .from('accounting_periods')
-    .update({ status: 'locked' })
-    .eq('id', periodId)
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('lock_accounting_period', {
+    p_period_id: periodId,
+  });
   if (error) {
     loggingService.error('lockAccountingPeriod failed', { periodId, error }, 'glService');
     return { data: null, error: new Error(error.message) };
@@ -212,12 +209,9 @@ export async function lockAccountingPeriod(
 export async function closeAccountingPeriod(
   periodId: string,
 ): Promise<{ data: AccountingPeriod | null; error: Error | null }> {
-  const { data, error } = await supabase
-    .from('accounting_periods')
-    .update({ status: 'closed' })
-    .eq('id', periodId)
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('close_accounting_period', {
+    p_period_id: periodId,
+  });
   if (error) {
     loggingService.error('closeAccountingPeriod failed', { periodId , error }, 'glService');
     return { data: null, error: new Error(error.message) };
