@@ -17,6 +17,7 @@ export default defineConfig({
       'src/test/sales-pipeline.spec.ts',
       'src/test/ap-foundation.spec.ts',
       'src/test/ar-finance-posting.rls.spec.ts',
+      'src/test/finance-settlement-reconciliation.rls.spec.ts',
       'src/test/admin-vehicle-permissions.rls.spec.ts',
       'src/test/admin-webhook-secrets.rls.spec.ts',
       'src/test/admin-role-matrix.rls.spec.ts',
