@@ -131,6 +131,7 @@ jobs:
       VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
       VITE_SUPABASE_ANON_KEY: ci_placeholder_anon_key_do_not_use_in_production
       VITE_APP_ENV: development
+      VITE_LIFECYCLE_DIAGNOSTICS: 'true'
       VITE_APP_URL: https://ubs.protonfookloi.com
       VITE_HRMS_APP_URL: ''
     steps:
@@ -151,6 +152,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run desktop route smoke specs
         run: npx playwright test e2e/routes.spec.ts --project=chromium
+      - name: Run Admin lifecycle browser regression
+        run: npx playwright test e2e/admin-lifecycle.spec.ts --project=chromium
       - name: Run responsive smoke specs
         run: npx playwright test e2e/responsive.spec.ts --project=mobile-chromium --project=tablet-chromium
       - name: Run accessibility smoke specs

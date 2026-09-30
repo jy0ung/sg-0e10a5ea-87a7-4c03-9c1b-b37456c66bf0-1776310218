@@ -5,6 +5,7 @@
 import React from 'react';
 import { AuthProvider as BaseAuthProvider } from '@flc/auth';
 import { errorTrackingService, loggingService } from '@flc/platform-services';
+import { recordAuthLifecycle } from '@/lib/lifecycleDiagnostics';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export { useAuth, ProtectedRoute } from '@flc/auth';
@@ -12,7 +13,7 @@ export type { Profile, AuthContextType, AuthLogger, AuthErrorTracker } from '@fl
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
-    <BaseAuthProvider logger={loggingService} errorTracker={errorTrackingService}>
+    <BaseAuthProvider logger={loggingService} errorTracker={errorTrackingService} onAuthEvent={recordAuthLifecycle}>
       {children}
     </BaseAuthProvider>
   );

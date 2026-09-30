@@ -1,7 +1,7 @@
 # Admin Module Audit and Refactor Plan
 
 Date: 2026-09-22
-Status: Source, architecture, security, and automated-test audit complete. Browser visual audit and lifecycle reproduction are pending an approved browser choice.
+Status: Source and architecture audit complete. The 2026-09-30 lifecycle diagnostic slice adds browser regressions; the reported intermittent loss remains unconfirmed.
 Scope: Main application Admin module (`/admin/*`), its shared UI, auth/session dependencies, Supabase services and policies, and the reported refresh/form-loss behavior.
 
 ## Implementation checkpoint — 2026-09-28
@@ -25,6 +25,8 @@ The recovery-invariant follow-up reserves Admin section access for the Super Adm
 The Modules navigation slice gives company and super admins a dedicated `/admin/modules` page using the existing module-access context and RLS-backed upsert path. The Home Administration card opens `/admin` only when the signed-in role and section matrix permit that route, and the disabled-module recovery link opens `/admin/modules`. Legacy Settings remains usable for bookmarked administrators until the Organization/Branding split is complete.
 
 The Organization/Branding slice completes the first-class Admin route split: `/admin/organization` is guarded by the Admin role and section, and `/admin/settings` redirects to `/profile` for existing bookmarks. The duplicate Settings tabs and role editor are removed. The branding form guards a dirty draft against navigation and background branding refresh, and uploads now write the new asset path into the company branding row before reporting success. The read query explicitly filters by company ID, with RLS still authoritative. This does not establish the root cause of the broader reported form-loss issue or complete operational Admin workbench data.
+
+The 2026-09-30 reliability slice adds an opt-in metadata-only trace for document, page, service-worker, auth, route, and dirty-form lifecycle events. A mocked-session Chromium regression preserved a dirty Profile through a dispatched visibility event and an explicit Supabase `TOKEN_REFRESHED`; the existing Stay/Leave guard and a hard-reload/new-boot classification also passed. These tests do not reproduce the intermittent user report or identify its cause. The trace remains available for UAT investigation; no PWA or auth behavior was changed.
 
 Migration/compatibility: the new RPC and grants are additive; revoking direct column-permission writes intentionally makes a cached old editor fail closed until it reloads the updated client. The legacy package service delegates Vehicle saves to the new command, preserving in-repository callers. A rollback of the client alone would leave the old editor unable to save; any rollback must keep the new client contract or restore direct grants through a reviewed migration. Disposable Supabase tests cover the new write path and denial of direct writes.
 
@@ -387,7 +389,7 @@ Reported steps:
 
 Expected: focus changes and normal token refreshes must not destroy a mounted form. If the browser discards or the application intentionally updates, the user should receive protection or an appropriate non-sensitive draft restoration.
 
-Current browser reproduction result: **pending**. No “confirmed root cause” is asserted without a browser trace.
+Current browser reproduction result: **the reported intermittent loss has not reproduced**. The bounded 2026-09-30 attempts are recorded below. No “confirmed root cause” is asserted without a trace of the complete destructive event chain.
 
 ### 4.2 What source analysis confirms
 
@@ -416,9 +418,11 @@ Current browser reproduction result: **pending**. No “confirmed root cause” 
 
 ### 4.4 Diagnostic instrumentation
 
-Add a temporary, development/diagnostic-only lifecycle probe. It must record metadata, never field values:
+Implemented behind `VITE_LIFECYCLE_DIAGNOSTICS=true` (default `false`, see `.env.example`). The flag is a build-time public boolean and needs no production credential. The `window.__flcLifecycleDiagnostics` developer-console handle exposes `bootId`, `read()`, and `clear()` only when enabled. `read()` returns a copy of the metadata history; `clear()` removes its in-memory and `sessionStorage` history. The schema-1 buffer holds at most 80 events, drops oldest events, and survives a document reload within the same tab. It is not sent to Sentry, a backend, or console logging. To investigate UAT, enable the flag in a Dev/UAT build, clear the trace, reproduce, then inspect `read()` immediately; a new `document_boot` event contains `previousBootId`, browser navigation type, and `wasDiscarded` when supported.
 
-- per-document boot ID in `sessionStorage` and memory;
+The probe records metadata, never field values:
+
+- per-document random boot ID in memory, with prior events mirrored to tab-scoped `sessionStorage`;
 - timestamp, route, `location.key`, and page/shell mount IDs;
 - `PerformanceNavigationTiming.type`;
 - `document.wasDiscarded` when available;
@@ -427,7 +431,20 @@ Add a temporary, development/diagnostic-only lifecycle probe. It must record met
 - Supabase auth event name and whether a session/user exists, without tokens;
 - dirty-form IDs/count only, never draft contents.
 
-Keep a bounded in-memory/session log and optionally send a redacted structured event through the existing logging boundary. Remove or feature-gate verbose diagnostics after confirmation.
+Routes are allowlisted to the static Profile/Admin paths; all other paths become `other`, so customer or entity IDs and URL queries never enter the buffer. Form IDs are limited to My Profile, Admin Roles, and Admin Organization; each reports only mount IDs and a dirty boolean. Auth and worker event names are allowlisted. Loaded storage is validated and copied into the same fixed schema, excluding unexpected properties. The probe observes events only; it does not reload, navigate, reset drafts, activate workers, or alter auth semantics.
+
+### 4.4.1 Bounded reproduction result — 2026-09-30
+
+| Scenario | Attempt and observed result | Evidence limit |
+|---|---|---|
+| Immediate tab switch | Opened another tab and returned in headless Chromium. Profile draft, document boot, shell mount, and page mount survived. Chromium kept both pages visible and emitted no actual `visibilitychange`; a dispatched event then produced a trace event with the dirty form and still preserved the draft. | The dispatched event proves the app handler is observational, not how an OS-hidden tab behaves. |
+| Normal token refresh | Called the actual browser Supabase client's `refreshSession()` through mocked auth endpoints while Profile was dirty. The trace recorded `TOKEN_REFRESHED` with a session; route, boot, shell/page mounts, dirty state, and draft survived without sign-out redirect. | Auth network/session was mocked; no real token expiry or remote auth outage was tested. |
+| In-app navigation and history | Profile Stay retained its draft; explicit Leave reached Security. Browser back/forward then navigated between clean routes. Existing Roles and Organization Stay guards are exercised by `e2e/routes.spec.ts`. | This does not prove dirty browser-history traversal in every browser. |
+| Hard reload | A real Chromium `page.reload()` produced a new boot ID, `previousBootId` matching the earlier document, and navigation type `reload`. | Draft recovery after an intentional reload is outside the current contract. |
+| Browser discard | No deterministic discard was available from the headless Playwright run. | No discard cause or recovery claim. |
+| Service-worker build A to B | Not run in the Vite development browser run: PWA `devOptions.enabled` is false, and no stable two-build UAT host was used. Registration/update/controller observers are in place for UAT. | No service-worker cause or update-policy claim. |
+
+**What was disproven in these controlled paths:** a dispatched visibility event and a successful `TOKEN_REFRESHED` did not destroy the dirty Profile, and the diagnostic probe did not interfere with its navigation guard. **What remains unknown:** the reported intermittent trigger, real browser discard behavior, actual deployed service-worker update sequence, prolonged idle/auth failure, and whether another Admin form has an independent reset effect. **Decision:** retain the dormant UAT trace and await a real reproduction; keep any cause-specific behavioral correction in a separate PR. The next programme slice can proceed with AR/AP settlement-chain and close/report reconciliation UAT.
 
 ### 4.5 Required reproduction matrix
 
