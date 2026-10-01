@@ -426,3 +426,35 @@ Before implementing a DMSv3 slice:
 5. do not silently replace a rule because a current spreadsheet formula is broken.
 
 Current source defects and business definitions are different things.
+
+## 8. Additional repository evidence — Commission
+
+### supabase/migrations/20260416000002_migration_sales_module.sql
+
+Evidence:
+
+- commission_rules structure;
+- branch/global applicability;
+- threshold_days;
+- amount;
+- historical Deal-stage/Sales-order foundations retained only as legacy context.
+
+### supabase/migrations/20260927092000_commission_employee_identity.sql
+
+Evidence:
+
+- Employee identity added to Commission rules/records;
+- canonical workforce convergence.
+
+### supabase/migrations/20260927093000_commission_backend_commands.sql
+
+Evidence:
+
+- backend Commission calculation;
+- Delivery month qualification;
+- optional BG→Delivery threshold;
+- Employee/branch rule matching;
+- immutable calculation source/amount;
+- guarded pending→approved→paid transitions.
+
+This is relevant to DMSv3 because Delivery and BG semantics feed Commission eligibility.
