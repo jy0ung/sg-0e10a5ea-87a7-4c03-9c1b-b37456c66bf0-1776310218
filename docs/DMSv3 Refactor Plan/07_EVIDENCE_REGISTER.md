@@ -562,17 +562,30 @@ Recovered artifacts document:
 - OBR projection;
 - concurrency protection.
 
-### September 2026 — Registration reconnaissance/evidence
+### September 2026 — Registration preparation and actual-Registration evidence
 
 Recovered artifacts document:
 
-- readiness is derived and cannot authorize Registration;
+- explicit versioned financing disposition separate from Loan Application;
+- approved/current LOU selection and stale-context handling;
+- append-only Agreement evidence;
+- customer-payment clearance as an explicit prerequisite dimension;
+- SOLA applicability/clearance modeled explicitly rather than inferred from bank name;
+- Special Plate process state;
+- EHAK REQUESTED/RECEIVED bound to the current financed disposition context;
+- Cash = no EHAK/LOU gate;
+- narrow blocker-override model rather than generic bypass;
+- eligibility/readiness/Focus derived at read time;
+- UNKNOWN coverage fails closed;
+- readiness is not authorization to Register;
 - actual Registration re-derives facts under lock;
 - active Allocation binds Booking↔Vehicle;
 - Reservation alone is insufficient;
 - no permanent Vehicle.bookingId;
 - IN_TRANSIT/ON_HANDS are not automatically hard Registration gates;
 - PRE-REGISTER/sequential commercial cases preserve history.
+
+Target reconciliation note: the old implementation used a customer-payment attestation because it lacked the current UBS Accounts domain. DMSv3 should consume Accounts-owned payment truth where available instead of recreating a second ledger.
 
 ### September 2026 — source/KPI reconciliation
 
