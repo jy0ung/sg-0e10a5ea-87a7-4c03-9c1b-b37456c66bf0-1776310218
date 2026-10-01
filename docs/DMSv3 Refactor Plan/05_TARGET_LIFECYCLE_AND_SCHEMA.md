@@ -302,6 +302,7 @@ Version/effective-date configuration by company/payment type:
 - effective_from / effective_to
 - financing_required
 - financing_registration_gate
+- registration_payment_gate
 - delivery_payment_gate
 - registration_requires_vehicle
 - delivery_requires_registration
@@ -335,6 +336,7 @@ One row per Deal containing:
 - payment_type_id
 - financing_required
 - financing registration gate
+- registration payment gate
 - delivery gates
 - completion gates
 - deposit requirement
@@ -641,18 +643,18 @@ Current Vehicle milestone columns may remain as compatibility/read-model fields 
 
 ## 23. deal_registrations
 
-Authoritative Registration workflow:
+Current Registration projection/aggregate:
 
 - id
 - company_id
 - deal_id
 - vehicle_id
+- current_version_no
 - status
-- jpj_reference
-- registration_number
-- registration_date
-- plate_no
-- road_tax_expiry
+- current_registration_number
+- current_registration_date
+- current_plate_no
+- current_road_tax_expiry
 - submitted_at
 - registered_at
 - plate_received_at
@@ -666,6 +668,26 @@ The authoritative Registration command must validate the current active Allocati
 Physical IN_TRANSIT / ON_HANDS status is not automatically a hard Registration gate unless a later approved policy explicitly makes it one.
 
 Cancellation after Registration preserves the registration record; PRE-REGISTER is derived rather than destructive.
+
+### deal_registration_versions
+
+Immutable externally completed Registration/correction evidence:
+
+- id
+- company_id
+- registration_id
+- version_no
+- registration_number
+- registration_date
+- plate_no
+- road_tax_expiry
+- source_system
+- source_reference/evidence
+- correction_reason nullable
+- recorded_by
+- recorded_at.
+
+Prior versions cannot be UPDATE/DELETEd through normal application paths.
 
 ## 24. deal_registration_events
 
@@ -702,24 +724,50 @@ Keep append-only transition/event history.
 
 ## 26. deal_deliveries
 
-Customer handover:
+Current Delivery projection/aggregate:
 
 - id
 - company_id
 - deal_id
 - vehicle_id
+- current_version_no
 - status
-- planned_delivery_at
-- actual_delivery_at
+- planned_delivery_at nullable
+- current_actual_delivery_at nullable
 - delivery_branch_id
 - handover_employee_id
-- recipient_name
-- proof document link
-- source_system/source_record_id
+- recipient_name nullable
+- signed_vdo_document_id/evidence_reference
+- payment_clearance_payment_event_id nullable
+- outstanding_balance_approval_instance_id nullable
+- outstanding_balance_snapshot nullable
 - created_by
-- timestamps.
+- created_at / updated_at.
 
-Only one successful delivered event per Deal.
+Only one successful current Delivery projection per Deal.
+
+### deal_delivery_versions
+
+Append-only Delivery/correction history:
+
+- id
+- company_id
+- delivery_id
+- version_no
+- actual_delivery_at
+- vehicle_id
+- delivery_branch_id
+- handover_employee_id
+- signed_vdo_document_id/evidence_reference
+- payment_clearance_payment_event_id nullable
+- outstanding_balance_approval_instance_id nullable
+- outstanding_balance_snapshot nullable
+- source_system/source_record_id
+- correction_reason nullable
+- recorded_by
+- recorded_at.
+
+A wrong Delivery date/evidence is corrected by a new version or explicit reversal/correction event, never silent overwrite.
 
 ## 27. deal_delivery_readiness_v
 
@@ -823,7 +871,7 @@ Add optional source linkage:
 Examples:
 
 - deal_deposit
-- bank_disbursement
+- verified_bank_credit
 - manual_receipt
 - dms_reconciliation.
 
@@ -962,9 +1010,9 @@ Authenticated direct mutation should be removed for authority tables such as:
 - vehicle_reservations / reservation_terms
 - sales_stock_demands
 - vehicle_allocations / reallocation_proposals
-- deal_registrations/events
+- deal_registrations / registration_versions / events
 - deal_insurance policies/events
-- deal_deliveries
+- deal_deliveries / delivery_versions
 - deal_cancellations
 - domain_outbox_events.
 
@@ -986,6 +1034,7 @@ One row per Deal combining:
 - Vehicle/chassis
 - Vehicle physical state
 - Registration
+- PRE-REGISTER condition where applicable
 - Insurance
 - Delivery
 - bank submission / Invoice Submitted
