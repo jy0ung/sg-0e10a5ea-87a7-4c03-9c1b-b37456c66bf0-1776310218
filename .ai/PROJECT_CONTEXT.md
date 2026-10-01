@@ -1,6 +1,12 @@
 ## DMSv3 Sales lifecycle SOT
 
-Effective 2026-10-01, all Sales/DMS lifecycle work must read and follow `docs/DMSv3 Refactor Plan/README.md` and the relevant files in that folder first. It is authoritative for DMS Lead/Prospect → Booking → Financing/LOU → Allocation/Registration → Delivery → Disbursement, KPI meanings, business rules, source ownership, target schema, migration and open policy decisions. Older Sales gap/Phase 5/Deal-stage descriptions are historical when they conflict with the DMSv3 SOT.
+Effective 2026-10-01, all Sales/DMS lifecycle work must read `docs/DMSv3 Refactor Plan/README.md` **and `docs/DMSv3 Refactor Plan/00_RECONSTRUCTED_BASELINE_2026-10-01.md` first**, then the relevant detailed files in that folder.
+
+The reconstructed baseline is authoritative for the current product model: Lead is optional / Direct Prospect is valid; local FLC Booking/Case may precede the official Proton Retail Order; deposit is independent; Master RO owns official Booking MTD; financing, stock request/reservation/allocation, registration, delivery, bank submission and disbursement are independent dimensions; Accounts verifies actual bank credit; the Cash path does not use fictitious bank stages.
+
+The historical 2026-09-16 PRD contributes confirmed business/product rules only. Its old Fastify/Prisma repository architecture is **not** the current implementation baseline. Current UBS architecture, RLS, domain ownership, Accounts/Finance boundaries and additive-migration rules remain authoritative.
+
+Older Sales gap/Phase 5/Deal-stage descriptions and legacy dashboard definitions are historical when they conflict with the DMSv3 SOT.
 
 # Unified Business Suite Project Context
 
