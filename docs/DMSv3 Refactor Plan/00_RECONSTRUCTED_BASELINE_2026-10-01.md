@@ -172,11 +172,15 @@ Each application preserves:
 - LOU context;
 - dates.
 
-The selected downstream financing disposition is explicit.
+LOU/offer-letter evidence is versioned separately from the Loan Application.
 
-Every approved application is **not** automatically selected.
+The selected downstream financing disposition is explicit and versioned.
 
-Cash/non-loan cases must not traverse fictitious Loan/LOU stages.
+For a financed path, downstream selection binds to the selected approved application and its current LOU context. Every approved application is **not** automatically selected.
+
+If requirements/selection change materially, stale financing/LOU evidence fails closed rather than being auto-reselected.
+
+Cash/non-loan cases use an explicit Cash disposition and must not traverse fictitious Loan/LOU states.
 
 LOU remains an important financing milestone, not a top-level Deal truth duplicated elsewhere.
 
@@ -304,6 +308,14 @@ Confirmed:
 - readiness does not create a Registration;
 - actual Registration requires explicit externally completed JPJ/mySikap evidence and an authorized command;
 - history is immutable/versioned;
+- active Allocation binds the Deal to the Vehicle for Registration; Reservation alone is insufficient;
+- current Financing disposition is explicit;
+- financed readiness uses the selected approved/current financing + current LOU context;
+- Agreement, SOLA applicability/clearance, Special Plate process and EHAK evidence remain explicit prerequisite dimensions where applicable;
+- EHAK is tied to the current financed disposition context and stale context cannot be reused automatically;
+- Cash has no EHAK/LOU gate and requires confirmed cash credit before Registration;
+- customer-payment truth should come from Accounts in current UBS rather than a second Sales ledger;
+- readiness may return ELIGIBLE / INELIGIBLE / UNKNOWN; missing/ambiguous evidence fails closed;
 - physical IN_TRANSIT is not automatically a Registration blocker;
 - the Registration command must re-evaluate authoritative prerequisites under lock;
 - registration relationship must match the applicable Booking/Vehicle allocation context.
