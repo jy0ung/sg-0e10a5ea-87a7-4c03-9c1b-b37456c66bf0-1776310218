@@ -1,3 +1,7 @@
+## DMSv3 Sales lifecycle source of truth
+
+**Effective 2026-10-01:** all detailed Sales/DMS lifecycle, KPI, workflow-rule, source-ownership, target-schema and cutover work is governed by [DMSv3 Refactor Plan](DMSv3%20Refactor%20Plan/README.md). When an older Sales/Auto Aging/Deal workflow description conflicts with that folder, the DMSv3 SOT wins. Programme-wide identity, RLS, domain ownership, Finance and safety rules in this roadmap remain authoritative.
+
 # FLC Unified Business Suite Roadmap
 
 **Status:** Active execution roadmap (rebaselined 2026-09-27)
