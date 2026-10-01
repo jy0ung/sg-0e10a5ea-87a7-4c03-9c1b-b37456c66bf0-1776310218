@@ -87,6 +87,11 @@ Still to decide:
 
 These become policy/Accounts commands, not a Booking existence rule.
 
+Phase 1C [characterization evidence](../DMSV3_CASE_RO_CHARACTERIZATION_EVIDENCE.md)
+shows numeric inputs 0/500 create no Accounts/Finance event. The operating
+decisions above remain OPEN for governed deposit/Accounts commands; optional
+deposit for Case existence stays confirmed.
+
 ## 5. Delivery readiness gates — financial gate resolved, non-financial gates open
 
 Confirmed:
@@ -187,6 +192,11 @@ Still OPEN:
 - deadline/escalation when a local Case has not yet acquired a Proton Retail Order.
 
 Do not let a generic form create an untraceable parallel official-Proton booking.
+
+Phase 1C [component/live evidence](../DMSV3_CASE_RO_CHARACTERIZATION_EVIDENCE.md)
+characterizes the current manager fixture and minimal manual form, not an
+approved creator/document gate. These decisions remain OPEN and block the
+authoritative create-Case command/front-door cutover, not characterization.
 
 ## 12. Prospect access scope
 
@@ -464,6 +474,12 @@ Still OPEN:
 
 Until approved, preserve source status and expose drill-down rather than silently excluding rows.
 
+Phase 1C [population/month evidence](../DMSV3_CASE_RO_CHARACTERIZATION_EVIDENCE.md)
+counts legacy SOs, including a next-month witness; it approves no official RO
+eligibility or gross/net headline. The inclusion/effective-date decisions remain
+OPEN and block official Booking KPI cutover. Official identifier/date/status
+mapping and freshness separately require source verification.
+
 ## 34. VAA Date exact semantics
 
 Historical KPI documentation describes VAA Date as vehicle receipt/arrival, while later procurement/inventory work treats VAA as a procurement/aging milestone distinct from outlet receipt evidence.
@@ -493,6 +509,12 @@ Confirm:
 - who may attest/link completion in UBS;
 - whether maker/checker is required;
 - visibility/escalation for FLC Cases waiting on official Proton Booking.
+
+Phase 1C [provenance/authority evidence](../DMSV3_CASE_RO_CHARACTERIZATION_EVIDENCE.md)
+uses privileged test normalization and proves only raw→SO provenance. It
+decides no production attester capability or maker/checker policy. These remain
+OPEN and block authoritative official-RO attestation/link commands; source
+identifier/date/status/freshness verification is a separate prerequisite.
 
 ## 36. Reservation policy implementation in current UBS
 

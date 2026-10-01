@@ -149,12 +149,39 @@ existing suffixes bootstrap/advance state, and later failures/deletion never
 reclaim reservations. Upgrade is lazy per namespace; retain counter state and
 forward-correct after allocations begin, rather than reverting to unsafe MAX+1.
 
-This remains partial Phase 1 evidence pending independent review of this slice.
+This bounded correction was independently accepted in [PR #129](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/129)
+and squash-merged as `730f900533ad207dd44c40297e911e7f860072b5`. Phase 1 remains partial.
 It does not complete Phase 2 or the FLC Case contract: the service still creates
 legacy stage `lead` through separate RPC/Deal/activity requests. Creation roles,
 required documents, deposit policy, source provenance, official Booking metrics,
 workflow events/outbox and idempotency remain separate work. Zero/positive
 deposit inputs create no financial or official-Proton records in this harness.
+
+### Bounded Phase 1C checkpoint — Case/deposit, legacy dashboard and raw RO characterization
+
+On refreshed main `730f900533ad207dd44c40297e911e7f860072b5`, the
+[Case/RO characterization evidence](../DMSV3_CASE_RO_CHARACTERIZATION_EVIDENCE.md)
+maps CP-01–CP-10 to 14 new registered live cases and eight actual-component/router
+compatibility tests with mocked services. This slice is pending independent
+review; it adds evidence only and keeps all 290 existing live cases intact.
+
+Actual unchanged `createDeal` persists distinct local UUIDs/numbers with deposits
+0/500 and no implicit financial/source/SO creation. Both persist legacy `lead`;
+this witnessed stage defect is not acceptance of the target no-deposit rule.
+Raw-only observations and local Deals do not enter the legacy MTD Orders
+headline; manual and explicitly source-associated SOs do. The current headline
+includes next-month local booking dates, and its branch/trend populations differ.
+Privileged raw→SO normalization preserves populated local dates/notes/commercial
+facts and local Deals, but neither it nor its replay establishes typed Case→RO
+lineage. Duplicate text fallback selects an arbitrary same-company candidate.
+
+These passing KNOWN GAP witnesses are not target business acceptance. Phase 1
+remains partial; Phase 2/3, creator/document/deposit operating policies, official
+Booking parity/inclusion and attester capabilities remain open. See SOT 08
+§§4,11,33,35 and the report for future command/cutover blockers and source facts
+requiring verification. No lifecycle/schema/KPI/policy correction is included.
+All prior local-history, allocator, worker replay, access-scope and Employee
+responsibility limits above remain; no production acceptance is implied.
 
 ## 4. Phase 2 — Additive schema foundation
 
