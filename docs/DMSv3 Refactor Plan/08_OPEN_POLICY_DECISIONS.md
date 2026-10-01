@@ -373,3 +373,44 @@ Before changing an OPEN POLICY to governed:
 7. document migration treatment for historical records.
 
 No policy becomes authoritative solely because code shipped first.
+
+## 31. Master Report Plan abbreviations/classifications
+
+The reviewed FLC Master Report Plan requests Payment Status labels:
+
+- CS
+- CN
+- TT
+- Pending Full Payment
+
+and Booking/Registration planning labels such as:
+
+- QR
+- Manual
+- EHAK.
+
+The reviewed source does not provide a sufficiently precise official definition/mapping for every abbreviation.
+
+Before DMSv3 creates enums/KPI codes from them, confirm:
+
+- full business meaning;
+- source field/code;
+- owning domain;
+- whether it is a status, document, payment method, source type or reporting-only label.
+
+Do not infer these meanings from common industry usage.
+
+## 32. Commission eligibility after DMSv3
+
+Current backend Commission calculation qualifies by Delivery month and optional BG→Delivery threshold.
+
+Because DMSv3 changes lifecycle ownership and BG is unresolved, management must confirm whether the future Commission rule catalogue should continue to use:
+
+- Delivery Date;
+- BG→Delivery threshold;
+- Disbursement;
+- full settlement;
+- Registration;
+- or another combination.
+
+Until a separate Commission payout/Finance convergence decision is approved, preserve current calculation behavior and version any future rule change explicitly.
