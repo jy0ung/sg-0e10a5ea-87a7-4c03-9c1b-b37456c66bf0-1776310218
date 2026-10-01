@@ -563,3 +563,112 @@ Target event/fact source:
 | Daily history | event/read model or immutable captured snapshot |
 
 The metric meaning must be preserved even as the physical source moves from Sheets/legacy tables into DMSv3 domain events.
+
+## 23. FLC Master Report Plan — current requested KPI coverage
+
+The current FLC Master Report Plan records these management/reporting requirements. They are requirements/evidence, not all finalized DMSv3 metric definitions.
+
+### Stocks Overview
+
+Requested coverage:
+
+- Incoming
+- Carry Forward
+- Total in hand
+- Floor stock
+- Aging analysis
+- OBR
+- Vessel
+- LOU → Disbursement context.
+
+### Payment Status
+
+Current requested labels include:
+
+- CS
+- CN
+- TT
+- Pending Full Payment.
+
+The exact approved semantic expansion of CS/CN/TT is not established by the reviewed sources and is therefore OPEN POLICY for DMSv3 documentation.
+
+### Loan & Disbursement Status
+
+Requested coverage:
+
+- Submission with Stock
+- Submitted
+- Rejected
+- Pending Doc
+- Allocated Stock
+- Delivery
+- Disbursement
+- BG → Disbursement analysis.
+
+### Registration Status
+
+Requested coverage includes:
+
+- Pending
+- Deposit
+- Agreement
+- LOU
+- EHAK
+- OBR
+- LOU Aging / Expiry.
+
+These are reporting requirements, not evidence that each item should become a top-level Deal state.
+
+### Booking Status
+
+Requested coverage includes:
+
+- Model / Variant / Colour
+- QR
+- Manual
+- Loan approval confidence-rate analysis.
+
+QR/Manual must not be promoted to canonical source classifications until their business definition/source mapping is documented.
+
+## 24. Current Commission rule/metric contract
+
+Current repository Commission calculation is backend-authoritative and Employee-backed.
+
+A current calculated Commission candidate requires:
+
+- Vehicle belongs to the company;
+- Vehicle is not deleted;
+- Vehicle has Delivery Date in the selected commission month;
+- Vehicle owner resolves through Profile → Employee identity;
+- a Commission Rule applies to Employee/global + Branch;
+- if the rule has threshold_days, Vehicle BG→Delivery must be non-negative and <= threshold_days.
+
+Current rule fields include:
+
+- Employee-specific/global applicability;
+- Branch applicability;
+- rule name;
+- threshold days;
+- amount.
+
+The calculated source snapshot stores:
+
+- rule identity/name/version timestamp;
+- Employee;
+- Vehicle/chassis;
+- branch;
+- Delivery Date;
+- BG→Delivery;
+- amount.
+
+Calculated source and amount become immutable.
+
+Current operational transitions:
+
+**pending → approved → paid**
+
+Important:
+
+- paid is currently an operational Commission status; it is not yet proof of a Payroll/Finance payout.
+- current threshold logic depends on BG→Delivery, so the unresolved BG DATE semantic is material to future Commission convergence.
+- DMSv3 must not change Commission eligibility indirectly by redefining BG or Delivery without an explicit Commission migration/version decision.
