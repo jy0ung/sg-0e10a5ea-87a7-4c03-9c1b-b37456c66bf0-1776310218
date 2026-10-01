@@ -1,7 +1,7 @@
 # 06 — Migration and Cutover Plan
 
 **Status:** TARGET DMSv3 execution contract  
-**Baseline:** main@e0c2da3 reviewed 2026-10-01
+**Baseline:** reconstructed business baseline + current UBS main@52d72dae reviewed 2026-10-01
 
 DMSv3 is a convergence programme, not a rewrite. Existing evidence and working domain foundations are retained until the replacement is proven.
 
@@ -64,13 +64,17 @@ Minimum disposable/live tests:
 - event/non-event cohort denominator;
 - follow-up overdue behavior.
 
-### Booking
+### FLC Booking / Proton Retail Order
 
-- Booking No uniqueness;
-- Booking with no deposit remains Booking;
-- Booking with deposit remains Booking;
-- Booking Date drives Booking daily/MTD events;
-- DMS replay does not duplicate Booking.
+- Direct Prospect is valid without a Lead;
+- FLC Booking/Case receives immutable local UUID;
+- local Case can exist before Proton Booking No;
+- Booking with no deposit remains an FLC Booking/Case;
+- Booking with deposit remains an FLC Booking/Case;
+- official Proton Retail Order can later link deterministically to the existing Case;
+- DMS replay does not duplicate the local Case or official Retail Order link;
+- official Booking MTD is driven by the governed Master RO / Proton Retail Order population;
+- FLC Cases Created MTD, if shown, is a separate metric.
 
 ### Financing/LOU
 
@@ -78,20 +82,32 @@ Minimum disposable/live tests:
 - LOU 0–1 / 2–3 / 4–7 / 8+ bands;
 - controlled financing status/reason normalization.
 
-### Allocation
+### Stock Request / Reservation / Allocation
 
-- DMS allocation evidence recognized;
+- Stock Request alone does not reserve/allocate;
+- one effective Reservation per chassis;
+- 3/7/3 working-day Reservation term policy;
+- expiry does not auto-release;
+- extension/pre-emption is explicit;
+- one active Allocation per chassis;
+- management controls authoritative Allocation;
+- reallocation preserves displaced history;
+- DMS allocation evidence recognized as source observation;
 - Date Stock Requested not treated as Allocation Date;
-- post-LOU linkage rule;
+- current post-LOU workbook linkage rule;
 - pre-LOU allocation preserved + control-breach flag;
-- 3/5-day SLA;
-- no SLA when allocation type missing.
+- Control Tower Allocation SLA 3/5 days remains distinct from Reservation duration;
+- no Allocation SLA when allocation type missing.
 
 ### Registration
 
-- 7-day SLA;
-- Registration actual reconciles to authoritative Inventory REG DATE;
-- Booking projection cannot rewrite actual event.
+- 7-day current management SLA;
+- readiness/Focus does not create Registration;
+- actual Registration reconciles to authoritative Inventory REG DATE;
+- Booking projection cannot rewrite actual event;
+- active Allocation context is validated;
+- physical IN_TRANSIT is not automatically a hard gate;
+- cancellation after Registration preserves Registration/PRE-REGISTER history.
 
 ### Queue/data quality
 
@@ -118,11 +134,13 @@ Also add required indexes, RLS and command-only write boundary.
 
 No current V1 fields are removed.
 
-## 5. Phase 3 — DMS funnel → Booking boundary
+## 5. Phase 3 — DMS funnel → FLC Case → Proton Retail Order reconciliation
 
-Implement the canonical conversion boundary:
+Implement **two boundaries**, not one.
 
-**DMS Prospect / Retail Order evidence → canonical Booking/Deal**
+### Phase 3A — create the local FLC Booking/Case
+
+**DMS Prospect / Direct Prospect / approved local case initiation → FLC Booking/Case**
 
 Required command behavior:
 
@@ -130,19 +148,39 @@ Required command behavior:
 - company and branch validation;
 - canonical Customer resolution;
 - Employee-backed SA resolution where deterministic;
-- Booking business date;
-- Deal number;
-- source links to Lead/Prospect/RO;
+- FLC Case business date;
+- local Deal/case number;
+- source links to Lead/Prospect where present;
 - policy snapshot;
 - workflow state = booking;
 - immutable event/audit/outbox;
 - idempotency.
+
+The local Case may exist before Proton Booking No.
 
 Correct the known V1 semantic defect:
 
 - “New without Deposit” must not become Lead.
 
 Do not synthesize a deposit event from missing/ambiguous historic amount data.
+
+### Phase 3B — link the official Proton Retail Order
+
+**Master RO / Proton Retail Order observation → existing FLC Case**
+
+Required behavior:
+
+- preserve source Retail Order ID and Proton Booking No;
+- preserve official Proton Booking Date/status evidence;
+- deterministically match to the FLC Case;
+- duplicate/ambiguous links enter reconciliation;
+- replay is idempotent;
+- source refresh cannot silently rewrite FLC-owned history.
+
+Exit gate:
+
+- official Booking MTD from the new source projection exactly reconciles to the governed Master RO population by month/outlet;
+- local FLC-case count is separately reportable and cannot contaminate official Booking MTD.
 
 ## 6. Phase 4 — Financing convergence
 
@@ -168,11 +206,16 @@ Do not lose multiple-bank attempts by collapsing them into one mutable row if so
 
 Cut client/direct status writes only after commands + tests are ready.
 
-## 7. Phase 5 — Vehicle allocation and Inventory convergence
+## 7. Phase 5 — Stock Control and Inventory convergence
 
-Add:
+Add or converge the distinct stock-control records:
 
-- deal_vehicle_assignments
+- sales_stock_requests
+- vehicle_reservations
+- vehicle_reservation_terms
+- sales_stock_demands / LNS
+- vehicle_allocations
+- vehicle_reallocation_proposals
 - vehicle_lifecycle_events as needed.
 
 Reconcile:
@@ -187,7 +230,14 @@ Required gates:
 
 - deterministic unique Vehicle match;
 - ambiguous match goes to review;
-- pre-LOU allocation preserved as control breach;
+- one effective Reservation per chassis;
+- one active Allocation per chassis;
+- 3/7/3 Reservation policy reproduced with versioned working calendar;
+- expiry remains review/control, not auto-release;
+- management allocation authority enforced server-side;
+- reallocation is explicit and auditable;
+- no permanent lifetime Vehicle.bookingId;
+- pre-LOU DMS allocation preserved as control breach;
 - no name-based SA/ownership inference.
 
 Shipment and outlet receipt migrate out of Deal.stage and into Inventory-owned events/read models.
@@ -214,7 +264,10 @@ Implement authoritative Delivery readiness + command.
 Delivery event must:
 
 - reference canonical Deal and Vehicle;
-- validate policy prerequisites;
+- mean physical handover of vehicle/keys with signed VDO evidence;
+- validate the Accounts-derived customer-payable clearance for the normal path;
+- alternatively require the canonical authenticated Director exception with outstanding-balance snapshot;
+- validate remaining approved non-financial prerequisites;
 - preserve actor/date/source;
 - update Sales state;
 - publish outbox event;
@@ -222,22 +275,36 @@ Delivery event must:
 
 Do not coordinate direct multi-table cross-domain writes from the page.
 
-## 10. Phase 8 — Settlement / Disbursement / Deposit
+## 10. Phase 8 — Documents, Invoice Submission, Settlement / Disbursement / Deposit
 
-Add:
+Add/converge:
 
 - Deal-context deposit events linked to Accounts;
-- verified bank-disbursement evidence;
+- VSO/VDO evidence/document identities;
+- financed bank-submission / Invoice Submitted event;
+- financing-side disbursement report/reference;
+- Accounts-owned verified bank-credit event;
 - invoice.deal_id;
-- payment_event source linkage.
+- payment_event source linkage;
+- Official Receipt linkage.
 
 Reconcile:
 
 - current Booking Money/deposit evidence;
+- legacy VSO/VDO/Invoice evidence;
 - DMS collections;
 - customer invoices;
 - official receipts;
 - bank disbursement evidence.
+
+Financed flow to prove:
+
+**Delivered + signed VDO + VSO → Invoice Submitted → bank credit → Accounts verification → Disbursement**
+
+Cash flow to prove:
+
+- cash credit confirmed before Registration;
+- no fictitious bank Invoice Submitted/Disbursement records.
 
 Money remains Accounts-owned.
 
@@ -337,10 +404,14 @@ Do not drop columns yet unless a later dedicated retirement PR proves:
 - event/campaign cohorts
 - SA assignment.
 
-### Booking reconciliation
+### FLC Case / Proton Retail Order reconciliation
 
-- Booking No uniqueness
-- Booking Date
+- FLC Case UUID uniqueness
+- local case-opened business date
+- Proton Retail Order source ID
+- Proton Booking No uniqueness/reconciliation
+- official Proton Booking Date
+- official Booking MTD inclusion/exclusion state
 - Outlet
 - Customer
 - SA Employee
@@ -358,10 +429,12 @@ Do not drop columns yet unless a later dedicated retirement PR proves:
 - multiple-bank attempt evidence
 - selected facility.
 
-### Vehicle reconciliation
+### Stock/Vehicle reconciliation
 
-- RO/Booking ↔ Vehicle
+- Proton RO / FLC Case ↔ Vehicle
 - chassis
+- Stock Request/Reservation/Allocation distinctions
+- Reservation term/policy
 - allocation date
 - outlet receipt
 - transfer/location
@@ -375,11 +448,14 @@ Do not drop columns yet unless a later dedicated retirement PR proves:
 - registration number/plate
 - current authoritative monthly totals.
 
-### Delivery/disbursement reconciliation
+### Delivery / Invoice Submission / Disbursement reconciliation
 
-- Delivery Date
-- Disbursement Date
-- Accounts receipt
+- Delivery Date + signed VDO evidence
+- VSO/final Invoice identity
+- bank submission / Invoice Submitted
+- reported disbursement evidence
+- Accounts-verified bank credit/value date
+- Official Receipt where applicable
 - current Auto Aging/report values.
 
 ## 16. KPI parity gates
@@ -398,7 +474,8 @@ Before repointing management dashboards:
 
 ### Booking/Control Tower
 
-- Booking MTD
+- Official Booking MTD from Master RO
+- FLC Cases Created MTD if exposed separately
 - Pending Loan
 - Loan overdue
 - Pending LOU
@@ -417,9 +494,13 @@ Before repointing management dashboards:
 - company total
 - source reconciliation.
 
-### Vehicle cycle KPIs
+### Vehicle / Delivery cycle KPIs
 
-Do not retire BG-based metrics until BG semantics are explicitly resolved.
+- Free Stock parity must distinguish legacy flag from target derived availability.
+- OBR/On Hands populations must be reconciled to later confirmed semantics.
+- Pending Delivery / Pending Invoice Submission / Pending Disbursement must reconcile before KPI cutover.
+- Disbursed MTD must move to Accounts-verified bank-credit authority.
+- Do not retire BG-based metrics until BG semantics are explicitly resolved.
 
 ## 17. Daily snapshot cutover
 
@@ -455,17 +536,23 @@ After cutover, Sheets become reference/archive/report outputs as decided; they m
 DMSv3 is not complete until:
 
 - Lead and Prospect remain DMS-owned without duplicate UBS lifecycle states;
-- every active Booking has one canonical Deal;
+- Direct Prospect works without a Lead;
+- every FLC Booking/Case has one immutable local Deal identity;
+- official Proton Retail Orders reconcile explicitly to FLC Cases;
+- official Booking MTD reconciles to Master RO and cannot be polluted by local-case creation;
 - Booking with/without deposit behaves correctly;
 - canonical Customer/Employee identity is used;
 - financing state is backend-authoritative;
 - LOU evidence is preserved;
-- vehicle allocation is canonical and deterministic;
+- Stock Request, Reservation and Allocation are separate canonical records;
+- 3/7/3 Reservation policy is preserved/versioned;
+- allocation/reallocation is canonical, manager-controlled and deterministic;
 - Shipment/Receipt are Inventory-owned;
-- Registration actuals reconcile;
-- Delivery is authoritative;
-- financed Disbursement is distinct from Delivery;
-- non-financed path does not fake loan events;
+- Registration actuals reconcile and PRE-REGISTER history is preserved;
+- Delivery is authoritative with payment-clearance/Director-exception evidence;
+- financed Invoice Submitted and Accounts-verified Disbursement are distinct from Delivery;
+- Cash credit-before-Registration is enforced;
+- non-financed path does not fake loan/bank events;
 - cancellation is first-class;
 - lifecycle commands are server-owned;
 - event history supports cycle-time KPIs;
@@ -485,3 +572,24 @@ Rollback means:
 - no irreversible backfill is required merely to test the slice.
 
 Physical retirement is a later programme decision.
+
+
+## 21. Historical KPI-guide reconciliation gate
+
+Before replacing legacy Inventory Dashboard reporting, explicitly prove or version the definitions that changed after July 2026:
+
+- legacy Free Stock flag versus derived Free/Reserved/Allocated;
+- legacy OBR label versus allocated-before-receipt OBR;
+- legacy D2D label versus external-dealer D2D;
+- Forecast/Focus labels versus canonical readiness/blockers;
+- legacy DISB DATE versus Accounts-verified credit/value date.
+
+Do not claim parity when the business definition intentionally changed. Record a versioned metric transition instead.
+
+## 22. Historical technical baseline rule
+
+The 2026-09-16 PRD's old Fastify/Prisma repo is not a migration target.
+
+Use it only for confirmed product/business rules and historical implementation evidence.
+
+All new DMSv3 implementation lands in the current UBS architecture.
