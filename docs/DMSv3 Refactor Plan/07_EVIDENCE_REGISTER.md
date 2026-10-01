@@ -2,7 +2,9 @@
 
 **Status:** evidence index for the DMSv3 SOT  
 **Review date:** 2026-10-01  
-**Repository baseline:** main@52d72dae23f4d30a1e8fc0d529dabd9c939f8b57
+**Original SOT repository baseline:** main@52d72dae23f4d30a1e8fc0d529dabd9c939f8b57
+
+**Phase 1C refreshed baseline:** main@730f900533ad207dd44c40297e911e7f860072b5 (2026-10-01)
 
 No individual customer sample values are reproduced in this SOT. Evidence extraction is limited to structure, definitions, rules, formulas and aggregated metrics.
 
@@ -302,8 +304,9 @@ preexisting history limitation is documented, with redesign outside this slice.
 ### Bounded Phase 1B Deal-number prerequisite
 
 Baseline: accepted PR #128 squash `2d744dbbc16410a7762abf7bcb16974b000590d6`.
-This is a partial programme checkpoint, pending independent review of the new
-correction; it does not complete Phase 1, Phase 2 or the FLC Case contract.
+[PR #129](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/129) was independently accepted and squash-merged as
+`730f900533ad207dd44c40297e911e7f860072b5`. This partial programme checkpoint
+does not complete Phase 1, Phase 2 or the FLC Case contract.
 
 - [Deal-number evidence and DN-01–DN-10 assertion mapping](../DMSV3_DEAL_NUMBER_ALLOCATION_EVIDENCE.md): committed red-before/green-after scenarios, exact validation and limits.
 - [Registered disposable suite](../../src/test/deal-number-allocation.rls.spec.ts): real Auth/PostgREST/PostgreSQL, independently authenticated concurrent clients and actual TypeScript `createDeal` with a real authenticated client export; no RPC/from/row mocks.
@@ -317,6 +320,26 @@ policy/deposit documents, official Booking metrics, canonical Case/source links,
 Employee responsibility, successful worker replay, route/backend convergence
 and local-history controls remain separate. The previously documented note
 reattachment/created_at limitation is not changed here.
+
+### Bounded Phase 1C Case / legacy SO / raw RO characterization
+
+Date: 2026-10-01. Baseline: accepted PR #129 squash
+`730f900533ad207dd44c40297e911e7f860072b5`, refreshed with no intervening changes.
+This evidence-only slice is pending independent review; Phase 1 remains partial.
+
+- [CP-01–CP-10 report, population matrix and gap/policy register](../DMSV3_CASE_RO_CHARACTERIZATION_EVIDENCE.md).
+- [Committed live characterization suite](../../src/test/dms-case-ro-characterization.rls.spec.ts): 14 additional cases, real unchanged TS createDeal with authenticated client export, full-row persistence/side-effect checks, regular-session dashboard RPCs, privileged normalizer behavior, existing authority denial and exact owned cleanup. Registered alongside all 290 baseline cases; no baseline assertions removed.
+- [Actual-component/router compatibility tests](../../src/pages/sales/CaseCreationCompatibility.test.tsx): eight tests with mocked services/hooks. NewDeal/LeadIntake navigation, both deposits, vehicle prefill and actor binding; not browser-to-DB E2E.
+- LIVE CATALOG/STATIC evidence: missing typed Case-source relationships, existing company-qualified LIMIT 1 ambiguity, and historical migration UUID/activity metadata mappings inspected without replay.
+- Astra's preceding external synthetic probes support the audit but are separate from these committed assertions. Neither synthetic source fixtures nor all-green characterization certify production Master RO parity, official Booking eligibility or target lifecycle/policy acceptance.
+
+Observed differences include both deposits remaining legacy lead; customer-only
+navigation ignored by NewDeal; unconditional auto_aging/default and no enforced
+document checklist; raw→SO provenance without Case provenance; next-month SOs
+included in MTD Orders; different branch/trend populations; and ambiguous text
+fallback. SOT 08 §§4,11,33,35 remain OPEN. Preserve optional deposit as confirmed,
+all prior allocator/history/access/Employee limits, and successful worker replay
+as separate work from privileged normalizer replay.
 
 ### supabase/migrations/20260621000000_deal_lifecycle.sql
 
