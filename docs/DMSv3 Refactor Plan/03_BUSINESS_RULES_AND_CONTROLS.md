@@ -303,6 +303,39 @@ Additional confirmed rules:
 
 Registration evidence closes the current pre-registration queue, but does **not** mean the entire customer Deal is economically complete; Delivery and, where applicable, Disbursement follow.
 
+### Registration-preparation facts and derived readiness
+
+Recovered established baseline rules:
+
+- current selected financing disposition is explicit;
+- financed disposition requires current approved financing/LOU context;
+- Cash is a first-class disposition with no fake LOU/EHAK;
+- active Allocation is a hard commercial Vehicle-context gate;
+- Agreement evidence is append-only;
+- SOLA applicability/clearance is explicit and may be UNKNOWN / NOT APPLICABLE / REQUIRED rather than guessed from bank name;
+- Special Plate process is explicit evidence/status; absence does not permit invented plate data;
+- EHAK is bound to the current financed disposition context;
+- a financing-selection change cannot reuse stale EHAK evidence automatically;
+- readiness/blockers/Focus are derived read models, never stored transaction truth;
+- UNKNOWN coverage fails closed rather than being coerced to eligible;
+- physical IN_TRANSIT / ON_HANDS are informational logistics factors unless later policy explicitly promotes a specific factor to a hard gate;
+- actual Registration re-derives authoritative prerequisites under lock and never trusts a displayed readiness result.
+
+In the old clean-sheet implementation, CUSTOMER_PAYMENT_CLEARANCE was an operational attestation because Accounts was not implemented. In current UBS, use Accounts-owned payment/receivable evidence where available instead of recreating a second financial truth.
+
+### Registration override boundary
+
+Historical established behavior permitted only a narrowly scoped payment-clearance blocker override and kept the factual blocker visible.
+
+No generic override may waive:
+
+- missing active Allocation;
+- stale/invalid selected financing;
+- required EHAK;
+- source ambiguity.
+
+Current UBS must implement any override through canonical Workflow/permission authority and preserve reason/history.
+
 ## 13. Delivery rules
 
 Delivery is a customer handover business event.
