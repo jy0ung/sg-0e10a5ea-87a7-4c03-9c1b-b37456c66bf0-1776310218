@@ -405,31 +405,29 @@ Before changing an OPEN POLICY to governed:
 
 No policy becomes authoritative solely because code shipped first.
 
-## 31. Master Report Plan abbreviations/classifications
+## 31. Master Report Plan abbreviations/classifications — partially resolved
 
-The reviewed FLC Master Report Plan requests Payment Status labels:
+The July KPI guide provides:
 
-- CS
-- CN
-- TT
-- Pending Full Payment
+- **TT = Telegraphic Transfer**
+- **CN = Cash-and-Carry**
+- **Contra Sola** as the corresponding named financing/payment workflow concept.
 
-and Booking/Registration planning labels such as:
+Still OPEN:
 
-- QR
-- Manual
-- EHAK.
+- whether the Master Report Plan abbreviation **CS** is formally approved to mean Contra Sola in every reporting context;
+- QR;
+- Manual;
+- any other shorthand not explicitly mapped by the source contract.
 
-The reviewed source does not provide a sufficiently precise official definition/mapping for every abbreviation.
-
-Before DMSv3 creates enums/KPI codes from them, confirm:
+Before DMSv3 creates enums/KPI codes for unresolved abbreviations, confirm:
 
 - full business meaning;
 - source field/code;
 - owning domain;
 - whether it is a status, document, payment method, source type or reporting-only label.
 
-Do not infer these meanings from common industry usage.
+Do not infer unresolved meanings from common industry usage.
 
 ## 32. Commission eligibility after DMSv3
 
