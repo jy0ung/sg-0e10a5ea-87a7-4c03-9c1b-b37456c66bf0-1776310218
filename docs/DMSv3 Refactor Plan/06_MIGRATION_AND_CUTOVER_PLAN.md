@@ -57,8 +57,9 @@ Execution checkpoint (2026-10-01): [PR #128](https://github.com/jy0ung/sg-0e10a5
 implements the bounded Phase 1A Lead/Prospect source/local-follow-up regression
 contract. The [source boundary evidence](../DMSV3_PHASE1_SOURCE_BOUNDARY_EVIDENCE.md)
 maps LP-01–LP-10 to committed disposable assertions and records validation.
-This is a **partial Phase 1 checkpoint**, pending independent review; it does not
-complete the programme or the remaining rule/lifecycle acceptance below.
+This independently accepted slice was squash-merged as
+`2d744dbbc16410a7762abf7bcb16974b000590d6`. It is a **partial Phase 1 checkpoint**;
+it does not complete the programme or the remaining rule/lifecycle acceptance below.
 Successful privileged source refresh is covered separately from duplicate staging
 rejection; successful worker replay remains separate ingestion work. Route/backend
 access convergence, Employee responsibility and FLC Case/source provenance also
@@ -131,6 +132,30 @@ Minimum disposable/live tests:
 
 These tests are the safety net for refactoring.
 
+### Bounded Phase 1B prerequisite — existing Deal number allocation
+
+On the accepted PR #128 baseline `2d744dbbc16410a7762abf7bcb16974b000590d6`,
+independent disposable probes reproduced failed null-branch creation, concurrent
+allocation collisions and suffix truncation after 999. The planned sequence
+foundation is therefore brought forward solely to unblock ordinary existing
+Deal creation and the next Case/deposit/official-RO characterization.
+
+[Deal-number evidence](../DMSV3_DEAL_NUMBER_ALLOCATION_EVIDENCE.md) maps DN-01–DN-10
+to committed live assertions, including execution of the unchanged `createDeal`
+service. Additive migration `20261001020000_deal_number_allocation.sql` reserves
+private, durable numbers by company/literal display label/YY/MM; null GEN and a
+real GEN branch share state. Existing numbers and UUIDs are preserved, valid
+existing suffixes bootstrap/advance state, and later failures/deletion never
+reclaim reservations. Upgrade is lazy per namespace; retain counter state and
+forward-correct after allocations begin, rather than reverting to unsafe MAX+1.
+
+This remains partial Phase 1 evidence pending independent review of this slice.
+It does not complete Phase 2 or the FLC Case contract: the service still creates
+legacy stage `lead` through separate RPC/Deal/activity requests. Creation roles,
+required documents, deposit policy, source provenance, official Booking metrics,
+workflow events/outbox and idempotency remain separate work. Zero/positive
+deposit inputs create no financial or official-Proton records in this harness.
+
 ## 4. Phase 2 — Additive schema foundation
 
 Add, without changing existing UI authority yet:
@@ -146,6 +171,10 @@ Add, without changing existing UI authority yet:
 Also add required indexes, RLS and command-only write boundary.
 
 No current V1 fields are removed.
+
+Only the existing display-number sequence prerequisite above has been brought
+forward from this list. Its private counter boundary is not the programme-wide
+command-only Deal/Case write boundary; the remaining foundation is still target.
 
 ## 5. Phase 3 — DMS funnel → FLC Case → Proton Retail Order reconciliation
 
