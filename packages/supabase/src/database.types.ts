@@ -8557,6 +8557,19 @@ export type Database = {
         }
         Returns: string
       }
+      create_linked_purchase_invoice: {
+        Args: {
+          p_invoice_no: string
+          p_supplier: string
+          p_chassis_no: string
+          p_model: string
+          p_invoice_date: string
+          p_amount: number
+          p_remark: string | null
+          p_po_line_id: string
+        }
+        Returns: string
+      }
       create_purchase_order: {
         Args: {
           p_company_id: string
@@ -8980,6 +8993,10 @@ export type Database = {
         Returns: boolean
       }
       is_same_company: { Args: { target_company_id: string }; Returns: boolean }
+      link_purchase_invoice_po_line: {
+        Args: { p_invoice_id: string; p_po_line_id: string }
+        Returns: string
+      }
       link_vehicle_to_sales_order: {
         Args: {
           p_chassis_no?: string

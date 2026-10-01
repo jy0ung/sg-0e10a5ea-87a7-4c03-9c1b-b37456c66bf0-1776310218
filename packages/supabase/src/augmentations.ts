@@ -97,6 +97,9 @@ export const nullableRpcArgs: Record<string, string[]> = {
     "p_notes",
     "p_supplier_dn_no"
   ],
+  "create_linked_purchase_invoice": [
+    "p_remark"
+  ],
   "get_leads_feed": [
     "p_branch_code",
     "p_kind",

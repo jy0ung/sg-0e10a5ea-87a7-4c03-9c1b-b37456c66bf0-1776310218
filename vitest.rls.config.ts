@@ -22,6 +22,7 @@ export default defineConfig({
       'src/test/admin-webhook-secrets.rls.spec.ts',
       'src/test/admin-role-matrix.rls.spec.ts',
       'src/test/purchase-invoice-receipt.rls.spec.ts',
+      'src/test/purchasing-ap-finance-uat.rls.spec.ts',
       'src/test/production-readiness.spec.ts',
       'src/test/release-workflows.spec.ts',
     ],

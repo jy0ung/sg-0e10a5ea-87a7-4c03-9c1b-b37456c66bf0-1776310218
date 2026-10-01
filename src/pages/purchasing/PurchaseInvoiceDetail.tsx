@@ -17,8 +17,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompanyId } from '@/hooks/useCompanyId';
 import {
   getPurchaseInvoiceById,
+  linkPurchaseInvoicePoLine,
   updatePurchaseInvoice,
 } from '@/services/purchaseInvoiceService';
+import { PurchaseInvoicePoLineSelect } from './PurchaseInvoicePoLineSelect';
 import { PurchaseInvoiceReceiptDialog } from './PurchaseInvoiceReceiptDialog';
 import {
   getSupplierPaymentEvents,
@@ -84,6 +86,10 @@ export default function PurchaseInvoiceDetail() {
   const [editForm, setEditForm] = useState(EMPTY_EDIT);
   const [saving, setSaving]     = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkPoId, setLinkPoId] = useState('');
+  const [linkLineId, setLinkLineId] = useState('');
+  const [linking, setLinking] = useState(false);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['purchase-invoice', companyId, id] });
@@ -217,6 +223,17 @@ export default function PurchaseInvoiceDetail() {
     invalidate();
   };
 
+  const handleLink = async () => {
+    if (!invoice || !linkLineId) return;
+    setLinking(true);
+    const { error: err } = await linkPurchaseInvoicePoLine(invoice.id, linkLineId);
+    setLinking(false);
+    if (err) { toast({ title: 'PO link failed', description: err.message, variant: 'destructive' }); return; }
+    toast({ title: 'Purchase order line linked' });
+    setLinkOpen(false);
+    invalidate();
+  };
+
   // ── Loading / error states ────────────────────────────────────────────────────
 
   if (isLoading) {
@@ -279,6 +296,15 @@ export default function PurchaseInvoiceDetail() {
             {isEditable && (
               <Button variant="outline" size="sm" onClick={openEditDialog}>
                 <Pencil className="h-4 w-4 mr-1" />Edit
+              </Button>
+            )}
+            {canReceive && invoice.status === 'pending' && invoice.lifecycleStatus === 'received' && (
+              <Button variant="outline" size="sm" onClick={() => {
+                setLinkPoId(invoice.poId ?? '');
+                setLinkLineId(invoice.poLineId ?? '');
+                setLinkOpen(true);
+              }}>
+                <Link2 className="h-4 w-4 mr-1" />{invoice.poLineId ? 'Change PO Link' : 'Link PO Line'}
               </Button>
             )}
           </div>
@@ -369,7 +395,7 @@ export default function PurchaseInvoiceDetail() {
 
         {/* ── PO Reference ─────────────────────────────────────────────── */}
         {invoice.poLineId && (
-          <Card className={invoice.poNo && invoice.amount && invoice.poUnitPrice && Math.abs(invoice.amount - invoice.poUnitPrice) > 1 ? 'border-warning' : ''}>
+          <Card className={invoice.poNo && invoice.amount && invoice.poUnitPrice && invoice.poQuantity && Math.abs(invoice.amount - invoice.poUnitPrice * invoice.poQuantity) > 1 ? 'border-warning' : ''}>
             <CardHeader className="pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                 <Link2 className="h-3.5 w-3.5" />
@@ -382,7 +408,7 @@ export default function PurchaseInvoiceDetail() {
                   <dt className="text-xs text-muted-foreground">PO Number</dt>
                   <dd className="text-sm font-medium">
                     {invoice.poNo ? (
-                      <Button variant="link" className="h-auto p-0" onClick={() => navigate(`/purchasing/orders/${invoice.poLineId?.split('-')[0] || ''}`)}>
+                      <Button variant="link" className="h-auto p-0" onClick={() => navigate(`/purchasing/orders/${invoice.poId || ''}`)}>
                         {invoice.poNo}
                       </Button>
                     ) : '—'}
@@ -400,12 +426,12 @@ export default function PurchaseInvoiceDetail() {
                     <dd className="text-sm">{fmt(invoice.poUnitPrice)}</dd>
                   </div>
                 )}
-                {invoice.poUnitPrice != null && invoice.amount != null && Math.abs(invoice.amount - invoice.poUnitPrice) > 1 && (
+                {invoice.poUnitPrice != null && invoice.poQuantity != null && invoice.amount != null && Math.abs(invoice.amount - invoice.poUnitPrice * invoice.poQuantity) > 1 && (
                   <div className="col-span-full">
                     <div className="flex items-center gap-2 p-2 rounded bg-warning/10 text-warning">
                       <AlertTriangle className="h-4 w-4 shrink-0" />
                       <p className="text-xs">
-                        Amount mismatch: Invoice {fmt(invoice.amount)} vs PO {fmt(invoice.poUnitPrice)} (diff: {fmt(Math.abs(invoice.amount - invoice.poUnitPrice))})
+                        Amount mismatch: Invoice {fmt(invoice.amount)} vs PO {fmt(invoice.poUnitPrice * invoice.poQuantity)} (diff: {fmt(Math.abs(invoice.amount - invoice.poUnitPrice * invoice.poQuantity))})
                       </p>
                     </div>
                   </div>
@@ -579,6 +605,22 @@ export default function PurchaseInvoiceDetail() {
         onClose={() => setReceiptOpen(false)}
         onReceived={invalidate}
       />
+
+      <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Link Purchase Order Line</DialogTitle></DialogHeader>
+          <PurchaseInvoicePoLineSelect
+            companyId={companyId}
+            poId={linkPoId}
+            value={linkLineId}
+            onChange={(poId, poLineId) => { setLinkPoId(poId); setLinkLineId(poLineId); }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkOpen(false)}>Cancel</Button>
+            <Button onClick={handleLink} disabled={linking || !linkLineId}>{linking ? 'Linking…' : 'Save PO Link'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Record Payment Dialog ──────────────────────────────────────────── */}
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
