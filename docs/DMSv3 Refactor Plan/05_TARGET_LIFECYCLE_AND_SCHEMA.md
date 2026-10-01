@@ -173,17 +173,14 @@ Target authoritative fields for new V2 Deals:
 | requested_model_name | text snapshot | display/source snapshot |
 | requested_variant | text | requested variant |
 | requested_colour | text | requested colour |
-| selling_price | numeric | commercial amount |
-| discount_amount | numeric | discount |
-| accessories_amount | numeric | accessories |
-| total_amount | numeric | derived commercial total |
+| recorded_commercial_terms_version_id | uuid nullable | optional pointer/read optimization to current immutable recorded-terms version; owning terms ledger remains authoritative |
 | payment_type_id | FK payment_types | current selected payment path |
 | booking_source | text | prospect_conversion / direct_case / migration / legacy compatibility |
 | notes | text | local notes |
 | created_by | FK profiles | creator |
 | created_at / updated_at | timestamps | system timestamps |
 
-Compatibility fields such as old `booking_date`, stage, sales_advisor_id/name, deposit_amount/date, chassis_no and vso_no stay temporarily but are not new-write authority.
+Compatibility fields such as old `booking_date`, stage, sales_advisor_id/name, deposit_amount/date, chassis_no, vso_no, selling_price and other commercial amount columns stay temporarily but are not new-write authority.
 
 **Important:** `case_opened_date` and the official Proton Retail Order/Booking Date are different business dates. Official Booking MTD must read the Proton Retail Order observation, not `case_opened_date`.
 
@@ -616,8 +613,6 @@ The approval/decision model must follow current capability/manager ownership rul
 
 ## 22. vehicle_lifecycle_events
 
-## 22. vehicle_lifecycle_events
-
 Inventory-owned event history:
 
 - id
@@ -802,7 +797,23 @@ Do not remove sales_order_id compatibility until callers/reconciliation are comp
 
 One Deal may have more than one Invoice if business rules ever require it.
 
-## 32. payment_events source linkage
+## 32. recorded commercial terms
+
+Reuse or evolve the current immutable commercial-terms foundation rather than storing a new pricing formula on Deals.
+
+Target requirements:
+
+- Booking/Deal scoped;
+- complete immutable version snapshots;
+- exact MYR decimals;
+- verbatim business line labels/evidence;
+- correction appends a full replacement version with mandatory reason;
+- prior versions remain immutable;
+- no subtotal/OTR/customer-payable/discount/insurance/tax/balance formula is inferred unless separately confirmed and versioned.
+
+The Delivery/payment workflow may read an approved/current commercial-terms snapshot, but cannot derive accounting truth from presentation labels.
+
+## 33. payment_events source linkage
 
 Add optional source linkage:
 
@@ -818,7 +829,7 @@ Examples:
 
 Use unique idempotency constraints where appropriate.
 
-## 33. deal_documents
+## 34. deal_documents
 
 Preserve existing document table and add scope metadata:
 
@@ -839,7 +850,7 @@ Scopes:
 
 Documents support evidence but do not decide workflow state.
 
-## 34. domain_outbox_events
+## 35. domain_outbox_events
 
 Transactional cross-domain event outbox:
 
@@ -867,7 +878,7 @@ Examples:
 - deal.cancelled
 - deal.completed.
 
-## 35. deal_number_sequences
+## 36. deal_number_sequences
 
 Replace race-prone MAX+1 number allocation:
 
@@ -882,7 +893,7 @@ composite PK by company/branch/year/month.
 
 UUID remains actual PK.
 
-## 36. Authoritative command surface
+## 37. Authoritative command surface
 
 Target commands/use cases include:
 
@@ -937,7 +948,7 @@ Each command:
 9. appends outbox event where applicable;
 10. commits atomically.
 
-## 37. Direct-DML boundary
+## 38. Direct-DML boundary
 
 Authenticated direct mutation should be removed for authority tables such as:
 
@@ -959,7 +970,7 @@ Authenticated direct mutation should be removed for authority tables such as:
 
 RLS remains necessary even with commands.
 
-## 38. Canonical read models
+## 39. Canonical read models
 
 ### deal_current_state_v
 
@@ -1044,7 +1055,7 @@ Operational queue:
 - age
 - next action.
 
-## 39. Current → target stage mapping
+## 40. Current → target stage mapping
 
 Safe conceptual mapping only; migration still requires evidence:
 
@@ -1067,7 +1078,7 @@ Safe conceptual mapping only; migration still requires evidence:
 
 Do not blindly map legacy “completed,” because historical migrations used completed-like outcomes for Car Out, Cancel and Passed.
 
-## 40. “New without Deposit” migration rule
+## 41. “New without Deposit” migration rule
 
 Target meaning:
 
@@ -1076,7 +1087,7 @@ Target meaning:
 
 Do not create financial receipt history solely from an old amount field without reconciliation evidence.
 
-## 41. Idempotency
+## 42. Idempotency
 
 Stable keys required for replayed DMS evidence, e.g.:
 
@@ -1090,7 +1101,7 @@ Stable keys required for replayed DMS evidence, e.g.:
 
 Replay must not duplicate canonical events.
 
-## 42. Index/constraint requirements
+## 43. Index/constraint requirements
 
 At minimum index:
 
@@ -1117,7 +1128,7 @@ Use partial unique constraints for:
 - one successful Delivery event;
 - idempotency keys.
 
-## 43. Compatibility policy
+## 44. Compatibility policy
 
 Do not drop V1 tables/columns while:
 
@@ -1133,7 +1144,7 @@ Compatibility views/adapters may expose old shapes during cutover.
 No dual independent truth.
 
 
-## 44. Official Proton Retail Order read model
+## 45. Official Proton Retail Order read model
 
 DMSv3 should expose a canonical read-only projection over the accepted Proton Retail Order observation for each linked Deal, including:
 
@@ -1150,7 +1161,7 @@ This projection is source-owned and must not be edited as local Deal state.
 
 Official Booking MTD reads this projection/source population.
 
-## 45. Business-calendar / Reservation policy tables
+## 46. Business-calendar / Reservation policy tables
 
 Reuse existing governed configuration tables where current UBS already has an equivalent.
 
@@ -1165,7 +1176,7 @@ If absent, add versioned configuration for:
 
 Historical Reservation terms store the selected policy/version snapshot.
 
-## 46. Delivery financial exception evidence
+## 47. Delivery financial exception evidence
 
 A successful Delivery must store or reference the evidence used for its customer-payable gate:
 
@@ -1180,7 +1191,7 @@ Exception case:
 
 Delivery does not directly mutate Accounts balances.
 
-## 47. PRE-REGISTER read model
+## 48. PRE-REGISTER read model
 
 Create a derived read model such as `vehicle_commercial_condition_v` or extend an existing Inventory projection.
 
