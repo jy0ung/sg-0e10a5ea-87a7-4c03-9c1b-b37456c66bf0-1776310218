@@ -49,15 +49,19 @@ No fake Loan, LOU or bank Disbursement state is created for a non-loan Deal.
 
 ### Financing
 
+Loan Application state:
+
 - draft
 - submitted
 - approved
 - rejected
 - cancelled
-- lou_received
-- lou_verified
-- disbursing
-- disbursed
+
+LOU/offer-letter evidence is a separate versioned record associated with an approved application.
+
+The selected downstream Financing disposition is also separate from the application itself.
+
+Bank submission and actual Disbursement remain later independent dimensions.
 
 ### Stock Control
 
@@ -398,17 +402,64 @@ Support more than one bank attempt per Deal:
 - approved_at
 - rejected_at
 - rejection_reason
-- lou_reference
-- lou_received_at
-- lou_verified_at
 - created_by
 - created_at / updated_at.
 
-Only one selected facility per Deal.
+Multiple applications per Deal are allowed.
 
-Rejected/cancelled application cannot be selected.
+Application approval does not itself select the facility for downstream use.
 
-## 13. deal_financing_events
+Rejected/cancelled applications cannot be selected.
+
+## 13. deal_financing_lou_versions
+
+Versioned LOU / loan-offer-letter evidence per financing application:
+
+- id
+- company_id
+- deal_id
+- financing_application_id
+- version_no
+- lou_reference
+- approved_amount nullable
+- lou_date
+- requirement_version/reference nullable
+- evidence_reference
+- state current/superseded/stale as a projection or derivable status
+- recorded_by
+- recorded_at
+- correction_reason nullable.
+
+Prior versions are immutable.
+
+A material financing requirement change may make a previously selected LOU stale; the system must not auto-select another application/LOU.
+
+## 14. deal_financing_disposition_versions
+
+Append-only selection of downstream financing mode/context:
+
+- id
+- company_id
+- deal_id
+- version_no
+- mode financed/cash
+- financing_application_id nullable
+- lou_version_id nullable
+- selected_by
+- selected_at
+- selection_reason
+- supersedes_version_id nullable.
+
+Rules:
+
+- FINANCED requires a same-Deal approved application and current LOU evidence.
+- CASH has no application/LOU relationship.
+- current = highest/effective version.
+- changing bank/application/LOU or FINANCED↔CASH creates a new version; history is never overwritten.
+
+This selected/current disposition is the financing context used by Registration readiness.
+
+## 15. deal_financing_events
 
 Append-only financing history:
 
@@ -424,7 +475,7 @@ Append-only financing history:
 - occurred_at
 - created_at.
 
-## 14. deal_bank_submissions
+## 16. deal_bank_submissions
 
 Financed post-delivery bank-submission evidence:
 
@@ -448,7 +499,7 @@ This models **Invoice Submitted** without turning it into a universal Deal stage
 
 Cash/non-loan Deals cannot create this record.
 
-## 15. deal_financing_disbursements
+## 17. deal_financing_disbursements
 
 Operational financing-side disbursement report/reference:
 
@@ -484,7 +535,7 @@ The Accounts-owned payment/receipt record must carry:
 
 The Deal read model may show the verified disbursement through this link, but Financing may not self-certify bank credit.
 
-## 16. sales_stock_requests
+## 18. sales_stock_requests
 
 Sales/Stock request:
 
@@ -504,7 +555,7 @@ Sales/Stock request:
 
 A Stock Request does not itself reserve or allocate a Vehicle.
 
-## 17. vehicle_reservations
+## 19. vehicle_reservations
 
 Temporary stock-control hold:
 
@@ -528,7 +579,7 @@ Constraints:
 - Reservation is not Allocation;
 - expired-but-still-effective Reservation is not Free Stock.
 
-## 18. vehicle_reservation_terms
+## 20. vehicle_reservation_terms
 
 Append-only term history:
 
@@ -553,7 +604,7 @@ Default policy snapshots:
 
 Expiry does not automatically release the Reservation.
 
-## 19. sales_stock_demands
+## 21. sales_stock_demands
 
 Waiting-for-Stock / LNS demand:
 
@@ -569,7 +620,7 @@ Waiting-for-Stock / LNS demand:
 
 LNS is derived from authoritative financing context + active demand + absence of qualifying effective Reservation/Allocation.
 
-## 20. vehicle_allocations
+## 22. vehicle_allocations
 
 Canonical customer-control relationship:
 
@@ -595,7 +646,7 @@ Constraints:
 - sequential allocations are preserved historically;
 - there is no permanent lifetime `vehicles.deal_id`.
 
-## 21. vehicle_reallocation_proposals
+## 23. vehicle_reallocation_proposals
 
 For controlled cross-responsibility reallocation:
 
@@ -613,7 +664,7 @@ For controlled cross-responsibility reallocation:
 
 The approval/decision model must follow current capability/manager ownership rules and remain auditable.
 
-## 22. vehicle_lifecycle_events
+## 24. vehicle_lifecycle_events
 
 Inventory-owned event history:
 
@@ -641,7 +692,7 @@ Initial event vocabulary:
 
 Current Vehicle milestone columns may remain as compatibility/read-model fields during migration.
 
-## 23. deal_registrations
+## 25. deal_registrations
 
 Current Registration projection/aggregate:
 
@@ -689,7 +740,7 @@ Immutable externally completed Registration/correction evidence:
 
 Prior versions cannot be UPDATE/DELETEd through normal application paths.
 
-## 24. deal_registration_events
+## 26. deal_registration_events
 
 Immutable transitions:
 
@@ -703,7 +754,7 @@ Immutable transitions:
 - occurred_at
 - created_at.
 
-## 25. deal_insurance_policies + events
+## 27. deal_insurance_policies + events
 
 Policy record:
 
@@ -722,7 +773,7 @@ Policy record:
 
 Keep append-only transition/event history.
 
-## 26. deal_deliveries
+## 28. deal_deliveries
 
 Current Delivery projection/aggregate:
 
@@ -769,7 +820,7 @@ Append-only Delivery/correction history:
 
 A wrong Delivery date/evidence is corrected by a new version or explicit reversal/correction event, never silent overwrite.
 
-## 27. deal_delivery_readiness_v
+## 29. deal_delivery_readiness_v
 
 Derived view, not manually stored booleans.
 
@@ -787,7 +838,7 @@ Fields should include:
 - ready_to_deliver
 - blocking_reasons.
 
-## 28. deal_cancellation_reasons
+## 30. deal_cancellation_reasons
 
 Company-configurable:
 
@@ -797,7 +848,7 @@ Company-configurable:
 - requires_approval
 - active/effective metadata.
 
-## 29. deal_cancellations
+## 31. deal_cancellations
 
 One authoritative cancellation:
 
@@ -820,7 +871,7 @@ Deposit resolution states:
 
 Actual monetary movements still use Accounts/deposit events.
 
-## 30. deal_relationships
+## 32. deal_relationships
 
 Preserve rebooking/replacement history:
 
@@ -837,7 +888,7 @@ Types:
 - duplicate_of
 - supersedes.
 
-## 31. invoices.deal_id
+## 33. invoices.deal_id
 
 Add canonical Deal relationship to Accounts Invoice.
 
@@ -845,7 +896,7 @@ Do not remove sales_order_id compatibility until callers/reconciliation are comp
 
 One Deal may have more than one Invoice if business rules ever require it.
 
-## 32. recorded commercial terms
+## 34. recorded commercial terms
 
 Reuse or evolve the current immutable commercial-terms foundation rather than storing a new pricing formula on Deals.
 
@@ -861,7 +912,7 @@ Target requirements:
 
 The Delivery/payment workflow may read an approved/current commercial-terms snapshot, but cannot derive accounting truth from presentation labels.
 
-## 33. payment_events source linkage
+## 35. payment_events source linkage
 
 Add optional source linkage:
 
@@ -877,7 +928,7 @@ Examples:
 
 Use unique idempotency constraints where appropriate.
 
-## 34. deal_documents
+## 36. deal_documents
 
 Preserve existing document table and add scope metadata:
 
@@ -898,7 +949,7 @@ Scopes:
 
 Documents support evidence but do not decide workflow state.
 
-## 35. domain_outbox_events
+## 37. domain_outbox_events
 
 Transactional cross-domain event outbox:
 
@@ -926,7 +977,7 @@ Examples:
 - deal.cancelled
 - deal.completed.
 
-## 36. deal_number_sequences
+## 38. deal_number_sequences
 
 Replace race-prone MAX+1 number allocation:
 
@@ -941,7 +992,7 @@ composite PK by company/branch/year/month.
 
 UUID remains actual PK. Any locally generated Deal/Case number is a display/reference key only; the official Proton Booking No remains the Proton business identifier once created.
 
-## 37. Authoritative command surface
+## 39. Authoritative command surface
 
 Target commands/use cases include:
 
@@ -956,9 +1007,9 @@ Target commands/use cases include:
 - create_financing_application
 - submit_financing_application
 - record_financing_decision
-- record_lou_received
-- verify_lou
-- select_financing_application
+- record_financing_lou
+- correct_financing_lou
+- select_financing_disposition
 - request_stock
 - reserve_vehicle
 - extend_vehicle_reservation
@@ -996,14 +1047,17 @@ Each command:
 9. appends outbox event where applicable;
 10. commits atomically.
 
-## 38. Direct-DML boundary
+## 40. Direct-DML boundary
 
 Authenticated direct mutation should be removed for authority tables such as:
 
 - deal_workflow_state
 - deal_status_events
 - deal_deposit_events
-- deal_financing_applications/events
+- deal_financing_applications
+- deal_financing_lou_versions
+- deal_financing_disposition_versions
+- deal_financing_events
 - deal_bank_submissions
 - financing-side disbursement reports
 - sales_stock_requests
@@ -1018,7 +1072,7 @@ Authenticated direct mutation should be removed for authority tables such as:
 
 RLS remains necessary even with commands.
 
-## 39. Canonical read models
+## 41. Canonical read models
 
 ### deal_current_state_v
 
@@ -1104,7 +1158,7 @@ Operational queue:
 - age
 - next action.
 
-## 40. Current → target stage mapping
+## 42. Current → target stage mapping
 
 Safe conceptual mapping only; migration still requires evidence:
 
@@ -1127,7 +1181,7 @@ Safe conceptual mapping only; migration still requires evidence:
 
 Do not blindly map legacy “completed,” because historical migrations used completed-like outcomes for Car Out, Cancel and Passed.
 
-## 41. “New without Deposit” migration rule
+## 43. “New without Deposit” migration rule
 
 Target meaning:
 
@@ -1136,7 +1190,7 @@ Target meaning:
 
 Do not create financial receipt history solely from an old amount field without reconciliation evidence.
 
-## 42. Idempotency
+## 44. Idempotency
 
 Stable keys required for replayed DMS evidence, e.g.:
 
@@ -1150,7 +1204,7 @@ Stable keys required for replayed DMS evidence, e.g.:
 
 Replay must not duplicate canonical events.
 
-## 43. Index/constraint requirements
+## 45. Index/constraint requirements
 
 At minimum index:
 
@@ -1177,7 +1231,7 @@ Use partial unique constraints for:
 - one successful Delivery event;
 - idempotency keys.
 
-## 44. Compatibility policy
+## 46. Compatibility policy
 
 Do not drop V1 tables/columns while:
 
@@ -1193,7 +1247,7 @@ Compatibility views/adapters may expose old shapes during cutover.
 No dual independent truth.
 
 
-## 45. Official Proton Retail Order read model
+## 47. Official Proton Retail Order read model
 
 DMSv3 should expose a canonical read-only projection over the accepted Proton Retail Order observation for each linked Deal, including:
 
@@ -1210,7 +1264,7 @@ This projection is source-owned and must not be edited as local Deal state.
 
 Official Booking MTD reads this projection/source population.
 
-## 46. Business-calendar / Reservation policy tables
+## 48. Business-calendar / Reservation policy tables
 
 Reuse existing governed configuration tables where current UBS already has an equivalent.
 
@@ -1225,7 +1279,7 @@ If absent, add versioned configuration for:
 
 Historical Reservation terms store the selected policy/version snapshot.
 
-## 47. Delivery financial exception evidence
+## 49. Delivery financial exception evidence
 
 A successful Delivery must store or reference the evidence used for its customer-payable gate:
 
@@ -1240,7 +1294,7 @@ Exception case:
 
 Delivery does not directly mutate Accounts balances.
 
-## 48. PRE-REGISTER read model
+## 50. PRE-REGISTER read model
 
 Create a derived read model such as `vehicle_commercial_condition_v` or extend an existing Inventory projection.
 
