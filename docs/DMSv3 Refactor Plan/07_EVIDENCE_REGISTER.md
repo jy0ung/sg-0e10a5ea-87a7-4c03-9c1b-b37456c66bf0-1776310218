@@ -278,6 +278,26 @@ Evidence:
 - explicit statement that conversion is a separate flow;
 - current manual handoff behavior.
 
+### DMSv3 Phase 1A source boundary checkpoint — PR #128
+
+Date: 2026-10-01. [PR #128](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/128)
+is a partial Phase 1 checkpoint, pending independent review.
+
+Evidence:
+
+- [Source boundary evidence and LP-01–LP-10 assertion mapping](../DMSV3_PHASE1_SOURCE_BOUNDARY_EVIDENCE.md), including current validation and limits.
+- [Committed disposable regression suite](../../src/test/dms-lead-prospect-boundary.rls.spec.ts): 49 cases, retaining the 27 reviewed cases and adding 22 named LP cases; real authentication, PostgREST, PostgreSQL, RPC/RLS and persisted-state verification.
+- [Source/author policy correction](../../supabase/migrations/20261001010000_dms_lead_followup_source_boundary.sql): same-company kind/raw UUID existence and current-author checks on direct local follow-up writes; migration unchanged in this review-correction round.
+- Direct Prospect independence; source write denial and tenant/kind identity separation; persisted authorship, local converted/lost outcomes without implicit commercial/financial events; rejected-write stability; deterministic count/latest/outcome/action priority using database today; anonymous/inactive RPC denial; successful privileged same-UUID source refresh with local notes unchanged.
+
+Duplicate staging rejection is retained and distinguished from successful fixture
+refresh. Successful worker replay, route/backend access convergence, Employee
+responsibility and FLC Case/source provenance remain separate work; this evidence
+does not complete the entire Phase 1 programme. Same-company source reattachment
+and `created_at` rewriting remain possible for local notes: the nominal 24-hour
+predicate is not an immutable-history or fixed-correction-window guarantee. This
+preexisting history limitation is documented, with redesign outside this slice.
+
 ### supabase/migrations/20260621000000_deal_lifecycle.sql
 
 Evidence:

@@ -77,11 +77,13 @@ Migration `20260915090000_production_readiness_security.sql` adds restrictive po
 ## RPC Contracts
 
 `lead_followups` supports company-scoped reads (and existing global scope),
-same-company authored inserts, and original-author corrections within 24 hours;
+same-company authored inserts, and an original-author/nominal-24-hour UPDATE predicate;
 authenticated DELETE has no policy. Migration
 `20261001010000_dms_lead_followup_source_boundary.sql` also requires direct
 INSERT/UPDATE to reference an existing same-company Lead or Prospect of the
 specified kind. The restrictive enabled-user and tenant gates remain active.
+Same-company source reattachment and `created_at` rewriting remain possible, so
+this predicate does not guarantee immutable history or a fixed correction window.
 `add_lead_followup` derives the author from `auth.uid()` and checks the source
 company itself. `get_leads_feed` / `get_lead_detail` enforce their existing
 company/global contract. See [DMSv3 Phase 1 evidence](DMSV3_PHASE1_SOURCE_BOUNDARY_EVIDENCE.md)
