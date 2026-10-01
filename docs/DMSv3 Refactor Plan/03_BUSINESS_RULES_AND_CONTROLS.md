@@ -9,18 +9,22 @@ This file is the authoritative rule catalogue for DMSv3 implementation. Rules ma
 
 ### Booking identity
 
-**CURRENT GOVERNED**
+**CURRENT WORKBOOK CONTROL**
 
-- Booking No is the permanent external/business case key in the current Control Tower.
+- Booking No is the durable synchronization key in the current Control Tower.
 - Do not key history by spreadsheet row number or current row position.
 - DMS/system refreshes UPSERT by Booking No.
 - DMS/system refreshes must not overwrite staff-owned manual workflow fields.
 
-**TARGET DMSv3**
+**BUSINESS CONFIRMED / TARGET DMSv3**
 
-- Deal UUID is canonical internal identity.
-- DMS Booking/Retail Order ID and Booking No remain explicit external/source identities.
-- One upstream DMS Booking must not create duplicate canonical Deals on replay.
+- FLC Booking/Case UUID is the permanent technical identity.
+- FLC Booking/Case may exist before Proton creates a Booking No.
+- Proton Booking No is the official Proton business identifier and may initially be null.
+- DMS Retail Order ID and Proton Booking No remain explicit external/source identities.
+- one customer may legitimately have multiple Bookings;
+- one upstream Proton Retail Order must not create duplicate canonical Deals on replay;
+- customer name is never Booking identity.
 
 ### Sales Advisor identity
 
@@ -50,6 +54,7 @@ This file is the authoritative rule catalogue for DMSv3 implementation. Rules ma
 
 - Lead is DMS-owned.
 - Prospect is DMS-owned.
+- Lead is optional; Direct Prospect is first-class.
 - UBS may hold local follow-up/action workflow.
 - UBS must not create a competing canonical Lead/Prospect status.
 
@@ -92,14 +97,20 @@ Rules:
 
 **BUSINESS CONFIRMED**
 
-A Booking is valid **with or without deposit**.
+Two concepts must remain distinct:
+
+1. **FLC Booking/Case** — local commercial case with immutable UUID; may be created once genuine purchase intent and sufficient information/documents exist.
+2. **Official Proton Booking/Retail Order** — created in Proton DMS and identified by Proton Booking No; current operational mirror is Master RO.
+
+A local FLC Booking/Case is valid **with or without deposit**.
 
 Therefore:
 
 - deposit amount = 0 does not mean Lead;
 - missing deposit does not demote Booking to Prospect;
 - “New without Deposit” must not be modeled as Lead in DMSv3;
-- deposit is a parallel financial fact.
+- deposit is a parallel financial fact;
+- official Booking MTD comes from the Proton Retail Order population, not from manually keyed/local-case rows.
 
 ## 5. Current lifecycle-state precedence
 
@@ -202,11 +213,42 @@ DMSv3 target keeps LOU in Financing, not as a top-level Deal stage.
 
 The exact financing milestone required to unlock Registration remains OPEN POLICY if it differs from the current “confirmed LOU before allocation” control.
 
-## 11. Allocation rules
+## 11. Stock request, Reservation and Allocation rules
 
-### Allocation fact
+### Stock Request
 
-Use DMS Allocation Status / Allocation Date / Chassis evidence.
+- Sales Advisor/authorized user may request stock.
+- A request alone does not reserve or allocate a chassis.
+
+### Reservation
+
+- at most one effective Reservation per chassis;
+- Reservation is temporary stock control, distinct from Allocation;
+- versioned default terms:
+  - 3 working days: no loan/LOU context;
+  - 7 working days: pending LOU;
+  - 3 working days: approved LOU;
+- later policy changes do not rewrite existing snapshotted terms;
+- expiry is a control/review point, not automatic release;
+- extension and pre-emption require explicit authorized action/history.
+
+### Allocation authority
+
+- authorized management controls authoritative allocation;
+- Sales Advisor may request but does not allocate a specific chassis;
+- one active Allocation per chassis;
+- Reservation may convert to Allocation under the owning-domain command;
+- Reallocation is explicit and auditable;
+- no silent last-write-wins;
+- no permanent Vehicle.bookingId is authoritative; sequential commercial cases are permitted.
+
+### LNS / Waiting for Stock
+
+LNS is derived from selected/current financing context + explicit Waiting-for-Stock demand + no qualifying effective Reservation/Allocation. No manually stored `is_lns` flag is authoritative.
+
+### Current DMS Allocation evidence
+
+Use DMS Allocation Status / Allocation Date / Chassis evidence as source observations during reconciliation.
 
 **Date Stock Requested is not Allocation Date.**
 
@@ -249,26 +291,53 @@ Enterprise Registration actual = Master Inventory (OUTLET) REG DATE.
 
 Pending Registration cannot already have a valid effective Registration Date.
 
+Additional confirmed rules:
+
+- Registration readiness/Focus is derived, never actual Registration.
+- actual Registration is an explicit externally completed result with immutable history/provenance;
+- physical IN_TRANSIT is not automatically a Registration blocker;
+- the Registration command must re-evaluate authoritative prerequisites under lock;
+- Reservation alone is not equivalent to active Allocation for the commercial chassis context;
+- cancellation after Registration does not erase Registration;
+- PRE-REGISTER/sequential commercial cases preserve the carried chassis Registration history.
+
 Registration evidence closes the current pre-registration queue, but does **not** mean the entire customer Deal is economically complete; Delivery and, where applicable, Disbursement follow.
 
 ## 13. Delivery rules
 
 Delivery is a customer handover business event.
 
-DMSv3 target requires an authoritative delivery command/event.
+**Delivered = physical handover of vehicle/keys + signed VDO evidence.**
 
-The exact mandatory readiness checklist remains partly OPEN POLICY, but the event must reference the canonical Deal and Vehicle and preserve actor/time/source evidence.
+Normal financial rule:
 
-## 14. Disbursement rules
+- customer-payable amounts are cleared before Delivery.
 
-Disbursement means bank funds are released to FLC for financed cases.
+Authorized exception:
+
+- authenticated Director approval may permit Delivery with an outstanding balance;
+- the outstanding balance remains visible and is not silently waived.
+
+DMSv3 requires an authoritative delivery command/event referencing the canonical Deal and Vehicle with actor/time/source evidence.
+
+The remaining **non-financial** readiness checklist (e.g. exact insurance/plate/location gates) may remain OPEN POLICY where not already confirmed.
+
+## 14. Invoice Submission and Disbursement rules
+
+For financed cases, confirmed downstream flow:
+
+**signed VDO + VSO submitted to bank → Invoice Submitted → actual bank credit → Accounts verification → Disbursement**
 
 Rules:
 
 - Delivery and Disbursement are distinct events.
 - A financed Deal may remain outstanding after Delivery.
-- Non-loan Deals must not create fake bank-disbursement state.
-- operational disbursement evidence does not itself authorize a Finance journal; Accounts/Finance contracts remain authoritative.
+- Disbursement is recognized only after Accounts verifies actual bank-statement credit.
+- Disbursement Date = actual credit/value date.
+- Invoice Submitted is a financed document/settlement milestone, not a universal Deal stage.
+- Non-loan Deals must not create fake bank Invoice Submitted/Disbursement state.
+- operational financing evidence does not itself authorize a Finance journal; Accounts/Finance contracts remain authoritative.
+- Official Receipt is issued only after confirmed credit; one OR per payment transaction.
 
 ## 15. Payment-method normalization
 
@@ -283,6 +352,8 @@ Current payment master also includes Trade-In.
 
 Future payment-method-specific lifecycle behavior must be explicit and versioned.
 
+**Confirmed Cash rule:** cash credit/receipt confirmation is required before Registration; Cash does not traverse fictitious bank Invoice Submitted/Disbursement states.
+
 ## 16. Deposit controls
 
 **BUSINESS CONFIRMED**
@@ -294,9 +365,11 @@ Future payment-method-specific lifecycle behavior must be explicit and versioned
 
 ## 17. Date integrity
 
-Current required ordering:
+Current workbook chronology:
 
-**Booking ≤ Loan Submission ≤ LOU ≤ Allocation ≤ Registration**
+**Official Proton Booking ≤ Loan Submission ≤ LOU ≤ Allocation ≤ Registration**
+
+The FLC Booking/Case may precede the official Proton Booking and requires its own business timestamp.
 
 General rules:
 
@@ -429,7 +502,36 @@ Current market-profile rules:
 
 Future DMSv3 analytics should preserve data minimization and role-appropriate access.
 
-## 26. Direct-write architecture rule
+## 26. Business calendar
+
+Confirmed baseline:
+
+- Monday–Friday 08:00–17:00;
+- Saturday 08:00–13:00;
+- Sunday non-working;
+- Sabah public holidays non-working and configurable.
+
+Working-day computations used by Reservation/SLA policy must be server-authoritative and versioned where historical reproducibility matters.
+
+## 27. Physical stock / OBR / Free Stock controls
+
+Later confirmed rules supersede legacy dashboard shorthand:
+
+- ON_HANDS requires confirmed physical receipt evidence.
+- OBR may project when a Vehicle is customer-allocated but not yet physically received.
+- unallocated pre-receipt stock is In Transit, not OBR.
+- Free / Reserved / Allocated are derived from stock-control facts.
+- legacy `FREE STOCK = YES` is evidence only and cannot authorize availability.
+
+## 28. B2B / D2D terminology
+
+- B2B = branch-to-branch chassis transfer with confirmed Director-controlled approval.
+- repeated B2B transfers are legitimate and historically preserved.
+- transfer cost mode/payer is separate from transfer authorization.
+- D2D in DMSv3 = external-dealer transfer/evidence boundary; automated stock-mutating execution remains restricted until separately approved.
+- do not use the old “Door-to-Door delivery service” definition for DMSv3.
+
+## 29. Direct-write architecture rule
 
 DMSv3 lifecycle state must not be enforced only by React or client services.
 
@@ -445,7 +547,7 @@ Authoritative lifecycle changes must use backend commands/RPCs with:
 - idempotency for upstream events;
 - atomic commit.
 
-## 27. Legacy contradictions that must not be carried forward
+## 30. Legacy contradictions that must not be carried forward
 
 - “New without Deposit → Lead” is invalid for DMSv3.
 - Deal Lead/Prospect duplication is invalid.
@@ -454,3 +556,8 @@ Authoritative lifecycle changes must use backend commands/RPCs with:
 - legacy custom KPI “Pending LOU = delivered but LOU absent” conflicts with the governed current pre-registration process.
 - names must not become person identity.
 - current-row/dashboard cell positions must not become historical KPI sources.
+- local FLC Case and official Proton Retail Order must not be collapsed into one identity/date.
+- Reservation and Allocation must not be collapsed into one assignment record.
+- legacy FREE STOCK field must not become authoritative availability.
+- legacy OBR “received-awaiting-processing” shorthand must not override the later stock-control meaning.
+- D2D must not be interpreted as Door-to-Door delivery in DMSv3.
