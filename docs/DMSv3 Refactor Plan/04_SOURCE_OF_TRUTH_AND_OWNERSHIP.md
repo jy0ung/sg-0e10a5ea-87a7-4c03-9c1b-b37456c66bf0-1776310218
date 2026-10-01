@@ -19,8 +19,10 @@ DMSv3 uses:
 | Prospect | DMS Prospect | Proton DMS |
 | Prospect rating/status | DMS + approved mapping layer | DMS evidence; approved mapping in Integration/Sales |
 | Prospect follow-up | DMS fields + local notes | Sales CRM local workflow |
-| Booking / local commercial case | DMS RO/Booking + current Control Tower | Sales / Deal |
-| Booking external number | DMS/Booking workbooks | DMS source identifier linked to Deal |
+| FLC Booking / local commercial case | local workflow + Prospect/Customer evidence | Sales / Deal |
+| Official Proton Booking / Retail Order | Master RO / Proton DMS | Proton source observation linked to Deal |
+| Proton Booking No | Master RO / Proton DMS | Proton source identifier linked to Deal |
+| Official Booking MTD population | Master RO / Proton Retail Orders | Proton source / governed analytics read model |
 | Customer | DMS + UBS customer records | Sales/CRM canonical Customer |
 | Sales Advisor person | DMS SA code + reference roster | HRMS Employee |
 | Deal ownership | current Deal/SA reconciliation | Sales relationship to Employee |
@@ -29,14 +31,19 @@ DMSv3 uses:
 | LOU | current manual/Control Tower | Sales Financing |
 | Vehicle | DMS stock + Master Inventory + UBS vehicles | Inventory |
 | Chassis | DMS/Inventory business identifier | Inventory attribute; vehicle_id is internal FK |
-| Allocation | DMS allocation status/date/chassis | Inventory/Vehicle assignment, reconciled from DMS |
+| Stock Request | local Sales/Stock workflow | Inventory / Stock Control command |
+| Reservation | local stock-control transaction | Inventory / Stock Control |
+| Allocation | local stock-control transaction + DMS allocation evidence | Inventory / Stock Control, reconciled from DMS |
+| Reallocation | local stock-control transaction | Inventory / Stock Control |
 | Shipment | Auto Aging/DMS evidence | Inventory |
 | Outlet receipt | Auto Aging/DMS/Inventory | Inventory |
 | Registration workflow | Control Tower + Inventory facts | Sales Fulfilment / Registration |
 | Enterprise registration actual | Master Inventory (OUTLET) REG DATE | target canonical Registration/Inventory event |
 | Insurance | current Deal sub-workflow/manual evidence | Sales Fulfilment / Insurance |
 | Delivery/handover | DMS/Auto Aging/local evidence | Sales Deal delivery event |
-| Bank disbursement | DMS/Auto Aging/finance evidence | Financing operational evidence + Accounts reconciliation |
+| Bank submission / Invoice Submitted | signed VDO + VSO submission evidence | Sales Financing / document workflow |
+| Bank disbursement operational evidence | bank/DMS evidence | Sales Financing |
+| Verified bank credit / receivable settlement | bank statement + payment evidence | Accounts |
 | Customer receivable/payment | invoices/payment_events | Accounts |
 | GL posting | journal entries | Finance |
 | Commission | Auto Aging/commission tables | Commission domain |
@@ -54,7 +61,7 @@ Examples:
 
 - Lead
 - Prospect
-- Retail Order evidence
+- official Retail Order / Booking evidence
 - source status codes
 - upstream customer references
 - stock/allocation evidence
@@ -173,26 +180,64 @@ A local Booking/Deal may link to:
 
 The provenance must survive conversion.
 
-## 7. Booking boundary
+## 7. FLC Booking / Proton Retail Order boundary
 
-Booking is the point where a canonical local Deal begins in DMSv3.
+The local FLC Booking/Case and the official Proton Retail Order are different authorities.
 
-A Booking can be created from DMS evidence only through an idempotent owning-domain command.
+### FLC Booking / Case
 
-Required outcomes:
+Sales owns the local commercial case.
+
+It may be created before Proton creates the official Booking No when genuine purchase intent and sufficient information/documents exist.
+
+Required local-case command outcomes:
 
 - canonical Customer resolved/created under Customer rules;
-- Deal created once;
+- Deal/FLC Case created once with immutable UUID;
 - Employee-backed Sales Advisor resolved where deterministic;
-- DMS Prospect/RO source links recorded;
+- Lead/Prospect source links preserved;
 - applicable workflow policy snapshotted;
-- immutable Booking/status event written.
+- immutable case/Booking event written.
 
-## 8. Inventory boundary
+### Official Proton Retail Order
 
-Inventory owns Vehicle state.
+Proton owns the official Booking/Retail Order fact.
 
-Sales may request/record an allocation through an Inventory-owned contract but may not directly edit Vehicle lifecycle state.
+Master RO is the current operational source mirror.
+
+When Proton later creates the Retail Order:
+
+- link it to the existing FLC Case using deterministic evidence;
+- preserve Proton Booking No as external business key;
+- do not create a duplicate local case;
+- ambiguous links enter reconciliation.
+
+Official Booking MTD is computed from the governed Proton Retail Order population, not from the local-case table alone.
+
+## 8. Inventory / Stock Control boundary
+
+Inventory owns Vehicle and stock-control state.
+
+Sales may request stock but may not directly mutate stock authority.
+
+Distinct owned records:
+
+- Stock Request;
+- Reservation;
+- Reservation Terms;
+- Allocation;
+- Reallocation / proposal;
+- Waiting-for-Stock demand;
+- Transfer.
+
+Confirmed baseline:
+
+- one effective Reservation per chassis;
+- one active Allocation per chassis;
+- Reservation expiry does not auto-release stock;
+- authorized management controls Allocation;
+- reallocation is explicit and auditable;
+- no permanent Vehicle.bookingId is authoritative.
 
 Current Control Tower business rule restricts normal stock linkage until confirmed LOU.
 
@@ -220,15 +265,21 @@ Inventory owns the Vehicle state change/reaction.
 
 The Delivery command should publish a domain event; Inventory/Commission/Analytics react through their own contracts rather than a page updating multiple tables.
 
-## 11. Disbursement boundary
+## 11. Bank submission / Disbursement boundary
 
-Operational bank-disbursement evidence belongs to Financing.
+Sales Financing owns operational financing progression, including the financed **Invoice Submitted** milestone based on signed VDO + VSO submission evidence.
 
-Money received/allocated against the customer receivable belongs to Accounts.
+Accounts owns recognition of actual money received.
 
-The GL belongs to Finance.
+Confirmed Disbursement authority:
 
-These may be correlated but must not be collapsed into one mutable “Disbursed=true” field.
+- actual bank-statement credit is verified by Accounts;
+- Disbursement Date is the actual credit/value date;
+- Official Receipt follows confirmed credit according to Accounts rules.
+
+Finance owns the GL.
+
+Financing status, Accounts settlement and Finance posting may be correlated but must not be collapsed into one mutable “Disbursed=true” field.
 
 ## 12. Deposit boundary
 
@@ -279,7 +330,8 @@ For every important event preserve:
 Examples:
 
 - Prospect Created At
-- Booking Date
+- FLC Case Created At
+- official Proton Booking/Retail Order Date
 - Loan Submitted At
 - LOU Approved At
 - Allocation At
@@ -357,3 +409,34 @@ When source systems disagree:
 - never hide disagreement by overwriting the weaker source.
 
 This is the required approach for DMSv3 cutover.
+
+
+## 21. Read-model-only legacy classifications
+
+The following are not independent owners:
+
+- S1/S2/S3;
+- Focus Register labels;
+- sequential dashboard lifecycle labels;
+- legacy FREE STOCK flag;
+- Forecast YES/50-50/NO;
+- OBR dashboard shorthand.
+
+They may remain reconciliation/reporting inputs during migration, but canonical ownership comes from the underlying source facts and domain transactions.
+
+## 22. Stock terminology ownership
+
+For DMSv3:
+
+- ON_HANDS comes from physical receipt evidence.
+- OBR is a derived allocated-before-receipt projection.
+- Free / Reserved / Allocated are derived from stock-control transactions.
+- D2D means external-dealer transfer/evidence boundary, not Door-to-Door delivery.
+
+## 23. Historical technical architecture
+
+The 2026-09-16 PRD's old Fastify/Prisma repository is business/product evidence only.
+
+Current UBS technical architecture remains authoritative for implementation.
+
+Do not use the historical repo as a write-path or persistence authority.
