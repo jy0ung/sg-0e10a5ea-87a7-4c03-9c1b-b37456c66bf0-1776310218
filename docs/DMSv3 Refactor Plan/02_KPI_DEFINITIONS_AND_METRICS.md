@@ -239,15 +239,32 @@ Current outlet monitoring:
 - Pending Registration
 - Registration MTD.
 
-### Booking MTD
+### Booking MTD — Official Proton Booking production
 
-Count of Bookings whose **Booking Date** falls in the selected calendar month.
+**Authoritative source:** Master RO / Proton Retail Order population.
 
-Do not use created_at as a substitute when Booking Date exists.
+**Definition:** count of official Proton Retail Orders whose governed Proton Booking/Retail Order business date falls in the selected calendar month, subject to the approved cancellation/deletion inclusion contract.
 
-### New Bookings Today
+Rules:
 
-Count of Bookings whose Booking Date falls on the snapshot date.
+- manually created FLC cases cannot add/remove official Booking MTD;
+- a Booking that later registers/delivers still counts in the month it was officially booked;
+- source freshness and exact drill-down population must be visible;
+- created_at is not a substitute for the governed Proton Booking business date.
+
+### FLC Cases Created MTD
+
+This is a separate optional operational KPI.
+
+**Definition:** count of local FLC Booking/Cases opened in the selected month.
+
+It must never be labelled simply “Booking MTD” unless management explicitly changes the governed definition.
+
+### New Official Bookings Today
+
+Count of official Proton Retail Orders whose governed Booking business date is the snapshot date.
+
+If the current Daily Snapshot retains the historical field name `new_bookings_today`, the source/definition must be versioned at cutover.
 
 ### Pending Loan
 
@@ -547,7 +564,8 @@ Target event/fact source:
 | New Leads | DMS Lead created evidence |
 | New Prospects | DMS Prospect created evidence |
 | Prospect conversion | DMS Prospect → Booking provenance |
-| Booking MTD | canonical Booking event/business date |
+| Booking MTD | official Proton Retail Order / Master RO event population |
+| FLC Cases Created MTD | canonical FLC Booking/Case creation event |
 | Deposit metrics | Accounts-owned deposit/payment events |
 | Loan submitted | Financing submission event |
 | Loan approved/rejected | Financing decision event |
@@ -672,3 +690,117 @@ Important:
 - paid is currently an operational Commission status; it is not yet proof of a Payroll/Finance payout.
 - current threshold logic depends on BG→Delivery, so the unresolved BG DATE semantic is material to future Commission convergence.
 - DMSv3 must not change Commission eligibility indirectly by redefining BG or Delivery without an explicit Commission migration/version decision.
+
+
+## 25. Delivery / Invoice Submission / Disbursement KPIs
+
+The July Inventory Dashboard documented these useful lifecycle metrics. DMSv3 preserves the metric concepts while replacing legacy-field shortcuts with canonical event sources.
+
+### Delivered MTD
+
+**Definition:** count of authoritative Delivery/handover events whose actual Delivery Date falls in the selected month.
+
+Delivered means physical handover of vehicle/keys with signed VDO evidence.
+
+### Pending Delivery
+
+Target definition:
+
+authoritative Registration exists
++ Deal not cancelled/completed
++ authoritative Delivery does not yet exist.
+
+Do not define this only from legacy blank columns after cutover.
+
+### Pending Invoice Submission — financed cases
+
+Financed Deal is delivered but the confirmed bank submission event has not occurred.
+
+Bank submission event is based on the signed VDO + VSO/final-invoice evidence submitted to the financing institution.
+
+Cash/non-loan Deals are excluded.
+
+### Invoice Submitted
+
+Financed Deal has the bank-submission event but actual bank credit has not yet been verified.
+
+This is a financing/document milestone, not a universal top-level Deal stage.
+
+### Pending Disbursement
+
+Financed Deal has reached the applicable post-delivery bank-submission context but no Accounts-verified actual bank credit exists.
+
+### Disbursed MTD
+
+Count of **Accounts-verified bank-credit/disbursement events** whose actual credit/value date falls in the selected month.
+
+Do not use a manually advanced Deal stage as disbursement truth.
+
+### Delivery → Disbursement
+
+Current legacy KPI target is 14 days.
+
+The duration remains a valid analytical metric; whether 14 days remains the future governed SLA is tracked as an OPEN POLICY.
+
+## 26. Stock KPI reconciliation with the July dashboard guide
+
+The July KPI guide is retained as historical dashboard evidence, not the final authority where later confirmed rules exist.
+
+### Free Stock
+
+Legacy formula:
+
+`FREE STOCK = YES`
+
+DMSv3 authoritative definition:
+
+**no effective Reservation + no active Allocation + otherwise operationally eligible under the governed stock policy.**
+
+A legacy FREE STOCK flag may be shown during reconciliation but cannot authorize availability by itself.
+
+### OBR / On Hands
+
+Later baseline supersedes the July shorthand.
+
+- **On Hands** = confirmed physical receipt evidence.
+- **OBR** = customer-allocated vehicle not yet physically received.
+- unallocated pre-receipt stock = In Transit.
+
+### Forecast YES / 50-50 / NO
+
+Legacy Forecast values remain historical evidence.
+
+Target forecast must derive from:
+
+- reconciled canonical Booking/Vehicle facts;
+- current blockers/readiness;
+- versioned management assumptions;
+- source freshness;
+- exact cohort lineage.
+
+No legacy Forecast field becomes target truth automatically.
+
+## 27. Lifecycle KPI dimensions are independent
+
+Management may present a sequential funnel, but KPI populations must come from independent event/fact dimensions:
+
+- Booking;
+- Financing;
+- Reservation;
+- Allocation;
+- Transfer;
+- Registration;
+- Delivery;
+- Invoice Submission;
+- Disbursement.
+
+A row can violate expected chronology or contain a later physical fact while an earlier workflow defect remains open. KPI logic must preserve both the fact and the exception instead of forcing one status backward.
+
+## 28. Historical acronym/term correction
+
+For DMSv3 analytics:
+
+- **D2D** means external-dealer transfer boundary, not Door-to-Door delivery.
+- **OBR** follows the later established stock-control meaning above.
+- **VAA Date** remains a procurement/vehicle-aging evidence date; do not equate it automatically to outlet receipt without the field-authority contract.
+- **BG DATE** remains unresolved and must not be silently renamed Booking Date or Deposit Date.
