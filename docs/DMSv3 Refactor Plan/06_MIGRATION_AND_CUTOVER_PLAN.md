@@ -53,6 +53,19 @@ Create an explicit baseline report before any lifecycle mutation work:
 
 Before changing the model, automate the governed rules that should remain true.
 
+Execution checkpoint (2026-10-01): [PR #128](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/128)
+implements the bounded Phase 1A Lead/Prospect source/local-follow-up regression
+contract. The [source boundary evidence](../DMSV3_PHASE1_SOURCE_BOUNDARY_EVIDENCE.md)
+maps LP-01–LP-10 to committed disposable assertions and records validation.
+This is a **partial Phase 1 checkpoint**, pending independent review; it does not
+complete the programme or the remaining rule/lifecycle acceptance below.
+Successful privileged source refresh is covered separately from duplicate staging
+rejection; successful worker replay remains separate ingestion work. Route/backend
+access convergence, Employee responsibility and FLC Case/source provenance also
+remain separate. Same-company note reattachment and `created_at` rewriting are
+still possible, so the nominal 24-hour predicate guarantees neither immutable
+local history nor a fixed correction window; history-control redesign is deferred.
+
 Minimum disposable/live tests:
 
 ### Prospect
