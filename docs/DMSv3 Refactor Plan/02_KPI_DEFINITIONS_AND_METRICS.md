@@ -804,3 +804,272 @@ For DMSv3 analytics:
 - **OBR** follows the later established stock-control meaning above.
 - **VAA Date** remains a procurement/vehicle-aging evidence date; do not equate it automatically to outlet receipt without the field-authority contract.
 - **BG DATE** remains unresolved and must not be silently renamed Booking Date or Deposit Date.
+
+
+## 29. July 2026 Inventory Dashboard KPI catalogue — migration reference
+
+The July management-approved KPI guide remains part of the migration contract. Each metric below must either:
+
+- be preserved with its approved meaning;
+- be explicitly versioned to a corrected canonical definition; or
+- be retired with an approved replacement.
+
+It must not silently disappear during DMSv3 refactor.
+
+### 29.1 New Incoming — This Month
+
+Legacy key: `NEW_INCOMING_THIS_MONTH`
+
+Historical definition:
+
+count Vehicles across S1/S2/S3 whose VAA Date falls in the current calendar month.
+
+Target treatment:
+
+- retain the metric concept;
+- do not finalize the canonical formula until VAA Date semantics/source authority are resolved;
+- replace S1/S2/S3 dependence with canonical Vehicle/procurement facts.
+
+### 29.2 Carry Forward
+
+Legacy key: `CARRY_FORWARD_AGING_POOL`
+
+Historical definition:
+
+S1 Vehicles with valid chassis and VAA Date before the current month.
+
+Target treatment:
+
+- retain month-based Carry Forward concept;
+- derive from canonical active stock + governed VAA/procurement date;
+- do not depend on S1 row membership after cutover.
+
+### 29.3 Inventory aging buckets
+
+Historical VAA aging buckets:
+
+- `AGING_0_30` = 0–30 days
+- `AGING_31_60` = 31–60 days
+- `AGING_61_90` = 61–90 days
+- `AGING_90_PLUS` = 91+ days
+
+Current legacy population = valid-chassis S1 rows.
+
+Target treatment:
+
+- retain bucket labels unless management versions them;
+- use canonical in-scope stock population;
+- use the confirmed VAA/procurement aging date after field-authority resolution;
+- keep exact drill-down.
+
+### 29.4 Free Stock
+
+Legacy key: `FREE_STOCK`
+
+Historical formula:
+
+`FREE STOCK = YES`.
+
+This formula is **superseded**.
+
+DMSv3 availability:
+
+**FREE = no effective Reservation + no active Allocation + operational eligibility under current stock policy.**
+
+Preserve the legacy flag only for reconciliation/exception reporting.
+
+### 29.5 Forecast YES / 50-50 / NO
+
+Historical keys:
+
+- `FORECAST_COLUMN_YES`
+- `FORECAST_COLUMN_50_50`
+- `FORECAST_COLUMN_NO`
+
+Historical source: legacy Forecast column.
+
+Target treatment:
+
+- retain historical values as source observations;
+- canonical forecast is derived from reconciled facts + versioned forecast/readiness policy;
+- manager forecast is recorded separately from system projection;
+- historical snapshots preserve what management saw.
+
+### 29.6 Legacy Forecast Register / FOCUS REG labels
+
+Historical labels include:
+
+- PENDING SIGN AGREEMENT
+- PENDING COMPLETE LOU T & C
+- PENDING DEPOSIT
+- PENDING REDEEM SOLA
+- PENDING CONTRA SOLA
+- PENDING EHAK
+- CUSTOMER REJECTS OBR
+- READY REGISTER (OBR)
+- PENDING TENDER / BID NO
+- PENDING CLEAR SABAH EKSAIS
+- REGISTERED.
+
+Target treatment:
+
+- preserve source labels for migration/report comparison;
+- map to canonical prerequisite/blocker facts only where deterministic;
+- do not store one free-text Focus status as target truth;
+- REGISTERED comes only from actual Registration fact, never readiness.
+
+### 29.7 Loan Submission With Stock
+
+Legacy key: `LOAN_SUBMISSION_WITH_STOCK`
+
+Historical definition:
+
+S1 Vehicles where `PENDING LOAN 1` is populated.
+
+Target treatment:
+
+define from canonical Financing + Vehicle/stock relationship rather than a populated legacy column. Preserve the legacy metric only until the canonical population is agreed and parity-tested.
+
+### 29.8 Pending Registration
+
+Legacy key: `PENDING_REGISTRATION`
+
+Historical dashboard formula:
+
+LOU present while REG DATE, DELIVERY DATE, DISB DATE and INVOICE DATE are blank.
+
+This is a **legacy projection**, not the target eligibility rule.
+
+Target Pending Registration should use canonical Deal/Vehicle + actual Registration absence + approved registration readiness/blocker model.
+
+### 29.9 Registered MTD
+
+Legacy key: `REGISTERED_MTD`
+
+Historical definition:
+
+REG DATE falls in current calendar month across S1/S2/S3.
+
+Current governed authority:
+
+Master Inventory / authoritative Registration fact population.
+
+Target:
+
+canonical actual Registration event after reconciliation/cutover.
+
+### 29.10 Pending Delivery
+
+Legacy key: `PENDING_DELIVERY`
+
+Historical definition:
+
+REG DATE exists, DELIVERY DATE and DISB DATE blank.
+
+Target:
+
+actual Registration exists + authoritative Delivery absent, subject to active/cancelled commercial-case rules.
+
+### 29.11 Pending Disbursement
+
+Legacy key: `PENDING_DISBURSEMENT`
+
+Historical definition:
+
+DELIVERY DATE and INVOICE DATE exist; DISB DATE blank.
+
+Target financed definition:
+
+authoritative Delivery exists
++ applicable bank-submission / Invoice Submitted context exists
++ no Accounts-verified bank credit/disbursement.
+
+Cash/non-bank paths excluded.
+
+### 29.12 Disbursed MTD
+
+Legacy key: `DISBURSED_MTD`
+
+Historical definition:
+
+DISB DATE in current calendar month across S1/S2/S3.
+
+Target:
+
+Accounts-verified actual bank-credit/disbursement event using credit/value date.
+
+### 29.13 Contra Sola RHB — Redeemed / Eligible
+
+Legacy key: `CONTRA_SOLA_RHB_PENDING_WORKFLOW`
+
+Historical numerator:
+
+S2 rows with CONTRA SOLA = YES-RHB.
+
+Historical denominator:
+
+unique S1+S2 Vehicles whose FULL PAYMENT TYPE contains RHB.
+
+Target treatment:
+
+preserve the historical KPI for reconciliation until Contra/SOLA/payment-domain authority is fully migrated. Do not recreate the metric from bank name alone.
+
+### 29.14 Contra Sola MBB — Redeemed / Eligible
+
+Legacy key: `CONTRA_SOLA_MBB_PENDING_WORKFLOW`
+
+Historical numerator:
+
+S2 rows with CONTRA SOLA = YES-MBB.
+
+Historical denominator:
+
+unique S1+S2 Vehicles whose FULL PAYMENT TYPE contains MBB.
+
+Same target treatment as RHB Contra Sola.
+
+### 29.15 TT / CN — Pending Delivery
+
+Legacy key: `TT_CN_NO_PENDING_WORKFLOW`
+
+Historical definition:
+
+S2 rows where CONTRA SOLA is blank/NO and FULL PAYMENT TYPE does not contain RHB/MBB.
+
+This is retained as a legacy payment-workflow classification pending canonical payment-type/SOLA mapping.
+
+### 29.16 TT / CN — Active Workflow
+
+Legacy key: `TT_CN_NO_ACTIVE_WORKFLOW`
+
+Historical definition:
+
+S1+S2 rows under the same non-Contra/non-RHB/non-MBB condition.
+
+Target treatment:
+
+version rather than silently translating this into Cash/Loan status.
+
+### 29.17 Pending Full Payment
+
+Legacy key: `PENDING_FULL_PAYMENT`
+
+Historical definition:
+
+S1 rows where FULL PAYMENT DATE is blank.
+
+Target:
+
+derive customer-settlement/readiness from Accounts-owned receipts/payment allocation and the applicable workflow policy. Legacy FULL PAYMENT DATE remains evidence during reconciliation.
+
+## 30. July lifecycle dashboard — reporting projection only
+
+Historical dashboard sequence:
+
+**Booking → Loan Submission → LOU Approved → Pending Registration → Pending Delivery → Pending Invoice Submission → Pending Disbursement**
+
+This sequence remains useful as a management funnel visualization.
+
+It is **not** a single canonical state machine.
+
+DMSv3 metric cards/drill-down must derive each population from its owning facts and make source freshness/reconciliation visible.
