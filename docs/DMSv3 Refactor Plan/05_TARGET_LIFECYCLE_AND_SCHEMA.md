@@ -1019,6 +1019,12 @@ Target commands/use cases include:
 - release_vehicle_allocation
 - propose_vehicle_reallocation
 - decide_vehicle_reallocation
+- select_financing_disposition
+- record_registration_prerequisite
+- request_ehak
+- record_ehak_received
+- grant_registration_blocker_override
+- revoke_registration_blocker_override
 - prepare_registration
 - submit_registration
 - record_registration
@@ -1064,6 +1070,9 @@ Authenticated direct mutation should be removed for authority tables such as:
 - vehicle_reservations / reservation_terms
 - sales_stock_demands
 - vehicle_allocations / reallocation_proposals
+- deal_registration_prerequisite_versions
+- deal_registration_ehak_events
+- deal_registration_blocker_overrides
 - deal_registrations / registration_versions / events
 - deal_insurance policies/events
 - deal_deliveries / delivery_versions
@@ -1305,3 +1314,185 @@ PRE-REGISTER means:
 - vehicle may be eligible for a later sequential case under policy.
 
 PRE-REGISTER is not a destructive Registration reversal and not a Vehicle physical-state value.
+
+
+## 51. deal_registration_prerequisite_versions
+
+Append-only Registration-preparation facts. Do not store one mutable “Focus Register status.”
+
+Suggested fields:
+
+- id
+- company_id
+- deal_id
+- disposition_version_id
+- prerequisite_kind
+- assertion_state asserted/withdrawn
+- business_date nullable
+- evidence_reference nullable
+- source_system/source_record_id nullable
+- recorded_by
+- recorded_at
+- supersedes_version_id nullable
+- correction_reason nullable.
+
+Initial prerequisite kinds reconstructed from the established baseline:
+
+- AGREEMENT_SIGNED
+- SOLA_APPLICABILITY
+- SOLA_CLEARANCE
+- SPECIAL_PLATE_PROCESS.
+
+### Customer payment clearance
+
+In the old clean-sheet implementation this was an operational attestation because no Accounts ledger existed.
+
+In current UBS, **Accounts-owned payment/receivable truth should be used where available**. Do not recreate an independent Sales attestation that can contradict Accounts.
+
+Legacy payment-clearance attestations may be migrated as evidence with provenance, not promoted blindly to financial truth.
+
+## 52. deal_registration_ehak_events
+
+Append-only EHAK preparation history, bound to the selected/current financing-disposition context:
+
+- id
+- company_id
+- deal_id
+- disposition_version_id
+- event_type requested/received/cancelled_or_corrected as approved
+- business_date/time
+- evidence_reference
+- actor_profile_id
+- source_system/source_record_id
+- created_at.
+
+Rules:
+
+- financed disposition may require EHAK;
+- Cash = not applicable;
+- changing selected financing starts a new disposition context;
+- old EHAK evidence does not silently satisfy the new context;
+- duplicate concurrent event creation must be idempotent/serialized.
+
+## 53. deal_registration_blocker_overrides
+
+Narrowly scoped auditable override history:
+
+- id
+- company_id
+- deal_id
+- blocker_code
+- disposition_version_id nullable
+- status active/revoked
+- reason
+- approval_instance_id or authorized actor evidence
+- granted_by / granted_at
+- revoked_by / revoked_at nullable.
+
+Historical established behavior allowed only a narrowly scoped customer-payment-clearance blocker override and did **not** allow EHAK/stock/stale-financing override.
+
+Current UBS implementation must reconcile this rule against the Accounts and canonical Workflow domains before enabling it.
+
+No generic “override all blockers” capability is allowed.
+
+## 54. registration_readiness_policy_versions
+
+Versioned configuration used only for **derived** readiness/forecast scoring:
+
+- id
+- company_id
+- version_no
+- effective_from
+- effective_to nullable
+- policy_json / typed columns as implementation chooses
+- created_by
+- created_at
+- active.
+
+Policy may contain:
+
+- blocker expected-clearance working days;
+- readiness weights;
+- forecast thresholds;
+- ETA/logistics confidence factors.
+
+Readiness score is derived. It is not Registration truth.
+
+No production probability/threshold may be invented if not approved.
+
+## 55. manager_registration_forecasts
+
+Append-only management forecast history:
+
+- id
+- company_id
+- deal_id
+- closing_month
+- manager_label / forecast value
+- reason
+- system_readiness_snapshot nullable
+- system_confidence_snapshot nullable
+- blocker_snapshot nullable
+- policy_version_id nullable
+- recorded_by
+- recorded_at.
+
+A manager forecast is a forecast decision/history record; it never creates actual Registration.
+
+## 56. month_closing_configurations
+
+Versioned/configured month-closing boundary where management does not use normal calendar month end:
+
+- id
+- company_id
+- year_month
+- closing_date
+- reason/source
+- created_by
+- created_at.
+
+Default may be calendar month end where policy says so; no Proton-specific closing date may be invented.
+
+## 57. registration readiness derivation
+
+Target Registration readiness is a read model derived from authoritative facts.
+
+At minimum it should consider:
+
+### All paths
+
+- active Allocation matching Deal + Vehicle;
+- selected/current payment/financing disposition;
+- applicable special-plate process;
+- authoritative customer-payment clearance from Accounts/current approved evidence.
+
+### Financed
+
+- selected approved/current financing application + current LOU;
+- Agreement evidence;
+- applicable SOLA evidence;
+- EHAK received for the current disposition context.
+
+### Cash
+
+- confirmed cash credit before Registration;
+- no EHAK requirement;
+- no fake LOU requirement.
+
+### Logistics
+
+IN_TRANSIT / ON_HANDS / ETA remain informational factors unless a later approved policy makes a specific logistics fact a hard gate.
+
+### Output
+
+Return:
+
+- ELIGIBLE / INELIGIBLE / UNKNOWN;
+- explicit blocker codes;
+- blocker opened-at/working-day age where deterministic;
+- readiness score only when policy and source coverage permit;
+- source freshness.
+
+UNKNOWN must never silently become eligible.
+
+The actual Registration command re-derives authoritative facts under lock; it must not trust a previously displayed readiness response.
