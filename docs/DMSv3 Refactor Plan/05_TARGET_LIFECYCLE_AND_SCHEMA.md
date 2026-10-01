@@ -313,7 +313,7 @@ Version/effective-date configuration by company/payment type:
 - deposit_required
 - active/version metadata.
 
-Deposit defaults to **not required** unless an approved payment-type policy says otherwise.
+Deposit defaults to **not required**. Any future `deposit_required` policy may govern a downstream readiness/action requirement, but it must **never** become a prerequisite for creating the FLC Booking/Case without a new confirmed owner decision.
 
 Possible financing registration gates:
 
@@ -939,7 +939,7 @@ Replace race-prone MAX+1 number allocation:
 
 composite PK by company/branch/year/month.
 
-UUID remains actual PK.
+UUID remains actual PK. Any locally generated Deal/Case number is a display/reference key only; the official Proton Booking No remains the Proton business identifier once created.
 
 ## 37. Authoritative command surface
 
