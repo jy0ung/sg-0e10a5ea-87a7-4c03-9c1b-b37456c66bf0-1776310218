@@ -252,11 +252,19 @@ Use DMS Allocation Status / Allocation Date / Chassis evidence as source observa
 
 **Date Stock Requested is not Allocation Date.**
 
-### Post-LOU inventory boundary
+### Post-LOU authoritative Allocation boundary
 
 Current rule:
 
-- normal stock linkage only after confirmed LOU.
+- normal authoritative financed-case Allocation/stock linkage only after confirmed/current LOU.
+
+This does **not** prohibit:
+
+- read-only/advisory stock intelligence before LOU;
+- Stock Request before LOU;
+- temporary Reservation before/pending LOU under the confirmed 3/7/3 Reservation-term policy.
+
+Reservation and Allocation are different controls.
 
 ### Pre-LOU allocation control breach
 
