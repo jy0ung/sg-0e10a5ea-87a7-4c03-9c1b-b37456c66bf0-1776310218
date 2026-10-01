@@ -1019,7 +1019,6 @@ Target commands/use cases include:
 - release_vehicle_allocation
 - propose_vehicle_reallocation
 - decide_vehicle_reallocation
-- select_financing_disposition
 - record_registration_prerequisite
 - request_ehak
 - record_ehak_received
@@ -1065,7 +1064,7 @@ Authenticated direct mutation should be removed for authority tables such as:
 - deal_financing_disposition_versions
 - deal_financing_events
 - deal_bank_submissions
-- financing-side disbursement reports
+- deal_financing_disbursements (Financing-side report/reference only)
 - sales_stock_requests
 - vehicle_reservations / reservation_terms
 - sales_stock_demands
@@ -1134,8 +1133,9 @@ Daily/groupable:
 
 - new Leads
 - new Prospects
-- new Bookings
-- with/without deposit
+- new FLC Cases
+- new official Proton Retail Orders / Bookings
+- FLC Cases with/without deposit
 - cancellations
 - registered
 - delivered
@@ -1146,9 +1146,10 @@ Daily/groupable:
 
 Examples:
 
-- Lead→Prospect
-- Prospect→Booking
-- Booking→Loan Submission
+- Lead→Prospect where a Lead exists
+- Prospect→FLC Case
+- FLC Case→Official Proton Retail Order
+- Official Proton Booking→Loan Submission
 - Loan Submission→Approval
 - LOU→Allocation
 - Allocation→Registration
@@ -1184,7 +1185,7 @@ Safe conceptual mapping only; migration still requires evidence:
 | Receive | Inventory outlet-receipt event |
 | Registration | registration sub-workflow / high-level registration |
 | Delivery | delivery event / high-level delivery |
-| Disbursement | financing settlement event / high-level settlement |
+| Disbursement | Accounts-verified bank-credit settlement event / high-level settlement |
 | Completed | server-validated completed |
 | Cancel | first-class cancelled |
 
