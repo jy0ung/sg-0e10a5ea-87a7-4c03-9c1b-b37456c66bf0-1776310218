@@ -227,6 +227,9 @@ Authoritative customer control of a specific chassis.
 
 Confirmed baseline:
 
+- advisory stock intelligence, Stock Request and temporary Reservation may exist before LOU according to the 3/7/3 policy;
+- for a financed case, **normal authoritative Allocation follows the selected/current approved financing + current LOU context**;
+- a pre-LOU DMS allocation observation is preserved but treated as a control exception rather than rewritten;
 - Sales Advisor may request;
 - authorized management controls allocation;
 - one active allocation per chassis;
