@@ -28,6 +28,7 @@ export interface PurchaseInvoiceRecord {
   approvedBy?: string;
   // PO matching
   poLineId?: string;
+  poId?: string;
   poNo?: string;
   poQuantity?: number;
   poUnitPrice?: number;
@@ -57,6 +58,10 @@ function rowToInvoice(row: Record<string, unknown>): PurchaseInvoiceRecord {
     approvedBy: row.approved_by ? String(row.approved_by) : undefined,
     // PO matching
     poLineId: row.po_line_id ? String(row.po_line_id) : undefined,
+    poId: (() => {
+      const po = row._po as Record<string, unknown> | undefined;
+      return po?.purchase_order_id ? String(po.purchase_order_id) : undefined;
+    })(),
     poNo: (() => {
       const po = row._po as Record<string, unknown> | undefined;
       const poHeader = po?.purchase_orders as Record<string, unknown> | undefined;
@@ -99,11 +104,29 @@ export interface CreatePurchaseInvoiceInput {
   invoiceDate: string;
   amount: number;
   remark?: string | null;
+  poLineId?: string;
 }
 
 export async function createPurchaseInvoice(
   input: CreatePurchaseInvoiceInput,
 ): Promise<{ error: Error | null }> {
+  if (input.poLineId) {
+    const { error } = await supabase.rpc('create_linked_purchase_invoice', {
+      p_invoice_no: input.invoiceNo,
+      p_supplier: input.supplier,
+      p_chassis_no: input.chassisNo,
+      p_model: input.model,
+      p_invoice_date: input.invoiceDate,
+      p_amount: input.amount,
+      p_remark: input.remark ?? null,
+      p_po_line_id: input.poLineId,
+    });
+    if (error) {
+      loggingService.error('createPurchaseInvoice linked creation failed', { error }, 'PurchaseInvoiceService');
+      return { error: new Error(error.message) };
+    }
+    return { error: null };
+  }
   const { error } = await supabase.from('purchase_invoices').insert({
     company_id: input.companyId,
     invoice_no: input.invoiceNo,
@@ -121,6 +144,60 @@ export async function createPurchaseInvoice(
   }
   if (input.actorId) void logUserAction(input.actorId, 'create', 'purchase_invoice', undefined, { component: 'PurchaseInvoiceService' });
   return { error: null };
+}
+
+export interface EligiblePoLine {
+  id: string;
+  poId: string;
+  poNo: string;
+  supplier: string;
+  lineNo: number;
+  model: string;
+  chassisNo: string | null;
+  orderedQuantity: number;
+  receivedQuantity: number;
+  unitPrice: number;
+}
+
+/** Same-company candidate IDs for an explicit Purchasing invoice link. */
+export async function listEligiblePoLines(companyId: string): Promise<EligiblePoLine[]> {
+  const { data: orders, error: ordersError } = await supabase.from('purchase_orders')
+    .select('id,po_no,supplier').eq('company_id', companyId)
+    .in('lifecycle_status', ['approved', 'fulfilled']).order('order_date', { ascending: false }).limit(100);
+  if (ordersError) throw new Error(ordersError.message);
+  if (!orders?.length) return [];
+  const { data: lines, error: linesError } = await supabase.from('purchase_order_lines')
+    .select('id,purchase_order_id,line_no,model,chassis_no,quantity,unit_price')
+    .eq('company_id', companyId).in('purchase_order_id', orders.map(order => order.id))
+    .order('line_no', { ascending: true });
+  if (linesError) throw new Error(linesError.message);
+  if (!lines?.length) return [];
+  const { data: receipts, error: receiptsError } = await supabase.from('grn_lines')
+    .select('purchase_order_line_id,received_quantity').eq('company_id', companyId)
+    .in('purchase_order_line_id', lines.map(line => line.id));
+  if (receiptsError) throw new Error(receiptsError.message);
+  const poById = new Map(orders.map(order => [order.id, order]));
+  const receivedByLine = new Map<string, number>();
+  for (const receipt of receipts ?? []) receivedByLine.set(
+    receipt.purchase_order_line_id,
+    (receivedByLine.get(receipt.purchase_order_line_id) ?? 0) + Number(receipt.received_quantity),
+  );
+  return lines.map(line => {
+    const order = poById.get(line.purchase_order_id);
+    return {
+      id: line.id, poId: line.purchase_order_id, poNo: order?.po_no ?? '', supplier: order?.supplier ?? '',
+      lineNo: line.line_no, model: line.model, chassisNo: line.chassis_no,
+      orderedQuantity: Number(line.quantity), receivedQuantity: receivedByLine.get(line.id) ?? 0,
+      unitPrice: Number(line.unit_price),
+    };
+  });
+}
+
+export async function linkPurchaseInvoicePoLine(invoiceId: string, poLineId: string): Promise<{ error: Error | null }> {
+  const { error } = await supabase.rpc('link_purchase_invoice_po_line', {
+    p_invoice_id: invoiceId, p_po_line_id: poLineId,
+  });
+  return { error: error ? new Error(error.message) : null };
 }
 
 /** Receive a PI and record its Vehicle through one audited database command. */

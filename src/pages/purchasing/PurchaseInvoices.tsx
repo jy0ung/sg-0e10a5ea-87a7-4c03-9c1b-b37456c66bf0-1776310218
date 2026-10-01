@@ -24,6 +24,7 @@ import {
 } from '@/services/apService';
 import { STALE } from '@/lib/queryClient';
 import { purchaseInvoiceSchema } from '@/lib/validations';
+import { PurchaseInvoicePoLineSelect } from './PurchaseInvoicePoLineSelect';
 import { Search, Plus, Truck, CheckCircle, ThumbsUp, CreditCard, ExternalLink } from 'lucide-react';
 import { TableSkeleton } from '@/components/shared/TableSkeleton';
 import { PageErrorState } from '@/components/shared/PageState';
@@ -49,7 +50,7 @@ const AP_PAYMENT_BADGE: Record<string, string> = {
   paid:    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
 };
 
-const EMPTY_FORM = { invoiceNo: '', supplier: '', chassisNo: '', model: '', invoiceDate: new Date().toISOString().split('T')[0], amount: '', remark: '' };
+const EMPTY_FORM = { invoiceNo: '', supplier: '', chassisNo: '', model: '', invoiceDate: new Date().toISOString().split('T')[0], amount: '', remark: '', poId: '', poLineId: '' };
 
 function fmt(n: number) {
   return `RM ${n.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -166,6 +167,9 @@ export default function PurchaseInvoices() {
         variant: 'destructive',
       });
     }
+    if (form.poId && !form.poLineId) {
+      return toast({ title: 'Choose a PO line for the selected order', variant: 'destructive' });
+    }
     if (!user) return;
     setSaving(true);
     const { error } = await createPurchaseInvoice({
@@ -178,6 +182,7 @@ export default function PurchaseInvoices() {
       invoiceDate: parsed.data.invoiceDate,
       amount: parsed.data.amount,
       remark: parsed.data.remark ?? null,
+      poLineId: form.poLineId || undefined,
     });
     setSaving(false);
     if (error) {
@@ -410,6 +415,12 @@ export default function PurchaseInvoices() {
               <label htmlFor="purchase-invoice-remark" className="text-xs font-medium text-muted-foreground">Remark</label>
               <Input id="purchase-invoice-remark" className="h-8 text-sm" placeholder="Optional note" value={form.remark} onChange={e => setForm(f => ({ ...f, remark: e.target.value }))} />
             </div>
+            <PurchaseInvoicePoLineSelect
+              companyId={companyId}
+              poId={form.poId}
+              value={form.poLineId}
+              onChange={(poId, poLineId) => setForm(f => ({ ...f, poId, poLineId }))}
+            />
           </div>
           <DialogFooter className="mt-4">
             <Button variant="outline" size="sm" onClick={() => setAddOpen(false)}>Cancel</Button>
