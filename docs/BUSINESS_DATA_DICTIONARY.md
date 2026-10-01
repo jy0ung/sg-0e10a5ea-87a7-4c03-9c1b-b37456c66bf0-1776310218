@@ -1,3 +1,7 @@
+## DMSv3 Sales/DMS authority note
+
+**Effective 2026-10-01:** fine-grained definitions for DMS Lead/Prospect, Booking, financing/LOU, allocation, Registration, Delivery, Disbursement and their KPI semantics are governed by [DMSv3 Refactor Plan](DMSv3%20Refactor%20Plan/README.md). This dictionary remains authoritative for shared cross-domain terminology; the DMSv3 SOT supersedes older Sales lifecycle interpretations when they conflict.
+
 # FLC UBS Business Data Dictionary
 
 **Status:** Architecture baseline  
