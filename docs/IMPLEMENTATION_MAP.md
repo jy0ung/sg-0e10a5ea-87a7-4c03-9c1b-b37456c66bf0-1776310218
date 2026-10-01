@@ -1,3 +1,5 @@
+> **DMSv3 Sales lifecycle SOT:** Effective 2026-10-01, use [DMSv3 Refactor Plan](DMSv3%20Refactor%20Plan/README.md) for all Sales/DMS lifecycle, KPI, rule, target-schema and cutover decisions. This implementation map remains a physical repository inventory, not the Sales lifecycle business authority.
+
 # FLC BI — Implementation Map
 
 > **Historical assessment — architecture superseded (2026-09-27).** Use [the roadmap](UNIFIED_BUSINESS_SUITE_ROADMAP.md), programme #47 and [the identity migration map](BUSINESS_CORE_IDENTITY_MIGRATION_MAP_2026-09-23.md) for current implementation decisions. Employee + `employee_module_assignments` is the Sales Advisor registry. `sales_advisors` is legacy compatibility/import data and has no `employee_id` relationship. Deals own new local Sales workflow. Proposals below to restore legacy Sales Advisor authority or add new target FKs to that table are withdrawn. Historical counts and feature gaps below are not current evidence.

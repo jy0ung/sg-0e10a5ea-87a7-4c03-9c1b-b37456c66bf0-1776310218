@@ -1,3 +1,7 @@
+## DMSv3 Sales lifecycle SOT
+
+Effective 2026-10-01, all Sales/DMS lifecycle work must read and follow `docs/DMSv3 Refactor Plan/README.md` and the relevant files in that folder first. It is authoritative for DMS Lead/Prospect → Booking → Financing/LOU → Allocation/Registration → Delivery → Disbursement, KPI meanings, business rules, source ownership, target schema, migration and open policy decisions. Older Sales gap/Phase 5/Deal-stage descriptions are historical when they conflict with the DMSv3 SOT.
+
 # Unified Business Suite Project Context
 
 CRITICAL: Read this file first in every session before asking project basics. This repo has already deployed to production. The current working copy may be on the production server with live Supabase data; treat commands and edits as production-sensitive. Do not run destructive database, git, Docker, or deployment commands unless explicitly requested.

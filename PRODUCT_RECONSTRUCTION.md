@@ -1,3 +1,5 @@
+> **Sales/DMS lifecycle authority:** Effective 2026-10-01, detailed Sales/DMS workflow, KPI, rules, target schema and cutover are governed by [docs/DMSv3 Refactor Plan/README.md](docs/DMSv3%20Refactor%20Plan/README.md). Sales/Auto Aging lifecycle descriptions in this reconstruction are historical context where they conflict with that SOT.
+
 # Product Reconstruction — Fook Loi UBS (FLC BI App)
 
 **Author:** CTO / Principal product engineer review

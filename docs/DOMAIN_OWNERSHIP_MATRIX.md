@@ -1,3 +1,7 @@
+## DMSv3 Sales/DMS ownership note
+
+**Effective 2026-10-01:** detailed ownership and source-of-truth rules for the Sales/DMS customer lifecycle are governed by [DMSv3 Refactor Plan](DMSv3%20Refactor%20Plan/README.md). This matrix remains the programme-wide domain boundary; the DMSv3 SOT provides the finer-grained Sales/DMS event and source contract.
+
 # Domain Ownership Matrix
 
 **Status:** Architecture baseline  

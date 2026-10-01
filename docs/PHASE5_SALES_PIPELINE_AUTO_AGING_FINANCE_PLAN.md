@@ -1,3 +1,6 @@
+> **HISTORICAL — DMSv3 SOT supersedes Sales lifecycle design.**  
+> Effective 2026-10-01, future Sales/DMS lifecycle, KPI, rule, schema and cutover work must use [DMSv3 Refactor Plan](DMSv3%20Refactor%20Plan/README.md). This plan remains historical implementation evidence only where it conflicts with the DMSv3 SOT.
+
 # Phase 5: Sales Pipeline, Auto Aging Integration, Accounts, and Finance
 
 Status: Planning  
