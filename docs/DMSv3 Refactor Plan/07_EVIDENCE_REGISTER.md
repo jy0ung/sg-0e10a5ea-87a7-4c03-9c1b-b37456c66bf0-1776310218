@@ -2,7 +2,7 @@
 
 **Status:** evidence index for the DMSv3 SOT  
 **Review date:** 2026-10-01  
-**Repository baseline:** main@e0c2da3add7e2f80364173d9df6efc8e58e4b497
+**Repository baseline:** main@52d72dae23f4d30a1e8fc0d529dabd9c939f8b57
 
 No individual customer sample values are reproduced in this SOT. Evidence extraction is limited to structure, definitions, rules, formulas and aggregated metrics.
 
@@ -10,13 +10,15 @@ No individual customer sample values are reproduced in this SOT. Evidence extrac
 
 Confirmed in the FLC Data Analysis project:
 
-1. Lead comes from DMS.
-2. Prospect comes from DMS.
-3. Customer lifecycle continues:
-   DMS Lead → DMS Prospect → Booking → Loan Submission → Registration → Delivery → Disbursement.
-4. Booking may be **with or without deposit**.
-5. The current lifecycle should be redesigned/refactored rather than preserving the generic 11-stage Deal model.
-6. Target schema should be designed before implementation to avoid schema-by-slice drift.
+1. Lead source facts come from DMS.
+2. Prospect source facts come from DMS.
+3. Lead is optional; Direct Prospect is valid.
+4. The full journey connects Prospect/customer intent to FLC Booking/Case, official Proton Retail Order, financing/LOU, stock control, Registration, Delivery and Disbursement/Settlement.
+5. FLC Booking/Case may exist before the official Proton Booking No.
+6. Booking may be **with or without deposit**.
+7. Official Booking MTD comes from the governed Master RO / Proton Retail Order population.
+8. The current lifecycle should be redesigned/refactored rather than preserving the generic 11-stage Deal model.
+9. Target schema should be designed before implementation to avoid schema-by-slice drift.
 
 These decisions are encoded in this SOT.
 
@@ -458,3 +460,153 @@ Evidence:
 - guarded pending→approved→paid transitions.
 
 This is relevant to DMSv3 because Delivery and BG semantics feed Commission eligibility.
+
+
+## 9. Historical established product baseline revisited
+
+### FLC Operations Platform PRD v1.1 Established Baseline
+
+Document date: **2026-09-16**
+
+Status in document: **ESTABLISHED — product and engineering execution baseline; named governance signatures pending**
+
+This document was reintroduced to the current Project on 2026-10-01 and reconciled against the DMSv3 SOT.
+
+Business/product evidence adopted into the reconstructed baseline includes:
+
+- requirement status separated from implementation status;
+- explicit evidence precedence and fail-closed treatment of TBDs;
+- Lead optional / Direct Prospect first-class;
+- distinction between FLC Booking/Case and official Proton Retail Order;
+- local FLC Case may exist before Proton Booking No;
+- deposit independent of FLC Case creation;
+- Master RO owns official Proton Booking existence/Booking MTD;
+- multiple financing applications and explicit selected disposition;
+- Cash path without fake Loan/LOU;
+- Stock Request separate from Reservation/Allocation;
+- versioned 3/7/3 working-day Reservation policy;
+- expiry is control point, not auto-release;
+- management-controlled Allocation;
+- LNS derived;
+- B2B/D2D distinction;
+- readiness ≠ actual Registration;
+- active Allocation context for commercial Vehicle relationship;
+- PRE-REGISTER/sequential commercial cases;
+- immutable commercial terms without invented pricing formulas;
+- Delivered = physical handover + signed VDO;
+- normal Delivery payment clearance + Director outstanding-balance exception;
+- financed Invoice Submitted milestone;
+- Accounts-verified actual bank credit for Disbursement;
+- Cash credit confirmation before Registration;
+- OR after confirmed credit;
+- business-calendar policy;
+- exact RO↔Inventory reconciliation evidence order.
+
+### Technical architecture disposition
+
+The PRD audited historical repo:
+
+`jy0ung/flc-dmsv2` / Fastify / Prisma / PostgreSQL 18.
+
+That implementation architecture is **not adopted** into the current UBS programme.
+
+Current UBS main and its Supabase/RLS/service/RPC architecture remain the implementation baseline.
+
+## 10. Historical KPI reference revisited
+
+### FLC Inventory Dashboard — KPI Reference Guide v1.0
+
+Document date: **2026-07-18**
+
+Classification: Internal — Management Use.
+
+Useful evidence retained:
+
+- inventory-aging KPI labels/ranges;
+- legacy S1/S2/S3 reporting stages;
+- Registered MTD / Disbursed MTD concepts;
+- Pending Delivery;
+- Pending Invoice Submission;
+- Pending Disbursement;
+- Contra/TT/CN legacy reporting;
+- historical dashboard lifecycle vocabulary.
+
+Later confirmed baseline supersedes these July shorthand definitions where conflicting:
+
+- `FREE STOCK = YES` is not target availability authority;
+- OBR is not simply “received at branch awaiting processing”;
+- D2D is not Door-to-Door in the DMSv3 domain model;
+- sequential lifecycle stages are a reporting/read-model projection, not one canonical status;
+- Forecast/Focus fields are evidence/read-model inputs, not target transactional truth;
+- VAA field semantics require field-authority confirmation and must not be inferred solely from the July glossary.
+
+## 11. Recovered Project/Library source artifacts
+
+The exact exported PRD/KPI filenames were not found as earlier Project/Library files under those names before the 2026-10-01 upload.
+
+However, the Project Library retains source artifacts that independently reconstruct the same baseline.
+
+### August 2026 — stock-control implementation evidence
+
+Recovered artifacts document:
+
+- Stock Request separate from Reservation/Allocation;
+- one effective Reservation per chassis;
+- 3/7/3 versioned working-day hold policy;
+- expiry not auto-release;
+- Manager decision/Allocation control;
+- one active Allocation per chassis;
+- explicit Reallocation;
+- Waiting-for-Stock demand;
+- derived Free Stock;
+- OBR projection;
+- concurrency protection.
+
+### September 2026 — Registration preparation and actual-Registration evidence
+
+Recovered artifacts document:
+
+- explicit versioned financing disposition separate from Loan Application;
+- approved/current LOU selection and stale-context handling;
+- append-only Agreement evidence;
+- customer-payment clearance as an explicit prerequisite dimension;
+- SOLA applicability/clearance modeled explicitly rather than inferred from bank name;
+- Special Plate process state;
+- EHAK REQUESTED/RECEIVED bound to the current financed disposition context;
+- Cash = no EHAK/LOU gate;
+- narrow blocker-override model rather than generic bypass;
+- eligibility/readiness/Focus derived at read time;
+- UNKNOWN coverage fails closed;
+- readiness is not authorization to Register;
+- actual Registration re-derives facts under lock;
+- active Allocation binds Booking↔Vehicle;
+- Reservation alone is insufficient;
+- no permanent Vehicle.bookingId;
+- IN_TRANSIT/ON_HANDS are not automatically hard Registration gates;
+- PRE-REGISTER/sequential commercial cases preserve history.
+
+Target reconciliation note: the old implementation used a customer-payment attestation because it lacked the current UBS Accounts domain. DMSv3 should consume Accounts-owned payment truth where available instead of recreating a second ledger.
+
+### September 2026 — source/KPI reconciliation
+
+Recovered project analysis documented:
+
+- Master RO as the correct official Booking MTD population;
+- active booking projection undercounting historical MTD after cases register/deliver;
+- Master Inventory as Registration/vehicle evidence;
+- exact chassis then contextual unique identity reconciliation;
+- forecast under-coverage caused by duplicate/manual source architecture;
+- Booking Register/Control Tower/Focus as read models rather than fact owners.
+
+### September 2026 — Delivery/Disbursement reconnaissance
+
+Recovered artifacts documented:
+
+- Delivery as independent lifecycle axis;
+- signed VDO/VSO evidence seam;
+- Cash vs financed divergence;
+- Invoice Submitted after financed Delivery;
+- bank credit / Disbursement seam;
+- append-only correction/reversal direction.
+
+These artifacts provide independent corroboration of the reconstructed baseline rather than relying only on the exported PRD.

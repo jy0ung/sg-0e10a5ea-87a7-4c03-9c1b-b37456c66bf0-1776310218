@@ -5,39 +5,48 @@
 
 The target schema is designed so these decisions can be made without another structural redesign.
 
-## 1. Exact Financing gate before Registration
+## 1. Financing gate before Registration — core rule resolved
 
-Current operating control requires confirmed LOU before normal Inventory linkage/allocation.
+Confirmed reconstructed baseline for a financed case:
 
-DMSv3 policy must confirm which Financing milestone permits progression toward Registration:
+- a downstream Financing disposition is selected explicitly;
+- selected application belongs to the same Deal and is approved;
+- current LOU/offer-letter evidence is associated with that selected application/context;
+- stale financing/LOU context fails closed;
+- Registration readiness is derived from that current selected financing context plus the other applicable prerequisites.
 
-- Loan Approved;
-- LOU Received;
-- LOU Verified;
-- another approved condition.
+Therefore DMSv3 should not choose among vague statuses such as “loan approved vs LOU received vs LOU verified” at implementation time. The authority is the **selected/current approved financing + current LOU evidence** contract.
 
-Until confirmed, preserve the current LOU-before-normal-allocation control in UAT logic.
+Still OPEN:
 
-## 2. Payment-type lifecycle matrix
+- final business vocabulary displayed for LOU issuance/approval/verification;
+- LOU expiry/renewal rules (see below);
+- any product-specific exception approved later.
 
-We need an explicit business matrix for:
+## 2. Payment-type lifecycle matrix — partially resolved
 
-- Loan
-- Cash
-- Government
-- Trade-In
-- any other/Multi cases.
+Confirmed:
 
-For each type confirm:
+### Loan / financed
 
-- financing required?
-- LOU required?
-- customer full payment required before Registration?
-- customer full payment required before Delivery?
-- bank disbursement applicable?
-- what constitutes Settlement/Completed?
+- financing/LOU applies;
+- bank Invoice Submitted and Disbursement apply after Delivery;
+- Disbursement requires Accounts-verified actual bank credit.
 
-Do not force Cash/Government/Trade-In through a Loan workflow.
+### Cash
+
+- no fictitious Loan/LOU/EHAK/bank Invoice Submitted/Disbursement states;
+- cash credit confirmation is required **before Registration**.
+
+Still OPEN:
+
+- Government flow;
+- Trade-In flow;
+- mixed/Multi flow;
+- exact completion/settlement gates for those paths;
+- any financed-product exception that legitimately changes the normal sequence.
+
+Do not reopen the confirmed Cash/financed distinctions without a new owner decision.
 
 ## 3. BG DATE semantic conflict
 
@@ -78,43 +87,52 @@ Still to decide:
 
 These become policy/Accounts commands, not a Booking existence rule.
 
-## 5. Delivery readiness gates
+## 5. Delivery readiness gates — financial gate resolved, non-financial gates open
 
-Confirm whether Delivery requires all of:
+Confirmed:
 
-- vehicle received at correct outlet;
-- Registration complete;
-- plate received;
-- Insurance active;
-- customer payment threshold satisfied;
-- LOU/Financing milestone;
-- approved documents;
-- other handover checklist.
+- Delivered means physical handover of vehicle/keys + signed VDO.
+- normal Delivery requires customer-payable amounts cleared.
+- authenticated Director exception may allow Delivery with an outstanding balance; that balance remains visible.
+
+Still OPEN as hard permanent prerequisites:
+
+- exact physical-location/On-Hands requirement;
+- Registration/plate requirement if any exception exists;
+- Insurance requirement and required state;
+- additional document checklist;
+- other non-financial handover controls.
 
 The schema intentionally derives readiness from owning domains.
 
-## 6. Delivery before bank Disbursement
+## 6. Delivery / Invoice Submitted / bank Disbursement — sequence resolved, SLA open
 
-Current workflow includes Delivery then Disbursement, so this is clearly possible/expected in financed cases.
+Confirmed normal financed sequence:
 
-Still confirm:
+**Delivery + signed VDO/VSO → Invoice Submitted → actual bank credit → Accounts verification → Disbursement**
 
-- whether any bank/product requires Disbursement before Delivery;
-- whether exceptions require approval;
-- management escalation SLA after Delivery.
+Therefore Delivery before Disbursement is part of the established normal financed flow.
 
-Current Auto Aging target Delivery→Disbursement is 14 days, but confirm whether that remains the DMSv3 management SLA.
+Still OPEN:
 
-## 7. Customer settlement gate for non-loan cases
+- whether a specific bank/product requires an alternate sequencing exception;
+- exception approval policy if so;
+- whether the current 14-day Delivery→Disbursement target remains the formal DMSv3 SLA.
 
-For Cash/Government/Trade-In:
+## 7. Customer settlement gate for non-loan cases — Cash resolved
 
-- when must customer/company settlement be complete?
-- before Registration?
-- before Delivery?
-- before Completed only?
+Confirmed Cash rule:
 
-Do not derive policy from legacy Full Payment columns alone.
+**cash credit confirmation is required before Registration.**
+
+Still OPEN:
+
+- Government settlement gate;
+- Trade-In settlement gate;
+- mixed-payment settlement gate;
+- whether any additional Cash completion rule exists after Delivery beyond the already-confirmed pre-Registration credit requirement.
+
+Do not derive unresolved policy from legacy Full Payment columns alone.
 
 ## 8. Insurance gate
 
@@ -151,16 +169,24 @@ Confirm whether the standard operational model is:
 
 The target schema supports explicit Deal relationships.
 
-## 11. Manual UBS Booking creation
+## 11. FLC Booking/Case creation front door — concept resolved, capability detail open
 
-Decide whether production DMSv3 permits:
+Confirmed:
 
-- only DMS-originated Booking;
-- manual UBS Booking for exceptional cases;
-- manual draft that must later reconcile to DMS;
-- specific non-Proton/manual business path.
+- FLC Booking/Case is a first-class local case.
+- it may be created before Proton creates an official Booking No.
+- genuine purchase intent + sufficient information/documents establish the case.
+- the official Proton Retail Order is linked later through deterministic reconciliation.
+- deposit is not required.
 
-Do not let a generic “New Deal” form create an untraceable parallel Sales system.
+Still OPEN:
+
+- exact production capability/role permitted to create the FLC Case;
+- which required information/documents constitute “sufficient” by product/payment type;
+- whether every local Case must originate from an existing DMS Prospect or whether exceptional direct local case creation is permitted;
+- deadline/escalation when a local Case has not yet acquired a Proton Retail Order.
+
+Do not let a generic form create an untraceable parallel official-Proton booking.
 
 ## 12. Prospect access scope
 
@@ -200,16 +226,26 @@ Define:
 - renewal/reissue;
 - whether expired LOU blocks allocation/registration/delivery.
 
-## 15. Allocation model
+## 15. Stock-control model — core resolved, edge policy open
 
-Confirm:
+Confirmed:
 
-- one active Vehicle allocation per Booking as normal rule?
-- temporary reservation versus firm allocation?
-- when allocation may change?
-- approval for reallocation?
-- D2D/transfer interaction?
-- treatment of a DMS allocation that violates local LOU control.
+- Stock Request is distinct from Reservation and Allocation.
+- one effective Reservation per chassis.
+- default Reservation terms are versioned 3/7/3 working days by financing basis.
+- expiry is a control point, not auto-release.
+- one active Allocation per chassis.
+- Sales Advisor may request; authorized management controls Allocation.
+- Reallocation is explicit/auditable and preserves displaced history.
+- no permanent lifetime Vehicle.bookingId.
+- a DMS allocation that occurs before the local confirmed-LOU control is preserved as physical/source evidence and flagged as a control breach.
+
+Still OPEN in the current UBS implementation context:
+
+- exact capability/manager-resolution model to adopt after Employee/module-assignment convergence;
+- detailed D2D interaction if external-dealer execution is later authorized;
+- specific pre-emption priority beyond already confirmed policy;
+- whether any product class legitimately permits more than one active Vehicle allocation per Deal.
 
 ## 16. Registration owner and command authority
 
@@ -235,17 +271,17 @@ Therefore “closed” must be qualified:
 
 Future dashboards must not mix these populations.
 
-## 18. Disbursement verification
+## 18. Disbursement verification — resolved
 
-Confirm what evidence makes disbursement “verified”:
+Confirmed:
 
-- bank statement;
-- DMS collection;
-- Accounts receipt;
-- Finance bank reconciliation;
-- another source.
+- actual bank-statement credit is the recognition evidence;
+- Accounts verifies the credit;
+- Disbursement Date is actual credit/value date;
+- Financing operational status and Accounts receipt remain distinct but linked;
+- OR follows confirmed credit under Accounts rules.
 
-Operational Financing status and financial receipt must remain distinct even when correlated.
+Remaining implementation detail belongs to reconciliation/statement-ingestion design, not business-definition uncertainty.
 
 ## 19. DMS collections → Accounts
 
@@ -374,31 +410,29 @@ Before changing an OPEN POLICY to governed:
 
 No policy becomes authoritative solely because code shipped first.
 
-## 31. Master Report Plan abbreviations/classifications
+## 31. Master Report Plan abbreviations/classifications — partially resolved
 
-The reviewed FLC Master Report Plan requests Payment Status labels:
+The July KPI guide provides:
 
-- CS
-- CN
-- TT
-- Pending Full Payment
+- **TT = Telegraphic Transfer**
+- **CN = Cash-and-Carry**
+- **Contra Sola** as the corresponding named financing/payment workflow concept.
 
-and Booking/Registration planning labels such as:
+Still OPEN:
 
-- QR
-- Manual
-- EHAK.
+- whether the Master Report Plan abbreviation **CS** is formally approved to mean Contra Sola in every reporting context;
+- QR;
+- Manual;
+- any other shorthand not explicitly mapped by the source contract.
 
-The reviewed source does not provide a sufficiently precise official definition/mapping for every abbreviation.
-
-Before DMSv3 creates enums/KPI codes from them, confirm:
+Before DMSv3 creates enums/KPI codes for unresolved abbreviations, confirm:
 
 - full business meaning;
 - source field/code;
 - owning domain;
 - whether it is a status, document, payment method, source type or reporting-only label.
 
-Do not infer these meanings from common industry usage.
+Do not infer unresolved meanings from common industry usage.
 
 ## 32. Commission eligibility after DMSv3
 
@@ -414,3 +448,56 @@ Because DMSv3 changes lifecycle ownership and BG is unresolved, management must 
 - or another combination.
 
 Until a separate Commission payout/Finance convergence decision is approved, preserve current calculation behavior and version any future rule change explicitly.
+
+
+## 33. Official Booking MTD cancellation/deletion inclusion contract
+
+Confirmed owner/population:
+
+**Master RO / Proton Retail Orders**
+
+Still OPEN:
+
+- exact treatment of Proton `Deleted`, cancelled, replaced or rebooked Retail Orders in the official Booking MTD headline;
+- whether management wants gross-created and net-valid metrics side by side;
+- effective date for any revised inclusion rule.
+
+Until approved, preserve source status and expose drill-down rather than silently excluding rows.
+
+## 34. VAA Date exact semantics
+
+Historical KPI documentation describes VAA Date as vehicle receipt/arrival, while later procurement/inventory work treats VAA as a procurement/aging milestone distinct from outlet receipt evidence.
+
+Decision required:
+
+- exact FLC/Proton business definition of VAA;
+- source field;
+- whether it represents Proton advice, dealer procurement date, shipment/arrival notice, physical arrival, or another milestone;
+- which aging KPIs may legitimately use it.
+
+Until resolved:
+
+- preserve VAA as its own named source/business date;
+- do not equate VAA to RECEIVED BY OUTLET;
+- keep legacy VAA-based KPI names versioned.
+
+## 35. Official Proton Booking creation responsibility/capability
+
+Historical baseline says Sales Admin creates the official Proton Booking in DMS when ready.
+
+Current UBS permission model does not yet have a final approved Sales Admin capability bundle.
+
+Confirm:
+
+- who performs/owns the DMS action operationally;
+- who may attest/link completion in UBS;
+- whether maker/checker is required;
+- visibility/escalation for FLC Cases waiting on official Proton Booking.
+
+## 36. Reservation policy implementation in current UBS
+
+The 3/7/3 Reservation policy is a confirmed business baseline from the earlier clean-sheet work.
+
+Before implementing it in current UBS, reconcile it against any existing current-repo Vehicle/stock-control schema to avoid creating duplicate stock authority.
+
+This is an implementation-convergence question, not an open business rule.
