@@ -25,6 +25,7 @@ Migration `20260915090000_production_readiness_security.sql` adds restrictive po
 | `dashboard_preferences`       | Self              | Self              | Self              | Self              | user_id = auth                           |
 | `companies`                   | Company           | Super admin       | Super admin       | Super admin       |                                          |
 | `branches`                    | Company           | Admin             | Admin             | Admin             |                                          |
+| `deal_number_sequences`       | Service only      | Service / authorized allocator | Service / authorized allocator | Service only | Private display-number reservations; no direct anon/authenticated CRUD, including company admins |
 | `finance_companies`           | Company           | Admin             | Admin             | Admin             | Master data                              |
 | `insurance_companies`         | Company           | Admin             | Admin             | Admin             | Master data                              |
 | `vehicle_models`              | Company           | Admin             | Admin             | Admin             | Master data                              |
@@ -75,6 +76,22 @@ Migration `20260915090000_production_readiness_security.sql` adds restrictive po
 | `source_reconciliation_events` | Company          | Admin             | —                 | —                 | Append-only reconciliation audit events  |
 
 ## RPC Contracts
+
+`deal_number_sequences` is private technical reservation state: RLS enabled,
+no PUBLIC/anonymous/authenticated table privileges (including company admins),
+and an intentional service-role ALL policy/grant. The existing
+`generate_deal_no(text,text)` SECURITY DEFINER RPC retains its safe
+`pg_catalog, public` search path and authenticated/service EXECUTE grants; anon
+has none. Existing enabled-actor/company checks run before writes, retaining
+global/service allocation semantics and the inactive-session pre-request gate.
+Company + literal displayed branch label + database YY/MM scopes the atomic
+counter; null/unresolved GEN and an actual GEN branch share it. Unresolved or
+foreign branch IDs retain the existing own-company GEN fallback, without
+granting access to that foreign branch. This is compatibility, not a new branch
+permission policy. See [Deal-number evidence](DMSV3_DEAL_NUMBER_ALLOCATION_EVIDENCE.md)
+and `src/test/deal-number-allocation.rls.spec.ts` DN-08/DN-09 for populated
+authorization denials and privileged before/after counter equality across all
+direct CRUD attempts. Deal uniqueness and existing Deal policies are unchanged.
 
 `lead_followups` supports company-scoped reads (and existing global scope),
 same-company authored inserts, and an original-author/nominal-24-hour UPDATE predicate;

@@ -281,7 +281,8 @@ Evidence:
 ### DMSv3 Phase 1A source boundary checkpoint — PR #128
 
 Date: 2026-10-01. [PR #128](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/128)
-is a partial Phase 1 checkpoint, pending independent review.
+was independently accepted and squash-merged as
+`2d744dbbc16410a7762abf7bcb16974b000590d6`; it remains a partial Phase 1 checkpoint.
 
 Evidence:
 
@@ -297,6 +298,25 @@ does not complete the entire Phase 1 programme. Same-company source reattachment
 and `created_at` rewriting remain possible for local notes: the nominal 24-hour
 predicate is not an immutable-history or fixed-correction-window guarantee. This
 preexisting history limitation is documented, with redesign outside this slice.
+
+### Bounded Phase 1B Deal-number prerequisite
+
+Baseline: accepted PR #128 squash `2d744dbbc16410a7762abf7bcb16974b000590d6`.
+This is a partial programme checkpoint, pending independent review of the new
+correction; it does not complete Phase 1, Phase 2 or the FLC Case contract.
+
+- [Deal-number evidence and DN-01–DN-10 assertion mapping](../DMSV3_DEAL_NUMBER_ALLOCATION_EVIDENCE.md): committed red-before/green-after scenarios, exact validation and limits.
+- [Registered disposable suite](../../src/test/deal-number-allocation.rls.spec.ts): real Auth/PostgREST/PostgreSQL, independently authenticated concurrent clients and actual TypeScript `createDeal` with a real authenticated client export; no RPC/from/row mocks.
+- [Additive private-counter migration](../../supabase/migrations/20261001020000_deal_number_allocation.sql): atomic reservations by literal displayed namespace, existing-number high-water, minimum-width suffix growth, capacity denial, unchanged authorization and private table boundary.
+- [RLS matrix](../RLS_MATRIX.md): caller/security contract and direct counter CRUD denial.
+
+UUID is governed local identity; display numbers are references and official
+Proton identifiers remain separate. Null/unresolved GEN fallback and legacy
+stage `lead` are current compatibility, not target Case acceptance. Case creation
+policy/deposit documents, official Booking metrics, canonical Case/source links,
+Employee responsibility, successful worker replay, route/backend convergence
+and local-history controls remain separate. The previously documented note
+reattachment/created_at limitation is not changed here.
 
 ### supabase/migrations/20260621000000_deal_lifecycle.sql
 

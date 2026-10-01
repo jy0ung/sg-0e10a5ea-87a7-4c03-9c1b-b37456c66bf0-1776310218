@@ -979,16 +979,32 @@ Examples:
 
 ## 38. deal_number_sequences
 
-Replace race-prone MAX+1 number allocation:
+Replace race-prone MAX+1 number allocation. The bounded existing-Deal prerequisite
+is implemented by `20261001020000_deal_number_allocation.sql`; see the
+[DN-01–DN-10 evidence](../DMSV3_DEAL_NUMBER_ALLOCATION_EVIDENCE.md).
 
 - company_id
-- branch_id
-- year
-- month
-- next_number
+- branch_label (exact literal displayed code, including GEN fallback)
+- year (database-clock YY, 0–99, matching the existing emitted namespace)
+- month (database-clock MM, 1–12)
+- last_number (bigint high-water reservation, never reclaimed by Deal deletion)
 - updated_at
 
-composite PK by company/branch/year/month.
+Composite PK by company/displayed branch label/YY/MM. This refines the earlier
+nullable branch-ID key: null/unresolved branches and an actual branch coded GEN
+emit the same prefix and must share reservations. `branches.id` remains canonical
+branch identity; display namespace does not grant branch authority.
+
+The existing authorized RPC atomically persists a reservation before returning,
+then the current service separately inserts the Deal and activity. Existing valid
+suffixes establish or advance the high-water value without rewriting historical
+rows. Padding has minimum width three and grows beyond 999. Exhaustion fails
+explicitly; failed/abandoned creations leave gaps. Counter state is private with
+RLS, no anonymous/authenticated table privileges and intentional service access.
+Retain state and forward-correct after rollout; restoring unsafe MAX+1 is not a
+normal rollback. This is neither gapless numbering nor an idempotent/atomic Case
+command. The unique company/Deal-number constraint remains the final backstop;
+arbitrary concurrent writers bypassing allocation are not certified.
 
 UUID remains actual PK. Any locally generated Deal/Case number is a display/reference key only; the official Proton Booking No remains the Proton business identifier once created.
 
