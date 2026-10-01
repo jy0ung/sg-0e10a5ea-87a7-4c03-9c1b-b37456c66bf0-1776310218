@@ -157,6 +157,37 @@ OR only after confirmed credit; one OR per payment transaction.
 
 Added stronger rule that commercial terms are immutable recorded facts, not authorization to infer pricing/OTR/customer-payable formulas.
 
+### R-19 — LOU / selected financing disposition
+
+**Initial SOT:** Loan Application row also carried LOU-like lifecycle statuses/fields.
+
+**Reconciled:** Loan Application, versioned LOU evidence and selected downstream Financing disposition are separate. Multiple applications may be approved; selection is explicit and history-preserving. Stale financing/LOU context fails closed.
+
+### R-20 — Registration preparation/readiness
+
+**Initial SOT:** Registration sub-workflow was too shallow and risked becoming another status field.
+
+**Reconciled:** restored the prior established preparation model:
+
+- active Allocation context;
+- selected/current financing disposition;
+- Agreement;
+- payment clearance;
+- SOLA applicability/clearance;
+- Special Plate process;
+- EHAK per current financed context;
+- derived blockers/eligibility/readiness;
+- narrow override boundary;
+- actual Registration revalidation under lock.
+
+In current UBS, Accounts replaces the old payment-clearance attestation as financial truth where possible.
+
+### R-21 — Commercial Deal amount fields
+
+**Initial SOT:** placed selling/discount/accessory/total values directly on Deals as target authority.
+
+**Reconciled:** immutable recorded commercial-term versions are authoritative evidence; no pricing formula is inferred. Legacy Deal amount columns remain compatibility fields only unless a future confirmed pricing contract says otherwise.
+
 ## 4. Historical KPI guide retained without becoming authority
 
 The July KPI guide remains valuable for:
