@@ -168,9 +168,8 @@ Target authoritative fields for new V2 Deals:
 | id | uuid PK | internal Deal identity |
 | company_id | FK companies | tenant |
 | branch_id | FK branches | Booking transaction outlet |
-| deal_no | text | UBS/local FLC case display number |
+| deal_no | text | UBS/local FLC case display/reference number only |
 | case_opened_date | date | FLC Booking/Case business date |
-| proton_booking_no | text nullable compatibility/cache | official Proton business key; source authority remains Proton observation |
 | customer_id | FK customers | canonical customer |
 | sales_advisor_employee_id | FK employees | canonical Sales Advisor |
 | requested_model_id | FK vehicle_models nullable | intended model |
@@ -277,6 +276,13 @@ Relationship types include:
 - registration_evidence
 - delivery_evidence.
 
+Constraints for official Proton Retail Order linkage:
+
+- a source Retail Order observation may link to only one canonical Deal unless a reviewed correction/supersession explicitly changes the relationship;
+- one Deal normally has at most one current/primary `official_booking` link;
+- historical/superseded links remain auditable;
+- Proton Booking No/official Booking Date/status are read from the source observation/projection rather than copied as independently editable Deal facts.
+
 ## 8. lead_followups v2
 
 Lead/Prospect remains DMS-owned.
@@ -305,11 +311,8 @@ Version/effective-date configuration by company/payment type:
 - payment_type_id
 - effective_from / effective_to
 - financing_required
-- financing_registration_gate
 - registration_payment_gate
 - delivery_payment_gate
-- registration_requires_vehicle
-- delivery_requires_registration
 - delivery_requires_insurance
 - delivery_requires_vehicle_receipt
 - completion_requires_disbursement
@@ -319,16 +322,14 @@ Version/effective-date configuration by company/payment type:
 
 Deposit defaults to **not required**. Any future `deposit_required` policy may govern a downstream readiness/action requirement, but it must **never** become a prerequisite for creating the FLC Booking/Case without a new confirmed owner decision.
 
-Possible financing registration gates:
+Confirmed hard invariants are **not configurable** through this table:
 
-- none
-- loan_approved
-- lou_received
-- lou_verified.
+- Registration requires the active Allocation linking the Deal and Vehicle.
+- Financed Registration uses the selected/current approved financing + current LOU context.
+- Delivery follows actual Registration in the confirmed normal lifecycle.
+- Cash requires confirmed customer credit before Registration.
 
-The exact financed gate remains policy-configurable until management confirms the final DMSv3 rule.
-
-For **Cash**, the policy must encode the confirmed rule that customer cash credit is required before Registration.
+The policy table may configure only genuine business variants that remain approved as configurable, such as product/payment-type settlement or Insurance gates.
 
 ## 10. deal_workflow_requirements
 
@@ -339,9 +340,8 @@ One row per Deal containing:
 - policy_id
 - payment_type_id
 - financing_required
-- financing registration gate
 - registration payment gate
-- delivery gates
+- configurable delivery gates
 - completion gates
 - deposit requirement
 - created_at.
@@ -1027,12 +1027,15 @@ Target commands/use cases include:
 - prepare_registration
 - submit_registration
 - record_registration
+- correct_registration
 - record_plate_received
 - record_insurance_cover_note
 - activate_insurance_policy
 - schedule_delivery
 - record_delivery
+- correct_delivery
 - record_bank_submission
+- correct_bank_submission
 - report_bank_disbursement
 - verify_bank_credit
 - issue_official_receipt
@@ -1072,6 +1075,9 @@ Authenticated direct mutation should be removed for authority tables such as:
 - deal_registration_prerequisite_versions
 - deal_registration_ehak_events
 - deal_registration_blocker_overrides
+- registration_readiness_policy_versions
+- manager_registration_forecasts
+- month_closing_configurations
 - deal_registrations / registration_versions / events
 - deal_insurance policies/events
 - deal_deliveries / delivery_versions
@@ -1276,18 +1282,50 @@ Official Booking MTD reads this projection/source population.
 
 ## 48. Business-calendar / Reservation policy tables
 
-Reuse existing governed configuration tables where current UBS already has an equivalent.
+Reuse existing governed configuration tables where current UBS already has an equivalent. Do not create duplicates.
 
-If absent, add versioned configuration for:
+If absent, the logical target is:
 
-- Sabah working calendar / holidays;
-- Reservation basis policy;
-- working-day duration;
-- effective dates;
-- version;
-- active state.
+### business_calendars
 
-Historical Reservation terms store the selected policy/version snapshot.
+- id
+- company_id
+- name
+- timezone
+- monday_friday_start/end
+- saturday_start/end
+- sunday_working boolean default false
+- effective_from/effective_to
+- version_no
+- created_by/created_at.
+
+### business_calendar_holidays
+
+- id
+- calendar_id
+- holiday_date
+- name
+- source/governance reference
+- created_by/created_at.
+
+### vehicle_reservation_policy_versions
+
+- id
+- company_id
+- version_no
+- basis
+- duration_working_days
+- effective_from/effective_to
+- active
+- created_by/created_at.
+
+Initial confirmed basis values:
+
+- NO_LOAN_LOU_CONTEXT → 3 working days
+- PENDING_LOU → 7 working days
+- APPROVED_CURRENT_LOU → 3 working days.
+
+Historical Reservation terms store the selected calendar + policy/version snapshot.
 
 ## 49. Delivery financial exception evidence
 
