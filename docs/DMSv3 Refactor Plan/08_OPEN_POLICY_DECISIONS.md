@@ -5,18 +5,23 @@
 
 The target schema is designed so these decisions can be made without another structural redesign.
 
-## 1. Exact Financing gate before Registration
+## 1. Financing gate before Registration — core rule resolved
 
-Current operating control requires confirmed LOU before normal Inventory linkage/allocation.
+Confirmed reconstructed baseline for a financed case:
 
-DMSv3 policy must confirm which Financing milestone permits progression toward Registration:
+- a downstream Financing disposition is selected explicitly;
+- selected application belongs to the same Deal and is approved;
+- current LOU/offer-letter evidence is associated with that selected application/context;
+- stale financing/LOU context fails closed;
+- Registration readiness is derived from that current selected financing context plus the other applicable prerequisites.
 
-- Loan Approved;
-- LOU Received;
-- LOU Verified;
-- another approved condition.
+Therefore DMSv3 should not choose among vague statuses such as “loan approved vs LOU received vs LOU verified” at implementation time. The authority is the **selected/current approved financing + current LOU evidence** contract.
 
-Until confirmed, preserve the current LOU-before-normal-allocation control in UAT logic.
+Still OPEN:
+
+- final business vocabulary displayed for LOU issuance/approval/verification;
+- LOU expiry/renewal rules (see below);
+- any product-specific exception approved later.
 
 ## 2. Payment-type lifecycle matrix — partially resolved
 
