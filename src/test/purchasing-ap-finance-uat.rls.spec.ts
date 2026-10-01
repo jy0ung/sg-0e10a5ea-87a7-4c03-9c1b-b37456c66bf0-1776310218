@@ -206,7 +206,7 @@ live('Purchasing → AP → Finance live UAT', () => {
       .select('po_line_id,_po:purchase_order_lines!po_line_id(purchase_order_id,quantity,unit_price,purchase_orders!purchase_order_id(po_no))')
       .eq('id', invoiceId).single(), 'invoice detail PO reference');
     expect(linkedDetail.po_line_id).toBe(lineId);
-    expect(linkedDetail._po?.purchase_order_id).toBe(poId);
+    expect((linkedDetail._po as unknown as { purchase_order_id: string } | null)?.purchase_order_id).toBe(poId);
     expect((await match()).match_status).toBe('pending_receipt');
 
     const secondGrn = must(await grn(3, 1), 'final GRN');
