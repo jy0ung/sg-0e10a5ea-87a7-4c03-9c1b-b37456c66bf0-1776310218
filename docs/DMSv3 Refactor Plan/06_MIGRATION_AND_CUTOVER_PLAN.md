@@ -242,19 +242,41 @@ Required gates:
 
 Shipment and outlet receipt migrate out of Deal.stage and into Inventory-owned events/read models.
 
-## 8. Phase 6 — Registration and Insurance
+## 8. Phase 6 — Registration preparation, actual Registration and Insurance
 
 Add/activate V2:
 
-- deal_registrations
-- deal_registration_events
+- financing-disposition versioning/current selection;
+- Registration prerequisite history;
+- EHAK event history;
+- derived blockers/eligibility/readiness;
+- narrowly scoped canonical override history;
+- Registration readiness policy versions;
+- manager forecast/history where retained;
+- deal_registrations + immutable registration versions/events;
 - deal_insurance_policies/events.
+
+Migration/reconciliation must preserve the distinction:
+
+**preparation/readiness/forecast ≠ actual Registration**
+
+Target rules:
+
+- financed path uses selected/current approved financing + current LOU context;
+- Cash uses confirmed cash credit and no fake EHAK/LOU;
+- active Allocation links Deal↔Vehicle;
+- Agreement/SOLA/Special Plate/EHAK evidence remains explicit;
+- UNKNOWN coverage fails closed;
+- actual Registration command re-derives facts under lock;
+- physical IN_TRANSIT/ON_HANDS is not automatically a hard gate;
+- post-Registration cancellation preserves PRE-REGISTER/sequential-case history.
 
 Reconcile Registration actual against the current authoritative Master Inventory REG DATE layer.
 
 Exit gate:
 
 - monthly/daily Registration actuals match current governed source within explained, approved reconciliation differences;
+- Registration readiness/forecast populations never count as actual;
 - no current Registration KPI is repointed early.
 
 ## 9. Phase 7 — Delivery
