@@ -1,3 +1,7 @@
+## DMSv3 Sales lifecycle SOT checkpoint — 2026-10-01
+
+A new authoritative documentation set now lives under [docs/DMSv3 Refactor Plan/](DMSv3%20Refactor%20Plan/README.md). It records the current governed FLC workflow and KPI/rule evidence from the live Master Data, Master Booking & Stock and FLC Master Report Plan workbooks, separates current rules from target DMSv3 normalization, freezes the target additive schema, and maintains an explicit open-policy register. Future Sales/DMS lifecycle work must use that folder as its SOT. This documentation checkpoint changes no production data and authorizes no production deployment.
+
 # UBS web application UAT checkpoint
 
 **Assessment:** 2026-09-27, `main@5fe80d9401cd3c893e3b20d90e4c626dc0fef9e0`. This is an implementation inventory, not a claim that end-to-end UAT has passed.
