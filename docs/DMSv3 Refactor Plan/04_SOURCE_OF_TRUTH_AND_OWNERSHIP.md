@@ -153,6 +153,31 @@ Conflict-review examples:
 
 This pattern should be extended to DMSv3 events/relationships rather than replaced by direct “last writer wins.”
 
+### Bounded legacy Sales Order write precondition (2026-10-02)
+
+`normalize_dms_sales_order(uuid)` remains a service-only staged raw-DMS→legacy-SO
+operation. Exactly one approved (`accepted`/`auto_matched`) decision must match
+company, raw UUID, source system `dms`, object kind `sales_order` and table
+`dms_raw_sales_orders`. Other object/source evidence cannot authorize the write.
+Multiple core decisions fail 21000, even if one has a malformed declaration;
+zero fails 42501. The sole canonical table must be `sales_orders`, with legacy
+NULL/NULL unresolved evidence allowed; other shapes fail 22023.
+
+Explicit UUID must be own-company and locally nondeleted (P0002 otherwise,
+without fallback). Otherwise use one nonblank exact external-ID candidate, then
+one nonblank exact text candidate: ambiguity fails 21000 and genuine absence
+returns the existing unmatched JSON without writes. Original nonblank strings
+are compared literally. All checks precede canonical/backlink/decision/event
+writes; column authority above is retained. Same-source calls serialize and
+existing locked rows are requalified after waits. Arbitrary privileged phantom
+inserts/retargets across reconciliation writers are not globally serialized.
+
+[Committed NR/CP evidence](../DMSV3_SALES_ORDER_NORMALIZER_EVIDENCE.md) distinguishes
+this protective prerequisite from target Case provenance (§7), full Phase 3B
+reconciliation and official Booking eligibility. Local SO soft deletion is a
+storage guard; SOT 08 official Proton inclusion/creator/attester policies remain
+OPEN. No candidate winner, history repair or new capability is supplied.
+
 ## 5. DMS raw → canonical flow
 
 Required flow:

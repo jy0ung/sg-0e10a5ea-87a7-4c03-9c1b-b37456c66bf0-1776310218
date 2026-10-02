@@ -162,8 +162,12 @@ deposit inputs create no financial or official-Proton records in this harness.
 On refreshed main `730f900533ad207dd44c40297e911e7f860072b5`, the
 [Case/RO characterization evidence](../DMSV3_CASE_RO_CHARACTERIZATION_EVIDENCE.md)
 maps CP-01–CP-10 to 14 new registered live cases and eight actual-component/router
-compatibility tests with mocked services. This slice is pending independent
-review; it adds evidence only and keeps all 290 existing live cases intact.
+compatibility tests with mocked services. Independently accepted
+[PR #130](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/130)
+was squash-merged as `6585773f0f530364fb04e7ca01dbd9d7b386d279`, single parent
+`730f900533ad207dd44c40297e911e7f860072b5`, tree equal to accepted
+`c713fb2d0fb29fcae5e2905a264dba6f8793ebc3`. All six merged-main checks passed;
+304 live cases (LP49/DN30/CP14) and eight component witnesses are retained.
 
 Actual unchanged `createDeal` persists distinct local UUIDs/numbers with deposits
 0/500 and no implicit financial/source/SO creation. Both persist legacy `lead`;
@@ -173,7 +177,8 @@ headline; manual and explicitly source-associated SOs do. The current headline
 includes next-month local booking dates, and its branch/trend populations differ.
 Privileged raw→SO normalization preserves populated local dates/notes/commercial
 facts and local Deals, but neither it nor its replay establishes typed Case→RO
-lineage. Duplicate text fallback selects an arbitrary same-company candidate.
+lineage. Historical CP-08 recorded arbitrary duplicate text selection; the
+following bounded correction strengthens that witness without changing its fixtures.
 
 These passing KNOWN GAP witnesses are not target business acceptance. Phase 1
 remains partial; Phase 2/3, creator/document/deposit operating policies, official
@@ -182,6 +187,27 @@ Booking parity/inclusion and attester capabilities remain open. See SOT 08
 requiring verification. No lifecycle/schema/KPI/policy correction is included.
 All prior local-history, allocator, worker replay, access-scope and Employee
 responsibility limits above remain; no production acceptance is implied.
+
+### Bounded prerequisite — Sales Order normalizer decision/target guards
+
+On refreshed PR #130 squash `6585773f0f530364fb04e7ca01dbd9d7b386d279`,
+[normalizer evidence](../DMSV3_SALES_ORDER_NORMALIZER_EVIDENCE.md) maps NR-01–NR-12
+and the strengthened CP-08 witness to real disposable calls and full-row checks.
+Forward migration `20261002010000_dms_sales_order_normalizer_target_guards.sql`
+replaces only the existing service-only function: exactly one typed approval,
+valid declaration and one eligible target at the selected tier before any write.
+No priority winner, blank identity, implicit target creation or invalid-explicit
+fallback is permitted. Existing source/local authority and response contracts remain.
+
+This correction is pending independent review. It preserves all 304 baseline
+live scenarios with only the authorized CP-08 ambiguity expectation strengthened;
+new guard coverage is additional. This is partial Phase 1 protection, **not** the
+full Phase 3B resolver, Case provenance, successful ingestion-worker replay,
+command idempotency, official RO population/metric cutover or production acceptance.
+Same-source normalizer calls serialize; arbitrary direct privileged phantom
+inserts/retargets, other normalizers and complete reconciliation history remain
+outside the guarantee. Stage/form/dashboard gaps and all prior source-history,
+allocator, route/Employee and SOT 08 §§4,11,33,35 limits remain unchanged.
 
 ## 4. Phase 2 — Additive schema foundation
 

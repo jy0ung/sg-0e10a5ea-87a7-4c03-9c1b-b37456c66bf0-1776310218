@@ -14,6 +14,7 @@ export default defineConfig({
       'src/test/employee-history-delete.rls.spec.ts',
       'src/test/employee-sales-assignment-atomicity.rls.spec.ts',
       'src/test/dms-normalizer.spec.ts',
+      'src/test/dms-sales-order-normalizer-guards.rls.spec.ts',
       'src/test/dms-lead-prospect-boundary.rls.spec.ts',
       'src/test/deal-number-allocation.rls.spec.ts',
       'src/test/dms-case-ro-characterization.rls.spec.ts',

@@ -416,23 +416,25 @@ live('DMSv3 Phase 1C Case / legacy SO / raw RO characterization', () => {
       expect(await state()).toEqual(before);
     });
 
-    it('CP-08 KNOWN GAP ambiguous same-company text fallback picks one candidate, stamps lineage and leaves foreign collisions intact', async () => {
+    it('CP-08 CORRECTED GUARD ambiguous same-company text fallback rejects without changing candidates or foreign collisions', async () => {
       const who = await tenant();
       const foreign = await tenant();
       await twoRealDeals(who);
       const evidence = { dms_so_no: 'SAME-RO-TEXT', dms_so_no_id: null };
       const candidates = [await order(who, evidence), await order(who, evidence)];
-      await order(foreign, { ...evidence, customer_name: 'Repeated customer' });
-      await raw(foreign, evidence);
+      const foreignOrder = await order(foreign, { ...evidence, customer_name: 'Repeated customer' });
+      const foreignRaw = await raw(foreign, evidence);
       const source = await raw(who, evidence);
       const accepted = await match(who, source, null);
-      // Membership, not row order: the existing SQL fallback uses LIMIT 1 without a tie-breaker.
-      // Full delta verification also keeps the unselected candidate and all foreign rows unchanged.
-      const result = await normalizeAndVerify(source, candidates, accepted);
-      expect(result.canonical.company_id).toBe(who.companyId);
-      expect(result.accepted.match_status).toBe('accepted');
+      const before = await state();
+      const result = await svc.rpc('normalize_dms_sales_order', { p_raw_id: source.id });
+      expect(result.error?.code).toBe('21000');
+      expect(result.data).toBeNull();
+      expect(await state()).toEqual(before);
       record('CP-08 ambiguous identity manifest', { candidates: candidates.map(row => row.id),
-        selected: result.canonical.id, company: who.companyId });
+        raw: source.id, decision: accepted.id, company: who.companyId, selected: null,
+        foreignCompany: foreign.companyId, foreignOrder: foreignOrder.id, foreignRaw: foreignRaw.id,
+        result: '21000; complete business/counter state unchanged' });
     });
 
     it('CP-08 external ID fallback selects actual own-company SO despite identical foreign identifiers and customer evidence', async () => {

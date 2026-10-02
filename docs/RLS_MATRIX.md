@@ -109,9 +109,18 @@ negative cases. Raw DMS Lead/Prospect rows remain service-write-only.
 
 | Function | Scope | Writes | Notes |
 | -------- | ----- | ------ | ----- |
+| `normalize_dms_sales_order` | Service role only | Existing SO DMS fields, raw backlink, unresolved SO decision, normalized event | SECURITY DEFINER with `search_path=pg_catalog, public`; PUBLIC/anon/authenticated have no EXECUTE, including company admin/inactive sessions. Exactly one typed approved own-company/raw decision, valid declaration and one eligible explicit/ID/text target precede writes. Missing/foreign/deleted explicit target never falls back. Existing column authority/grants retained; no Case, money or other normalizer authorization change. |
 | `auto_aging_source_ledger` | Company | None | Read-only source ledger over UBS vehicles/orders, raw DMS staging, and legacy invoice evidence. Uses caller RLS through `security invoker`; it does not normalize, reconcile, or overwrite canonical rows. |
 | `link_vehicle_to_sales_order` | Company | `sales_orders` update only | Links an existing same-company vehicle to a same-company sales order by vehicle id or chassis number. Does not create vehicle rows. |
 | `unlink_vehicle_from_sales_order` | Company | `sales_orders` update only | Removes the vehicle link from a same-company sales order. Does not delete or modify vehicle rows. |
+
+[Sales Order guard evidence](DMSV3_SALES_ORDER_NORMALIZER_EVIDENCE.md) and
+`src/test/dms-sales-order-normalizer-guards.rls.spec.ts` add actual anonymous,
+active sales/company-admin and inactive-session denials for a fully eligible
+fixture, catalog PUBLIC/role grants and safe-search-path checks, exact no-write
+snapshots, privileged positive/replay/concurrency cases and owned cleanup.
+This preserves the service-only execution boundary; the existing four database
+security audits and unrelated regression suites remain mandatory.
 
 ## Verification
 

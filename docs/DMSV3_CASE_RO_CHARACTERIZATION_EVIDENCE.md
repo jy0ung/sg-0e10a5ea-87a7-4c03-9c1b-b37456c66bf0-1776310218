@@ -3,9 +3,29 @@
 Date: 2026-10-01. Refreshed baseline: `730f900533ad207dd44c40297e911e7f860072b5`
 (independently accepted PR #129 squash; parent PR #128 squash
 `2d744dbbc16410a7762abf7bcb16974b000590d6`). No intervening main changes were found.
-This is **partial Phase 1 characterization**, pending independent review of this
-slice. It changes tests and evidence only. Phase 2/3, official Booking cutover,
+This historical **partial Phase 1 characterization** was independently accepted
+at `c713fb2d0fb29fcae5e2905a264dba6f8793ebc3` and squash-merged in
+[PR #130](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/130)
+as `6585773f0f530364fb04e7ca01dbd9d7b386d279` (2026-10-02 Asia/Kuala_Lumpur).
+Parent: `730f900533ad207dd44c40297e911e7f860072b5`; squash tree
+`16b08daec7e5a4b68eff51c44d7af608e1e90837` equals the accepted head.
+[Actual merged-main CI](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/actions/runs/36933800523)
+passed all six required jobs: 304 live, 1,393 unit passes / 192 skips,
+48 browser passes / two existing skips. Optional RLS Matrix tested no database.
+The original slice changed tests and evidence only. Phase 2/3, official Booking cutover,
 production acceptance, #48 and production reconciliation in #94 remain incomplete.
+
+## Later bounded correction — CP-08 only
+
+The [Sales Order normalizer correction](DMSV3_SALES_ORDER_NORMALIZER_EVIDENCE.md)
+adds a forward function guard on that merged baseline. The historical arbitrary
+text selection remains a reproduced defect of PR #130; its committed CP-08
+fixture is now strengthened to require **21000 and full unchanged state**.
+Both own candidate UUIDs, foreign SO/raw UUIDs, approved decision, two real
+local Deals/activities/counters and all 20 business tables remain in the witness.
+No other CP scenario is removed or reinterpreted; all 14 live and eight component
+cases remain. Stage, front-door, month/population and Case-provenance gaps below
+still describe current behavior. This correction is pending Astra review.
 
 ## Evidence strength and reproducibility
 
@@ -20,8 +40,8 @@ production acceptance, #48 and production reconciliation in #94 remain incomplet
   mocking service responses and actor/hooks only. These are component/router
   evidence, not browser-to-database E2E. Live creation is independently covered.
 - **STATIC / LIVE CATALOG:** effective SQL, current service/page code and applied
-  migration mapping identify absent typed Case provenance and the fallback's
-  `LIMIT 1`. Catalog assertions execute against the reconstructed database.
+  migration mapping identify absent typed Case provenance and the historical
+  fallback's `LIMIT 1`. Catalog assertions execute against the reconstructed database.
 - **OPEN POLICY:** the owner decisions below are retained, not implemented.
 
 Run `npm ci`, then the affected tests below and
@@ -56,7 +76,7 @@ real operations and verify their full before/after rows in each calling test.
 | CP-05 | LIVE DB: `CP-05 KNOWN GAP missing month upper bound and distinct branch/trend predicates remain tenant scoped` | DB-derived prior last day/current first day/next first day, deleted row, A/B branches, foreign colliding order/RO evidence. Exact all/branch/absent/foreign summary objects and full unchanged state; own-company argument plus foreign UUID reads expose no SO/raw row. |
 | CP-06 | LIVE DB: CP-04/06/07 case | Previous-month source order date versus populated current-month SO booking date; identity/status/freshness/payload/hash retained, exact DMS field/backlink changes, all local/commercial fields retained. Actual full dashboard summary unchanged. `created_at` is not used as a business date. |
 | CP-07 | Same LIVE DB case; `CP-07 LIVE CATALOG KNOWN GAP Deals have no typed raw-origin columns or deal_source_links relationship`; STATIC applied migration and normalizer code below | Explicit company-qualified match; two privileged calls target the same SO, each adds one exact normalized event; allowed sync/update timestamps are checked while every other row remains equal. Existing Deal UUIDs/numbers/notes/activities remain full-row equal. Catalog lacks typed source columns/FKs and `deal_source_links`. |
-| CP-08 | LIVE DB: `CP-08 no accepted reconciliation rejects privileged normalization and retains every business row`; `CP-08 accepted source without existing target returns unmatched without manufacturing SO or Case`; `CP-08 KNOWN GAP ambiguous same-company text fallback picks one candidate, stamps lineage and leaves foreign collisions intact`; `CP-08 external ID fallback selects actual own-company SO despite identical foreign identifiers and customer evidence` | Rejection 42501 and exact unchanged full state; exact unmatched result with no writes/events; two same-company text candidates and absent raw external ID return one candidate by set membership, never a claimed deterministic winner. Match/backlink and complete delta are verified. Actual selected company is checked; unselected and foreign SO/raw/match/event rows remain equal. |
+| CP-08 | LIVE DB: `CP-08 no accepted reconciliation rejects privileged normalization and retains every business row`; `CP-08 accepted source without existing target returns unmatched without manufacturing SO or Case`; `CP-08 CORRECTED GUARD ambiguous same-company text fallback rejects without changing candidates or foreign collisions`; `CP-08 external ID fallback selects actual own-company SO despite identical foreign identifiers and customer evidence` | Rejection 42501 and exact unchanged full state; exact unmatched result with no writes/events; originally two same-company text candidates with absent raw external ID returned one by set membership. The later correction retains these fixtures and requires 21000, null data and full unchanged state, including every candidate, foreign row, source/match/event and local Deal/counter. External-ID success still checks actual selected company and complete deltas. |
 | CP-09 | LIVE DB: `CP-09 active ordinary session cannot normalize; active dashboard remains scoped with unchanged full business state`; anonymous/inactive variants with `dashboard is denied`; `CP-09 anonymous allocator and actual createDeal reject writes without advancing any owned state`, with inactive/cross-company variants | Ordinary normalizer denied 42501; anonymous/inactive dashboards denied 42501; anonymous/inactive/cross-company allocator and unchanged actual service reject creation. Full business/counter state remains equal after each request. Successful normalization is explicitly privileged; cleanup and profile restoration are asserted. CP-05 separately proves regular-session cross-company read isolation. |
 | CP-10 | This report; SOT [06](DMSv3%20Refactor%20Plan/06_MIGRATION_AND_CUTOVER_PLAN.md), [07](DMSv3%20Refactor%20Plan/07_EVIDENCE_REGISTER.md), [08](DMSv3%20Refactor%20Plan/08_OPEN_POLICY_DECISIONS.md) | Coverage, populations, current/gap/policy labels, commands/counts and limits are recorded. Exact published head/CI are recorded after commit in the PR description and `ASTRA_REVIEW_HANDOFF.md`; a commit cannot embed its own SHA. |
 
@@ -95,11 +115,13 @@ date bound, not a new MTD definition or an approved official gross/net count.
 - **KNOWN GAP — typed Case provenance:** catalog has no `deal_source_links`
   or typed raw-origin Deal columns/FKs. Existing accepted raw→SO backlink/match
   does not identify a Case. Target SOT 04 §7 and 05 §7 remain unimplemented.
-- **KNOWN GAP — ambiguous fallback:** the existing
+- **HISTORICAL GAP, now guarded — ambiguous fallback:** the PR #130
   [normalizer](../supabase/migrations/20260511010000_normalize_dms_sales_order.sql)
   uses company-qualified ID/text lookups with `LIMIT 1` and no uniqueness/tie
-  resolution for duplicated text. CP-08 asserts candidate membership and actual
-  company, not arbitrary winner order. No resolver/constraint is added here.
+  resolution for duplicated text. Historical CP-08 asserted candidate membership
+  and actual company. The later forward function correction rejects ambiguity
+  before writing; current CP-08 asserts 21000 and full unchanged state. No new
+  constraint, candidate winner, conflict queue or historical repair is added.
 - **KNOWN GAP — complete command:** number reservation, Deal insert and activity
   are separate requests. Atomic allocator acceptance is not atomic/idempotent
   Case creation, event/outbox or Case-source-link idempotency.
@@ -128,7 +150,7 @@ RO parity before source/KPI cutover. Those are source facts to verify, not
 owner policy choices. Neither open policies nor source verification block this
 bounded characterization slice.
 
-## Validation and preserved limits
+## Original PR #130 validation and preserved limits
 
 Validation logs and synthetic manifests are under
 `/home/flitadmin/.codex/artifacts/dmsv3-phase1c-implementation-2026-10-01/`.
@@ -173,7 +195,8 @@ separate from privileged normalizer replay and duplicate staging rejection.
 Route/backend access convergence and Employee responsibility remain separate.
 Same-company follow-up reattachment and `created_at` rewriting remain possible,
 so neither immutable local history nor a fixed 24-hour correction window is
-guaranteed. No lifecycle/schema/metric/policy correction, migration/type churn,
-official KPI, production mutation/deployment, merge or programme comment occurs
-in this slice. Known-gap expectations must change after independent acceptance
-of a later governed correction while preserving the witness fixtures.
+guaranteed. The original characterization implementation performed no lifecycle,
+schema, metric or policy correction, migration/type churn, official KPI, production
+mutation/deployment, merge or programme comment. Its later accepted merge is
+recorded above. Known-gap expectations must change through governed corrections
+while preserving the witness fixtures; the CP-08 correction awaits Astra review.
