@@ -1,10 +1,11 @@
 # 07 — Evidence Register
 
 **Status:** evidence index for the DMSv3 SOT  
-**Review date:** 2026-10-01  
+**Review date:** 2026-10-02
 **Original SOT repository baseline:** main@52d72dae23f4d30a1e8fc0d529dabd9c939f8b57
 
-**Phase 1C refreshed baseline:** main@730f900533ad207dd44c40297e911e7f860072b5 (2026-10-01)
+**Phase 1C implementation baseline:** main@730f900533ad207dd44c40297e911e7f860072b5 (2026-10-01)
+**Accepted merged checkpoint / normalizer correction baseline:** main@6585773f0f530364fb04e7ca01dbd9d7b386d279 (2026-10-02)
 
 No individual customer sample values are reproduced in this SOT. Evidence extraction is limited to structure, definitions, rules, formulas and aggregated metrics.
 
@@ -325,21 +326,43 @@ reattachment/created_at limitation is not changed here.
 
 Date: 2026-10-01. Baseline: accepted PR #129 squash
 `730f900533ad207dd44c40297e911e7f860072b5`, refreshed with no intervening changes.
-This evidence-only slice is pending independent review; Phase 1 remains partial.
+This evidence-only slice was independently accepted at
+`c713fb2d0fb29fcae5e2905a264dba6f8793ebc3` and merged in
+[PR #130](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/130)
+as `6585773f0f530364fb04e7ca01dbd9d7b386d279`; tree equals the accepted head,
+single parent is the implementation baseline above.
+[Actual main CI](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/actions/runs/36933800523)
+passed all six required jobs and 304 live cases. Phase 1 remains partial.
 
 - [CP-01–CP-10 report, population matrix and gap/policy register](../DMSV3_CASE_RO_CHARACTERIZATION_EVIDENCE.md).
 - [Committed live characterization suite](../../src/test/dms-case-ro-characterization.rls.spec.ts): 14 additional cases, real unchanged TS createDeal with authenticated client export, full-row persistence/side-effect checks, regular-session dashboard RPCs, privileged normalizer behavior, existing authority denial and exact owned cleanup. Registered alongside all 290 baseline cases; no baseline assertions removed.
 - [Actual-component/router compatibility tests](../../src/pages/sales/CaseCreationCompatibility.test.tsx): eight tests with mocked services/hooks. NewDeal/LeadIntake navigation, both deposits, vehicle prefill and actor binding; not browser-to-DB E2E.
-- LIVE CATALOG/STATIC evidence: missing typed Case-source relationships, existing company-qualified LIMIT 1 ambiguity, and historical migration UUID/activity metadata mappings inspected without replay.
+- LIVE CATALOG/STATIC evidence: missing typed Case-source relationships, historical company-qualified LIMIT 1 ambiguity, and historical migration UUID/activity metadata mappings inspected without replay.
 - Astra's preceding external synthetic probes support the audit but are separate from these committed assertions. Neither synthetic source fixtures nor all-green characterization certify production Master RO parity, official Booking eligibility or target lifecycle/policy acceptance.
 
 Observed differences include both deposits remaining legacy lead; customer-only
 navigation ignored by NewDeal; unconditional auto_aging/default and no enforced
 document checklist; raw→SO provenance without Case provenance; next-month SOs
 included in MTD Orders; different branch/trend populations; and ambiguous text
-fallback. SOT 08 §§4,11,33,35 remain OPEN. Preserve optional deposit as confirmed,
+fallback (historically; now guarded by the separately evidenced correction below). SOT 08 §§4,11,33,35 remain OPEN. Preserve optional deposit as confirmed,
 all prior allocator/history/access/Employee limits, and successful worker replay
 as separate work from privileged normalizer replay.
+
+### Bounded Sales Order normalizer guard correction
+
+Date: 2026-10-02. Refreshed baseline: accepted PR #130 squash
+`6585773f0f530364fb04e7ca01dbd9d7b386d279`; correction pending Astra review.
+
+- [Dedicated NR-01–NR-12 report](../DMSV3_SALES_ORDER_NORMALIZER_EVIDENCE.md): red-before product failures, error/selection matrix, supported locks, full-row preservation, commands/counts and residual scope.
+- [Forward function migration](../../supabase/migrations/20261002010000_dms_sales_order_normalizer_target_guards.sql): typed sole approval and canonical declaration; explicit/ID/text precedence, nonblank exact identity and local target eligibility. Existing grants and column authority retained.
+- [Registered live guard suite](../../src/test/dms-sales-order-normalizer-guards.rls.spec.ts): real privileged and ordinary clients, full 20-table/counter snapshots, two-client raw-lock barrier, post-wait decision/target revalidation, replay, literal/tenant/uniqueness controls and exact owned cleanup.
+- [Retained CP suite](../../src/test/dms-case-ro-characterization.rls.spec.ts): only the obsolete CP-08 arbitrary-success expectation becomes 21000/full no-write, preserving both candidates, foreign collisions and local Cases. Historical PR #130 reproduction remains separately documented; stage/month/front-door/Case-provenance witnesses are unchanged.
+
+This protective prerequisite is not Phase 3B completion, a conflict queue,
+historical repair, other-normalizer certification, global direct-writer
+serializability, worker replay, Case provenance or official KPI eligibility.
+No production data/deployment, programme comment or issue closure is evidence.
+All open policies and partial Phase 1 status are retained.
 
 ### supabase/migrations/20260621000000_deal_lifecycle.sql
 
