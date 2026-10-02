@@ -6,6 +6,7 @@
 
 **Phase 1C implementation baseline:** main@730f900533ad207dd44c40297e911e7f860072b5 (2026-10-01)
 **Accepted merged checkpoint / normalizer correction baseline:** main@6585773f0f530364fb04e7ca01dbd9d7b386d279 (2026-10-02)
+**Accepted normalizer checkpoint / Deal child correction baseline:** main@988526f36d07061946f1d4c450449ac725b1f4a2 (2026-10-02)
 
 No individual customer sample values are reproduced in this SOT. Evidence extraction is limited to structure, definitions, rules, formulas and aggregated metrics.
 
@@ -351,7 +352,14 @@ as separate work from privileged normalizer replay.
 ### Bounded Sales Order normalizer guard correction
 
 Date: 2026-10-02. Refreshed baseline: accepted PR #130 squash
-`6585773f0f530364fb04e7ca01dbd9d7b386d279`; correction pending Astra review.
+`6585773f0f530364fb04e7ca01dbd9d7b386d279`. Independently accepted head
+`6666aefe6459790345fb530a80ce6600f6fdbcee` was squash-merged in
+[PR #131](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/131)
+as `988526f36d07061946f1d4c450449ac725b1f4a2`, sole parent the baseline above;
+tree `b8d81683ddfeae6a9c38e2eca8e6f22f4ad2ca82` equals the accepted head.
+[Actual merged-main CI](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/actions/runs/36977417028)
+passed all six checks, 363 live/zero skips, 1,393 unit passes/251 skips and 48
+browser passes/two existing skips. Optional RLS Matrix supplied no DB evidence.
 
 - [Dedicated NR-01–NR-12 report](../DMSV3_SALES_ORDER_NORMALIZER_EVIDENCE.md): red-before product failures, error/selection matrix, supported locks, full-row preservation, commands/counts and residual scope.
 - [Forward function migration](../../supabase/migrations/20261002010000_dms_sales_order_normalizer_target_guards.sql): typed sole approval and canonical declaration; explicit/ID/text precedence, nonblank exact identity and local target eligibility. Existing grants and column authority retained.
@@ -363,6 +371,27 @@ historical repair, other-normalizer certification, global direct-writer
 serializability, worker replay, Case provenance or official KPI eligibility.
 No production data/deployment, programme comment or issue closure is evidence.
 All open policies and partial Phase 1 status are retained.
+
+### Bounded authenticated Deal child/parent company prerequisite
+
+Date: 2026-10-02. Refreshed accepted PR #131 squash
+`988526f36d07061946f1d4c450449ac725b1f4a2`; new correction pending Astra review.
+
+- [DC-01–DC-10 evidence and remaining defects](../DMSV3_DEAL_CHILD_BOUNDARY_EVIDENCE.md): real committed red-before/green-after assertions, full 21-table/private-counter snapshots with populated independent tenant sentinels, authenticated historical visibility impact, catalog/grant comparisons and exact cleanup.
+- [Registered live suite](../../src/test/deal-child-boundary.rls.spec.ts): 111 additional cases; real manager/company-admin/global/anonymous/deactivated clients and unchanged setupLoan/setupInsurance/setupRegistration/getDeal execution through real authenticated client bindings. Baseline createDeal remains executed by retained CP/DN coverage, not a duplicate harness. No Storage objects or response mocks.
+- [One forward RLS migration](../../supabase/migrations/20261002020000_deal_child_parent_company_boundary.sql): five restrictive authenticated ALL policies, matching USING/WITH CHECK on visible parent UUID and company. Existing permissive/tenant/enabled/author policies and grants remain, with no new verbs/capability/table/index/helper/RPC.
+- [Effective RLS matrix](../RLS_MATRIX.md) and ownership §19 explain valid reads/writes, denied relationships, historical malformed rows retained but hidden and service-role BYPASSRLS limits.
+
+This is partial Phase 1 tenant protection, not Financing/LOU or official
+Registration acceptance. Same-company reattachment, privileged concurrent parent
+retargeting, other master-FK coherence, Storage and immutable history remain
+outside. Separate current Financing defects remain: repeated-save duplicate loan
+UUIDs, array-position detail selection, Deal-wide status fanout and zero-row status
+success/activity. Multiple applications are confirmed; no Deal-level uniqueness
+or new selection/LOU/Cash policy is introduced. All 363 baseline live and eight
+component witnesses, prior history/allocator/source/access/Employee/worker limits,
+and SOT 08 open policies remain. No production query/count/repair, deployment,
+programme comment, issue closure or phase completion is evidence.
 
 ### supabase/migrations/20260621000000_deal_lifecycle.sql
 

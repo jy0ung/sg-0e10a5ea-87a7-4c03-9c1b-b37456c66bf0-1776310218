@@ -3,7 +3,16 @@
 Date: **2026-10-02, Asia/Kuala_Lumpur**. Refreshed main:
 `6585773f0f530364fb04e7ca01dbd9d7b386d279` (accepted PR #130 squash).
 No intervening main changes or overlapping DMS implementation PR were found.
-This correction is pending independent Astra review; Phase 1 remains **partial**.
+This correction was independently accepted at `6666aefe6459790345fb530a80ce6600f6fdbcee`
+and squash-merged in [PR #131](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/131)
+as `988526f36d07061946f1d4c450449ac725b1f4a2`, sole parent the implementation
+baseline above; tree `b8d81683ddfeae6a9c38e2eca8e6f22f4ad2ca82` equals the
+accepted head. [Actual merged-main CI](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/actions/runs/36977417028)
+passed all six required checks: 363 live/zero skips, 1,393 unit passes/251 skips,
+48 browser passes/two existing skips. Optional RLS Matrix executed no DB tests.
+Phase 1 remains **partial**. The later
+[Deal child boundary correction](DMSV3_DEAL_CHILD_BOUNDARY_EVIDENCE.md) is a
+separate pending-review prerequisite; all NR/CP assertions and limits below remain.
 
 [Forward migration](../supabase/migrations/20261002010000_dms_sales_order_normalizer_target_guards.sql)
 replaces only `public.normalize_dms_sales_order(uuid) -> jsonb`, comment and
