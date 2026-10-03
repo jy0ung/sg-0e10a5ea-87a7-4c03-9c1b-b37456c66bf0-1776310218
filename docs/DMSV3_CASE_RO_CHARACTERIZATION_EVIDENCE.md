@@ -25,7 +25,16 @@ Both own candidate UUIDs, foreign SO/raw UUIDs, approved decision, two real
 local Deals/activities/counters and all 20 business tables remain in the witness.
 No other CP scenario is removed or reinterpreted; all 14 live and eight component
 cases remain. Stage, front-door, month/population and Case-provenance gaps below
-still describe current behavior. This correction is pending Astra review.
+still describe current behavior. The correction was independently accepted at
+`6666aefe6459790345fb530a80ce6600f6fdbcee` and squash-merged in
+[PR #131](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/131)
+as `988526f36d07061946f1d4c450449ac725b1f4a2`, sole parent the PR #130 squash,
+tree `b8d81683ddfeae6a9c38e2eca8e6f22f4ad2ca82` equal to the accepted head.
+[Actual main CI](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/actions/runs/36977417028)
+passed all six required checks, 363 live/zero skips, 1,393 unit passes/251 skips,
+48 browser passes/two existing skips. Optional RLS Matrix executed no DB tests.
+The later [Deal child prerequisite](DMSV3_DEAL_CHILD_BOUNDARY_EVIDENCE.md) is
+separate and pending review; it changes none of these CP fixtures/expectations.
 
 ## Evidence strength and reproducibility
 

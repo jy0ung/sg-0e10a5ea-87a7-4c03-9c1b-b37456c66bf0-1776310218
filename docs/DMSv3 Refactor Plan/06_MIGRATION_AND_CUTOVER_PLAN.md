@@ -199,15 +199,49 @@ valid declaration and one eligible target at the selected tier before any write.
 No priority winner, blank identity, implicit target creation or invalid-explicit
 fallback is permitted. Existing source/local authority and response contracts remain.
 
-This correction is pending independent review. It preserves all 304 baseline
-live scenarios with only the authorized CP-08 ambiguity expectation strengthened;
-new guard coverage is additional. This is partial Phase 1 protection, **not** the
+This correction was independently accepted at `6666aefe6459790345fb530a80ce6600f6fdbcee`
+and squash-merged in [PR #131](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/131)
+as `988526f36d07061946f1d4c450449ac725b1f4a2`, sole parent `6585773f0f530364fb04e7ca01dbd9d7b386d279`,
+tree `b8d81683ddfeae6a9c38e2eca8e6f22f4ad2ca82` equal to the accepted head.
+[Actual main CI](https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/actions/runs/36977417028)
+passed all six required checks: 363 live/zero skips, 1,393 unit passes/251 skips,
+48 browser passes/two existing skips; optional RLS Matrix executed no DB tests.
+It preserves all 304 baseline live scenarios with only the authorized CP-08
+ambiguity expectation strengthened; NR59 is additional. This is partial Phase 1 protection, **not** the
 full Phase 3B resolver, Case provenance, successful ingestion-worker replay,
 command idempotency, official RO population/metric cutover or production acceptance.
 Same-source normalizer calls serialize; arbitrary direct privileged phantom
 inserts/retargets, other normalizers and complete reconciliation history remain
 outside the guarantee. Stage/form/dashboard gaps and all prior source-history,
 allocator, route/Employee and SOT 08 §§4,11,33,35 limits remain unchanged.
+
+### Bounded prerequisite — authenticated Deal child/parent company coherence
+
+On refreshed PR #131 squash `988526f36d07061946f1d4c450449ac725b1f4a2`,
+[DC evidence](../DMSV3_DEAL_CHILD_BOUNDARY_EVIDENCE.md) maps DC-01–DC-10 to 111
+new committed live cases. One forward migration (`20261002020000`) adds a
+restrictive authenticated visible-parent UUID/company guard on the five existing
+Deal child tables. Existing policies/grants and valid service operations remain;
+foreign/missing-parent writes fail without business-state changes. Historical
+malformed tuples remain stored but hidden to authenticated direct/nested/detail
+reads, including global readers; controlled privileged inspection/repair is separate.
+
+This correction is **pending independent Astra review**, a tenant prerequisite
+within partial Phase 1. All 363 baseline live cases (NR59/LP49/DN30/CP14 and the
+13 older normalizer cases) and eight component witnesses are retained. It does
+not implement Financing/LOU, new schema/lifecycle commands, official Registration,
+Case/source provenance or KPI cutover. Service-role BYPASSRLS, same-company
+reattachment, concurrent privileged parent changes, other master-FK coherence,
+Storage authorization, history and multi-request atomicity remain outside.
+
+A separate later Financing audit should revisit the current defects: repeated
+saves create distinct loan rows; detail selects array position; status updates
+fan out by Deal; zero-row status updates report success and append activity.
+Multiple applications are confirmed, so no uniqueness/deduplication shortcut is
+authorized. Application/disposition identity, versioned LOU, aging/status and Cash
+characterization remain separate. SOT 08 §§4,11,13,14,33,35 and all other open
+policies are unchanged; optional deposit remains confirmed. No Phase completion,
+production acceptance, deployment, historical repair or programme comment is claimed.
 
 ## 4. Phase 2 — Additive schema foundation
 

@@ -422,6 +422,30 @@ RLS + domain command authorization are authoritative.
 
 Global/admin scope must not silently bypass business-state invariants.
 
+### Existing Deal child relationship prerequisite (2026-10-02)
+
+The bounded authenticated guard on `deal_loan`, `deal_insurance`,
+`deal_registration`, `deal_activities` and `deal_documents` requires an existing
+visible `public.deals` parent with matching UUID and company in both USING and
+WITH CHECK. It is restrictive and retains the current tenant/enabled/author
+policies, verbs and grants. Valid global reads remain; company-admin/global
+callers cannot bypass relationship coherence or gain foreign writes.
+
+Historical malformed children remain stored but become invisible to authenticated
+direct/nested/detail reads and unavailable for ordinary correction. Privileged
+inspection/repair is separate, with no production affected-row claim or backfill.
+Service-role BYPASSRLS and same-company editable subtrack reattachment remain;
+this is not universal privileged/concurrent-parent integrity or immutable history.
+Document metadata does not certify Storage authorization or Case document policy.
+
+[DC-01–DC-10 evidence](../DMSV3_DEAL_CHILD_BOUNDARY_EVIDENCE.md) records this pending
+review prerequisite within partial Phase 1. Financing application selection,
+versioned LOU, Stock Control and official Registration remain separate target
+contracts; the domain ownership and local Case/official RO distinctions above
+are unchanged. Repeated loan saves, array-position detail selection, Deal-wide
+status fanout and zero-row status success/activity remain current technical
+defects for a separate Financing audit, not accepted operating policy.
+
 ## 20. Reconciliation principle
 
 When source systems disagree:

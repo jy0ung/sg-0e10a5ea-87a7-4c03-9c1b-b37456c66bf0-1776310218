@@ -6,6 +6,25 @@ Migration `20260915090000_production_readiness_security.sql` adds restrictive po
 
 ## Scope legend
 
+The five Deal child tables additionally carry the authenticated restrictive
+`deal_parent_company_gate` (forward migration `20261002020000`): USING and WITH
+CHECK require a visible `public.deals` row matching both child `deal_id` and
+`company_id`. Existing permissive, enabled-account, tenant and author policies
+and SQL grants remain. Manager/company-admin valid own-company access is retained;
+global scope retains valid foreign reads, without foreign writes or a relationship
+bypass. Direct child DELETE remains denied, including for company admins; parent
+Deal deletion/cascades are a separate existing operation. Activity/document UPDATE
+remains denied. Anonymous/inactive requests fail through the existing pre-request gate.
+
+Already-malformed rows remain stored but are hidden from authenticated direct and
+nested reads, including global detail; hidden mutations affect zero rows. This
+operational visibility change requires separate controlled privileged inspection,
+not automatic historical repair. Service-role BYPASSRLS remains. Same-company
+subtrack reattachment, privileged parent-company changes/concurrency, other master
+FK coherence, author-history immutability and Storage policy are not certified.
+[DC-01–DC-10 live evidence](DMSV3_DEAL_CHILD_BOUNDARY_EVIDENCE.md) maps the boundary.
+This is a partial Phase 1 prerequisite, not new Financing/Registration authority.
+
 - **Company** — `company_id = (select company_id from profiles where id = auth.uid())`
 - **Self** — `user_id = auth.uid()` or `profile_id = auth.uid()`
 - **Admin** — caller is in an admin role within their company
@@ -25,6 +44,11 @@ Migration `20260915090000_production_readiness_security.sql` adds restrictive po
 | `dashboard_preferences`       | Self              | Self              | Self              | Self              | user_id = auth                           |
 | `companies`                   | Company           | Super admin       | Super admin       | Super admin       |                                          |
 | `branches`                    | Company           | Admin             | Admin             | Admin             |                                          |
+| `deal_loan`                   | Company or existing global scope | Own company | Own company | — | Visible parent Deal must match child company |
+| `deal_insurance`              | Company or existing global scope | Own company | Own company | — | Visible parent Deal must match child company |
+| `deal_registration`           | Company or existing global scope | Own company | Own company | — | Visible parent Deal must match child company; legacy subtrack, not official Registration authority |
+| `deal_activities`             | Company or existing global scope | Own company + `actor_id = auth.uid()` | — | — | Matching visible parent required; no new author/verb permission |
+| `deal_documents`              | Company or existing global scope | Own company + `uploaded_by = auth.uid()` | — | — | Matching visible parent required; metadata only, Storage authorization separate |
 | `deal_number_sequences`       | Service only      | Service / authorized allocator | Service / authorized allocator | Service only | Private display-number reservations; no direct anon/authenticated CRUD, including company admins |
 | `finance_companies`           | Company           | Admin             | Admin             | Admin             | Master data                              |
 | `insurance_companies`         | Company           | Admin             | Admin             | Admin             | Master data                              |
