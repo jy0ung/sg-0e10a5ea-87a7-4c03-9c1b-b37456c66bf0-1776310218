@@ -1,0 +1,17 @@
+/* Preserve established utility/preflight behavior while replacing the build graph.
+   See https://tailwindcss.com/docs/upgrade-guide. These are appearance settings,
+   not an embedded legacy Tailwind compiler or a vulnerability exception. */
+@theme {
+  --default-ring-width: 3px;
+  --default-ring-color: #3b82f6;
+}
+
+/* Touch hover and class-based dark mode retain the existing interaction contract. */
+@custom-variant hover (&:hover);
+
+/* Tailwind 4 renamed the accessible invisible outline to outline-hidden.
+   Existing consumers keep their public class string and forced-colors behavior. */
+@utility outline-none {
+  outline: 2px solid transparent !important;
+  outline-offset: 2px !important;
+}
