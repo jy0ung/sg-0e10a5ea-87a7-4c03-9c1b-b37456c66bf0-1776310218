@@ -15,7 +15,7 @@
       "checkpoint-03/evidence/failure-boundary-findings.json",
       "checkpoint-03/evidence/final-read-only-recheck.json"
     ],
-    "expectedInterpretation": "Historical witnesses; intended future invariants differ from legacy defects"
+    "expectedInterpretation": "Historical witnesses; intended future invariants differ from legacy defects. Booking failedAttemptAt is completion at 12:54:25 MYT; attempt started at 12:54:08 MYT."
   },
   "validationAt": "2026-08-23T00:46:15+08:00",
   "checks": {
@@ -35,6 +35,6 @@
   "booking": {
     "retainedKeys": 1880,
     "lastGoodAt": "2026-10-04T11:29:49+08:00",
-    "failedAttemptAt": "2026-10-04T12:54:00+08:00"
+    "failedAttemptAt": "2026-10-04T12:54:25+08:00"
   }
 }

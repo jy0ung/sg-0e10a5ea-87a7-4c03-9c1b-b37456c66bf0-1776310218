@@ -61,3 +61,5 @@ The initial Security Audit job (`111445895063`) failed `npm audit --audit-level=
 ## Final raw-lineage review
 
 Different raw values under the same immutable company/source/table/snapshot/row lineage are conflicting evidence even if trimming/case normalization agrees. Identical raw occurrences remain duplicate transport evidence; independent source rows can observe the same chassis without becoming duplicate canonical Vehicles. The final regression tightens this distinction without changing any production function or fixture population. The final branch-tip CI is observed separately in the handoff.
+
+The frozen Booking audit confirms failed attempt start 12:54:08 and completion 12:54:25 MYT on 2026-10-04. Both incident/evidence fixtures use the exact completion timestamp and their byte hashes are updated; the retained-state invariant remains 1,880 keys.

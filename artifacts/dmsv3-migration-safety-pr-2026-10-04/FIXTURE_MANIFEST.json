@@ -40,7 +40,7 @@
     },
     {
       "path": "src/test/dmsv3-migration-safety/fixtures/incidents.json",
-      "sha256": "caee1f1e9c8d03e6d1e4e84344886d7067122ec57840346863efd81840213b82"
+      "sha256": "cc4c55e1e90ec0df78b5fe7367b85cd7a410cdfb9ec6be00d682ffd79e206542"
     },
     {
       "path": "src/test/dmsv3-migration-safety/fixtures/legacy-identities.json",
@@ -52,7 +52,7 @@
     },
     {
       "path": "artifacts/dmsv3-migration-safety-pr-2026-10-04/LEGACY_STOCK_EVIDENCE.json",
-      "sha256": "e708f74704a31c39f0c42117f22d6f4053c0fa1b32ec303e8e9d44ec1ccbe1b6"
+      "sha256": "7252ad460ea7226d17a68dc47a2e9b5c1bbfb6df34446f0bab503c3a4cd216cd"
     }
   ]
 }
