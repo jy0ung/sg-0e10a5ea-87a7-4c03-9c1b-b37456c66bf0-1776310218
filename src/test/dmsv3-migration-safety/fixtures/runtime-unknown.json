@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "projectAlias": "legacy-master-data-v3",
+  "projectId": {
+    "status": "UNKNOWN",
+    "reason": "Installed executor/deployment not certified by Checkpoint 03"
+  },
+  "deploymentId": {
+    "status": "UNKNOWN",
+    "reason": "Installed executor/deployment not certified by Checkpoint 03"
+  },
+  "deploymentVersion": {
+    "status": "UNKNOWN",
+    "reason": "Installed executor/deployment not certified by Checkpoint 03"
+  },
+  "boundContainer": {
+    "status": "UNKNOWN",
+    "reason": "Installed executor/deployment not certified by Checkpoint 03"
+  },
+  "effectiveProperties": {
+    "status": "ACCESS DENIED",
+    "reason": "Effective Script Properties not available",
+    "evidenceRef": "checkpoint-03/LIVE_RUNTIME_CERTIFICATION.md",
+    "capturedAt": "2026-10-04T18:38:14+08:00"
+  },
+  "codeFingerprint": {
+    "status": "UNKNOWN",
+    "reason": "Installed executor/deployment not certified by Checkpoint 03"
+  },
+  "triggerInventory": {
+    "status": "UNKNOWN",
+    "reason": "Installed executor/deployment not certified by Checkpoint 03"
+  }
+}

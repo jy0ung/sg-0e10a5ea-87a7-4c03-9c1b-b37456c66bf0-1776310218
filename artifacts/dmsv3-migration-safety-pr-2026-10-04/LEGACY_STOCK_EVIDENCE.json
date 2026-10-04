@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "classification": "FORENSIC_MIGRATION_EVIDENCE",
+  "authoritativeCurrentStock": false,
+  "allowedUse": "OFFLINE_CHARACTERIZATION_ONLY",
+  "evidenceTimestamp": "2026-10-04T18:38:14+08:00",
+  "decision": "STRATEGY_4_PRESERVE_LEGACY_ADVANCE_ISOLATED_UBS",
+  "populations": {
+    "distinctChassis": 1337,
+    "rawOccurrences": 1341,
+    "lduDuplicateIdentities": 4
+  },
+  "publicationDates": {
+    "centralInventory": "approximately 2026-08-23",
+    "bookingStock": "approximately 2026-08-27",
+    "outletSnapshots": "approximately 2026-09-15"
+  },
+  "anomalies": {
+    "twuCheckAgeSeconds": 3577,
+    "lduCheckAgeSeconds": 3540,
+    "recoveryBeforeLeaseExpirySeconds": 120.115,
+    "abandonedHistoryWitnessCount": 1,
+    "preCommitTimeout": true,
+    "dirtyBlockedState": true
+  },
+  "booking": {
+    "retainedKeys": 1880,
+    "lastGoodAt": "2026-10-04T11:29:49+08:00",
+    "failedAttemptAt": "2026-10-04T12:54:00+08:00"
+  },
+  "liveExecutor": "UNKNOWN",
+  "legacyFullReplaySafe": "UNKNOWN",
+  "provenance": {
+    "sourceSystem": "LEGACY_OUTLET_SNAPSHOT",
+    "sourceTables": [
+      "Snapshot Validation Log",
+      "Outlet Snapshot Log",
+      "Epoch Log",
+      "Inventory Run Log",
+      "Master Inventory History",
+      "Booking Audit"
+    ],
+    "extractionDate": "2026-10-04",
+    "evidenceRefs": [
+      "checkpoint-03/TWU_LDU_COVERAGE_ANALYSIS.md",
+      "checkpoint-03/evidence/failure-boundary-findings.json",
+      "checkpoint-03/evidence/final-read-only-recheck.json"
+    ],
+    "expectedInterpretation": "Historical witnesses; intended future invariants differ from legacy defects"
+  }
+}

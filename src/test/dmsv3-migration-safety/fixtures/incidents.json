@@ -1,0 +1,40 @@
+{
+  "provenance": {
+    "sourceSystem": "LEGACY_OUTLET_SNAPSHOT",
+    "sourceTables": [
+      "Snapshot Validation Log",
+      "Outlet Snapshot Log",
+      "Epoch Log",
+      "Inventory Run Log",
+      "Master Inventory History",
+      "Booking Audit"
+    ],
+    "extractionDate": "2026-10-04",
+    "evidenceRefs": [
+      "checkpoint-03/TWU_LDU_COVERAGE_ANALYSIS.md",
+      "checkpoint-03/evidence/failure-boundary-findings.json",
+      "checkpoint-03/evidence/final-read-only-recheck.json"
+    ],
+    "expectedInterpretation": "Historical witnesses; intended future invariants differ from legacy defects"
+  },
+  "validationAt": "2026-08-23T00:46:15+08:00",
+  "checks": {
+    "TWU": "2026-08-22T23:46:38+08:00",
+    "LDU": "2026-08-22T23:47:15+08:00"
+  },
+  "legacyDeclaredStale": [
+    "TWU",
+    "LDU"
+  ],
+  "lease": {
+    "startedAt": "2026-08-23T02:41:13.391+08:00",
+    "heartbeatAt": "2026-08-23T02:41:14.576+08:00",
+    "expiresAt": "2026-08-23T02:53:14.576+08:00",
+    "recoveredAt": "2026-08-23T02:51:14.461+08:00"
+  },
+  "booking": {
+    "retainedKeys": 1880,
+    "lastGoodAt": "2026-10-04T11:29:49+08:00",
+    "failedAttemptAt": "2026-10-04T12:54:00+08:00"
+  }
+}
