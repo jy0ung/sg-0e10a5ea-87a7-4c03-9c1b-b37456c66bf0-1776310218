@@ -2,6 +2,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { buildSync } from 'esbuild';
 import { MOCK_PROFILE, MOCK_USER, SUPABASE_URL, setupAuthMocks } from './helpers/auth-mock';
 
 const evidence = process.env.SB_EVIDENCE_DIR!;
@@ -68,13 +69,13 @@ async function fixtures(page: Page, dark: boolean) {
   });
 }
 
-async function record(page: Page, name: string, engine: string) {
+async function record(page: Page, name: string, engine: string, pausedMotion = false) {
   await page.mouse.move(0, 0); // neutral hover state even when a portal covers the prior click target
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(100); // let hover invalidation enqueue its transitions before finishing them
   // Finish finite CSS animations before BOTH style capture and screenshots.
   // A fixed sleep captured intermediate WebKit frames under CPU contention.
-  await page.evaluate(() => {
+  if (!pausedMotion) await page.evaluate(() => {
     for (const animation of document.getAnimations()) {
       if (animation.effect?.getTiming().iterations !== Infinity) animation.finish();
     }
@@ -95,7 +96,7 @@ async function record(page: Page, name: string, engine: string) {
     });
   }, properties);
   writeFileSync(path.join(folder, `${name}.json`), JSON.stringify(styles, null, 2));
-  const screenshot = await page.screenshot({ animations: 'disabled', caret: 'hide', fullPage: false });
+  const screenshot = await page.screenshot({ animations: pausedMotion ? 'allow' : 'disabled', caret: 'hide', fullPage: false });
   writeFileSync(path.join(folder, `${name}.png`), screenshot);
   if (!capture) {
     const baseline = JSON.parse(readFileSync(path.join(reference!, engine, `${name}.json`), 'utf8'));
@@ -303,4 +304,105 @@ if (process.env.SB_SERVER !== 'preview') test('actual shared UI consumers retain
   await expect(input).toHaveCSS('outline-style', 'solid');
   await expect(input).toHaveCSS('outline-width', '2px');
   await expect(input).toHaveCSS('outline-offset', '2px');
+});
+
+
+// Bundle unchanged shared React consumers once; load CSS from the actual normal
+// dev server or production index's stylesheet links, never a mocked compiler.
+const transformBundle = buildSync({ entryPoints: ['e2e/fixtures/build-tool-transforms.tsx'],
+  bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic',
+  define: { 'process.env.NODE_ENV': '"production"' },
+}).outputFiles[0].text;
+async function transformFixture(page: Page, scene: string) {
+  await fixtures(page, false);
+  await page.setViewportSize({ width: 800, height: 600 });
+  const origin = `http://127.0.0.1:${basePort + 1}`;
+  let css: string;
+  if (process.env.SB_SERVER === 'preview') {
+    const html = await (await page.request.get(`${origin}/index.html`)).text();
+    const urls = [...html.matchAll(/<link[^>]*href="([^"]+\.css)"[^>]*>/g)].map(match => match[1]);
+    expect(urls.length, 'Actual production stylesheet links').toBeGreaterThan(0);
+    css = (await Promise.all(urls.map(async url => (await page.request.get(`${origin}${url}`)).text()))).join('\n');
+  } else css = await (await page.request.get(`${origin}/src/index.css?direct`)).text();
+  await page.setContent(`<html><body><div id="root" data-scene="${scene}"></div></body></html>`);
+  await page.addStyleTag({ content: css });
+  // Pause on creation, not after an arbitrary sleep or animation.finish().
+  await page.addStyleTag({ content: '* { animation-play-state: paused !important; }' });
+  await page.addScriptTag({ content: transformBundle });
+}
+
+test('R1 actual Carousel vertical/horizontal geometry, arrow direction and caller overrides', async ({ page, browserName }) => {
+  for (const scene of ['vertical', 'horizontal', 'override']) {
+    await transformFixture(page, scene);
+    await expect(page.locator('#next')).toBeEnabled();
+    const controls = await page.locator('#previous, #next').evaluateAll(nodes => nodes.map(el => {
+      const r = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      const matrix = new DOMMatrix(style.transform === 'none' ? undefined : style.transform);
+      // Individual rotate/scale must be included: a transform-only assertion
+      // would miss the reviewed regression even with an apparently valid matrix.
+      const angle = style.rotate === 'none' ? 0 : parseFloat(style.rotate);
+      const rotation = new DOMMatrix().rotate(angle).multiply(matrix);
+      return { rect: [r.x, r.y, r.width, r.height], direction: [rotation.a, rotation.b], classes: el.className };
+    }));
+    const expected = scene === 'vertical' ? [[284, 52, 32, 32], [284, 316, 32, 32]]
+      : scene === 'horizontal' ? [[52, 184, 32, 32], [516, 184, 32, 32]]
+      : [[300, 52, 40, 40], [300, 308, 40, 40]];
+    for (let i = 0; i < controls.length; i++) {
+      expect.soft(controls[i].rect, `${scene} control ${i}: unchanged v3 geometry`).toEqual(expected[i]);
+      expect.soft(controls[i].direction[0]).toBeCloseTo(scene === 'vertical' ? 0 : 1, 6);
+      expect.soft(controls[i].direction[1]).toBeCloseTo(scene === 'vertical' ? 1 : 0, 6);
+      if (scene === 'override') {
+        expect(controls[i].classes).not.toMatch(/(?:^|\s)(?:h-8|w-8|rotate-90|-translate-x-1\/2)(?:\s|$)/);
+        expect(controls[i].classes).toContain('translate-x-0');
+      }
+    }
+    await record(page, `r1-carousel-${scene}`, browserName);
+  }
+});
+
+test('R1 real Dialog, AlertDialog and Select retain animation trajectory and final placement', async ({ page, browserName }) => {
+  for (const scene of ['dialog', 'alert', 'select']) {
+    await transformFixture(page, scene);
+    const target = page.getByRole(scene === 'dialog' ? 'dialog' : scene === 'alert' ? 'alertdialog' : 'listbox');
+    await expect(target).toBeAttached();
+    await expect(target).toHaveCSS('animation-name', 'enter');
+    const duration = await target.evaluate(el => {
+      const animation = el.getAnimations().find(item => item instanceof CSSAnimation && item.animationName === 'enter');
+      if (!animation) throw new Error('Actual enter animation missing');
+      animation.pause();
+      return Number(animation.effect!.getTiming().duration);
+    });
+    expect(duration).toBeGreaterThan(0);
+    for (const progress of [0.25, 0.5, 0.75, 1]) {
+      await target.evaluate((el, time) => {
+        const animation = el.getAnimations().find(item => item instanceof CSSAnimation && item.animationName === 'enter')!;
+        animation.currentTime = time;
+        for (const overlay of document.getAnimations()) {
+          if (overlay !== animation && overlay.effect?.getTiming().iterations !== Infinity) overlay.finish();
+        }
+      }, duration * progress);
+      await record(page, `r1-${scene}-enter-${progress * 100}`, browserName, true);
+    }
+    const rect = await target.boundingBox();
+    expect(rect).not.toBeNull();
+    if (scene !== 'select') {
+      expect(rect!.x + rect!.width / 2).toBeCloseTo(400, 2);
+      expect(rect!.y + rect!.height / 2).toBeCloseTo(300, 2);
+    } else {
+      await expect(target).toHaveAttribute('data-side', 'bottom');
+      expect(rect!.x).toBe(100);
+      expect(rect!.y).toBe(140);
+    }
+    if (scene === 'select') await target.getByRole('option').first().focus();
+    await page.keyboard.press('Escape');
+    if (scene === 'alert') await page.getByRole('button', { name: 'Cancel alert' }).click();
+    // Closing Dialog/AlertDialog remains mounted during its real exit animation.
+    if (await target.count()) {
+      await expect(target).toHaveAttribute('data-state', 'closed');
+      await expect(target).toHaveCSS('animation-name', 'exit');
+      await target.evaluate(el => { for (const animation of el.getAnimations()) animation.finish(); });
+    }
+    await expect(target).toHaveCount(0);
+  }
 });

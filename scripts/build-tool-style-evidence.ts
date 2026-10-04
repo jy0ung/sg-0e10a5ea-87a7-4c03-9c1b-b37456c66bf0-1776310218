@@ -37,10 +37,22 @@ for (const server of ['dev', 'preview']) for (const engine of ['chromium', 'fire
       sourceControl: state.startsWith('hrms-web-'), artifacts: sources.map(file => ({ path: file, sha256: digest(path.join(artifactRoot, file)) })) });
   }
 }
-if (states.length !== 225) throw new Error(`Expected all 225 captured states; found ${states.length}`);
+// Require every original state by identity, not just a count that new R1 states
+// could accidentally satisfy while an established regression disappeared.
+const expected = new Set<string>();
+for (const server of ['dev', 'preview']) for (const engine of ['chromium', 'firefox', 'webkit']) {
+  for (const app of ['ubs', 'hrms-web', 'hrms-mobile']) for (const size of ['desktop', 'mobile']) for (const theme of ['light', 'dark']) {
+    for (const state of app === 'hrms-mobile' ? ['profile', 'focus', 'validation'] : ['table', 'form', 'overlay']) expected.add(`${server}/${engine}/${app}-${size}-${theme}-${state}`);
+  }
+  if (server === 'dev') for (const state of ['open-state', 'focus', 'popover']) expected.add(`${server}/${engine}/shared-ui-${state}`);
+  for (const scene of ['vertical', 'horizontal', 'override']) expected.add(`${server}/${engine}/r1-carousel-${scene}`);
+  for (const scene of ['dialog', 'alert', 'select']) for (const progress of [25, 50, 75, 100]) expected.add(`${server}/${engine}/r1-${scene}-enter-${progress}`);
+}
+const actual = new Set(states.map(state => `${state.server}/${state.engine}/${state.state}`));
+if (actual.size !== expected.size || [...expected].some(state => !actual.has(state))) throw new Error(`Expected all 225 retained + 90 R1 states; found ${states.length}`);
 const result = { baselineCommit: '1cfe067944f6e2b479efe8b72685f93bd2f8ae21', artifactRoot,
-  method: 'Unchanged baseline; original HRMS differences retained plus independently compiled one-source-entry v3 control. Neutral hover; finite animations finished; mocked auth/API; external traffic blocked. No candidate rebaselining.',
+  method: 'Unchanged baseline; original HRMS differences retained plus independently compiled one-source-entry v3 control. All 225 original states retained with finite animations finished; 90 additional R1 states exercise actual Carousel controls and paused real Dialog/AlertDialog/Select animations at 25/50/75/100 percent. Neutral hover; mocked auth/API; external traffic blocked. No candidate rebaselining.',
   pixelPolicy: { yiqThreshold: 0.1, maximumPixelsBeyondThreshold: 0, snapshotUpdates: 'none' },
-  totalStates: states.length, totalChangedProperties: states.reduce((total, state) => total + state.changedProperties, 0), unexplained: 0, states };
+  totalStates: states.length, retainedStates: 225, additionalR1States: 90, totalChangedProperties: states.reduce((total, state) => total + state.changedProperties, 0), unexplained: 0, states };
 fs.mkdirSync(path.dirname(output), { recursive: true });
 fs.writeFileSync(output, JSON.stringify(result, null, 2) + '\n');

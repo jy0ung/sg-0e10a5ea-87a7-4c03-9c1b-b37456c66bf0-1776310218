@@ -41,4 +41,30 @@ describe.each(['src/index.css', 'apps/hrms-web/src/index.css', 'apps/hrms-mobile
     expect(output.css).toContain('--primary');
     expect(output.css.includes('@keyframes enter')).toBe(!entry.includes('hrms-mobile'));
   }, 30_000);
+
+  it.each([false, true])('keeps the established shared transform order without individual rotation/scale (minified=%s)', async minified => {
+    const from = path.resolve(entry);
+    const css = await readFile(from, 'utf8');
+    const output = await postcss([tailwind({ optimize: { minify: minified } }), appearanceCompatibility(), autoprefixer()]).process(css, { from });
+    const parsed = postcss.parse(output.css);
+    const transforms = new Map<string, string>();
+    parsed.walkRules(rule => {
+      if (['.rotate-90', '.scale-100', '.-translate-x-1\\/2', '.transform'].includes(rule.selector)) {
+        rule.walkDecls(declaration => {
+          expect(['translate', 'rotate', 'scale']).not.toContain(declaration.prop);
+          if (declaration.prop === 'transform') transforms.set(rule.selector, declaration.value);
+        });
+      }
+    });
+    // Mobile intentionally omits unrelated root ThemeToggle sources (scale-100).
+    expect(transforms.size).toBe(entry.includes('hrms-mobile') ? 3 : 4);
+    expect(transforms.has('.scale-100')).toBe(!entry.includes('hrms-mobile'));
+    expect(new Set(transforms.values()).size).toBe(1); // Every utility must compose the others.
+    const combined = [...transforms.values()][0];
+    expect(combined.indexOf('translate(')).toBeLessThan(combined.indexOf('--tw-rotate-z'));
+    expect(combined.indexOf('--tw-rotate-z')).toBeLessThan(combined.indexOf('scale('));
+    // Application transforms/keyframes and new 3D declarations are outside this rewrite.
+    const application = await postcss([appearanceCompatibility()]).process('.custom { transform: translateX(13px) rotate(7deg); rotate: 7deg; scale: 2; } .axis { rotate: x 45deg; }', { from: undefined });
+    expect(application.css).toBe('.custom { transform: translateX(13px) rotate(7deg); rotate: 7deg; scale: 2; } .axis { rotate: x 45deg; }');
+  }, 30_000);
 });

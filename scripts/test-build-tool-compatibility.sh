@@ -32,7 +32,7 @@ export VITE_HRMS_APP_URL=https://hrms.example.test
 git -C "$ROOT_DIR" worktree add --detach "$BASELINE_DIR" "$BASELINE_REF"
 git -C "$ROOT_DIR" worktree add --detach "$CONTROL_DIR" "$BASELINE_REF"
 for checkout in "$BASELINE_DIR" "$CONTROL_DIR"; do
-  for file in playwright.build-tools.config.ts e2e/build-tool-compatibility.spec.ts e2e/fixtures/build-tools.html e2e/fixtures/build-tools.tsx; do
+  for file in playwright.build-tools.config.ts e2e/build-tool-compatibility.spec.ts e2e/fixtures/build-tools.html e2e/fixtures/build-tools.tsx e2e/fixtures/build-tool-transforms.tsx; do
     mkdir -p "$(dirname "$checkout/$file")"
     cp "$ROOT_DIR/$file" "$checkout/$file"
   done
