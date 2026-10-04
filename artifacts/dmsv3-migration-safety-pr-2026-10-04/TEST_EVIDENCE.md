@@ -12,12 +12,13 @@ At 2026-10-04 21:28 MYT, Lint, Web App and Mobile App passed; isolated Productio
 | Full lint | npm run lint passed, zero errors/warnings |
 | Full TypeScript and boundary/migration contract checks | npm run typecheck passed, including all workspace checks and RPC/frontend/migration/domain boundary scripts |
 | Final changed-file lint and application types | passed after final helper/test edits |
-| Focused final safety suite, run 1 | 75 passed, 0 failed, 0 skipped, 3 files |
-| Focused final safety suite, run 2 | 75 passed, 0 failed, 0 skipped, 3 files |
+| Focused safety suite before raw-lineage review, run 1 | 75 passed, 0 failed, 0 skipped, 3 files |
+| Focused safety suite before raw-lineage review, run 2 | 75 passed, 0 failed, 0 skipped, 3 files |
 | Full suite in machine local timezone | 1,465 passed, 2 failed, 362 skipped; two unchanged dateParsing tests parse locale text as local midnight and assume UTC output |
 | Full suite with TZ=UTC, as in CI | 1,467 passed, 0 failed, 362 skipped, 227 discovered files; includes 74-test harness before final unsuccessful-check regression assertion |
 | Initial CI full suite | 1,468 passed, 0 failed, 362 skipped; 206 test files passed, 21 skipped (227 total) |
 | Provenance amendment verification | 75 passed twice again; changed-file lint and application types passed |
+| Final immutable raw-lineage regression | 76 passed twice; changed-file lint and application types passed after final code review |
 | Repository hygiene | passed; only source/test/evidence paths added |
 | RPC/frontend migration consistency | check:rpc-frontend passed; no migration changed or applied |
 | Disposable local database integration | npm run test:integration attempted, stopped at Docker prerequisite (Docker/CLI absent); no database connection occurred |
@@ -56,3 +57,7 @@ Production safety: no production Supabase/Cloud SQL connection, live Sheets writ
 ## CI dependency audit exception
 
 The initial Security Audit job (`111445895063`) failed `npm audit --audit-level=low` with eight high-severity findings: braces and its affected dependents @tailwindcss/typography, chokidar, fast-glob, lovable-tagger, micromatch, tailwindcss and tailwindcss-animate. A fresh local audit reproduced the same eight-package result. Package manifest and lockfile are byte-identical to starting main; baseline/current lockfile SHA-256 is `f6c638458bbdc6a1c6692678090841ed6103a01261564c5c4f24e06fa8c3de11`. No dependency or build workflow changed. This is a clearly unrelated baseline failure, recorded rather than fixed or suppressed in this safety-contract PR. It may still prevent merge under repository rules; no merge or dependency override is attempted.
+
+## Final raw-lineage review
+
+Different raw values under the same immutable company/source/table/snapshot/row lineage are conflicting evidence even if trimming/case normalization agrees. Identical raw occurrences remain duplicate transport evidence; independent source rows can observe the same chassis without becoming duplicate canonical Vehicles. The final regression tightens this distinction without changing any production function or fixture population. The final branch-tip CI is observed separately in the handoff.

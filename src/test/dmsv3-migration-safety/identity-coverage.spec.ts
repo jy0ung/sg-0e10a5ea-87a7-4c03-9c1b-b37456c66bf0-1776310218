@@ -76,6 +76,13 @@ describe('frozen identity population and source lineage', () => {
     expect(result.identities[0].outlets).toEqual(['LDU', 'TWU']);
     expect(result.exceptions).toContainEqual(expect.objectContaining({ kind: 'SAME_VEHICLE_OBSERVED_TWICE', scope: 'cross-outlet' }));
   });
+  it('flags changed raw values under immutable row lineage even when normalization agrees', () => {
+    const row = edge('normalized-chassis');
+    const result = analyzeIdentity([row, { ...row, chassis: 'EDGE-VEHICLE' }]);
+    expect(result.exceptions.some(issue => issue.kind === 'CONFLICTING_VEHICLE_IDENTITY')).toBe(true);
+    expect(result.exceptions.some(issue => issue.kind === 'DUPLICATE_RAW_OCCURRENCE')).toBe(false);
+    expect(result.identities[0].blocked).toBe(true);
+  });
   it.each([
     ['conflicting-engine', 'conflicting-engine-second'],
     ['conflicting-canonical-target', 'conflicting-canonical-target-second'],

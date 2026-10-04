@@ -37,6 +37,12 @@ export const canonicalIdentityKey = (row: SourceOccurrence): string | null => {
 };
 
 export function analyzeIdentity(input: readonly SourceOccurrence[]) {
+  const rawVariants = new Map<string, Set<string>>();
+  for (const row of input) {
+    const key = occurrenceKey(row);
+    const variants = rawVariants.get(key) ?? new Set<string>();
+    variants.add(stableJson(row)); rawVariants.set(key, variants);
+  }
   const normalized = input.map(row => ({ ...row, chassis: normalizeKey(row.chassis), engine: normalizeKey(row.engine) }))
     .sort((a, b) => stableJson(a).localeCompare(stableJson(b), 'en'));
   const byOccurrence = new Map<string, SourceOccurrence[]>();
@@ -52,7 +58,7 @@ export function analyzeIdentity(input: readonly SourceOccurrence[]) {
   }
   const conflicted = new Set<string>();
   for (const [key, rows] of byOccurrence) {
-    const variants = new Set(rows.map(stableJson));
+    const variants = rawVariants.get(key)!;
     if (variants.size > 1) {
       issue('CONFLICTING_VEHICLE_IDENTITY', key, rows);
       rows.forEach(row => { const identity = canonicalIdentityKey(row); if (identity) conflicted.add(identity); });
