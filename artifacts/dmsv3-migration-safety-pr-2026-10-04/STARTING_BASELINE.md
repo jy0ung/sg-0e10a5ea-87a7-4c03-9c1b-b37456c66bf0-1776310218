@@ -5,7 +5,9 @@
 - Starting HEAD and origin/main: `1cfe067944f6e2b479efe8b72685f93bd2f8ae21`.
 - Branch: `test/dmsv3-migration-safety-2026-10-04`.
 - Donor main freshly checked read-only: `4f468a3ab8a817bafb56682c94b0de516e3cef6c`. Pinned audit donor blobs match this unchanged SHA; no donor changes.
-- Resulting implementation commit: recorded in the subsequent implementation evidence commit and final PR handoff. A commit cannot contain its own SHA; the final branch tip is reported outside its own committed contents.
+- Resulting initial implementation commit: `0ee5f1e5eabd82a450efff861447dfb53e6d524d`.
+- PR: https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/pull/134 (open, unmerged).
+- This follow-up commits evidence and runtime fixture provenance. A commit cannot contain its own SHA; the exact final branch tip is recorded in the final PR handoff and PR metadata, independently of this committed file.
 
 ## Evidence reviewed before edits
 

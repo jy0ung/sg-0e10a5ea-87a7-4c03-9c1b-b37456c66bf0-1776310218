@@ -2,7 +2,9 @@
 
 Starting commit: `1cfe067944f6e2b479efe8b72685f93bd2f8ae21`.
 Branch: `test/dmsv3-migration-safety-2026-10-04`.
-Validation date: 2026-10-04. CI result is pending the PR run; actual observed results will be recorded in a follow-up evidence commit.
+Validation date: 2026-10-04. Initial implementation commit: `0ee5f1e5eabd82a450efff861447dfb53e6d524d`.
+PR: #134. Initial CI run: `37205557664` (https://github.com/jy0ung/sg-0e10a5ea-87a7-4c03-9c1b-b37456c66bf0-1776310218/actions/runs/37205557664).
+At 2026-10-04 21:28 MYT, Lint, Web App and Mobile App passed; isolated Production Readiness and mocked E2E were running; push-only RLS Matrix was skipped. Security Audit failed solely on the unchanged baseline dependency tree. The final handoff records the subsequent branch-tip run and completion decision.
 
 | Check | Actual result |
 |---|---|
@@ -14,7 +16,8 @@ Validation date: 2026-10-04. CI result is pending the PR run; actual observed re
 | Focused final safety suite, run 2 | 75 passed, 0 failed, 0 skipped, 3 files |
 | Full suite in machine local timezone | 1,465 passed, 2 failed, 362 skipped; two unchanged dateParsing tests parse locale text as local midnight and assume UTC output |
 | Full suite with TZ=UTC, as in CI | 1,467 passed, 0 failed, 362 skipped, 227 discovered files; includes 74-test harness before final unsuccessful-check regression assertion |
-| Final new unsuccessful-check regression | final 75-test focused runs above passed; CI will run the final full tree |
+| Initial CI full suite | 1,468 passed, 0 failed, 362 skipped; 206 test files passed, 21 skipped (227 total) |
+| Provenance amendment verification | 75 passed twice again; changed-file lint and application types passed |
 | Repository hygiene | passed; only source/test/evidence paths added |
 | RPC/frontend migration consistency | check:rpc-frontend passed; no migration changed or applied |
 | Disposable local database integration | npm run test:integration attempted, stopped at Docker prerequisite (Docker/CLI absent); no database connection occurred |
@@ -49,3 +52,7 @@ Production safety: no production Supabase/Cloud SQL connection, live Sheets writ
 - `src/test/dmsv3-migration-safety/publication-model.ts`
 - `src/test/dmsv3-migration-safety/runtime-evidence.spec.ts`
 - `src/test/dmsv3-migration-safety/runtime-evidence.ts`
+
+## CI dependency audit exception
+
+The initial Security Audit job (`111445895063`) failed `npm audit --audit-level=low` with eight high-severity findings: braces and its affected dependents @tailwindcss/typography, chokidar, fast-glob, lovable-tagger, micromatch, tailwindcss and tailwindcss-animate. A fresh local audit reproduced the same eight-package result. Package manifest and lockfile are byte-identical to starting main; baseline/current lockfile SHA-256 is `f6c638458bbdc6a1c6692678090841ed6103a01261564c5c4f24e06fa8c3de11`. No dependency or build workflow changed. This is a clearly unrelated baseline failure, recorded rather than fixed or suppressed in this safety-contract PR. It may still prevent merge under repository rules; no merge or dependency override is attempted.

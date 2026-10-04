@@ -48,7 +48,7 @@
     },
     {
       "path": "src/test/dmsv3-migration-safety/fixtures/runtime-unknown.json",
-      "sha256": "4158c92c541c5b1060605027fc25d25d5451b0758db27d37eeca57916b171863"
+      "sha256": "0c0db8febdecd545452df4c0942d3a687caba803f6459115aa0db69fbbf3df7b"
     },
     {
       "path": "artifacts/dmsv3-migration-safety-pr-2026-10-04/LEGACY_STOCK_EVIDENCE.json",

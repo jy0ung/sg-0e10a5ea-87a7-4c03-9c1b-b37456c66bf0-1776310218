@@ -22,6 +22,7 @@ const trigger = z.object({
 
 export const runtimeEvidenceSchema = z.object({
   schemaVersion: z.literal(1), projectAlias: text,
+  provenance: z.object({ sourceSystem: text, sourceTables: z.array(text).min(1), extractionDate: text, evidenceRef: text, expectedInterpretation: text }).strict(),
   projectId: evidence(text), deploymentId: evidence(text),
   deploymentVersion: evidence(z.number().int().nonnegative()),
   boundContainer: evidence(text),
