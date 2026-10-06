@@ -1,11 +1,9 @@
+import { appearanceTheme } from "../../packages/ui/tailwind-compat";
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: ['class'],
-  content: [
-    './index.html',
-    './src/**/*.{ts,tsx}',
-  ],
+  darkMode: 'class',
   theme: {
+    ...appearanceTheme,
     extend: {
       borderRadius: {
         lg: 'var(--radius)',

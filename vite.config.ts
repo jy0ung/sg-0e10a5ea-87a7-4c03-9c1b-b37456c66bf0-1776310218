@@ -1,7 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 const buildSourceMaps = process.env.BUILD_SOURCEMAP === "true";
@@ -88,7 +87,6 @@ export default defineConfig(({ mode }) => {
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   plugins: [
     react(),
-    mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
       devOptions: {

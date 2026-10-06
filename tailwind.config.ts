@@ -1,18 +1,12 @@
+import { appearanceTheme } from "./packages/ui/tailwind-compat";
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
-  darkMode: ["class"],
-  content: [
-    "./pages/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./app/**/*.{ts,tsx}",
-    "./src/**/*.{ts,tsx}",
-    "./packages/**/*.{ts,tsx}",
-    "./apps/**/*.{ts,tsx}",
-  ],
+  darkMode: "class",
   prefix: "",
   theme: {
+    ...appearanceTheme,
     container: {
       center: true,
       padding: "2rem",
@@ -20,8 +14,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"],
+        sans: "Inter, system-ui, sans-serif",
+        mono: 'JetBrains Mono, monospace',
       },
       colors: {
         border: "hsl(var(--border))",

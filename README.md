@@ -20,7 +20,7 @@ This project is a Vite React application backed by a local Supabase stack for de
 
 ## Prerequisites
 
-- Node.js 20+ and npm
+- Node.js 20 and npm (the CI/build baseline)
 - Docker
 - Supabase CLI
 
@@ -32,6 +32,24 @@ npm --version
 docker --version
 supabase --version
 ```
+
+## Browser and CSS build compatibility
+
+UBS, HRMS web and HRMS mobile use Tailwind CSS **4.3.3** through matching
+`@tailwindcss/postcss` pipelines and `tailwind-merge` **3.7.0**. Keep all three
+workspace declarations aligned and install from the lockfile with `npm ci`.
+CSS entries explicitly scan their own pages, imported root sources and shared
+packages; legacy theme configuration and static appearance compatibility files
+preserve the established tokens, preflight, spacing, outlines and animations.
+
+The approved minimum browsers are **Safari 16.4+, Chrome 111+, Firefox 128+**.
+These are support targets; current Playwright engines and mobile viewports do
+not qualify native Safari at the minimum version, iOS/Android or WebViews.
+Lovable development annotations were retired because their tagger retained the
+vulnerable Tailwind 3 build chain. Other Vite/PWA/proxy behavior is retained.
+
+See [dependency security and browser evidence](docs/BUILD_TOOL_DEPENDENCY_SECURITY_EVIDENCE_2026-10.md)
+for baseline comparisons, limitations and reproducible safe test commands.
 
 ## Local Development
 

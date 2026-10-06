@@ -1,6 +1,13 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "../../../styles/preflight-compat.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "../../../styles/tailwind-v3-compat.css";
+@config "../tailwind.config.ts";
+@source ".";
+@source "../index.html";
+@source "../../../src";
+@source "../../../packages";
 
 @layer base {
   :root {
