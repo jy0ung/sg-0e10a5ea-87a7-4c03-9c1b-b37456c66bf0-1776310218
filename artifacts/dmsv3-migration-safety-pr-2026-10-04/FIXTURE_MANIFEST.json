@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "sanitization": "Sorted ordinal pseudonyms MIGRATION-VEHICLE-NNNN replace every real chassis. No customer data, engine values, workbook IDs, project IDs, credentials or real canonical IDs retained. Engine/canonical negative cases are synthetic.",
+  "fullPopulation": {
+    "distinctIdentities": 1337,
+    "rawOccurrences": 1341,
+    "lduDuplicateIdentities": [
+      "MIGRATION-VEHICLE-0201",
+      "MIGRATION-VEHICLE-0853",
+      "MIGRATION-VEHICLE-1294",
+      "MIGRATION-VEHICLE-1310"
+    ],
+    "outletOccurrenceCounts": {
+      "API-API": 101,
+      "FLAGSHIP": 325,
+      "KGU": 111,
+      "LDU": 192,
+      "SDK-1S": 159,
+      "SDK-3S": 157,
+      "TWU": 296
+    }
+  },
+  "provenance": {
+    "sourceSystem": "LEGACY_OUTLET_SNAPSHOT",
+    "sourceTables": [
+      "outlet aliases:S1-S3"
+    ],
+    "extractionDate": "2026-10-04",
+    "evidenceRefs": [
+      "checkpoint-03/evidence/identity-shadow-output.json",
+      "checkpoint-03/SHADOW_REPLAY_RESULTS.json"
+    ],
+    "expectedInterpretation": "Full observed identity population, pseudonymized; no approved canonical matches; not current stock"
+  },
+  "inputArtifactSha256": "9823c7961f07bd2fcf3f83350418896385dc8759e9eae8ce9d34987cf8aac530",
+  "fixtures": [
+    {
+      "path": "src/test/dmsv3-migration-safety/fixtures/identity-edge-cases.json",
+      "sha256": "ba83955baf4281c04164be12fc06a6815936392486bb153a50b667472799995d"
+    },
+    {
+      "path": "src/test/dmsv3-migration-safety/fixtures/incidents.json",
+      "sha256": "cc4c55e1e90ec0df78b5fe7367b85cd7a410cdfb9ec6be00d682ffd79e206542"
+    },
+    {
+      "path": "src/test/dmsv3-migration-safety/fixtures/legacy-identities.json",
+      "sha256": "552954f022fb9ef09dcc055f24ad22f3a56f53b3e97af0eb5476f241eb1b69d4"
+    },
+    {
+      "path": "src/test/dmsv3-migration-safety/fixtures/runtime-unknown.json",
+      "sha256": "0c0db8febdecd545452df4c0942d3a687caba803f6459115aa0db69fbbf3df7b"
+    },
+    {
+      "path": "artifacts/dmsv3-migration-safety-pr-2026-10-04/LEGACY_STOCK_EVIDENCE.json",
+      "sha256": "7252ad460ea7226d17a68dc47a2e9b5c1bbfb6df34446f0bab503c3a4cd216cd"
+    }
+  ]
+}

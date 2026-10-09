@@ -1,0 +1,184 @@
+{
+  "provenance": {
+    "sourceSystem": "SYNTHETIC_REGRESSION",
+    "sourceTables": [
+      "outlet aliases:S1-S3"
+    ],
+    "extractionDate": "2026-10-04",
+    "evidenceRefs": [
+      "checkpoint-03/evidence/identity-shadow-output.json",
+      "checkpoint-03/SHADOW_REPLAY_RESULTS.json"
+    ],
+    "expectedInterpretation": "Constructed negative cases; no claim these occurred in legacy source"
+  },
+  "cases": [
+    {
+      "label": "normalized-chassis",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": " EDGE-VEHICLE ",
+        "engine": " ENGINE-A ",
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 1,
+        "canonicalMatch": null
+      }
+    },
+    {
+      "label": "same-vehicle-distinct-row",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": "edge-vehicle",
+        "engine": "engine-a",
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 2,
+        "canonicalMatch": null
+      }
+    },
+    {
+      "label": "blank-chassis",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": "   ",
+        "engine": null,
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 3,
+        "canonicalMatch": null
+      }
+    },
+    {
+      "label": "missing-chassis",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": null,
+        "engine": null,
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 4,
+        "canonicalMatch": null
+      }
+    },
+    {
+      "label": "cross-outlet-same-vehicle",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": " EDGE-VEHICLE ",
+        "engine": "ENGINE-A",
+        "outlet": "TWU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 5,
+        "canonicalMatch": null
+      }
+    },
+    {
+      "label": "conflicting-engine",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": "CONFLICT-VEHICLE",
+        "engine": "ENGINE-A",
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 6,
+        "canonicalMatch": null
+      }
+    },
+    {
+      "label": "conflicting-engine-second",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": "CONFLICT-VEHICLE",
+        "engine": "ENGINE-B",
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 7,
+        "canonicalMatch": null
+      }
+    },
+    {
+      "label": "conflicting-canonical-target",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": "TARGET-CONFLICT",
+        "engine": null,
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 8,
+        "canonicalMatch": "TARGET-A"
+      }
+    },
+    {
+      "label": "conflicting-canonical-target-second",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": "TARGET-CONFLICT",
+        "engine": null,
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 9,
+        "canonicalMatch": "TARGET-B"
+      }
+    },
+    {
+      "label": "no-canonical-match",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": "UNMATCHED-VEHICLE",
+        "engine": null,
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 10,
+        "canonicalMatch": null
+      }
+    },
+    {
+      "label": "identical-raw-occurrence-replay",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": " EDGE-VEHICLE ",
+        "engine": " ENGINE-A ",
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 1,
+        "canonicalMatch": null
+      }
+    },
+    {
+      "label": "same-lineage-conflicting-payload",
+      "row": {
+        "company": "FIXTURE-FLC",
+        "chassis": "DIFFERENT-VEHICLE",
+        "engine": " ENGINE-A ",
+        "outlet": "LDU",
+        "source": "LEGACY_OUTLET_SNAPSHOT",
+        "table": "synthetic-edge-cases",
+        "snapshot": "synthetic-v1",
+        "row": 1,
+        "canonicalMatch": null
+      }
+    }
+  ]
+}
