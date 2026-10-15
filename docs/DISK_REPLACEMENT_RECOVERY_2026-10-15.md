@@ -34,6 +34,12 @@ Only the Google Drive copy survives replacing the OS disk.
   Supabase environment file, Cloudflare credentials/configuration, SSH host
   keys, network configuration, and the Supabase service startup scripts.
   It is a configuration backup, not a database backup.
+- `root-configuration-complete.tar.zst.gpg`: the preferred privileged archive,
+  including the configuration above plus root's entire home, older system
+  backups, the old `50.bak`, and fallback Docker volume metadata. Local
+  checksum/decryption/decompression/tar validation and a fresh Drive download
+  SHA-256 comparison passed. No database dump or PostgreSQL data directory
+  was found in the added material.
 - `user-home.tar.zst.gpg` or its numbered chunks: project and Git metadata,
   ignored local configuration, SSH and Cloudflare user credentials,
   developer settings, custom skills, agent history/memories, local evidence,
@@ -50,12 +56,10 @@ Only the Google Drive copy survives replacing the OS disk.
   files, exclusions, and remaining gaps.
 
 The larger user archive has 39 uploaded parts, all at their expected sizes.
-Full local decryption/decompression/tar validation passed. Fresh downloads
-matched SHA-256 for 27 parts; the other 12 encountered proxy read timeouts, so
-full remote readback verification remains incomplete. The two compact
-configuration archives above are independently verified. The expanded capture
-of root's entire home and older system backups still requires local sudo and
-has not yet been received; this is recorded in the Drive recovery README.
+Full local decryption/decompression/tar validation passed. Fresh Drive downloads
+matched SHA-256 for all 39 parts. The compact configuration archives and the
+expanded root capture are independently verified. No local sudo capture is
+pending. Supabase database and Storage recovery remain incomplete.
 
 The randomly generated encryption passphrase is in `RECOVERY-KEY.txt` in
 local staging and is supplied separately to the owner. **It is deliberately
@@ -91,9 +95,9 @@ Use an interactive GPG prompt for the separately saved passphrase. First list
 the contents, then extract into a private review directory:
 
 ```bash
-gpg --decrypt root-configuration.tar.zst.gpg | zstd -d | tar -tf -
+gpg --decrypt root-configuration-complete.tar.zst.gpg | zstd -d | tar -tf -
 mkdir -m 700 root-review user-review
-gpg --decrypt root-configuration.tar.zst.gpg | zstd -d | tar -xpf - -C root-review
+gpg --decrypt root-configuration-complete.tar.zst.gpg | zstd -d | tar -xpf - -C root-review
 gpg --decrypt user-home.tar.zst.gpg | zstd -d | tar -xpf - -C user-review
 ```
 
