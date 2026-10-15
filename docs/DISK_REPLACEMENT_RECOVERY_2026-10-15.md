@@ -3,12 +3,13 @@
 ## Recovery boundary
 
 **Supabase database records and Storage objects have not been recovered.**
-The Lexar SSD NQ100 (`/dev/sda`, approximately 894 GiB) is unavailable; its
-`/srv` filesystem is not mounted. Docker's configured data root is
-`/srv/docker`. Docker failed on 7 October with
-`chmod /srv/docker: input/output error`. No PostgreSQL server is running.
-The fallback `/var/lib/docker/volumes` on the OS disk is only 28 KiB and
-contains no `PG_VERSION` file. Do not treat an empty reinstall as recovery.
+The original Lexar SSD NQ100 failed with `/srv` I/O errors and was removed.
+Docker failed on 7 October with `chmod /srv/docker: input/output error`.
+Before replacement, no PostgreSQL server was running; the fallback
+`/var/lib/docker/volumes` on the OS disk was only 28 KiB and contained no
+`PG_VERSION` file. The owner subsequently authorized a **fresh, empty Dev/UAT
+Supabase rebuild**. That rebuild is described below and does not recover the
+original database or uploads.
 
 The GitHub Database Backup workflow returned no successful runs when queried
 on 15 October. No database backup artifacts were returned, and searches for
@@ -51,6 +52,18 @@ Only the Google Drive copy survives replacing the OS disk.
   custom skills, and developer settings. It passed local archive validation
   and a fresh Drive download SHA-256 comparison, as did the root configuration
   archive.
+- `post-replacement-root-configuration.tar.zst.gpg`: the latest privileged
+  configuration capture, taken after the new SSD was mounted and the rebuilt
+  Supabase systemd service was activated. Use this for the new `/srv` UUID,
+  Docker mount guard, and current host configuration. The earlier captures
+  remain available for historical recovery.
+- `replacement-supabase.tar.zst.gpg`: the fresh Dev/UAT PostgreSQL custom dump,
+  roles, Storage volume archive, Supabase config/migrations/functions,
+  rebuilt web bundles/configuration, deployment command and verification
+  records. **This contains the new empty instance, not the old Lexar data.**
+  `pg_restore` catalog and complete SQL decoding passed; no isolated restore
+  drill is claimed. Both post-replacement archives passed local full archive
+  validation and fresh Google Drive download SHA-256 comparison.
 - `SHA256SUMS` and `RECOVERY-README.txt`: encrypted-file checksums and the
   capture's verification record. Read the final record in Drive for exact
   files, exclusions, and remaining gaps.
@@ -118,7 +131,68 @@ manifest of local branches, worktrees, and stashes. Raw Git/worktree metadata
 retains the original absolute paths; restore to the same paths or recreate
 worktrees from their saved branches.
 
-## Bring services back only after data recovery
+## Replacement SSD and empty Dev/UAT rebuild
+
+The owner ran `scripts/prepare-replacement-data-ssd.py --execute` locally
+with sudo. The helper checked the exact disk serial, capacity, SMART status,
+mounts, holders, and separation from Ubuntu's root/boot devices before writing.
+Its completion marker prevents repeating the format.
+
+- Replacement: Kingston SA400S3, serial `50026B72837E6C5E`, 960,197,124,096
+  bytes. SMART passed and a filesystem write/read/fsync check passed.
+- One GPT/ext4 partition, label `flc-data`, mounted read/write at `/srv`.
+  UUID: `b0c7da3c-caeb-4669-a1ee-a3ac21cd901b`.
+  Approximately 871 GiB was available immediately after preparation.
+- The Ubuntu NVMe and its root, boot, and EFI partitions were preserved.
+  The pre-cutover OS-disk `/srv` directory remains at
+  `/srv.before-replacement-20261015T023420Z`.
+- `/etc/fstab` uses the new UUID with
+  `defaults,noatime,nofail,x-systemd.device-timeout=10s`. The Docker systemd
+  drop-in requires `/srv/docker` and asserts `/srv` is a mount point, so an
+  absent data SSD does not silently place new Docker data on the OS disk.
+- Docker's root is `/srv/docker`; PostgreSQL and Storage volumes resolve
+  beneath it. Existing container image content under `/var/lib/containerd`
+  remains on the OS disk.
+
+Live Supabase/SMTP and Cloudflare configuration and the existing Supabase
+service/scripts matched the verified encrypted configuration backup. They
+were retained. Supabase CLI 2.98.2 rebuilt project `rbmsbppvpgcrmtkdfahy` and
+applied all 187 repository migrations; the database migration ledger matched
+the filenames exactly. Auth users, profiles, customers, vehicles, deals and
+Storage objects were all zero. The migrations created one default company.
+No initial administrator has been provisioned.
+
+The UBS, HRMS subpath and dedicated HRMS frontend bundles were rebuilt from
+preserved source commit `c76143754aa75c2c3b477fd2452f63c76a320f7b` after
+`npm ci --no-audit --no-fund`. The restored `flc-bi-uat` nginx container binds
+`127.0.0.1:80` for the existing Cloudflare ingress and restarts with Docker.
+Static files and nginx configuration are mounted read-only from
+`/srv/web-releases/recovery-20261015-c761437`. The cached application image
+`sha-85b0251` supplies the nginx runtime; the mounted bundles/configuration
+supply the rebuilt application. API requests proxy to host port 54321.
+The optional recovery worker was not restored; its nginx include is empty.
+
+Verification completed:
+
+- Normal `supabase stop` / `supabase start` passed with all startup health
+  checks enabled. An earlier diagnostic start used `--ignore-health-check`;
+  the successful normal restart supersedes that diagnostic result.
+- Local and public UBS/HRMS gateway, Auth health, Edge runtime health and
+  REST OpenAPI checks returned HTTP 200. REST was checked with the service
+  role privately; the existing anonymous permission boundary was preserved.
+- Headless Chromium rendered both public `/login` pages, including their
+  password fields, with no uncaught page errors. This is page-render evidence;
+  successful login/email/business workflows were not tested with an empty
+  Auth database.
+
+The owner ran the prepared `finish-ssd-rebuild.sh` with local sudo to activate
+the service and capture the updated host configuration. Docker, Cloudflare
+and `flc-bi-supabase.service` were verified active; the Supabase unit is enabled
+and retains its original startup script and SMTP environment file. No reboot
+test is claimed. The post-replacement archives above are verified point-in-time
+captures; recurring database/Storage backups are not established by this work.
+
+## Recover original records on a separate instance
 
 1. Reinstall the OS and required versions of Docker, Node/npm, Supabase CLI,
    and cloudflared from the captured inventory.
