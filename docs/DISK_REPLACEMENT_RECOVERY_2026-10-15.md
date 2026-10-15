@@ -40,9 +40,22 @@ Only the Google Drive copy survives replacing the OS disk.
   and consistent snapshots of local SQLite application databases.
   Reinstallable dependencies, editor binaries/extensions, browser test
   profiles, caches, and the backup directory itself are excluded.
+- `essential-user-configuration.tar.zst.gpg`: a separate compact copy of user
+  SSH/Cloudflare/Supabase configuration, authentication files, Git settings,
+  custom skills, and developer settings. It passed local archive validation
+  and a fresh Drive download SHA-256 comparison, as did the root configuration
+  archive.
 - `SHA256SUMS` and `RECOVERY-README.txt`: encrypted-file checksums and the
   capture's verification record. Read the final record in Drive for exact
   files, exclusions, and remaining gaps.
+
+The larger user archive has 39 uploaded parts, all at their expected sizes.
+Full local decryption/decompression/tar validation passed. Fresh downloads
+matched SHA-256 for 27 parts; the other 12 encountered proxy read timeouts, so
+full remote readback verification remains incomplete. The two compact
+configuration archives above are independently verified. The expanded capture
+of root's entire home and older system backups still requires local sudo and
+has not yet been received; this is recorded in the Drive recovery README.
 
 The randomly generated encryption passphrase is in `RECOVERY-KEY.txt` in
 local staging and is supplied separately to the owner. **It is deliberately
