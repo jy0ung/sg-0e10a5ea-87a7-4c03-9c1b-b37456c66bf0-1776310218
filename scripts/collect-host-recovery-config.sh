@@ -44,8 +44,8 @@ mkdir -m 700 "$stage/gnupg"
     tail -80
 } > "$stage/privileged-inventory.txt" 2>&1
 
-paths=(etc usr/local/bin usr/local/sbin var/spool/cron/crontabs)
-for item in home/deploy root/.ssh root/.cloudflared root/.config/flc-bi var/lib/docker/containers; do
+paths=(etc usr/local/bin usr/local/sbin var/spool/cron/crontabs root var/backups)
+for item in home/deploy home/flitadmin/50.bak var/lib/docker/containers var/lib/docker/volumes var/lib/postgresql; do
   if [[ -e "/$item" ]]; then paths+=("$item"); fi
 done
 
